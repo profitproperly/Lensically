@@ -37,7 +37,7 @@ export default function PostsList() {
   const [needsConnection, setNeedsConnection] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [sortMetric, setSortMetric] = useState<
-    "views" | "likes" | "replies" | "reposts" | "quotes" | "shares" | null
+    "views" | "likes" | "replies" | "reposts" | "quotes" | "shares" | "timestamp" | null
   >(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -106,6 +106,12 @@ export default function PostsList() {
       return new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime();
     }
 
+    if (sortMetric === "timestamp") {
+      const av = new Date(a.timestamp ?? 0).getTime();
+      const bv = new Date(b.timestamp ?? 0).getTime();
+      return sortDirection === "desc" ? bv - av : av - bv;
+    }
+
     const av = a[sortMetric] ?? 0;
     const bv = b[sortMetric] ?? 0;
     return sortDirection === "desc" ? bv - av : av - bv;
@@ -165,44 +171,85 @@ export default function PostsList() {
         <table className="table-auto w-full border-collapse">
           <thead>
             <tr className="text-xs uppercase text-slate-500 border-b border-slate-200">
-              <th className="px-4 py-3 text-left font-semibold">Post</th>
+              <th
+                className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
+                onClick={() => {
+                  setSortMetric(null);
+                  setSortDirection("desc");
+                }}
+              >
+                <span className="inline-flex items-center gap-1">Post</span>
+              </th>
               <th
                 className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("views")}
               >
-                Views {sortMetric === "views" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                <span className="inline-flex items-center gap-1">
+                  Views
+                  {sortMetric === "views" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
               </th>
               <th
                 className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("likes")}
               >
-                Likes {sortMetric === "likes" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                <span className="inline-flex items-center gap-1">
+                  Likes
+                  {sortMetric === "likes" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
               </th>
               <th
                 className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("replies")}
               >
-                Replies {sortMetric === "replies" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                <span className="inline-flex items-center gap-1">
+                  Replies
+                  {sortMetric === "replies" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
               </th>
               <th
                 className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("reposts")}
               >
-                Reposts {sortMetric === "reposts" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                <span className="inline-flex items-center gap-1">
+                  Reposts
+                  {sortMetric === "reposts" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
               </th>
               <th
                 className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("quotes")}
               >
-                Quotes {sortMetric === "quotes" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                <span className="inline-flex items-center gap-1">
+                  Quotes
+                  {sortMetric === "quotes" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
               </th>
               <th
                 className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("shares")}
               >
-                Shares {sortMetric === "shares" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                <span className="inline-flex items-center gap-1">
+                  Shares
+                  {sortMetric === "shares" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
               </th>
-              <th className="px-4 py-3 text-left font-semibold">Posted</th>
+              <th
+                className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
+                onClick={() => {
+                  if (sortMetric === "timestamp") {
+                    setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
+                  } else {
+                    setSortMetric("timestamp");
+                    setSortDirection("desc");
+                  }
+                }}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Posted
+                  {sortMetric === "timestamp" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
