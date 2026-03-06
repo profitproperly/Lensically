@@ -29,10 +29,23 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="min-h-screen bg-slate-50">
-          <div className="mx-auto flex min-h-screen max-w-7xl">
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          <header className="h-16 border-b border-slate-200 bg-white flex items-center px-6">
+            <div className="flex items-center gap-3">
+              <img
+                src="/lensically-logo-white-with-black-bg.png"
+                alt="Lensically"
+                className="h-10 w-10 rounded-md"
+              />
+              <span className="text-lg font-semibold text-slate-900">
+                Lensically
+              </span>
+            </div>
+          </header>
+
+          <div className="flex flex-1">
             <Sidebar />
-            <main className="flex-1 p-6 md:p-10">{children}</main>
+            <main className="flex-1 p-8">{children}</main>
           </div>
         </div>
       </body>
