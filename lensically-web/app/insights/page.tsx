@@ -56,6 +56,7 @@ export default function InsightsPage() {
       setCursor(data.next_cursor || null);
       setHasMore(Boolean(data.has_more));
       setCursorDepth(1);
+      setHasError(false);
     } catch {
       setHasError(true);
       setNeedsConnection(false);
