@@ -633,6 +633,12 @@ export default {
           const metricsResp = await fetch(
             `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
           );
+          if (!metricsResp.ok) {
+            console.log("INSIGHTS_REQUEST_FAILED", {
+              postId,
+              status: metricsResp.status,
+            });
+          }
 
           const metricsJson = await metricsResp.json() as {
             data?: Array<{
