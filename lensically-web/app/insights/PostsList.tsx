@@ -7,6 +7,7 @@ type ThreadsPost = {
   text?: string;
   timestamp?: string;
   username?: string;
+  profile_picture_url?: string;
   permalink?: string;
   views?: number;
   likes?: number;
@@ -35,8 +36,10 @@ export default function PostsList() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [needsConnection, setNeedsConnection] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [sortMetric, setSortMetric] = useState("likes");
-  const [sortDirection, setSortDirection] = useState("desc");
+  const [sortMetric, setSortMetric] = useState<
+    "views" | "likes" | "replies" | "reposts" | "quotes" | "shares" | null
+  >(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const loadPosts = async () => {
     try {
@@ -98,9 +101,30 @@ export default function PostsList() {
     void loadPosts();
   }, []);
 
-  const sortedPosts = [...posts].sort(
-    (a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime(),
-  );
+  const sortedPosts = [...posts].sort((a, b) => {
+    if (!sortMetric) {
+      return new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime();
+    }
+
+    const av = a[sortMetric] ?? 0;
+    const bv = b[sortMetric] ?? 0;
+    return sortDirection === "desc" ? bv - av : av - bv;
+  });
+
+  const accountPost =
+    posts.find((post) => post.username || post.profile_picture_url) ?? posts[0];
+
+  const handleMetricSort = (
+    metric: "views" | "likes" | "replies" | "reposts" | "quotes" | "shares",
+  ) => {
+    if (sortMetric === metric) {
+      setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
+      return;
+    }
+
+    setSortMetric(metric);
+    setSortDirection("desc");
+  };
 
   if (loadingInitial) return <p className="text-sm text-slate-700">Loading posts...</p>;
 
@@ -124,17 +148,60 @@ export default function PostsList() {
 
   return (
     <div>
+      <div className="mb-4 flex items-center gap-3">
+        {accountPost?.profile_picture_url ? (
+          <img
+            src={accountPost.profile_picture_url}
+            alt={accountPost.username ? `@${accountPost.username}` : "Threads profile"}
+            className="h-10 w-10 rounded-full"
+          />
+        ) : (
+          <div className="h-10 w-10 rounded-full bg-slate-200" />
+        )}
+        <p className="text-sm font-medium text-slate-900">@{accountPost?.username || "unknown"}</p>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="table-auto w-full border-collapse">
           <thead>
             <tr className="text-xs uppercase text-slate-500 border-b border-slate-200">
               <th className="px-4 py-3 text-left font-semibold">Post</th>
-              <th className="px-4 py-3 text-center font-semibold">Views</th>
-              <th className="px-4 py-3 text-center font-semibold">Likes</th>
-              <th className="px-4 py-3 text-center font-semibold">Replies</th>
-              <th className="px-4 py-3 text-center font-semibold">Reposts</th>
-              <th className="px-4 py-3 text-center font-semibold">Quotes</th>
-              <th className="px-4 py-3 text-center font-semibold">Shares</th>
+              <th
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                onClick={() => handleMetricSort("views")}
+              >
+                Views {sortMetric === "views" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+              </th>
+              <th
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                onClick={() => handleMetricSort("likes")}
+              >
+                Likes {sortMetric === "likes" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+              </th>
+              <th
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                onClick={() => handleMetricSort("replies")}
+              >
+                Replies {sortMetric === "replies" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+              </th>
+              <th
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                onClick={() => handleMetricSort("reposts")}
+              >
+                Reposts {sortMetric === "reposts" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+              </th>
+              <th
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                onClick={() => handleMetricSort("quotes")}
+              >
+                Quotes {sortMetric === "quotes" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+              </th>
+              <th
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                onClick={() => handleMetricSort("shares")}
+              >
+                Shares {sortMetric === "shares" ? (sortDirection === "desc" ? "▼" : "▲") : ""}
+              </th>
               <th className="px-4 py-3 text-left font-semibold">Posted</th>
             </tr>
           </thead>
