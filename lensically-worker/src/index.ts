@@ -597,11 +597,89 @@ export default {
         };
       };
       const postsArray = Array.isArray(data.data) ? data.data : [];
+      const enrichedPosts = await Promise.all(
+        postsArray.map(async (post) => {
+          const postId = String((post as { id?: string })?.id ?? "");
+          const basePost = {
+            id: (post as { id?: string })?.id,
+            text: (post as { text?: string })?.text,
+            timestamp: (post as { timestamp?: string })?.timestamp,
+            permalink: (post as { permalink?: string })?.permalink,
+            username: (post as { username?: string })?.username,
+          };
+
+          if (!postId) {
+            return {
+              ...basePost,
+              views: 0,
+              likes: 0,
+              replies: 0,
+              reposts: 0,
+              quotes: 0,
+              shares: 0,
+            };
+          }
+
+          try {
+            const metricsResp = await fetch(
+              `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
+            );
+
+            const metricsJson = await metricsResp.json() as {
+              data?: Array<{
+                name?: string;
+                values?: Array<{ value?: number }>;
+                total_value?: { value?: number };
+                link_total_values?: Array<{ value?: number }>;
+              }>;
+            };
+            console.log("THREADS_INSIGHTS_DEBUG", {
+              postId: postId,
+              status: metricsResp.status,
+              response: metricsJson,
+            });
+
+            const metricMap: Record<string, number> = {};
+
+            for (const m of metricsJson.data ?? []) {
+              const value =
+                m?.values?.[0]?.value ??
+                m?.total_value?.value ??
+                m?.link_total_values?.[0]?.value ??
+                0;
+
+              if (m?.name) {
+                metricMap[m.name] = Number(value ?? 0);
+              }
+            }
+
+            return {
+              ...basePost,
+              views: metricMap.views ?? 0,
+              likes: metricMap.likes ?? 0,
+              replies: metricMap.replies ?? 0,
+              reposts: metricMap.reposts ?? 0,
+              quotes: metricMap.quotes ?? 0,
+              shares: metricMap.shares ?? 0,
+            };
+          } catch {
+            return {
+              ...basePost,
+              views: 0,
+              likes: 0,
+              replies: 0,
+              reposts: 0,
+              quotes: 0,
+              shares: 0,
+            };
+          }
+        }),
+      );
       const hasMore = Boolean(data.paging?.next) && cursorDepth < 3;
       const nextCursor = cursorDepth < 3 ? (data.paging?.cursors?.after || null) : null;
 
       return new Response(JSON.stringify({
-        posts: postsArray,
+        posts: enrichedPosts,
         next_cursor: nextCursor,
         has_more: hasMore,
       }), {
