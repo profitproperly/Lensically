@@ -696,6 +696,7 @@ export default {
         status: postsResp.status,
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-store",
           ...corsHeaders,
         },
       });
