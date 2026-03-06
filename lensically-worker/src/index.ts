@@ -1,5 +1,11 @@
 import { enforceLimit } from "./utils/limits";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 const REDIRECT_URI =
   "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
 const SCOPES = [
@@ -90,6 +96,13 @@ async function checkUserCapacity(
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders,
+      });
+    }
 
     if (url.pathname === "/connect/threads") {
       return Response.redirect(
@@ -523,7 +536,10 @@ export default {
           }),
           {
             status: 200,
-            headers: { "content-type": "application/json; charset=UTF-8" },
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
           },
         );
       }
@@ -537,13 +553,22 @@ export default {
           JSON.stringify({ error: "Threads account not connected" }),
           {
             status: 401,
-            headers: { "content-type": "application/json; charset=UTF-8" },
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
           },
         );
       }
       const limitResponse = await runLimitCheck(env, account.threads_user_id, "insights_calls", 3);
       if (limitResponse) {
-        return limitResponse;
+        return new Response(await limitResponse.text(), {
+          status: limitResponse.status,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        });
       }
 
       const params = new URLSearchParams({
@@ -581,7 +606,10 @@ export default {
         has_more: hasMore,
       }), {
         status: postsResp.status,
-        headers: { "content-type": "application/json; charset=UTF-8" },
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
       });
     }
 
