@@ -84,11 +84,11 @@ export function Sidebar() {
 
       <nav className="w-full space-y-2">
         {links.map((link) => (
-          <div key={link.href}>
+          <div key={link.href} className="px-4">
             <Link
               href={link.href}
               className={[
-                "block w-full px-4 py-3 text-[15px] font-medium rounded-xl transition-colors",
+                "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
                 pathname === link.href
                   ? "bg-black text-white"
                   : "text-black hover:bg-black hover:text-white",

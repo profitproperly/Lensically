@@ -35,7 +35,7 @@ export default function RootLayout({
               <img
                 src="/lensically-logo-white-with-black-bg.png"
                 alt="Lensically"
-                className="h-10 w-10 rounded-md"
+                className="h-16 w-16 rounded-md"
               />
               <span className="text-lg font-semibold text-slate-900">
                 Lensically

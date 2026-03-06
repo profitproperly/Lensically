@@ -151,7 +151,7 @@ export default function PostsList() {
 
   return (
     <div>
-      <div className="overflow-auto max-h-[70vh] rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="table-auto w-full border-collapse">
           <thead>
             <tr className="sticky top-0 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200">
