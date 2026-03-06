@@ -604,93 +604,103 @@ export default {
       );
       const profileJson = await profileResp.json() as { threads_profile_picture_url?: string };
       const profilePicture = profileJson?.threads_profile_picture_url ?? null;
+      console.log("POST_COUNT", postsArray.length);
       const enrichedPosts = [];
-      for (const post of postsArray) {
-        const postId = String((post as { id?: string })?.id ?? "");
-        const basePost = {
-          id: (post as { id?: string })?.id,
-          text: (post as { text?: string })?.text,
-          timestamp: (post as { timestamp?: string })?.timestamp,
-          permalink: (post as { permalink?: string })?.permalink,
-          username: (post as { username?: string })?.username,
-        };
+      const batchSize = 10;
+      for (let i = 0; i < postsArray.length; i += batchSize) {
+        const batch = postsArray.slice(i, i + batchSize);
 
-        if (!postId) {
-          enrichedPosts.push({
-            ...basePost,
-            profile_picture_url: profilePicture,
-            views: 0,
-            likes: 0,
-            replies: 0,
-            reposts: 0,
-            quotes: 0,
-            shares: 0,
-          });
-          continue;
-        }
+        const results = await Promise.all(
+          batch.map(async (post) => {
+            const postId = String((post as { id?: string })?.id ?? "");
+            console.log("PROCESSING_POST", postId);
+            const basePost = {
+              id: (post as { id?: string })?.id,
+              text: (post as { text?: string })?.text,
+              timestamp: (post as { timestamp?: string })?.timestamp,
+              permalink: (post as { permalink?: string })?.permalink,
+              username: (post as { username?: string })?.username,
+            };
 
-        try {
-          const metricsResp = await fetch(
-            `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
-          );
-          if (!metricsResp.ok) {
-            console.log("INSIGHTS_REQUEST_FAILED", {
-              postId,
-              text: basePost.text,
-              status: metricsResp.status,
-            });
-          }
-
-          const metricsJson = await metricsResp.json() as {
-            data?: Array<{
-              name?: string;
-              values?: Array<{ value?: number }>;
-              total_value?: { value?: number };
-              link_total_values?: Array<{ value?: number }>;
-            }>;
-          };
-          console.log("THREADS_INSIGHTS_DEBUG", {
-            postId: postId,
-            status: metricsResp.status,
-            response: metricsJson,
-          });
-
-          const metricMap: Record<string, number> = {};
-
-          for (const m of metricsJson.data ?? []) {
-            const value =
-              m?.values?.[0]?.value ??
-              m?.total_value?.value ??
-              m?.link_total_values?.[0]?.value ??
-              0;
-
-            if (m?.name) {
-              metricMap[m.name] = Number(value ?? 0);
+            if (!postId) {
+              return {
+                ...basePost,
+                profile_picture_url: profilePicture,
+                views: 0,
+                likes: 0,
+                replies: 0,
+                reposts: 0,
+                quotes: 0,
+                shares: 0,
+              };
             }
-          }
 
-          enrichedPosts.push({
-            ...basePost,
-            profile_picture_url: profilePicture,
-            views: metricMap.views ?? 0,
-            likes: metricMap.likes ?? 0,
-            replies: metricMap.replies ?? 0,
-            reposts: metricMap.reposts ?? 0,
-            quotes: metricMap.quotes ?? 0,
-            shares: metricMap.shares ?? 0,
-          });
-        } catch {
-          enrichedPosts.push({
-            ...basePost,
-            profile_picture_url: profilePicture,
-            views: 0,
-            likes: 0,
-            replies: 0,
-            reposts: 0,
-            quotes: 0,
-            shares: 0,
-          });
-        }
+            try {
+              const metricsResp = await fetch(
+                `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
+              );
+              if (!metricsResp.ok) {
+                console.log("INSIGHTS_REQUEST_FAILED", {
+                  postId,
+                  text: basePost.text,
+                  status: metricsResp.status,
+                });
+              }
+
+              const metricsJson = await metricsResp.json() as {
+                data?: Array<{
+                  name?: string;
+                  values?: Array<{ value?: number }>;
+                  total_value?: { value?: number };
+                  link_total_values?: Array<{ value?: number }>;
+                }>;
+              };
+              console.log("THREADS_INSIGHTS_DEBUG", {
+                postId: postId,
+                status: metricsResp.status,
+                response: metricsJson,
+              });
+
+              const metricMap: Record<string, number> = {};
+
+              for (const m of metricsJson.data ?? []) {
+                const value =
+                  m?.values?.[0]?.value ??
+                  m?.total_value?.value ??
+                  m?.link_total_values?.[0]?.value ??
+                  0;
+
+                if (m?.name) {
+                  metricMap[m.name] = Number(value ?? 0);
+                }
+              }
+
+              return {
+                ...basePost,
+                profile_picture_url: profilePicture,
+                views: metricMap.views ?? 0,
+                likes: metricMap.likes ?? 0,
+                replies: metricMap.replies ?? 0,
+                reposts: metricMap.reposts ?? 0,
+                quotes: metricMap.quotes ?? 0,
+                shares: metricMap.shares ?? 0,
+              };
+            } catch {
+              return {
+                ...basePost,
+                profile_picture_url: profilePicture,
+                views: 0,
+                likes: 0,
+                replies: 0,
+                reposts: 0,
+                quotes: 0,
+                shares: 0,
+              };
+            }
+          }),
+        );
+
+        enrichedPosts.push(...results);
       }
       const hasMore = Boolean(data.paging?.next) && cursorDepth < 3;
       const nextCursor = cursorDepth < 3 ? (data.paging?.cursors?.after || null) : null;
