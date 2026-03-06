@@ -1,3 +1,5 @@
+import { enforceLimit } from "./utils/limits";
+
 const REDIRECT_URI =
   "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
 const SCOPES = [
@@ -20,6 +22,23 @@ interface Env {
   INTERNAL_API_KEY: string;
   WEB_APP_URL?: string;
   DB: D1Database;
+}
+
+async function runLimitCheck(
+  env: Env,
+  userId: string,
+  column: "me_calls" | "insights_calls" | "publish_calls" | "keyword_calls" | "discovery_calls",
+  limit: number,
+): Promise<Response | null> {
+  try {
+    await enforceLimit(env, userId, column, limit);
+    return null;
+  } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
+    throw error;
+  }
 }
 
 function getCookieValue(request: Request, name: string): string | null {
@@ -362,14 +381,18 @@ export default {
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
       const account = await env.DB
-        .prepare("SELECT access_token FROM threads_accounts LIMIT 1")
-        .first<{ access_token: string }>();
+        .prepare("SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1")
+        .first<{ threads_user_id: string; access_token: string }>();
 
       if (!account) {
         return new Response(
           JSON.stringify({ error: "no connected account" }),
           { status: 400 },
         );
+      }
+      const limitResponse = await runLimitCheck(env, account.threads_user_id, "me_calls", 2);
+      if (limitResponse) {
+        return limitResponse;
       }
 
       const res = await fetch(
@@ -388,7 +411,10 @@ export default {
       });
     }
 
-    if (url.pathname === "/api/threads/profile" && request.method === "GET") {
+    if (
+      (url.pathname === "/api/threads/profile" || url.pathname === "/api/threads/profile_lookup")
+      && request.method === "GET"
+    ) {
       const username = url.searchParams.get("username");
 
       if (!username) {
@@ -399,14 +425,18 @@ export default {
       }
 
       const account = await env.DB
-        .prepare("SELECT access_token FROM threads_accounts LIMIT 1")
-        .first<{ access_token: string }>();
+        .prepare("SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1")
+        .first<{ threads_user_id: string; access_token: string }>();
 
       if (!account) {
         return new Response(
           JSON.stringify({ error: "no connected account" }),
           { status: 400 },
         );
+      }
+      const limitResponse = await runLimitCheck(env, account.threads_user_id, "discovery_calls", 20);
+      if (limitResponse) {
+        return limitResponse;
       }
 
       const res = await fetch(
@@ -438,6 +468,10 @@ export default {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
+      }
+      const limitResponse = await runLimitCheck(env, account.threads_user_id, "insights_calls", 3);
+      if (limitResponse) {
+        return limitResponse;
       }
 
       const params = new URLSearchParams({
@@ -585,14 +619,18 @@ export default {
       const limit = url.searchParams.get("limit") || "25";
 
       const account = await env.DB.prepare(
-        "SELECT access_token FROM threads_accounts LIMIT 1",
-      ).first<{ access_token: string }>();
+        "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
+      ).first<{ threads_user_id: string; access_token: string }>();
 
       if (!account) {
         return new Response(
           JSON.stringify({ error: "no connected account" }),
           { status: 400 },
         );
+      }
+      const limitResponse = await runLimitCheck(env, account.threads_user_id, "keyword_calls", 25);
+      if (limitResponse) {
+        return limitResponse;
       }
 
       const params = new URLSearchParams({
@@ -668,6 +706,10 @@ export default {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
+      }
+      const limitResponse = await runLimitCheck(env, threadsUserId, "publish_calls", 50);
+      if (limitResponse) {
+        return limitResponse;
       }
 
       const publishBody = new URLSearchParams({
