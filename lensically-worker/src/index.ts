@@ -7,12 +7,34 @@ const SCOPES = [
   "threads_profile_discovery",
   "threads_content_publish",
 ].join(",");
+const API_OAUTH_REDIRECT_URI =
+  "https://lensically-worker.lensically.workers.dev/api/auth/threads/callback";
+const API_OAUTH_SCOPES = [
+  "threads_basic",
+  "threads_manage_insights",
+].join(",");
 
 interface Env {
   THREADS_CLIENT_ID: string;
   THREADS_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
+  WEB_APP_URL?: string;
   DB: D1Database;
+}
+
+function getCookieValue(request: Request, name: string): string | null {
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) {
+    return null;
+  }
+
+  for (const cookie of cookieHeader.split(";")) {
+    const [rawKey, ...rawValue] = cookie.trim().split("=");
+    if (rawKey === name) {
+      return rawValue.join("=");
+    }
+  }
+  return null;
 }
 
 export default {
@@ -24,6 +46,151 @@ export default {
         "https://lensically-worker.lensically.workers.dev/auth/threads/login",
         302
       );
+    }
+
+    if (url.pathname === "/api/auth/threads/start" && request.method === "GET") {
+      const state = crypto.randomUUID().replace(/-/g, "");
+      const authURL = new URL("https://graph.threads.net/oauth/authorize");
+      authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
+      authURL.searchParams.set("redirect_uri", API_OAUTH_REDIRECT_URI);
+      authURL.searchParams.set("scope", API_OAUTH_SCOPES);
+      authURL.searchParams.set("response_type", "code");
+      authURL.searchParams.set("state", state);
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: authURL.toString(),
+          "Set-Cookie": `lensically_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+        },
+      });
+    }
+
+    if (url.pathname === "/api/auth/threads/callback" && request.method === "GET") {
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
+      const cookieState = getCookieValue(request, "lensically_oauth_state");
+
+      if (!code || !state || !cookieState || state !== cookieState) {
+        return new Response(
+          JSON.stringify({ error: "Invalid OAuth state" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const tokenBody = new URLSearchParams({
+        client_id: env.THREADS_CLIENT_ID,
+        client_secret: env.THREADS_CLIENT_SECRET,
+        redirect_uri: API_OAUTH_REDIRECT_URI,
+        grant_type: "authorization_code",
+        code,
+      });
+
+      const tokenResp = await fetch("https://graph.threads.net/oauth/access_token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: tokenBody,
+      });
+
+      if (!tokenResp.ok) {
+        return new Response(await tokenResp.text(), {
+          status: tokenResp.status,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      const shortTokenData = await tokenResp.json() as { access_token?: string };
+      const shortToken = shortTokenData.access_token;
+      if (!shortToken) {
+        return new Response(
+          JSON.stringify({ error: "Missing short-lived access token" }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const longResp = await fetch(
+        `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${env.THREADS_CLIENT_SECRET}&access_token=${shortToken}`,
+      );
+
+      if (!longResp.ok) {
+        return new Response(await longResp.text(), {
+          status: longResp.status,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      const longTokenData = await longResp.json() as {
+        access_token?: string;
+        expires_in?: number;
+      };
+      const accessToken = longTokenData.access_token;
+      const expiresIn = Number(longTokenData.expires_in ?? 0);
+
+      if (!accessToken || !expiresIn) {
+        return new Response(
+          JSON.stringify({ error: "Invalid long-lived token response" }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const meResp = await fetch(
+        `https://graph.threads.net/me?fields=id&access_token=${accessToken}`,
+      );
+      if (!meResp.ok) {
+        return new Response(await meResp.text(), {
+          status: meResp.status,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      const meData = await meResp.json() as { id?: string };
+      if (!meData.id) {
+        return new Response(
+          JSON.stringify({ error: "Missing Threads user id" }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = now + expiresIn;
+
+      await env.DB.prepare(
+        `INSERT OR REPLACE INTO threads_accounts (threads_user_id, access_token, expires_at)
+         VALUES (?, ?, ?)`,
+      )
+        .bind(meData.id, accessToken, expiresAt)
+        .run();
+
+      if (!env.WEB_APP_URL) {
+        return new Response(
+          JSON.stringify({ error: "WEB_APP_URL is not configured" }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      const destination = `${env.WEB_APP_URL.replace(/\/$/, "")}/dashboard?connected=1`;
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination,
+          "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+        },
+      });
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
@@ -62,7 +229,7 @@ export default {
     }
 
     if (url.pathname === "/auth/threads/login") {
-      const authURL = new URL("https://threads.net/oauth/authorize");
+      const authURL = new URL("https://graph.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
       authURL.searchParams.set("redirect_uri", REDIRECT_URI);
       authURL.searchParams.set("scope", SCOPES);
@@ -173,10 +340,10 @@ export default {
       const expiresAt = now + expiresIn;
 
       await env.DB.prepare(
-        `INSERT OR REPLACE INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO threads_accounts (threads_user_id, access_token, expires_at)
+         VALUES (?, ?, ?)`,
       )
-        .bind(meData.id, accessToken, expiresAt, now)
+        .bind(meData.id, accessToken, expiresAt)
         .run();
 
       return Response.redirect(
@@ -265,8 +432,9 @@ export default {
 
       if (!account) {
         return new Response(
-          JSON.stringify({ error: "no connected account" }),
+          JSON.stringify({ error: "Threads account not connected" }),
           {
+            status: 401,
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );

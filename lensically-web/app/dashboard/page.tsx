@@ -7,8 +7,15 @@ type ThreadsProfile = {
 };
 
 export const runtime = "edge";
+const CONNECT_THREADS_URL =
+  "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
 
-async function getProfile(): Promise<ThreadsProfile | null> {
+type ProfileResult = {
+  profile: ThreadsProfile | null;
+  needsConnection: boolean;
+};
+
+async function getProfile(): Promise<ProfileResult> {
   try {
     const res = await fetch(
       "https://lensically-worker.lensically.workers.dev/api/threads/me",
@@ -16,23 +23,45 @@ async function getProfile(): Promise<ThreadsProfile | null> {
     );
 
     if (!res.ok) {
-      return null;
+      const errorData = await res.json().catch(() => null) as { error?: string } | null;
+      const errorMessage = (errorData?.error || "").toLowerCase();
+      return {
+        profile: null,
+        needsConnection:
+          errorMessage.includes("account not connected") ||
+          errorMessage.includes("no connected account"),
+      };
     }
 
-    return (await res.json()) as ThreadsProfile;
+    return {
+      profile: (await res.json()) as ThreadsProfile,
+      needsConnection: false,
+    };
   } catch {
-    return null;
+    return { profile: null, needsConnection: false };
   }
 }
 
 export default async function DashboardPage() {
-  const profile = await getProfile();
+  const { profile, needsConnection } = await getProfile();
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
 
-      {!profile ? (
+      {!profile && needsConnection ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-slate-700">
+            Connect your Threads account to load your profile.
+          </p>
+          <a
+            href={CONNECT_THREADS_URL}
+            className="mt-4 inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            Connect Threads
+          </a>
+        </div>
+      ) : !profile ? (
         <p className="text-sm text-red-600">Unable to load Threads profile.</p>
       ) : (
         <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
