@@ -380,6 +380,13 @@ export default {
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
+      const cacheKey = new Request(request.url, request);
+      const cache = caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const account = await env.DB
         .prepare("SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1")
         .first<{ threads_user_id: string; access_token: string }>();
@@ -406,9 +413,16 @@ export default {
 
       const data = await res.json();
 
-      return new Response(JSON.stringify(data), {
-        headers: { "Content-Type": "application/json" },
+      const response = new Response(JSON.stringify(data), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=43200",
+        },
       });
+
+      await cache.put(cacheKey, response.clone());
+
+      return response;
     }
 
     if (
