@@ -6,6 +6,8 @@ type ThreadsProfile = {
   is_verified?: boolean;
 };
 
+export const runtime = "edge";
+
 async function getProfile(): Promise<ThreadsProfile | null> {
   try {
     const res = await fetch(

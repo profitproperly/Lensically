@@ -10,6 +10,8 @@ type SearchResponse = {
   data?: ThreadsPost[];
 };
 
+export const runtime = "edge";
+
 async function getPosts(): Promise<ThreadsPost[] | null> {
   try {
     const res = await fetch(
