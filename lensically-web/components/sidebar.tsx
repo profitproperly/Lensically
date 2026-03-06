@@ -45,7 +45,7 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
+    <aside className="sticky top-16 h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
       <div className="flex flex-col items-center w-full mt-6 mb-8">
         <div className="relative group cursor-pointer">
           <a

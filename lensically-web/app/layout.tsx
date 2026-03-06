@@ -30,7 +30,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <div className="min-h-screen flex flex-col bg-slate-50">
-          <header className="h-16 border-b border-slate-200 bg-white flex items-center px-6">
+          <header className="sticky top-0 z-50 h-16 border-b border-slate-200 bg-white flex items-center px-6">
             <div className="flex items-center gap-3">
               <img
                 src="/lensically-logo-white-with-black-bg.png"
