@@ -560,7 +560,7 @@ export default {
           },
         );
       }
-      const limitResponse = await runLimitCheck(env, account.threads_user_id, "insights_calls", 3);
+      const limitResponse = await runLimitCheck(env, account.threads_user_id, "insights_calls", 100);
       if (limitResponse) {
         return new Response(await limitResponse.text(), {
           status: limitResponse.status,
