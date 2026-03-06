@@ -84,7 +84,7 @@ export function Sidebar() {
 
       <nav className="w-full space-y-2">
         {links.map((link) => (
-          <div key={link.href} className="px-4">
+          <div key={link.href}>
             <Link
               href={link.href}
               className={[
