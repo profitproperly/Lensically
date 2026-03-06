@@ -432,49 +432,48 @@ export default {
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
-      const cacheKey = new Request(request.url, request);
-      const cache = caches.default;
-      const cached = await cache.match(cacheKey);
-      if (cached) {
-        return cached;
-      }
-
-      const account = await env.DB
-        .prepare("SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1")
-        .first<{ threads_user_id: string; access_token: string }>();
+      const account = await env.DB.prepare(
+        "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
+      ).first<{ threads_user_id: string; access_token: string }>();
 
       if (!account) {
         return new Response(
-          JSON.stringify({ error: "no connected account" }),
-          { status: 400 },
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 401,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
         );
       }
-      const limitResponse = await runLimitCheck(env, account.threads_user_id, "me_calls", 2);
-      if (limitResponse) {
-        return limitResponse;
-      }
 
-      const res = await fetch(
-        "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url,threads_biography,is_verified",
+      const meResp = await fetch(
+        "https://graph.threads.net/v1.0/me?fields=id,username,threads_profile_picture_url",
         {
-          headers: {
-            Authorization: `Bearer ${account.access_token}`,
-          },
+          headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
 
-      const data = await res.json();
+      const meJson = await meResp.json() as {
+        username?: string;
+        threads_profile_picture_url?: string;
+      };
 
-      const response = new Response(JSON.stringify(data), {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=43200",
+      return new Response(
+        JSON.stringify({
+          username: meJson.username ?? null,
+          threads_profile_picture_url: meJson.threads_profile_picture_url ?? null,
+        }),
+        {
+          status: meResp.status,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
         },
-      });
-
-      await cache.put(cacheKey, response.clone());
-
-      return response;
+      );
     }
 
     if (
