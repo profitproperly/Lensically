@@ -151,12 +151,12 @@ export default function PostsList() {
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-auto max-h-[70vh] rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="table-auto w-full border-collapse">
           <thead>
-            <tr className="sticky top-0 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200">
+            <tr>
               <th
-                className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-left font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => {
                   setSortMetric(null);
                   setSortDirection("desc");
@@ -165,7 +165,7 @@ export default function PostsList() {
                 <span className="inline-flex items-center gap-1">Post</span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => handleMetricSort("views")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -174,7 +174,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => handleMetricSort("likes")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -183,7 +183,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => handleMetricSort("replies")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -192,7 +192,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => handleMetricSort("reposts")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -201,7 +201,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => handleMetricSort("quotes")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -210,7 +210,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-center font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => handleMetricSort("shares")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -219,7 +219,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
+                className="px-4 py-3 text-left font-semibold cursor-pointer select-none sticky top-16 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200"
                 onClick={() => {
                   if (sortMetric === "timestamp") {
                     setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
