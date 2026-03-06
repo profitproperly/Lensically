@@ -98,11 +98,9 @@ export default function PostsList() {
     void loadPosts();
   }, []);
 
-  const sortedPosts = [...posts].sort((a, b) => {
-    const av = (a[sortMetric as keyof ThreadsPost] as number | undefined) ?? 0;
-    const bv = (b[sortMetric as keyof ThreadsPost] as number | undefined) ?? 0;
-    return sortDirection === "desc" ? bv - av : av - bv;
-  });
+  const sortedPosts = [...posts].sort(
+    (a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime(),
+  );
 
   if (loadingInitial) return <p className="text-sm text-slate-700">Loading posts...</p>;
 
@@ -126,38 +124,55 @@ export default function PostsList() {
 
   return (
     <div>
-      <div className="space-y-4">
-        {sortedPosts.map((post) => (
-          <article
-            key={post.id ?? post.permalink ?? `${post.username}-${post.timestamp}`}
-            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <p className="whitespace-pre-wrap text-sm leading-6 text-slate-900">
-              {post.text || "No text content."}
-            </p>
-            <p className="mt-3 text-xs text-slate-600">
-              @{post.username || "unknown"} • {post.timestamp || "unknown time"}
-            </p>
-            <div className="mt-3 flex gap-4 text-xs text-slate-600">
-              <span>{"\u{1F441}"} {post.views ?? 0}</span>
-              <span>{"\u2764\uFE0F"} {post.likes ?? 0}</span>
-              <span>{"\u{1F4AC}"} {post.replies ?? 0}</span>
-              <span>{"\u{1F501}"} {post.reposts ?? 0}</span>
-              <span>{"\u270D\uFE0F"} {post.quotes ?? 0}</span>
-              <span>{"\u{1F4E4}"} {post.shares ?? 0}</span>
-            </div>
-            {post.permalink && (
-              <a
-                href={post.permalink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-block text-sm font-medium text-blue-700 hover:text-blue-800"
-              >
-                View on Threads
-              </a>
-            )}
-          </article>
-        ))}
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="table-auto w-full border-collapse">
+          <thead>
+            <tr className="text-xs uppercase text-slate-500 border-b border-slate-200">
+              <th className="px-4 py-3 text-left font-semibold">Post</th>
+              <th className="px-4 py-3 text-center font-semibold">Views</th>
+              <th className="px-4 py-3 text-center font-semibold">Likes</th>
+              <th className="px-4 py-3 text-center font-semibold">Replies</th>
+              <th className="px-4 py-3 text-center font-semibold">Reposts</th>
+              <th className="px-4 py-3 text-center font-semibold">Quotes</th>
+              <th className="px-4 py-3 text-center font-semibold">Shares</th>
+              <th className="px-4 py-3 text-left font-semibold">Posted</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedPosts.map((post) => {
+              const formattedTime = post.timestamp
+                ? new Date(post.timestamp).toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  })
+                : "Unknown time";
+
+              return (
+                <tr
+                  key={post.id ?? post.permalink ?? `${post.username}-${post.timestamp}`}
+                  className="border-b border-slate-100 align-top last:border-b-0"
+                >
+                  <td className="px-4 py-3 text-sm text-slate-900">
+                    <div className="max-w-xl whitespace-normal break-words">
+                      {post.text || "No text content."}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.views ?? 0}</td>
+                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.likes ?? 0}</td>
+                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.replies ?? 0}</td>
+                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.reposts ?? 0}</td>
+                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.quotes ?? 0}</td>
+                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.shares ?? 0}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600">{formattedTime}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {hasMore && (
