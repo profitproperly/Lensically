@@ -597,6 +597,14 @@ export default {
         };
       };
       const postsArray = Array.isArray(data.data) ? data.data : [];
+      const profileResp = await fetch(
+        "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url",
+        {
+          headers: { Authorization: `Bearer ${account.access_token}` },
+        },
+      );
+      const profileJson = await profileResp.json() as { threads_profile_picture_url?: string };
+      const profilePicture = profileJson?.threads_profile_picture_url ?? null;
       const enrichedPosts = await Promise.all(
         postsArray.map(async (post) => {
           const postId = String((post as { id?: string })?.id ?? "");
@@ -611,6 +619,7 @@ export default {
           if (!postId) {
             return {
               ...basePost,
+              profile_picture_url: profilePicture,
               views: 0,
               likes: 0,
               replies: 0,
@@ -655,6 +664,7 @@ export default {
 
             return {
               ...basePost,
+              profile_picture_url: profilePicture,
               views: metricMap.views ?? 0,
               likes: metricMap.likes ?? 0,
               replies: metricMap.replies ?? 0,
@@ -665,6 +675,7 @@ export default {
           } catch {
             return {
               ...basePost,
+              profile_picture_url: profilePicture,
               views: 0,
               likes: 0,
               replies: 0,
