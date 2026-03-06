@@ -46,6 +46,7 @@ export default function PostsList() {
 
       const res = await fetch(
         "https://lensically-worker.lensically.workers.dev/api/threads/posts",
+        { cache: "no-store" },
       );
       const data = (await res.json()) as PostsResponse;
 
