@@ -152,11 +152,11 @@ export default function PostsList() {
   return (
     <div>
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full border-collapse">
-          <thead className="bg-white border-b border-slate-200 text-xs uppercase text-slate-500">
+        <table className="w-full border-collapse table-fixed">
+          <thead className="sticky top-16 z-20 bg-white border-b border-slate-200 text-xs uppercase text-slate-500">
             <tr>
               <th
-                className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
+                className="w-[55%] px-4 py-3 text-left font-semibold cursor-pointer select-none"
                 onClick={() => {
                   setSortMetric(null);
                   setSortDirection("desc");
@@ -165,7 +165,7 @@ export default function PostsList() {
                 <span className="inline-flex items-center gap-1">Post</span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="w-[7%] px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("views")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -174,7 +174,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="w-[6%] px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("likes")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -183,7 +183,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="w-[6%] px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("replies")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -192,7 +192,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="w-[6%] px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("reposts")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -201,7 +201,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="w-[6%] px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("quotes")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -210,7 +210,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-center font-semibold cursor-pointer select-none"
+                className="w-[6%] px-4 py-3 text-center font-semibold cursor-pointer select-none"
                 onClick={() => handleMetricSort("shares")}
               >
                 <span className="inline-flex items-center gap-1">
@@ -219,7 +219,7 @@ export default function PostsList() {
                 </span>
               </th>
               <th
-                className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
+                className="w-[8%] px-4 py-3 text-left font-semibold cursor-pointer select-none"
                 onClick={() => {
                   if (sortMetric === "timestamp") {
                     setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
@@ -236,10 +236,6 @@ export default function PostsList() {
               </th>
             </tr>
           </thead>
-        </table>
-
-        <div className="overflow-auto max-h-[70vh]">
-          <table className="w-full border-collapse">
           <tbody>
             {sortedPosts.map((post) => {
               const formattedTime = post.timestamp
@@ -258,24 +254,23 @@ export default function PostsList() {
                   key={post.id ?? post.permalink ?? `${post.username}-${post.timestamp}`}
                   className="border-b border-slate-100 align-top last:border-b-0"
                 >
-                  <td className="px-4 py-3 text-sm text-slate-900">
+                  <td className="w-[55%] px-4 py-3 text-sm text-slate-900">
                     <div className="max-w-xl whitespace-normal break-words">
                       {post.text || "No text content."}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.views ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.likes ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.replies ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.reposts ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.quotes ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-sm text-slate-700">{post.shares ?? 0}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{formattedTime}</td>
+                  <td className="w-[7%] px-4 py-3 text-center text-sm text-slate-700">{post.views ?? 0}</td>
+                  <td className="w-[6%] px-4 py-3 text-center text-sm text-slate-700">{post.likes ?? 0}</td>
+                  <td className="w-[6%] px-4 py-3 text-center text-sm text-slate-700">{post.replies ?? 0}</td>
+                  <td className="w-[6%] px-4 py-3 text-center text-sm text-slate-700">{post.reposts ?? 0}</td>
+                  <td className="w-[6%] px-4 py-3 text-center text-sm text-slate-700">{post.quotes ?? 0}</td>
+                  <td className="w-[6%] px-4 py-3 text-center text-sm text-slate-700">{post.shares ?? 0}</td>
+                  <td className="w-[8%] px-4 py-3 text-sm text-slate-600">{formattedTime}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        </div>
       </div>
 
       {hasMore && (
