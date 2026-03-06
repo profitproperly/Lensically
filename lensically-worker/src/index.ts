@@ -636,6 +636,7 @@ export default {
           if (!metricsResp.ok) {
             console.log("INSIGHTS_REQUEST_FAILED", {
               postId,
+              text: basePost.text,
               status: metricsResp.status,
             });
           }
