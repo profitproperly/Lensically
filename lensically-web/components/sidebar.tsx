@@ -47,41 +47,51 @@ export function Sidebar() {
   return (
     <aside className="w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
       <div className="flex flex-col items-center w-full mt-6 mb-8">
-        <a
-          href={`https://www.threads.net/@${username}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:opacity-90"
-        >
-          {profilePictureUrl ? (
-            <img
-              src={profilePictureUrl}
-              alt={`@${username}`}
-              className="h-16 w-16 rounded-full"
-            />
-          ) : (
-            <div className="h-16 w-16 rounded-full bg-slate-200" />
-          )}
-        </a>
+        <div className="relative group cursor-pointer">
+          <a
+            href={`https://www.threads.net/@${username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {profilePictureUrl ? (
+              <img
+                src={profilePictureUrl}
+                alt={`@${username}`}
+                className="h-32 w-32 rounded-full"
+              />
+            ) : (
+              <div className="h-32 w-32 rounded-full bg-slate-200" />
+            )}
+            <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-8 w-8 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M7 7h10v10" />
+              </svg>
+            </div>
+          </a>
+          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 text-white text-xs px-3 py-1 opacity-0 group-hover:opacity-100 transition">
+            Open Threads Profile
+          </div>
+        </div>
         <p className="text-base font-semibold text-slate-900 mt-3">@{username}</p>
       </div>
 
-      <nav className="w-full px-4 space-y-2">
+      <nav className="w-full space-y-2">
         {links.map((link) => (
-          <div key={link.href} className="relative group">
-            <div
-              className={[
-                "absolute left-0 top-0 h-full w-[2px] opacity-0 group-hover:opacity-100",
-                pathname === link.href ? "opacity-100 bg-slate-500" : "bg-slate-300",
-              ].join(" ")}
-            />
+          <div key={link.href} className="px-4">
             <Link
               href={link.href}
               className={[
-                "block px-4 py-3 text-[15px] font-medium rounded-xl",
+                "block w-full px-4 py-3 text-[15px] font-medium rounded-xl transition-colors",
                 pathname === link.href
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-600 hover:bg-slate-50",
+                  ? "bg-black text-white"
+                  : "text-black hover:bg-black hover:text-white",
               ].join(" ")}
             >
               {link.label}
