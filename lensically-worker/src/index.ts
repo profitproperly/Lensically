@@ -56,6 +56,37 @@ function getCookieValue(request: Request, name: string): string | null {
   return null;
 }
 
+async function checkUserCapacity(
+  env: Env,
+  threadsUserId: string,
+): Promise<Response | null> {
+  const existing = await env.DB.prepare(
+    "SELECT threads_user_id FROM threads_accounts WHERE threads_user_id = ? LIMIT 1",
+  )
+    .bind(threadsUserId)
+    .first<{ threads_user_id: string }>();
+
+  if (existing) {
+    return null;
+  }
+
+  const users = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM threads_accounts",
+  ).first<{ total: number | string }>();
+
+  if (Number(users?.total ?? 0) >= 800) {
+    return new Response(
+      JSON.stringify({ error: "user capacity reached" }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  return null;
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
@@ -180,6 +211,10 @@ export default {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
+      }
+      const userCapacityResponse = await checkUserCapacity(env, meData.id);
+      if (userCapacityResponse) {
+        return userCapacityResponse;
       }
 
       const now = Math.floor(Date.now() / 1000);
@@ -354,6 +389,10 @@ export default {
           },
         );
       }
+      const userCapacityResponse = await checkUserCapacity(env, meData.id);
+      if (userCapacityResponse) {
+        return userCapacityResponse;
+      }
 
       const now = Math.floor(Date.now() / 1000);
       const expiresAt = now + expiresIn;
@@ -470,6 +509,25 @@ export default {
     }
 
     if (url.pathname === "/api/threads/posts" && request.method === "GET") {
+      const cursor = url.searchParams.get("cursor");
+      const cursorDepthParam = Number(url.searchParams.get("cursor_depth") || 0);
+      const cursorDepth = Number.isFinite(cursorDepthParam) && cursorDepthParam > 0
+        ? cursorDepthParam
+        : (cursor ? 2 : 1);
+
+      if (cursorDepth > 3) {
+        return new Response(
+          JSON.stringify({
+            posts: [],
+            has_more: false,
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
       const account = await env.DB.prepare(
         "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
       ).first<{ threads_user_id: string; access_token: string }>();
@@ -491,8 +549,11 @@ export default {
       const params = new URLSearchParams({
         fields:
           "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply",
-        limit: "25",
+        limit: "100",
       });
+      if (cursor) {
+        params.set("after", cursor);
+      }
 
       const postsResp = await fetch(
         `https://graph.threads.net/v1.0/${account.threads_user_id}/threads?${params.toString()}`,
@@ -501,8 +562,24 @@ export default {
         },
       );
 
-      const data = await postsResp.json();
-      return new Response(JSON.stringify(data), {
+      const data = await postsResp.json() as {
+        data?: unknown[];
+        paging?: {
+          next?: string;
+          cursors?: {
+            after?: string;
+          };
+        };
+      };
+      const postsArray = Array.isArray(data.data) ? data.data : [];
+      const hasMore = Boolean(data.paging?.next) && cursorDepth < 3;
+      const nextCursor = cursorDepth < 3 ? (data.paging?.cursors?.after || null) : null;
+
+      return new Response(JSON.stringify({
+        posts: postsArray,
+        next_cursor: nextCursor,
+        has_more: hasMore,
+      }), {
         status: postsResp.status,
         headers: { "content-type": "application/json; charset=UTF-8" },
       });
