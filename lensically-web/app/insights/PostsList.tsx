@@ -52,6 +52,7 @@ export default function PostsList() {
         { cache: "no-store" },
       );
       const data = (await res.json()) as PostsResponse;
+      console.log("THREADS API RESPONSE:", data);
 
       if (!res.ok) {
         const errorMessage = (data.error || "").toLowerCase();
