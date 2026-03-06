@@ -117,9 +117,6 @@ export default function PostsList() {
     return sortDirection === "desc" ? bv - av : av - bv;
   });
 
-  const accountPost =
-    posts.find((post) => post.username || post.profile_picture_url) ?? posts[0];
-
   const handleMetricSort = (
     metric: "views" | "likes" | "replies" | "reposts" | "quotes" | "shares",
   ) => {
@@ -154,23 +151,10 @@ export default function PostsList() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        {accountPost?.profile_picture_url ? (
-          <img
-            src={accountPost.profile_picture_url}
-            alt={accountPost.username ? `@${accountPost.username}` : "Threads profile"}
-            className="h-10 w-10 rounded-full"
-          />
-        ) : (
-          <div className="h-10 w-10 rounded-full bg-slate-200" />
-        )}
-        <p className="text-sm font-medium text-slate-900">@{accountPost?.username || "unknown"}</p>
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-auto max-h-[70vh] rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="table-auto w-full border-collapse">
           <thead>
-            <tr className="text-xs uppercase text-slate-500 border-b border-slate-200">
+            <tr className="sticky top-0 bg-white z-10 text-xs uppercase text-slate-500 border-b border-slate-200">
               <th
                 className="px-4 py-3 text-left font-semibold cursor-pointer select-none"
                 onClick={() => {
