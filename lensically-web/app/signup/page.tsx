@@ -4,17 +4,18 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { login } from "../../lib/authClient"
+import { register } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
 
 const WORKER_BASE_URL = "https://lensically-worker.lensically.workers.dev"
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter()
   const { user, loading, refreshUser } = useAuth()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
@@ -24,17 +25,23 @@ export default function LoginPage() {
     }
   }, [user, loading, router])
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
 
     setSubmitting(true)
     setError("")
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      setSubmitting(false)
+      return
+    }
+
     try {
-      const res = await login(email, password)
+      const res = await register(email, password)
 
       if (res?.success === false || res?.error) {
-        setError(res.error || "Login failed")
+        setError(res.error || "Signup failed")
         setSubmitting(false)
         return
       }
@@ -42,11 +49,7 @@ export default function LoginPage() {
       await refreshUser()
       router.push("/dashboard")
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Failed to fetch")) {
-        setError("Unable to connect. Please try again.")
-      } else {
-        setError(err instanceof Error ? err.message : "Invalid email or password.")
-      }
+      setError(err instanceof Error ? err.message : "Signup failed")
       setSubmitting(false)
     }
   }
@@ -75,14 +78,25 @@ export default function LoginPage() {
         </Link>
 
         <div className="w-[420px] border border-gray-200 rounded-xl p-8 shadow-sm flex flex-col gap-4">
+          <h1 className="text-xl font-semibold text-center text-black">
+            Create your Lensically account
+          </h1>
 
-        <h1 className="text-xl font-semibold text-center text-black">
-          Sign in to Lensically
-        </h1>
-
-        <form onSubmit={handleLogin} className="flex flex-col gap-3">
+        <form onSubmit={handleSignup} className="flex flex-col gap-3">
           {error && (
-            <p className="text-red-500 text-sm text-center">{error}</p>
+            <p className="text-red-500 text-sm text-center">
+              {error.toLowerCase().includes("already exists") ? (
+                <>
+                  An account with this email already exists.{" "}
+                  <Link href="/login" className="underline">
+                    Log in
+                  </Link>
+                  {" "}instead.
+                </>
+              ) : (
+                error
+              )}
+            </p>
           )}
 
           <input
@@ -103,13 +117,24 @@ export default function LoginPage() {
             className="w-full border border-gray-300 p-2 rounded-lg text-black bg-white placeholder-gray-400"
           />
 
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            className="w-full border border-gray-300 p-2 rounded-lg text-black bg-white placeholder-gray-400"
+          />
+
           <button
             type="submit"
             disabled={submitting}
             className="w-full bg-black text-white rounded-lg py-3 font-medium disabled:opacity-60 cursor-pointer"
           >
-            {submitting ? "Logging in..." : "Login"}
+            {submitting ? "Creating account..." : "Create Account"}
           </button>
+
+          <p className="text-sm text-center text-gray-500">──────── OR ────────</p>
 
           <button
             type="button"
@@ -148,13 +173,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-sm text-center text-gray-600">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-black font-medium hover:underline">
-            Sign up
-          </Link>
-        </p>
-
+          <p className="text-sm text-center text-gray-600">
+            Already have an account?{" "}
+            <Link href="/login" className="text-black font-medium hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>

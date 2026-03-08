@@ -5,6 +5,8 @@ import { verifyEmail } from "../auth/verifyEmail.js";
 import { forgotPassword, resetPassword } from "../auth/passwordReset.js";
 import { logout } from "../auth/logout.js";
 import { currentUser } from "../auth/me.js";
+import { createSession } from "../auth/sessions.js";
+import { setSessionCookie } from "../auth/cookies.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,6 +33,14 @@ const API_OAUTH_SCOPES = [
 interface Env {
   THREADS_CLIENT_ID: string;
   THREADS_CLIENT_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GITHUB_DEV_CLIENT_ID: string;
+  GITHUB_DEV_CLIENT_SECRET: string;
+  GITHUB_PROD_CLIENT_ID: string;
+  GITHUB_PROD_CLIENT_SECRET: string;
+  DISCORD_CLIENT_ID: string;
+  DISCORD_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
   WEB_APP_URL?: string;
   DB: D1Database;
@@ -100,6 +110,13 @@ type OauthStateContext = {
   appUserId: string | null;
 };
 
+type AuthProvider = "google" | "github" | "discord";
+
+type OAuthIdentity = {
+  providerUserId: string;
+  email: string | null;
+};
+
 function buildOauthState(appBaseUrl: string, appUserId: string): string {
   const nonce = crypto.randomUUID().replace(/-/g, "");
   const encodedContext = btoa(JSON.stringify({ appBaseUrl, appUserId }));
@@ -136,6 +153,294 @@ function contextFromState(state: string | null): OauthStateContext | null {
   } catch {
     return null;
   }
+}
+
+function oauthStateCookieName(provider: AuthProvider): string {
+  return `lensically_oauth_state_${provider}`;
+}
+
+function setOauthStateCookie(name: string, state: string): string {
+  return `${name}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`;
+}
+
+function clearOauthStateCookie(name: string): string {
+  return `${name}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+}
+
+function getOauthClientCredentials(
+  provider: AuthProvider,
+  env: Env,
+  request: Request,
+): { clientId: string; clientSecret: string } | null {
+  if (provider === "google") {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      return null;
+    }
+    return { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET };
+  }
+  if (provider === "github") {
+    if (!env.GITHUB_PROD_CLIENT_ID || !env.GITHUB_PROD_CLIENT_SECRET) {
+      return null;
+    }
+    return {
+      clientId: env.GITHUB_PROD_CLIENT_ID,
+      clientSecret: env.GITHUB_PROD_CLIENT_SECRET,
+    };
+  }
+  if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET) {
+    return null;
+  }
+  return { clientId: env.DISCORD_CLIENT_ID, clientSecret: env.DISCORD_CLIENT_SECRET };
+}
+
+function buildProviderAuthorizationUrl(
+  provider: AuthProvider,
+  clientId: string,
+  callbackUrl: string,
+  state: string,
+): string {
+  if (provider === "google") {
+    const authURL = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    authURL.searchParams.set("client_id", clientId);
+    authURL.searchParams.set("redirect_uri", callbackUrl);
+    authURL.searchParams.set("response_type", "code");
+    authURL.searchParams.set("scope", "openid email profile");
+    authURL.searchParams.set("state", state);
+    return authURL.toString();
+  }
+  if (provider === "github") {
+    const authURL = new URL("https://github.com/login/oauth/authorize");
+    authURL.searchParams.set("client_id", clientId);
+    authURL.searchParams.set("redirect_uri", callbackUrl);
+    authURL.searchParams.set("scope", "read:user user:email");
+    authURL.searchParams.set("state", state);
+    return authURL.toString();
+  }
+  const authURL = new URL("https://discord.com/oauth2/authorize");
+  authURL.searchParams.set("client_id", clientId);
+  authURL.searchParams.set("redirect_uri", callbackUrl);
+  authURL.searchParams.set("response_type", "code");
+  authURL.searchParams.set("scope", "identify email");
+  authURL.searchParams.set("state", state);
+  return authURL.toString();
+}
+
+async function exchangeCodeForAccessToken(
+  provider: AuthProvider,
+  code: string,
+  callbackUrl: string,
+  env: Env,
+  request: Request,
+): Promise<string | null> {
+  const credentials = getOauthClientCredentials(provider, env, request);
+  if (!credentials) {
+    return null;
+  }
+
+  const tokenBody = new URLSearchParams({
+    client_id: credentials.clientId,
+    client_secret: credentials.clientSecret,
+    code,
+    redirect_uri: callbackUrl,
+  });
+
+  if (provider === "google") {
+    tokenBody.set("grant_type", "authorization_code");
+    const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: tokenBody,
+    });
+    if (!tokenResp.ok) {
+      return null;
+    }
+    const tokenData = await tokenResp.json() as { access_token?: string };
+    return tokenData.access_token ?? null;
+  }
+
+  if (provider === "github") {
+    const tokenResp = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: tokenBody,
+    });
+    if (!tokenResp.ok) {
+      return null;
+    }
+    const tokenData = await tokenResp.json() as { access_token?: string };
+    return tokenData.access_token ?? null;
+  }
+
+  tokenBody.set("grant_type", "authorization_code");
+  const tokenResp = await fetch("https://discord.com/api/oauth2/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: tokenBody,
+  });
+  if (!tokenResp.ok) {
+    return null;
+  }
+  const tokenData = await tokenResp.json() as { access_token?: string };
+  return tokenData.access_token ?? null;
+}
+
+async function fetchProviderIdentity(
+  provider: AuthProvider,
+  accessToken: string,
+): Promise<OAuthIdentity | null> {
+  if (provider === "google") {
+    const profileResp = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!profileResp.ok) {
+      return null;
+    }
+    const profile = await profileResp.json() as { sub?: string; email?: string };
+    if (!profile.sub) {
+      return null;
+    }
+    return {
+      providerUserId: profile.sub,
+      email: typeof profile.email === "string" ? profile.email.trim().toLowerCase() : null,
+    };
+  }
+
+  if (provider === "github") {
+    const profileResp = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!profileResp.ok) {
+      return null;
+    }
+    const profile = await profileResp.json() as { id?: number | string; email?: string | null };
+    if (profile.id === undefined || profile.id === null) {
+      return null;
+    }
+
+    let email = typeof profile.email === "string" ? profile.email.trim().toLowerCase() : null;
+
+    if (!email) {
+      const emailResp = await fetch("https://api.github.com/user/emails", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.github+json",
+        },
+      });
+      if (emailResp.ok) {
+        const emailData = await emailResp.json() as Array<{
+          email?: string;
+          verified?: boolean;
+          primary?: boolean;
+        }>;
+        const selectedEmail =
+          emailData.find((entry) => entry.primary && entry.verified && entry.email)?.email
+          ?? emailData.find((entry) => entry.verified && entry.email)?.email
+          ?? emailData.find((entry) => entry.email)?.email
+          ?? null;
+        email = selectedEmail ? selectedEmail.trim().toLowerCase() : null;
+      }
+    }
+
+    return {
+      providerUserId: String(profile.id),
+      email,
+    };
+  }
+
+  const profileResp = await fetch("https://discord.com/api/users/@me", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!profileResp.ok) {
+    return null;
+  }
+  const profile = await profileResp.json() as { id?: string; email?: string | null };
+  if (!profile.id) {
+    return null;
+  }
+  return {
+    providerUserId: profile.id,
+    email: typeof profile.email === "string" ? profile.email.trim().toLowerCase() : null,
+  };
+}
+
+async function getOrCreateOauthUser(
+  env: Env,
+  provider: AuthProvider,
+  providerUserId: string,
+  email: string | null,
+): Promise<{ id: string; email: string }> {
+  const existingOauthUser = await env.DB.prepare(
+    `SELECT users.id, users.email
+     FROM oauth_accounts
+     JOIN users ON users.id = oauth_accounts.user_id
+     WHERE oauth_accounts.provider = ?
+       AND oauth_accounts.provider_user_id = ?
+     LIMIT 1`,
+  )
+    .bind(provider, providerUserId)
+    .first<{ id: string; email: string }>();
+  if (existingOauthUser) {
+    return existingOauthUser;
+  }
+
+  let user = null as { id: string; email: string } | null;
+  if (email) {
+    user = await env.DB.prepare("SELECT id, email FROM users WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first<{ id: string; email: string }>();
+  }
+
+  if (!user) {
+    const userId = crypto.randomUUID();
+    const resolvedEmail = email ?? `${provider}_${providerUserId}@oauth.lensically.local`;
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, NULL, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind(userId, resolvedEmail)
+      .run();
+    user = { id: userId, email: resolvedEmail };
+  }
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, created_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    )
+      .bind(crypto.randomUUID(), user.id, provider, providerUserId)
+      .run();
+  } catch {
+    const linkedOauthUser = await env.DB.prepare(
+      `SELECT users.id, users.email
+       FROM oauth_accounts
+       JOIN users ON users.id = oauth_accounts.user_id
+       WHERE oauth_accounts.provider = ?
+         AND oauth_accounts.provider_user_id = ?
+       LIMIT 1`,
+    )
+      .bind(provider, providerUserId)
+      .first<{ id: string; email: string }>();
+    if (linkedOauthUser) {
+      return linkedOauthUser;
+    }
+    throw new Error("Failed to persist oauth account");
+  }
+
+  return user;
+}
+
+function buildOauthAppBaseUrl(url: URL, request: Request, env: Env): string {
+  return normalizeAppBaseUrl(url.searchParams.get("return_to"))
+    ?? normalizeAppBaseUrl(request.headers.get("origin"))
+    ?? normalizeAppBaseUrl(request.headers.get("referer"))
+    ?? normalizeAppBaseUrl(env.WEB_APP_URL)
+    ?? "https://lensically2.pages.dev";
 }
 
 async function ensureAppThreadsTable(env: Env): Promise<void> {
@@ -201,6 +506,7 @@ export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+    const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -235,6 +541,119 @@ export default {
 
     if (path === "/api/auth/me" && request.method === "GET") {
       return currentUser(request, env);
+    }
+
+    if (
+      (normalizedPath === "/api/auth/google/start"
+        || normalizedPath === "/api/auth/github/start"
+        || normalizedPath === "/api/auth/discord/start")
+      && request.method === "GET"
+    ) {
+      const provider = normalizedPath.includes("/google/")
+        ? "google"
+        : normalizedPath.includes("/github/")
+          ? "github"
+          : "discord";
+      const appBaseUrl = buildOauthAppBaseUrl(url, request, env);
+      const credentials = getOauthClientCredentials(provider, env, request);
+
+      if (!credentials) {
+        return Response.redirect(`${appBaseUrl}/login?error=server_config`, 302);
+      }
+
+      const state = buildOauthState(appBaseUrl, "");
+      const callbackUrl = `${url.origin}/api/auth/${provider}/callback`;
+      const authURL = buildProviderAuthorizationUrl(
+        provider,
+        credentials.clientId,
+        callbackUrl,
+        state,
+      );
+      const stateCookieName = oauthStateCookieName(provider);
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: authURL,
+          "Set-Cookie": setOauthStateCookie(stateCookieName, state),
+        },
+      });
+    }
+
+    if (
+      (normalizedPath === "/api/auth/google/callback"
+        || normalizedPath === "/api/auth/github/callback"
+        || normalizedPath === "/api/auth/discord/callback")
+      && request.method === "GET"
+    ) {
+      const provider = normalizedPath.includes("/google/")
+        ? "google"
+        : normalizedPath.includes("/github/")
+          ? "github"
+          : "discord";
+      const stateCookieName = oauthStateCookieName(provider);
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
+      const cookieState = getCookieValue(request, stateCookieName);
+      const stateContext = contextFromState(state);
+      const appBaseUrl =
+        stateContext?.appBaseUrl
+        ?? normalizeAppBaseUrl(env.WEB_APP_URL)
+        ?? "https://lensically2.pages.dev";
+      const callbackUrl = `${url.origin}/api/auth/${provider}/callback`;
+      const redirectToAuthError = (error: string): Response =>
+        new Response(null, {
+          status: 302,
+          headers: {
+            Location: `${appBaseUrl}/login?error=${error}`,
+            "Set-Cookie": clearOauthStateCookie(stateCookieName),
+          },
+        });
+
+      try {
+        if (!code) {
+          return redirectToAuthError("access_denied");
+        }
+        if (!state || !cookieState) {
+          return redirectToAuthError("state_missing");
+        }
+        if (state !== cookieState) {
+          return redirectToAuthError("state_mismatch");
+        }
+
+        const accessToken = await exchangeCodeForAccessToken(
+          provider,
+          code,
+          callbackUrl,
+          env,
+          request,
+        );
+        if (!accessToken) {
+          return redirectToAuthError("token_exchange_failed");
+        }
+
+        const identity = await fetchProviderIdentity(provider, accessToken);
+        if (!identity?.providerUserId) {
+          return redirectToAuthError("account_lookup_failed");
+        }
+
+        const user = await getOrCreateOauthUser(
+          env,
+          provider,
+          identity.providerUserId,
+          identity.email,
+        );
+        const sessionToken = await createSession(env, user.id, request);
+
+        const headers = new Headers({
+          Location: `${appBaseUrl}/dashboard`,
+        });
+        headers.append("Set-Cookie", clearOauthStateCookie(stateCookieName));
+        headers.append("Set-Cookie", setSessionCookie(sessionToken));
+        return new Response(null, { status: 302, headers });
+      } catch {
+        return redirectToAuthError("unexpected");
+      }
     }
 
     if (url.pathname === "/connect/threads") {
@@ -1082,13 +1501,13 @@ export default {
           { status: 400 },
         );
       }
-      const limit = await enforceLimit(
+      const usageLimit = await enforceLimit(
         env,
         { id: account.threads_user_id },
         "keyword_search",
       );
-      if (!limit.allowed) {
-        return limitDeniedResponse(limit, "keyword_search");
+      if (!usageLimit.allowed) {
+        return limitDeniedResponse(usageLimit, "keyword_search");
       }
 
       const params = new URLSearchParams({

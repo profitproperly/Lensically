@@ -105,7 +105,7 @@ export default function Home() {
                   Log in
                 </Link>
                 <Link
-                  href="/login"
+                  href="/signup"
                   className="rounded-xl border border-black bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
                 >
                   Sign up
@@ -172,7 +172,7 @@ export default function Home() {
                       Log in
                     </Link>
                     <Link
-                      href="/login"
+                      href="/signup"
                       className="flex-1 rounded-xl border border-black bg-black px-4 py-2 text-center text-sm font-medium text-white"
                     >
                       Sign up
