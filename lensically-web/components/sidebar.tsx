@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -20,14 +21,21 @@ type ThreadsMeResponse = {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const isConnectPage = pathname === "/connect";
+  const appUserId = session?.user?.email?.trim().toLowerCase();
   const [username, setUsername] = useState<string>("unknown");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isConnectPage || !appUserId) {
+      return;
+    }
+
     const loadProfile = async () => {
       try {
         const res = await fetch(
-          "https://lensically-worker.lensically.workers.dev/api/threads/me",
+          `https://lensically-worker.lensically.workers.dev/api/threads/me?app_user_id=${encodeURIComponent(appUserId)}`,
           { cache: "no-store" },
         );
         if (!res.ok) {
@@ -42,60 +50,76 @@ export function Sidebar() {
     };
 
     void loadProfile();
-  }, []);
+  }, [appUserId, isConnectPage]);
 
   return (
     <aside className="sticky top-16 h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
-      <div className="flex flex-col items-center w-full mt-6 mb-8">
-        <div className="relative group cursor-pointer">
-          <a
-            href={`https://www.threads.net/@${username}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {profilePictureUrl ? (
-              <img
-                src={profilePictureUrl}
-                alt={`@${username}`}
-                className="h-32 w-32 rounded-full"
-              />
-            ) : (
-              <div className="h-32 w-32 rounded-full bg-slate-200" />
-            )}
-            <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M7 7h10v10" />
-              </svg>
+      {!isConnectPage && (
+        <div className="flex flex-col items-center w-full mt-6 mb-8">
+          <div className="relative group cursor-pointer">
+            <a
+              href={`https://www.threads.net/@${username}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {profilePictureUrl ? (
+                <img
+                  src={profilePictureUrl}
+                  alt={`@${username}`}
+                  className="h-32 w-32 rounded-full"
+                />
+              ) : (
+                <div className="h-32 w-32 rounded-full bg-slate-200" />
+              )}
+              <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M7 7h10v10" />
+                </svg>
+              </div>
+            </a>
+            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 text-white text-xs px-3 py-1 opacity-0 group-hover:opacity-100 transition">
+              Open Threads Profile
             </div>
-          </a>
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 text-white text-xs px-3 py-1 opacity-0 group-hover:opacity-100 transition">
-            Open Threads Profile
           </div>
+          <p className="text-base font-semibold text-slate-900 mt-3">@{username}</p>
         </div>
-        <p className="text-base font-semibold text-slate-900 mt-3">@{username}</p>
-      </div>
+      )}
 
       <nav className="w-full space-y-2">
         {links.map((link) => (
           <div key={link.href} className="px-4">
-            <Link
-              href={link.href}
-              className={[
-                "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
-                pathname === link.href
-                  ? "bg-black text-white"
-                  : "text-black hover:bg-black hover:text-white",
-              ].join(" ")}
-            >
-              {link.label}
-            </Link>
+            {isConnectPage ? (
+              <button
+                type="button"
+                className={[
+                  "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left",
+                  pathname === link.href
+                    ? "bg-black text-white"
+                    : "text-black hover:bg-black hover:text-white",
+                ].join(" ")}
+              >
+                {link.label}
+              </button>
+            ) : (
+              <Link
+                href={link.href}
+                className={[
+                  "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
+                  pathname === link.href
+                    ? "bg-black text-white"
+                    : "text-black hover:bg-black hover:text-white",
+                ].join(" ")}
+              >
+                {link.label}
+              </Link>
+            )}
           </div>
         ))}
       </nav>

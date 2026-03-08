@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS user_usage_daily (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  me_calls INTEGER NOT NULL DEFAULT 0,
+  insights_calls INTEGER NOT NULL DEFAULT 0,
+  publish_calls INTEGER NOT NULL DEFAULT 0,
+  keyword_calls INTEGER NOT NULL DEFAULT 0,
+  profile_calls INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(user_id, date)
+);

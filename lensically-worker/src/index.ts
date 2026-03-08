@@ -1,4 +1,10 @@
-import { enforceLimit } from "./utils/limits";
+import { enforceLimit, type EnforceLimitResult, type UsageFeature } from "./utils/enforceLimit";
+import { register } from "../auth/register.js";
+import { login } from "../auth/login.js";
+import { verifyEmail } from "../auth/verifyEmail.js";
+import { forgotPassword, resetPassword } from "../auth/passwordReset.js";
+import { logout } from "../auth/logout.js";
+import { currentUser } from "../auth/me.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,21 +36,25 @@ interface Env {
   DB: D1Database;
 }
 
-async function runLimitCheck(
-  env: Env,
-  userId: string,
-  column: "me_calls" | "insights_calls" | "publish_calls" | "keyword_calls" | "discovery_calls",
-  limit: number,
-): Promise<Response | null> {
-  try {
-    await enforceLimit(env, userId, column, limit);
-    return null;
-  } catch (error) {
-    if (error instanceof Response) {
-      return error;
-    }
-    throw error;
-  }
+function limitDeniedResponse(
+  result: Exclude<EnforceLimitResult, { allowed: true }>,
+  feature: UsageFeature,
+): Response {
+  return new Response(
+    JSON.stringify({
+      error: result.error,
+      feature,
+      limit: result.limit ?? null,
+      used: result.used ?? null,
+    }),
+    {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    },
+  );
 }
 
 function getCookieValue(request: Request, name: string): string | null {
@@ -60,6 +70,100 @@ function getCookieValue(request: Request, name: string): string | null {
     }
   }
   return null;
+}
+
+function normalizeAppBaseUrl(raw: string | null | undefined): string | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAppUserId(raw: string | null | undefined): string | null {
+  const value = raw?.trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+  return value;
+}
+
+type OauthStateContext = {
+  appBaseUrl: string;
+  appUserId: string | null;
+};
+
+function buildOauthState(appBaseUrl: string, appUserId: string): string {
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const encodedContext = btoa(JSON.stringify({ appBaseUrl, appUserId }));
+  return `${nonce}.${encodedContext}`;
+}
+
+function contextFromState(state: string | null): OauthStateContext | null {
+  if (!state) {
+    return null;
+  }
+  const dotIndex = state.indexOf(".");
+  if (dotIndex === -1 || dotIndex === state.length - 1) {
+    return null;
+  }
+  const encodedState = state.slice(dotIndex + 1);
+  try {
+    const decoded = atob(encodedState);
+    if (decoded.startsWith("{")) {
+      const parsed = JSON.parse(decoded) as { appBaseUrl?: string; appUserId?: string };
+      const appBaseUrl = normalizeAppBaseUrl(parsed.appBaseUrl ?? null);
+      if (!appBaseUrl) {
+        return null;
+      }
+      return {
+        appBaseUrl,
+        appUserId: normalizeAppUserId(parsed.appUserId ?? null),
+      };
+    }
+    const appBaseUrl = normalizeAppBaseUrl(decoded);
+    if (!appBaseUrl) {
+      return null;
+    }
+    return { appBaseUrl, appUserId: null };
+  } catch {
+    return null;
+  }
+}
+
+async function ensureAppThreadsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS app_threads_accounts (
+      app_user_id TEXT PRIMARY KEY,
+      threads_user_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`,
+  ).run();
+}
+
+type ThreadsAccount = {
+  threads_user_id: string;
+  access_token: string;
+};
+
+async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise<ThreadsAccount | null> {
+  await ensureAppThreadsTable(env);
+  return env.DB.prepare(
+    `SELECT t.threads_user_id, t.access_token
+     FROM app_threads_accounts a
+     JOIN threads_accounts t ON t.threads_user_id = a.threads_user_id
+     WHERE a.app_user_id = ?
+     LIMIT 1`,
+  )
+    .bind(appUserId)
+    .first<ThreadsAccount>();
 }
 
 async function checkUserCapacity(
@@ -96,12 +200,41 @@ async function checkUserCapacity(
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+    const path = url.pathname;
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: corsHeaders,
       });
+    }
+
+    if (path === "/api/auth/register" && request.method === "POST") {
+      return register(request, env);
+    }
+
+    if (path === "/api/auth/login" && request.method === "POST") {
+      return login(request, env);
+    }
+
+    if (path === "/api/auth/verify-email" && request.method === "GET") {
+      return verifyEmail(request, env);
+    }
+
+    if (path === "/api/auth/forgot-password" && request.method === "POST") {
+      return forgotPassword(request, env);
+    }
+
+    if (path === "/api/auth/reset-password" && request.method === "POST") {
+      return resetPassword(request, env);
+    }
+
+    if (path === "/api/auth/logout" && request.method === "POST") {
+      return logout(request, env);
+    }
+
+    if (path === "/api/auth/me" && request.method === "GET") {
+      return currentUser(request, env);
     }
 
     if (url.pathname === "/connect/threads") {
@@ -112,8 +245,18 @@ export default {
     }
 
     if (url.pathname === "/api/auth/threads/start" && request.method === "GET") {
-      const state = crypto.randomUUID().replace(/-/g, "");
-      const authURL = new URL("https://graph.threads.net/oauth/authorize");
+      const requestAppBase =
+        normalizeAppBaseUrl(url.searchParams.get("return_to"))
+        ?? normalizeAppBaseUrl(request.headers.get("origin"))
+        ?? normalizeAppBaseUrl(request.headers.get("referer"))
+        ?? normalizeAppBaseUrl(env.WEB_APP_URL)
+        ?? "https://lensically2.pages.dev";
+      const requestAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!requestAppUserId) {
+        return Response.redirect(`${requestAppBase}/connect?error=missing_user`, 302);
+      }
+      const state = buildOauthState(requestAppBase, requestAppUserId);
+      const authURL = new URL("https://www.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
       authURL.searchParams.set("redirect_uri", API_OAUTH_REDIRECT_URI);
       authURL.searchParams.set("scope", API_OAUTH_SCOPES);
@@ -133,131 +276,139 @@ export default {
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state");
       const cookieState = getCookieValue(request, "lensically_oauth_state");
-
-      if (!code || !state || !cookieState || state !== cookieState) {
-        return new Response(
-          JSON.stringify({ error: "Invalid OAuth state" }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
+      const stateContext = contextFromState(state);
+      const appBaseUrl =
+        stateContext?.appBaseUrl
+        ?? normalizeAppBaseUrl(env.WEB_APP_URL)
+        ?? "https://lensically2.pages.dev";
+      const appUserId = stateContext?.appUserId;
+      const redirectToConnectError = (error: string): Response =>
+        new Response(null, {
+          status: 302,
+          headers: {
+            Location: `${appBaseUrl}/connect?error=${error}`,
+            "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
           },
-        );
-      }
-
-      const tokenBody = new URLSearchParams({
-        client_id: env.THREADS_CLIENT_ID,
-        client_secret: env.THREADS_CLIENT_SECRET,
-        redirect_uri: API_OAUTH_REDIRECT_URI,
-        grant_type: "authorization_code",
-        code,
-      });
-
-      const tokenResp = await fetch("https://graph.threads.net/oauth/access_token", {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: tokenBody,
-      });
-
-      if (!tokenResp.ok) {
-        return new Response(await tokenResp.text(), {
-          status: tokenResp.status,
-          headers: { "content-type": "application/json; charset=UTF-8" },
         });
-      }
 
-      const shortTokenData = await tokenResp.json() as { access_token?: string };
-      const shortToken = shortTokenData.access_token;
-      if (!shortToken) {
-        return new Response(
-          JSON.stringify({ error: "Missing short-lived access token" }),
-          {
-            status: 500,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
+      try {
+        if (!code) {
+          return redirectToConnectError("access_denied");
+        }
 
-      const longResp = await fetch(
-        `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${env.THREADS_CLIENT_SECRET}&access_token=${shortToken}`,
-      );
+        if (!state || !cookieState) {
+          return redirectToConnectError("state_missing");
+        }
 
-      if (!longResp.ok) {
-        return new Response(await longResp.text(), {
-          status: longResp.status,
-          headers: { "content-type": "application/json; charset=UTF-8" },
+        if (state !== cookieState) {
+          return redirectToConnectError("state_mismatch");
+        }
+
+        if (!appUserId) {
+          return redirectToConnectError("state_missing");
+        }
+
+        if (!env.THREADS_CLIENT_ID || !env.THREADS_CLIENT_SECRET) {
+          return redirectToConnectError("server_config");
+        }
+
+        const tokenBody = new URLSearchParams({
+          client_id: env.THREADS_CLIENT_ID,
+          client_secret: env.THREADS_CLIENT_SECRET,
+          redirect_uri: API_OAUTH_REDIRECT_URI,
+          grant_type: "authorization_code",
+          code,
         });
-      }
 
-      const longTokenData = await longResp.json() as {
-        access_token?: string;
-        expires_in?: number;
-      };
-      const accessToken = longTokenData.access_token;
-      const expiresIn = Number(longTokenData.expires_in ?? 0);
-
-      if (!accessToken || !expiresIn) {
-        return new Response(
-          JSON.stringify({ error: "Invalid long-lived token response" }),
-          {
-            status: 500,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-
-      const meResp = await fetch(
-        `https://graph.threads.net/me?fields=id&access_token=${accessToken}`,
-      );
-      if (!meResp.ok) {
-        return new Response(await meResp.text(), {
-          status: meResp.status,
-          headers: { "content-type": "application/json; charset=UTF-8" },
+        const tokenResp = await fetch("https://graph.threads.net/oauth/access_token", {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: tokenBody,
         });
-      }
 
-      const meData = await meResp.json() as { id?: string };
-      if (!meData.id) {
-        return new Response(
-          JSON.stringify({ error: "Missing Threads user id" }),
-          {
-            status: 500,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
+        if (!tokenResp.ok) {
+          return redirectToConnectError("token_exchange_failed");
+        }
+
+        const shortTokenData = await tokenResp.json() as { access_token?: string };
+        const shortToken = shortTokenData.access_token;
+        if (!shortToken) {
+          return redirectToConnectError("token_exchange_failed");
+        }
+
+        const longResp = await fetch(
+          `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${env.THREADS_CLIENT_SECRET}&access_token=${shortToken}`,
         );
-      }
-      const userCapacityResponse = await checkUserCapacity(env, meData.id);
-      if (userCapacityResponse) {
-        return userCapacityResponse;
-      }
 
-      const now = Math.floor(Date.now() / 1000);
-      const expiresAt = now + expiresIn;
+        if (!longResp.ok) {
+          return redirectToConnectError("token_upgrade_failed");
+        }
 
-      await env.DB.prepare(
-        `INSERT OR REPLACE INTO threads_accounts (threads_user_id, access_token, expires_at)
-         VALUES (?, ?, ?)`,
-      )
-        .bind(meData.id, accessToken, expiresAt)
-        .run();
+        const longTokenData = await longResp.json() as {
+          access_token?: string;
+          expires_in?: number;
+        };
+        const accessToken = longTokenData.access_token;
+        const expiresIn = Number(longTokenData.expires_in ?? 0);
 
-      if (!env.WEB_APP_URL) {
-        return new Response(
-          JSON.stringify({ error: "WEB_APP_URL is not configured" }),
-          {
-            status: 500,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
+        if (!accessToken || !expiresIn) {
+          return redirectToConnectError("token_upgrade_failed");
+        }
+
+        const meResp = await fetch(
+          `https://graph.threads.net/me?fields=id&access_token=${accessToken}`,
         );
-      }
-      const destination = `${env.WEB_APP_URL.replace(/\/$/, "")}/dashboard?connected=1`;
+        if (!meResp.ok) {
+          return redirectToConnectError("account_lookup_failed");
+        }
 
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: destination,
-          "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
-        },
-      });
+        const meData = await meResp.json() as { id?: string };
+        if (!meData.id) {
+          return redirectToConnectError("account_lookup_failed");
+        }
+
+        const userCapacityResponse = await checkUserCapacity(env, meData.id);
+        if (userCapacityResponse) {
+          return redirectToConnectError("account_lookup_failed");
+        }
+
+        const now = Math.floor(Date.now() / 1000);
+        const expiresAt = now + expiresIn;
+
+        try {
+          await env.DB.prepare(
+            `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(threads_user_id) DO UPDATE SET
+               access_token = excluded.access_token,
+               expires_at = excluded.expires_at`,
+          )
+            .bind(meData.id, accessToken, expiresAt, now)
+            .run();
+
+          await ensureAppThreadsTable(env);
+          await env.DB.prepare(
+            `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(app_user_id) DO UPDATE SET
+               threads_user_id = excluded.threads_user_id`,
+          )
+            .bind(appUserId, meData.id, now)
+            .run();
+        } catch {
+          return redirectToConnectError("save_failed");
+        }
+
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: `${appBaseUrl}/dashboard`,
+            "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+          },
+        });
+      } catch {
+        return redirectToConnectError("unexpected");
+      }
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
@@ -411,10 +562,13 @@ export default {
       const expiresAt = now + expiresIn;
 
       await env.DB.prepare(
-        `INSERT OR REPLACE INTO threads_accounts (threads_user_id, access_token, expires_at)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(threads_user_id) DO UPDATE SET
+           access_token = excluded.access_token,
+           expires_at = excluded.expires_at`,
       )
-        .bind(meData.id, accessToken, expiresAt)
+        .bind(meData.id, accessToken, expiresAt, now)
         .run();
 
       return Response.redirect(
@@ -432,9 +586,20 @@ export default {
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
-      const account = await env.DB.prepare(
-        "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
-      ).first<{ threads_user_id: string; access_token: string }>();
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Missing app_user_id" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
+        );
+      }
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account) {
         return new Response(
@@ -448,22 +613,36 @@ export default {
           },
         );
       }
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id },
+        "me",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "me");
+      }
 
       const meResp = await fetch(
-        "https://graph.threads.net/v1.0/me?fields=id,username,threads_profile_picture_url",
+        "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url",
         {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
 
       const meJson = await meResp.json() as {
+        name?: string;
         username?: string;
+        threads_biography?: string;
+        is_verified?: boolean;
         threads_profile_picture_url?: string;
       };
 
       return new Response(
         JSON.stringify({
+          name: meJson.name ?? null,
           username: meJson.username ?? null,
+          threads_biography: meJson.threads_biography ?? null,
+          is_verified: meJson.is_verified ?? false,
           threads_profile_picture_url: meJson.threads_profile_picture_url ?? null,
         }),
         {
@@ -481,17 +660,16 @@ export default {
       && request.method === "GET"
     ) {
       const username = url.searchParams.get("username");
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
 
-      if (!username) {
+      if (!username || !appUserId) {
         return new Response(
-          JSON.stringify({ error: "missing username" }),
+          JSON.stringify({ error: "missing username or app_user_id" }),
           { status: 400 },
         );
       }
 
-      const account = await env.DB
-        .prepare("SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1")
-        .first<{ threads_user_id: string; access_token: string }>();
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account) {
         return new Response(
@@ -499,9 +677,13 @@ export default {
           { status: 400 },
         );
       }
-      const limitResponse = await runLimitCheck(env, account.threads_user_id, "discovery_calls", 20);
-      if (limitResponse) {
-        return limitResponse;
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id },
+        "profile_discovery",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "profile_discovery");
       }
 
       const res = await fetch(
@@ -521,6 +703,7 @@ export default {
     }
 
     if (url.pathname === "/api/threads/posts" && request.method === "GET") {
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       const cursor = url.searchParams.get("cursor");
       const cursorDepthParam = Number(url.searchParams.get("cursor_depth") || 0);
       const cursorDepth = Number.isFinite(cursorDepthParam) && cursorDepthParam > 0
@@ -543,9 +726,20 @@ export default {
         );
       }
 
-      const account = await env.DB.prepare(
-        "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
-      ).first<{ threads_user_id: string; access_token: string }>();
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Missing app_user_id" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
+        );
+      }
+
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account) {
         return new Response(
@@ -559,15 +753,13 @@ export default {
           },
         );
       }
-      const limitResponse = await runLimitCheck(env, account.threads_user_id, "insights_calls", 100);
-      if (limitResponse) {
-        return new Response(await limitResponse.text(), {
-          status: limitResponse.status,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        });
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id },
+        "insights",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "insights");
       }
 
       const params = new URLSearchParams({
@@ -720,16 +912,21 @@ export default {
     }
 
     if (url.pathname === "/api/threads/insights" && request.method === "GET") {
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       const threadsUserId = url.searchParams.get("threads_user_id");
-      const account = threadsUserId
-        ? await env.DB.prepare(
-            "SELECT access_token FROM threads_accounts WHERE threads_user_id = ?",
-          )
-            .bind(threadsUserId)
-            .first<{ access_token: string }>()
-        : null;
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "missing app_user_id" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
 
-      if (!account?.access_token) {
+      const account = await getThreadsAccountForAppUser(env, appUserId);
+
+      if (!account?.access_token || (threadsUserId && threadsUserId !== account.threads_user_id)) {
         return new Response(
           JSON.stringify({ error: "Threads account not connected" }),
           {
@@ -737,6 +934,14 @@ export default {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
+      }
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id },
+        "insights",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "insights");
       }
 
       const insightsResp = await fetch(
@@ -754,6 +959,7 @@ export default {
 
     if (url.pathname === "/api/threads/post-insights" && request.method === "GET") {
       const mediaId = url.searchParams.get("id");
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!mediaId) {
         return new Response(
           JSON.stringify({ error: "missing media id" }),
@@ -764,9 +970,17 @@ export default {
         );
       }
 
-      const account = await env.DB.prepare(
-        "SELECT access_token FROM threads_accounts LIMIT 1",
-      ).first<{ access_token: string }>();
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "missing app_user_id" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account?.access_token) {
         return new Response(
@@ -797,9 +1011,18 @@ export default {
     }
 
     if (url.pathname === "/api/threads/user-insights" && request.method === "GET") {
-      const account = await env.DB.prepare(
-        "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
-      ).first<{ threads_user_id: string; access_token: string }>();
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "missing app_user_id" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account) {
         return new Response(
@@ -831,6 +1054,7 @@ export default {
 
     if (url.pathname === "/api/threads/search" && request.method === "GET") {
       const q = url.searchParams.get("q");
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!q) {
         return new Response(
           JSON.stringify({ error: "missing query parameter q" }),
@@ -843,9 +1067,14 @@ export default {
       const mediaType = url.searchParams.get("media_type");
       const limit = url.searchParams.get("limit") || "25";
 
-      const account = await env.DB.prepare(
-        "SELECT threads_user_id, access_token FROM threads_accounts LIMIT 1",
-      ).first<{ threads_user_id: string; access_token: string }>();
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "missing app_user_id" }),
+          { status: 400 },
+        );
+      }
+
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account) {
         return new Response(
@@ -853,9 +1082,13 @@ export default {
           { status: 400 },
         );
       }
-      const limitResponse = await runLimitCheck(env, account.threads_user_id, "keyword_calls", 25);
-      if (limitResponse) {
-        return limitResponse;
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id },
+        "keyword_search",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "keyword_search");
       }
 
       const params = new URLSearchParams({
@@ -891,7 +1124,7 @@ export default {
     }
 
     if (url.pathname === "/api/threads/publish" && request.method === "POST") {
-      let payload: { threads_user_id?: string; text?: string };
+      let payload: { app_user_id?: string; threads_user_id?: string; text?: string };
       try {
         payload = await request.json();
       } catch {
@@ -904,12 +1137,13 @@ export default {
         );
       }
 
+      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
       const threadsUserId = payload.threads_user_id?.trim();
       const text = payload.text?.trim();
 
-      if (!threadsUserId || !text) {
+      if (!appUserId || !threadsUserId || !text) {
         return new Response(
-          JSON.stringify({ error: "threads_user_id and text are required" }),
+          JSON.stringify({ error: "app_user_id, threads_user_id and text are required" }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -917,13 +1151,9 @@ export default {
         );
       }
 
-      const account = await env.DB.prepare(
-        "SELECT access_token FROM threads_accounts WHERE threads_user_id = ?",
-      )
-        .bind(threadsUserId)
-        .first<{ access_token: string }>();
+      const account = await getThreadsAccountForAppUser(env, appUserId);
 
-      if (!account?.access_token) {
+      if (!account?.access_token || account.threads_user_id !== threadsUserId) {
         return new Response(
           JSON.stringify({ error: "Threads account not connected" }),
           {
@@ -932,9 +1162,13 @@ export default {
           },
         );
       }
-      const limitResponse = await runLimitCheck(env, threadsUserId, "publish_calls", 50);
-      if (limitResponse) {
-        return limitResponse;
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id },
+        "publish",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "publish");
       }
 
       const publishBody = new URLSearchParams({

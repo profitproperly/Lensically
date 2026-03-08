@@ -29,7 +29,10 @@
 			"database_name": "lensically-db",
 			"database_id": "98f48396-a972-4cc7-955a-fdbf51e889b2"
 		}
-	]
+	],
+	"vars": {
+		"WEB_APP_URL": "https://lensically2.pages.dev"
+	}
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
