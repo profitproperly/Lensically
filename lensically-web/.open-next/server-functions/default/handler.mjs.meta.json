@@ -3606,13 +3606,13 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
-      "bytes": 8176,
+    ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
+      "bytes": 8178,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
-      "bytes": 8178,
+    ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
+      "bytes": 8176,
       "imports": [],
       "format": "cjs"
     },
@@ -3621,13 +3621,13 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
-      "bytes": 9309,
+    ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js": {
+      "bytes": 8179,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js": {
-      "bytes": 8179,
+    ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
+      "bytes": 9309,
       "imports": [],
       "format": "cjs"
     },
@@ -3675,14 +3675,14 @@
           "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\login\\page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\search\\page_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\schedule\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\search\\page_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js",
@@ -3690,14 +3690,14 @@
           "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\dashboard\\page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\connect\\page_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\discovery\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\Users\\brian\\Downloads\\Profit Properly\\Lensically\\lensically-web\\.open-next\\server-functions\\default\\.next\\server\\app\\(internal)\\connect\\page_client-reference-manifest.js"
         }
       ],
       "format": "cjs"
@@ -6674,20 +6674,20 @@
         ".open-next/server-functions/default/.next/server/app/login/page_client-reference-manifest.js": {
           "bytesInOutput": 6979
         },
-        ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
-          "bytesInOutput": 7788
-        },
         ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
           "bytesInOutput": 7792
+        },
+        ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
+          "bytesInOutput": 7788
         },
         ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js": {
           "bytesInOutput": 8881
         },
-        ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
-          "bytesInOutput": 8867
-        },
         ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js": {
           "bytesInOutput": 7794
+        },
+        ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
+          "bytesInOutput": 8867
         },
         ".open-next/server-functions/default/node_modules/next/dist/server/load-manifest.external.js": {
           "bytesInOutput": 21799
