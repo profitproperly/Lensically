@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useAuth } from "../../../lib/AuthProvider";
 
 type ThreadsProfile = {
@@ -26,8 +25,7 @@ type ProfileState = {
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { data: session } = useSession();
-  const appUserId = session?.user?.email?.trim().toLowerCase();
+  const appUserId = user?.email?.trim().toLowerCase();
   const [state, setState] = useState<ProfileState>({
     profile: null,
     needsConnection: true,

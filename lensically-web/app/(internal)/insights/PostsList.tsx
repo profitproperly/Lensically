@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "../../../lib/AuthProvider";
 
 type ThreadsPost = {
   id?: string;
@@ -29,8 +29,8 @@ const CONNECT_THREADS_URL =
   "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
 
 export default function PostsList() {
-  const { data: session } = useSession();
-  const appUserId = session?.user?.email?.trim().toLowerCase();
+  const { user } = useAuth();
+  const appUserId = user?.email?.trim().toLowerCase();
   const cacheKey = appUserId
     ? `lensically_insights_cache_${appUserId}`
     : "lensically_insights_cache";

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { signIn } from "next-auth/react"
 import { login } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
 
@@ -91,29 +90,6 @@ export default function LoginPage() {
             {submitting ? "Logging in..." : "Login with Email"}
           </button>
         </form>
-
-        <div className="text-center text-sm text-gray-500">or continue with</div>
-
-        <button
-          onClick={() => signIn("google", { callbackUrl: "/connect" })}
-          className="w-full border border-black text-black rounded-lg py-3 font-medium hover:bg-black hover:text-white transition"
-        >
-          Continue with Google
-        </button>
-
-        <button
-          onClick={() => signIn("github")}
-          className="w-full border border-black text-black rounded-lg py-3 font-medium hover:bg-black hover:text-white transition"
-        >
-          Continue with GitHub
-        </button>
-
-        <button
-          onClick={() => signIn("discord")}
-          className="w-full border border-black text-black rounded-lg py-3 font-medium hover:bg-black hover:text-white transition"
-        >
-          Continue with Discord
-        </button>
 
       </div>
     </div>

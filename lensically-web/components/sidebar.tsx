@@ -2,9 +2,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAuth } from "../lib/AuthProvider";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -21,9 +21,9 @@ type ThreadsMeResponse = {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const isConnectPage = pathname === "/connect";
-  const appUserId = session?.user?.email?.trim().toLowerCase();
+  const appUserId = user?.email?.trim().toLowerCase();
   const [username, setUsername] = useState<string>("unknown");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
 

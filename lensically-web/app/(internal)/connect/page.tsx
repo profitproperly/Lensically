@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "../../../lib/AuthProvider";
 
 const CONNECT_THREADS_URL =
   "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
 
 export default function ConnectPage() {
-  const { data: session } = useSession();
-  const appUserId = session?.user?.email?.trim().toLowerCase();
+  const { user } = useAuth();
+  const appUserId = user?.email?.trim().toLowerCase();
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;

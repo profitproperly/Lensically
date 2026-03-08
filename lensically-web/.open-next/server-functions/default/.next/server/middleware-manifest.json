@@ -1,0 +1,53 @@
+{
+  "version": 3,
+  "middleware": {},
+  "sortedMiddleware": [],
+  "functions": {
+    "/(internal)/insights/page": {
+      "files": [
+        "server/middleware-build-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "required-server-files.js",
+        "server/next-font-manifest.js",
+        "server/server-reference-manifest.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_353d32d2._.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_esm_aeeb2a8e._.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_esm_1de25341._.js",
+        "server/edge/chunks/ssr/node_modules_f7f6450d._.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_4be51fa8._.js",
+        "server/edge/chunks/ssr/_b74c1070._.js",
+        "server/edge/chunks/ssr/_b04f468e._.js",
+        "server/edge/chunks/ssr/node_modules_284f580d._.js",
+        "server/edge/chunks/ssr/app_(internal)_insights_PostsList_tsx_e99dd0f6._.js",
+        "server/app/(internal)/insights/page_client-reference-manifest.js",
+        "server/edge/chunks/ssr/_next-internal_server_app_(internal)_insights_page_actions_774f1e9c.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_esm_66ff6d9f._.js",
+        "server/edge/chunks/ssr/[root-of-the-server]__22eac611._.js",
+        "server/edge/chunks/ssr/[root-of-the-server]__909e0e4f._.js",
+        "server/edge/chunks/ssr/[root-of-the-server]__5af60d80._.js",
+        "server/edge/chunks/ssr/node_modules_a9b200b8._.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_9e149d85._.js",
+        "server/edge/chunks/ssr/node_modules_next_dist_compiled_2adaed9e._.js",
+        "server/edge/chunks/ssr/turbopack-node_modules_next_dist_esm_build_templates_edge-wrapper_42d1d7d2.js",
+        "server/app/(internal)/insights/page/react-loadable-manifest.js"
+      ],
+      "name": "app/(internal)/insights/page",
+      "page": "/(internal)/insights/page",
+      "matchers": [
+        {
+          "regexp": "^/insights(?:/)?$",
+          "originalSource": "/insights"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "HpdyOzYCC0CxbuRlDDquU",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "cNI4uOac2fq4JA2VRRfCZj5gNNkWXP9hE/QNqH9EK98=",
+        "__NEXT_PREVIEW_MODE_ID": "900e62308c99b91bd187d884b82aae89",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "543db0a0f76c55c936014040f08771b011a80fba518c796f1829d2ec8153d816",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "80a0b0dcbd57ea3965861807019cce6248837069521736b105a19f8e51c466e0"
+      }
+    }
+  }
+}

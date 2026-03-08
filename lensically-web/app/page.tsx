@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "../lib/AuthProvider";
 
 const tools = [
   { label: "Insights", href: "#" },
@@ -13,8 +13,8 @@ const tools = [
 ];
 
 export default function Home() {
-  const { data: session } = useSession();
-  const isAuthenticated = Boolean(session?.user);
+  const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
   const [desktopToolsOpen, setDesktopToolsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
