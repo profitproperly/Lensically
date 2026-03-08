@@ -1,2 +1,2 @@
 name = "lensically-web"
-pages_build_output_dir = ".open-next"
+pages_build_output_dir = ".open-next/assets"
