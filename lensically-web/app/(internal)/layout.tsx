@@ -3,19 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/lib/AuthProvider";
-import { buildWorkerUrl } from "@/lib/apiClient";
 import { disconnectThreadsAccount } from "@/lib/authClient";
-
-type ThreadsMeResponse = {
-  account?: {
-    threads_profile_picture_url?: string;
-    username?: string;
-  } | null;
-};
 
 export default function InternalLayout({
   children,
@@ -25,50 +17,8 @@ export default function InternalLayout({
   const { user, logoutUser } = useAuth();
   const router = useRouter();
   const appUserId = user?.id?.trim() ?? "";
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  useEffect(() => {
-    if (!appUserId) {
-      setAvatarUrl(null);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function loadThreadsProfile() {
-      try {
-        const response = await fetch(
-          `${buildWorkerUrl("/api/threads/me")}?app_user_id=${encodeURIComponent(appUserId)}`,
-          {
-            cache: "no-store",
-            credentials: "include",
-            signal: controller.signal,
-          },
-        );
-
-        if (!response.ok) {
-          setAvatarUrl(null);
-          return;
-        }
-
-        const data = (await response.json()) as ThreadsMeResponse;
-        setAvatarUrl(data.account?.threads_profile_picture_url ?? null);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-        setAvatarUrl(null);
-      }
-    }
-
-    void loadThreadsProfile();
-
-    return () => {
-      controller.abort();
-    };
-  }, [appUserId]);
 
   async function handleDisconnectThreads() {
     if (!appUserId) {
@@ -79,7 +29,6 @@ export default function InternalLayout({
 
     try {
       await disconnectThreadsAccount(appUserId);
-      setAvatarUrl(null);
       router.push("/connect");
       router.refresh();
     } finally {
@@ -115,8 +64,7 @@ export default function InternalLayout({
 
         {user ? (
           <ProfileMenu
-            avatarUrl={avatarUrl}
-            displayName={user.email}
+            displayName={null}
             email={user.email}
             accountHref="/dashboard"
             onDisconnectThreads={handleDisconnectThreads}

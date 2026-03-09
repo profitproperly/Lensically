@@ -95,7 +95,7 @@ export function ProfileMenu({
         aria-label="Open profile menu"
         disabled={isBusy}
         onClick={() => setIsOpen((current) => !current)}
-        className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-2 text-left shadow-sm transition hover:border-slate-300 hover:shadow disabled:cursor-not-allowed disabled:opacity-70"
+        className="cursor-pointer rounded-full border border-slate-200 bg-white p-2 text-left shadow-sm transition hover:border-slate-300 hover:shadow disabled:cursor-not-allowed disabled:opacity-70"
       >
         {avatarUrl ? (
           <img
@@ -108,21 +108,28 @@ export function ProfileMenu({
             {initials}
           </div>
         )}
-        <div className="hidden min-w-0 sm:block">
-          <p className="truncate text-sm font-semibold text-slate-900">{label}</p>
-          {email ? (
-            <p className="truncate text-xs text-slate-500">{email}</p>
-          ) : null}
-        </div>
       </button>
 
       {isOpen ? (
         <div className="absolute right-0 top-full z-30 mt-3 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-          <div className="border-b border-slate-100 px-3 py-3">
-            <p className="truncate text-sm font-semibold text-slate-900">{label}</p>
-            {email ? (
-              <p className="truncate text-xs text-slate-500">{email}</p>
-            ) : null}
+          <div className="flex items-center gap-3 border-b border-slate-100 px-3 py-3">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={label}
+                className="h-10 w-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                {initials}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">{label}</p>
+              {email ? (
+                <p className="truncate text-xs text-slate-500">{email}</p>
+              ) : null}
+            </div>
           </div>
 
           <div role="menu" aria-label="Profile actions" className="pt-2">
@@ -130,7 +137,7 @@ export function ProfileMenu({
               href={accountHref}
               role="menuitem"
               onClick={() => setIsOpen(false)}
-              className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+              className="block cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
             >
               Account
             </Link>
@@ -140,7 +147,7 @@ export function ProfileMenu({
               role="menuitem"
               onClick={() => void handleDisconnectThreads()}
               disabled={!onDisconnectThreads || isBusy}
-              className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="block w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
               {isDisconnecting ? "Disconnecting..." : "Disconnect Threads"}
             </button>
@@ -150,7 +157,7 @@ export function ProfileMenu({
               role="menuitem"
               onClick={() => void handleLogout()}
               disabled={!onLogout || isBusy}
-              className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="block w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
               {isLoggingOut ? "Logging out..." : "Logout"}
             </button>
