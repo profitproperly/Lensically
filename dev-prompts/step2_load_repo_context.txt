@@ -1,0 +1,8 @@
+STEP 2
+LOAD REPOSITORY CONTEXT
+
+Action
+Open PROJECT_CONTEXT.md from the repository and paste its contents into the chat.
+
+Source
+~/lensically/PROJECT_CONTEXT.md

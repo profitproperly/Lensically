@@ -1,0 +1,85 @@
+STEP 5
+EVAL / NEXT TASK
+
+Purpose
+Evaluate Codex output and determine the next step in the implementation plan.
+
+Development Task Registry
+
+All operational commands are executed through VS Code tasks.
+
+Task definitions
+
+git add commit push
+git add . → git commit -m "{message}" → git push
+
+front end deploy
+cd ~/lensically/lensically-web
+npx opennextjs-cloudflare build
+wrangler deploy
+
+front end dev
+cd ~/lensically/lensically-web
+npm run dev
+
+back end deploy
+cd ~/lensically/lensically-worker
+wrangler deploy
+
+back end dev
+cd ~/lensically/lensically-worker
+wrangler tail
+
+When instructing execution use the format
+
+Press task keybind → select: {task label}
+
+Evaluation Procedure
+
+Evaluate the changes.
+Determine if the step was implemented correctly.
+
+Return the following sections.
+
+Status
+Good or Bad
+
+Explanation
+Very short reasoning.
+
+If Status = Bad
+Provide corrected instructions for the current step.
+
+If Status = Good
+
+Determine whether a task must be executed.
+
+If a task must be run state
+
+Task to Run
+Press task keybind → select: {task label}
+
+Commit Handling
+
+If a commit should be created write
+
+commit?
+
+Provide the commit message in a separate copy box.
+
+Next Step
+
+Return the next step from the implementation plan.
+
+Rules
+
+Only place the next instructions intended for Codex inside a txt box.
+Keep all evaluation remarks in chat outside the txt box.
+Do not place explanations inside the txt box.
+The txt box must contain only the next implementation step.
+
+If all steps in the plan are complete return
+
+Done
+
+Then provide a short analysis of completion and overall system quality.

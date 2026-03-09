@@ -1,0 +1,10 @@
+STEP 4
+CODEX EXECUTION
+
+Goal
+Execute the following step from the implementation plan.
+
+Step
+[Paste the exact step description from the PLAN IMPLEMENTATION output.]
+
+Put in txt file every time so i can copy easily.

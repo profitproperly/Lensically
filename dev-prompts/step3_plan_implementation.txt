@@ -1,0 +1,35 @@
+STEP 3
+PLAN IMPLEMENTATION
+
+Purpose
+Break the objective into deterministic steps that Codex will execute.
+
+Template
+Create a safe implementation plan for Codex.
+
+Rules
+Break the task into small deterministic steps.
+Each step should modify a limited number of files.
+Avoid large refactors in one step.
+Steps must be independently executable.
+Prefer more smaller steps rather than fewer large steps.
+Assume Codex will execute each step sequentially.
+
+Return format
+
+Goal
+[clear description]
+
+Step 1
+Description
+Files likely affected
+
+Step 2
+Description
+Files likely affected
+
+Step 3
+Description
+Files likely affected
+
+Continue until the feature is complete.

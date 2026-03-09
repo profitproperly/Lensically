@@ -45,6 +45,42 @@
         "cwd": "/home/brian/lensically/lensically-worker"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "PROMPT STEP 1 — PORT AI CHAT CONTEXT",
+      "type": "shell",
+      "command": "cat ~/lensically/dev-prompts/step1_port_context.txt | clip.exe",
+      "problemMatcher": []
+    },
+    {
+      "label": "PROMPT STEP 2 — LOAD REPOSITORY CONTEXT",
+      "type": "shell",
+      "command": "cat ~/lensically/dev-prompts/step2_load_repo_context.txt | clip.exe",
+      "problemMatcher": []
+    },
+    {
+      "label": "PROMPT STEP 3 — PLAN IMPLEMENTATION",
+      "type": "shell",
+      "command": "cat ~/lensically/dev-prompts/step3_plan_implementation.txt | clip.exe",
+      "problemMatcher": []
+    },
+    {
+      "label": "PROMPT STEP 4 — CODEX EXECUTION",
+      "type": "shell",
+      "command": "cat ~/lensically/dev-prompts/step4_codex_execution.txt | clip.exe",
+      "problemMatcher": []
+    },
+    {
+      "label": "PROMPT STEP 5 — EVAL / NEXT TASK",
+      "type": "shell",
+      "command": "cat ~/lensically/dev-prompts/step5_eval_next_task.txt | clip.exe",
+      "problemMatcher": []
+    },
+    {
+      "label": "PROMPT STEP 6 — UPDATE REPO CONTEXT",
+      "type": "shell",
+      "command": "cat ~/lensically/dev-prompts/step6_update_repo_context.txt | clip.exe",
+      "problemMatcher": []
     }
   ],
   "inputs": [

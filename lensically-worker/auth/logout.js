@@ -1,23 +1,27 @@
-import { clearSessionCookie } from "./cookies.js";
+import { clearAuthCookies } from "./cookies.js";
+import { destroySession } from "./sessions.js";
 
 export async function logout(request, env) {
   if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
+      status: 405,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   }
 
-  const cookieHeader = request.headers.get("Cookie") || "";
-  const sessionMatch = cookieHeader.match(/session_token=([^;]+)/);
-  const sessionToken = sessionMatch ? sessionMatch[1] : null;
+  await destroySession(env, request);
 
-  if (sessionToken) {
-    await env.DB.prepare("DELETE FROM sessions WHERE session_token = ?").bind(sessionToken).run();
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+  for (const cookie of clearAuthCookies()) {
+    headers.append("Set-Cookie", cookie);
   }
 
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": clearSessionCookie(),
-    },
+    headers,
   });
 }

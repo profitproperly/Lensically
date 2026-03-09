@@ -1,0 +1,31 @@
+STEP 1
+PORT AI CHAT CONTEXT
+
+Purpose
+Summarize the current chat so it can be transferred into a new chat without losing the present development state.
+
+Return only the following sections.
+
+Current Objective
+What we are currently trying to achieve in this session.
+
+Work Completed
+What has been confirmed or implemented during this session.
+
+Current State
+Where the system stands right now.
+
+Active Step
+The step currently being executed or the last step completed.
+
+Next Step (Optional)
+The next action if one is clearly defined.
+If no next step exists yet, return "None".
+
+Rules
+Use present tense.
+Do not restate repository architecture.
+Do not restate stack information.
+Keep the output concise.
+Only summarize the state of this chat.
+Do not invent next steps if none exist.
