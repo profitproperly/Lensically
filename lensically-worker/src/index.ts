@@ -7,6 +7,7 @@ import { logout } from "../auth/logout.js";
 import { currentUser } from "../auth/me.js";
 import { createSession } from "../auth/sessions.js";
 import { setSessionCookie } from "../auth/cookies.js";
+import { requireAuth } from "../auth/requireAuth.js";
 
 const ALLOWED_ORIGIN = "https://lensically-web.lensically.workers.dev";
 const corsHeaders = {
@@ -504,6 +505,54 @@ async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise
   )
     .bind(appUserId)
     .first<ThreadsAccount>();
+}
+
+async function disconnectThreadsAccountForAppUser(
+  env: Env,
+  appUserId: string,
+): Promise<{ disconnected: boolean; threadsUserId: string | null }> {
+  await ensureAppThreadsTable(env);
+
+  const existingLink = await env.DB.prepare(
+    `SELECT threads_user_id
+     FROM app_threads_accounts
+     WHERE app_user_id = ?
+     LIMIT 1`,
+  )
+    .bind(appUserId)
+    .first<{ threads_user_id: string }>();
+
+  if (!existingLink?.threads_user_id) {
+    return { disconnected: false, threadsUserId: null };
+  }
+
+  const threadsUserId = existingLink.threads_user_id;
+
+  await env.DB.prepare(
+    `DELETE FROM app_threads_accounts
+     WHERE app_user_id = ?`,
+  )
+    .bind(appUserId)
+    .run();
+
+  const remainingLinks = await env.DB.prepare(
+    `SELECT COUNT(*) AS total
+     FROM app_threads_accounts
+     WHERE threads_user_id = ?`,
+  )
+    .bind(threadsUserId)
+    .first<{ total: number | string }>();
+
+  if (Number(remainingLinks?.total ?? 0) === 0) {
+    await env.DB.prepare(
+      `DELETE FROM threads_accounts
+       WHERE threads_user_id = ?`,
+    )
+      .bind(threadsUserId)
+      .run();
+  }
+
+  return { disconnected: true, threadsUserId };
 }
 
 async function checkUserCapacity(
@@ -1339,6 +1388,92 @@ export default {
         }),
         {
           status: meResp.status,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/disconnect" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        });
+      }
+
+      let payload: { app_user_id?: string } = {};
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
+        );
+      }
+
+      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Missing app_user_id" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
+        );
+      }
+
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
+        );
+      }
+
+      const result = await disconnectThreadsAccountForAppUser(env, appUserId);
+      if (!result.disconnected) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          disconnected: true,
+          threads_user_id: result.threadsUserId,
+        }),
+        {
+          status: 200,
           headers: {
             "Content-Type": "application/json",
             ...corsHeaders,
