@@ -1,3 +1,12 @@
+const DEFAULT_WORKER_ORIGIN = "https://lensically-worker.lensically.workers.dev";
+
+export function buildWorkerUrl(path: string) {
+  const configuredOrigin =
+    process.env.NEXT_PUBLIC_WORKER_ORIGIN?.trim() || DEFAULT_WORKER_ORIGIN;
+  const normalizedOrigin = configuredOrigin.replace(/\/+$/, "");
+  return `${normalizedOrigin}${path}`;
+}
+
 export async function apiRequest(
   url: string,
   options: RequestInit = {},
