@@ -40,6 +40,7 @@ export function ProfileMenu({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const initials = getInitials(displayName, email);
   const label = displayName?.trim() || email?.trim() || "Account";
+  const isBusy = isDisconnecting || isLoggingOut;
 
   useEffect(() => {
     if (!isOpen) {
@@ -72,8 +73,8 @@ export function ProfileMenu({
       return;
     }
 
-    await onDisconnectThreads();
     setIsOpen(false);
+    await onDisconnectThreads();
   }
 
   async function handleLogout() {
@@ -81,8 +82,8 @@ export function ProfileMenu({
       return;
     }
 
-    await onLogout();
     setIsOpen(false);
+    await onLogout();
   }
 
   return (
@@ -92,8 +93,9 @@ export function ProfileMenu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label="Open profile menu"
+        disabled={isBusy}
         onClick={() => setIsOpen((current) => !current)}
-        className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-2 text-left shadow-sm transition hover:border-slate-300 hover:shadow"
+        className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-2 text-left shadow-sm transition hover:border-slate-300 hover:shadow disabled:cursor-not-allowed disabled:opacity-70"
       >
         {avatarUrl ? (
           <img
@@ -137,7 +139,7 @@ export function ProfileMenu({
               type="button"
               role="menuitem"
               onClick={() => void handleDisconnectThreads()}
-              disabled={!onDisconnectThreads || isDisconnecting}
+              disabled={!onDisconnectThreads || isBusy}
               className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
               {isDisconnecting ? "Disconnecting..." : "Disconnect Threads"}
@@ -147,7 +149,7 @@ export function ProfileMenu({
               type="button"
               role="menuitem"
               onClick={() => void handleLogout()}
-              disabled={!onLogout || isLoggingOut}
+              disabled={!onLogout || isBusy}
               className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
               {isLoggingOut ? "Logging out..." : "Logout"}

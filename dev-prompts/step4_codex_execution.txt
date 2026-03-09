@@ -5,6 +5,12 @@ Goal
 Execute the following step from the implementation plan.
 
 Step
-[Paste the exact step description from the PLAN IMPLEMENTATION output.]
+[Rewrite the selected implementation-plan step into a complete,
+in-depth execution instruction for Codex. Do not paste only the
+step title. Expand it so the full objective is clear, the expected
+behavior is explicit, the necessary inspection or integration work
+is included, and the step can be completed in one execution without
+creating micro follow-up steps.]
 
-Put in txt file every time so i can copy easily.
+Rule
+Return only the Step content inside a txt box.
