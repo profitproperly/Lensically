@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "git add commit push",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && git add . && git commit -m \"${input:commitMessage}\" && git push",
+      "options": {
+        "cwd": "/home/brian/lensically"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "front end deploy",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npx opennextjs-cloudflare build && wrangler deploy",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-web"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "front end dev",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run dev",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-web"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "back end deploy",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && wrangler deploy",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-worker"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "back end dev",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && wrangler tail",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-worker"
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "commitMessage",
+      "type": "promptString",
+      "description": "Enter commit message"
+    }
+  ]
+}

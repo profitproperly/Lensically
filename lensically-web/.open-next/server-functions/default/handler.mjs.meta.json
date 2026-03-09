@@ -3616,13 +3616,13 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js": {
-      "bytes": 9315,
+    ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
+      "bytes": 8178,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
-      "bytes": 8178,
+    ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js": {
+      "bytes": 9315,
       "imports": [],
       "format": "cjs"
     },
@@ -3695,14 +3695,14 @@
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js",
@@ -8314,11 +8314,11 @@
         ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
           "bytesInOutput": 7788
         },
-        ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js": {
-          "bytesInOutput": 8874
-        },
         ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
           "bytesInOutput": 7792
+        },
+        ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js": {
+          "bytesInOutput": 8874
         },
         ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js": {
           "bytesInOutput": 7794

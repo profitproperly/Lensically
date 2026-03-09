@@ -49,6 +49,7 @@ Email verification and password reset
 
 ## Recent Changes (Git History)
 
+- stabilize threads insights pipeline and usage enforcement
 - auth system stable: google, github, discord oauth working
 - Update wrangler.toml to use OpenNext worker and ASSETS binding
 - move opennext worker into pages asset output
@@ -58,7 +59,6 @@ Email verification and password reset
 - remove invalid pages function worker
 - connect opennext worker to pages functions
 - add wrangler.toml for non-interactive OpenNext build
-- remove wrangler config from pages build
 
 ## Current Objective
-Finalize the OpenNext-to-Cloudflare deployment setup while preserving the now-stable multi-provider authentication flow in the backend worker.
+Stabilize the Threads insights pipeline and usage-limit enforcement while preserving the deployed OpenNext-to-Cloudflare routing and stable multi-provider authentication flow.
