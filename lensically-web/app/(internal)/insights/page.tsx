@@ -1,6 +1,6 @@
-import PostsList from "./PostsList";
+"use client";
 
-export const runtime = "edge";
+import PostsList from "./PostsList";
 
 export default function InsightsPage() {
   return (

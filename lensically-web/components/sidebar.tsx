@@ -23,7 +23,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const isConnectPage = pathname === "/connect";
-  const appUserId = user?.email?.trim().toLowerCase();
+  const appUserId = user?.id?.trim() ?? "";
   const [username, setUsername] = useState<string>("unknown");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
 
@@ -36,7 +36,7 @@ export function Sidebar() {
       try {
         const res = await fetch(
           `https://lensically-worker.lensically.workers.dev/api/threads/me?app_user_id=${encodeURIComponent(appUserId)}`,
-          { cache: "no-store" },
+          { cache: "no-store", credentials: "include" },
         );
         if (!res.ok) {
           return;

@@ -29,8 +29,8 @@ const CONNECT_THREADS_URL =
   "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
 
 export default function PostsList() {
-  const { user } = useAuth();
-  const appUserId = user?.email?.trim().toLowerCase();
+  const { user, loading } = useAuth();
+  const appUserId = user?.id?.trim() ?? "";
   const cacheKey = appUserId
     ? `lensically_insights_cache_${appUserId}`
     : "lensically_insights_cache";
@@ -76,6 +76,10 @@ export default function PostsList() {
   }, [appUserId, cacheKey]);
 
   const loadPosts = useCallback(async () => {
+    if (!appUserId) {
+      setLoadingInitial(false);
+      return;
+    }
     try {
       setLoadingInitial(true);
       setNeedsConnection(false);
@@ -190,7 +194,19 @@ export default function PostsList() {
   };
 
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!appUserId) {
+      setPosts([]);
+      setCursor(null);
+      setHasMore(false);
+      setCursorDepth(1);
+      setNeedsConnection(true);
+      setHasError(false);
+      setCacheChecked(true);
+      setRestoredFromCache(false);
+      setLoadingInitial(false);
       return;
     }
 
@@ -230,9 +246,12 @@ export default function PostsList() {
     } finally {
       setCacheChecked(true);
     }
-  }, [appUserId, cacheKey]);
+  }, [appUserId, cacheKey, loading]);
 
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!appUserId) {
       return;
     }
@@ -240,7 +259,7 @@ export default function PostsList() {
       return;
     }
     void loadPosts();
-  }, [appUserId, cacheChecked, restoredFromCache, loadPosts]);
+  }, [appUserId, cacheChecked, restoredFromCache, loadPosts, loading]);
 
   useEffect(() => {
     if (!appUserId || loadingInitial) {

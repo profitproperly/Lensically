@@ -31,7 +31,7 @@
 		}
 	],
 	"vars": {
-		"WEB_APP_URL": "https://lensically2.pages.dev"
+		"WEB_APP_URL": "https://lensically-web.lensically.workers.dev"
 	}
 	/**
 	 * Smart Placement

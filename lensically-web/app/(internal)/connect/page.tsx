@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
-import { useAuth } from "../../../lib/AuthProvider";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-const CONNECT_THREADS_URL =
-  "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
+const WORKER_BASE_URL = "https://lensically-worker.lensically.workers.dev";
+const CONNECT_THREADS_PATH = "/api/auth/threads/start";
+
+type AuthMeUser = {
+  id: string;
+  email: string;
+  email_verified: boolean;
+};
 
 export default function ConnectPage() {
-  const { user } = useAuth();
-  const appUserId = user?.email?.trim().toLowerCase();
+  const router = useRouter();
+  const [authUser, setAuthUser] = useState<AuthMeUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -18,6 +25,60 @@ export default function ConnectPage() {
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCurrentUser() {
+      setLoadingUser(true);
+      try {
+        const response = await fetch(`${WORKER_BASE_URL}/api/auth/me`, {
+          credentials: "include",
+        });
+        if (!isMounted) {
+          return;
+        }
+        if (response.status === 200) {
+          const data = await response.json();
+          setAuthUser({
+            id: String(data.id),
+            email: typeof data.email === "string" ? data.email : "",
+            email_verified: Boolean(data.email_verified),
+          });
+          return;
+        }
+        if (response.status === 401) {
+          setAuthUser(null);
+          router.replace("/login");
+        } else {
+          setAuthUser(null);
+        }
+      } catch {
+        if (isMounted) {
+          setAuthUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingUser(false);
+        }
+      }
+    }
+
+    void loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  const destinationUrl = useMemo(() => {
+    if (!authUser?.id || typeof window === "undefined") {
+      return "";
+    }
+    return `${WORKER_BASE_URL}${CONNECT_THREADS_PATH}?return_to=${encodeURIComponent(window.location.origin)}&app_user_id=${encodeURIComponent(authUser.id)}`;
+  }, [authUser?.id]);
+
+  const connectDisabled = loadingUser;
 
   return (
     <div className="flex-1 flex items-start justify-center pt-32">
@@ -29,12 +90,16 @@ export default function ConnectPage() {
           </p>
           <div className="w-full flex justify-center">
             <button
+              type="button"
               onClick={() => {
-                const returnTo = encodeURIComponent(window.location.origin);
-                const encodedUser = encodeURIComponent(appUserId ?? "");
-                window.location.href = `${CONNECT_THREADS_URL}?return_to=${returnTo}&app_user_id=${encodedUser}`;
+                if (!authUser?.id || !destinationUrl) {
+                  router.push("/login");
+                  return;
+                }
+                window.location.href = destinationUrl;
               }}
-              className="bg-black text-white px-6 py-2 rounded-lg hover:bg-neutral-800 transition"
+              disabled={connectDisabled}
+              className="bg-black text-white px-6 py-2 rounded-lg hover:bg-neutral-800 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Connect Threads
             </button>

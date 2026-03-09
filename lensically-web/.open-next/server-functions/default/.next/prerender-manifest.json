@@ -122,6 +122,30 @@
         "x-next-revalidate-tag-token"
       ]
     },
+    "/insights": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/insights",
+      "dataRoute": "/insights.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
     "/schedule": {
       "experimentalBypassFor": [
         {
@@ -246,13 +270,37 @@
         "x-next-revalidated-tags",
         "x-next-revalidate-tag-token"
       ]
+    },
+    "/signup": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/signup",
+      "dataRoute": "/signup.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
     }
   },
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "562d6502bafbcb0dcb7489b3cc7d2734",
-    "previewModeSigningKey": "6b2e55c38769267b844b6641ca697ceb0d33282f55c9dfe07dc3c89b762a7002",
-    "previewModeEncryptionKey": "3aeae76b832394f54b5ae32857feb98a2b6330ac8901aea69491ba49a7d78e7f"
+    "previewModeId": "1f448d6a0bd3257bca49949e553291ef",
+    "previewModeSigningKey": "12598c3efb8f03099cd12f032b9fe4b9cddc1a0155c318e11c42998b91b69eb4",
+    "previewModeEncryptionKey": "a4e5374df827c1c78383925a292262bc94b90b5f906144840680bff9a4e872f0"
   }
 }

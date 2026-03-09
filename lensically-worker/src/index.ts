@@ -8,10 +8,12 @@ import { currentUser } from "../auth/me.js";
 import { createSession } from "../auth/sessions.js";
 import { setSessionCookie } from "../auth/cookies.js";
 
+const ALLOWED_ORIGIN = "https://lensically-web.lensically.workers.dev";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 const REDIRECT_URI =
@@ -29,6 +31,7 @@ const API_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
 ].join(",");
+const DEFAULT_WEB_APP_URL = "https://lensically-web.lensically.workers.dev";
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -440,7 +443,35 @@ function buildOauthAppBaseUrl(url: URL, request: Request, env: Env): string {
     ?? normalizeAppBaseUrl(request.headers.get("origin"))
     ?? normalizeAppBaseUrl(request.headers.get("referer"))
     ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-    ?? "https://lensically2.pages.dev";
+    ?? DEFAULT_WEB_APP_URL;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "unknown_error";
+  }
+}
+
+function withAuthCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.append("Vary", "Origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function ensureAppThreadsTable(env: Env): Promise<void> {
@@ -459,6 +490,10 @@ type ThreadsAccount = {
 };
 
 async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise<ThreadsAccount | null> {
+  console.log(JSON.stringify({
+    event: "THREADS_ACCOUNT_LOOKUP",
+    appUserId,
+  }));
   await ensureAppThreadsTable(env);
   return env.DB.prepare(
     `SELECT t.threads_user_id, t.access_token
@@ -507,40 +542,49 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
+    const isAuthPath = normalizedPath.startsWith("/api/auth/") || normalizedPath.startsWith("/auth/threads/");
+    const applyAuthCors = (response: Response): Response =>
+      isAuthPath ? withAuthCors(response) : response;
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: corsHeaders,
+        headers: {
+          "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Credentials": "true",
+          Vary: "Origin",
+        },
       });
     }
 
     if (path === "/api/auth/register" && request.method === "POST") {
-      return register(request, env);
+      return applyAuthCors(await register(request, env));
     }
 
     if (path === "/api/auth/login" && request.method === "POST") {
-      return login(request, env);
+      return applyAuthCors(await login(request, env));
     }
 
     if (path === "/api/auth/verify-email" && request.method === "GET") {
-      return verifyEmail(request, env);
+      return applyAuthCors(await verifyEmail(request, env));
     }
 
     if (path === "/api/auth/forgot-password" && request.method === "POST") {
-      return forgotPassword(request, env);
+      return applyAuthCors(await forgotPassword(request, env));
     }
 
     if (path === "/api/auth/reset-password" && request.method === "POST") {
-      return resetPassword(request, env);
+      return applyAuthCors(await resetPassword(request, env));
     }
 
     if (path === "/api/auth/logout" && request.method === "POST") {
-      return logout(request, env);
+      return applyAuthCors(await logout(request, env));
     }
 
     if (path === "/api/auth/me" && request.method === "GET") {
-      return currentUser(request, env);
+      return applyAuthCors(await currentUser(request, env));
     }
 
     if (
@@ -558,7 +602,7 @@ export default {
       const credentials = getOauthClientCredentials(provider, env, request);
 
       if (!credentials) {
-        return Response.redirect(`${appBaseUrl}/login?error=server_config`, 302);
+        return applyAuthCors(Response.redirect(`${appBaseUrl}/login?error=server_config`, 302));
       }
 
       const state = buildOauthState(appBaseUrl, "");
@@ -571,13 +615,13 @@ export default {
       );
       const stateCookieName = oauthStateCookieName(provider);
 
-      return new Response(null, {
+      return applyAuthCors(new Response(null, {
         status: 302,
         headers: {
           Location: authURL,
           "Set-Cookie": setOauthStateCookie(stateCookieName, state),
         },
-      });
+      }));
     }
 
     if (
@@ -599,16 +643,137 @@ export default {
       const appBaseUrl =
         stateContext?.appBaseUrl
         ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-        ?? "https://lensically2.pages.dev";
+        ?? DEFAULT_WEB_APP_URL;
       const callbackUrl = `${url.origin}/api/auth/${provider}/callback`;
       const redirectToAuthError = (error: string): Response =>
-        new Response(null, {
+        applyAuthCors(new Response(null, {
           status: 302,
           headers: {
             Location: `${appBaseUrl}/login?error=${error}`,
             "Set-Cookie": clearOauthStateCookie(stateCookieName),
           },
+        }));
+
+      if (provider === "google") {
+        const logEvent = (
+          event: string,
+          extra: Record<string, string | number | boolean | null> = {},
+        ): void => {
+          console.log(JSON.stringify({
+            event,
+            provider: "google",
+            ...extra,
+          }));
+        };
+        const logError = (
+          event: string,
+          error: unknown,
+          extra: Record<string, string | number | boolean | null> = {},
+        ): void => {
+          console.error(JSON.stringify({
+            event,
+            provider: "google",
+            error: getErrorMessage(error),
+            ...extra,
+          }));
+        };
+
+        logEvent("GOOGLE_OAUTH_CALLBACK_RECEIVED", {
+          hasCode: Boolean(code),
+          hasState: Boolean(state),
+          hasStateCookie: Boolean(cookieState),
         });
+
+        try {
+          logEvent("GOOGLE_OAUTH_STATE_VALIDATION_STARTED");
+          if (!code) {
+            throw new Error("missing_code");
+          }
+          if (!state || !cookieState) {
+            throw new Error("missing_state_or_cookie_state");
+          }
+          if (state !== cookieState) {
+            throw new Error("state_mismatch");
+          }
+          logEvent("GOOGLE_OAUTH_STATE_VALIDATION_SUCCEEDED");
+        } catch (error) {
+          logError("GOOGLE_OAUTH_STATE_VALIDATION_FAILED", error);
+          return redirectToAuthError("unexpected");
+        }
+
+        let accessToken = "";
+        try {
+          logEvent("GOOGLE_OAUTH_TOKEN_EXCHANGE_STARTED");
+          const maybeToken = await exchangeCodeForAccessToken(
+            provider,
+            code,
+            callbackUrl,
+            env,
+            request,
+          );
+          if (!maybeToken) {
+            throw new Error("token_exchange_returned_null");
+          }
+          accessToken = maybeToken;
+          logEvent("GOOGLE_OAUTH_TOKEN_EXCHANGE_SUCCEEDED");
+        } catch (error) {
+          logError("GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", error);
+          return redirectToAuthError("unexpected");
+        }
+
+        let identity = null as OAuthIdentity | null;
+        try {
+          logEvent("GOOGLE_OAUTH_PROFILE_FETCH_STARTED");
+          identity = await fetchProviderIdentity(provider, accessToken);
+          if (!identity?.providerUserId) {
+            throw new Error("profile_missing_provider_user_id");
+          }
+          logEvent("GOOGLE_OAUTH_PROFILE_FETCH_SUCCEEDED", {
+            hasEmail: Boolean(identity.email),
+          });
+        } catch (error) {
+          logError("GOOGLE_OAUTH_PROFILE_FETCH_FAILED", error);
+          return redirectToAuthError("unexpected");
+        }
+
+        let user = null as { id: string; email: string } | null;
+        try {
+          logEvent("GOOGLE_OAUTH_DB_USER_UPSERT_STARTED");
+          user = await getOrCreateOauthUser(
+            env,
+            provider,
+            identity.providerUserId,
+            identity.email,
+          );
+          logEvent("GOOGLE_OAUTH_DB_USER_UPSERT_SUCCEEDED", {
+            hasUserId: Boolean(user.id),
+          });
+        } catch (error) {
+          logError("GOOGLE_OAUTH_DB_USER_UPSERT_FAILED", error);
+          return redirectToAuthError("unexpected");
+        }
+
+        let sessionToken = "";
+        try {
+          logEvent("GOOGLE_OAUTH_SESSION_CREATION_STARTED");
+          sessionToken = await createSession(env, user.id, request);
+          if (!sessionToken) {
+            throw new Error("session_token_empty");
+          }
+          logEvent("GOOGLE_OAUTH_SESSION_CREATION_SUCCEEDED");
+        } catch (error) {
+          logError("GOOGLE_OAUTH_SESSION_CREATION_FAILED", error);
+          return redirectToAuthError("unexpected");
+        }
+
+        const headers = new Headers({
+          Location: `${appBaseUrl}/connect`,
+        });
+        headers.append("Set-Cookie", clearOauthStateCookie(stateCookieName));
+        headers.append("Set-Cookie", setSessionCookie(sessionToken));
+        logEvent("GOOGLE_OAUTH_CALLBACK_COMPLETED");
+        return applyAuthCors(new Response(null, { status: 302, headers }));
+      }
 
       try {
         if (!code) {
@@ -650,7 +815,7 @@ export default {
         });
         headers.append("Set-Cookie", clearOauthStateCookie(stateCookieName));
         headers.append("Set-Cookie", setSessionCookie(sessionToken));
-        return new Response(null, { status: 302, headers });
+        return applyAuthCors(new Response(null, { status: 302, headers }));
       } catch {
         return redirectToAuthError("unexpected");
       }
@@ -669,10 +834,10 @@ export default {
         ?? normalizeAppBaseUrl(request.headers.get("origin"))
         ?? normalizeAppBaseUrl(request.headers.get("referer"))
         ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-        ?? "https://lensically2.pages.dev";
+        ?? DEFAULT_WEB_APP_URL;
       const requestAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!requestAppUserId) {
-        return Response.redirect(`${requestAppBase}/connect?error=missing_user`, 302);
+        return applyAuthCors(Response.redirect(`${requestAppBase}/connect?error=missing_user`, 302));
       }
       const state = buildOauthState(requestAppBase, requestAppUserId);
       const authURL = new URL("https://www.threads.net/oauth/authorize");
@@ -682,55 +847,139 @@ export default {
       authURL.searchParams.set("response_type", "code");
       authURL.searchParams.set("state", state);
 
-      return new Response(null, {
+      return applyAuthCors(new Response(null, {
         status: 302,
         headers: {
           Location: authURL.toString(),
           "Set-Cookie": `lensically_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
         },
-      });
+      }));
     }
 
     if (url.pathname === "/api/auth/threads/callback" && request.method === "GET") {
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state");
       const cookieState = getCookieValue(request, "lensically_oauth_state");
+      const sessionToken = getCookieValue(request, "session_token");
       const stateContext = contextFromState(state);
       const appBaseUrl =
         stateContext?.appBaseUrl
         ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-        ?? "https://lensically2.pages.dev";
+        ?? DEFAULT_WEB_APP_URL;
       const appUserId = stateContext?.appUserId;
       const redirectToConnectError = (error: string): Response =>
-        new Response(null, {
+        applyAuthCors(new Response(null, {
           status: 302,
           headers: {
             Location: `${appBaseUrl}/connect?error=${error}`,
             "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
           },
-        });
-
+        }));
+      console.log(JSON.stringify({
+        event: "THREADS_SESSION_RESOLUTION_STARTED",
+        provider: "threads",
+        has_session_cookie: Boolean(sessionToken),
+      }));
       try {
+        if (!sessionToken) {
+          throw new Error("session_cookie_missing");
+        }
+        const resolvedSession = await env.DB.prepare(
+          `SELECT user_id
+           FROM sessions
+           WHERE session_token = ?
+           LIMIT 1`,
+        )
+          .bind(sessionToken)
+          .first<{ user_id: string }>();
+        if (!resolvedSession?.user_id) {
+          throw new Error("session_not_found");
+        }
+        console.log(JSON.stringify({
+          event: "THREADS_SESSION_RESOLUTION_SUCCEEDED",
+          provider: "threads",
+          has_session_cookie: true,
+          session_resolved: true,
+          user_id: resolvedSession.user_id,
+        }));
+      } catch (error) {
+        console.error(JSON.stringify({
+          event: "THREADS_SESSION_RESOLUTION_FAILED",
+          provider: "threads",
+          has_session_cookie: Boolean(sessionToken),
+          session_resolved: false,
+          error: getErrorMessage(error),
+        }));
+      }
+
+      const logEvent = (
+        event: string,
+        extra: Record<string, string | number | boolean | null> = {},
+      ): void => {
+        console.log(JSON.stringify({
+          event,
+          provider: "threads",
+          ...extra,
+        }));
+      };
+      const logError = (
+        event: string,
+        error: unknown,
+        extra: Record<string, string | number | boolean | null> = {},
+      ): void => {
+        console.error(JSON.stringify({
+          event,
+          provider: "threads",
+          error: getErrorMessage(error),
+          ...extra,
+        }));
+      };
+
+      logEvent("THREADS_OAUTH_CALLBACK_RECEIVED", {
+        hasCode: Boolean(code),
+        hasState: Boolean(state),
+        hasStateCookie: Boolean(cookieState),
+        hasAppUserId: Boolean(appUserId),
+      });
+
+      let resolvedAppUserId = "";
+      try {
+        logEvent("THREADS_OAUTH_STATE_VALIDATION_STARTED");
         if (!code) {
-          return redirectToConnectError("access_denied");
+          throw new Error("access_denied");
         }
-
         if (!state || !cookieState) {
-          return redirectToConnectError("state_missing");
+          throw new Error("state_missing");
         }
-
         if (state !== cookieState) {
-          return redirectToConnectError("state_mismatch");
+          throw new Error("state_mismatch");
         }
-
         if (!appUserId) {
-          return redirectToConnectError("state_missing");
+          throw new Error("state_missing");
         }
-
         if (!env.THREADS_CLIENT_ID || !env.THREADS_CLIENT_SECRET) {
-          return redirectToConnectError("server_config");
+          throw new Error("server_config");
         }
+        resolvedAppUserId = appUserId;
+        logEvent("THREADS_OAUTH_STATE_VALIDATION_SUCCEEDED");
+      } catch (error) {
+        logError("THREADS_OAUTH_STATE_VALIDATION_FAILED", error);
+        const errorCode = getErrorMessage(error);
+        if (
+          errorCode === "access_denied"
+          || errorCode === "state_missing"
+          || errorCode === "state_mismatch"
+          || errorCode === "server_config"
+        ) {
+          return redirectToConnectError(errorCode);
+        }
+        return redirectToConnectError("unexpected");
+      }
 
+      let accessToken = "";
+      let expiresIn = 0;
+      try {
+        logEvent("THREADS_OAUTH_TOKEN_EXCHANGE_STARTED");
         const tokenBody = new URLSearchParams({
           client_id: env.THREADS_CLIENT_ID,
           client_secret: env.THREADS_CLIENT_SECRET,
@@ -746,13 +995,13 @@ export default {
         });
 
         if (!tokenResp.ok) {
-          return redirectToConnectError("token_exchange_failed");
+          throw new Error("token_exchange_failed");
         }
 
         const shortTokenData = await tokenResp.json() as { access_token?: string };
         const shortToken = shortTokenData.access_token;
         if (!shortToken) {
-          return redirectToConnectError("token_exchange_failed");
+          throw new Error("token_exchange_failed");
         }
 
         const longResp = await fetch(
@@ -760,74 +1009,100 @@ export default {
         );
 
         if (!longResp.ok) {
-          return redirectToConnectError("token_upgrade_failed");
+          throw new Error("token_upgrade_failed");
         }
 
         const longTokenData = await longResp.json() as {
           access_token?: string;
           expires_in?: number;
         };
-        const accessToken = longTokenData.access_token;
-        const expiresIn = Number(longTokenData.expires_in ?? 0);
+        accessToken = longTokenData.access_token ?? "";
+        expiresIn = Number(longTokenData.expires_in ?? 0);
 
         if (!accessToken || !expiresIn) {
-          return redirectToConnectError("token_upgrade_failed");
+          throw new Error("token_upgrade_failed");
         }
+        logEvent("THREADS_OAUTH_TOKEN_EXCHANGE_SUCCEEDED");
+      } catch (error) {
+        logError("THREADS_OAUTH_TOKEN_EXCHANGE_FAILED", error);
+        const errorCode = getErrorMessage(error);
+        if (errorCode === "token_exchange_failed" || errorCode === "token_upgrade_failed") {
+          return redirectToConnectError(errorCode);
+        }
+        return redirectToConnectError("unexpected");
+      }
 
+      let threadsUserId = "";
+      try {
+        logEvent("THREADS_OAUTH_PROFILE_FETCH_STARTED");
         const meResp = await fetch(
           `https://graph.threads.net/me?fields=id&access_token=${accessToken}`,
         );
         if (!meResp.ok) {
-          return redirectToConnectError("account_lookup_failed");
+          throw new Error("account_lookup_failed");
         }
 
         const meData = await meResp.json() as { id?: string };
         if (!meData.id) {
-          return redirectToConnectError("account_lookup_failed");
+          throw new Error("account_lookup_failed");
         }
 
         const userCapacityResponse = await checkUserCapacity(env, meData.id);
         if (userCapacityResponse) {
-          return redirectToConnectError("account_lookup_failed");
+          throw new Error("account_lookup_failed");
         }
 
+        threadsUserId = meData.id;
+        logEvent("THREADS_OAUTH_PROFILE_FETCH_SUCCEEDED", {
+          hasThreadsUserId: Boolean(threadsUserId),
+        });
+      } catch (error) {
+        logError("THREADS_OAUTH_PROFILE_FETCH_FAILED", error);
+        const errorCode = getErrorMessage(error);
+        if (errorCode === "account_lookup_failed") {
+          return redirectToConnectError(errorCode);
+        }
+        return redirectToConnectError("unexpected");
+      }
+
+      try {
+        logEvent("THREADS_OAUTH_ACCOUNT_SAVE_STARTED");
         const now = Math.floor(Date.now() / 1000);
         const expiresAt = now + expiresIn;
 
-        try {
-          await env.DB.prepare(
-            `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
-             VALUES (?, ?, ?, ?)
-             ON CONFLICT(threads_user_id) DO UPDATE SET
-               access_token = excluded.access_token,
-               expires_at = excluded.expires_at`,
-          )
-            .bind(meData.id, accessToken, expiresAt, now)
-            .run();
+        await env.DB.prepare(
+          `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(threads_user_id) DO UPDATE SET
+             access_token = excluded.access_token,
+             expires_at = excluded.expires_at`,
+        )
+          .bind(threadsUserId, accessToken, expiresAt, now)
+          .run();
 
-          await ensureAppThreadsTable(env);
-          await env.DB.prepare(
-            `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
-             VALUES (?, ?, ?)
-             ON CONFLICT(app_user_id) DO UPDATE SET
-               threads_user_id = excluded.threads_user_id`,
-          )
-            .bind(appUserId, meData.id, now)
-            .run();
-        } catch {
-          return redirectToConnectError("save_failed");
-        }
-
-        return new Response(null, {
-          status: 302,
-          headers: {
-            Location: `${appBaseUrl}/dashboard`,
-            "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
-          },
-        });
-      } catch {
-        return redirectToConnectError("unexpected");
+        await ensureAppThreadsTable(env);
+        await env.DB.prepare(
+          `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(app_user_id) DO UPDATE SET
+             threads_user_id = excluded.threads_user_id`,
+        )
+          .bind(resolvedAppUserId, threadsUserId, now)
+          .run();
+        logEvent("THREADS_OAUTH_ACCOUNT_SAVE_SUCCEEDED");
+      } catch (error) {
+        logError("THREADS_OAUTH_ACCOUNT_SAVE_FAILED", error);
+        return redirectToConnectError("save_failed");
       }
+
+      logEvent("THREADS_OAUTH_CALLBACK_COMPLETED");
+      return applyAuthCors(new Response(null, {
+        status: 302,
+        headers: {
+          Location: `${appBaseUrl}/dashboard`,
+          "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+        },
+      }));
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
@@ -1022,23 +1297,15 @@ export default {
 
       if (!account) {
         return new Response(
-          JSON.stringify({ error: "Threads account not connected" }),
+          JSON.stringify({ connected: false }),
           {
-            status: 401,
+            status: 200,
             headers: {
               "Content-Type": "application/json",
               ...corsHeaders,
             },
           },
         );
-      }
-      const limit = await enforceLimit(
-        env,
-        { id: account.threads_user_id },
-        "me",
-      );
-      if (!limit.allowed) {
-        return limitDeniedResponse(limit, "me");
       }
 
       const meResp = await fetch(
@@ -1056,13 +1323,19 @@ export default {
         threads_profile_picture_url?: string;
       };
 
+      const accountPayload = {
+        name: meJson.name ?? null,
+        username: meJson.username ?? null,
+        threads_biography: meJson.threads_biography ?? null,
+        is_verified: meJson.is_verified ?? false,
+        threads_profile_picture_url: meJson.threads_profile_picture_url ?? null,
+      };
+
       return new Response(
         JSON.stringify({
-          name: meJson.name ?? null,
-          username: meJson.username ?? null,
-          threads_biography: meJson.threads_biography ?? null,
-          is_verified: meJson.is_verified ?? false,
-          threads_profile_picture_url: meJson.threads_profile_picture_url ?? null,
+          connected: true,
+          account: accountPayload,
+          ...accountPayload,
         }),
         {
           status: meResp.status,
@@ -1128,6 +1401,10 @@ export default {
       const cursorDepth = Number.isFinite(cursorDepthParam) && cursorDepthParam > 0
         ? cursorDepthParam
         : (cursor ? 2 : 1);
+      console.log(JSON.stringify({
+        event: "THREADS_POSTS_REQUEST",
+        app_user_id: appUserId,
+      }));
 
       if (cursorDepth > 3) {
         return new Response(
@@ -1159,12 +1436,27 @@ export default {
       }
 
       const account = await getThreadsAccountForAppUser(env, appUserId);
+      console.log(JSON.stringify({
+        event: "THREADS_ACCOUNT_VALUES",
+        threads_user_id: account?.threads_user_id ?? null,
+        access_token_present: Boolean(account?.access_token),
+        access_token_length: account?.access_token?.length ?? 0,
+      }));
+      console.log(JSON.stringify({
+        event: "THREADS_ACCOUNT_DATA",
+        hasAccount: Boolean(account),
+        keys: account ? Object.keys(account) : null,
+      }));
+      console.log(JSON.stringify({
+        event: "THREADS_ACCOUNT_LOOKUP_RESULT",
+        found: Boolean(account),
+      }));
 
-      if (!account) {
+      if (!account || !account.access_token) {
         return new Response(
-          JSON.stringify({ error: "Threads account not connected" }),
+          JSON.stringify({ error: "Threads access token missing" }),
           {
-            status: 401,
+            status: 500,
             headers: {
               "Content-Type": "application/json",
               ...corsHeaders,
@@ -1172,13 +1464,29 @@ export default {
           },
         );
       }
-      const limit = await enforceLimit(
-        env,
-        { id: account.threads_user_id },
-        "insights",
-      );
-      if (!limit.allowed) {
-        return limitDeniedResponse(limit, "insights");
+      let limitCheck = null as EnforceLimitResult | null;
+      try {
+        limitCheck = await enforceLimit(
+          env,
+          { id: account.threads_user_id },
+          "insights",
+        );
+        if (limitCheck && limitCheck.allowed === false) {
+          console.log(JSON.stringify({
+            event: "USAGE_LIMIT_EXCEEDED",
+            feature: "insights",
+            app_user_id: appUserId,
+            limit: "limit" in limitCheck ? (limitCheck.limit ?? null) : null,
+            used: "used" in limitCheck ? (limitCheck.used ?? null) : null,
+          }));
+        }
+      } catch (error) {
+        console.log(JSON.stringify({
+          event: "USAGE_LIMIT_CHECK_FAILED",
+          feature: "insights",
+          app_user_id: appUserId,
+          error: String(error),
+        }));
       }
 
       const params = new URLSearchParams({
@@ -1190,14 +1498,25 @@ export default {
         params.set("after", cursor);
       }
 
+      const requestUrl = `https://graph.threads.net/v1.0/${account.threads_user_id}/threads?${params.toString()}`;
       const postsResp = await fetch(
-        `https://graph.threads.net/v1.0/${account.threads_user_id}/threads?${params.toString()}`,
+        requestUrl,
         {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
+      console.log(JSON.stringify({
+        event: "THREADS_API_REQUEST",
+        url: requestUrl,
+      }));
+      const postsResponseText = await postsResp.text();
+      console.log(JSON.stringify({
+        event: "THREADS_API_RESPONSE",
+        status: postsResp.status,
+        body: postsResponseText,
+      }));
 
-      const data = await postsResp.json() as {
+      const data = JSON.parse(postsResponseText) as {
         data?: unknown[];
         paging?: {
           next?: string;
