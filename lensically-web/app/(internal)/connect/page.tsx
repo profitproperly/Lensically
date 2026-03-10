@@ -2,10 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildWorkerUrl } from "../../../lib/apiClient";
-
-const CONNECT_THREADS_URL = buildWorkerUrl("/api/auth/threads/start");
-const CURRENT_USER_URL = buildWorkerUrl("/api/auth/me");
+import { markThreadsOauthPending } from "../../../lib/threadsOauth";
+import { CONNECT_THREADS_URL, CURRENT_USER_URL } from "../../../lib/threadsApi";
 
 type AuthMeUser = {
   id: string;
@@ -97,6 +95,7 @@ export default function ConnectPage() {
                   router.push("/login");
                   return;
                 }
+                markThreadsOauthPending();
                 window.location.href = destinationUrl;
               }}
               disabled={connectDisabled}

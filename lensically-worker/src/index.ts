@@ -16,6 +16,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Credentials": "true",
 };
+const REDIRECT_URI =
+  "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
 const SCOPES = [
   "threads_basic",
   "threads_manage_insights",
@@ -23,6 +25,8 @@ const SCOPES = [
   "threads_profile_discovery",
   "threads_content_publish",
 ].join(",");
+const API_OAUTH_REDIRECT_URI =
+  "https://lensically-worker.lensically.workers.dev/api/auth/threads/callback";
 const API_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
@@ -43,7 +47,6 @@ interface Env {
   DISCORD_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
   WEB_APP_URL?: string;
-  WORKER_BASE_URL?: string;
   DB: D1Database;
 }
 
@@ -104,18 +107,6 @@ function normalizeAppUserId(raw: string | null | undefined): string | null {
     return null;
   }
   return value;
-}
-
-function getWorkerBaseUrl(request: Request, env: Env): string {
-  return normalizeAppBaseUrl(env.WORKER_BASE_URL) ?? new URL(request.url).origin;
-}
-
-function getThreadsLegacyCallbackUrl(request: Request, env: Env): string {
-  return `${getWorkerBaseUrl(request, env)}/auth/threads/callback`;
-}
-
-function getThreadsApiCallbackUrl(request: Request, env: Env): string {
-  return `${getWorkerBaseUrl(request, env)}/api/auth/threads/callback`;
 }
 
 type OauthStateContext = {
@@ -183,6 +174,15 @@ function getAuthCorsOrigin(request: Request): string {
   }
 
   return ALLOWED_ORIGIN;
+}
+
+function getCorsHeadersForRequest(request: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": getAuthCorsOrigin(request),
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Credentials": "true",
+  };
 }
 
 function contextFromState(state: string | null): OauthStateContext | null {
@@ -375,6 +375,8 @@ async function fetchProviderIdentity(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
+        "User-Agent": "Lensically",
+        "X-GitHub-Api-Version": "2022-11-28",
       },
     });
     if (!profileResp.ok) {
@@ -392,6 +394,8 @@ async function fetchProviderIdentity(
         headers: {
           Authorization: `Bearer ${accessToken}`,
           Accept: "application/vnd.github+json",
+          "User-Agent": "Lensically",
+          "X-GitHub-Api-Version": "2022-11-28",
         },
       });
       if (emailResp.ok) {
@@ -565,6 +569,26 @@ async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise
     .first<ThreadsAccount>();
 }
 
+async function getThreadsAccountForAppUserWithRetry(
+  env: Env,
+  appUserId: string,
+  attempts = 6,
+  delayMs = 500,
+): Promise<ThreadsAccount | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const account = await getThreadsAccountForAppUser(env, appUserId);
+    if (account) {
+      return account;
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return null;
+}
+
 async function disconnectThreadsAccountForAppUser(
   env: Env,
   appUserId: string,
@@ -649,12 +673,14 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
+    const isApiPath = normalizedPath.startsWith("/api/") || normalizedPath.startsWith("/auth/threads/");
     const isAuthPath = normalizedPath.startsWith("/api/auth/") || normalizedPath.startsWith("/auth/threads/");
+    const requestCorsHeaders = getCorsHeadersForRequest(request);
     const applyAuthCors = (response: Response): Response =>
       isAuthPath ? withAuthCors(request, response) : response;
 
     if (request.method === "OPTIONS") {
-      const accessControlOrigin = isAuthPath ? getAuthCorsOrigin(request) : ALLOWED_ORIGIN;
+      const accessControlOrigin = isApiPath ? getAuthCorsOrigin(request) : ALLOWED_ORIGIN;
       return new Response(null, {
         status: 204,
         headers: {
@@ -919,7 +945,7 @@ export default {
         const sessionToken = await createSession(env, user.id, request);
 
         const headers = new Headers({
-          Location: `${appBaseUrl}/dashboard`,
+          Location: `${appBaseUrl}/connect`,
         });
         headers.append("Set-Cookie", clearOauthStateCookie(stateCookieName));
         headers.append("Set-Cookie", setSessionCookie(sessionToken));
@@ -930,7 +956,10 @@ export default {
     }
 
     if (url.pathname === "/connect/threads") {
-      return Response.redirect(`${getWorkerBaseUrl(request, env)}/auth/threads/login`, 302);
+      return Response.redirect(
+        "https://lensically-worker.lensically.workers.dev/auth/threads/login",
+        302
+      );
     }
 
     if (url.pathname === "/api/auth/threads/start" && request.method === "GET") {
@@ -949,9 +978,8 @@ export default {
 
       const state = buildOauthState(requestAppBase, effectiveAppUserId);
       const authURL = new URL("https://www.threads.net/oauth/authorize");
-      const callbackUrl = getThreadsApiCallbackUrl(request, env);
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
-      authURL.searchParams.set("redirect_uri", callbackUrl);
+      authURL.searchParams.set("redirect_uri", API_OAUTH_REDIRECT_URI);
       authURL.searchParams.set("scope", API_OAUTH_SCOPES);
       authURL.searchParams.set("response_type", "code");
       authURL.searchParams.set("state", state);
@@ -1092,7 +1120,7 @@ export default {
         const tokenBody = new URLSearchParams({
           client_id: env.THREADS_CLIENT_ID,
           client_secret: env.THREADS_CLIENT_SECRET,
-          redirect_uri: getThreadsApiCallbackUrl(request, env),
+          redirect_uri: API_OAUTH_REDIRECT_URI,
           grant_type: "authorization_code",
           code,
         });
@@ -1198,6 +1226,10 @@ export default {
         )
           .bind(resolvedAppUserId, threadsUserId, now)
           .run();
+        logEvent("THREADS_OAUTH_ACCOUNT_LINK_SAVED", {
+          resolvedAppUserId,
+          threadsUserId,
+        });
         logEvent("THREADS_OAUTH_ACCOUNT_SAVE_SUCCEEDED");
       } catch (error) {
         logError("THREADS_OAUTH_ACCOUNT_SAVE_FAILED", error);
@@ -1251,9 +1283,8 @@ export default {
 
     if (url.pathname === "/auth/threads/login") {
       const authURL = new URL("https://graph.threads.net/oauth/authorize");
-      const callbackUrl = getThreadsLegacyCallbackUrl(request, env);
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
-      authURL.searchParams.set("redirect_uri", callbackUrl);
+      authURL.searchParams.set("redirect_uri", REDIRECT_URI);
       authURL.searchParams.set("scope", SCOPES);
       authURL.searchParams.set("response_type", "code");
       return Response.redirect(authURL.toString(), 302);
@@ -1274,7 +1305,7 @@ export default {
       const body = new URLSearchParams({
         client_id: env.THREADS_CLIENT_ID,
         client_secret: env.THREADS_CLIENT_SECRET,
-        redirect_uri: getThreadsLegacyCallbackUrl(request, env),
+        redirect_uri: REDIRECT_URI,
         grant_type: "authorization_code",
         code,
       });
@@ -1391,6 +1422,10 @@ export default {
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      console.log(JSON.stringify({
+        event: "THREADS_ME_REQUEST_RECEIVED",
+        appUserId,
+      }));
       if (!appUserId) {
         return new Response(
           JSON.stringify({ error: "Missing app_user_id" }),
@@ -1398,12 +1433,18 @@ export default {
             status: 400,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
       }
-      const account = await getThreadsAccountForAppUser(env, appUserId);
+      const account = await getThreadsAccountForAppUserWithRetry(env, appUserId);
+      console.log(JSON.stringify({
+        event: "THREADS_ME_LOOKUP_RESULT",
+        appUserId,
+        found: Boolean(account),
+        threadsUserId: account?.threads_user_id ?? null,
+      }));
 
       if (!account) {
         return new Response(
@@ -1412,7 +1453,7 @@ export default {
             status: 200,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1451,7 +1492,7 @@ export default {
           status: meResp.status,
           headers: {
             "Content-Type": "application/json",
-            ...corsHeaders,
+            ...requestCorsHeaders,
           },
         },
       );
@@ -1465,7 +1506,7 @@ export default {
           statusText: authUser.statusText,
           headers: {
             "Content-Type": "application/json",
-            ...corsHeaders,
+            ...requestCorsHeaders,
           },
         });
       }
@@ -1480,7 +1521,7 @@ export default {
             status: 400,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1494,7 +1535,7 @@ export default {
             status: 400,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1507,7 +1548,7 @@ export default {
             status: 403,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1521,7 +1562,7 @@ export default {
             status: 404,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1537,7 +1578,7 @@ export default {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            ...corsHeaders,
+            ...requestCorsHeaders,
           },
         },
       );
@@ -1612,7 +1653,7 @@ export default {
             status: 200,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1625,7 +1666,7 @@ export default {
             status: 400,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1655,7 +1696,7 @@ export default {
             status: 500,
             headers: {
               "Content-Type": "application/json",
-              ...corsHeaders,
+              ...requestCorsHeaders,
             },
           },
         );
@@ -1840,7 +1881,7 @@ export default {
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
-          ...corsHeaders,
+          ...requestCorsHeaders,
         },
       });
     }

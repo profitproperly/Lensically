@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../lib/AuthProvider";
 import { buildWorkerUrl } from "../../../lib/apiClient";
+import { markThreadsOauthPending } from "../../../lib/threadsOauth";
 
 type ThreadsPost = {
   id?: string;
@@ -333,6 +334,7 @@ export default function PostsList() {
 
   const handleConnectRedirect = () => {
     const returnTo = encodeURIComponent(window.location.origin);
+    markThreadsOauthPending();
     window.location.href =
       `${CONNECT_THREADS_URL}?return_to=${returnTo}&app_user_id=${encodeURIComponent(appUserId ?? "")}`;
   };

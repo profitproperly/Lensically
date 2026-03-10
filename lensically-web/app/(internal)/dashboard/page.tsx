@@ -3,13 +3,23 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/AuthProvider";
-import { buildWorkerUrl } from "../../../lib/apiClient";
+import { CONNECT_THREADS_URL, THREADS_ME_URL } from "../../../lib/threadsApi";
+import {
+  clearThreadsOauthPending,
+  hasRecentThreadsOauthPending,
+  markThreadsOauthPending,
+} from "../../../lib/threadsOauth";
+import {
+  clearThreadsProfileCache,
+  readThreadsProfileCache,
+  writeThreadsProfileCache,
+} from "../../../lib/threadsProfileCache";
 
 type ThreadsProfile = {
-  threads_profile_picture_url?: string;
-  name?: string;
-  username?: string;
-  threads_biography?: string;
+  threads_profile_picture_url?: string | null;
+  name?: string | null;
+  username?: string | null;
+  threads_biography?: string | null;
   is_verified?: boolean;
 };
 
@@ -17,9 +27,6 @@ type ThreadsMeResponse = {
   connected?: boolean;
   account?: ThreadsProfile | null;
 };
-
-const CONNECT_THREADS_URL = buildWorkerUrl("/api/auth/threads/start");
-const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -37,10 +44,20 @@ export default function DashboardPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (!loading && user && !loadingConnection && !isConnected) {
-      router.replace("/connect");
+    if (!appUserId) {
+      return;
     }
-  }, [user, loading, loadingConnection, isConnected, router]);
+
+    const cachedProfile = readThreadsProfileCache(appUserId);
+    if (!cachedProfile?.account) {
+      return;
+    }
+
+    setIsConnected(true);
+    setProfile(cachedProfile.account);
+    setHasError(false);
+    setLoadingConnection(false);
+  }, [appUserId]);
 
   useEffect(() => {
     if (loading) {
@@ -54,41 +71,77 @@ export default function DashboardPage() {
       return;
     }
     const controller = new AbortController();
+    const cachedProfile = readThreadsProfileCache(appUserId);
+    const hasCachedAccount = Boolean(cachedProfile?.account);
 
     async function checkConnection() {
-      setLoadingConnection(true);
+      if (!hasCachedAccount) {
+        setLoadingConnection(true);
+      }
       setHasError(false);
-      try {
-        const res = await fetch(
-          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
-          {
-            cache: "no-store",
-            credentials: "include",
-            signal: controller.signal,
-          },
-        );
+      const shouldWaitForOauth = hasRecentThreadsOauthPending();
+      const maxAttempts = shouldWaitForOauth ? 8 : 1;
 
-        if (!res.ok) {
-          setIsConnected(false);
-          setProfile(null);
-          setHasError(res.status !== 401);
-          return;
+      try {
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          const res = await fetch(
+            `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            {
+              cache: "no-store",
+              credentials: "include",
+              signal: controller.signal,
+            },
+          );
+
+          if (!res.ok) {
+            if (!hasCachedAccount) {
+              setIsConnected(false);
+              setProfile(null);
+              setHasError(res.status !== 401);
+              clearThreadsProfileCache(appUserId);
+              clearThreadsOauthPending();
+            }
+            return;
+          }
+
+          const data = (await res.json()) as ThreadsMeResponse;
+          const isConnected = Boolean(data.account);
+
+          if (isConnected) {
+            setIsConnected(true);
+            setProfile(data.account ?? null);
+            setHasError(false);
+            writeThreadsProfileCache(appUserId, data.account ?? null);
+            clearThreadsOauthPending();
+            return;
+          }
+
+          if (attempt < maxAttempts - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
         }
 
-        const data = (await res.json()) as ThreadsMeResponse;
-        const isConnected = Boolean(data.account);
-        setIsConnected(isConnected);
-        setProfile(isConnected ? (data.account ?? null) : null);
-        setHasError(false);
+        if (!hasCachedAccount) {
+          setIsConnected(false);
+          setProfile(null);
+          setHasError(false);
+          clearThreadsProfileCache(appUserId);
+          clearThreadsOauthPending();
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
-        setIsConnected(false);
-        setProfile(null);
-        setHasError(true);
+        if (!hasCachedAccount) {
+          setIsConnected(false);
+          setProfile(null);
+          setHasError(true);
+          clearThreadsOauthPending();
+        }
       } finally {
-        setLoadingConnection(false);
+        if (!hasCachedAccount) {
+          setLoadingConnection(false);
+        }
       }
     }
 
@@ -100,11 +153,12 @@ export default function DashboardPage() {
 
   const handleConnectRedirect = () => {
     const returnTo = encodeURIComponent(window.location.origin);
+    markThreadsOauthPending();
     window.location.href =
       `${CONNECT_THREADS_URL}?return_to=${returnTo}&app_user_id=${encodeURIComponent(appUserId)}`;
   };
 
-  if (loading || loadingConnection) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p>Loading...</p>
@@ -116,7 +170,11 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
 
-      {!profile && isConnected ? (
+      {loadingConnection ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-slate-700">Loading Threads profile...</p>
+        </div>
+      ) : !profile && isConnected ? (
         <p className="text-sm text-red-600">Unable to load Threads profile.</p>
       ) : !profile ? (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

@@ -6,6 +6,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/AuthProvider";
 import { buildWorkerUrl } from "../lib/apiClient";
+import {
+  readThreadsProfileCache,
+  writeThreadsProfileCache,
+} from "../lib/threadsProfileCache";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -31,6 +35,20 @@ export function Sidebar() {
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!appUserId) {
+      return;
+    }
+
+    const cachedProfile = readThreadsProfileCache(appUserId);
+    if (!cachedProfile?.account) {
+      return;
+    }
+
+    setUsername(cachedProfile.account.username || "unknown");
+    setProfilePictureUrl(cachedProfile.account.threads_profile_picture_url ?? null);
+  }, [appUserId]);
+
+  useEffect(() => {
     if (isConnectPage || !appUserId) {
       return;
     }
@@ -47,6 +65,10 @@ export function Sidebar() {
         const data = (await res.json()) as ThreadsMeResponse;
         setUsername(data.username || "unknown");
         setProfilePictureUrl(data.threads_profile_picture_url ?? null);
+        writeThreadsProfileCache(appUserId, {
+          username: data.username ?? null,
+          threads_profile_picture_url: data.threads_profile_picture_url ?? null,
+        });
       } catch {
         // Ignore profile load errors to keep sidebar usable.
       }
