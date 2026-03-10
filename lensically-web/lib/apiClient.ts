@@ -1,4 +1,4 @@
-const DEFAULT_WORKER_ORIGIN = "https://lensically-worker.lensically.workers.dev";
+const DEFAULT_WORKER_ORIGIN = "https://api.lensically.com";
 
 export function buildWorkerUrl(path: string) {
   const configuredOrigin =
