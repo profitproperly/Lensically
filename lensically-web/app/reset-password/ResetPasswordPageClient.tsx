@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { resetPassword, validateResetPasswordToken } from "../../lib/authClient"
 
 type ResetTokenStatus = "checking" | "ready" | "invalid"
 
 export default function ResetPasswordPageClient() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")?.trim() ?? ""
   const [tokenStatus, setTokenStatus] = useState<ResetTokenStatus>(token ? "checking" : "invalid")
@@ -61,6 +62,20 @@ export default function ResetPasswordPageClient() {
       cancelled = true
     }
   }, [token])
+
+  useEffect(() => {
+    if (!successMessage) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      router.push("/login?reset=success")
+    }, 1500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [router, successMessage])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -132,7 +147,7 @@ export default function ResetPasswordPageClient() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             {(error || successMessage) && (
               <p className={`text-sm text-center ${error ? "text-red-500" : "text-green-700"}`}>
-                {error || successMessage}
+                {error || (successMessage ? `${successMessage} Redirecting to login...` : "")}
               </p>
             )}
 
