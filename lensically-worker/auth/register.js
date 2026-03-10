@@ -3,7 +3,7 @@ import { sendEmail } from "../email/sendEmail.js";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const DEFAULT_WEB_APP_URL = "https://lensically-web.lensically.workers.dev";
+const DEFAULT_WEB_APP_URL = "https://app.lensically.com";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -75,7 +75,7 @@ export async function register(request, env) {
     .bind(verificationTokenId, userId, verificationToken, expiresAt)
     .run();
 
-  const webAppUrl = (env.WEB_APP_URL || DEFAULT_WEB_APP_URL).replace(/\/+$/, "");
+  const webAppUrl = (env.APP_URL || env.WEB_APP_URL || DEFAULT_WEB_APP_URL).replace(/\/+$/, "");
   const verifyUrl = `${webAppUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
   const subject = "Verify your Lensically account";
   const html = `<!DOCTYPE html>

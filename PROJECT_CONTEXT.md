@@ -13,10 +13,10 @@ Tailwind CSS
 ## Architecture
 
 lensically-web
-Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes the main product routes plus login, signup, and authenticated app sections. It talks to the worker through `lib/apiClient.ts`.
+Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes login, signup, verify-email, and authenticated app sections. It talks to the worker through `lib/apiClient.ts` and routes authenticated users based on Threads connection state.
 
 lensically-worker
-Backend Cloudflare Worker responsible for Threads API integration, email/password auth, OAuth auth, session cookies, email verification, password reset, admin-aware usage enforcement, and D1-backed persistence.
+Backend Cloudflare Worker responsible for Threads API integration, email/password auth, OAuth auth, session cookies, email verification, password reset, Threads-account capacity checks, admin-aware usage enforcement, and D1-backed persistence.
 
 Legacy directories
 `server`, `client`, and `database` still exist as earlier scaffolding, but the active deployment target is the `lensically-web` + `lensically-worker` Cloudflare stack.
@@ -43,6 +43,7 @@ lensically-worker/migrations/limits.sql
 Authentication
 OAuth
 Usage limits
+Threads account capacity enforcement
 Insights
 Discovery
 Post scheduling
@@ -50,16 +51,16 @@ Email verification and password reset
 
 ## Recent Changes (Git History)
 
-- auth: catch users.email unique constraint during signup insert
-- auth: block OAuth auto-linking when email already exists
-- auth: enforce unique provider + provider_user_id in oauth_accounts
-- limits: pass is_admin to enforceLimit to enable admin daily-limit bypass
-- auth: load and expose is_admin in requireAuth user object
-- auth: add is_admin column to users table schema
-- limit: change Threads account capacity cap from 800 to 500
-- finally fixed everything dev and live login logout works magic link and threads
-- feat: make threads oauth redirect uris environment driven via WORKER_BASE_URL
-- refactor: replace hard-coded worker urls with apiClient helper and add dev worker origin
+- fix: narrow user before threads connection check to satisfy TypeScript
+- feat: route verified users without Threads connection to connect page after login
+- feat: add styled HTML template for verification emails
+- fix: update verification email link to use current frontend domain via WEB_APP_URL
+- fix: guard verify-email token before encodeURIComponent to satisfy TypeScript
+- auth: add verify-email route and redirect signup success to verification screen
+- auth: disable automatic retries for signup POST to prevent duplicate registration requests
+- auth: decouple signup success from email delivery; make verification email best-effort
+- auth: standardize login, signup, and OAuth error messages across UI and worker
+- auth: wrap login route in Suspense and move useSearchParams into LoginPageClient
 
 ## Current Objective
-Harden authentication edge cases in the Cloudflare worker, especially duplicate-account handling, OAuth account linking safety, and admin-aware usage enforcement, while keeping the web-to-worker deployment flow stable.
+Stabilize the end-to-end authentication and onboarding flow, especially signup, verification, post-login routing, and Threads connection gating, while preserving capacity limits and admin-aware enforcement in the worker.

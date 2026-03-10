@@ -9,7 +9,7 @@ import { createSession } from "../auth/sessions.js";
 import { setSessionCookie } from "../auth/cookies.js";
 import { requireAuth } from "../auth/requireAuth.js";
 
-const ALLOWED_ORIGIN = "https://lensically-web.lensically.workers.dev";
+const ALLOWED_ORIGIN = "https://app.lensically.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -31,7 +31,7 @@ const API_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
 ].join(",");
-const DEFAULT_WEB_APP_URL = "https://lensically-web.lensically.workers.dev";
+const DEFAULT_WEB_APP_URL = "https://app.lensically.com";
 const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const DUPLICATE_EMAIL_OAUTH_ERROR = "duplicate_email";
 
@@ -47,6 +47,8 @@ interface Env {
   DISCORD_CLIENT_ID: string;
   DISCORD_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
+  APP_URL?: string;
+  ROOT_SITE_URL?: string;
   WEB_APP_URL?: string;
   DB: D1Database;
 }

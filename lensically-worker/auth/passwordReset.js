@@ -3,6 +3,7 @@ import { sendEmail } from "../email/sendEmail.js";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const DEFAULT_APP_URL = "https://app.lensically.com";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -48,7 +49,8 @@ export async function forgotPassword(request, env) {
       .bind(tokenId, user.id, token, expiresAt)
       .run();
 
-    const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    const appUrl = (env.APP_URL || env.WEB_APP_URL || DEFAULT_APP_URL).replace(/\/+$/, "");
+    const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
     const subject = "Reset your Lensically password";
     const html = `<p>We received a request to reset your Lensically password.</p>
 <p>Use the link below to set a new password:</p>
