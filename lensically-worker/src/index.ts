@@ -460,6 +460,9 @@ async function getOrCreateOauthUser(
     user = await env.DB.prepare("SELECT id, email FROM users WHERE email = ? LIMIT 1")
       .bind(email)
       .first<{ id: string; email: string }>();
+    if (user) {
+      throw new Error("email_already_has_account");
+    }
   }
 
   if (!user) {
@@ -884,6 +887,9 @@ export default {
           });
         } catch (error) {
           logError("GOOGLE_OAUTH_DB_USER_UPSERT_FAILED", error);
+          if (getErrorMessage(error) === "email_already_has_account") {
+            return redirectToAuthError("email_already_has_account");
+          }
           return redirectToAuthError("unexpected");
         }
 
@@ -950,7 +956,10 @@ export default {
         headers.append("Set-Cookie", clearOauthStateCookie(stateCookieName));
         headers.append("Set-Cookie", setSessionCookie(sessionToken));
         return applyAuthCors(new Response(null, { status: 302, headers }));
-      } catch {
+      } catch (error) {
+        if (getErrorMessage(error) === "email_already_has_account") {
+          return redirectToAuthError("email_already_has_account");
+        }
         return redirectToAuthError("unexpected");
       }
     }
