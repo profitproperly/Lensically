@@ -1,19 +1,66 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { resetPassword } from "../../lib/authClient"
+import { resetPassword, validateResetPasswordToken } from "../../lib/authClient"
+
+type ResetTokenStatus = "checking" | "ready" | "invalid"
 
 export default function ResetPasswordPageClient() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")?.trim() ?? ""
+  const [tokenStatus, setTokenStatus] = useState<ResetTokenStatus>(token ? "checking" : "invalid")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+
+  useEffect(() => {
+    if (!token) {
+      setTokenStatus("invalid")
+      setError("Reset link is missing or invalid.")
+      return
+    }
+
+    let cancelled = false
+
+    async function validateToken() {
+      setTokenStatus("checking")
+      setError("")
+      setSuccessMessage("")
+
+      try {
+        const result = await validateResetPasswordToken(token)
+        if (cancelled) {
+          return
+        }
+
+        if (result?.success) {
+          setTokenStatus("ready")
+          return
+        }
+
+        setTokenStatus("invalid")
+        setError(result?.error || "Reset link is invalid or expired.")
+      } catch (err) {
+        if (cancelled) {
+          return
+        }
+
+        setTokenStatus("invalid")
+        setError(err instanceof Error ? err.message : "Reset link is invalid or expired.")
+      }
+    }
+
+    void validateToken()
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,8 +68,8 @@ export default function ResetPasswordPageClient() {
     setError("")
     setSuccessMessage("")
 
-    if (!token) {
-      setError("Reset link is missing or invalid.")
+    if (tokenStatus !== "ready" || !token) {
+      setError("Reset link is invalid or expired.")
       return
     }
 
@@ -77,7 +124,9 @@ export default function ResetPasswordPageClient() {
           </h1>
 
           <p className="text-sm text-center text-gray-600">
-            Enter and confirm your new password to finish resetting your account.
+            {tokenStatus === "invalid"
+              ? "This reset link is invalid or has expired. Request a new password reset email to continue."
+              : "Enter and confirm your new password to finish resetting your account."}
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -87,13 +136,19 @@ export default function ResetPasswordPageClient() {
               </p>
             )}
 
+            {tokenStatus === "checking" && (
+              <p className="text-sm text-center text-gray-600">
+                Validating reset link...
+              </p>
+            )}
+
             <input
               type="password"
               placeholder="New password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={!token || Boolean(successMessage)}
+              disabled={tokenStatus !== "ready" || Boolean(successMessage)}
               className="w-full border border-gray-300 p-2 rounded-lg text-black bg-white placeholder-gray-400 disabled:opacity-60"
             />
 
@@ -103,13 +158,13 @@ export default function ResetPasswordPageClient() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              disabled={!token || Boolean(successMessage)}
+              disabled={tokenStatus !== "ready" || Boolean(successMessage)}
               className="w-full border border-gray-300 p-2 rounded-lg text-black bg-white placeholder-gray-400 disabled:opacity-60"
             />
 
             <button
               type="submit"
-              disabled={submitting || !token || Boolean(successMessage)}
+              disabled={submitting || tokenStatus !== "ready" || Boolean(successMessage)}
               className="w-full bg-black text-white rounded-lg py-3 font-medium disabled:opacity-60 cursor-pointer"
             >
               {submitting ? "Resetting password..." : "Reset password"}
@@ -117,9 +172,15 @@ export default function ResetPasswordPageClient() {
           </form>
 
           <p className="text-sm text-center text-gray-600">
-            <Link href="/login" className="text-black font-medium hover:underline">
-              Back to login
-            </Link>
+            {tokenStatus === "invalid" ? (
+              <Link href="/forgot-password" className="text-black font-medium hover:underline">
+                Request a new reset link
+              </Link>
+            ) : (
+              <Link href="/login" className="text-black font-medium hover:underline">
+                Back to login
+              </Link>
+            )}
           </p>
         </div>
       </div>

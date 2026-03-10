@@ -38,6 +38,11 @@ export async function resetPassword(token: string, password: string) {
   });
 }
 
+export async function validateResetPasswordToken(token: string) {
+  const url = `${buildWorkerUrl("/api/auth/reset-password")}?token=${encodeURIComponent(token)}`;
+  return apiRequest(url, {}, 0);
+}
+
 export async function disconnectThreadsAccount(appUserId: string) {
   return apiRequest(buildWorkerUrl("/api/threads/disconnect"), {
     method: "POST",
