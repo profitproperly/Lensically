@@ -1588,13 +1588,44 @@ export default {
       (url.pathname === "/api/threads/profile" || url.pathname === "/api/threads/profile_lookup")
       && request.method === "GET"
     ) {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const username = url.searchParams.get("username");
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
 
       if (!username || !appUserId) {
         return new Response(
           JSON.stringify({ error: "missing username or app_user_id" }),
-          { status: 400 },
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
         );
       }
 
@@ -1603,12 +1634,18 @@ export default {
       if (!account) {
         return new Response(
           JSON.stringify({ error: "no connected account" }),
-          { status: 400 },
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
         );
       }
       const limit = await enforceLimit(
         env,
-        { id: account.threads_user_id },
+        { id: account.threads_user_id, is_admin: authUser.is_admin },
         "profile_discovery",
       );
       if (!limit.allowed) {
@@ -1632,6 +1669,18 @@ export default {
     }
 
     if (url.pathname === "/api/threads/posts" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       const cursor = url.searchParams.get("cursor");
       const cursorDepthParam = Number(url.searchParams.get("cursor_depth") || 0);
@@ -1664,6 +1713,19 @@ export default {
           JSON.stringify({ error: "Missing app_user_id" }),
           {
             status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
             headers: {
               "Content-Type": "application/json",
               ...requestCorsHeaders,
@@ -1705,7 +1767,7 @@ export default {
       try {
         limitCheck = await enforceLimit(
           env,
-          { id: account.threads_user_id },
+          { id: account.threads_user_id, is_admin: authUser.is_admin },
           "insights",
         );
         if (limitCheck && limitCheck.allowed === false) {
@@ -1887,6 +1949,18 @@ export default {
     }
 
     if (url.pathname === "/api/threads/insights" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       const threadsUserId = url.searchParams.get("threads_user_id");
       if (!appUserId) {
@@ -1894,6 +1968,16 @@ export default {
           JSON.stringify({ error: "missing app_user_id" }),
           {
             status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
@@ -1912,7 +1996,7 @@ export default {
       }
       const limit = await enforceLimit(
         env,
-        { id: account.threads_user_id },
+        { id: account.threads_user_id, is_admin: authUser.is_admin },
         "insights",
       );
       if (!limit.allowed) {
@@ -2028,6 +2112,18 @@ export default {
     }
 
     if (url.pathname === "/api/threads/search" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const q = url.searchParams.get("q");
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!q) {
@@ -2049,6 +2145,19 @@ export default {
         );
       }
 
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
       const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account) {
@@ -2059,7 +2168,7 @@ export default {
       }
       const usageLimit = await enforceLimit(
         env,
-        { id: account.threads_user_id },
+        { id: account.threads_user_id, is_admin: authUser.is_admin },
         "keyword_search",
       );
       if (!usageLimit.allowed) {
@@ -2099,6 +2208,18 @@ export default {
     }
 
     if (url.pathname === "/api/threads/publish" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       let payload: { app_user_id?: string; threads_user_id?: string; text?: string };
       try {
         payload = await request.json();
@@ -2126,6 +2247,16 @@ export default {
         );
       }
 
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
       const account = await getThreadsAccountForAppUser(env, appUserId);
 
       if (!account?.access_token || account.threads_user_id !== threadsUserId) {
@@ -2139,7 +2270,7 @@ export default {
       }
       const limit = await enforceLimit(
         env,
-        { id: account.threads_user_id },
+        { id: account.threads_user_id, is_admin: authUser.is_admin },
         "publish",
       );
       if (!limit.allowed) {
