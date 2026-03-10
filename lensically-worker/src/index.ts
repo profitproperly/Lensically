@@ -11,8 +11,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
-const REDIRECT_URI =
-  "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
+const DEFAULT_WORKER_ORIGIN = "https://api.lensically.com";
 const SCOPES = [
   "threads_basic",
   "threads_manage_insights",
@@ -20,8 +19,6 @@ const SCOPES = [
   "threads_profile_discovery",
   "threads_content_publish",
 ].join(",");
-const API_OAUTH_REDIRECT_URI =
-  "https://lensically-worker.lensically.workers.dev/api/auth/threads/callback";
 const API_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
@@ -43,6 +40,7 @@ interface Env {
   INTERNAL_API_KEY: string;
   APP_URL?: string;
   ROOT_SITE_URL?: string;
+  WORKER_ORIGIN?: string;
   WEB_APP_URL?: string;
   DB: D1Database;
 }
@@ -147,11 +145,22 @@ function getConfiguredRootSiteUrl(env: Env): string {
     ?? DEFAULT_ROOT_SITE_URL;
 }
 
+function getConfiguredWorkerOrigin(env: Env): string {
+  return normalizeAppBaseUrl(env.WORKER_ORIGIN)
+    ?? DEFAULT_WORKER_ORIGIN;
+}
+
 function getAllowedAppOrigins(env: Env): Set<string> {
   return new Set([
     getConfiguredAppBaseUrl(env),
     getConfiguredRootSiteUrl(env),
   ]);
+}
+
+function buildWorkerCallbackUrl(env: Env, path: string): string {
+  const workerOrigin = getConfiguredWorkerOrigin(env).replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${workerOrigin}${normalizedPath}`;
 }
 
 function isLocalDevHostname(hostname: string | null | undefined): boolean {
@@ -775,7 +784,7 @@ export default {
       }
 
       const state = buildOauthState(appBaseUrl, "");
-      const callbackUrl = `${url.origin}/api/auth/${provider}/callback`;
+      const callbackUrl = buildWorkerCallbackUrl(env, `/api/auth/${provider}/callback`);
       const authURL = buildProviderAuthorizationUrl(
         provider,
         credentials.clientId,
@@ -812,7 +821,7 @@ export default {
       const appBaseUrl =
         stateContext?.appBaseUrl
         ?? getConfiguredAppBaseUrl(env);
-      const callbackUrl = `${url.origin}/api/auth/${provider}/callback`;
+      const callbackUrl = buildWorkerCallbackUrl(env, `/api/auth/${provider}/callback`);
       const redirectToAuthError = (error: string): Response =>
         applyAuthCors(new Response(null, {
           status: 302,
@@ -1015,7 +1024,7 @@ export default {
       const state = buildOauthState(requestAppBase, effectiveAppUserId);
       const authURL = new URL("https://www.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
-      authURL.searchParams.set("redirect_uri", API_OAUTH_REDIRECT_URI);
+      authURL.searchParams.set("redirect_uri", buildWorkerCallbackUrl(env, "/api/auth/threads/callback"));
       authURL.searchParams.set("scope", API_OAUTH_SCOPES);
       authURL.searchParams.set("response_type", "code");
       authURL.searchParams.set("state", state);
@@ -1155,7 +1164,7 @@ export default {
         const tokenBody = new URLSearchParams({
           client_id: env.THREADS_CLIENT_ID,
           client_secret: env.THREADS_CLIENT_SECRET,
-          redirect_uri: API_OAUTH_REDIRECT_URI,
+          redirect_uri: buildWorkerCallbackUrl(env, "/api/auth/threads/callback"),
           grant_type: "authorization_code",
           code,
         });
@@ -1320,7 +1329,7 @@ export default {
     if (url.pathname === "/auth/threads/login") {
       const authURL = new URL("https://graph.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
-      authURL.searchParams.set("redirect_uri", REDIRECT_URI);
+      authURL.searchParams.set("redirect_uri", buildWorkerCallbackUrl(env, "/auth/threads/callback"));
       authURL.searchParams.set("scope", SCOPES);
       authURL.searchParams.set("response_type", "code");
       return Response.redirect(authURL.toString(), 302);
@@ -1341,7 +1350,7 @@ export default {
       const body = new URLSearchParams({
         client_id: env.THREADS_CLIENT_ID,
         client_secret: env.THREADS_CLIENT_SECRET,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: buildWorkerCallbackUrl(env, "/auth/threads/callback"),
         grant_type: "authorization_code",
         code,
       });

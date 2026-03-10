@@ -33,6 +33,7 @@
 	"vars": {
 		"APP_URL": "https://app.lensically.com",
 		"ROOT_SITE_URL": "https://lensically.com",
+		"WORKER_ORIGIN": "https://api.lensically.com",
 		"WEB_APP_URL": "https://app.lensically.com"
 	}
 	/**
