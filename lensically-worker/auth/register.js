@@ -78,9 +78,66 @@ export async function register(request, env) {
   const webAppUrl = (env.WEB_APP_URL || DEFAULT_WEB_APP_URL).replace(/\/+$/, "");
   const verifyUrl = `${webAppUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
   const subject = "Verify your Lensically account";
-  const html = `<p>Welcome to Lensically.</p>
-<p>Please verify your email by clicking the link below:</p>
-<p><a href="${verifyUrl}">Verify your email</a></p>`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify your Lensically account</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+            <tr>
+              <td style="background-color:#111827;padding:24px 32px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;letter-spacing:0.02em;color:#ffffff;">Lensically</div>
+                <div style="margin-top:8px;font-size:13px;color:#d1d5db;">Social signal analytics</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:40px 32px 24px 32px;">
+                <h1 style="margin:0 0 16px 0;font-size:28px;line-height:1.2;color:#111827;">Verify your email</h1>
+                <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#374151;">
+                  Welcome to Lensically. Confirm your email address to activate your account and continue.
+                </p>
+                <p style="margin:0 0 32px 0;font-size:16px;line-height:1.6;color:#374151;">
+                  Click the button below to verify your email. This link will expire in 24 hours.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px auto;">
+                  <tr>
+                    <td align="center" style="border-radius:10px;background-color:#111827;">
+                      <a
+                        href="${verifyUrl}"
+                        style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;"
+                      >
+                        Verify Email
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 12px 0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If the button does not work, copy and paste this link into your browser:
+                </p>
+                <p style="margin:0;word-break:break-word;font-size:14px;line-height:1.6;">
+                  <a href="${verifyUrl}" style="color:#111827;text-decoration:underline;">${verifyUrl}</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 32px 32px;">
+                <div style="border-top:1px solid #e5e7eb;padding-top:24px;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center;">
+                  You received this email because a Lensically account was created with this address.
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
 
   try {
     await sendEmail(env, email, subject, html);
