@@ -9,13 +9,8 @@ import { createSession } from "../auth/sessions.js";
 import { setSessionCookie } from "../auth/cookies.js";
 import { requireAuth } from "../auth/requireAuth.js";
 
-const ALLOWED_ORIGIN = "https://app.lensically.com";
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Credentials": "true",
-};
+const DEFAULT_APP_URL = "https://app.lensically.com";
+const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
 const REDIRECT_URI =
   "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
 const SCOPES = [
@@ -31,7 +26,6 @@ const API_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
 ].join(",");
-const DEFAULT_WEB_APP_URL = "https://app.lensically.com";
 const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const DUPLICATE_EMAIL_OAUTH_ERROR = "duplicate_email";
 
@@ -56,6 +50,8 @@ interface Env {
 function limitDeniedResponse(
   result: Exclude<EnforceLimitResult, { allowed: true }>,
   feature: UsageFeature,
+  request: Request,
+  env: Env,
 ): Response {
   return new Response(
     JSON.stringify({
@@ -68,7 +64,7 @@ function limitDeniedResponse(
       status: 429,
       headers: {
         "Content-Type": "application/json",
-        ...corsHeaders,
+        ...getCorsHeadersForRequest(request, env),
       },
     },
   );
@@ -141,6 +137,23 @@ function parseUrl(raw: string | null | undefined): URL | null {
   }
 }
 
+function getConfiguredAppBaseUrl(env: Env): string {
+  return normalizeAppBaseUrl(env.APP_URL)
+    ?? DEFAULT_APP_URL;
+}
+
+function getConfiguredRootSiteUrl(env: Env): string {
+  return normalizeAppBaseUrl(env.ROOT_SITE_URL)
+    ?? DEFAULT_ROOT_SITE_URL;
+}
+
+function getAllowedAppOrigins(env: Env): Set<string> {
+  return new Set([
+    getConfiguredAppBaseUrl(env),
+    getConfiguredRootSiteUrl(env),
+  ]);
+}
+
 function isLocalDevHostname(hostname: string | null | undefined): boolean {
   return Boolean(hostname && LOCAL_DEV_HOSTS.has(hostname.trim().toLowerCase()));
 }
@@ -160,11 +173,12 @@ function isLocalDevelopmentRequest(request: Request): boolean {
   return isLocalDevHostname(refererUrl?.hostname);
 }
 
-function getAuthCorsOrigin(request: Request): string {
+function getAuthCorsOrigin(request: Request, env: Env): string {
+  const allowedOrigins = getAllowedAppOrigins(env);
   const requestOrigin = normalizeAppBaseUrl(request.headers.get("origin"));
   if (requestOrigin) {
     const requestOriginUrl = parseUrl(requestOrigin);
-    if (isLocalDevHostname(requestOriginUrl?.hostname) || requestOrigin === ALLOWED_ORIGIN) {
+    if (isLocalDevHostname(requestOriginUrl?.hostname) || allowedOrigins.has(requestOrigin)) {
       return requestOrigin;
     }
   }
@@ -176,12 +190,12 @@ function getAuthCorsOrigin(request: Request): string {
     }
   }
 
-  return ALLOWED_ORIGIN;
+  return getConfiguredAppBaseUrl(env);
 }
 
-function getCorsHeadersForRequest(request: Request): Record<string, string> {
+function getCorsHeadersForRequest(request: Request, env: Env): Record<string, string> {
   return {
-    "Access-Control-Allow-Origin": getAuthCorsOrigin(request),
+    "Access-Control-Allow-Origin": getAuthCorsOrigin(request, env),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Credentials": "true",
@@ -508,11 +522,24 @@ async function getOrCreateOauthUser(
 }
 
 function buildOauthAppBaseUrl(url: URL, request: Request, env: Env): string {
-  return normalizeAppBaseUrl(url.searchParams.get("return_to"))
-    ?? normalizeAppBaseUrl(request.headers.get("origin"))
-    ?? normalizeAppBaseUrl(request.headers.get("referer"))
-    ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-    ?? DEFAULT_WEB_APP_URL;
+  const allowedOrigins = getAllowedAppOrigins(env);
+  const candidates = [
+    normalizeAppBaseUrl(url.searchParams.get("return_to")),
+    normalizeAppBaseUrl(request.headers.get("origin")),
+    normalizeAppBaseUrl(request.headers.get("referer")),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    const candidateUrl = parseUrl(candidate);
+    if (isLocalDevHostname(candidateUrl?.hostname) || allowedOrigins.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return getConfiguredAppBaseUrl(env);
 }
 
 function getErrorMessage(error: unknown): string {
@@ -529,9 +556,9 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
-function withAuthCors(request: Request, response: Response): Response {
+function withAuthCors(request: Request, env: Env, response: Response): Response {
   const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", getAuthCorsOrigin(request));
+  headers.set("Access-Control-Allow-Origin", getAuthCorsOrigin(request, env));
   headers.set("Access-Control-Allow-Credentials", "true");
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type");
@@ -681,12 +708,14 @@ export default {
     const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
     const isApiPath = normalizedPath.startsWith("/api/") || normalizedPath.startsWith("/auth/threads/");
     const isAuthPath = normalizedPath.startsWith("/api/auth/") || normalizedPath.startsWith("/auth/threads/");
-    const requestCorsHeaders = getCorsHeadersForRequest(request);
+    const requestCorsHeaders = getCorsHeadersForRequest(request, env);
     const applyAuthCors = (response: Response): Response =>
-      isAuthPath ? withAuthCors(request, response) : response;
+      isAuthPath ? withAuthCors(request, env, response) : response;
 
     if (request.method === "OPTIONS") {
-      const accessControlOrigin = isApiPath ? getAuthCorsOrigin(request) : ALLOWED_ORIGIN;
+      const accessControlOrigin = isApiPath
+        ? getAuthCorsOrigin(request, env)
+        : getConfiguredAppBaseUrl(env);
       return new Response(null, {
         status: 204,
         headers: {
@@ -782,8 +811,7 @@ export default {
       const stateContext = contextFromState(state);
       const appBaseUrl =
         stateContext?.appBaseUrl
-        ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-        ?? DEFAULT_WEB_APP_URL;
+        ?? getConfiguredAppBaseUrl(env);
       const callbackUrl = `${url.origin}/api/auth/${provider}/callback`;
       const redirectToAuthError = (error: string): Response =>
         applyAuthCors(new Response(null, {
@@ -969,18 +997,14 @@ export default {
 
     if (url.pathname === "/connect/threads") {
       return Response.redirect(
-        "https://lensically-worker.lensically.workers.dev/auth/threads/login",
+        `${url.origin}/auth/threads/login`,
         302
       );
     }
 
     if (url.pathname === "/api/auth/threads/start" && request.method === "GET") {
       const requestAppBase =
-        normalizeAppBaseUrl(url.searchParams.get("return_to"))
-        ?? normalizeAppBaseUrl(request.headers.get("origin"))
-        ?? normalizeAppBaseUrl(request.headers.get("referer"))
-        ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-        ?? DEFAULT_WEB_APP_URL;
+        buildOauthAppBaseUrl(url, request, env);
 
       const effectiveAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
 
@@ -1013,8 +1037,7 @@ export default {
       const stateContext = contextFromState(state);
       const appBaseUrl =
         stateContext?.appBaseUrl
-        ?? normalizeAppBaseUrl(env.WEB_APP_URL)
-        ?? DEFAULT_WEB_APP_URL;
+        ?? getConfiguredAppBaseUrl(env);
       const appUserId = stateContext?.appUserId;
       const redirectToConnectError = (error: string): Response =>
         applyAuthCors(new Response(null, {
@@ -1273,6 +1296,7 @@ export default {
     }
 
     if (url.pathname === "/connect/success" && request.method === "GET") {
+      const rootSiteUrl = getConfiguredRootSiteUrl(env);
       return new Response(
         `<!doctype html>
 <html lang="en">
@@ -1283,7 +1307,7 @@ export default {
   </head>
   <body>
     <p>Threads account connected successfully.</p>
-    <a href="/">Return to Lensically</a>
+    <a href="${rootSiteUrl}">Return to Lensically</a>
   </body>
 </html>`,
         {
@@ -1419,7 +1443,7 @@ export default {
         .run();
 
       return Response.redirect(
-        "https://lensically-worker.lensically.workers.dev/connect/success",
+        `${getConfiguredAppBaseUrl(env)}/connect`,
         302
       );
     }
@@ -1661,7 +1685,7 @@ export default {
         "profile_discovery",
       );
       if (!limit.allowed) {
-        return limitDeniedResponse(limit, "profile_discovery");
+        return limitDeniedResponse(limit, "profile_discovery", request, env);
       }
 
       const res = await fetch(
@@ -2012,7 +2036,7 @@ export default {
         "insights",
       );
       if (!limit.allowed) {
-        return limitDeniedResponse(limit, "insights");
+        return limitDeniedResponse(limit, "insights", request, env);
       }
 
       const insightsResp = await fetch(
@@ -2184,7 +2208,7 @@ export default {
         "keyword_search",
       );
       if (!usageLimit.allowed) {
-        return limitDeniedResponse(usageLimit, "keyword_search");
+        return limitDeniedResponse(usageLimit, "keyword_search", request, env);
       }
 
       const params = new URLSearchParams({
@@ -2286,7 +2310,7 @@ export default {
         "publish",
       );
       if (!limit.allowed) {
-        return limitDeniedResponse(limit, "publish");
+        return limitDeniedResponse(limit, "publish", request, env);
       }
 
       const publishBody = new URLSearchParams({
