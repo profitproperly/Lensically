@@ -48,12 +48,20 @@ export async function register(request, env) {
   const userId = crypto.randomUUID();
   const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
 
-  await env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, email_verified, created_at)
-     VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
-  )
-    .bind(userId, email, passwordHash)
-    .run();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
+    )
+      .bind(userId, email, passwordHash)
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("UNIQUE constraint failed: users.email")) {
+      return json({ success: false, error: "Email already exists" }, 409);
+    }
+    throw error;
+  }
 
   const verificationToken = crypto.randomUUID();
   const verificationTokenId = crypto.randomUUID();
