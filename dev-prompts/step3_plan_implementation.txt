@@ -1,3 +1,4 @@
+```
 STEP 3
 PLAN IMPLEMENTATION
 
@@ -14,6 +15,7 @@ Avoid large refactors in one step.
 Steps must be independently executable.
 Prefer more smaller steps rather than fewer large steps.
 Assume Codex will execute each step sequentially.
+Do not reference or assume specific file names or file paths.
 
 Return format
 
@@ -30,3 +32,7 @@ Step 3
 Description
 
 Continue until the feature is complete.
+Put respnse in a txt box
+Wrap responses so there is no horizontal scroll bar
+
+```

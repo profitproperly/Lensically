@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { login } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
 import { buildWorkerUrl } from "../../lib/apiClient"
@@ -11,15 +11,31 @@ import { buildWorkerUrl } from "../../lib/apiClient"
 const GOOGLE_START_URL = buildWorkerUrl("/api/auth/google/start")
 const GITHUB_START_URL = buildWorkerUrl("/api/auth/github/start")
 const DISCORD_START_URL = buildWorkerUrl("/api/auth/discord/start")
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  duplicate_email: "This email is already registered. Sign in with your password instead.",
+  server_config: "Authentication is temporarily unavailable. Please try again later.",
+  access_denied: "Authentication was cancelled. Please try again.",
+  state_missing: "Authentication session expired. Please try again.",
+  state_mismatch: "Authentication session could not be verified. Please try again.",
+  token_exchange_failed: "Authentication could not be completed. Please try again.",
+  account_lookup_failed: "We could not load your account details. Please try again.",
+  unexpected: "OAuth sign-in failed. Please try again.",
+}
+
+function getAuthErrorMessage(errorParam: string | null) {
+  return errorParam ? AUTH_ERROR_MESSAGES[errorParam] ?? "" : ""
+}
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading, refreshUser } = useAuth()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState("")
+  const [formError, setFormError] = useState("")
+  const authError = getAuthErrorMessage(searchParams.get("error"))
 
   useEffect(() => {
     if (!loading && user) {
@@ -31,13 +47,13 @@ export default function LoginPage() {
     e.preventDefault()
 
     setSubmitting(true)
-    setError("")
+    setFormError("")
 
     try {
       const res = await login(email, password)
 
       if (res?.success === false || res?.error) {
-        setError(res.error || "Login failed")
+        setFormError(res.error || "Login failed")
         setSubmitting(false)
         return
       }
@@ -46,9 +62,9 @@ export default function LoginPage() {
       router.push("/dashboard")
     } catch (err) {
       if (err instanceof Error && err.message.includes("Failed to fetch")) {
-        setError("Unable to connect. Please try again.")
+        setFormError("Unable to connect. Please try again.")
       } else {
-        setError(err instanceof Error ? err.message : "Invalid email or password.")
+        setFormError(err instanceof Error ? err.message : "Invalid email or password.")
       }
       setSubmitting(false)
     }
@@ -84,8 +100,8 @@ export default function LoginPage() {
         </h1>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-3">
-          {error && (
-            <p className="text-red-500 text-sm text-center">{error}</p>
+          {(authError || formError) && (
+            <p className="text-red-500 text-sm text-center">{authError || formError}</p>
           )}
 
           <input

@@ -33,6 +33,7 @@ const API_OAUTH_SCOPES = [
 ].join(",");
 const DEFAULT_WEB_APP_URL = "https://lensically-web.lensically.workers.dev";
 const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
+const DUPLICATE_EMAIL_OAUTH_ERROR = "duplicate_email";
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -461,7 +462,7 @@ async function getOrCreateOauthUser(
       .bind(email)
       .first<{ id: string; email: string }>();
     if (user) {
-      throw new Error("email_already_has_account");
+      throw new Error(DUPLICATE_EMAIL_OAUTH_ERROR);
     }
   }
 
@@ -887,8 +888,8 @@ export default {
           });
         } catch (error) {
           logError("GOOGLE_OAUTH_DB_USER_UPSERT_FAILED", error);
-          if (getErrorMessage(error) === "email_already_has_account") {
-            return redirectToAuthError("email_already_has_account");
+          if (getErrorMessage(error) === DUPLICATE_EMAIL_OAUTH_ERROR) {
+            return redirectToAuthError(DUPLICATE_EMAIL_OAUTH_ERROR);
           }
           return redirectToAuthError("unexpected");
         }
@@ -957,8 +958,8 @@ export default {
         headers.append("Set-Cookie", setSessionCookie(sessionToken));
         return applyAuthCors(new Response(null, { status: 302, headers }));
       } catch (error) {
-        if (getErrorMessage(error) === "email_already_has_account") {
-          return redirectToAuthError("email_already_has_account");
+        if (getErrorMessage(error) === DUPLICATE_EMAIL_OAUTH_ERROR) {
+          return redirectToAuthError(DUPLICATE_EMAIL_OAUTH_ERROR);
         }
         return redirectToAuthError("unexpected");
       }
