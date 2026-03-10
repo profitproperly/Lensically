@@ -3601,23 +3601,23 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js": {
-      "bytes": 6578,
-      "imports": [],
-      "format": "cjs"
-    },
     ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js": {
       "bytes": 5980,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
-      "bytes": 7420,
+    ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js": {
+      "bytes": 6578,
       "imports": [],
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
       "bytes": 7418,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
+      "bytes": 7420,
       "imports": [],
       "format": "cjs"
     },
@@ -3631,13 +3631,13 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js": {
-      "bytes": 8520,
+    ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
+      "bytes": 8510,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
-      "bytes": 8510,
+    ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js": {
+      "bytes": 8520,
       "imports": [],
       "format": "cjs"
     },
@@ -3680,24 +3680,24 @@
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/login/page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js",
+          "path": ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js",
           "kind": "require-call",
-          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js"
+          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js",
@@ -3710,14 +3710,14 @@
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "/home/brian/lensically/lensically-web/.open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js"
         }
       ],
       "format": "cjs"
@@ -4164,7 +4164,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__ea2305de._.js": {
-      "bytes": 2571,
+      "bytes": 2573,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js",
@@ -8290,17 +8290,17 @@
         ".open-next/server-functions/default/.next/server/app/login/page_client-reference-manifest.js": {
           "bytesInOutput": 7046
         },
-        ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js": {
-          "bytesInOutput": 6286
-        },
         ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js": {
           "bytesInOutput": 5746
         },
-        ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
-          "bytesInOutput": 7082
+        ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js": {
+          "bytesInOutput": 6286
         },
         ".open-next/server-functions/default/.next/server/app/(internal)/search/page_client-reference-manifest.js": {
           "bytesInOutput": 7078
+        },
+        ".open-next/server-functions/default/.next/server/app/(internal)/schedule/page_client-reference-manifest.js": {
+          "bytesInOutput": 7082
         },
         ".open-next/server-functions/default/.next/server/app/(internal)/insights/page_client-reference-manifest.js": {
           "bytesInOutput": 8122
@@ -8308,11 +8308,11 @@
         ".open-next/server-functions/default/.next/server/app/(internal)/discovery/page_client-reference-manifest.js": {
           "bytesInOutput": 7084
         },
-        ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js": {
-          "bytesInOutput": 8129
-        },
         ".open-next/server-functions/default/.next/server/app/(internal)/connect/page_client-reference-manifest.js": {
           "bytesInOutput": 8117
+        },
+        ".open-next/server-functions/default/.next/server/app/(internal)/dashboard/page_client-reference-manifest.js": {
+          "bytesInOutput": 8129
         },
         ".open-next/server-functions/default/node_modules/next/dist/server/load-manifest.external.js": {
           "bytesInOutput": 21243
@@ -8384,7 +8384,7 @@
           "bytesInOutput": 159155
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__ea2305de._.js": {
-          "bytesInOutput": 2692
+          "bytesInOutput": 2694
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__f2770306._.js": {
           "bytesInOutput": 2782
@@ -8759,7 +8759,7 @@
           "bytesInOutput": 60992
         }
       },
-      "bytes": 3142971
+      "bytes": 3142973
     }
   }
 }

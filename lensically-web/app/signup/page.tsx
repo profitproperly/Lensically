@@ -49,8 +49,8 @@ export default function SignupPage() {
         return
       }
 
-      await refreshUser()
-      router.push("/dashboard")
+      const normalizedEmail = email.trim().toLowerCase()
+      router.push(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed.")
       setSubmitting(false)
