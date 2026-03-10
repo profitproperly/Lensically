@@ -43,12 +43,13 @@ export default function LoginPageClient() {
       return
     }
 
+    const authenticatedUser = user
     let cancelled = false
 
     async function routeAuthenticatedUser() {
       try {
         const response = await fetch(
-          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(user.id)}`,
+          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(authenticatedUser.id)}`,
           {
             cache: "no-store",
             credentials: "include",
