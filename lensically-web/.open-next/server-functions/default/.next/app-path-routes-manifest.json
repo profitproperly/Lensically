@@ -10,5 +10,6 @@
   "/favicon.ico/route": "/favicon.ico",
   "/login/page": "/login",
   "/page": "/",
-  "/signup/page": "/signup"
+  "/signup/page": "/signup",
+  "/verify-email/page": "/verify-email"
 }

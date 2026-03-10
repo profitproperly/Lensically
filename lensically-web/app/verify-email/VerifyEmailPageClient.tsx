@@ -25,6 +25,7 @@ export default function VerifyEmailPageClient() {
       return
     }
 
+    const verificationToken = token
     let cancelled = false
 
     async function verifyToken() {
@@ -33,7 +34,7 @@ export default function VerifyEmailPageClient() {
 
       try {
         const result = await apiRequest(
-          `${buildWorkerUrl("/api/auth/verify-email")}?token=${encodeURIComponent(token)}`,
+          `${buildWorkerUrl("/api/auth/verify-email")}?token=${encodeURIComponent(verificationToken)}`,
           {},
           0,
         )
