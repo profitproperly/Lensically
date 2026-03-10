@@ -80,7 +80,14 @@ export async function register(request, env) {
 <p>Please verify your email by clicking the link below:</p>
 <p><a href="${verifyUrl}">Verify your email</a></p>`;
 
-  await sendEmail(env, email, subject, html);
+  try {
+    await sendEmail(env, email, subject, html);
+  } catch (error) {
+    console.error("Verification email delivery failed", {
+      email,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return json({
     success: true,
