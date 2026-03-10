@@ -42,5 +42,6 @@ CREATE TABLE IF NOT EXISTS oauth_accounts (
   provider TEXT NOT NULL CHECK (provider IN ('google', 'discord', 'github')),
   provider_user_id TEXT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (provider, provider_user_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
