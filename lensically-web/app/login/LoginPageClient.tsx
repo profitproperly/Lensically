@@ -165,6 +165,13 @@ export default function LoginPageClient() {
               className="w-full border border-gray-300 p-2 rounded-lg text-black bg-white placeholder-gray-400"
             />
 
+            <Link
+              href="/forgot-password"
+              className="text-sm text-right text-gray-600 hover:text-black hover:underline"
+            >
+              Forgot password?
+            </Link>
+
             <button
               type="submit"
               disabled={submitting}

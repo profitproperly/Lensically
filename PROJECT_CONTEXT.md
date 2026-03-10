@@ -13,10 +13,10 @@ Tailwind CSS
 ## Architecture
 
 lensically-web
-Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes login, signup, verify-email, and authenticated app sections. It talks to the worker through `lib/apiClient.ts` and routes authenticated users based on Threads connection state.
+Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes login, signup, verify-email, and authenticated app sections. It talks to the worker through `lib/apiClient.ts`, using `NEXT_PUBLIC_WORKER_ORIGIN` with a production fallback of `https://api.lensically.com`, and routes authenticated users based on Threads connection state.
 
 lensically-worker
-Backend Cloudflare Worker responsible for Threads API integration, email/password auth, OAuth auth, session cookies, email verification, password reset, Threads-account capacity checks, admin-aware usage enforcement, and D1-backed persistence.
+Backend Cloudflare Worker responsible for Threads API integration, email/password auth, OAuth auth, session cookies, email verification, password reset, Threads-account capacity checks, admin-aware usage enforcement, and D1-backed persistence. Production domain handling is centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.
 
 Legacy directories
 `server`, `client`, and `database` still exist as earlier scaffolding, but the active deployment target is the `lensically-web` + `lensically-worker` Cloudflare stack.
@@ -51,16 +51,16 @@ Email verification and password reset
 
 ## Recent Changes (Git History)
 
+- fix(frontend): update API origin fallback to api.lensically.com and remove workers.dev dependency
+- Add WORKER_ORIGIN configuration for production worker host Replace hardcoded OAuth callback URLs with env-driven builder Route all provider callbacks through api.lensically.com
+- Centralize domain resolution using APP_URL and ROOT_SITE_URL Replace hardcoded origins with env-driven validation helpers Update CORS, redirects, and OAuth fallback handling
+- Add canonical APP_URL and ROOT_SITE_URL configuration Update WEB_APP_URL to production app domain Update auth email links and env typing to use new domain config
 - fix: narrow user before threads connection check to satisfy TypeScript
 - feat: route verified users without Threads connection to connect page after login
 - feat: add styled HTML template for verification emails
 - fix: update verification email link to use current frontend domain via WEB_APP_URL
 - fix: guard verify-email token before encodeURIComponent to satisfy TypeScript
 - auth: add verify-email route and redirect signup success to verification screen
-- auth: disable automatic retries for signup POST to prevent duplicate registration requests
-- auth: decouple signup success from email delivery; make verification email best-effort
-- auth: standardize login, signup, and OAuth error messages across UI and worker
-- auth: wrap login route in Suspense and move useSearchParams into LoginPageClient
 
 ## Current Objective
-Stabilize the end-to-end authentication and onboarding flow, especially signup, verification, post-login routing, and Threads connection gating, while preserving capacity limits and admin-aware enforcement in the worker.
+Finalize production-domain alignment across the Cloudflare stack so frontend API traffic, worker redirects, auth email links, CORS/origin validation, and OAuth callback handling all resolve through `app.lensically.com`, `lensically.com`, and `api.lensically.com` consistently.
