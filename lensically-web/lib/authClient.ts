@@ -4,7 +4,7 @@ export async function register(email: string, password: string) {
   return apiRequest(buildWorkerUrl("/api/auth/register"), {
     method: "POST",
     body: JSON.stringify({ email, password }),
-  });
+  }, 0);
 }
 
 export async function login(email: string, password: string) {
