@@ -16,9 +16,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Credentials": "true",
 };
-
-const REDIRECT_URI =
-  "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
 const SCOPES = [
   "threads_basic",
   "threads_manage_insights",
@@ -26,8 +23,6 @@ const SCOPES = [
   "threads_profile_discovery",
   "threads_content_publish",
 ].join(",");
-const API_OAUTH_REDIRECT_URI =
-  "https://lensically-worker.lensically.workers.dev/api/auth/threads/callback";
 const API_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
@@ -48,6 +43,7 @@ interface Env {
   DISCORD_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
   WEB_APP_URL?: string;
+  WORKER_BASE_URL?: string;
   DB: D1Database;
 }
 
@@ -108,6 +104,18 @@ function normalizeAppUserId(raw: string | null | undefined): string | null {
     return null;
   }
   return value;
+}
+
+function getWorkerBaseUrl(request: Request, env: Env): string {
+  return normalizeAppBaseUrl(env.WORKER_BASE_URL) ?? new URL(request.url).origin;
+}
+
+function getThreadsLegacyCallbackUrl(request: Request, env: Env): string {
+  return `${getWorkerBaseUrl(request, env)}/auth/threads/callback`;
+}
+
+function getThreadsApiCallbackUrl(request: Request, env: Env): string {
+  return `${getWorkerBaseUrl(request, env)}/api/auth/threads/callback`;
 }
 
 type OauthStateContext = {
@@ -922,10 +930,7 @@ export default {
     }
 
     if (url.pathname === "/connect/threads") {
-      return Response.redirect(
-        "https://lensically-worker.lensically.workers.dev/auth/threads/login",
-        302
-      );
+      return Response.redirect(`${getWorkerBaseUrl(request, env)}/auth/threads/login`, 302);
     }
 
     if (url.pathname === "/api/auth/threads/start" && request.method === "GET") {
@@ -944,8 +949,9 @@ export default {
 
       const state = buildOauthState(requestAppBase, effectiveAppUserId);
       const authURL = new URL("https://www.threads.net/oauth/authorize");
+      const callbackUrl = getThreadsApiCallbackUrl(request, env);
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
-      authURL.searchParams.set("redirect_uri", API_OAUTH_REDIRECT_URI);
+      authURL.searchParams.set("redirect_uri", callbackUrl);
       authURL.searchParams.set("scope", API_OAUTH_SCOPES);
       authURL.searchParams.set("response_type", "code");
       authURL.searchParams.set("state", state);
@@ -1086,7 +1092,7 @@ export default {
         const tokenBody = new URLSearchParams({
           client_id: env.THREADS_CLIENT_ID,
           client_secret: env.THREADS_CLIENT_SECRET,
-          redirect_uri: API_OAUTH_REDIRECT_URI,
+          redirect_uri: getThreadsApiCallbackUrl(request, env),
           grant_type: "authorization_code",
           code,
         });
@@ -1245,8 +1251,9 @@ export default {
 
     if (url.pathname === "/auth/threads/login") {
       const authURL = new URL("https://graph.threads.net/oauth/authorize");
+      const callbackUrl = getThreadsLegacyCallbackUrl(request, env);
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
-      authURL.searchParams.set("redirect_uri", REDIRECT_URI);
+      authURL.searchParams.set("redirect_uri", callbackUrl);
       authURL.searchParams.set("scope", SCOPES);
       authURL.searchParams.set("response_type", "code");
       return Response.redirect(authURL.toString(), 302);
@@ -1267,7 +1274,7 @@ export default {
       const body = new URLSearchParams({
         client_id: env.THREADS_CLIENT_ID,
         client_secret: env.THREADS_CLIENT_SECRET,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: getThreadsLegacyCallbackUrl(request, env),
         grant_type: "authorization_code",
         code,
       });
