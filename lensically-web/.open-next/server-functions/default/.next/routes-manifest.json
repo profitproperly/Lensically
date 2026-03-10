@@ -83,6 +83,12 @@
       "namedRegex": "^/login(?:/)?$"
     },
     {
+      "page": "/reset-password",
+      "regex": "^/reset\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reset\\-password(?:/)?$"
+    },
+    {
       "page": "/schedule",
       "regex": "^/schedule(?:/)?$",
       "routeKeys": {},

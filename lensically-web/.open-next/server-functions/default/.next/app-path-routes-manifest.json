@@ -11,6 +11,7 @@
   "/forgot-password/page": "/forgot-password",
   "/login/page": "/login",
   "/page": "/",
+  "/reset-password/page": "/reset-password",
   "/signup/page": "/signup",
   "/verify-email/page": "/verify-email"
 }
