@@ -4314,7 +4314,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__86ea5fe7._.js": {
-      "bytes": 9775,
+      "bytes": 9696,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/server/app-render/work-async-storage.external.js",
@@ -8423,7 +8423,7 @@
           "bytesInOutput": 1466
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__86ea5fe7._.js": {
-          "bytesInOutput": 9974
+          "bytesInOutput": 9895
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__a457c799._.js": {
           "bytesInOutput": 2369
@@ -8759,7 +8759,7 @@
           "bytesInOutput": 60992
         }
       },
-      "bytes": 3140160
+      "bytes": 3140081
     }
   }
 }

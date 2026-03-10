@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/AuthProvider";
+import { buildWorkerUrl } from "../lib/apiClient";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -18,6 +19,8 @@ type ThreadsMeResponse = {
   username?: string;
   threads_profile_picture_url?: string;
 };
+
+const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -35,7 +38,7 @@ export function Sidebar() {
     const loadProfile = async () => {
       try {
         const res = await fetch(
-          `https://lensically-worker.lensically.workers.dev/api/threads/me?app_user_id=${encodeURIComponent(appUserId)}`,
+          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
           { cache: "no-store", credentials: "include" },
         );
         if (!res.ok) {

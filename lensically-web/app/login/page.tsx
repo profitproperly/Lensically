@@ -6,8 +6,11 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { login } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
+import { buildWorkerUrl } from "../../lib/apiClient"
 
-const WORKER_BASE_URL = "https://lensically-worker.lensically.workers.dev"
+const GOOGLE_START_URL = buildWorkerUrl("/api/auth/google/start")
+const GITHUB_START_URL = buildWorkerUrl("/api/auth/github/start")
+const DISCORD_START_URL = buildWorkerUrl("/api/auth/discord/start")
 
 export default function LoginPage() {
   const router = useRouter()
@@ -114,7 +117,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              window.location.href = `${WORKER_BASE_URL}/api/auth/google/start`
+              window.location.href = GOOGLE_START_URL
             }}
             className="w-full border border-gray-300 rounded-lg py-3 font-medium text-black hover:bg-gray-50 cursor-pointer"
           >
@@ -128,8 +131,8 @@ export default function LoginPage() {
                 window.location.hostname === "localhost" ||
                 window.location.hostname === "127.0.0.1"
               const githubStartUrl = isLocal
-                ? `${WORKER_BASE_URL}/api/auth/github/start?env=dev`
-                : `${WORKER_BASE_URL}/api/auth/github/start`
+                ? `${GITHUB_START_URL}?env=dev`
+                : GITHUB_START_URL
               window.location.href = githubStartUrl
             }}
             className="w-full border border-gray-300 rounded-lg py-3 font-medium text-black hover:bg-gray-50 cursor-pointer"
@@ -140,7 +143,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              window.location.href = `${WORKER_BASE_URL}/api/auth/discord/start`
+              window.location.href = DISCORD_START_URL
             }}
             className="w-full border border-gray-300 rounded-lg py-3 font-medium text-black hover:bg-gray-50 cursor-pointer"
           >

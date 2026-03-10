@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../lib/AuthProvider";
+import { buildWorkerUrl } from "../../../lib/apiClient";
 
 type ThreadsPost = {
   id?: string;
@@ -25,8 +26,8 @@ type PostsResponse = {
   error?: string;
 };
 
-const CONNECT_THREADS_URL =
-  "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
+const CONNECT_THREADS_URL = buildWorkerUrl("/api/auth/threads/start");
+const THREADS_POSTS_URL = buildWorkerUrl("/api/threads/posts");
 
 export default function PostsList() {
   const { user, loading } = useAuth();
@@ -86,8 +87,8 @@ export default function PostsList() {
       setHasError(false);
 
       const res = await fetch(
-        `https://lensically-worker.lensically.workers.dev/api/threads/posts?app_user_id=${encodeURIComponent(appUserId ?? "")}`,
-        { cache: "no-store" },
+        `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId ?? "")}`,
+        { cache: "no-store", credentials: "include" },
       );
       const data = (await res.json()) as PostsResponse;
       console.log("THREADS API RESPONSE:", data);
@@ -122,7 +123,8 @@ export default function PostsList() {
 
     try {
       const res = await fetch(
-        `https://lensically-worker.lensically.workers.dev/api/threads/posts?app_user_id=${encodeURIComponent(appUserId ?? "")}&cursor=${encodeURIComponent(cursor)}&cursor_depth=${nextDepth}`,
+        `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId ?? "")}&cursor=${encodeURIComponent(cursor)}&cursor_depth=${nextDepth}`,
+        { credentials: "include" },
       );
 
       const data = (await res.json()) as PostsResponse;
@@ -153,8 +155,8 @@ export default function PostsList() {
 
     try {
       const res = await fetch(
-        `https://lensically-worker.lensically.workers.dev/api/threads/posts?app_user_id=${encodeURIComponent(appUserId)}`,
-        { cache: "no-store" },
+        `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+        { cache: "no-store", credentials: "include" },
       );
 
       const data = (await res.json()) as PostsResponse;

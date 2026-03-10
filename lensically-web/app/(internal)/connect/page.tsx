@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildWorkerUrl } from "../../../lib/apiClient";
 
-const WORKER_BASE_URL = "https://lensically-worker.lensically.workers.dev";
-const CONNECT_THREADS_PATH = "/api/auth/threads/start";
+const CONNECT_THREADS_URL = buildWorkerUrl("/api/auth/threads/start");
+const CURRENT_USER_URL = buildWorkerUrl("/api/auth/me");
 
 type AuthMeUser = {
   id: string;
@@ -32,7 +33,7 @@ export default function ConnectPage() {
     async function loadCurrentUser() {
       setLoadingUser(true);
       try {
-        const response = await fetch(`${WORKER_BASE_URL}/api/auth/me`, {
+        const response = await fetch(CURRENT_USER_URL, {
           credentials: "include",
         });
         if (!isMounted) {
@@ -75,7 +76,7 @@ export default function ConnectPage() {
     if (!authUser?.id || typeof window === "undefined") {
       return "";
     }
-    return `${WORKER_BASE_URL}${CONNECT_THREADS_PATH}?return_to=${encodeURIComponent(window.location.origin)}&app_user_id=${encodeURIComponent(authUser.id)}`;
+    return `${CONNECT_THREADS_URL}?return_to=${encodeURIComponent(window.location.origin)}&app_user_id=${encodeURIComponent(authUser.id)}`;
   }, [authUser?.id]);
 
   const connectDisabled = loadingUser;

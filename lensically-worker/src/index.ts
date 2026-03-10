@@ -33,6 +33,7 @@ const API_OAUTH_SCOPES = [
   "threads_manage_insights",
 ].join(",");
 const DEFAULT_WEB_APP_URL = "https://lensically-web.lensically.workers.dev";
+const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -125,6 +126,55 @@ function buildOauthState(appBaseUrl: string, appUserId: string): string {
   const nonce = crypto.randomUUID().replace(/-/g, "");
   const encodedContext = btoa(JSON.stringify({ appBaseUrl, appUserId }));
   return `${nonce}.${encodedContext}`;
+}
+
+function parseUrl(raw: string | null | undefined): URL | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    return new URL(raw);
+  } catch {
+    return null;
+  }
+}
+
+function isLocalDevHostname(hostname: string | null | undefined): boolean {
+  return Boolean(hostname && LOCAL_DEV_HOSTS.has(hostname.trim().toLowerCase()));
+}
+
+function isLocalDevelopmentRequest(request: Request): boolean {
+  const requestUrl = parseUrl(request.url);
+  if (isLocalDevHostname(requestUrl?.hostname)) {
+    return true;
+  }
+
+  const originUrl = parseUrl(request.headers.get("origin"));
+  if (isLocalDevHostname(originUrl?.hostname)) {
+    return true;
+  }
+
+  const refererUrl = parseUrl(request.headers.get("referer"));
+  return isLocalDevHostname(refererUrl?.hostname);
+}
+
+function getAuthCorsOrigin(request: Request): string {
+  const requestOrigin = normalizeAppBaseUrl(request.headers.get("origin"));
+  if (requestOrigin) {
+    const requestOriginUrl = parseUrl(requestOrigin);
+    if (isLocalDevHostname(requestOriginUrl?.hostname) || requestOrigin === ALLOWED_ORIGIN) {
+      return requestOrigin;
+    }
+  }
+
+  if (isLocalDevelopmentRequest(request)) {
+    const refererOrigin = normalizeAppBaseUrl(request.headers.get("referer"));
+    if (refererOrigin) {
+      return refererOrigin;
+    }
+  }
+
+  return ALLOWED_ORIGIN;
 }
 
 function contextFromState(state: string | null): OauthStateContext | null {
@@ -461,9 +511,9 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
-function withAuthCors(response: Response): Response {
+function withAuthCors(request: Request, response: Response): Response {
   const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  headers.set("Access-Control-Allow-Origin", getAuthCorsOrigin(request));
   headers.set("Access-Control-Allow-Credentials", "true");
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type");
@@ -593,13 +643,14 @@ export default {
     const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
     const isAuthPath = normalizedPath.startsWith("/api/auth/") || normalizedPath.startsWith("/auth/threads/");
     const applyAuthCors = (response: Response): Response =>
-      isAuthPath ? withAuthCors(response) : response;
+      isAuthPath ? withAuthCors(request, response) : response;
 
     if (request.method === "OPTIONS") {
+      const accessControlOrigin = isAuthPath ? getAuthCorsOrigin(request) : ALLOWED_ORIGIN;
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+          "Access-Control-Allow-Origin": accessControlOrigin,
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
           "Access-Control-Allow-Credentials": "true",
@@ -884,11 +935,14 @@ export default {
         ?? normalizeAppBaseUrl(request.headers.get("referer"))
         ?? normalizeAppBaseUrl(env.WEB_APP_URL)
         ?? DEFAULT_WEB_APP_URL;
-      const requestAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
-      if (!requestAppUserId) {
-        return applyAuthCors(Response.redirect(`${requestAppBase}/connect?error=missing_user`, 302));
+
+      const effectiveAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+
+      if (!effectiveAppUserId) {
+        return applyAuthCors(Response.redirect(`${requestAppBase}/login`, 302));
       }
-      const state = buildOauthState(requestAppBase, requestAppUserId);
+
+      const state = buildOauthState(requestAppBase, effectiveAppUserId);
       const authURL = new URL("https://www.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
       authURL.searchParams.set("redirect_uri", API_OAUTH_REDIRECT_URI);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/AuthProvider";
+import { buildWorkerUrl } from "../../../lib/apiClient";
 
 type ThreadsProfile = {
   threads_profile_picture_url?: string;
@@ -17,8 +18,8 @@ type ThreadsMeResponse = {
   account?: ThreadsProfile | null;
 };
 
-const CONNECT_THREADS_URL =
-  "https://lensically-worker.lensically.workers.dev/api/auth/threads/start";
+const CONNECT_THREADS_URL = buildWorkerUrl("/api/auth/threads/start");
+const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -59,7 +60,7 @@ export default function DashboardPage() {
       setHasError(false);
       try {
         const res = await fetch(
-          `https://lensically-worker.lensically.workers.dev/api/threads/me?app_user_id=${encodeURIComponent(appUserId)}`,
+          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
           {
             cache: "no-store",
             credentials: "include",

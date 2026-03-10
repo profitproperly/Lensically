@@ -95,7 +95,7 @@ export function ProfileMenu({
         aria-label="Open profile menu"
         disabled={isBusy}
         onClick={() => setIsOpen((current) => !current)}
-        className="cursor-pointer rounded-full border border-slate-200 bg-white p-2 text-left shadow-sm transition hover:border-slate-300 hover:shadow disabled:cursor-not-allowed disabled:opacity-70"
+        className="cursor-pointer rounded-full p-0 text-left transition disabled:cursor-not-allowed disabled:opacity-70"
       >
         {avatarUrl ? (
           <img
