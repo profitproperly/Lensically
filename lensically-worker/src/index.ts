@@ -655,7 +655,7 @@ async function checkUserCapacity(
     "SELECT COUNT(*) AS total FROM threads_accounts",
   ).first<{ total: number | string }>();
 
-  if (Number(users?.total ?? 0) >= 800) {
+  if (Number(users?.total ?? 0) >= 500) {
     return new Response(
       JSON.stringify({ error: "user capacity reached" }),
       {

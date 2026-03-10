@@ -2,15 +2,38 @@ STEP 4
 CODEX EXECUTION
 
 Goal
-Execute the following step from the implementation plan.
+Execute the next step from the implementation plan one at a time in order.
 
 Step
-[Rewrite the selected implementation-plan step into a complete,
-in-depth execution instruction for Codex. Do not paste only the
-step title. Expand it so the full objective is clear, the expected
-behavior is explicit, the necessary inspection or integration work
-is included, and the step can be completed in one execution without
-creating micro follow-up steps.]
+Rewrite the selected implementation-plan step as a clear execution
+instruction for Codex.
 
-Rule
+Instruction for Codex
+
+Task
+(2–4 sentences)
+[Describe what Codex must implement or change.]
+
+Context
+(1–3 sentences)
+[Explain why this change is required.]
+
+Expected Result
+(1–2 sentences)
+[Describe the behavior after the change.]
+
+Instruction Length
+Use short paragraphs.
+Each section must stay within the sentence limits above.
+Wrap long sentences onto multiple lines so there is no horizontal scrolling.
+
+Rules
+Do not create additional steps.
+Do not break the step into sub-steps.
+Do not restructure the implementation plan.
+
+Output
 Return only the Step content inside a txt box.
+
+Remarks
+Any brief remarks should be written outside the txt box.

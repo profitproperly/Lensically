@@ -22,14 +22,11 @@ Goal
 
 Step 1
 Description
-Files likely affected
 
 Step 2
 Description
-Files likely affected
 
 Step 3
 Description
-Files likely affected
 
 Continue until the feature is complete.
