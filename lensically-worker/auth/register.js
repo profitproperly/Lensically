@@ -35,14 +35,14 @@ export async function register(request, env) {
   }
 
   if (!isValidEmail(email)) {
-    return json({ success: false, error: "Invalid email address" }, 400);
+    return json({ success: false, error: "Invalid email address." }, 400);
   }
 
   const existingUser = await env.DB.prepare("SELECT id FROM users WHERE email = ? LIMIT 1")
     .bind(email)
     .first();
   if (existingUser) {
-    return json({ success: false, error: "Email already exists" }, 409);
+    return json({ success: false, error: "Email already registered. Log in instead." }, 409);
   }
 
   const userId = crypto.randomUUID();
@@ -58,7 +58,7 @@ export async function register(request, env) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("UNIQUE constraint failed: users.email")) {
-      return json({ success: false, error: "Email already exists" }, 409);
+      return json({ success: false, error: "Email already registered. Log in instead." }, 409);
     }
     throw error;
   }

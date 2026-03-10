@@ -16,6 +16,25 @@ When implementing a task:
 2. Identify the safest integration point.
 3. Implement the change with minimal modifications.
 
+## Environment Consistency
+
+The development environment and runtime versions are controlled by the
+VS Code task system.
+
+Agents must NOT:
+
+- diagnose local Node versions
+- recommend runtime upgrades
+- modify environment configuration
+- block implementation due to local runtime assumptions
+
+All builds, Node versions, and deployment commands are executed through
+the task registry defined in the development workflow.
+
+If a build failure appears to be environment-related, assume the runtime
+is correct and focus only on code-level causes unless explicitly told
+otherwise.
+
 ## Verification
 
 Every implementation must include:
@@ -34,4 +53,5 @@ Risks / Edge Cases
 
 ## Rule
 
-If the correct integration point cannot be confidently determined from the repository, stop and ask for clarification instead of guessing.
+If the correct integration point cannot be confidently determined from
+the repository, stop and ask for clarification instead of guessing.

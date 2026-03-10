@@ -12,14 +12,14 @@ const GOOGLE_START_URL = buildWorkerUrl("/api/auth/google/start")
 const GITHUB_START_URL = buildWorkerUrl("/api/auth/github/start")
 const DISCORD_START_URL = buildWorkerUrl("/api/auth/discord/start")
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
-  duplicate_email: "This email is already registered. Sign in with your password instead.",
-  server_config: "Authentication is temporarily unavailable. Please try again later.",
-  access_denied: "Authentication was cancelled. Please try again.",
-  state_missing: "Authentication session expired. Please try again.",
-  state_mismatch: "Authentication session could not be verified. Please try again.",
-  token_exchange_failed: "Authentication could not be completed. Please try again.",
-  account_lookup_failed: "We could not load your account details. Please try again.",
-  unexpected: "OAuth sign-in failed. Please try again.",
+  duplicate_email: "Email already registered. Log in instead.",
+  server_config: "Authentication temporarily unavailable.",
+  access_denied: "Login cancelled.",
+  state_missing: "Session expired. Please try again.",
+  state_mismatch: "Session verification failed.",
+  token_exchange_failed: "Authentication failed. Please try again.",
+  account_lookup_failed: "Could not load account details.",
+  unexpected: "OAuth login failed.",
 }
 
 function getAuthErrorMessage(errorParam: string | null) {
@@ -53,7 +53,7 @@ export default function LoginPageClient() {
       const res = await login(email, password)
 
       if (res?.success === false || res?.error) {
-        setFormError(res.error || "Login failed")
+        setFormError(res.error || "Login failed.")
         setSubmitting(false)
         return
       }
@@ -62,7 +62,7 @@ export default function LoginPageClient() {
       router.push("/dashboard")
     } catch (err) {
       if (err instanceof Error && err.message.includes("Failed to fetch")) {
-        setFormError("Unable to connect. Please try again.")
+        setFormError("Connection error. Please try again.")
       } else {
         setFormError(err instanceof Error ? err.message : "Invalid email or password.")
       }

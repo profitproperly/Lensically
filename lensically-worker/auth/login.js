@@ -41,16 +41,16 @@ export async function login(request, env) {
     .first();
 
   if (!user) {
-    return json({ success: false, error: "Invalid email or password" }, 401);
+    return json({ success: false, error: "Invalid email or password." }, 401);
   }
 
   if (!user.password_hash) {
-    return json({ success: false, error: "Invalid email or password" }, 401);
+    return json({ success: false, error: "Invalid email or password." }, 401);
   }
 
   const passwordOk = await bcrypt.compare(password, user.password_hash);
   if (!passwordOk) {
-    return json({ success: false, error: "Invalid email or password" }, 401);
+    return json({ success: false, error: "Invalid email or password." }, 401);
   }
 
   if (!user.email_verified) {

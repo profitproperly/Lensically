@@ -35,7 +35,7 @@ export default function SignupPage() {
     setError("")
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match")
+      setError("Passwords do not match.")
       setSubmitting(false)
       return
     }
@@ -44,7 +44,7 @@ export default function SignupPage() {
       const res = await register(email, password)
 
       if (res?.success === false || res?.error) {
-        setError(res.error || "Signup failed")
+        setError(res.error || "Signup failed.")
         setSubmitting(false)
         return
       }
@@ -52,7 +52,7 @@ export default function SignupPage() {
       await refreshUser()
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed")
+      setError(err instanceof Error ? err.message : "Signup failed.")
       setSubmitting(false)
     }
   }
@@ -87,19 +87,7 @@ export default function SignupPage() {
 
         <form onSubmit={handleSignup} className="flex flex-col gap-3">
           {error && (
-            <p className="text-red-500 text-sm text-center">
-              {error.toLowerCase().includes("already exists") ? (
-                <>
-                  An account with this email already exists.{" "}
-                  <Link href="/login" className="underline">
-                    Log in
-                  </Link>
-                  {" "}instead.
-                </>
-              ) : (
-                error
-              )}
-            </p>
+            <p className="text-red-500 text-sm text-center">{error}</p>
           )}
 
           <input
