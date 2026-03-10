@@ -753,7 +753,7 @@ export default {
       return applyAuthCors(await forgotPassword(request, env));
     }
 
-    if (path === "/api/auth/reset-password" && request.method === "POST") {
+    if (path === "/api/auth/reset-password" && (request.method === "GET" || request.method === "POST")) {
       return applyAuthCors(await resetPassword(request, env));
     }
 

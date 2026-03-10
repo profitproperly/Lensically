@@ -16,6 +16,29 @@ function normalizeEmail(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
+async function getValidResetTokenRow(env, token) {
+  const tokenRow = await env.DB.prepare(
+    `SELECT id, user_id, token, expires_at
+     FROM password_reset_tokens
+     WHERE token = ?
+     LIMIT 1`,
+  )
+    .bind(token)
+    .first();
+
+  if (!tokenRow) {
+    return { tokenRow: null, error: "Invalid reset token" };
+  }
+
+  const expiresAt = new Date(tokenRow.expires_at);
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+    await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token = ?").bind(token).run();
+    return { tokenRow: null, error: "Reset token expired" };
+  }
+
+  return { tokenRow, error: null };
+}
+
 export async function forgotPassword(request, env) {
   if (request.method !== "POST") {
     return json({ success: false, error: "Method not allowed" }, 405);
@@ -66,6 +89,24 @@ export async function forgotPassword(request, env) {
 }
 
 export async function resetPassword(request, env) {
+  if (request.method === "GET") {
+    const token = new URL(request.url).searchParams.get("token")?.trim() || "";
+
+    if (!token) {
+      return json({ success: false, error: "Reset token is required" }, 400);
+    }
+
+    const { error } = await getValidResetTokenRow(env, token);
+    if (error) {
+      return json({ success: false, error }, 400);
+    }
+
+    return json({
+      success: true,
+      message: "Reset token is valid",
+    });
+  }
+
   if (request.method !== "POST") {
     return json({ success: false, error: "Method not allowed" }, 405);
   }
@@ -84,23 +125,9 @@ export async function resetPassword(request, env) {
     return json({ success: false, error: "Token and password are required" }, 400);
   }
 
-  const tokenRow = await env.DB.prepare(
-    `SELECT id, user_id, token, expires_at
-     FROM password_reset_tokens
-     WHERE token = ?
-     LIMIT 1`,
-  )
-    .bind(token)
-    .first();
-
-  if (!tokenRow) {
-    return json({ success: false, error: "Invalid reset token" }, 400);
-  }
-
-  const expiresAt = new Date(tokenRow.expires_at);
-  if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
-    await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token = ?").bind(token).run();
-    return json({ success: false, error: "Reset token expired" }, 400);
+  const { tokenRow, error } = await getValidResetTokenRow(env, token);
+  if (error || !tokenRow) {
+    return json({ success: false, error: error || "Invalid reset token" }, 400);
   }
 
   const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
