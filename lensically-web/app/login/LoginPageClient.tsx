@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { login } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
 import { buildWorkerUrl } from "../../lib/apiClient"
+import { THREADS_ME_URL } from "../../lib/threadsApi"
 
 const GOOGLE_START_URL = buildWorkerUrl("/api/auth/google/start")
 const GITHUB_START_URL = buildWorkerUrl("/api/auth/github/start")
@@ -38,8 +39,51 @@ export default function LoginPageClient() {
   const authError = getAuthErrorMessage(searchParams.get("error"))
 
   useEffect(() => {
-    if (!loading && user) {
-      router.push("/dashboard")
+    if (loading || !user) {
+      return
+    }
+
+    let cancelled = false
+
+    async function routeAuthenticatedUser() {
+      try {
+        const response = await fetch(
+          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(user.id)}`,
+          {
+            cache: "no-store",
+            credentials: "include",
+          },
+        )
+
+        if (cancelled) {
+          return
+        }
+
+        if (!response.ok) {
+          router.push("/dashboard")
+          return
+        }
+
+        const data = await response.json() as { connected?: boolean; account?: unknown | null }
+        if (!cancelled && (data.connected === false || !data.account)) {
+          router.push("/connect")
+          return
+        }
+
+        if (!cancelled) {
+          router.push("/dashboard")
+        }
+      } catch {
+        if (!cancelled) {
+          router.push("/dashboard")
+        }
+      }
+    }
+
+    void routeAuthenticatedUser()
+
+    return () => {
+      cancelled = true
     }
   }, [user, loading, router])
 
@@ -59,7 +103,6 @@ export default function LoginPageClient() {
       }
 
       await refreshUser()
-      router.push("/dashboard")
     } catch (err) {
       if (err instanceof Error && err.message.includes("Failed to fetch")) {
         setFormError("Connection error. Please try again.")
