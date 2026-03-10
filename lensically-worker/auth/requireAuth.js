@@ -19,7 +19,8 @@ export async function requireAuth(request, env) {
       sessions.user_id,
       sessions.expires_at,
       users.email,
-      users.email_verified
+      users.email_verified,
+      users.is_admin
     FROM sessions
     JOIN users
       ON sessions.user_id = users.id
@@ -40,5 +41,6 @@ export async function requireAuth(request, env) {
     id: row.user_id,
     email: row.email,
     email_verified: row.email_verified,
+    is_admin: Boolean(row.is_admin),
   };
 }
