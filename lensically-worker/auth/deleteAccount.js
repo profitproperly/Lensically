@@ -15,9 +15,25 @@ export async function deleteAccount(request, env) {
     return user;
   }
 
+  const result = await env.DB.prepare("DELETE FROM users WHERE id = ?")
+    .bind(user.id)
+    .run();
+
+  if (Number(result.meta?.changes ?? 0) === 0) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: "Account not found",
+    }), {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }
+
   return new Response(JSON.stringify({
     success: true,
-    message: "Authenticated account deletion request received",
+    message: "Account deleted successfully",
     user: {
       id: user.id,
       email: user.email,
