@@ -5,6 +5,7 @@ import {
   type UsageCounterColumn,
   type UsageEnv,
 } from "./usage";
+import { sanitizeForLog } from "../../auth/logSanitizer.js";
 
 export type UsageFeature =
   | "me"
@@ -104,12 +105,12 @@ export async function enforceLimit(
     const currentUsage = Number(usage[column] ?? 0);
 
     if (currentUsage >= limit) {
-      console.log("limit_exceeded", {
+      console.log("limit_exceeded", sanitizeForLog({
         userId: normalizedUserId,
         feature,
         limit,
         used: currentUsage,
-      });
+      }));
       return {
         allowed: false,
         feature,

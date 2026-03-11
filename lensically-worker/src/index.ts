@@ -19,6 +19,7 @@ import {
   setSessionCookie,
 } from "../auth/cookies.js";
 import { requireAuth } from "../auth/requireAuth.js";
+import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -570,16 +571,32 @@ function buildOauthAppBaseUrl(url: URL, request: Request, env: Env): string {
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return String(sanitizeLogMessage(error.message));
   }
   if (typeof error === "string") {
-    return error;
+    return String(sanitizeLogMessage(error));
   }
   try {
-    return JSON.stringify(error);
+    return JSON.stringify(sanitizeForLog(error));
   } catch {
     return "unknown_error";
   }
+}
+
+function logWorkerEvent(
+  event: string,
+  details: Record<string, unknown> = {},
+  level: "log" | "error" = "log",
+): void {
+  const serialized = JSON.stringify(sanitizeForLog({
+    event,
+    ...details,
+  }));
+  if (level === "error") {
+    console.error(serialized);
+    return;
+  }
+  console.log(serialized);
 }
 
 function withAuthCors(request: Request, env: Env, response: Response): Response {
@@ -617,12 +634,11 @@ function providerFailureResponse(error: string, status = 502): Response {
 }
 
 function logUnhandledWorkerError(error: unknown, request: Request, path: string): void {
-  console.error(JSON.stringify({
-    event: "UNHANDLED_WORKER_ERROR",
+  logWorkerEvent("UNHANDLED_WORKER_ERROR", {
     path,
     method: request.method,
     error: getErrorMessage(error),
-  }));
+  }, "error");
 }
 
 function buildUnhandledErrorResponse(
@@ -703,10 +719,9 @@ type MetaDeletionRequestRecord = {
 };
 
 async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise<ThreadsAccount | null> {
-  console.log(JSON.stringify({
-    event: "THREADS_ACCOUNT_LOOKUP",
+  logWorkerEvent("THREADS_ACCOUNT_LOOKUP", {
     appUserId,
-  }));
+  });
   await ensureAppThreadsTable(env);
   return env.DB.prepare(
     `SELECT t.threads_user_id, t.access_token
@@ -866,19 +881,17 @@ async function processMetaDeletionRequest(
     if (transactionStarted) {
       await dbSession.prepare("ROLLBACK").run();
     }
-    console.error(JSON.stringify({
-      event: "META_DELETION_REQUEST_FAILED",
+    logWorkerEvent("META_DELETION_REQUEST_FAILED", {
       platform_user_id: platformUserId,
       error: getErrorMessage(error),
-    }));
+    }, "error");
     throw error;
   }
 
-  console.log(JSON.stringify({
-    event: "META_DELETION_REQUEST_PROCESSED",
+  logWorkerEvent("META_DELETION_REQUEST_PROCESSED", {
     platform_user_id: platformUserId,
     confirmation_code: confirmationCode,
-  }));
+  });
 
   const statusUrl =
     `${getConfiguredWorkerOrigin(env)}/auth/threads/delete-status?confirmation_code=${encodeURIComponent(confirmationCode)}`;
@@ -923,18 +936,16 @@ async function processThreadsUninstallRequest(env: Env, platformUserId: string):
     if (transactionStarted) {
       await dbSession.prepare("ROLLBACK").run();
     }
-    console.error(JSON.stringify({
-      event: "THREADS_UNINSTALL_CALLBACK_FAILED",
+    logWorkerEvent("THREADS_UNINSTALL_CALLBACK_FAILED", {
       platform_user_id: platformUserId,
       error: getErrorMessage(error),
-    }));
+    }, "error");
     throw error;
   }
 
-  console.log(JSON.stringify({
-    event: "THREADS_UNINSTALL_CALLBACK_PROCESSED",
+  logWorkerEvent("THREADS_UNINSTALL_CALLBACK_PROCESSED", {
     platform_user_id: platformUserId,
-  }));
+  });
 }
 
 async function getThreadsAccountForAppUserWithRetry(
@@ -1189,23 +1200,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           event: string,
           extra: Record<string, string | number | boolean | null> = {},
         ): void => {
-          console.log(JSON.stringify({
-            event,
+          logWorkerEvent(event, {
             provider: "google",
             ...extra,
-          }));
+          });
         };
         const logError = (
           event: string,
           error: unknown,
           extra: Record<string, string | number | boolean | null> = {},
         ): void => {
-          console.error(JSON.stringify({
-            event,
+          logWorkerEvent(event, {
             provider: "google",
             error: getErrorMessage(error),
             ...extra,
-          }));
+          }, "error");
         };
 
         logEvent("GOOGLE_OAUTH_CALLBACK_RECEIVED", {
@@ -1415,51 +1424,46 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             "Set-Cookie": clearOauthStateCookie(THREADS_OAUTH_STATE_COOKIE_NAME),
           },
         }));
-      console.log(JSON.stringify({
-        event: "THREADS_SESSION_RESOLUTION_STARTED",
+      logWorkerEvent("THREADS_SESSION_RESOLUTION_STARTED", {
         provider: "threads",
         has_session_cookie: Boolean(getSessionCookieValue(request)),
-      }));
+      });
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
-        console.error(JSON.stringify({
-          event: "THREADS_SESSION_RESOLUTION_FAILED",
+        logWorkerEvent("THREADS_SESSION_RESOLUTION_FAILED", {
           provider: "threads",
           has_session_cookie: Boolean(getSessionCookieValue(request)),
           session_resolved: false,
           error: authUser.status === 401 ? "session_not_found" : "unauthorized",
-        }));
+        }, "error");
         return redirectToConnectError("session_not_found");
       }
-      console.log(JSON.stringify({
-        event: "THREADS_SESSION_RESOLUTION_SUCCEEDED",
+      logWorkerEvent("THREADS_SESSION_RESOLUTION_SUCCEEDED", {
         provider: "threads",
         has_session_cookie: true,
         session_resolved: true,
         user_id: authUser.id,
-      }));
+      });
 
       const logEvent = (
         event: string,
         extra: Record<string, string | number | boolean | null> = {},
       ): void => {
-        console.log(JSON.stringify({
-          event,
+        logWorkerEvent(event, {
           provider: "threads",
           ...extra,
-        }));
+        });
       };
       const logError = (
         event: string,
         error: unknown,
         extra: Record<string, string | number | boolean | null> = {},
       ): void => {
-        console.error(JSON.stringify({
-          event,
+        logWorkerEvent(event, {
           provider: "threads",
           error: getErrorMessage(error),
           ...extra,
-        }));
+        }, "error");
       };
 
       logEvent("THREADS_OAUTH_CALLBACK_RECEIVED", {
@@ -1924,10 +1928,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
-      console.log(JSON.stringify({
-        event: "THREADS_ME_REQUEST_RECEIVED",
+      logWorkerEvent("THREADS_ME_REQUEST_RECEIVED", {
         appUserId,
-      }));
+      });
       if (!appUserId) {
         return new Response(
           JSON.stringify({ error: "Missing app_user_id" }),
@@ -1941,12 +1944,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
       const account = await getThreadsAccountForAppUserWithRetry(env, appUserId);
-      console.log(JSON.stringify({
-        event: "THREADS_ME_LOOKUP_RESULT",
+      logWorkerEvent("THREADS_ME_LOOKUP_RESULT", {
         appUserId,
         found: Boolean(account),
         threadsUserId: account?.threads_user_id ?? null,
-      }));
+      });
 
       if (!account) {
         return new Response(
@@ -2170,10 +2172,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const cursorDepth = Number.isFinite(cursorDepthParam) && cursorDepthParam > 0
         ? cursorDepthParam
         : (cursor ? 2 : 1);
-      console.log(JSON.stringify({
-        event: "THREADS_POSTS_REQUEST",
+      logWorkerEvent("THREADS_POSTS_REQUEST", {
         app_user_id: appUserId,
-      }));
+      });
 
       if (cursorDepth > 3) {
         return new Response(
@@ -2218,11 +2219,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const account = await getThreadsAccountForAppUser(env, appUserId);
-      console.log(JSON.stringify({
-        event: "THREADS_ACCOUNT_LOOKUP_RESULT",
+      logWorkerEvent("THREADS_ACCOUNT_LOOKUP_RESULT", {
         found: Boolean(account),
         threads_user_id: account?.threads_user_id ?? null,
-      }));
+      });
 
       if (!account || !account.access_token) {
         return new Response(
@@ -2244,21 +2244,19 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           "insights",
         );
         if (limitCheck && limitCheck.allowed === false) {
-          console.log(JSON.stringify({
-            event: "USAGE_LIMIT_EXCEEDED",
+          logWorkerEvent("USAGE_LIMIT_EXCEEDED", {
             feature: "insights",
             app_user_id: appUserId,
             limit: "limit" in limitCheck ? (limitCheck.limit ?? null) : null,
             used: "used" in limitCheck ? (limitCheck.used ?? null) : null,
-          }));
+          });
         }
       } catch (error) {
-        console.log(JSON.stringify({
-          event: "USAGE_LIMIT_CHECK_FAILED",
+        logWorkerEvent("USAGE_LIMIT_CHECK_FAILED", {
           feature: "insights",
           app_user_id: appUserId,
-          error: String(error),
-        }));
+          error: getErrorMessage(error),
+        });
       }
 
       const params = new URLSearchParams({
@@ -2277,16 +2275,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
-      console.log(JSON.stringify({
-        event: "THREADS_API_REQUEST",
-        url: requestUrl,
-      }));
+      logWorkerEvent("THREADS_API_REQUEST", {
+        endpoint: "/v1.0/:threads_user_id/threads",
+        has_cursor: Boolean(cursor),
+      });
       const postsResponseText = await postsResp.text();
-      console.log(JSON.stringify({
-        event: "THREADS_API_RESPONSE",
+      logWorkerEvent("THREADS_API_RESPONSE", {
         status: postsResp.status,
         hasBody: Boolean(postsResponseText),
-      }));
+      });
 
       const data = JSON.parse(postsResponseText) as {
         data?: unknown[];
@@ -2306,7 +2303,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
       const profileJson = await profileResp.json() as { threads_profile_picture_url?: string };
       const profilePicture = profileJson?.threads_profile_picture_url ?? null;
-      console.log("POST_COUNT", postsArray.length);
+      logWorkerEvent("THREADS_POSTS_COUNT", { count: postsArray.length });
       const enrichedPosts = [];
       const batchSize = 10;
       for (let i = 0; i < postsArray.length; i += batchSize) {
@@ -2315,7 +2312,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const results = await Promise.all(
           batch.map(async (post) => {
             const postId = String((post as { id?: string })?.id ?? "");
-            console.log("PROCESSING_POST", postId);
             const basePost = {
               id: (post as { id?: string })?.id,
               text: (post as { text?: string })?.text,
@@ -2342,9 +2338,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                 `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
               );
               if (!metricsResp.ok) {
-                console.log("INSIGHTS_REQUEST_FAILED", {
-                  postId,
-                  text: basePost.text,
+                logWorkerEvent("INSIGHTS_REQUEST_FAILED", {
                   status: metricsResp.status,
                 });
               }
@@ -2357,8 +2351,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                   link_total_values?: Array<{ value?: number }>;
                 }>;
               };
-              console.log("THREADS_INSIGHTS_DEBUG", {
-                postId: postId,
+              logWorkerEvent("THREADS_INSIGHTS_DEBUG", {
                 status: metricsResp.status,
                 metricCount: Array.isArray(metricsJson.data) ? metricsJson.data.length : 0,
               });
@@ -2867,7 +2860,10 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
         );
 
         if (!refresh.ok) {
-          console.log("refresh failed", row.threads_user_id);
+          logWorkerEvent("THREADS_TOKEN_REFRESH_FAILED", {
+            source: "scheduled",
+            status: refresh.status,
+          });
           continue;
         }
 
@@ -2881,9 +2877,13 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
           .bind(newToken, expiresAt, row.threads_user_id)
           .run();
 
-        console.log("token refreshed", row.threads_user_id);
+        logWorkerEvent("THREADS_TOKEN_REFRESH_SUCCEEDED", {
+          source: "scheduled",
+        });
       } catch {
-        console.log("refresh error", row.threads_user_id);
+        logWorkerEvent("THREADS_TOKEN_REFRESH_ERROR", {
+          source: "scheduled",
+        });
       }
     }
 }
@@ -2902,11 +2902,10 @@ export default {
     try {
       await handleScheduled(event, env, ctx);
     } catch (error) {
-      console.error(JSON.stringify({
-        event: "UNHANDLED_SCHEDULED_ERROR",
+      logWorkerEvent("UNHANDLED_SCHEDULED_ERROR", {
         cron: event.cron,
         error: getErrorMessage(error),
-      }));
+      }, "error");
     }
   },
 } satisfies ExportedHandler<Env>;

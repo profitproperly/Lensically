@@ -1,8 +1,10 @@
+import { sanitizeForLog } from "./logSanitizer.js";
+
 function emit(level, payload) {
-  const entry = {
+  const entry = sanitizeForLog({
     ts: new Date().toISOString(),
     ...payload,
-  };
+  });
 
   const serialized = JSON.stringify(entry);
   if (level === "error") {
