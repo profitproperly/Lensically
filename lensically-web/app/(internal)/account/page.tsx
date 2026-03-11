@@ -9,18 +9,12 @@ export default function AccountPage() {
   const router = useRouter();
   const { user, loading, logoutUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   async function handleDeleteAccount() {
     if (!user || isDeleting) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Delete your account permanently? This action cannot be undone.",
-    );
-    if (!confirmed) {
       return;
     }
 
@@ -92,14 +86,50 @@ export default function AccountPage() {
           </p>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() => void handleDeleteAccount()}
-          disabled={isDeleting}
-          className="mt-5 inline-flex rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isDeleting ? "Deleting account..." : "Delete account"}
-        </button>
+        {showDeleteConfirmation ? (
+          <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <p className="text-sm text-rose-900">
+              This permanently deletes your account and cannot be undone.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void handleDeleteAccount()}
+                disabled={isDeleting}
+                className="inline-flex rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? "Deleting account..." : "Confirm permanent deletion"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isDeleting) {
+                    return;
+                  }
+                  setShowDeleteConfirmation(false);
+                  setError("");
+                }}
+                disabled={isDeleting}
+                className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setShowDeleteConfirmation(true);
+              setError("");
+              setSuccessMessage("");
+            }}
+            disabled={isDeleting}
+            className="mt-5 inline-flex rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Delete account
+          </button>
+        )}
       </section>
     </div>
   );
