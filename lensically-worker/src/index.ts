@@ -596,6 +596,30 @@ function withAuthCors(request: Request, env: Env, response: Response): Response 
   });
 }
 
+function forbiddenJsonResponse(
+  requestCorsHeaders: Record<string, string>,
+  error = "Forbidden",
+): Response {
+  return new Response(JSON.stringify({ error }), {
+    status: 403,
+    headers: {
+      "Content-Type": "application/json",
+      ...requestCorsHeaders,
+    },
+  });
+}
+
+function resolveAuthenticatedAppUserId(
+  authUserId: string,
+  requestedAppUserId: string | null,
+) {
+  if (requestedAppUserId && requestedAppUserId !== authUserId) {
+    return null;
+  }
+
+  return authUserId;
+}
+
 async function enforceAuthRequestRateLimit(
   request: Request,
   env: Env,
@@ -1298,10 +1322,17 @@ export default {
       const requestAppBase =
         buildOauthAppBaseUrl(url, request, env);
 
-      const effectiveAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
-
-      if (!effectiveAppUserId) {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
         return applyAuthCors(Response.redirect(`${requestAppBase}/login`, 302));
+      }
+
+      const effectiveAppUserId = resolveAuthenticatedAppUserId(
+        authUser.id,
+        normalizeAppUserId(url.searchParams.get("app_user_id")),
+      );
+      if (!effectiveAppUserId) {
+        return applyAuthCors(forbiddenJsonResponse(requestCorsHeaders));
       }
 
       const state = buildOauthState(requestAppBase, effectiveAppUserId);
@@ -1325,7 +1356,6 @@ export default {
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state");
       const cookieState = getCookieValue(request, THREADS_OAUTH_STATE_COOKIE_NAME);
-      const sessionToken = getSessionCookieValue(request);
       const stateContext = contextFromState(state);
       const appBaseUrl =
         stateContext?.appBaseUrl
@@ -1342,39 +1372,26 @@ export default {
       console.log(JSON.stringify({
         event: "THREADS_SESSION_RESOLUTION_STARTED",
         provider: "threads",
-        has_session_cookie: Boolean(sessionToken),
+        has_session_cookie: Boolean(getSessionCookieValue(request)),
       }));
-      try {
-        if (!sessionToken) {
-          throw new Error("session_cookie_missing");
-        }
-        const resolvedSession = await env.DB.prepare(
-          `SELECT user_id
-           FROM sessions
-           WHERE session_token = ?
-           LIMIT 1`,
-        )
-          .bind(sessionToken)
-          .first<{ user_id: string }>();
-        if (!resolvedSession?.user_id) {
-          throw new Error("session_not_found");
-        }
-        console.log(JSON.stringify({
-          event: "THREADS_SESSION_RESOLUTION_SUCCEEDED",
-          provider: "threads",
-          has_session_cookie: true,
-          session_resolved: true,
-          user_id: resolvedSession.user_id,
-        }));
-      } catch (error) {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
         console.error(JSON.stringify({
           event: "THREADS_SESSION_RESOLUTION_FAILED",
           provider: "threads",
-          has_session_cookie: Boolean(sessionToken),
+          has_session_cookie: Boolean(getSessionCookieValue(request)),
           session_resolved: false,
-          error: getErrorMessage(error),
+          error: authUser.status === 401 ? "session_not_found" : "unauthorized",
         }));
+        return redirectToConnectError("session_not_found");
       }
+      console.log(JSON.stringify({
+        event: "THREADS_SESSION_RESOLUTION_SUCCEEDED",
+        provider: "threads",
+        has_session_cookie: true,
+        session_resolved: true,
+        user_id: authUser.id,
+      }));
 
       const logEvent = (
         event: string,
@@ -1421,10 +1438,13 @@ export default {
         if (!appUserId) {
           throw new Error("state_missing");
         }
+        if (authUser.id !== appUserId) {
+          throw new Error("state_user_mismatch");
+        }
         if (!env.THREADS_CLIENT_ID || !env.THREADS_CLIENT_SECRET) {
           throw new Error("server_config");
         }
-        resolvedAppUserId = appUserId;
+        resolvedAppUserId = authUser.id;
         logEvent("THREADS_OAUTH_STATE_VALIDATION_SUCCEEDED");
       } catch (error) {
         logError("THREADS_OAUTH_STATE_VALIDATION_FAILED", error);
@@ -1433,6 +1453,7 @@ export default {
           errorCode === "access_denied"
           || errorCode === "state_missing"
           || errorCode === "state_mismatch"
+          || errorCode === "state_user_mismatch"
           || errorCode === "server_config"
         ) {
           return redirectToConnectError(errorCode);
@@ -1619,6 +1640,17 @@ export default {
     }
 
     if (url.pathname === "/auth/threads/callback") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          {
+            status: 401,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
       const code = url.searchParams.get("code");
       if (!code) {
         return new Response(
@@ -1960,31 +1992,12 @@ export default {
         );
       }
 
-      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
+      const appUserId = resolveAuthenticatedAppUserId(
+        authUser.id,
+        normalizeAppUserId(payload.app_user_id ?? null),
+      );
       if (!appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Missing app_user_id" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
-            },
-          },
-        );
-      }
-
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
-            },
-          },
-        );
+        return forbiddenJsonResponse(requestCorsHeaders);
       }
 
       const result = await disconnectThreadsAccountForAppUser(env, appUserId);
@@ -2670,9 +2683,9 @@ export default {
       const threadsUserId = payload.threads_user_id?.trim();
       const text = payload.text?.trim();
 
-      if (!appUserId || !threadsUserId || !text) {
+      if (!threadsUserId || !text) {
         return new Response(
-          JSON.stringify({ error: "app_user_id, threads_user_id and text are required" }),
+          JSON.stringify({ error: "threads_user_id and text are required" }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -2680,17 +2693,12 @@ export default {
         );
       }
 
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse({ "content-type": "application/json; charset=UTF-8" });
       }
 
-      const account = await getThreadsAccountForAppUser(env, appUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
       if (!account?.access_token || account.threads_user_id !== threadsUserId) {
         return new Response(
