@@ -50,6 +50,70 @@ function hasForbiddenTargetingInput(body, searchParams) {
   return false;
 }
 
+async function tableExists(db, tableName) {
+  const row = await db.prepare(
+    `SELECT name
+     FROM sqlite_master
+     WHERE type = 'table' AND name = ?
+     LIMIT 1`,
+  )
+    .bind(tableName)
+    .first();
+
+  return Boolean(row?.name);
+}
+
+async function deleteThreadsAccountLink(db, userId) {
+  const appThreadsTableExists = await tableExists(db, "app_threads_accounts");
+  if (!appThreadsTableExists) {
+    return;
+  }
+
+  const existingLink = await db.prepare(
+    `SELECT threads_user_id
+     FROM app_threads_accounts
+     WHERE app_user_id = ?
+     LIMIT 1`,
+  )
+    .bind(userId)
+    .first();
+
+  if (!existingLink?.threads_user_id) {
+    return;
+  }
+
+  const threadsUserId = existingLink.threads_user_id;
+
+  await db.prepare(
+    `DELETE FROM app_threads_accounts
+     WHERE app_user_id = ?`,
+  )
+    .bind(userId)
+    .run();
+
+  const threadsAccountsTableExists = await tableExists(db, "threads_accounts");
+  if (!threadsAccountsTableExists) {
+    return;
+  }
+
+  const remainingLinks = await db.prepare(
+    `SELECT COUNT(*) AS total
+     FROM app_threads_accounts
+     WHERE threads_user_id = ?`,
+  )
+    .bind(threadsUserId)
+    .first();
+
+  if (Number(remainingLinks?.total ?? 0) === 0) {
+    await db.prepare(
+      `DELETE FROM threads_accounts
+       WHERE threads_user_id = ?`,
+    )
+      .bind(threadsUserId)
+      .run();
+  }
+}
+
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
     return jsonResponse({ success: false, error: "Method not allowed" }, 405);
@@ -113,6 +177,8 @@ export async function deleteAccount(request, env) {
   try {
     await dbSession.prepare("BEGIN TRANSACTION").run();
     transactionStarted = true;
+
+    await deleteThreadsAccountLink(dbSession, user.id);
 
     await dbSession.prepare("DELETE FROM user_daily_usage WHERE user_id = ?")
       .bind(user.id)
