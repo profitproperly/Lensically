@@ -89,6 +89,9 @@ export default function Home() {
             <Link href="#" className="text-sm font-medium text-slate-900">
               Pricing
             </Link>
+            <Link href="/data-deletion" className="text-sm font-medium text-slate-900">
+              Data Deletion
+            </Link>
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
@@ -156,6 +159,12 @@ export default function Home() {
 
               <Link href="#" className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-900">
                 Pricing
+              </Link>
+              <Link
+                href="/data-deletion"
+                className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-900"
+              >
+                Data Deletion
               </Link>
 
               <div className="flex gap-2 pt-2">
