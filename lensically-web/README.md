@@ -16,6 +16,14 @@ Copy these values directly into the Meta app configuration:
 - Data deletion instructions URL: `https://lensically.com/data-deletion`
 - Support contact email: `support@lensically.com`
 
+## Google OAuth Consent Values
+
+Copy these values directly into the Google OAuth consent screen:
+
+- Homepage URL: `https://lensically.com`
+- Privacy policy URL: `https://lensically.com/privacy`
+- Support email: `support@lensically.com`
+
 ## Application Scope
 
 - Public marketing and landing pages
