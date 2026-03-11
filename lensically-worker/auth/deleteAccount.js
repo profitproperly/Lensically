@@ -23,6 +23,33 @@ function getErrorMessage(error) {
   return "unknown_error";
 }
 
+const FORBIDDEN_TARGET_FIELDS = [
+  "id",
+  "user_id",
+  "userId",
+  "target_user_id",
+  "targetUserId",
+];
+
+function hasForbiddenTargetingInput(body, searchParams) {
+  for (const field of FORBIDDEN_TARGET_FIELDS) {
+    if (searchParams.has(field)) {
+      return true;
+    }
+
+    if (
+      body
+      && typeof body === "object"
+      && !Array.isArray(body)
+      && Object.prototype.hasOwnProperty.call(body, field)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
     return jsonResponse({ success: false, error: "Method not allowed" }, 405);
@@ -38,6 +65,14 @@ export async function deleteAccount(request, env) {
     body = await request.json();
   } catch {
     body = {};
+  }
+
+  const { searchParams } = new URL(request.url);
+  if (hasForbiddenTargetingInput(body, searchParams)) {
+    return jsonResponse({
+      success: false,
+      error: "Target user identifiers are not allowed for account deletion.",
+    }, 400);
   }
 
   const password = typeof body?.password === "string" ? body.password : "";
