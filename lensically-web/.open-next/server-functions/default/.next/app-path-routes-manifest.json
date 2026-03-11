@@ -16,5 +16,6 @@
   "/privacy/page": "/privacy",
   "/reset-password/page": "/reset-password",
   "/signup/page": "/signup",
+  "/terms/page": "/terms",
   "/verify-email/page": "/verify-email"
 }

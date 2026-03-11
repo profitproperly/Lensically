@@ -14,6 +14,7 @@ These URLs are the official public pages for provider review. The terms page exp
 
 Copy these values directly into the Meta app configuration:
 
+- Data deletion callback URL: `https://api.lensically.com/auth/threads/delete`
 - Data deletion instructions URL: `https://lensically.com/data-deletion`
 - Support contact email: `support@lensically.com`
 

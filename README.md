@@ -11,6 +11,7 @@ Social Signal Analytics
 
 Use these exact values in the Meta developer dashboard:
 
+- Data deletion callback URL: `https://api.lensically.com/auth/threads/delete`
 - Data deletion instructions URL: `https://lensically.com/data-deletion`
 - Support contact email: `support@lensically.com`
 

@@ -125,6 +125,12 @@
       "namedRegex": "^/signup(?:/)?$"
     },
     {
+      "page": "/terms",
+      "regex": "^/terms(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/terms(?:/)?$"
+    },
+    {
       "page": "/verify-email",
       "regex": "^/verify\\-email(?:/)?$",
       "routeKeys": {},

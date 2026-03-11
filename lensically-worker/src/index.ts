@@ -588,6 +588,14 @@ type ThreadsAccount = {
   access_token: string;
 };
 
+type MetaDeletionRequestRecord = {
+  confirmation_code: string;
+  platform_user_id: string;
+  status: string;
+  requested_at: string;
+  completed_at: string | null;
+};
+
 async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise<ThreadsAccount | null> {
   console.log(JSON.stringify({
     event: "THREADS_ACCOUNT_LOOKUP",
@@ -603,6 +611,185 @@ async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise
   )
     .bind(appUserId)
     .first<ThreadsAccount>();
+}
+
+async function ensureMetaDeletionRequestsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS meta_deletion_requests (
+      confirmation_code TEXT PRIMARY KEY,
+      platform_user_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT
+    )`,
+  ).run();
+}
+
+function decodeBase64Url(value: string): string {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = normalized.length % 4;
+  const padded = padding === 0 ? normalized : normalized.padEnd(normalized.length + (4 - padding), "=");
+  return atob(padded);
+}
+
+function decodeBase64UrlBytes(value: string): Uint8Array {
+  const decoded = decodeBase64Url(value);
+  return Uint8Array.from(decoded, (char) => char.charCodeAt(0));
+}
+
+async function parseMetaSignedRequest(
+  signedRequest: string,
+  appSecret: string,
+): Promise<{ user_id?: string | null } | null> {
+  const [encodedSignature, encodedPayload] = signedRequest.split(".", 2);
+  if (!encodedSignature || !encodedPayload) {
+    return null;
+  }
+
+  const payloadJson = JSON.parse(decodeBase64Url(encodedPayload)) as {
+    algorithm?: string;
+    user_id?: string | null;
+  };
+
+  if (payloadJson.algorithm?.toUpperCase() !== "HMAC-SHA256") {
+    return null;
+  }
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+
+  const signatureVerified = await crypto.subtle.verify(
+    "HMAC",
+    cryptoKey,
+    decodeBase64UrlBytes(encodedSignature),
+    new TextEncoder().encode(encodedPayload),
+  );
+
+  if (!signatureVerified) {
+    return null;
+  }
+
+  return payloadJson;
+}
+
+async function resolveMetaDeletionUserId(request: Request, env: Env): Promise<string | null> {
+  const contentType = request.headers.get("content-type") ?? "";
+  const rawBody = await request.text();
+
+  if (!rawBody) {
+    return null;
+  }
+
+  if (contentType.includes("application/json")) {
+    try {
+      const parsed = JSON.parse(rawBody) as {
+        signed_request?: string;
+        user_id?: string;
+      };
+      if (typeof parsed.user_id === "string" && parsed.user_id.trim()) {
+        return parsed.user_id.trim();
+      }
+      if (typeof parsed.signed_request !== "string" || !parsed.signed_request.trim()) {
+        return null;
+      }
+      const payload = await parseMetaSignedRequest(parsed.signed_request.trim(), env.THREADS_CLIENT_SECRET);
+      return typeof payload?.user_id === "string" && payload.user_id.trim()
+        ? payload.user_id.trim()
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const params = new URLSearchParams(rawBody);
+  const directUserId = params.get("user_id")?.trim();
+  if (directUserId) {
+    return directUserId;
+  }
+
+  const signedRequest = params.get("signed_request")?.trim();
+  if (!signedRequest) {
+    return null;
+  }
+
+  const payload = await parseMetaSignedRequest(signedRequest, env.THREADS_CLIENT_SECRET);
+  return typeof payload?.user_id === "string" && payload.user_id.trim()
+    ? payload.user_id.trim()
+    : null;
+}
+
+async function processMetaDeletionRequest(
+  env: Env,
+  platformUserId: string,
+): Promise<{ confirmationCode: string; statusUrl: string }> {
+  await ensureAppThreadsTable(env);
+  await ensureMetaDeletionRequestsTable(env);
+
+  const confirmationCode = crypto.randomUUID();
+  const completedAt = new Date().toISOString();
+
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
+
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
+
+    await dbSession.prepare(
+      `DELETE FROM app_threads_accounts
+       WHERE threads_user_id = ?`,
+    )
+      .bind(platformUserId)
+      .run();
+
+    await dbSession.prepare(
+      `DELETE FROM threads_accounts
+       WHERE threads_user_id = ?`,
+    )
+      .bind(platformUserId)
+      .run();
+
+    await dbSession.prepare(
+      `INSERT INTO meta_deletion_requests (
+        confirmation_code,
+        platform_user_id,
+        status,
+        requested_at,
+        completed_at
+      ) VALUES (?, ?, 'processed', CURRENT_TIMESTAMP, ?)` ,
+    )
+      .bind(confirmationCode, platformUserId, completedAt)
+      .run();
+
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      await dbSession.prepare("ROLLBACK").run();
+    }
+    console.error(JSON.stringify({
+      event: "META_DELETION_REQUEST_FAILED",
+      platform_user_id: platformUserId,
+      error: getErrorMessage(error),
+    }));
+    throw error;
+  }
+
+  console.log(JSON.stringify({
+    event: "META_DELETION_REQUEST_PROCESSED",
+    platform_user_id: platformUserId,
+    confirmation_code: confirmationCode,
+  }));
+
+  const statusUrl =
+    `${getConfiguredWorkerOrigin(env)}/auth/threads/delete-status?confirmation_code=${encodeURIComponent(confirmationCode)}`;
+
+  return { confirmationCode, statusUrl };
 }
 
 async function getThreadsAccountForAppUserWithRetry(
@@ -1460,7 +1647,84 @@ export default {
     }
 
     if (url.pathname === "/auth/threads/delete" && request.method === "POST") {
-      return new Response("ok", { status: 200 });
+      const platformUserId = await resolveMetaDeletionUserId(request, env);
+      if (!platformUserId) {
+        return new Response(
+          JSON.stringify({ error: "Invalid Meta deletion request" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      try {
+        const { confirmationCode, statusUrl } = await processMetaDeletionRequest(env, platformUserId);
+        return new Response(
+          JSON.stringify({
+            url: statusUrl,
+            confirmation_code: confirmationCode,
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Could not process Meta deletion request" }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+    }
+
+    if (url.pathname === "/auth/threads/delete-status" && request.method === "GET") {
+      await ensureMetaDeletionRequestsTable(env);
+      const confirmationCode = url.searchParams.get("confirmation_code")?.trim();
+      if (!confirmationCode) {
+        return new Response(
+          JSON.stringify({ error: "Missing confirmation_code" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const requestRecord = await env.DB.prepare(
+        `SELECT confirmation_code, platform_user_id, status, requested_at, completed_at
+         FROM meta_deletion_requests
+         WHERE confirmation_code = ?
+         LIMIT 1`,
+      )
+        .bind(confirmationCode)
+        .first<MetaDeletionRequestRecord>();
+
+      if (!requestRecord) {
+        return new Response(
+          JSON.stringify({ error: "Deletion request not found" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          confirmation_code: requestRecord.confirmation_code,
+          status: requestRecord.status,
+          requested_at: requestRecord.requested_at,
+          completed_at: requestRecord.completed_at,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {

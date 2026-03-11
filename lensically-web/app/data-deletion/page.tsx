@@ -98,6 +98,12 @@ export default function DataDeletionPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Need help?</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
+            Lensically also supports provider-initiated deletion callbacks for Meta review
+            workflows. When a supported provider sends a deletion request for associated Threads
+            data, Lensically processes the request through its configured deletion callback and
+            returns a confirmation status response.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
             The related public privacy policy used for provider review is available at{" "}
             <Link href="/privacy" className="font-medium text-slate-900 underline">
               https://lensically.com/privacy

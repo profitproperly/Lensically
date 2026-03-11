@@ -16,5 +16,6 @@
   "/privacy/page": "app/privacy/page.js",
   "/reset-password/page": "app/reset-password/page.js",
   "/signup/page": "app/signup/page.js",
+  "/terms/page": "app/terms/page.js",
   "/verify-email/page": "app/verify-email/page.js"
 }
