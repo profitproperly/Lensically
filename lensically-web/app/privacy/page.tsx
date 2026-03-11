@@ -54,6 +54,11 @@ export default function PrivacyPage() {
           </p>
         </div>
 
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-medium leading-6 text-rose-900">
+          Deleting your Lensically account permanently removes associated user data from the system.
+          This action cannot be undone.
+        </div>
+
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
           <h2 className="text-xl font-semibold text-slate-900">What Lensically collects</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
