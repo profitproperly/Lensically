@@ -89,9 +89,15 @@ export default function AccountPage() {
 
         {showDeleteConfirmation ? (
           <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 p-4">
-            <p className="text-sm text-rose-900">
-              This permanently deletes your account and cannot be undone.
-            </p>
+            <div className="rounded-md border border-rose-300 bg-white px-4 py-3">
+              <p className="text-sm font-semibold uppercase tracking-wide text-rose-700">
+                Permanent deletion warning
+              </p>
+              <p className="mt-2 text-sm leading-6 text-rose-900">
+                Deleting your account permanently removes associated user data from the system.
+                This action cannot be undone.
+              </p>
+            </div>
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
