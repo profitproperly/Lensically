@@ -24,6 +24,14 @@ export async function deleteAccount(request, env) {
     .bind(user.id)
     .run();
 
+  await env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id = ?")
+    .bind(user.id)
+    .run();
+
+  await env.DB.prepare("DELETE FROM password_reset_tokens WHERE user_id = ?")
+    .bind(user.id)
+    .run();
+
   const result = await env.DB.prepare("DELETE FROM users WHERE id = ?")
     .bind(user.id)
     .run();
