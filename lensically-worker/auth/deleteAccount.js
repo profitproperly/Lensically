@@ -20,6 +20,10 @@ export async function deleteAccount(request, env) {
     .bind(user.id)
     .run();
 
+  await env.DB.prepare("DELETE FROM oauth_accounts WHERE user_id = ?")
+    .bind(user.id)
+    .run();
+
   const result = await env.DB.prepare("DELETE FROM users WHERE id = ?")
     .bind(user.id)
     .run();
