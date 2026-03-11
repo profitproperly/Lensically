@@ -24,13 +24,14 @@ export default function AccountPage() {
 
     try {
       const result = await deleteAccount();
-      if (result?.success === false || result?.error) {
+      if (!result.success) {
         setError(result.error || "Could not delete account.");
         setIsDeleting(false);
         return;
       }
 
-      setSuccessMessage(result?.message || "Account has been permanently deleted.");
+      setShowDeleteConfirmation(false);
+      setSuccessMessage(result.message || "Account has been permanently deleted.");
       await logoutUser();
       router.push("/login");
       router.refresh();

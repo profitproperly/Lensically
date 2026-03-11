@@ -1,5 +1,22 @@
 import { apiRequest, buildWorkerUrl } from "./apiClient";
 
+type DeletedAccountUser = {
+  id: string;
+  email: string;
+  email_verified: boolean;
+};
+
+export type DeleteAccountResponse =
+  | {
+      success: true;
+      message: string;
+      user: DeletedAccountUser;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 export async function register(email: string, password: string) {
   return apiRequest(buildWorkerUrl("/api/auth/register"), {
     method: "POST",
@@ -43,7 +60,7 @@ export async function validateResetPasswordToken(token: string) {
   return apiRequest(url, {}, 0);
 }
 
-export async function deleteAccount() {
+export async function deleteAccount(): Promise<DeleteAccountResponse> {
   return apiRequest(buildWorkerUrl("/api/auth/delete-account"), {
     method: "POST",
   }, 0);
