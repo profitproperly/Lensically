@@ -616,6 +616,46 @@ function providerFailureResponse(error: string, status = 502): Response {
   });
 }
 
+function logUnhandledWorkerError(error: unknown, request: Request, path: string): void {
+  console.error(JSON.stringify({
+    event: "UNHANDLED_WORKER_ERROR",
+    path,
+    method: request.method,
+    error: getErrorMessage(error),
+  }));
+}
+
+function buildUnhandledErrorResponse(
+  request: Request,
+  env: Env,
+  path: string,
+): Response {
+  const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
+  const isApiPath = normalizedPath.startsWith("/api/") || normalizedPath.startsWith("/auth/threads/");
+  const isAuthPath = normalizedPath.startsWith("/api/auth/") || normalizedPath.startsWith("/auth/threads/");
+
+  if (isApiPath) {
+    const payload = isAuthPath
+      ? { success: false, error: "An unexpected error occurred. Please try again." }
+      : { error: "An unexpected error occurred. Please try again." };
+
+    const response = new Response(JSON.stringify(payload), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        ...getCorsHeadersForRequest(request, env),
+      },
+    });
+
+    return isAuthPath ? withAuthCors(request, env, response) : response;
+  }
+
+  return new Response("Internal Server Error", {
+    status: 500,
+    headers: { "content-type": "text/plain; charset=UTF-8" },
+  });
+}
+
 function resolveAuthenticatedAppUserId(
   authUserId: string,
   requestedAppUserId: string | null,
@@ -996,8 +1036,7 @@ async function checkUserCapacity(
   return null;
 }
 
-export default {
-  async fetch(request, env): Promise<Response> {
+async function handleRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
@@ -2808,8 +2847,9 @@ export default {
       status: 200,
       headers: { "content-type": "text/plain; charset=UTF-8" },
     });
-  },
-  async scheduled(event, env, ctx) {
+}
+
+async function handleScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
     const threshold = now + (7 * 24 * 60 * 60);
 
@@ -2845,6 +2885,28 @@ export default {
       } catch {
         console.log("refresh error", row.threads_user_id);
       }
+    }
+}
+
+export default {
+  async fetch(request, env): Promise<Response> {
+    const path = new URL(request.url).pathname;
+    try {
+      return await handleRequest(request, env);
+    } catch (error) {
+      logUnhandledWorkerError(error, request, path);
+      return buildUnhandledErrorResponse(request, env, path);
+    }
+  },
+  async scheduled(event, env, ctx) {
+    try {
+      await handleScheduled(event, env, ctx);
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: "UNHANDLED_SCHEDULED_ERROR",
+        cron: event.cron,
+        error: getErrorMessage(error),
+      }));
     }
   },
 } satisfies ExportedHandler<Env>;
