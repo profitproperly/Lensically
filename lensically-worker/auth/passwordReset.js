@@ -9,6 +9,7 @@ import {
   validatePassword,
   validateUuidLike,
 } from "./validation.js";
+import { logAuthEvent } from "./operationalLog.js";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -39,23 +40,27 @@ async function getValidResetTokenRow(env, token) {
 
 export async function forgotPassword(request, env) {
   if (request.method !== "POST") {
+    logAuthEvent("forgot_password_rejected", { reason: "method_not_allowed" });
     return json({ success: false, error: "Method not allowed" }, 405);
   }
 
   const parsed = await readJsonObject(request);
   if (!parsed.ok) {
+    logAuthEvent("forgot_password_rejected", { reason: "invalid_json" });
     return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
   }
   const { body } = parsed;
 
   const unexpectedFieldResponse = rejectUnexpectedFields(body, ["email"]);
   if (unexpectedFieldResponse) {
+    logAuthEvent("forgot_password_rejected", { reason: "unexpected_field" });
     return unexpectedFieldResponse;
   }
 
   const email = normalizeEmail(body?.email);
   const emailError = validateEmail(email);
   if (emailError) {
+    logAuthEvent("forgot_password_rejected", { reason: "invalid_email" });
     return json({ success: false, error: emailError }, 400);
   }
 
@@ -83,6 +88,9 @@ export async function forgotPassword(request, env) {
 <p><a href="${resetUrl}">Reset password</a></p>`;
 
     await sendEmail(env, user.email, subject, html);
+    logAuthEvent("forgot_password_email_queued", { account_found: true });
+  } else {
+    logAuthEvent("forgot_password_email_queued", { account_found: false });
   }
 
   return json({
@@ -97,13 +105,17 @@ export async function resetPassword(request, env) {
 
     const tokenError = validateUuidLike(token, "Reset token");
     if (tokenError) {
+      logAuthEvent("reset_password_token_invalid", { reason: "token_format_invalid" });
       return json({ success: false, error: tokenError }, 400);
     }
 
     const { error } = await getValidResetTokenRow(env, token);
     if (error) {
+      logAuthEvent("reset_password_token_invalid", { reason: error });
       return json({ success: false, error }, 400);
     }
+
+    logAuthEvent("reset_password_token_validated");
 
     return json({
       success: true,
@@ -112,17 +124,20 @@ export async function resetPassword(request, env) {
   }
 
   if (request.method !== "POST") {
+    logAuthEvent("reset_password_rejected", { reason: "method_not_allowed" });
     return json({ success: false, error: "Method not allowed" }, 405);
   }
 
   const parsed = await readJsonObject(request);
   if (!parsed.ok) {
+    logAuthEvent("reset_password_rejected", { reason: "invalid_json" });
     return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
   }
   const { body } = parsed;
 
   const unexpectedFieldResponse = rejectUnexpectedFields(body, ["token", "password"]);
   if (unexpectedFieldResponse) {
+    logAuthEvent("reset_password_rejected", { reason: "unexpected_field" });
     return unexpectedFieldResponse;
   }
 
@@ -131,16 +146,19 @@ export async function resetPassword(request, env) {
 
   const tokenError = validateUuidLike(token, "Reset token");
   if (tokenError) {
+    logAuthEvent("reset_password_rejected", { reason: "token_format_invalid" });
     return json({ success: false, error: tokenError }, 400);
   }
 
   const passwordError = validatePassword(password, "Token and password are required");
   if (passwordError) {
+    logAuthEvent("reset_password_rejected", { reason: "invalid_password" });
     return json({ success: false, error: passwordError }, 400);
   }
 
   const { tokenRow, error } = await getValidResetTokenRow(env, token);
   if (error || !tokenRow) {
+    logAuthEvent("reset_password_failed", { reason: error || "invalid_reset_token" });
     return json({ success: false, error: error || "Invalid reset token" }, 400);
   }
 
@@ -150,6 +168,7 @@ export async function resetPassword(request, env) {
     .bind(passwordHash, tokenRow.user_id)
     .run();
   await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token = ?").bind(token).run();
+  logAuthEvent("reset_password_succeeded");
 
   return json({
     success: true,

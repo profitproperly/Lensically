@@ -8,6 +8,7 @@ import {
   validateEmail,
   validatePassword,
 } from "./validation.js";
+import { logAuthEvent } from "./operationalLog.js";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -15,17 +16,20 @@ const DEFAULT_WEB_APP_URL = "https://app.lensically.com";
 
 export async function register(request, env) {
   if (request.method !== "POST") {
+    logAuthEvent("register_rejected", { reason: "method_not_allowed" });
     return json({ success: false, error: "Method not allowed" }, 405);
   }
 
   const parsed = await readJsonObject(request);
   if (!parsed.ok) {
+    logAuthEvent("register_rejected", { reason: "invalid_json" });
     return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
   }
   const { body } = parsed;
 
   const unexpectedFieldResponse = rejectUnexpectedFields(body, ["email", "password"]);
   if (unexpectedFieldResponse) {
+    logAuthEvent("register_rejected", { reason: "unexpected_field" });
     return unexpectedFieldResponse;
   }
 
@@ -34,11 +38,13 @@ export async function register(request, env) {
 
   const emailError = validateEmail(email, "Email and password are required");
   if (emailError) {
+    logAuthEvent("register_rejected", { reason: "invalid_email" });
     return json({ success: false, error: emailError }, 400);
   }
 
   const passwordError = validatePassword(password, "Email and password are required");
   if (passwordError) {
+    logAuthEvent("register_rejected", { reason: "invalid_password" });
     return json({ success: false, error: passwordError }, 400);
   }
 
@@ -46,6 +52,7 @@ export async function register(request, env) {
     .bind(email)
     .first();
   if (existingUser) {
+    logAuthEvent("register_failed", { reason: "email_exists" });
     return json({ success: false, error: "Email already registered. Log in instead." }, 409);
   }
 
@@ -62,6 +69,7 @@ export async function register(request, env) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("UNIQUE constraint failed: users.email")) {
+      logAuthEvent("register_failed", { reason: "email_exists" });
       return json({ success: false, error: "Email already registered. Log in instead." }, 409);
     }
     throw error;
@@ -145,11 +153,12 @@ export async function register(request, env) {
   try {
     await sendEmail(env, email, subject, html);
   } catch (error) {
-    console.error("Verification email delivery failed", {
-      email,
-      error: error instanceof Error ? error.message : String(error),
+    logAuthEvent("register_email_failed", {
+      reason: error instanceof Error ? error.message : String(error),
     });
   }
+
+  logAuthEvent("register_succeeded", { verification_email_attempted: true });
 
   return json({
     success: true,

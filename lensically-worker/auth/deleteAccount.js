@@ -8,6 +8,7 @@ import {
   validateConfirmationText,
   validatePassword,
 } from "./validation.js";
+import { logAccountDeletionEvent } from "./operationalLog.js";
 
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
@@ -193,23 +194,27 @@ async function removeDeletionGuard(db, sessionToken) {
 
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
+    logAccountDeletionEvent("deletion_rejected", { reason: "method_not_allowed" });
     return jsonResponse({ success: false, error: "Method not allowed" }, 405);
   }
 
   const sessionToken = getSessionCookieValue(request);
   if (!sessionToken) {
+    logAccountDeletionEvent("deletion_rejected", { reason: "missing_session" });
     return jsonResponse({ success: false, error: "Unauthorized" }, 401);
   }
 
   await ensureAccountDeletionGuardsTable(env.DB);
   const existingGuard = await getDeletionGuard(env.DB, sessionToken);
   if (existingGuard?.status === "completed") {
+    logAccountDeletionEvent("deletion_duplicate_ignored", { status: "completed" });
     return buildDeletionResponse({
       success: true,
       message: "Account deletion already processed",
     });
   }
   if (existingGuard?.status === "in_progress") {
+    logAccountDeletionEvent("deletion_duplicate_blocked", { status: "in_progress" });
     return jsonResponse({
       success: false,
       error: "Account deletion is already in progress.",
@@ -218,22 +223,26 @@ export async function deleteAccount(request, env) {
 
   const user = await requireAuth(request, env);
   if (user instanceof Response) {
+    logAccountDeletionEvent("deletion_rejected", { reason: "unauthorized" });
     return user;
   }
 
   const parsed = await readJsonObject(request);
   if (!parsed.ok) {
+    logAccountDeletionEvent("deletion_rejected", { reason: "invalid_json" });
     return parsed.response ?? jsonResponse({ success: false, error: "Invalid JSON body" }, 400);
   }
   const body = parsed.body;
 
   const unexpectedFieldResponse = rejectUnexpectedFields(body, ["password", "confirmation_text"]);
   if (unexpectedFieldResponse) {
+    logAccountDeletionEvent("deletion_rejected", { reason: "unexpected_field" });
     return unexpectedFieldResponse;
   }
 
   const { searchParams } = new URL(request.url);
   if (hasForbiddenTargetingInput(body, searchParams)) {
+    logAccountDeletionEvent("deletion_rejected", { reason: "forbidden_targeting_input" });
     return jsonResponse({
       success: false,
       error: "Target user identifiers are not allowed for account deletion.",
@@ -248,6 +257,7 @@ export async function deleteAccount(request, env) {
 
   if (user.has_password) {
     if (confirmationText) {
+      logAccountDeletionEvent("deletion_rejected", { reason: "confirmation_text_not_supported" });
       return jsonResponse({
         success: false,
         error: "Confirmation text is not supported for password-based account deletion.",
@@ -256,6 +266,7 @@ export async function deleteAccount(request, env) {
 
     const passwordError = validatePassword(password, "Password is required to delete this account.");
     if (passwordError) {
+      logAccountDeletionEvent("deletion_rejected", { reason: "password_missing_or_invalid", account_type: "password" });
       return jsonResponse({
         success: false,
         error: passwordError,
@@ -269,6 +280,7 @@ export async function deleteAccount(request, env) {
       .first();
 
     if (!passwordRow?.password_hash) {
+      logAccountDeletionEvent("deletion_rejected", { reason: "password_reauth_unavailable", account_type: "password" });
       return jsonResponse({
         success: false,
         error: "Password re-authentication is unavailable for this account.",
@@ -277,6 +289,7 @@ export async function deleteAccount(request, env) {
 
     const passwordOk = await bcrypt.compare(password, passwordRow.password_hash);
     if (!passwordOk) {
+      logAccountDeletionEvent("deletion_failed", { reason: "password_invalid", account_type: "password" });
       return jsonResponse({
         success: false,
         error: "Invalid password.",
@@ -285,6 +298,7 @@ export async function deleteAccount(request, env) {
   } else {
     const confirmationTextError = validateConfirmationText(confirmationText, OAUTH_DELETE_CONFIRMATION_TEXT);
     if (confirmationTextError) {
+      logAccountDeletionEvent("deletion_rejected", { reason: "confirmation_text_invalid", account_type: "oauth" });
       return jsonResponse({
         success: false,
         error: confirmationTextError,
@@ -293,6 +307,7 @@ export async function deleteAccount(request, env) {
   }
 
   if (!user.has_password && password) {
+    logAccountDeletionEvent("deletion_rejected", { reason: "password_not_supported", account_type: "oauth" });
     return jsonResponse({
       success: false,
       error: "Password is not supported for this account deletion flow.",
@@ -303,12 +318,14 @@ export async function deleteAccount(request, env) {
   if (Number(guardInsert.meta?.changes ?? 0) === 0) {
     const concurrentGuard = await getDeletionGuard(env.DB, sessionToken);
     if (concurrentGuard?.status === "completed") {
+      logAccountDeletionEvent("deletion_duplicate_ignored", { status: "completed" });
       return buildDeletionResponse({
         success: true,
         message: "Account deletion already processed",
       });
     }
 
+    logAccountDeletionEvent("deletion_duplicate_blocked", { status: "in_progress" });
     return jsonResponse({
       success: false,
       error: "Account deletion is already in progress.",
@@ -317,6 +334,10 @@ export async function deleteAccount(request, env) {
 
   const dbSession = env.DB.withSession("first-primary");
   let transactionStarted = false;
+  logAccountDeletionEvent("deletion_started", {
+    account_type: user.has_password ? "password" : "oauth",
+    session_guard: "acquired",
+  });
 
   try {
     await dbSession.prepare("BEGIN TRANSACTION").run();
@@ -356,19 +377,15 @@ export async function deleteAccount(request, env) {
       try {
         await dbSession.prepare("ROLLBACK").run();
       } catch (rollbackError) {
-        console.error(JSON.stringify({
-          event: "ACCOUNT_DELETION_ROLLBACK_FAILED",
-          user_id: user.id,
-          error: getErrorMessage(rollbackError),
-        }));
+        logAccountDeletionEvent("deletion_rollback_failed", {
+          reason: getErrorMessage(rollbackError),
+        }, "error");
       }
     }
 
-    console.error(JSON.stringify({
-      event: "ACCOUNT_DELETION_FAILED",
-      user_id: user.id,
-      error: getErrorMessage(error),
-    }));
+    logAccountDeletionEvent("deletion_failed", {
+      reason: getErrorMessage(error),
+    }, "error");
 
     await removeDeletionGuard(env.DB, sessionToken);
 
@@ -378,11 +395,10 @@ export async function deleteAccount(request, env) {
     }, 500);
   }
   await markDeletionGuardCompleted(env.DB, sessionToken);
-
-  console.log(JSON.stringify({
-    event: "ACCOUNT_DELETION_COMPLETED",
-    user_id: user.id,
-  }));
+  logAccountDeletionEvent("deletion_completed", {
+    account_type: user.has_password ? "password" : "oauth",
+    session_guard: "completed",
+  });
 
   return buildDeletionResponse({
     success: true,
