@@ -69,7 +69,7 @@ export async function deleteAccount(request, env) {
 
   return new Response(JSON.stringify({
     success: true,
-    message: "Account deleted successfully",
+    message: "Account has been permanently deleted",
     user: {
       id: user.id,
       email: user.email,
