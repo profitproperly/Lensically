@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { requireAuth } from "./requireAuth.js";
 import { clearAuthCookies } from "./cookies.js";
+import { getSessionCookieValue } from "./sessions.js";
 import {
   readJsonObject,
   rejectUnexpectedFields,
@@ -14,6 +15,20 @@ function jsonResponse(body, status) {
     headers: {
       "Content-Type": "application/json",
     },
+  });
+}
+
+function buildDeletionResponse(body, status = 200) {
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+  for (const cookie of clearAuthCookies()) {
+    headers.append("Set-Cookie", cookie);
+  }
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers,
   });
 }
 
@@ -121,9 +136,84 @@ async function deleteThreadsAccountLink(db, userId) {
   }
 }
 
+async function ensureAccountDeletionGuardsTable(db) {
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS account_deletion_guards (
+      session_token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('in_progress', 'completed')),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    )`,
+  ).run();
+}
+
+async function getDeletionGuard(db, sessionToken) {
+  return db.prepare(
+    `SELECT session_token, user_id, status, completed_at
+     FROM account_deletion_guards
+     WHERE session_token = ?
+     LIMIT 1`,
+  )
+    .bind(sessionToken)
+    .first();
+}
+
+async function createDeletionGuard(db, sessionToken, userId) {
+  return db.prepare(
+    `INSERT INTO account_deletion_guards (session_token, user_id, status, created_at, updated_at)
+     VALUES (?, ?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     ON CONFLICT(session_token) DO NOTHING`,
+  )
+    .bind(sessionToken, userId)
+    .run();
+}
+
+async function markDeletionGuardCompleted(db, sessionToken) {
+  await db.prepare(
+    `UPDATE account_deletion_guards
+     SET status = 'completed',
+         updated_at = CURRENT_TIMESTAMP,
+         completed_at = CURRENT_TIMESTAMP
+     WHERE session_token = ?`,
+  )
+    .bind(sessionToken)
+    .run();
+}
+
+async function removeDeletionGuard(db, sessionToken) {
+  await db.prepare(
+    `DELETE FROM account_deletion_guards
+     WHERE session_token = ?`,
+  )
+    .bind(sessionToken)
+    .run();
+}
+
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
     return jsonResponse({ success: false, error: "Method not allowed" }, 405);
+  }
+
+  const sessionToken = getSessionCookieValue(request);
+  if (!sessionToken) {
+    return jsonResponse({ success: false, error: "Unauthorized" }, 401);
+  }
+
+  await ensureAccountDeletionGuardsTable(env.DB);
+  const existingGuard = await getDeletionGuard(env.DB, sessionToken);
+  if (existingGuard?.status === "completed") {
+    return buildDeletionResponse({
+      success: true,
+      message: "Account deletion already processed",
+    });
+  }
+  if (existingGuard?.status === "in_progress") {
+    return jsonResponse({
+      success: false,
+      error: "Account deletion is already in progress.",
+    }, 409);
   }
 
   const user = await requireAuth(request, env);
@@ -209,6 +299,22 @@ export async function deleteAccount(request, env) {
     }, 400);
   }
 
+  const guardInsert = await createDeletionGuard(env.DB, sessionToken, user.id);
+  if (Number(guardInsert.meta?.changes ?? 0) === 0) {
+    const concurrentGuard = await getDeletionGuard(env.DB, sessionToken);
+    if (concurrentGuard?.status === "completed") {
+      return buildDeletionResponse({
+        success: true,
+        message: "Account deletion already processed",
+      });
+    }
+
+    return jsonResponse({
+      success: false,
+      error: "Account deletion is already in progress.",
+    }, 409);
+  }
+
   const dbSession = env.DB.withSession("first-primary");
   let transactionStarted = false;
 
@@ -264,25 +370,21 @@ export async function deleteAccount(request, env) {
       error: getErrorMessage(error),
     }));
 
+    await removeDeletionGuard(env.DB, sessionToken);
+
     return jsonResponse({
       success: false,
       error: "Could not delete account. Please try again.",
     }, 500);
   }
-
-  const headers = new Headers({
-    "Content-Type": "application/json",
-  });
-  for (const cookie of clearAuthCookies()) {
-    headers.append("Set-Cookie", cookie);
-  }
+  await markDeletionGuardCompleted(env.DB, sessionToken);
 
   console.log(JSON.stringify({
     event: "ACCOUNT_DELETION_COMPLETED",
     user_id: user.id,
   }));
 
-  return new Response(JSON.stringify({
+  return buildDeletionResponse({
     success: true,
     message: "Account has been permanently deleted",
     user: {
@@ -290,8 +392,5 @@ export async function deleteAccount(request, env) {
       email: user.email,
       email_verified: user.email_verified,
     },
-  }), {
-    status: 200,
-    headers,
   });
 }

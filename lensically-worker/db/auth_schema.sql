@@ -56,3 +56,15 @@ CREATE TABLE IF NOT EXISTS auth_rate_limits (
 
 CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_route_updated_at
   ON auth_rate_limits (route, updated_at);
+
+CREATE TABLE IF NOT EXISTS account_deletion_guards (
+  session_token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('in_progress', 'completed')),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at DATETIME
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_deletion_guards_user_id
+  ON account_deletion_guards (user_id);

@@ -22,6 +22,7 @@ async function resetDatabase() {
     DELETE FROM email_verification_tokens;
     DELETE FROM password_reset_tokens;
     DELETE FROM auth_rate_limits;
+    DELETE FROM account_deletion_guards;
     DELETE FROM users;
   `);
 }
@@ -282,6 +283,46 @@ describe("auth request validation", () => {
     await expect(response.json()).resolves.toMatchObject({
       success: false,
       error: "Unexpected field: target_user_id",
+    });
+  });
+});
+
+describe("account deletion deduplication", () => {
+  it("returns a no-op success for a repeated delete-account request in the same session after completion", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const firstResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        password: "correct-password",
+      }),
+    }));
+
+    expect(firstResponse.status).toBe(200);
+    await expect(firstResponse.json()).resolves.toMatchObject({
+      success: true,
+      message: "Account has been permanently deleted",
+    });
+
+    const secondResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        password: "correct-password",
+      }),
+    }));
+
+    expect(secondResponse.status).toBe(200);
+    await expect(secondResponse.json()).resolves.toMatchObject({
+      success: true,
+      message: "Account deletion already processed",
     });
   });
 });
