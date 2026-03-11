@@ -1,4 +1,5 @@
 import { requireAuth } from "./requireAuth.js";
+import { clearAuthCookies } from "./cookies.js";
 
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
@@ -14,6 +15,10 @@ export async function deleteAccount(request, env) {
   if (user instanceof Response) {
     return user;
   }
+
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?")
+    .bind(user.id)
+    .run();
 
   const result = await env.DB.prepare("DELETE FROM users WHERE id = ?")
     .bind(user.id)
@@ -31,6 +36,13 @@ export async function deleteAccount(request, env) {
     });
   }
 
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+  for (const cookie of clearAuthCookies()) {
+    headers.append("Set-Cookie", cookie);
+  }
+
   return new Response(JSON.stringify({
     success: true,
     message: "Account deleted successfully",
@@ -41,8 +53,6 @@ export async function deleteAccount(request, env) {
     },
   }), {
     status: 200,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
   });
 }
