@@ -3,6 +3,7 @@ Social Signal Analytics
 
 ## Public Compliance URLs
 
+- Terms of service: `https://lensically.com/terms`
 - Privacy policy: `https://lensically.com/privacy`
 - Data deletion instructions: `https://lensically.com/data-deletion`
 

@@ -26,6 +26,7 @@ const productFeatures = [
 
 const reviewLinks = [
   { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
   { label: "Data Deletion Instructions", href: "/data-deletion" },
 ];
 
@@ -64,6 +65,9 @@ export default function HomePageClient() {
             </Link>
             <Link href="/privacy" className="text-sm font-medium text-slate-700 hover:text-slate-950">
               Privacy
+            </Link>
+            <Link href="/terms" className="text-sm font-medium text-slate-700 hover:text-slate-950">
+              Terms
             </Link>
             <Link href="/data-deletion" className="text-sm font-medium text-slate-700 hover:text-slate-950">
               Data Deletion
@@ -126,6 +130,12 @@ export default function HomePageClient() {
                 className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
               >
                 Privacy
+              </Link>
+              <Link
+                href="/terms"
+                className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+              >
+                Terms
               </Link>
               <Link
                 href="/data-deletion"
@@ -220,8 +230,9 @@ export default function HomePageClient() {
               </p>
               <h2 className="mt-3 text-2xl font-semibold">Public compliance links</h2>
               <p className="mt-3 text-sm leading-6 text-slate-300">
-                The verified public site includes stable pages describing privacy practices and
-                account deletion instructions for unauthenticated visitors.
+                The verified public site includes stable legal and compliance pages covering
+                product terms, privacy practices, and account deletion instructions for
+                unauthenticated visitors.
               </p>
               <div className="mt-5 space-y-3">
                 {reviewLinks.map((link) => (
@@ -263,12 +274,12 @@ export default function HomePageClient() {
               Privacy and deletion
             </p>
             <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
-              Public documentation for privacy practices and self-serve account deletion
+              Public documentation for terms, privacy practices, and self-serve account deletion
             </h2>
             <p className="max-w-3xl text-sm leading-7 text-slate-600">
-              Lensically publishes a public privacy policy and public data deletion instructions on
-              the root domain so users and provider reviewers can understand what the application
-              does, what account-linked data it stores, and how deletion works without signing in.
+              Lensically publishes public legal and compliance pages on the root domain so users
+              and provider reviewers can understand what the application does, what rules govern
+              its use, what account-linked data it stores, and how deletion works without signing in.
             </p>
           </div>
 
