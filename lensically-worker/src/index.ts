@@ -609,6 +609,13 @@ function forbiddenJsonResponse(
   });
 }
 
+function providerFailureResponse(error: string, status = 502): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { "content-type": "application/json; charset=UTF-8" },
+  });
+}
+
 function resolveAuthenticatedAppUserId(
   authUserId: string,
   requestedAppUserId: string | null,
@@ -1680,10 +1687,7 @@ export default {
       );
 
       if (!tokenResp.ok) {
-        return new Response(await tokenResp.text(), {
-          status: tokenResp.status,
-          headers: { "content-type": "application/json; charset=UTF-8" },
-        });
+        return providerFailureResponse("Threads token exchange failed");
       }
 
       const shortTokenData = await tokenResp.json() as {
@@ -1705,10 +1709,7 @@ export default {
       );
 
       if (!longResp.ok) {
-        return new Response(await longResp.text(), {
-          status: longResp.status,
-          headers: { "content-type": "application/json; charset=UTF-8" },
-        });
+        return providerFailureResponse("Threads token upgrade failed");
       }
 
       const longTokenData = await longResp.json() as {
@@ -1732,10 +1733,7 @@ export default {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!meResp.ok) {
-        return new Response(await meResp.text(), {
-          status: meResp.status,
-          headers: { "content-type": "application/json; charset=UTF-8" },
-        });
+        return providerFailureResponse("Threads account lookup failed");
       }
 
       const meData = await meResp.json() as { id?: string };
@@ -2182,19 +2180,9 @@ export default {
 
       const account = await getThreadsAccountForAppUser(env, appUserId);
       console.log(JSON.stringify({
-        event: "THREADS_ACCOUNT_VALUES",
-        threads_user_id: account?.threads_user_id ?? null,
-        access_token_present: Boolean(account?.access_token),
-        access_token_length: account?.access_token?.length ?? 0,
-      }));
-      console.log(JSON.stringify({
-        event: "THREADS_ACCOUNT_DATA",
-        hasAccount: Boolean(account),
-        keys: account ? Object.keys(account) : null,
-      }));
-      console.log(JSON.stringify({
         event: "THREADS_ACCOUNT_LOOKUP_RESULT",
         found: Boolean(account),
+        threads_user_id: account?.threads_user_id ?? null,
       }));
 
       if (!account || !account.access_token) {
@@ -2258,7 +2246,7 @@ export default {
       console.log(JSON.stringify({
         event: "THREADS_API_RESPONSE",
         status: postsResp.status,
-        body: postsResponseText,
+        hasBody: Boolean(postsResponseText),
       }));
 
       const data = JSON.parse(postsResponseText) as {
@@ -2333,7 +2321,7 @@ export default {
               console.log("THREADS_INSIGHTS_DEBUG", {
                 postId: postId,
                 status: metricsResp.status,
-                response: metricsJson,
+                metricCount: Array.isArray(metricsJson.data) ? metricsJson.data.length : 0,
               });
 
               const metricMap: Record<string, number> = {};
@@ -2830,12 +2818,12 @@ export default {
         "SELECT threads_user_id, access_token FROM threads_accounts WHERE expires_at <= ?",
       )
       .bind(threshold)
-      .all();
+      .all<{ threads_user_id: string; access_token: string }>();
 
     for (const row of rows.results) {
       try {
         const refresh = await fetch(
-          `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${row.access_token}`,
+          `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(row.access_token)}`,
         );
 
         if (!refresh.ok) {
@@ -2854,8 +2842,8 @@ export default {
           .run();
 
         console.log("token refreshed", row.threads_user_id);
-      } catch (err) {
-        console.log("refresh error", err);
+      } catch {
+        console.log("refresh error", row.threads_user_id);
       }
     }
   },
