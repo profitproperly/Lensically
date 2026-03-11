@@ -1,4 +1,9 @@
 import { enforceLimit, type EnforceLimitResult, type UsageFeature } from "./utils/enforceLimit";
+import {
+  enforceAuthRateLimit,
+  getAuthRateLimitHeaders,
+  type AuthRateLimitRoute,
+} from "./utils/authRateLimit";
 import { register } from "../auth/register.js";
 import { login } from "../auth/login.js";
 import { verifyEmail } from "../auth/verifyEmail.js";
@@ -57,6 +62,27 @@ function limitDeniedResponse(
       headers: {
         "Content-Type": "application/json",
         ...getCorsHeadersForRequest(request, env),
+      },
+    },
+  );
+}
+
+function authRateLimitDeniedResponse(
+  request: Request,
+  env: Env,
+  result: Exclude<Awaited<ReturnType<typeof enforceAuthRateLimit>>, { allowed: true }>,
+): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: result.error,
+    }),
+    {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        ...getCorsHeadersForRequest(request, env),
+        ...getAuthRateLimitHeaders(result),
       },
     },
   );
@@ -573,6 +599,18 @@ function withAuthCors(request: Request, env: Env, response: Response): Response 
   });
 }
 
+async function enforceAuthRequestRateLimit(
+  request: Request,
+  env: Env,
+  route: AuthRateLimitRoute,
+): Promise<Response | null> {
+  const result = await enforceAuthRateLimit(env, request, route);
+  if (!result.allowed) {
+    return authRateLimitDeniedResponse(request, env, result);
+  }
+  return null;
+}
+
 async function ensureAppThreadsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS app_threads_accounts (
@@ -958,10 +996,18 @@ export default {
     }
 
     if (path === "/api/auth/register" && request.method === "POST") {
+      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "register");
+      if (rateLimitResponse) {
+        return applyAuthCors(rateLimitResponse);
+      }
       return applyAuthCors(await register(request, env));
     }
 
     if (path === "/api/auth/login" && request.method === "POST") {
+      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "login");
+      if (rateLimitResponse) {
+        return applyAuthCors(rateLimitResponse);
+      }
       return applyAuthCors(await login(request, env));
     }
 
@@ -970,10 +1016,22 @@ export default {
     }
 
     if (path === "/api/auth/forgot-password" && request.method === "POST") {
+      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "forgot-password");
+      if (rateLimitResponse) {
+        return applyAuthCors(rateLimitResponse);
+      }
       return applyAuthCors(await forgotPassword(request, env));
     }
 
-    if (path === "/api/auth/reset-password" && (request.method === "GET" || request.method === "POST")) {
+    if (path === "/api/auth/reset-password" && request.method === "GET") {
+      return applyAuthCors(await resetPassword(request, env));
+    }
+
+    if (path === "/api/auth/reset-password" && request.method === "POST") {
+      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "reset-password");
+      if (rateLimitResponse) {
+        return applyAuthCors(rateLimitResponse);
+      }
       return applyAuthCors(await resetPassword(request, env));
     }
 
@@ -986,6 +1044,10 @@ export default {
     }
 
     if (path === "/api/auth/delete-account" && request.method === "POST") {
+      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "delete-account");
+      if (rateLimitResponse) {
+        return applyAuthCors(rateLimitResponse);
+      }
       return applyAuthCors(await deleteAccount(request, env));
     }
 
