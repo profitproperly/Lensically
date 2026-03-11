@@ -5,6 +5,7 @@ import { verifyEmail } from "../auth/verifyEmail.js";
 import { forgotPassword, resetPassword } from "../auth/passwordReset.js";
 import { logout } from "../auth/logout.js";
 import { currentUser } from "../auth/me.js";
+import { deleteAccount } from "../auth/deleteAccount.js";
 import { createSession } from "../auth/sessions.js";
 import { setSessionCookie } from "../auth/cookies.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -763,6 +764,10 @@ export default {
 
     if (path === "/api/auth/me" && request.method === "GET") {
       return applyAuthCors(await currentUser(request, env));
+    }
+
+    if (path === "/api/auth/delete-account" && request.method === "POST") {
+      return applyAuthCors(await deleteAccount(request, env));
     }
 
     if (
