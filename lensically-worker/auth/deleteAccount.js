@@ -122,6 +122,11 @@ export async function deleteAccount(request, env) {
     headers.append("Set-Cookie", cookie);
   }
 
+  console.log(JSON.stringify({
+    event: "ACCOUNT_DELETION_COMPLETED",
+    user_id: user.id,
+  }));
+
   return new Response(JSON.stringify({
     success: true,
     message: "Account has been permanently deleted",
