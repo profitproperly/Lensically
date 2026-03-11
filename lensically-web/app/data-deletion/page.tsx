@@ -5,6 +5,9 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Data Deletion | Lensically",
   description: "How to delete your Lensically account and what data is removed.",
+  alternates: {
+    canonical: "https://lensically.com/data-deletion",
+  },
 };
 
 const deletedDataItems = [
@@ -51,6 +54,20 @@ export default function DataDeletionPage() {
           This action cannot be undone.
         </div>
 
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Official public review URL</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            The canonical public data deletion instructions for provider review are available at{" "}
+            <a
+              className="font-medium text-slate-900 underline"
+              href="https://lensically.com/data-deletion"
+            >
+              https://lensically.com/data-deletion
+            </a>
+            .
+          </p>
+        </section>
+
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
           <h2 className="text-xl font-semibold text-slate-900">Delete your account</h2>
           <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm leading-6 text-slate-700">
@@ -80,6 +97,13 @@ export default function DataDeletionPage() {
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Need help?</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            The related public privacy policy used for provider review is available at{" "}
+            <Link href="/privacy" className="font-medium text-slate-900 underline">
+              https://lensically.com/privacy
+            </Link>
+            .
+          </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             If you cannot access your account and need assistance with deletion, contact Lensically
             support and include the email address associated with your account.

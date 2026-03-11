@@ -4,9 +4,10 @@ Frontend application for Lensically, built with Next.js App Router and deployed 
 
 ## Public Review References
 
+- Privacy policy: `https://lensically.com/privacy`
 - Data deletion instructions: `https://lensically.com/data-deletion`
 
-This URL is the official public page describing how users can delete their Lensically account and how associated application data is removed.
+These URLs are the official public pages for provider review. The privacy policy explains data handling, and the data deletion page explains how users can delete their Lensically account and associated application data.
 
 ## Application Scope
 

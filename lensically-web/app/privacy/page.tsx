@@ -5,6 +5,9 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Privacy Policy | Lensically",
   description: "Lensically privacy policy covering data collection, use, storage, and deletion.",
+  alternates: {
+    canonical: "https://lensically.com/privacy",
+  },
 };
 
 const collectedData = [
@@ -59,6 +62,20 @@ export default function PrivacyPage() {
           This action cannot be undone.
         </div>
 
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Official public review URL</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            The canonical public privacy policy for provider review is available at{" "}
+            <a
+              className="font-medium text-slate-900 underline"
+              href="https://lensically.com/privacy"
+            >
+              https://lensically.com/privacy
+            </a>
+            .
+          </p>
+        </section>
+
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
           <h2 className="text-xl font-semibold text-slate-900">What Lensically collects</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
@@ -99,7 +116,7 @@ export default function PrivacyPage() {
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Public deletion instructions are available at{" "}
             <Link href="/data-deletion" className="font-medium text-slate-900 underline">
-              /data-deletion
+              https://lensically.com/data-deletion
             </Link>
             .
           </p>
