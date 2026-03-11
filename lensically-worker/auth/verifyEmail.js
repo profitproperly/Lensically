@@ -1,9 +1,4 @@
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+import { json, validateUuidLike } from "./validation.js";
 
 export async function verifyEmail(request, env) {
   if (request.method !== "GET") {
@@ -13,8 +8,9 @@ export async function verifyEmail(request, env) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token")?.trim();
 
-  if (!token) {
-    return json({ success: false, error: "Token is required" }, 400);
+  const tokenError = validateUuidLike(token, "Verification token");
+  if (tokenError) {
+    return json({ success: false, error: tokenError }, 400);
   }
 
   const tokenRow = await env.DB.prepare(

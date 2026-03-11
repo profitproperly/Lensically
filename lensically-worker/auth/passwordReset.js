@@ -1,20 +1,18 @@
 import bcrypt from "bcryptjs";
 import { sendEmail } from "../email/sendEmail.js";
+import {
+  json,
+  normalizeEmail,
+  readJsonObject,
+  rejectUnexpectedFields,
+  validateEmail,
+  validatePassword,
+  validateUuidLike,
+} from "./validation.js";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_APP_URL = "https://app.lensically.com";
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function normalizeEmail(value) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
 
 async function getValidResetTokenRow(env, token) {
   const tokenRow = await env.DB.prepare(
@@ -44,16 +42,21 @@ export async function forgotPassword(request, env) {
     return json({ success: false, error: "Method not allowed" }, 405);
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ success: false, error: "Invalid JSON body" }, 400);
+  const parsed = await readJsonObject(request);
+  if (!parsed.ok) {
+    return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
+  }
+  const { body } = parsed;
+
+  const unexpectedFieldResponse = rejectUnexpectedFields(body, ["email"]);
+  if (unexpectedFieldResponse) {
+    return unexpectedFieldResponse;
   }
 
   const email = normalizeEmail(body?.email);
-  if (!email) {
-    return json({ success: false, error: "Email is required" }, 400);
+  const emailError = validateEmail(email);
+  if (emailError) {
+    return json({ success: false, error: emailError }, 400);
   }
 
   const user = await env.DB.prepare("SELECT id, email FROM users WHERE email = ? LIMIT 1")
@@ -92,8 +95,9 @@ export async function resetPassword(request, env) {
   if (request.method === "GET") {
     const token = new URL(request.url).searchParams.get("token")?.trim() || "";
 
-    if (!token) {
-      return json({ success: false, error: "Reset token is required" }, 400);
+    const tokenError = validateUuidLike(token, "Reset token");
+    if (tokenError) {
+      return json({ success: false, error: tokenError }, 400);
     }
 
     const { error } = await getValidResetTokenRow(env, token);
@@ -111,18 +115,28 @@ export async function resetPassword(request, env) {
     return json({ success: false, error: "Method not allowed" }, 405);
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ success: false, error: "Invalid JSON body" }, 400);
+  const parsed = await readJsonObject(request);
+  if (!parsed.ok) {
+    return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
+  }
+  const { body } = parsed;
+
+  const unexpectedFieldResponse = rejectUnexpectedFields(body, ["token", "password"]);
+  if (unexpectedFieldResponse) {
+    return unexpectedFieldResponse;
   }
 
   const token = typeof body?.token === "string" ? body.token.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";
 
-  if (!token || !password) {
-    return json({ success: false, error: "Token and password are required" }, 400);
+  const tokenError = validateUuidLike(token, "Reset token");
+  if (tokenError) {
+    return json({ success: false, error: tokenError }, 400);
+  }
+
+  const passwordError = validatePassword(password, "Token and password are required");
+  if (passwordError) {
+    return json({ success: false, error: passwordError }, 400);
   }
 
   const { tokenRow, error } = await getValidResetTokenRow(env, token);

@@ -1,6 +1,12 @@
 import bcrypt from "bcryptjs";
 import { requireAuth } from "./requireAuth.js";
 import { clearAuthCookies } from "./cookies.js";
+import {
+  readJsonObject,
+  rejectUnexpectedFields,
+  validateConfirmationText,
+  validatePassword,
+} from "./validation.js";
 
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
@@ -125,11 +131,15 @@ export async function deleteAccount(request, env) {
     return user;
   }
 
-  let body = {};
-  try {
-    body = await request.json();
-  } catch {
-    body = {};
+  const parsed = await readJsonObject(request);
+  if (!parsed.ok) {
+    return parsed.response ?? jsonResponse({ success: false, error: "Invalid JSON body" }, 400);
+  }
+  const body = parsed.body;
+
+  const unexpectedFieldResponse = rejectUnexpectedFields(body, ["password", "confirmation_text"]);
+  if (unexpectedFieldResponse) {
+    return unexpectedFieldResponse;
   }
 
   const { searchParams } = new URL(request.url);
@@ -147,10 +157,18 @@ export async function deleteAccount(request, env) {
       : "";
 
   if (user.has_password) {
-    if (!password) {
+    if (confirmationText) {
       return jsonResponse({
         success: false,
-        error: "Password is required to delete this account.",
+        error: "Confirmation text is not supported for password-based account deletion.",
+      }, 400);
+    }
+
+    const passwordError = validatePassword(password, "Password is required to delete this account.");
+    if (passwordError) {
+      return jsonResponse({
+        success: false,
+        error: passwordError,
       }, 400);
     }
 
@@ -174,10 +192,20 @@ export async function deleteAccount(request, env) {
         error: "Invalid password.",
       }, 401);
     }
-  } else if (confirmationText !== OAUTH_DELETE_CONFIRMATION_TEXT) {
+  } else {
+    const confirmationTextError = validateConfirmationText(confirmationText, OAUTH_DELETE_CONFIRMATION_TEXT);
+    if (confirmationTextError) {
+      return jsonResponse({
+        success: false,
+        error: confirmationTextError,
+      }, 400);
+    }
+  }
+
+  if (!user.has_password && password) {
     return jsonResponse({
       success: false,
-      error: `Type ${OAUTH_DELETE_CONFIRMATION_TEXT} to confirm account deletion.`,
+      error: "Password is not supported for this account deletion flow.",
     }, 400);
   }
 
