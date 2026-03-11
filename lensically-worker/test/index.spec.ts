@@ -99,6 +99,44 @@ describe("auth rate limiting", () => {
     });
   });
 
+  it("throttles failed login attempts from the same IP across different user agents", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-login-ip-throttle", "user-ip-throttle@example.com", passwordHash)
+      .run();
+
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      response = await runWorker(new Request("https://api.lensically.com/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": "198.51.100.11",
+          "User-Agent": `rotating-client-${attempt}`,
+        },
+        body: JSON.stringify({
+          email: "user-ip-throttle@example.com",
+          password: "wrong-password",
+        }),
+      }));
+
+      if (attempt < 10) {
+        expect(response.status).toBe(401);
+      }
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toMatchObject({
+      success: false,
+      error: "Too many failed login attempts. Please wait before trying again.",
+    });
+  });
+
   it("rate limits repeated signup requests from the same client", async () => {
     let response: Response | null = null;
 
