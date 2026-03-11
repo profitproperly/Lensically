@@ -13,14 +13,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
 const DEFAULT_WORKER_ORIGIN = "https://api.lensically.com";
-const SCOPES = [
-  "threads_basic",
-  "threads_manage_insights",
-  "threads_keyword_search",
-  "threads_profile_discovery",
-  "threads_content_publish",
-].join(",");
-const API_OAUTH_SCOPES = [
+const THREADS_OAUTH_SCOPES = [
   "threads_basic",
   "threads_manage_insights",
 ].join(",");
@@ -1030,7 +1023,7 @@ export default {
       const authURL = new URL("https://www.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
       authURL.searchParams.set("redirect_uri", buildWorkerCallbackUrl(env, "/api/auth/threads/callback"));
-      authURL.searchParams.set("scope", API_OAUTH_SCOPES);
+      authURL.searchParams.set("scope", THREADS_OAUTH_SCOPES);
       authURL.searchParams.set("response_type", "code");
       authURL.searchParams.set("state", state);
 
@@ -1335,7 +1328,7 @@ export default {
       const authURL = new URL("https://graph.threads.net/oauth/authorize");
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
       authURL.searchParams.set("redirect_uri", buildWorkerCallbackUrl(env, "/auth/threads/callback"));
-      authURL.searchParams.set("scope", SCOPES);
+      authURL.searchParams.set("scope", THREADS_OAUTH_SCOPES);
       authURL.searchParams.set("response_type", "code");
       return Response.redirect(authURL.toString(), 302);
     }

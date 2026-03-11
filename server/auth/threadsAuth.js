@@ -3,6 +3,7 @@ const router = express.Router();
 
 const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID;
 const REDIRECT_URI = "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
+const THREADS_OAUTH_SCOPES = "threads_basic,threads_manage_insights";
 
 router.get("/login", (req, res) => {
 
@@ -10,7 +11,7 @@ router.get("/login", (req, res) => {
     "https://threads.net/oauth/authorize" +
     `?client_id=${THREADS_CLIENT_ID}` +
     `&redirect_uri=${REDIRECT_URI}` +
-    "&scope=threads_basic,threads_manage_insights,threads_keyword_search,threads_profile_discovery,threads_content_publish" +
+    `&scope=${THREADS_OAUTH_SCOPES}` +
     "&response_type=code";
 
   res.redirect(authURL);
