@@ -43,6 +43,12 @@ export async function validateResetPasswordToken(token: string) {
   return apiRequest(url, {}, 0);
 }
 
+export async function deleteAccount() {
+  return apiRequest(buildWorkerUrl("/api/auth/delete-account"), {
+    method: "POST",
+  }, 0);
+}
+
 export async function disconnectThreadsAccount(appUserId: string) {
   return apiRequest(buildWorkerUrl("/api/threads/disconnect"), {
     method: "POST",

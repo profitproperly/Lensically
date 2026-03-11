@@ -17,6 +17,7 @@ const links = [
   { href: "/schedule", label: "Schedule Posts" },
   { href: "/search", label: "Keyword Search" },
   { href: "/discovery", label: "Profile Discovery" },
+  { href: "/account", label: "Account Settings" },
 ];
 
 type ThreadsMeResponse = {
