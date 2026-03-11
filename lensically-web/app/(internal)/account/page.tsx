@@ -100,6 +100,17 @@ export default function AccountPage() {
             {user.email_verified ? "Yes" : "No"}
           </p>
         </div>
+        {!user.has_password ? (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            This account uses OAuth sign-in. If you connected with Google, Lensically uses Google
+            account data only to authenticate your account and maintain access to the application.
+            The stored provider linkage supports sign-in and account lifecycle functions. See{" "}
+            <a href="/privacy" className="font-medium text-slate-900 underline">
+              Privacy Policy
+            </a>
+            .
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-xl border border-rose-200 bg-white p-6 shadow-sm">

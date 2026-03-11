@@ -162,6 +162,16 @@ export default function SignupPage() {
           >
             Continue with Discord
           </button>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-600">
+            If you sign up with Google, Lensically uses your Google account data only for
+            authentication, account creation, and account access within the application. Lensically
+            stores the OAuth account linkage needed to sign you in. See{" "}
+            <Link href="/privacy" className="font-medium text-slate-900 underline">
+              Privacy Policy
+            </Link>
+            .
+          </div>
         </form>
 
           <p className="text-sm text-center text-gray-600">

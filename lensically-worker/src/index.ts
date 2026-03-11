@@ -740,19 +740,7 @@ async function processMetaDeletionRequest(
     await dbSession.prepare("BEGIN TRANSACTION").run();
     transactionStarted = true;
 
-    await dbSession.prepare(
-      `DELETE FROM app_threads_accounts
-       WHERE threads_user_id = ?`,
-    )
-      .bind(platformUserId)
-      .run();
-
-    await dbSession.prepare(
-      `DELETE FROM threads_accounts
-       WHERE threads_user_id = ?`,
-    )
-      .bind(platformUserId)
-      .run();
+    await removeThreadsLinkageForPlatformUser(dbSession, platformUserId);
 
     await dbSession.prepare(
       `INSERT INTO meta_deletion_requests (
@@ -790,6 +778,57 @@ async function processMetaDeletionRequest(
     `${getConfiguredWorkerOrigin(env)}/auth/threads/delete-status?confirmation_code=${encodeURIComponent(confirmationCode)}`;
 
   return { confirmationCode, statusUrl };
+}
+
+async function removeThreadsLinkageForPlatformUser(
+  db: D1DatabaseSession | D1Database,
+  platformUserId: string,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM app_threads_accounts
+     WHERE threads_user_id = ?`,
+  )
+    .bind(platformUserId)
+    .run();
+
+  await db.prepare(
+    `DELETE FROM threads_accounts
+     WHERE threads_user_id = ?`,
+  )
+    .bind(platformUserId)
+    .run();
+}
+
+async function processThreadsUninstallRequest(env: Env, platformUserId: string): Promise<void> {
+  await ensureAppThreadsTable(env);
+
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
+
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
+
+    await removeThreadsLinkageForPlatformUser(dbSession, platformUserId);
+
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      await dbSession.prepare("ROLLBACK").run();
+    }
+    console.error(JSON.stringify({
+      event: "THREADS_UNINSTALL_CALLBACK_FAILED",
+      platform_user_id: platformUserId,
+      error: getErrorMessage(error),
+    }));
+    throw error;
+  }
+
+  console.log(JSON.stringify({
+    event: "THREADS_UNINSTALL_CALLBACK_PROCESSED",
+    platform_user_id: platformUserId,
+  }));
 }
 
 async function getThreadsAccountForAppUserWithRetry(
@@ -1643,7 +1682,35 @@ export default {
     }
 
     if (url.pathname === "/auth/threads/uninstall" && request.method === "POST") {
-      return new Response("ok", { status: 200 });
+      const platformUserId = await resolveMetaDeletionUserId(request, env);
+      if (!platformUserId) {
+        return new Response(
+          JSON.stringify({ error: "Invalid Threads uninstall request" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      try {
+        await processThreadsUninstallRequest(env, platformUserId);
+        return new Response(
+          JSON.stringify({ success: true }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Could not process Threads uninstall callback" }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
     }
 
     if (url.pathname === "/auth/threads/delete" && request.method === "POST") {

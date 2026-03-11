@@ -215,6 +215,16 @@ export default function LoginPageClient() {
             >
               Continue with Discord
             </button>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-600">
+              If you continue with Google, Lensically uses your Google account data only to
+              authenticate your account and provide account access inside the application. OAuth
+              sign-in stores the account linkage needed for login and session management. See{" "}
+              <Link href="/privacy" className="font-medium text-slate-900 underline">
+                Privacy Policy
+              </Link>
+              .
+            </div>
           </form>
 
           <p className="text-sm text-center text-gray-600">
