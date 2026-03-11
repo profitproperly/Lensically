@@ -1,3 +1,5 @@
+import { getSessionCookieValue } from "./sessions.js";
+
 function unauthorized(message = "Unauthorized") {
   return new Response(JSON.stringify({ error: message }), {
     status: 401,
@@ -6,9 +8,7 @@ function unauthorized(message = "Unauthorized") {
 }
 
 export async function requireAuth(request, env) {
-  const cookieHeader = request.headers.get("Cookie") || "";
-  const match = cookieHeader.match(/session_token=([^;]+)/);
-  const sessionToken = match ? match[1] : null;
+  const sessionToken = getSessionCookieValue(request);
 
   if (!sessionToken) {
     return unauthorized("Unauthorized");

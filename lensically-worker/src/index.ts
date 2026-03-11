@@ -11,8 +11,13 @@ import { forgotPassword, resetPassword } from "../auth/passwordReset.js";
 import { logout } from "../auth/logout.js";
 import { currentUser } from "../auth/me.js";
 import { deleteAccount } from "../auth/deleteAccount.js";
-import { createSession } from "../auth/sessions.js";
-import { setSessionCookie } from "../auth/cookies.js";
+import { createSession, getSessionCookieValue } from "../auth/sessions.js";
+import {
+  clearOauthStateCookie,
+  setOauthStateCookie,
+  THREADS_OAUTH_STATE_COOKIE_NAME,
+  setSessionCookie,
+} from "../auth/cookies.js";
 import { requireAuth } from "../auth/requireAuth.js";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
@@ -265,14 +270,6 @@ function contextFromState(state: string | null): OauthStateContext | null {
 
 function oauthStateCookieName(provider: AuthProvider): string {
   return `lensically_oauth_state_${provider}`;
-}
-
-function setOauthStateCookie(name: string, state: string): string {
-  return `${name}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`;
-}
-
-function clearOauthStateCookie(name: string): string {
-  return `${name}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
 }
 
 function getOauthClientCredentials(
@@ -1319,7 +1316,7 @@ export default {
         status: 302,
         headers: {
           Location: authURL.toString(),
-          "Set-Cookie": `lensically_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+          "Set-Cookie": setOauthStateCookie(THREADS_OAUTH_STATE_COOKIE_NAME, state),
         },
       }));
     }
@@ -1327,8 +1324,8 @@ export default {
     if (url.pathname === "/api/auth/threads/callback" && request.method === "GET") {
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state");
-      const cookieState = getCookieValue(request, "lensically_oauth_state");
-      const sessionToken = getCookieValue(request, "session_token");
+      const cookieState = getCookieValue(request, THREADS_OAUTH_STATE_COOKIE_NAME);
+      const sessionToken = getSessionCookieValue(request);
       const stateContext = contextFromState(state);
       const appBaseUrl =
         stateContext?.appBaseUrl
@@ -1339,7 +1336,7 @@ export default {
           status: 302,
           headers: {
             Location: `${appBaseUrl}/connect?error=${error}`,
-            "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+            "Set-Cookie": clearOauthStateCookie(THREADS_OAUTH_STATE_COOKIE_NAME),
           },
         }));
       console.log(JSON.stringify({
@@ -1571,7 +1568,7 @@ export default {
         status: 302,
         headers: {
           Location: `${appBaseUrl}/dashboard`,
-          "Set-Cookie": "lensically_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+          "Set-Cookie": clearOauthStateCookie(THREADS_OAUTH_STATE_COOKIE_NAME),
         },
       }));
     }

@@ -1,4 +1,5 @@
-const SESSION_COOKIE_NAME = "session_token";
+import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "./cookies.js";
+
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export function generateSessionToken() {
@@ -22,6 +23,10 @@ export function getCookie(request, name) {
   return null;
 }
 
+export function getSessionCookieValue(request) {
+  return getCookie(request, SESSION_COOKIE_NAME) ?? getCookie(request, LEGACY_SESSION_COOKIE_NAME);
+}
+
 export async function createSession(env, userId, request) {
   const sessionToken = generateSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
@@ -42,7 +47,7 @@ export async function createSession(env, userId, request) {
 }
 
 export async function getSession(env, request) {
-  const sessionToken = getCookie(request, SESSION_COOKIE_NAME);
+  const sessionToken = getSessionCookieValue(request);
   if (!sessionToken) {
     return null;
   }
@@ -70,7 +75,7 @@ export async function getSession(env, request) {
 }
 
 export async function destroySession(env, request) {
-  const sessionToken = getCookie(request, SESSION_COOKIE_NAME);
+  const sessionToken = getSessionCookieValue(request);
   if (!sessionToken) {
     return;
   }
