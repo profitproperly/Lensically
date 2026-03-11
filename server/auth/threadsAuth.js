@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
+// Legacy scaffold route. Production Threads OAuth runs through lensically-worker.
 const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID;
-const REDIRECT_URI = "https://lensically-worker.lensically.workers.dev/auth/threads/callback";
+const REDIRECT_URI = "https://api.lensically.com/auth/threads/callback";
 const THREADS_OAUTH_SCOPES = "threads_basic,threads_manage_insights";
 
 router.get("/login", (req, res) => {
