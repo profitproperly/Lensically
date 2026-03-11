@@ -10,6 +10,7 @@ export default function AccountPage() {
   const { user, loading, logoutUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -18,12 +19,17 @@ export default function AccountPage() {
       return;
     }
 
+    if (user.has_password && !deletePassword) {
+      setError("Enter your password to confirm account deletion.");
+      return;
+    }
+
     setIsDeleting(true);
     setError("");
     setSuccessMessage("");
 
     try {
-      const result = await deleteAccount();
+      const result = await deleteAccount(user.has_password ? deletePassword : undefined);
       if (!result.success) {
         setError(result.error || "Could not delete account.");
         setIsDeleting(false);
@@ -31,6 +37,7 @@ export default function AccountPage() {
       }
 
       setShowDeleteConfirmation(false);
+      setDeletePassword("");
       setSuccessMessage(result.message || "Account has been permanently deleted.");
       await logoutUser();
       router.push("/?accountDeleted=1");
@@ -98,6 +105,29 @@ export default function AccountPage() {
                 This action cannot be undone.
               </p>
             </div>
+            {user.has_password ? (
+              <div className="mt-4">
+                <label
+                  htmlFor="delete-account-password"
+                  className="block text-sm font-medium text-slate-900"
+                >
+                  Re-enter your password
+                </label>
+                <input
+                  id="delete-account-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(event) => {
+                    setDeletePassword(event.target.value);
+                    setError("");
+                  }}
+                  autoComplete="current-password"
+                  disabled={isDeleting}
+                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  placeholder="Enter your password to confirm deletion"
+                />
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -114,6 +144,7 @@ export default function AccountPage() {
                     return;
                   }
                   setShowDeleteConfirmation(false);
+                  setDeletePassword("");
                   setError("");
                 }}
                 disabled={isDeleting}
@@ -128,6 +159,7 @@ export default function AccountPage() {
             type="button"
             onClick={() => {
               setShowDeleteConfirmation(true);
+              setDeletePassword("");
               setError("");
               setSuccessMessage("");
             }}

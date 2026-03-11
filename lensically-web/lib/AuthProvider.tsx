@@ -1,16 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { getCurrentUser, logout } from "./authClient";
-
-type User = {
-  id: string;
-  email: string;
-  email_verified: boolean;
-};
+import { getCurrentUser, logout, type CurrentUser } from "./authClient";
 
 type AuthContextType = {
-  user: User | null;
+  user: CurrentUser | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
   logoutUser: () => Promise<void>;
@@ -19,7 +13,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function refreshUser() {

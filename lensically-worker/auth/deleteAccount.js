@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { requireAuth } from "./requireAuth.js";
 import { clearAuthCookies } from "./cookies.js";
 
@@ -14,6 +15,60 @@ export async function deleteAccount(request, env) {
   const user = await requireAuth(request, env);
   if (user instanceof Response) {
     return user;
+  }
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  if (user.has_password) {
+    if (!password) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Password is required to delete this account.",
+      }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
+    const passwordRow = await env.DB.prepare(
+      "SELECT password_hash FROM users WHERE id = ? LIMIT 1",
+    )
+      .bind(user.id)
+      .first();
+
+    if (!passwordRow?.password_hash) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Password re-authentication is unavailable for this account.",
+      }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
+    const passwordOk = await bcrypt.compare(password, passwordRow.password_hash);
+    if (!passwordOk) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Invalid password.",
+      }), {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
   }
 
   await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?")

@@ -6,6 +6,13 @@ type DeletedAccountUser = {
   email_verified: boolean;
 };
 
+export type CurrentUser = {
+  id: string;
+  email: string;
+  email_verified: boolean;
+  has_password: boolean;
+};
+
 export type DeleteAccountResponse =
   | {
       success: true;
@@ -37,7 +44,7 @@ export async function logout() {
   });
 }
 
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<CurrentUser> {
   return apiRequest(buildWorkerUrl("/api/auth/me"));
 }
 
@@ -60,9 +67,10 @@ export async function validateResetPasswordToken(token: string) {
   return apiRequest(url, {}, 0);
 }
 
-export async function deleteAccount(): Promise<DeleteAccountResponse> {
+export async function deleteAccount(password?: string): Promise<DeleteAccountResponse> {
   return apiRequest(buildWorkerUrl("/api/auth/delete-account"), {
     method: "POST",
+    body: JSON.stringify(password ? { password } : {}),
   }, 0);
 }
 

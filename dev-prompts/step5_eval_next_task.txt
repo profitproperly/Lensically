@@ -54,10 +54,21 @@ If Status = Good
 
 Determine whether a task must be executed.
 
-If a task must be run state
+Task Execution Rules
 
+If files changed inside:
+
+lensically-web/**
 Task to Run
-Press task keybind → select: {task label}
+Press task keybind → select: front end deploy
+
+lensically-worker/**
+Task to Run
+Press task keybind → select: back end deploy
+
+If only documentation files changed (.md)
+Task to Run
+None
 
 Commit Handling
 
