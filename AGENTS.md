@@ -55,3 +55,7 @@ Risks / Edge Cases
 
 If the correct integration point cannot be confidently determined from
 the repository, stop and ask for clarification instead of guessing.
+
+`PROJECT_CONTEXT.md` is an AI context document. Agents must not modify
+or reference `PROJECT_CONTEXT.md` unless the user explicitly instructs
+them to do so.

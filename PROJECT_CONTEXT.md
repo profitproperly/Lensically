@@ -13,7 +13,7 @@ Tailwind CSS
 ## Architecture
 
 lensically-web
-Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes login, signup, verify-email, forgot-password, reset-password, account settings, and authenticated app sections. It talks to the worker through `lib/apiClient.ts`, using `NEXT_PUBLIC_WORKER_ORIGIN` with a production fallback of `https://api.lensically.com`, and routes authenticated users based on Threads connection state.
+Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes the public landing page, the public data deletion instructions page at `/data-deletion`, login, signup, verify-email, forgot-password, reset-password, account settings, and authenticated app sections. It talks to the worker through `lib/apiClient.ts`, using `NEXT_PUBLIC_WORKER_ORIGIN` with a production fallback of `https://api.lensically.com`, and routes authenticated users based on Threads connection state.
 
 lensically-worker
 Backend Cloudflare Worker responsible for Threads API integration, email/password auth, OAuth auth, session cookies, email verification, password reset, authenticated account deletion, Threads-account capacity checks, admin-aware usage enforcement, and D1-backed persistence. Production domain handling is centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.

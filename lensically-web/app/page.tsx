@@ -89,6 +89,9 @@ export default function Home() {
             <Link href="#" className="text-sm font-medium text-slate-900">
               Pricing
             </Link>
+            <Link href="/privacy" className="text-sm font-medium text-slate-900">
+              Privacy
+            </Link>
             <Link href="/data-deletion" className="text-sm font-medium text-slate-900">
               Data Deletion
             </Link>
@@ -159,6 +162,12 @@ export default function Home() {
 
               <Link href="#" className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-900">
                 Pricing
+              </Link>
+              <Link
+                href="/privacy"
+                className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-900"
+              >
+                Privacy
               </Link>
               <Link
                 href="/data-deletion"

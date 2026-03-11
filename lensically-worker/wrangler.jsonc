@@ -36,6 +36,7 @@
 		"WORKER_ORIGIN": "https://api.lensically.com",
 		"WEB_APP_URL": "https://app.lensically.com"
 	}
+	// Public compliance reference: https://lensically.com/data-deletion
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
