@@ -6,13 +6,16 @@ import { deleteAccount } from "@/lib/authClient";
 import { useAuth } from "@/lib/AuthProvider";
 
 export default function AccountPage() {
+  const deletePhrase = "DELETE";
   const router = useRouter();
   const { user, loading, logoutUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const deletePhraseConfirmed = deleteConfirmationText === deletePhrase;
 
   async function handleDeleteAccount() {
     if (!user || isDeleting) {
@@ -21,6 +24,11 @@ export default function AccountPage() {
 
     if (user.has_password && !deletePassword) {
       setError("Enter your password to confirm account deletion.");
+      return;
+    }
+
+    if (!user.has_password && !deletePhraseConfirmed) {
+      setError(`Type ${deletePhrase} to confirm account deletion.`);
       return;
     }
 
@@ -38,6 +46,7 @@ export default function AccountPage() {
 
       setShowDeleteConfirmation(false);
       setDeletePassword("");
+      setDeleteConfirmationText("");
       setSuccessMessage(result.message || "Account has been permanently deleted.");
       await logoutUser();
       router.push("/?accountDeleted=1");
@@ -127,13 +136,37 @@ export default function AccountPage() {
                   placeholder="Enter your password to confirm deletion"
                 />
               </div>
-            ) : null}
+            ) : (
+              <div className="mt-4">
+                <label
+                  htmlFor="delete-account-confirmation"
+                  className="block text-sm font-medium text-slate-900"
+                >
+                  Type {deletePhrase} to confirm deletion
+                </label>
+                <input
+                  id="delete-account-confirmation"
+                  type="text"
+                  value={deleteConfirmationText}
+                  onChange={(event) => {
+                    setDeleteConfirmationText(event.target.value);
+                    setError("");
+                  }}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  disabled={isDeleting}
+                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  placeholder={`Type ${deletePhrase}`}
+                />
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => void handleDeleteAccount()}
-                disabled={isDeleting}
-                className="inline-flex rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isDeleting || (!user.has_password && !deletePhraseConfirmed)}
+                className="inline-flex cursor-pointer rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDeleting ? "Deleting account..." : "Confirm permanent deletion"}
               </button>
@@ -145,10 +178,11 @@ export default function AccountPage() {
                   }
                   setShowDeleteConfirmation(false);
                   setDeletePassword("");
+                  setDeleteConfirmationText("");
                   setError("");
                 }}
                 disabled={isDeleting}
-                className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -160,11 +194,12 @@ export default function AccountPage() {
             onClick={() => {
               setShowDeleteConfirmation(true);
               setDeletePassword("");
+              setDeleteConfirmationText("");
               setError("");
               setSuccessMessage("");
             }}
             disabled={isDeleting}
-            className="mt-5 inline-flex rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-5 inline-flex cursor-pointer rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Delete account
           </button>
