@@ -78,7 +78,7 @@ export default function VerifyEmailPageClient() {
         {!token && (
           <>
             <p className="text-sm text-center text-gray-700">
-              Your account was created. Check {getEmailLabel(email)} for a verification email before continuing.
+              If the email address is eligible, check {getEmailLabel(email)} for a verification email before continuing.
             </p>
             <p className="text-sm text-center text-gray-500">
               After you verify your email, return here and log in.

@@ -1,124 +1,44 @@
-Here is the **full prompt with the manual execution rule appended**, keeping your structure intact.
-
-```
-STEP 5
 EVAL / NEXT TASK
 
 Purpose
-Evaluate Codex output and determine the next step in the implementation plan.
+Evaluate Codex output and return mandatory execution instructions.
 
-Development Task Registry
+Task Registry
+Use only these task labels:
+- CHECK: FE Build
+- CHECK: FE Lint
+- CHECK: BE Test
+- CHECK: BE Auth API Smoke
+- DEPLOY: FE Cloudflare
+- DEPLOY: BE Worker
+- GIT: Add Commit Push
 
-All operational commands are executed through VS Code tasks.
-
-Task definitions
-
-git add commit push
-git add . → git commit -m "{message}" → git push
-
-front end deploy
-cd ~/lensically/lensically-web
-npx opennextjs-cloudflare build
-wrangler deploy
-
-front end dev
-cd ~/lensically/lensically-web
-npm run dev
-
-back end deploy
-cd ~/lensically/lensically-worker
-wrangler deploy
-
-back end dev
-cd ~/lensically/lensically-worker
-wrangler tail
-
-When instructing execution use the format
-
-Press task keybind → select: {task label}
-
-Evaluation Procedure
-
-Evaluate the changes.
-Determine if the step was implemented correctly.
-
-Return the following sections.
+Evaluation Output (required)
 
 Status
 Good or Bad
 
 Explanation
-Very short reasoning.
+1-3 short sentences.
 
-If Status = Bad
-Provide corrected instructions for the current step.
+Run These Now
+List exact task labels only, one per line.
+No conditional wording.
+Only include tasks relevant to files changed.
 
-If Status = Good
+Commit
+Return exactly one line:
+- commit? yes
+or
+- commit? no
 
-Determine whether a task must be executed.
-
-Task Execution Rules
-
-If files changed inside:
-
-lensically-web/**
-Task to Run
-Press task keybind → select: front end deploy
-
-lensically-worker/**
-Task to Run
-Press task keybind → select: back end deploy
-
-If only documentation files changed (.md)
-Task to Run
-None
-
-Commit Handling
-
-If a commit should be created write
-
-commit?
-
-Provide the commit message in a separate copy box.
+If commit? yes
+Return a copy box with commit message only.
 
 Next Step
-
-Return the next step from the implementation plan.
+Return next Codex step in a txt box only.
 
 Rules
-
-Only place the next instructions intended for Codex inside a txt box.
-Keep all evaluation remarks in chat outside the txt box.
-Do not place explanations inside the txt box.
-The txt box must contain only the next implementation step.
-
-Manual Execution Fallback
-
-If Codex cannot execute a required action due to environment
-limitations (extension runtime Node version, local tooling
-requirements, permission restrictions, or unavailable commands),
-the step must not stall.
-
-Return the required command and instruct the user to execute
-it manually.
-
-Manual Action Required
-[short explanation]
-
-Run
-Press task keybind → select: {task label}
-
-or
-
-Run manually in terminal
-[exact command]
-
-After the manual action is completed, continue the evaluation
-loop normally with the next implementation step.
-
-If all steps in the plan are complete return
-
-Done
-
-Then provide a short analysis of completion and overall system quality.
-```
+- Do not use "if/then" phrasing in user-facing instructions.
+- Do not include non-task commands in Run These Now.
+- If no execution is required, write: None

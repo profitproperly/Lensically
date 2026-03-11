@@ -40,16 +40,37 @@ otherwise.
 Every implementation must include:
 
 - explanation of how the change works
-- how to test the change
-- commands required to run or verify the fix
+- exact VS Code task labels required to verify the fix
+
+Verification is task-driven and user-executed through the task registry.
+Agents must not re-run equivalent local checks in-agent by default when
+the task registry is available.
+
+Required check tasks when relevant:
+
+- `CHECK: FE Build`
+- `CHECK: FE Lint`
+- `CHECK: BE Test`
+- `CHECK: BE Auth API Smoke` for authentication, session, account lifecycle, or auth API contract changes
+
+Required deploy tasks when relevant:
+
+- `DEPLOY: FE Cloudflare`
+- `DEPLOY: BE Worker`
 
 ## Required Output
 
-Files Created  
-Files Modified  
-Code Changes  
 Summary  
+Files Modified  
+Run These Now  
 Risks / Edge Cases
+
+`Run These Now` rules:
+
+- list exact task labels only, one per line
+- include only tasks relevant to the files changed
+- treat listed tasks as mandatory
+- do not use conditional wording in the user-facing list
 
 ## Rule
 
@@ -75,7 +96,7 @@ them to do so.
 - New pages and major UI changes must remain usable on both mobile and desktop layouts.
 - Interactive controls must use semantic elements where possible and include accessible labels, keyboard reachability, and visible focus behavior.
 - Backend or network failures must not fail silently; meaningful user-facing errors should be shown when safe.
-- Agents must run the most relevant available verification after code changes unless explicitly instructed not to. If verification cannot be run, they must state why.
+- Agents must provide mandatory user-run verification tasks after code changes using the task labels defined in this repository.
 - Agents must not break existing public routes, auth routes, OAuth callback URLs, or redirect flows when making frontend or authentication changes.
 - Agents must follow existing environment and configuration patterns and must not hardcode secrets, origins, or environment-specific URLs when a configured source already exists.
 - User-facing copy for destructive actions, authentication flows, and compliance pages must be explicit, production-ready, and free of placeholder wording.
@@ -215,7 +236,7 @@ A task is not done unless all of the following are true:
 - the UI includes the required user feedback states
 - backend enforcement exists where required
 - documentation or compliance content was updated if behavior changed
-- the most relevant available verification was run, or the inability to run it was stated clearly
+- mandatory relevant task-based checks and deploys were listed in `Run These Now`
 - the final response explains what changed, how to test it, and any remaining risks
 
 ## Documentation Synchronization Rule
@@ -328,3 +349,4 @@ production engineer:
 - no hiding uncertainty
 - no overstating confidence when tests were not run
 - no changelog-style noise when a concise explanation will do
+- final responses must include a concise `Run These Now` task list with exact labels and no conditional phrasing

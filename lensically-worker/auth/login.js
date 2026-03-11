@@ -11,6 +11,8 @@ import {
 } from "./validation.js";
 import { logAuthEvent } from "./operationalLog.js";
 
+const GENERIC_LOGIN_ERROR = "Invalid email or password.";
+
 export async function login(request, env) {
   if (request.method !== "POST") {
     logAuthEvent("login_rejected", { reason: "method_not_allowed" });
@@ -56,23 +58,23 @@ export async function login(request, env) {
 
   if (!user) {
     logAuthEvent("login_failed", { reason: "credentials_invalid" });
-    return json({ success: false, error: "Invalid email or password." }, 401);
+    return json({ success: false, error: GENERIC_LOGIN_ERROR }, 401);
   }
 
   if (!user.password_hash) {
     logAuthEvent("login_failed", { reason: "credentials_invalid" });
-    return json({ success: false, error: "Invalid email or password." }, 401);
+    return json({ success: false, error: GENERIC_LOGIN_ERROR }, 401);
   }
 
   const passwordOk = await bcrypt.compare(password, user.password_hash);
   if (!passwordOk) {
     logAuthEvent("login_failed", { reason: "credentials_invalid" });
-    return json({ success: false, error: "Invalid email or password." }, 401);
+    return json({ success: false, error: GENERIC_LOGIN_ERROR }, 401);
   }
 
   if (!user.email_verified) {
     logAuthEvent("login_failed", { reason: "email_unverified" });
-    return json({ success: false, error: "Please verify your email before logging in" }, 403);
+    return json({ success: false, error: GENERIC_LOGIN_ERROR }, 401);
   }
 
   const sessionToken = await createSession(env, user.id, request);

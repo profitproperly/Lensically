@@ -1,4 +1,3 @@
-STEP 6
 UPDATE REPO CONTEXT
 
 Execute the instructions in UPDATE_CONTEXT.md

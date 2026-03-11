@@ -13,83 +13,10 @@ import { logAuthEvent } from "./operationalLog.js";
 const PASSWORD_SALT_ROUNDS = 12;
 const EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_WEB_APP_URL = "https://app.lensically.com";
+const GENERIC_REGISTRATION_MESSAGE = "If the email address is eligible, a verification email will be sent.";
 
-export async function register(request, env) {
-  if (request.method !== "POST") {
-    logAuthEvent("register_rejected", { reason: "method_not_allowed" });
-    return json({ success: false, error: "Method not allowed" }, 405);
-  }
-
-  const parsed = await readJsonObject(request);
-  if (!parsed.ok) {
-    logAuthEvent("register_rejected", { reason: "invalid_json" });
-    return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
-  }
-  const { body } = parsed;
-
-  const unexpectedFieldResponse = rejectUnexpectedFields(body, ["email", "password"]);
-  if (unexpectedFieldResponse) {
-    logAuthEvent("register_rejected", { reason: "unexpected_field" });
-    return unexpectedFieldResponse;
-  }
-
-  const email = normalizeEmail(body.email);
-  const password = typeof body?.password === "string" ? body.password : "";
-
-  const emailError = validateEmail(email, "Email and password are required");
-  if (emailError) {
-    logAuthEvent("register_rejected", { reason: "invalid_email" });
-    return json({ success: false, error: emailError }, 400);
-  }
-
-  const passwordError = validatePassword(password, "Email and password are required");
-  if (passwordError) {
-    logAuthEvent("register_rejected", { reason: "invalid_password" });
-    return json({ success: false, error: passwordError }, 400);
-  }
-
-  const existingUser = await env.DB.prepare("SELECT id FROM users WHERE email = ? LIMIT 1")
-    .bind(email)
-    .first();
-  if (existingUser) {
-    logAuthEvent("register_failed", { reason: "email_exists" });
-    return json({ success: false, error: "Email already registered. Log in instead." }, 409);
-  }
-
-  const userId = crypto.randomUUID();
-  const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
-
-  try {
-    await env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
-       VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
-    )
-      .bind(userId, email, passwordHash)
-      .run();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("UNIQUE constraint failed: users.email")) {
-      logAuthEvent("register_failed", { reason: "email_exists" });
-      return json({ success: false, error: "Email already registered. Log in instead." }, 409);
-    }
-    throw error;
-  }
-
-  const verificationToken = crypto.randomUUID();
-  const verificationTokenId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + EMAIL_TOKEN_TTL_MS).toISOString();
-
-  await env.DB.prepare(
-    `INSERT INTO email_verification_tokens (id, user_id, token, expires_at)
-     VALUES (?, ?, ?, ?)`,
-  )
-    .bind(verificationTokenId, userId, verificationToken, expiresAt)
-    .run();
-
-  const webAppUrl = (env.APP_URL || env.WEB_APP_URL || DEFAULT_WEB_APP_URL).replace(/\/+$/, "");
-  const verifyUrl = `${webAppUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
-  const subject = "Verify your Lensically account";
-  const html = `<!DOCTYPE html>
+function buildVerificationEmailHtml(verifyUrl) {
+  return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -149,19 +76,114 @@ export async function register(request, env) {
     </table>
   </body>
 </html>`;
+}
+
+async function sendVerificationEmail(env, userId, email) {
+  const verificationToken = crypto.randomUUID();
+  const verificationTokenId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + EMAIL_TOKEN_TTL_MS).toISOString();
+
+  await env.DB.prepare(
+    `INSERT INTO email_verification_tokens (id, user_id, token, expires_at)
+     VALUES (?, ?, ?, ?)`,
+  )
+    .bind(verificationTokenId, userId, verificationToken, expiresAt)
+    .run();
+
+  const webAppUrl = (env.APP_URL || env.WEB_APP_URL || DEFAULT_WEB_APP_URL).replace(/\/+$/, "");
+  const verifyUrl = `${webAppUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
 
   try {
-    await sendEmail(env, email, subject, html);
+    await sendEmail(env, email, "Verify your Lensically account", buildVerificationEmailHtml(verifyUrl));
   } catch (error) {
     logAuthEvent("register_email_failed", {
       reason: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+export async function register(request, env) {
+  if (request.method !== "POST") {
+    logAuthEvent("register_rejected", { reason: "method_not_allowed" });
+    return json({ success: false, error: "Method not allowed" }, 405);
+  }
+
+  const parsed = await readJsonObject(request);
+  if (!parsed.ok) {
+    logAuthEvent("register_rejected", { reason: "invalid_json" });
+    return parsed.response ?? json({ success: false, error: "Invalid JSON body" }, 400);
+  }
+  const { body } = parsed;
+
+  const unexpectedFieldResponse = rejectUnexpectedFields(body, ["email", "password"]);
+  if (unexpectedFieldResponse) {
+    logAuthEvent("register_rejected", { reason: "unexpected_field" });
+    return unexpectedFieldResponse;
+  }
+
+  const email = normalizeEmail(body.email);
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  const emailError = validateEmail(email, "Email and password are required");
+  if (emailError) {
+    logAuthEvent("register_rejected", { reason: "invalid_email" });
+    return json({ success: false, error: emailError }, 400);
+  }
+
+  const passwordError = validatePassword(password, "Email and password are required");
+  if (passwordError) {
+    logAuthEvent("register_rejected", { reason: "invalid_password" });
+    return json({ success: false, error: passwordError }, 400);
+  }
+
+  const existingUser = await env.DB.prepare(
+    "SELECT id, email_verified FROM users WHERE email = ? LIMIT 1",
+  )
+    .bind(email)
+    .first();
+  if (existingUser) {
+    logAuthEvent("register_duplicate_email_received", {
+      email_verified: Boolean(existingUser.email_verified),
+    });
+
+    if (!existingUser.email_verified) {
+      await sendVerificationEmail(env, existingUser.id, email);
+    }
+
+    return json({
+      success: true,
+      message: GENERIC_REGISTRATION_MESSAGE,
+    });
+  }
+
+  const userId = crypto.randomUUID();
+  const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
+    )
+      .bind(userId, email, passwordHash)
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("UNIQUE constraint failed: users.email")) {
+      logAuthEvent("register_duplicate_email_received", { email_verified: null });
+      return json({
+        success: true,
+        message: GENERIC_REGISTRATION_MESSAGE,
+      });
+    }
+    throw error;
+  }
+
+  await sendVerificationEmail(env, userId, email);
 
   logAuthEvent("register_succeeded", { verification_email_attempted: true });
 
   return json({
     success: true,
-    message: "Verification email sent",
+    message: GENERIC_REGISTRATION_MESSAGE,
   });
 }

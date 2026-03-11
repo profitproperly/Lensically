@@ -243,7 +243,7 @@ describe("auth request validation", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
       success: false,
-      error: "Invalid verification token",
+      error: "Invalid or expired verification token.",
     });
   });
 
@@ -260,7 +260,7 @@ describe("auth request validation", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
       success: false,
-      error: "Invalid reset token",
+      error: "Invalid or expired reset token.",
     });
   });
 
@@ -283,6 +283,109 @@ describe("auth request validation", () => {
     await expect(response.json()).resolves.toMatchObject({
       success: false,
       error: "Unexpected field: target_user_id",
+    });
+  });
+});
+
+describe("auth enumeration protections", () => {
+  it("returns the same login failure response for missing and unverified accounts", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-unverified", "unverified@example.com", passwordHash)
+      .run();
+
+    const missingResponse = await runWorker(new Request("https://api.lensically.com/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "missing@example.com",
+        password: "correct-password",
+      }),
+    }));
+
+    const unverifiedResponse = await runWorker(new Request("https://api.lensically.com/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "unverified@example.com",
+        password: "correct-password",
+      }),
+    }));
+
+    expect(missingResponse.status).toBe(401);
+    expect(unverifiedResponse.status).toBe(401);
+    await expect(missingResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: "Invalid email or password.",
+    });
+    await expect(unverifiedResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: "Invalid email or password.",
+    });
+  });
+
+  it("returns a generic success for duplicate registration attempts", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-existing", "existing@example.com", passwordHash)
+      .run();
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "existing@example.com",
+        password: "new-password-123",
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      message: "If the email address is eligible, a verification email will be sent.",
+    });
+  });
+
+  it("returns the same forgot-password response whether the account exists or not", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-forgot", "exists@example.com", passwordHash)
+      .run();
+
+    const existingResponse = await runWorker(new Request("https://api.lensically.com/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "exists@example.com",
+      }),
+    }));
+
+    const missingResponse = await runWorker(new Request("https://api.lensically.com/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "missing@example.com",
+      }),
+    }));
+
+    expect(existingResponse.status).toBe(200);
+    expect(missingResponse.status).toBe(200);
+    await expect(existingResponse.json()).resolves.toMatchObject({
+      success: true,
+      message: "If the account is eligible, password reset instructions will be sent.",
+    });
+    await expect(missingResponse.json()).resolves.toMatchObject({
+      success: true,
+      message: "If the account is eligible, password reset instructions will be sent.",
     });
   });
 });

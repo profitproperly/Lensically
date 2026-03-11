@@ -2,82 +2,127 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "git add commit push",
+      "label": "GIT: Add Commit Push",
       "type": "shell",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && git add . && git commit -m \"${input:commitMessage}\" && git push",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && git add . && git commit -m \"${input:commitMessage}\" && git push && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
       "options": {
         "cwd": "/home/brian/lensically"
       },
       "problemMatcher": []
     },
     {
-      "label": "front end deploy",
+      "label": "DEPLOY: FE Cloudflare",
       "type": "shell",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npx opennextjs-cloudflare build && wrangler deploy",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run deploy:cf && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
       "options": {
         "cwd": "/home/brian/lensically/lensically-web"
       },
       "problemMatcher": []
     },
     {
-      "label": "front end dev",
+      "label": "DEV: FE Web",
       "type": "shell",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run dev",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run dev; code=$?; if [ \"$code\" -eq 0 ]; then echo \"RESULT: SUCCESS\"; else echo \"RESULT: FAIL\"; fi; exit \"$code\"",
       "options": {
         "cwd": "/home/brian/lensically/lensically-web"
       },
       "problemMatcher": []
     },
     {
-      "label": "back end deploy",
+      "label": "DEPLOY: BE Worker",
       "type": "shell",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && wrangler deploy",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run deploy && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
       "options": {
         "cwd": "/home/brian/lensically/lensically-worker"
       },
       "problemMatcher": []
     },
     {
-      "label": "back end dev",
+      "label": "DEV: BE Worker",
       "type": "shell",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && wrangler tail",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run dev; code=$?; if [ \"$code\" -eq 0 ]; then echo \"RESULT: SUCCESS\"; else echo \"RESULT: FAIL\"; fi; exit \"$code\"",
       "options": {
         "cwd": "/home/brian/lensically/lensically-worker"
       },
       "problemMatcher": []
     },
     {
-      "label": "PROMPT STEP 1 — PORT AI CHAT CONTEXT",
+      "label": "LOGS: BE Worker Tail",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && wrangler tail; code=$?; if [ \"$code\" -eq 0 ]; then echo \"RESULT: SUCCESS\"; else echo \"RESULT: FAIL\"; fi; exit \"$code\"",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-worker"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CHECK: FE Build",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run build && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-web"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CHECK: FE Lint",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run lint && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-web"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CHECK: BE Test",
+      "type": "shell",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm test -- --run && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
+      "options": {
+        "cwd": "/home/brian/lensically/lensically-worker"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CHECK: BE Auth API Smoke",
+      "type": "shell",
+      "command": "verify_code=$(curl -s -o /tmp/lensically_verify_body.$$ -w \"%{http_code}\" \"https://api.lensically.com/api/auth/verify-email?token=not-a-uuid\") && reset_code=$(curl -s -o /tmp/lensically_reset_body.$$ -w \"%{http_code}\" -X POST \"https://api.lensically.com/api/auth/reset-password\" -H \"Content-Type: application/json\" -d '{\"token\":\"bad-token\",\"password\":\"new-password-123\"}') && [ \"$verify_code\" = \"400\" ] && [ \"$reset_code\" = \"400\" ] && grep -q \"Invalid or expired verification token.\" /tmp/lensically_verify_body.$$ && grep -q \"Invalid or expired reset token.\" /tmp/lensically_reset_body.$$ && rm -f /tmp/lensically_verify_body.$$ /tmp/lensically_reset_body.$$ && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
+      "options": {
+        "cwd": "/home/brian/lensically"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PROMPT: Step 1 Port AI Chat Context",
       "type": "shell",
       "command": "cat ~/lensically/dev-prompts/step1_port_context.txt | clip.exe",
       "problemMatcher": []
     },
     {
-      "label": "PROMPT STEP 2 — LOAD REPOSITORY CONTEXT",
+      "label": "PROMPT: Step 2 Load Repository Context",
       "type": "shell",
       "command": "cat ~/lensically/dev-prompts/step2_load_repo_context.txt | clip.exe",
       "problemMatcher": []
     },
     {
-      "label": "PROMPT STEP 3 — PLAN IMPLEMENTATION",
+      "label": "PROMPT: Step 3 Plan Implementation",
       "type": "shell",
       "command": "cat ~/lensically/dev-prompts/step3_plan_implementation.txt | clip.exe",
       "problemMatcher": []
     },
     {
-      "label": "PROMPT STEP 4 — CODEX EXECUTION",
+      "label": "PROMPT: Step 4 Codex Execution",
       "type": "shell",
       "command": "cat ~/lensically/dev-prompts/step4_codex_execution.txt | clip.exe",
       "problemMatcher": []
     },
     {
-      "label": "PROMPT STEP 5 — EVAL / NEXT TASK",
+      "label": "PROMPT: Step 5 Eval Next Task",
       "type": "shell",
       "command": "cat ~/lensically/dev-prompts/step5_eval_next_task.txt | clip.exe",
       "problemMatcher": []
     },
     {
-      "label": "PROMPT STEP 6 — UPDATE REPO CONTEXT",
+      "label": "PROMPT: Step 6 Update Repo Context",
       "type": "shell",
       "command": "cat ~/lensically/dev-prompts/step6_update_repo_context.txt | clip.exe",
       "problemMatcher": []

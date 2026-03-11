@@ -1,5 +1,4 @@
 ```
-STEP 3
 PLAN IMPLEMENTATION
 
 Purpose
@@ -22,13 +21,13 @@ Return format
 Goal
 [clear description]
 
-Step 1
+Work Item A
 Description
 
-Step 2
+Work Item B
 Description
 
-Step 3
+Work Item C
 Description
 
 Continue until the feature is complete.
