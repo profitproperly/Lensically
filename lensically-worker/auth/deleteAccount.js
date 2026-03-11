@@ -2,14 +2,30 @@ import bcrypt from "bcryptjs";
 import { requireAuth } from "./requireAuth.js";
 import { clearAuthCookies } from "./cookies.js";
 
+function jsonResponse(body, status) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+function getErrorMessage(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return "unknown_error";
+}
+
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
-      status: 405,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    return jsonResponse({ success: false, error: "Method not allowed" }, 405);
   }
 
   const user = await requireAuth(request, env);
@@ -28,15 +44,10 @@ export async function deleteAccount(request, env) {
 
   if (user.has_password) {
     if (!password) {
-      return new Response(JSON.stringify({
+      return jsonResponse({
         success: false,
         error: "Password is required to delete this account.",
-      }), {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      }, 400);
     }
 
     const passwordRow = await env.DB.prepare(
@@ -46,73 +57,78 @@ export async function deleteAccount(request, env) {
       .first();
 
     if (!passwordRow?.password_hash) {
-      return new Response(JSON.stringify({
+      return jsonResponse({
         success: false,
         error: "Password re-authentication is unavailable for this account.",
-      }), {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      }, 400);
     }
 
     const passwordOk = await bcrypt.compare(password, passwordRow.password_hash);
     if (!passwordOk) {
-      return new Response(JSON.stringify({
+      return jsonResponse({
         success: false,
         error: "Invalid password.",
-      }), {
-        status: 401,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      }, 401);
     }
   }
 
-  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
 
-  await env.DB.prepare("DELETE FROM oauth_accounts WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
 
-  await env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+    await dbSession.prepare("DELETE FROM user_daily_usage WHERE user_id = ?")
+      .bind(user.id)
+      .run();
 
-  await env.DB.prepare("DELETE FROM password_reset_tokens WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+    await dbSession.prepare("DELETE FROM user_usage_daily WHERE user_id = ?")
+      .bind(user.id)
+      .run();
 
-  await env.DB.prepare("DELETE FROM user_daily_usage WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+    await dbSession.prepare("DELETE FROM scheduled_posts WHERE user_id = ?")
+      .bind(user.id)
+      .run();
 
-  await env.DB.prepare("DELETE FROM user_usage_daily WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+    const result = await dbSession.prepare("DELETE FROM users WHERE id = ?")
+      .bind(user.id)
+      .run();
 
-  await env.DB.prepare("DELETE FROM scheduled_posts WHERE user_id = ?")
-    .bind(user.id)
-    .run();
+    if (Number(result.meta?.changes ?? 0) === 0) {
+      await dbSession.prepare("ROLLBACK").run();
+      transactionStarted = false;
+      return jsonResponse({
+        success: false,
+        error: "Account not found",
+      }, 404);
+    }
 
-  const result = await env.DB.prepare("DELETE FROM users WHERE id = ?")
-    .bind(user.id)
-    .run();
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await dbSession.prepare("ROLLBACK").run();
+      } catch (rollbackError) {
+        console.error(JSON.stringify({
+          event: "ACCOUNT_DELETION_ROLLBACK_FAILED",
+          user_id: user.id,
+          error: getErrorMessage(rollbackError),
+        }));
+      }
+    }
 
-  if (Number(result.meta?.changes ?? 0) === 0) {
-    return new Response(JSON.stringify({
+    console.error(JSON.stringify({
+      event: "ACCOUNT_DELETION_FAILED",
+      user_id: user.id,
+      error: getErrorMessage(error),
+    }));
+
+    return jsonResponse({
       success: false,
-      error: "Account not found",
-    }), {
-      status: 404,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+      error: "Could not delete account. Please try again.",
+    }, 500);
   }
 
   const headers = new Headers({
