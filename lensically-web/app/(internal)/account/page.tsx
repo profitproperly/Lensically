@@ -33,7 +33,7 @@ export default function AccountPage() {
       setShowDeleteConfirmation(false);
       setSuccessMessage(result.message || "Account has been permanently deleted.");
       await logoutUser();
-      router.push("/login");
+      router.push("/?accountDeleted=1");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete account.");

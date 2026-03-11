@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "../lib/AuthProvider";
 
@@ -14,7 +15,9 @@ const tools = [
 
 export default function Home() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const isAuthenticated = Boolean(user);
+  const accountDeleted = searchParams.get("accountDeleted") === "1";
   const [desktopToolsOpen, setDesktopToolsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
@@ -185,7 +188,13 @@ export default function Home() {
         )}
       </nav>
 
-      <main className="mx-auto flex w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-16 sm:px-6 lg:px-8">
+        {accountDeleted ? (
+          <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm text-emerald-900">
+            Your account has been permanently deleted and associated application data has been removed.
+          </div>
+        ) : null}
+
         <div className="h-64 w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50" />
       </main>
     </div>
