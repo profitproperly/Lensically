@@ -1,6 +1,10 @@
 # Lensically
 Social Signal Analytics
 
+## Reviewer Guide
+
+- Reviewer guide: [`REVIEWER_GUIDE.md`](./REVIEWER_GUIDE.md)
+
 ## Public Compliance URLs
 
 - Terms of service: `https://lensically.com/terms`

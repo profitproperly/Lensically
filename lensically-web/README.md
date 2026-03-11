@@ -2,6 +2,10 @@
 
 Frontend application for Lensically, built with Next.js App Router and deployed with OpenNext on Cloudflare.
 
+## Reviewer Guide
+
+- Repository reviewer guide: [`../REVIEWER_GUIDE.md`](../REVIEWER_GUIDE.md)
+
 ## Public Review References
 
 - Terms of service: `https://lensically.com/terms`
