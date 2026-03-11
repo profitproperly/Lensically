@@ -4,7 +4,7 @@
 Lensically
 
 ## Stack
-Next.js
+Next.js App Router
 OpenNext for Cloudflare
 Cloudflare Workers
 Cloudflare D1
@@ -13,18 +13,18 @@ Tailwind CSS
 ## Architecture
 
 lensically-web
-Frontend app built with Next.js App Router and deployed with OpenNext on Cloudflare. It includes the public landing page, a public privacy policy at `/privacy`, public data deletion instructions at `/data-deletion`, login, signup, verify-email, forgot-password, reset-password, account settings, and authenticated app sections. The landing page uses a Suspense-wrapped client banner for post-deletion confirmation state. The app talks to the worker through `lib/apiClient.ts`, using `NEXT_PUBLIC_WORKER_ORIGIN` with a production fallback of `https://api.lensically.com`, and routes authenticated users based on Threads connection state.
+Production frontend in `lensically-web`, built with Next.js App Router and deployed with OpenNext on Cloudflare. It serves the public landing page, login, signup, verify-email, forgot-password, reset-password, public compliance pages at `/privacy` and `/data-deletion`, and authenticated app routes including `/dashboard`, `/connect`, `/insights`, `/account`, `/discovery`, `/search`, and `/schedule`. Authenticated routing is driven by `AuthProvider` plus Threads connection checks; the landing page can show a post-deletion confirmation banner via `?accountDeleted=1`.
 
 lensically-worker
-Backend Cloudflare Worker responsible for Threads API integration, email/password auth, OAuth auth, session cookies, email verification, password reset, authenticated account deletion, password re-authentication requirements for password-based account deletion, Threads-account capacity checks, admin-aware usage enforcement, and D1-backed persistence. Production domain handling is centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.
+Production backend in `lensically-worker`, implemented as a Cloudflare Worker with D1-backed auth and Threads integration. It owns email/password auth, session cookies, current-user lookup, email verification, password reset, account deletion, Google/GitHub/Discord OAuth login, Threads OAuth connection, Threads disconnect, usage enforcement, profile lookup, keyword search, post publishing, insights fetches, and token refresh handling. Auth and OAuth origin handling are centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.
 
 Legacy directories
-`server`, `client`, and `database` still exist as earlier scaffolding, but the active deployment target is the `lensically-web` + `lensically-worker` Cloudflare stack.
+Root-level `server`, `client`, `database`, and `migrations` directories remain from older scaffolding. Current production behavior is centered on `lensically-web` and `lensically-worker`.
 
 ## Database
 Cloudflare D1
 
-Core tables:
+Core persisted tables:
 users
 sessions
 oauth_accounts
@@ -34,36 +34,41 @@ user_daily_usage
 user_usage_daily
 scheduled_posts
 
-Schema source:
-lensically-worker/db/auth_schema.sql
-lensically-worker/migrations/usage_daily.sql
-lensically-worker/migrations/limits.sql
+Runtime-managed Threads tables:
+threads_accounts
+app_threads_accounts
+
+Schema and migration sources:
+`lensically-worker/db/auth_schema.sql`
+`lensically-worker/migrations/usage_daily.sql`
+`lensically-worker/migrations/limits.sql`
 
 ## Core Systems
-Authentication
-OAuth
-Usage limits
-Threads account capacity enforcement
-Insights
-Discovery
-Post scheduling
+Email/password authentication
+Google, GitHub, and Discord OAuth login
+Session-based authenticated API access
 Email verification and password reset
-Authenticated account deletion
-Public privacy policy
-Public data deletion instructions
+Threads account connection and disconnect
+Threads profile fetch, profile lookup, keyword search, publishing, and insights
+Usage limits and admin-aware limit enforcement
+Authenticated account deletion with password re-auth for password users
+Public privacy policy and public data deletion instructions
+
+## Notes
+The authenticated dashboard and insights flow are wired to live Threads APIs. `/discovery`, `/search`, and `/schedule` exist as internal routes, but their current page implementations are minimal shells compared with the backend Threads capabilities.
 
 ## Recent Changes (Git History)
 
+- chore(oauth): reduce Threads OAuth scopes to minimum required permissions
+- docs(oauth): add Google OAuth consent configuration values to repository documentation
+- docs(meta): add Meta app review configuration values for data deletion URL and support contact
+- docs(compliance): align canonical privacy and data-deletion URLs across app and documentation
+- fix(account): remove orphaned Threads linkage during account deletion
+- feat(auth): enforce session-bound authorization for account deletion endpoint
+- fix(account): wrap deletion pipeline in D1 transaction to prevent partial account deletion
+- feat(account): add structured log event for completed account deletions
+- feat(account): require explicit acknowledgment checkbox before account deletion request
 - feat(account): add DELETE phrase confirmation for OAuth-only account deletion
-- fix(frontend): move accountDeleted query handling into suspense-wrapped client component
-- feat(auth): require password re-authentication before account deletion for password-based users
-- feat(account): add permanent deletion warning to account deletion confirmation panel
-- docs(legal): add permanent data deletion statement to privacy and data-deletion pages
-- feat(legal): add public privacy policy page and navigation link
-- feat(legal): add public data deletion instructions page and navigation link
-- feat(account): redirect to landing page with deletion confirmation banner after account deletion
-- feat(account): connect frontend deletion confirmation to backend delete-account endpoint
-- feat(account): add explicit confirmation step before account deletion request
 
 ## Current Objective
-Maintain and harden the production-ready self-serve account lifecycle across password and OAuth users, including authenticated account deletion safeguards, post-deletion UX, and public compliance pages that accurately reflect system behavior.
+Keep the production auth, OAuth, and compliance surfaces aligned while hardening account deletion integrity, session-bound authorization, canonical public review URLs, and the Threads connection flow used by the live Cloudflare app.

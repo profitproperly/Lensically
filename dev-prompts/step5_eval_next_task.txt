@@ -1,3 +1,6 @@
+Here is the **full prompt with the manual execution rule appended**, keeping your structure intact.
+
+```
 STEP 5
 EVAL / NEXT TASK
 
@@ -89,8 +92,33 @@ Keep all evaluation remarks in chat outside the txt box.
 Do not place explanations inside the txt box.
 The txt box must contain only the next implementation step.
 
+Manual Execution Fallback
+
+If Codex cannot execute a required action due to environment
+limitations (extension runtime Node version, local tooling
+requirements, permission restrictions, or unavailable commands),
+the step must not stall.
+
+Return the required command and instruct the user to execute
+it manually.
+
+Manual Action Required
+[short explanation]
+
+Run
+Press task keybind → select: {task label}
+
+or
+
+Run manually in terminal
+[exact command]
+
+After the manual action is completed, continue the evaluation
+loop normally with the next implementation step.
+
 If all steps in the plan are complete return
 
 Done
 
 Then provide a short analysis of completion and overall system quality.
+```

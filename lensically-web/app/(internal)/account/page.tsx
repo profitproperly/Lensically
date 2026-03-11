@@ -43,7 +43,11 @@ export default function AccountPage() {
     setSuccessMessage("");
 
     try {
-      const result = await deleteAccount(user.has_password ? deletePassword : undefined);
+      const result = await deleteAccount(
+        user.has_password
+          ? { password: deletePassword }
+          : { confirmationText: deleteConfirmationText },
+      );
       if (!result.success) {
         setError(result.error || "Could not delete account.");
         setIsDeleting(false);

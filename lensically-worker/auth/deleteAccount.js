@@ -30,6 +30,7 @@ const FORBIDDEN_TARGET_FIELDS = [
   "target_user_id",
   "targetUserId",
 ];
+const OAUTH_DELETE_CONFIRMATION_TEXT = "DELETE";
 
 function hasForbiddenTargetingInput(body, searchParams) {
   for (const field of FORBIDDEN_TARGET_FIELDS) {
@@ -140,6 +141,10 @@ export async function deleteAccount(request, env) {
   }
 
   const password = typeof body?.password === "string" ? body.password : "";
+  const confirmationText =
+    typeof body?.confirmation_text === "string"
+      ? body.confirmation_text.trim().toUpperCase()
+      : "";
 
   if (user.has_password) {
     if (!password) {
@@ -169,6 +174,11 @@ export async function deleteAccount(request, env) {
         error: "Invalid password.",
       }, 401);
     }
+  } else if (confirmationText !== OAUTH_DELETE_CONFIRMATION_TEXT) {
+    return jsonResponse({
+      success: false,
+      error: `Type ${OAUTH_DELETE_CONFIRMATION_TEXT} to confirm account deletion.`,
+    }, 400);
   }
 
   const dbSession = env.DB.withSession("first-primary");
