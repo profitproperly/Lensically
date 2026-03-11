@@ -13,12 +13,18 @@ export default function AccountPage() {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const deletePhraseConfirmed = deleteConfirmationText === deletePhrase;
 
   async function handleDeleteAccount() {
     if (!user || isDeleting) {
+      return;
+    }
+
+    if (!deleteAcknowledged) {
+      setError("Check the confirmation box before permanently deleting your account.");
       return;
     }
 
@@ -47,6 +53,7 @@ export default function AccountPage() {
       setShowDeleteConfirmation(false);
       setDeletePassword("");
       setDeleteConfirmationText("");
+      setDeleteAcknowledged(false);
       setSuccessMessage(result.message || "Account has been permanently deleted.");
       await logoutUser();
       router.push("/?accountDeleted=1");
@@ -161,11 +168,31 @@ export default function AccountPage() {
                 />
               </div>
             )}
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-md border border-rose-200 bg-white px-3 py-3 text-sm text-slate-800">
+              <input
+                type="checkbox"
+                checked={deleteAcknowledged}
+                onChange={(event) => {
+                  setDeleteAcknowledged(event.target.checked);
+                  setError("");
+                }}
+                disabled={isDeleting}
+                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-rose-600 focus-visible:outline-none disabled:cursor-not-allowed"
+              />
+              <span>
+                I understand this permanently deletes my account, and I want to confirm that
+                action before the request is sent.
+              </span>
+            </label>
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => void handleDeleteAccount()}
-                disabled={isDeleting || (!user.has_password && !deletePhraseConfirmed)}
+                disabled={
+                  isDeleting ||
+                  !deleteAcknowledged ||
+                  (!user.has_password && !deletePhraseConfirmed)
+                }
                 className="inline-flex cursor-pointer rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDeleting ? "Deleting account..." : "Confirm permanent deletion"}
@@ -179,6 +206,7 @@ export default function AccountPage() {
                   setShowDeleteConfirmation(false);
                   setDeletePassword("");
                   setDeleteConfirmationText("");
+                  setDeleteAcknowledged(false);
                   setError("");
                 }}
                 disabled={isDeleting}
@@ -195,6 +223,7 @@ export default function AccountPage() {
               setShowDeleteConfirmation(true);
               setDeletePassword("");
               setDeleteConfirmationText("");
+              setDeleteAcknowledged(false);
               setError("");
               setSuccessMessage("");
             }}
