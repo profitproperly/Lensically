@@ -23,6 +23,24 @@ Use these exact values in the Meta developer dashboard:
 
 Use these exact values in the Google Cloud OAuth consent screen:
 
+- Application name: `Lensically`
 - Homepage URL: `https://lensically.com`
 - Privacy policy URL: `https://lensically.com/privacy`
 - Support email: `support@lensically.com`
+- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
+
+## OAuth Branding Values (All Providers)
+
+Use these branding values consistently across Google, GitHub, Discord, and Threads provider dashboards:
+
+- Application name: `Lensically`
+- Homepage URL: `https://lensically.com`
+- Support email: `support@lensically.com`
+- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
+
+Verification checklist:
+
+1. Google OAuth consent screen branding matches the values above.
+2. GitHub OAuth app branding matches the values above.
+3. Discord OAuth app branding matches the values above.
+4. Threads/Meta app branding matches the values above.

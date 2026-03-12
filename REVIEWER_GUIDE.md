@@ -64,6 +64,22 @@ These pages are intended to be reachable without authentication and describe:
 - Meta deletion callback URL: `https://api.lensically.com/auth/threads/delete`
 - Meta uninstall callback URL: `https://api.lensically.com/auth/threads/uninstall`
 
+## OAuth Branding Verification
+
+Verify all provider consent/app branding values match production website references:
+
+- Application name: `Lensically`
+- Homepage URL: `https://lensically.com`
+- Support email: `support@lensically.com`
+- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
+
+Providers to verify:
+
+1. Google OAuth consent screen
+2. GitHub OAuth app
+3. Discord OAuth app
+4. Threads/Meta app
+
 ## Support
 
 - Support email: `support@lensically.com`

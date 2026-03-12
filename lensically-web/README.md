@@ -26,9 +26,20 @@ Copy these values directly into the Meta app configuration:
 
 Copy these values directly into the Google OAuth consent screen:
 
+- Application name: `Lensically`
 - Homepage URL: `https://lensically.com`
 - Privacy policy URL: `https://lensically.com/privacy`
 - Support email: `support@lensically.com`
+- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
+
+## OAuth Branding Values (All Providers)
+
+Keep branding values aligned across Google, GitHub, Discord, and Threads provider dashboards:
+
+- Application name: `Lensically`
+- Homepage URL: `https://lensically.com`
+- Support email: `support@lensically.com`
+- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
 
 ## Application Scope
 
