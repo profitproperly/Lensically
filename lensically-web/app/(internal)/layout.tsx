@@ -8,6 +8,11 @@ import { ProfileMenu } from "@/components/ProfileMenu";
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/lib/AuthProvider";
 import { disconnectThreadsAccount } from "@/lib/authClient";
+import {
+  clearThreadsConnectionCache,
+  readThreadsConnectionCache,
+  writeThreadsConnectionCache,
+} from "@/lib/threadsConnectionCache";
 import { THREADS_ME_URL } from "@/lib/threadsApi";
 
 type ThreadsMeResponse = {
@@ -46,6 +51,17 @@ export default function InternalLayout({
       return;
     }
 
+    const cachedConnectionState = readThreadsConnectionCache(appUserId);
+    if (cachedConnectionState === true) {
+      setIsCheckingThreadsConnection(false);
+      return;
+    }
+    if (cachedConnectionState === false) {
+      setIsCheckingThreadsConnection(false);
+      router.replace("/connect");
+      return;
+    }
+
     const controller = new AbortController();
     let isMounted = true;
 
@@ -60,6 +76,7 @@ export default function InternalLayout({
         });
 
         if (res.status === 401) {
+          clearThreadsConnectionCache(appUserId);
           router.replace("/login");
           return;
         }
@@ -71,6 +88,7 @@ export default function InternalLayout({
 
         const data = (await res.json()) as ThreadsMeResponse;
         const hasConnectedThreads = Boolean(data.connected && data.account);
+        writeThreadsConnectionCache(appUserId, hasConnectedThreads);
 
         if (!hasConnectedThreads) {
           router.replace("/connect");
@@ -103,6 +121,7 @@ export default function InternalLayout({
 
     try {
       await disconnectThreadsAccount(appUserId);
+      writeThreadsConnectionCache(appUserId, false);
       router.push("/connect");
       router.refresh();
     } finally {
@@ -114,6 +133,7 @@ export default function InternalLayout({
     setIsLoggingOut(true);
 
     try {
+      clearThreadsConnectionCache(appUserId);
       await logoutUser();
       router.push("/login");
       router.refresh();

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearThreadsConnectionCache } from "../../../lib/threadsConnectionCache";
 import { markThreadsOauthPending } from "../../../lib/threadsOauth";
 import { CONNECT_THREADS_URL, CURRENT_USER_URL } from "../../../lib/threadsApi";
 
@@ -95,6 +96,7 @@ export default function ConnectPage() {
                   router.push("/login");
                   return;
                 }
+                clearThreadsConnectionCache(authUser.id);
                 markThreadsOauthPending();
                 window.location.href = destinationUrl;
               }}

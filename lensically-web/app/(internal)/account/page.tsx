@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { deleteAccount, disconnectThreadsAccount } from "@/lib/authClient";
 import { toUserFacingAuthError } from "@/lib/authErrorMessage";
 import { useAuth } from "@/lib/AuthProvider";
+import { writeThreadsConnectionCache } from "@/lib/threadsConnectionCache";
 
 export default function AccountPage() {
   const deletePhrase = "DELETE";
@@ -34,6 +35,7 @@ export default function AccountPage() {
 
     try {
       await disconnectThreadsAccount(user.id);
+      writeThreadsConnectionCache(user.id, false);
       setProviderSuccessMessage("Threads provider has been disconnected.");
       router.refresh();
     } catch (err) {
