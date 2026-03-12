@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/prepare-next-output.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:cf": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && opennextjs-cloudflare build",
+    "prebuild:cf": "node scripts/prepare-next-output.js",
+    "build:cf": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && node scripts/prepare-next-output.js && opennextjs-cloudflare build",
     "preview:cf": "npm run build:cf && opennextjs-cloudflare preview",
     "deploy:cf": "npm run build:cf && opennextjs-cloudflare deploy"
   },

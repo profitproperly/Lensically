@@ -31,6 +31,20 @@ type ScheduledPostsResponse = {
   error?: string;
 };
 
+function resolveTimezonePreference(rawTimezone: string | null | undefined): string {
+  const candidate = rawTimezone?.trim();
+  if (!candidate) {
+    return "UTC";
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
+    return candidate;
+  } catch {
+    return "UTC";
+  }
+}
+
 function formatScheduledLocalTime(
   scheduledUtc: string,
   timezone: string,
@@ -60,8 +74,9 @@ function formatScheduledLocalTime(
 export default function SchedulePage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
-  const timezone = user?.timezone?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const clockFormatLabel = user?.clock_format === "24h" ? "24-hour" : "12-hour";
+  const timezone = resolveTimezonePreference(user?.timezone);
+  const clockFormatPreference: "12h" | "24h" = user?.clock_format === "24h" ? "24h" : "12h";
+  const clockFormatLabel = clockFormatPreference === "24h" ? "24-hour" : "12-hour";
 
   const [postText, setPostText] = useState("");
   const [scheduleDate, setScheduleDate] = useState("");
@@ -302,7 +317,7 @@ export default function SchedulePage() {
         ? formatScheduledLocalTime(
           scheduledUtc,
           timezone,
-          user?.clock_format === "24h" ? "24h" : "12h",
+          clockFormatPreference,
         )
         : null;
 
@@ -485,7 +500,7 @@ export default function SchedulePage() {
               const localTime = formatScheduledLocalTime(
                 post.scheduled_time_utc,
                 timezone,
-                user?.clock_format === "24h" ? "24h" : "12h",
+                clockFormatPreference,
               );
               const statusLabel = post.status === "posting" ? "Publishing" : "Scheduled";
 
@@ -502,7 +517,7 @@ export default function SchedulePage() {
                     <span className="text-slate-600">
                       {localTime
                         ? `${localTime} (${timezone})`
-                        : `${post.scheduled_time_utc} UTC`}
+                        : "Invalid scheduled timestamp"}
                     </span>
                   </div>
                 </li>
