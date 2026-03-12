@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { forgotPassword } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
+import { toUserFacingAuthError } from "../../lib/authErrorMessage"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -41,7 +42,7 @@ export default function ForgotPasswordPage() {
       )
       setEmail("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send reset email.")
+      setError(toUserFacingAuthError(err, "Could not send reset email. Please try again."))
     } finally {
       setSubmitting(false)
     }

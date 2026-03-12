@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { login } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
 import { buildWorkerUrl } from "../../lib/apiClient"
+import { toUserFacingAuthError } from "../../lib/authErrorMessage"
 import { THREADS_ME_URL } from "../../lib/threadsApi"
 
 const GOOGLE_START_URL = buildWorkerUrl("/api/auth/google/start")
@@ -114,11 +115,7 @@ export default function LoginPageClient() {
 
       await refreshUser()
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Failed to fetch")) {
-        setFormError("Connection error. Please try again.")
-      } else {
-        setFormError(err instanceof Error ? err.message : "Invalid email or password.")
-      }
+      setFormError(toUserFacingAuthError(err, "Invalid email or password."))
       setSubmitting(false)
     }
   }

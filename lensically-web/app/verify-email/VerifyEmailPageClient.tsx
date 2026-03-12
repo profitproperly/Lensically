@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { apiRequest, buildWorkerUrl } from "../../lib/apiClient"
+import { toUserFacingAuthError } from "../../lib/authErrorMessage"
 
 type VerificationState = "idle" | "verifying" | "success" | "error"
 
@@ -57,7 +58,7 @@ export default function VerifyEmailPageClient() {
         }
 
         setStatus("error")
-        setMessage(error instanceof Error ? error.message : "Verification failed.")
+        setMessage(toUserFacingAuthError(error, "Verification failed. Please request a new verification link."))
       }
     }
 

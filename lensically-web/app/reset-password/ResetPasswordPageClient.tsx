@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { resetPassword, validateResetPasswordToken } from "../../lib/authClient"
+import { toUserFacingAuthError } from "../../lib/authErrorMessage"
 
 type ResetTokenStatus = "checking" | "ready" | "invalid"
 
@@ -52,7 +53,7 @@ export default function ResetPasswordPageClient() {
         }
 
         setTokenStatus("invalid")
-        setError(err instanceof Error ? err.message : "Reset link is invalid or expired.")
+        setError(toUserFacingAuthError(err, "Reset link is invalid or expired."))
       }
     }
 
@@ -112,7 +113,7 @@ export default function ResetPasswordPageClient() {
       setPassword("")
       setConfirmPassword("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Password reset failed.")
+      setError(toUserFacingAuthError(err, "Password reset failed. Please try again."))
     } finally {
       setSubmitting(false)
     }

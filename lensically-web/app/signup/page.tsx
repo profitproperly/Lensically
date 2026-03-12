@@ -6,6 +6,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { register } from "../../lib/authClient"
 import { useAuth } from "../../lib/AuthProvider"
+import { toUserFacingAuthError } from "../../lib/authErrorMessage"
 import { buildWorkerUrl } from "../../lib/apiClient"
 
 const GOOGLE_START_URL = buildWorkerUrl("/api/auth/google/start")
@@ -52,7 +53,7 @@ export default function SignupPage() {
       const normalizedEmail = email.trim().toLowerCase()
       router.push(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed.")
+      setError(toUserFacingAuthError(err, "Signup failed. Please try again."))
       setSubmitting(false)
     }
   }

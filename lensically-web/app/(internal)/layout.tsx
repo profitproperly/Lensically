@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/lib/AuthProvider";
@@ -14,11 +14,17 @@ export default function InternalLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user, logoutUser } = useAuth();
+  const { user, loading, logoutUser } = useAuth();
   const router = useRouter();
   const appUserId = user?.id?.trim() ?? "";
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, router, user]);
 
   async function handleDisconnectThreads() {
     if (!appUserId) {
@@ -46,6 +52,35 @@ export default function InternalLayout({
     } finally {
       setIsLoggingOut(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-700">Loading session...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold text-amber-900">Session expired</h1>
+          <p className="mt-2 text-sm text-amber-900">
+            Your session is no longer active. Log in again to continue.
+          </p>
+          <div className="mt-4">
+            <Link
+              href="/login"
+              className="inline-flex cursor-pointer rounded-md border border-amber-700 bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800"
+            >
+              Log in again
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

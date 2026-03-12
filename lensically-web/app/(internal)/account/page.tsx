@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAccount, disconnectThreadsAccount } from "@/lib/authClient";
+import { toUserFacingAuthError } from "@/lib/authErrorMessage";
 import { useAuth } from "@/lib/AuthProvider";
 
 export default function AccountPage() {
@@ -36,7 +37,7 @@ export default function AccountPage() {
       setProviderSuccessMessage("Threads provider has been disconnected.");
       router.refresh();
     } catch (err) {
-      setProviderError(err instanceof Error ? err.message : "Could not disconnect Threads provider.");
+      setProviderError(toUserFacingAuthError(err, "Could not disconnect Threads provider."));
     } finally {
       setIsDisconnectingProvider(false);
     }
@@ -87,7 +88,7 @@ export default function AccountPage() {
       router.push("/?accountDeleted=1");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete account.");
+      setError(toUserFacingAuthError(err, "Could not delete account."));
       setIsDeleting(false);
     }
   }
