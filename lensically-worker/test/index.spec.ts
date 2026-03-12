@@ -1,9 +1,10 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import bcrypt from "bcryptjs";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src";
 import authSchema from "../db/auth_schema.sql?raw";
 import accountDeletionGuardsMigration from "../migrations/account_deletion_guards.sql?raw";
+import appThreadsAccountsMigration from "../migrations/app_threads_accounts.sql?raw";
 import limitsMigration from "../migrations/limits.sql?raw";
 import usageDailyMigration from "../migrations/usage_daily.sql?raw";
 import {
@@ -28,8 +29,17 @@ function normalizeSqlScript(script: string): string {
 }
 
 const accountDeletionGuardsSql = normalizeSqlScript(accountDeletionGuardsMigration);
+const appThreadsAccountsSql = normalizeSqlScript(appThreadsAccountsMigration);
 const limitsSql = normalizeSqlScript(limitsMigration);
 const usageDailySql = normalizeSqlScript(usageDailyMigration);
+const createThreadsAccountsTableSql = [
+  "CREATE TABLE IF NOT EXISTS threads_accounts (",
+  "threads_user_id TEXT PRIMARY KEY,",
+  "access_token TEXT NOT NULL,",
+  "expires_at INTEGER NOT NULL,",
+  "created_at INTEGER NOT NULL",
+  ");",
+].join(" ");
 
 const resetStatements = `
   DELETE FROM sessions;
@@ -78,6 +88,10 @@ beforeEach(async () => {
   await resetDatabase();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 async function createAuthenticatedRequestContext() {
   const passwordHash = await bcrypt.hash("correct-password", 4);
   await env.DB.prepare(
@@ -104,6 +118,20 @@ async function createAuthenticatedRequestContext() {
   return {
     cookieHeader: `${SESSION_COOKIE_NAME}=session-token-1`,
   };
+}
+
+async function runScheduled(cron = "* * * * *"): Promise<void> {
+  const ctx = createExecutionContext();
+  await worker.scheduled(
+    {
+      cron,
+      scheduledTime: Date.now(),
+      type: "scheduled",
+    } as ScheduledController,
+    env,
+    ctx,
+  );
+  await waitOnExecutionContext(ctx);
 }
 
 describe("auth rate limiting", () => {
@@ -1108,10 +1136,10 @@ describe("database integrity safeguards", () => {
       .bind("user-integrity-1", "2026-03-12")
       .run();
     await env.DB.prepare(
-      `INSERT INTO scheduled_posts (user_id, post_text, scheduled_time)
-       VALUES (?, ?, ?)`,
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, scheduled_time)
+       VALUES (?, ?, ?, ?)`,
     )
-      .bind("user-integrity-1", "hello", "2026-03-12T12:00:00Z")
+      .bind("user-integrity-1", "threads-user-1", "hello", "2026-03-12T12:00:00Z")
       .run();
 
     await expect(
@@ -1132,10 +1160,10 @@ describe("database integrity safeguards", () => {
     ).rejects.toThrow();
     await expect(
       env.DB.prepare(
-        `INSERT INTO scheduled_posts (user_id, post_text, scheduled_time)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, scheduled_time)
+         VALUES (?, ?, ?, ?)`,
       )
-        .bind("missing-user", "orphan", "2026-03-12T13:00:00Z")
+        .bind("missing-user", "threads-user-missing", "orphan", "2026-03-12T13:00:00Z")
         .run(),
     ).rejects.toThrow();
 
@@ -1203,5 +1231,156 @@ describe("database integrity safeguards", () => {
       .bind("guard-session-1")
       .first<{ status: string }>();
     expect(guardRow?.status).toBe("in_progress");
+  });
+});
+
+describe("scheduled post state machine", () => {
+  it("processes approved posts once even when scheduler runs repeatedly", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, NULL, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-scheduled-1", "scheduled-1@example.com")
+      .run();
+
+    const now = Math.floor(Date.now() / 1000);
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-scheduled-1", "token-scheduled-1", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-scheduled-1", "threads-scheduled-1", now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, scheduled_time, status)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        "user-scheduled-1",
+        "threads-scheduled-1",
+        "Scheduled message",
+        "2026-03-12T00:00:00.000Z",
+        "approved",
+      )
+      .run();
+
+    const publishSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("https://graph.threads.net/v1.0/me/threads")) {
+        return new Response(JSON.stringify({ id: "threads-post-1" }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    await runScheduled();
+    await runScheduled();
+
+    const postRow = await env.DB.prepare(
+      `SELECT status, publish_request_id, published_post_id, published_at
+       FROM scheduled_posts
+       WHERE user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-scheduled-1")
+      .first<{
+        status: string;
+        publish_request_id: string | null;
+        published_post_id: string | null;
+        published_at: string | null;
+      }>();
+
+    expect(postRow?.status).toBe("posted");
+    expect(postRow?.publish_request_id).toBe("threads-post-1");
+    expect(postRow?.published_post_id).toBe("threads-post-1");
+    expect(postRow?.published_at).toBeTruthy();
+    expect(publishSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers stale posting rows and preserves deterministic transitions", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, NULL, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-scheduled-2", "scheduled-2@example.com")
+      .run();
+
+    const now = Math.floor(Date.now() / 1000);
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-scheduled-2", "token-scheduled-2", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-scheduled-2", "threads-scheduled-2", now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO scheduled_posts (
+        user_id,
+        threads_user_id,
+        post_text,
+        scheduled_time,
+        status,
+        processing_started_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        "user-scheduled-2",
+        "threads-scheduled-2",
+        "Recovered message",
+        "2026-03-12T00:00:00.000Z",
+        "posting",
+        "2026-03-11T00:00:00.000Z",
+      )
+      .run();
+
+    const publishSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("https://graph.threads.net/v1.0/me/threads")) {
+        return new Response(JSON.stringify({ id: "threads-post-2" }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    await runScheduled();
+
+    const postRow = await env.DB.prepare(
+      `SELECT status, publish_request_id, published_post_id
+       FROM scheduled_posts
+       WHERE user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-scheduled-2")
+      .first<{
+        status: string;
+        publish_request_id: string | null;
+        published_post_id: string | null;
+      }>();
+
+    expect(postRow?.status).toBe("posted");
+    expect(postRow?.publish_request_id).toBe("threads-post-2");
+    expect(postRow?.published_post_id).toBe("threads-post-2");
+    expect(publishSpy).toHaveBeenCalledTimes(1);
   });
 });

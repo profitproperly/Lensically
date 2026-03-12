@@ -32,6 +32,11 @@ const THREADS_OAUTH_SCOPES = [
 ].join(",");
 const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const DUPLICATE_EMAIL_OAUTH_ERROR = "duplicate_email";
+const SCHEDULED_POST_STATUS_APPROVED = "approved";
+const SCHEDULED_POST_STATUS_POSTING = "posting";
+const SCHEDULED_POST_STATUS_POSTED = "posted";
+const SCHEDULED_POST_MAX_BATCH_SIZE = 25;
+const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -651,6 +656,276 @@ function logWorkerEvent(
   level: "log" | "error" = "log",
 ): void {
   logWorkerOperationalEvent(event, details, level);
+}
+
+type ScheduledPostStatus =
+  | typeof SCHEDULED_POST_STATUS_APPROVED
+  | typeof SCHEDULED_POST_STATUS_POSTING
+  | typeof SCHEDULED_POST_STATUS_POSTED;
+
+type ScheduledPostTransitionContext = {
+  publishRequestId?: string | null;
+  publishedPostId?: string | null;
+  publishErrorMessage?: string | null;
+};
+
+type DueScheduledPost = {
+  id: number;
+  user_id: string;
+  threads_user_id: string;
+  post_text: string;
+};
+
+const SCHEDULED_POST_ALLOWED_TRANSITIONS: Record<ScheduledPostStatus, ReadonlyArray<ScheduledPostStatus>> = {
+  [SCHEDULED_POST_STATUS_APPROVED]: [SCHEDULED_POST_STATUS_POSTING],
+  [SCHEDULED_POST_STATUS_POSTING]: [SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTED],
+  [SCHEDULED_POST_STATUS_POSTED]: [],
+};
+
+function isScheduledPostTransitionAllowed(from: ScheduledPostStatus, to: ScheduledPostStatus): boolean {
+  return SCHEDULED_POST_ALLOWED_TRANSITIONS[from].includes(to);
+}
+
+async function transitionScheduledPostStatus(
+  env: Env,
+  postId: number,
+  fromStatus: ScheduledPostStatus,
+  toStatus: ScheduledPostStatus,
+  context: ScheduledPostTransitionContext = {},
+): Promise<boolean> {
+  if (!isScheduledPostTransitionAllowed(fromStatus, toStatus)) {
+    logWorkerEvent("SCHEDULED_POST_TRANSITION_REJECTED", {
+      postId,
+      fromStatus,
+      toStatus,
+      reason: "invalid_transition",
+    });
+    return false;
+  }
+
+  let query = "";
+  const bindings: Array<string | number | null> = [];
+
+  if (toStatus === SCHEDULED_POST_STATUS_POSTING) {
+    query = `
+      UPDATE scheduled_posts
+      SET
+        status = ?,
+        processing_started_at = CURRENT_TIMESTAMP,
+        last_attempted_at = CURRENT_TIMESTAMP,
+        publish_error_message = NULL
+      WHERE id = ? AND status = ?
+    `;
+    bindings.push(toStatus, postId, fromStatus);
+  } else if (toStatus === SCHEDULED_POST_STATUS_POSTED) {
+    query = `
+      UPDATE scheduled_posts
+      SET
+        status = ?,
+        publish_request_id = ?,
+        published_post_id = ?,
+        publish_error_message = NULL,
+        published_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND status = ?
+    `;
+    bindings.push(
+      toStatus,
+      context.publishRequestId ?? null,
+      context.publishedPostId ?? null,
+      postId,
+      fromStatus,
+    );
+  } else {
+    query = `
+      UPDATE scheduled_posts
+      SET
+        status = ?,
+        publish_error_message = ?,
+        processing_started_at = NULL
+      WHERE id = ? AND status = ?
+    `;
+    bindings.push(toStatus, context.publishErrorMessage ?? null, postId, fromStatus);
+  }
+
+  const result = await env.DB.prepare(query).bind(...bindings).run();
+  return Number(result.meta?.changes ?? 0) > 0;
+}
+
+async function recoverStalePostingScheduledPosts(env: Env): Promise<void> {
+  const staleCutoffIso = new Date(Date.now() - SCHEDULED_POST_STALE_POSTING_WINDOW_MS).toISOString();
+  await env.DB.prepare(
+    `UPDATE scheduled_posts
+     SET
+       status = ?,
+       publish_error_message = 'publish_interrupted_retry',
+       processing_started_at = NULL
+     WHERE status = ?
+       AND (processing_started_at IS NULL OR processing_started_at <= ?)`,
+  )
+    .bind(SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING, staleCutoffIso)
+    .run();
+}
+
+async function doesTableExist(env: Env, tableName: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `SELECT name
+     FROM sqlite_master
+     WHERE type = 'table'
+       AND name = ?
+     LIMIT 1`,
+  )
+    .bind(tableName)
+    .first<{ name: string }>();
+
+  return Boolean(row?.name);
+}
+
+async function getDueApprovedScheduledPosts(
+  env: Env,
+  nowIso: string,
+): Promise<DueScheduledPost[]> {
+  const rows = await env.DB.prepare(
+    `SELECT id, user_id, threads_user_id, post_text
+     FROM scheduled_posts
+     WHERE status = ?
+       AND scheduled_time <= ?
+     ORDER BY scheduled_time ASC, id ASC
+     LIMIT ?`,
+  )
+    .bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, SCHEDULED_POST_MAX_BATCH_SIZE)
+    .all<DueScheduledPost>();
+
+  return rows.results ?? [];
+}
+
+async function getThreadsAccessTokenForScheduledPost(
+  env: Env,
+  appUserId: string,
+  threadsUserId: string,
+): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT t.access_token
+     FROM app_threads_accounts a
+     JOIN threads_accounts t
+       ON t.threads_user_id = a.threads_user_id
+     WHERE a.app_user_id = ?
+       AND a.threads_user_id = ?
+     LIMIT 1`,
+  )
+    .bind(appUserId, threadsUserId)
+    .first<{ access_token: string }>();
+
+  return row?.access_token ?? null;
+}
+
+function getPublishRequestIdFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const response = payload as { id?: unknown };
+  return typeof response.id === "string" && response.id.trim().length > 0
+    ? response.id.trim()
+    : null;
+}
+
+async function processScheduledPost(
+  env: Env,
+  post: DueScheduledPost,
+): Promise<void> {
+  const claimed = await transitionScheduledPostStatus(
+    env,
+    post.id,
+    SCHEDULED_POST_STATUS_APPROVED,
+    SCHEDULED_POST_STATUS_POSTING,
+  );
+  if (!claimed) {
+    return;
+  }
+
+  const accessToken = await getThreadsAccessTokenForScheduledPost(env, post.user_id, post.threads_user_id);
+  if (!accessToken) {
+    await transitionScheduledPostStatus(
+      env,
+      post.id,
+      SCHEDULED_POST_STATUS_POSTING,
+      SCHEDULED_POST_STATUS_APPROVED,
+      { publishErrorMessage: "threads_account_not_connected" },
+    );
+    return;
+  }
+
+  try {
+    const publishBody = new URLSearchParams({
+      text: post.post_text,
+      media_type: "TEXT",
+    });
+    const publishResp = await fetch("https://graph.threads.net/v1.0/me/threads", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: publishBody,
+    });
+    if (!publishResp.ok) {
+      await transitionScheduledPostStatus(
+        env,
+        post.id,
+        SCHEDULED_POST_STATUS_POSTING,
+        SCHEDULED_POST_STATUS_APPROVED,
+        { publishErrorMessage: `threads_publish_failed:${publishResp.status}` },
+      );
+      return;
+    }
+
+    const payload = await readJsonSafe(publishResp);
+    if (payload === null) {
+      await transitionScheduledPostStatus(
+        env,
+        post.id,
+        SCHEDULED_POST_STATUS_POSTING,
+        SCHEDULED_POST_STATUS_APPROVED,
+        { publishErrorMessage: "threads_publish_invalid_response" },
+      );
+      return;
+    }
+
+    const publishRequestId = getPublishRequestIdFromPayload(payload);
+    await transitionScheduledPostStatus(
+      env,
+      post.id,
+      SCHEDULED_POST_STATUS_POSTING,
+      SCHEDULED_POST_STATUS_POSTED,
+      {
+        publishRequestId,
+        publishedPostId: publishRequestId,
+      },
+    );
+  } catch {
+    await transitionScheduledPostStatus(
+      env,
+      post.id,
+      SCHEDULED_POST_STATUS_POSTING,
+      SCHEDULED_POST_STATUS_APPROVED,
+      { publishErrorMessage: "threads_publish_exception" },
+    );
+  }
+}
+
+async function processDueScheduledPosts(env: Env): Promise<void> {
+  const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
+  if (!scheduledPostsTableExists) {
+    return;
+  }
+
+  await recoverStalePostingScheduledPosts(env);
+  const nowIso = new Date().toISOString();
+  const posts = await getDueApprovedScheduledPosts(env, nowIso);
+
+  for (const post of posts) {
+    await processScheduledPost(env, post);
+  }
 }
 
 function withAuthCors(request: Request, env: Env, response: Response): Response {
@@ -3427,6 +3702,8 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
         });
       }
     }
+
+    await processDueScheduledPosts(env);
 }
 
 export default {

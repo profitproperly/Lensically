@@ -13,10 +13,10 @@ Tailwind CSS
 ## Architecture
 
 lensically-web
-Production frontend in `lensically-web`, built with Next.js App Router and deployed with OpenNext on Cloudflare. It serves the public landing page, login, signup, verify-email, forgot-password, reset-password, and public compliance pages at `/terms`, `/privacy`, and `/data-deletion`, plus authenticated app routes including `/dashboard`, `/connect`, `/insights`, `/account`, `/discovery`, `/search`, and `/schedule`. Session state is driven by `AuthProvider`; the shared `(internal)` layout centrally gates authenticated routes with login redirect behavior and a session-expired re-auth prompt.
+Production frontend in `lensically-web`, built with Next.js App Router and deployed with OpenNext on Cloudflare. It serves the public landing page, login, signup, verify-email, forgot-password, reset-password, and public compliance pages at `/terms`, `/privacy`, and `/data-deletion`, plus authenticated app routes including `/dashboard`, `/connect`, `/insights`, `/account`, `/discovery`, `/search`, and `/schedule`. Session state is driven by `AuthProvider`; the shared `(internal)` layout centrally gates authenticated routes with login redirect behavior and a session-expired re-auth prompt. Internal navigation now preloads route data and cache dependencies before transition so destination views avoid intermediate placeholder states.
 
 lensically-worker
-Production backend in `lensically-worker`, implemented as a Cloudflare Worker with D1-backed auth and Threads integration. It owns email/password auth, secure session cookies, current-user lookup, email verification, password reset, account deletion, Google/GitHub/Discord OAuth login, Threads OAuth connection/disconnect, Meta Threads deletion and uninstall callbacks, usage enforcement, profile lookup, keyword search, post publishing, insights fetches, and token refresh handling. Auth request validation, D1-backed auth rate limiting, response sanitization, route hardening for internal/admin paths, and sanitized operational logging are part of the worker surface. Auth and OAuth origin handling are centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.
+Production backend in `lensically-worker`, implemented as a Cloudflare Worker with D1-backed auth and Threads integration. It owns email/password auth, secure session cookies, current-user lookup, email verification, password reset, account deletion, Google/GitHub/Discord OAuth login, Threads OAuth connection/disconnect, Meta Threads deletion and uninstall callbacks, usage enforcement, profile lookup, keyword search, post publishing, insights fetches, and token refresh handling. Auth request validation, D1-backed auth rate limiting, response sanitization, route hardening for internal/admin paths, and sanitized operational logging are part of the worker surface. Transactional password-reset email dispatch is production-only (`ENVIRONMENT === "production"`), with provider failures logged without breaking auth responses. Auth and OAuth origin handling are centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.
 
 Legacy directories
 Root-level `server`, `client`, `database`, and `migrations` directories remain from older scaffolding. Current production behavior is centered on `lensically-web` and `lensically-worker`.
@@ -72,20 +72,20 @@ Reviewer guide for OAuth/provider verification
 Operational runbooks for backup/DR, support process, and production readiness audit
 
 ## Notes
-The authenticated dashboard and insights flow are wired to live Threads APIs. `/discovery`, `/search`, and `/schedule` exist as internal routes, but their current page implementations are minimal shells compared with the backend Threads capabilities.
+The authenticated dashboard and insights flow are wired to live Threads APIs with cache-backed preload behavior to reduce UI flicker. `/discovery`, `/search`, and `/schedule` exist as internal routes, but their current page implementations are minimal shells compared with the backend Threads capabilities.
 
 ## Recent Changes (Git History)
 
+- Add global cursor policy for interactive and disabled UI elements
+- Add route data preloading to prevent placeholder flicker during navigation
+- Add production-only guard for transactional email sending
+- Isolate email provider failures in forgot-password flow and preserve auth responses
+- Fix nullable userId handling in account Threads status request
+- Fix sidebar route comparison TypeScript mismatch and restore FE build
+- Cache Threads connection state to eliminate repeated guard API checks and loading screen
+- Add centralized Threads connection guard with redirect to /connect for protected routes
 - docs(audit): add final production readiness audit
 - docs(ops): add user support process and contact workflow
-- chore(security): audit and update project dependencies
-- docs(ops): define deletion-state safeguards for backup recovery
-- docs(ops): add D1 backup and disaster recovery runbook
-- feat(security): add schema-aware deletion safeguards for user-linked records
-- feat(db): enforce user-linked referential integrity with foreign keys and cleanup safeguards
-- feat(security): harden API response sanitization and remove internal identifiers from public responses
-- chore(security): enforce environment isolation and prevent secret leakage from build artifacts
-- feat(security): restrict internal and administrative worker routes from public access
 
 ## Current Objective
-Maintain production authentication/account lifecycle hardening and operational readiness while continuing to mature internal product routes (`/discovery`, `/search`, `/schedule`) without regressions.
+Maintain stable authenticated route transitions and account/auth reliability while continuing to harden production behavior (navigation preload quality, transactional email safety, and lifecycle regressions) as internal product routes (`/discovery`, `/search`, `/schedule`) are matured.
