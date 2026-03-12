@@ -755,6 +755,118 @@ describe("account lifecycle enforcement", () => {
     expect(Number(tombstoneCount?.total ?? 0)).toBeGreaterThan(0);
   });
 
+  it("cleans up newly introduced user-linked tables discovered by the deletion pipeline", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS future_user_events (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        payload TEXT
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS future_user_mappings (
+        id TEXT PRIMARY KEY,
+        app_user_id TEXT NOT NULL,
+        label TEXT
+      )`,
+    ).run();
+
+    await env.DB.prepare("DELETE FROM future_user_events WHERE user_id = ?")
+      .bind("user-authenticated")
+      .run();
+    await env.DB.prepare("DELETE FROM future_user_mappings WHERE app_user_id = ?")
+      .bind("user-authenticated")
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO future_user_events (id, user_id, payload)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("future-event-1", "user-authenticated", "event-payload")
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO future_user_mappings (id, app_user_id, label)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("future-mapping-1", "user-authenticated", "mapping")
+      .run();
+
+    const deleteResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        password: "correct-password",
+      }),
+    }));
+    expect(deleteResponse.status).toBe(200);
+
+    const eventCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM future_user_events WHERE user_id = ?",
+    )
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+    const mappingCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM future_user_mappings WHERE app_user_id = ?",
+    )
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+
+    expect(Number(eventCount?.total ?? 0)).toBe(0);
+    expect(Number(mappingCount?.total ?? 0)).toBe(0);
+  });
+
+  it("treats discovered-table cleanup failures as non-fatal and still completes deletion", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS future_cleanup_failures (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        payload TEXT
+      )`,
+    ).run();
+    await env.DB.prepare("DELETE FROM future_cleanup_failures WHERE user_id = ?")
+      .bind("user-authenticated")
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO future_cleanup_failures (id, user_id, payload)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("future-failure-1", "user-authenticated", "payload")
+      .run();
+    await env.DB.prepare(
+      `CREATE TRIGGER IF NOT EXISTS fail_delete_future_cleanup_for_test
+       BEFORE DELETE ON future_cleanup_failures
+       FOR EACH ROW
+       WHEN OLD.user_id = 'user-authenticated'
+       BEGIN
+         SELECT RAISE(ABORT, 'forced_future_cleanup_failure');
+       END`,
+    ).run();
+
+    try {
+      const deleteResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: cookieHeader,
+        },
+        body: JSON.stringify({
+          password: "correct-password",
+        }),
+      }));
+      expect(deleteResponse.status).toBe(200);
+    } finally {
+      await env.DB.exec("DROP TRIGGER IF EXISTS fail_delete_future_cleanup_for_test");
+      await env.DB.exec("DROP TABLE IF EXISTS future_cleanup_failures");
+    }
+  });
+
   it("rolls back deletion safely when a mid-pipeline cleanup step fails", async () => {
     const { cookieHeader } = await createAuthenticatedRequestContext();
 

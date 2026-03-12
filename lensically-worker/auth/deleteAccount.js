@@ -71,6 +71,22 @@ const FORBIDDEN_TARGET_FIELDS = [
   "targetUserId",
 ];
 const OAUTH_DELETE_CONFIRMATION_TEXT = "DELETE";
+const USER_REFERENCE_COLUMNS = ["user_id", "app_user_id"];
+const USER_LINKED_TABLE_EXCLUSIONS = new Set([
+  "users",
+  // This table intentionally keeps session dedupe state after deletion.
+  "account_deletion_guards",
+]);
+const STATIC_USER_LINKED_TARGETS = [
+  { tableName: "sessions", columnName: "user_id" },
+  { tableName: "oauth_accounts", columnName: "user_id" },
+  { tableName: "email_verification_tokens", columnName: "user_id" },
+  { tableName: "password_reset_tokens", columnName: "user_id" },
+  { tableName: "user_daily_usage", columnName: "user_id" },
+  { tableName: "user_usage_daily", columnName: "user_id" },
+  { tableName: "scheduled_posts", columnName: "user_id" },
+  { tableName: "app_threads_accounts", columnName: "app_user_id" },
+];
 
 function hasForbiddenTargetingInput(body, searchParams) {
   for (const field of FORBIDDEN_TARGET_FIELDS) {
@@ -104,6 +120,124 @@ async function tableExists(db, tableName) {
   );
 
   return Boolean(row?.name);
+}
+
+function quoteIdentifier(identifier) {
+  return `"${String(identifier).replace(/"/g, "\"\"")}"`;
+}
+
+async function listTableColumnNames(db, tableName) {
+  const pragmaRows = await runDbOperation(`table_columns:${tableName}`, async () =>
+    db.prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`).all(),
+  );
+  return (pragmaRows.results ?? [])
+    .map((row) => String(row?.name ?? "").trim())
+    .filter((name) => name.length > 0);
+}
+
+async function listUserLinkedTableTargets(db) {
+  const tables = await runDbOperation("table_list", async () =>
+    db.prepare(
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'table'
+         AND name NOT LIKE 'sqlite_%'`,
+    ).all(),
+  );
+
+  const targets = [];
+  for (const row of tables.results ?? []) {
+    const tableName = String(row?.name ?? "").trim();
+    if (!tableName || USER_LINKED_TABLE_EXCLUSIONS.has(tableName)) {
+      continue;
+    }
+
+    let columns = [];
+    try {
+      columns = await listTableColumnNames(db, tableName);
+    } catch (error) {
+      logAccountDeletionEvent("deletion_discovery_table_scan_failed", {
+        table: tableName,
+        reason: getErrorMessage(error),
+      }, "error");
+      continue;
+    }
+    for (const columnName of USER_REFERENCE_COLUMNS) {
+      if (columns.includes(columnName)) {
+        targets.push({ tableName, columnName });
+      }
+    }
+  }
+
+  return targets;
+}
+
+function dedupeUserLinkedTargets(targets) {
+  const seen = new Set();
+  const deduped = [];
+  for (const target of targets) {
+    const tableName = String(target?.tableName ?? "").trim();
+    const columnName = String(target?.columnName ?? "").trim();
+    if (!tableName || !columnName) {
+      continue;
+    }
+    const key = `${tableName}:${columnName}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push({ tableName, columnName });
+  }
+  return deduped;
+}
+
+async function listStaticExistingUserLinkedTargets(db) {
+  const existingTargets = [];
+  for (const target of STATIC_USER_LINKED_TARGETS) {
+    if (await tableExists(db, target.tableName)) {
+      existingTargets.push(target);
+    }
+  }
+  return existingTargets;
+}
+
+async function listDiscoveredUserLinkedTargetsSafe(db, stage) {
+  try {
+    const discoveredTargets = await listUserLinkedTableTargets(db);
+    return dedupeUserLinkedTargets(discoveredTargets);
+  } catch (error) {
+    logAccountDeletionEvent("deletion_discovery_scan_failed", {
+      stage,
+      reason: getErrorMessage(error),
+    }, "error");
+    return [];
+  }
+}
+
+async function deleteRowsByUserReference(db, tableName, columnName, userId) {
+  await runDbOperation(`cleanup_delete:${tableName}.${columnName}`, async () =>
+    db.prepare(
+      `DELETE FROM ${quoteIdentifier(tableName)}
+       WHERE ${quoteIdentifier(columnName)} = ?`,
+    )
+      .bind(userId)
+      .run(),
+  );
+}
+
+async function cleanupDiscoveredUserLinkedRows(db, userId) {
+  const targets = await listDiscoveredUserLinkedTargetsSafe(db, "cleanup");
+  for (const { tableName, columnName } of targets) {
+    try {
+      await deleteRowsByUserReference(db, tableName, columnName, userId);
+    } catch (error) {
+      logAccountDeletionEvent("deletion_discovery_cleanup_failed", {
+        table: tableName,
+        column: columnName,
+        reason: getErrorMessage(error),
+      }, "error");
+    }
+  }
 }
 
 async function deleteThreadsAccountLink(db, userId) {
@@ -311,12 +445,12 @@ async function runOptionalCleanup(cleanupLabel, action) {
   }
 }
 
-async function countRowsByUserId(db, tableName, userId) {
-  const row = await runDbOperation(`integrity_count:${tableName}`, async () =>
+async function countRowsByUserReference(db, tableName, columnName, userId) {
+  const row = await runDbOperation(`integrity_count:${tableName}.${columnName}`, async () =>
     db.prepare(
       `SELECT COUNT(*) AS total
-       FROM ${tableName}
-       WHERE user_id = ?`,
+       FROM ${quoteIdentifier(tableName)}
+       WHERE ${quoteIdentifier(columnName)} = ?`,
     )
       .bind(userId)
       .first(),
@@ -342,44 +476,37 @@ async function assertNoUserLinkedRowsRemain(db, userId) {
     throw new Error("integrity_check_failed:users_row_still_exists");
   }
 
-  const requiredTables = [
-    "sessions",
-    "oauth_accounts",
-    "email_verification_tokens",
-    "password_reset_tokens",
-  ];
-  for (const tableName of requiredTables) {
-    if (await countRowsByUserId(db, tableName, userId) !== 0) {
+  const staticTargets = await listStaticExistingUserLinkedTargets(db);
+  for (const { tableName, columnName } of staticTargets) {
+    const rowsRemaining = await countRowsByUserReference(db, tableName, columnName, userId);
+    if (rowsRemaining !== 0) {
       throw new Error(`integrity_check_failed:rows_remaining_in_${tableName}`);
     }
   }
 
-  const optionalTables = [
-    "user_daily_usage",
-    "user_usage_daily",
-    "scheduled_posts",
-  ];
-  for (const tableName of optionalTables) {
-    if (!(await tableExists(db, tableName))) {
+  const discoveredTargets = await listDiscoveredUserLinkedTargetsSafe(db, "verify_rows");
+  const staticKeySet = new Set(staticTargets.map((target) => `${target.tableName}:${target.columnName}`));
+  for (const { tableName, columnName } of discoveredTargets) {
+    if (staticKeySet.has(`${tableName}:${columnName}`)) {
       continue;
     }
-    if (await countRowsByUserId(db, tableName, userId) !== 0) {
-      throw new Error(`integrity_check_failed:rows_remaining_in_${tableName}`);
+    let rowsRemaining = 0;
+    try {
+      rowsRemaining = await countRowsByUserReference(db, tableName, columnName, userId);
+    } catch (error) {
+      logAccountDeletionEvent("deletion_discovery_verification_failed", {
+        table: tableName,
+        column: columnName,
+        reason: getErrorMessage(error),
+      }, "error");
+      continue;
     }
-  }
-
-  if (await tableExists(db, "app_threads_accounts")) {
-    const row = await runDbOperation("integrity_count:app_threads_accounts", async () =>
-      db.prepare(
-        `SELECT COUNT(*) AS total
-         FROM app_threads_accounts
-         WHERE app_user_id = ?`,
-      )
-        .bind(userId)
-        .first(),
-    );
-    if (Number(row?.total ?? 0) !== 0) {
-      throw new Error("integrity_check_failed:rows_remaining_in_app_threads_accounts");
+    if (rowsRemaining !== 0) {
+      logAccountDeletionEvent("deletion_discovery_rows_remaining", {
+        table: tableName,
+        column: columnName,
+        rows_remaining: rowsRemaining,
+      }, "error");
     }
   }
 }
@@ -392,10 +519,10 @@ async function countOrphansByUserReference(db, tableName, userIdColumn, userId) 
   const row = await runDbOperation(`integrity_orphan_count:${tableName}`, async () =>
     db.prepare(
       `SELECT COUNT(*) AS total
-       FROM ${tableName} t
+       FROM ${quoteIdentifier(tableName)} t
        LEFT JOIN users u
-         ON u.id = t.${userIdColumn}
-       WHERE t.${userIdColumn} = ?
+         ON u.id = t.${quoteIdentifier(userIdColumn)}
+       WHERE t.${quoteIdentifier(userIdColumn)} = ?
          AND u.id IS NULL`,
     )
       .bind(userId)
@@ -406,21 +533,37 @@ async function countOrphansByUserReference(db, tableName, userIdColumn, userId) 
 }
 
 async function assertNoOrphanedUserReferences(db, userId) {
-  const orphanTargets = [
-    ["sessions", "user_id"],
-    ["oauth_accounts", "user_id"],
-    ["email_verification_tokens", "user_id"],
-    ["password_reset_tokens", "user_id"],
-    ["user_daily_usage", "user_id"],
-    ["user_usage_daily", "user_id"],
-    ["scheduled_posts", "user_id"],
-    ["app_threads_accounts", "app_user_id"],
-  ];
-
-  for (const [tableName, userIdColumn] of orphanTargets) {
-    const orphanCount = await countOrphansByUserReference(db, tableName, userIdColumn, userId);
+  const staticTargets = await listStaticExistingUserLinkedTargets(db);
+  for (const { tableName, columnName } of staticTargets) {
+    const orphanCount = await countOrphansByUserReference(db, tableName, columnName, userId);
     if (orphanCount !== 0) {
       throw new Error(`integrity_check_failed:orphaned_rows_in_${tableName}`);
+    }
+  }
+
+  const discoveredTargets = await listDiscoveredUserLinkedTargetsSafe(db, "verify_orphans");
+  const staticKeySet = new Set(staticTargets.map((target) => `${target.tableName}:${target.columnName}`));
+  for (const { tableName, columnName } of discoveredTargets) {
+    if (staticKeySet.has(`${tableName}:${columnName}`)) {
+      continue;
+    }
+    let orphanCount = 0;
+    try {
+      orphanCount = await countOrphansByUserReference(db, tableName, columnName, userId);
+    } catch (error) {
+      logAccountDeletionEvent("deletion_discovery_orphan_check_failed", {
+        table: tableName,
+        column: columnName,
+        reason: getErrorMessage(error),
+      }, "error");
+      continue;
+    }
+    if (orphanCount !== 0) {
+      logAccountDeletionEvent("deletion_discovery_orphans_remaining", {
+        table: tableName,
+        column: columnName,
+        orphan_count: orphanCount,
+      }, "error");
     }
   }
 }
@@ -642,6 +785,9 @@ export async function deleteAccount(request, env) {
     });
     await runOptionalCleanup("scheduled_posts", async () => {
       await deleteByUserIdIfTableExists(db, "scheduled_posts", user.id);
+    });
+    await runOptionalCleanup("discovered_user_linked_cleanup", async () => {
+      await cleanupDiscoveredUserLinkedRows(db, user.id);
     });
 
     await runDbOperation("deletion_tombstones_insert", async () =>
