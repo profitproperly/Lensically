@@ -3,6 +3,9 @@ import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../src";
 import authSchema from "../db/auth_schema.sql?raw";
+import accountDeletionGuardsMigration from "../migrations/account_deletion_guards.sql?raw";
+import limitsMigration from "../migrations/limits.sql?raw";
+import usageDailyMigration from "../migrations/usage_daily.sql?raw";
 import {
   createDeletionTombstones,
   evaluateIdentityAccess,
@@ -14,6 +17,19 @@ const schemaSql = authSchema
   .join("\n")
   .replace(/^\s+/, "")
   .replace(/\r?\n+/g, " ");
+
+function normalizeSqlScript(script: string): string {
+  return script
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n")
+    .replace(/^\s+/, "")
+    .replace(/\r?\n+/g, " ");
+}
+
+const accountDeletionGuardsSql = normalizeSqlScript(accountDeletionGuardsMigration);
+const limitsSql = normalizeSqlScript(limitsMigration);
+const usageDailySql = normalizeSqlScript(usageDailyMigration);
 
 const resetStatements = `
   DELETE FROM sessions;
@@ -646,6 +662,16 @@ describe("account deletion deduplication", () => {
       message: "Account has been permanently deleted",
     });
 
+    const completedGuard = await env.DB.prepare(
+      `SELECT status
+       FROM account_deletion_guards
+       WHERE session_token = ?
+       LIMIT 1`,
+    )
+      .bind("session-token-1")
+      .first<{ status: string }>();
+    expect(completedGuard?.status).toBe("completed");
+
     const secondResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
       method: "POST",
       headers: {
@@ -942,5 +968,128 @@ describe("account lifecycle enforcement", () => {
       allowed: false,
       reason: "banned",
     });
+  });
+});
+
+describe("database integrity safeguards", () => {
+  it("prevents orphaned usage and scheduling rows and cleans them up on user deletion", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(usageDailySql);
+
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-integrity-1", "integrity-1@example.com", await bcrypt.hash("pw", 4))
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO user_usage_daily (user_id, date)
+       VALUES (?, ?)`,
+    )
+      .bind("user-integrity-1", "2026-03-12")
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO user_daily_usage (user_id, date)
+       VALUES (?, ?)`,
+    )
+      .bind("user-integrity-1", "2026-03-12")
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, post_text, scheduled_time)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-integrity-1", "hello", "2026-03-12T12:00:00Z")
+      .run();
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_usage_daily (user_id, date)
+         VALUES (?, ?)`,
+      )
+        .bind("missing-user", "2026-03-12")
+        .run(),
+    ).rejects.toThrow();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_daily_usage (user_id, date)
+         VALUES (?, ?)`,
+      )
+        .bind("missing-user", "2026-03-12")
+        .run(),
+    ).rejects.toThrow();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO scheduled_posts (user_id, post_text, scheduled_time)
+         VALUES (?, ?, ?)`,
+      )
+        .bind("missing-user", "orphan", "2026-03-12T13:00:00Z")
+        .run(),
+    ).rejects.toThrow();
+
+    await env.DB.prepare("DELETE FROM users WHERE id = ?")
+      .bind("user-integrity-1")
+      .run();
+
+    const usageDailyCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM user_usage_daily WHERE user_id = ?",
+    )
+      .bind("user-integrity-1")
+      .first<{ total: number }>();
+    const legacyUsageCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM user_daily_usage WHERE user_id = ?",
+    )
+      .bind("user-integrity-1")
+      .first<{ total: number }>();
+    const scheduledCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM scheduled_posts WHERE user_id = ?",
+    )
+      .bind("user-integrity-1")
+      .first<{ total: number }>();
+
+    expect(Number(usageDailyCount?.total ?? 0)).toBe(0);
+    expect(Number(legacyUsageCount?.total ?? 0)).toBe(0);
+    expect(Number(scheduledCount?.total ?? 0)).toBe(0);
+  });
+
+  it("keeps completed-session deletion guards after user deletion for idempotent retries", async () => {
+    await env.DB.exec(accountDeletionGuardsSql);
+
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-integrity-2", "integrity-2@example.com", await bcrypt.hash("pw", 4))
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO account_deletion_guards (session_token, user_id, status, created_at, updated_at)
+       VALUES (?, ?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    )
+      .bind("guard-session-1", "user-integrity-2")
+      .run();
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO account_deletion_guards (session_token, user_id, status, created_at, updated_at)
+         VALUES (?, ?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      )
+        .bind("guard-session-missing", "missing-user")
+        .run(),
+    ).rejects.toThrow();
+
+    await env.DB.prepare("DELETE FROM users WHERE id = ?")
+      .bind("user-integrity-2")
+      .run();
+
+    const guardRow = await env.DB.prepare(
+      `SELECT status
+       FROM account_deletion_guards
+       WHERE session_token = ?
+       LIMIT 1`,
+    )
+      .bind("guard-session-1")
+      .first<{ status: string }>();
+    expect(guardRow?.status).toBe("in_progress");
   });
 });

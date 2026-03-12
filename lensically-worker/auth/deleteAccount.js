@@ -205,6 +205,44 @@ async function ensureAccountDeletionGuardsTable(db) {
       )`,
     ).run(),
   );
+
+  await runDbOperation("guard_trigger_ensure_insert", async () =>
+    db.prepare(
+      `CREATE TRIGGER IF NOT EXISTS trg_account_deletion_guards_user_exists_insert
+       BEFORE INSERT ON account_deletion_guards
+       FOR EACH ROW
+       WHEN NOT EXISTS (
+         SELECT 1
+         FROM users
+         WHERE id = NEW.user_id
+       )
+       BEGIN
+         SELECT RAISE(ABORT, 'foreign_key_violation:account_deletion_guards.user_id');
+       END`,
+    ).run(),
+  );
+
+  await runDbOperation("guard_trigger_ensure_update", async () =>
+    db.prepare(
+      `CREATE TRIGGER IF NOT EXISTS trg_account_deletion_guards_user_exists_update
+       BEFORE UPDATE OF user_id ON account_deletion_guards
+       FOR EACH ROW
+       WHEN NOT EXISTS (
+         SELECT 1
+         FROM users
+         WHERE id = NEW.user_id
+       )
+       BEGIN
+         SELECT RAISE(ABORT, 'foreign_key_violation:account_deletion_guards.user_id');
+       END`,
+    ).run(),
+  );
+
+  await runDbOperation("guard_trigger_drop_cleanup", async () =>
+    db.prepare(
+      "DROP TRIGGER IF EXISTS trg_account_deletion_guards_user_cleanup",
+    ).run(),
+  );
 }
 
 async function getDeletionGuard(db, sessionToken) {

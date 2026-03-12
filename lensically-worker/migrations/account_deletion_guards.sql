@@ -9,3 +9,27 @@ CREATE TABLE IF NOT EXISTS account_deletion_guards (
 
 CREATE INDEX IF NOT EXISTS idx_account_deletion_guards_user_id
   ON account_deletion_guards (user_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_account_deletion_guards_user_exists_insert
+BEFORE INSERT ON account_deletion_guards
+FOR EACH ROW
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM users
+  WHERE id = NEW.user_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'foreign_key_violation:account_deletion_guards.user_id');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_account_deletion_guards_user_exists_update
+BEFORE UPDATE OF user_id ON account_deletion_guards
+FOR EACH ROW
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM users
+  WHERE id = NEW.user_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'foreign_key_violation:account_deletion_guards.user_id');
+END;
