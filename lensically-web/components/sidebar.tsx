@@ -29,8 +29,12 @@ const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 
 export function Sidebar() {
   const pathname = usePathname();
+  const currentPath = String(pathname ?? "");
+  const isActivePath = (href: string) => currentPath === String(href);
   const { user } = useAuth();
-  const isConnectPage = pathname === "/connect";
+  const isConnectPage = isActivePath("/connect");
+  const isAccountPage = isActivePath("/account");
+  const showThreadsProfile = !isConnectPage && !isAccountPage;
   const appUserId = user?.id?.trim() ?? "";
   const cachedProfile = appUserId ? readThreadsProfileCache(appUserId) : null;
   const [username, setUsername] = useState<string>("unknown");
@@ -39,7 +43,7 @@ export function Sidebar() {
   const displayProfilePictureUrl = profilePictureUrl ?? cachedProfile?.account?.threads_profile_picture_url ?? null;
 
   useEffect(() => {
-    if (isConnectPage || !appUserId) {
+    if (!showThreadsProfile || !appUserId) {
       return;
     }
 
@@ -65,11 +69,11 @@ export function Sidebar() {
     };
 
     void loadProfile();
-  }, [appUserId, isConnectPage]);
+  }, [appUserId, showThreadsProfile]);
 
   return (
     <aside className="sticky top-16 h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
-      {!isConnectPage && (
+      {showThreadsProfile && (
         <div className="flex flex-col items-center w-full mt-6 mb-8">
           <div className="relative group cursor-pointer">
             <a
@@ -111,23 +115,37 @@ export function Sidebar() {
         {links.map((link) => (
           <div key={link.href} className="px-4">
             {isConnectPage ? (
-              <button
-                type="button"
-                className={[
-                  "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left",
-                  pathname === link.href
-                    ? "bg-black text-white"
-                    : "text-black hover:bg-black hover:text-white",
-                ].join(" ")}
-              >
-                {link.label}
-              </button>
+              link.href === "/account" ? (
+                <Link
+                  href={link.href}
+                  className={[
+                    "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
+                    isActivePath(link.href)
+                      ? "bg-black text-white"
+                      : "text-black hover:bg-black hover:text-white",
+                  ].join(" ")}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className={[
+                    "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left",
+                    isActivePath(link.href)
+                      ? "bg-black text-white"
+                      : "text-black hover:bg-black hover:text-white",
+                  ].join(" ")}
+                >
+                  {link.label}
+                </button>
+              )
             ) : (
               <Link
                 href={link.href}
                 className={[
                   "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
-                  pathname === link.href
+                  isActivePath(link.href)
                     ? "bg-black text-white"
                     : "text-black hover:bg-black hover:text-white",
                 ].join(" ")}
