@@ -2906,6 +2906,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       };
 
       const accountPayload = {
+        threads_user_id: account.threads_user_id,
         name: meJson.name ?? null,
         username: meJson.username ?? null,
         threads_biography: meJson.threads_biography ?? null,
