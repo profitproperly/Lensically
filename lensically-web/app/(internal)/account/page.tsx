@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteAccount } from "@/lib/authClient";
+import { deleteAccount, disconnectThreadsAccount } from "@/lib/authClient";
 import { useAuth } from "@/lib/AuthProvider";
 
 export default function AccountPage() {
@@ -16,7 +17,30 @@ export default function AccountPage() {
   const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [providerError, setProviderError] = useState("");
+  const [providerSuccessMessage, setProviderSuccessMessage] = useState("");
+  const [isDisconnectingProvider, setIsDisconnectingProvider] = useState(false);
   const deletePhraseConfirmed = deleteConfirmationText === deletePhrase;
+
+  async function handleDisconnectThreadsProvider() {
+    if (!user || isDisconnectingProvider) {
+      return;
+    }
+
+    setIsDisconnectingProvider(true);
+    setProviderError("");
+    setProviderSuccessMessage("");
+
+    try {
+      await disconnectThreadsAccount(user.id);
+      setProviderSuccessMessage("Threads provider has been disconnected.");
+      router.refresh();
+    } catch (err) {
+      setProviderError(err instanceof Error ? err.message : "Could not disconnect Threads provider.");
+    } finally {
+      setIsDisconnectingProvider(false);
+    }
+  }
 
   async function handleDeleteAccount() {
     if (!user || isDeleting) {
@@ -110,6 +134,36 @@ export default function AccountPage() {
             </a>
             .
           </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Connected Providers</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Manage account-linked provider connections from this account settings area.
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/connect"
+            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Open provider connections
+          </Link>
+          <button
+            type="button"
+            onClick={() => void handleDisconnectThreadsProvider()}
+            disabled={isDisconnectingProvider}
+            className="inline-flex cursor-pointer rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isDisconnectingProvider ? "Disconnecting Threads..." : "Disconnect Threads"}
+          </button>
+        </div>
+
+        {(providerError || providerSuccessMessage) ? (
+          <p className={`mt-4 text-sm ${providerError ? "text-red-600" : "text-green-700"}`}>
+            {providerError || providerSuccessMessage}
+          </p>
         ) : null}
       </section>
 
