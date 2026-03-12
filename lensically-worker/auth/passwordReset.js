@@ -17,23 +17,8 @@ const DEFAULT_APP_URL = "https://app.lensically.com";
 const GENERIC_RESET_REQUEST_MESSAGE = "If the account is eligible, password reset instructions will be sent.";
 const GENERIC_RESET_TOKEN_ERROR = "Invalid or expired reset token.";
 
-function isTestMode(env) {
-  const runtimeModeCandidates = [
-    env?.NODE_ENV,
-    env?.APP_ENV,
-    env?.ENVIRONMENT,
-    typeof process !== "undefined" ? process.env?.NODE_ENV : undefined,
-    typeof process !== "undefined" ? process.env?.VITEST : undefined,
-  ];
-
-  return runtimeModeCandidates.some((value) => {
-    if (typeof value !== "string") {
-      return false;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    return normalized === "test" || normalized === "true";
-  });
+function isProductionEnvironment(env) {
+  return env?.ENVIRONMENT === "production";
 }
 
 function genericResetTokenErrorResponse() {
@@ -112,17 +97,22 @@ export async function forgotPassword(request, env) {
 <p>Use the link below to set a new password:</p>
 <p><a href="${resetUrl}">Reset password</a></p>`;
 
-    try {
-      if (!isTestMode(env)) {
-        await sendEmail(env, user.email, subject, html);
-      }
-      logAuthEvent("forgot_password_email_queued", { account_found: true });
-    } catch (error) {
-      logAuthEvent("forgot_password_email_queued", {
+    if (!isProductionEnvironment(env)) {
+      logAuthEvent("forgot_password_email_skipped", {
         account_found: true,
-        email_dispatch_succeeded: false,
-        detail: error instanceof Error ? error.message : String(error),
+        reason: "non_production_environment",
       });
+    } else {
+      try {
+        await sendEmail(env, user.email, subject, html);
+        logAuthEvent("forgot_password_email_queued", { account_found: true });
+      } catch (error) {
+        logAuthEvent("forgot_password_email_queued", {
+          account_found: true,
+          email_dispatch_succeeded: false,
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   } else {
     logAuthEvent("forgot_password_email_queued", { account_found: false });
