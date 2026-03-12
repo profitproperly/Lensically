@@ -9,6 +9,7 @@ import {
   validatePassword,
 } from "./validation.js";
 import { logAccountDeletionEvent } from "./operationalLog.js";
+import { createDeletionTombstones } from "./identityControl.js";
 
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
@@ -421,6 +422,23 @@ export async function deleteAccount(request, env) {
   });
 
   try {
+    const oauthIdentities = await runDbOperation("oauth_identities_select", async () =>
+      db.prepare(
+        `SELECT provider, provider_user_id
+         FROM oauth_accounts
+         WHERE user_id = ?`,
+      )
+        .bind(user.id)
+        .all(),
+    );
+
+    await runDbOperation("deletion_tombstones_insert", async () =>
+      createDeletionTombstones(db, {
+        email: user.email,
+        oauthIdentities: oauthIdentities.results ?? [],
+      }),
+    );
+
     // Delete required child rows before deleting users to avoid FK/runtime failures.
     await deleteByUserId(db, "sessions", user.id);
     await deleteByUserId(db, "oauth_accounts", user.id);

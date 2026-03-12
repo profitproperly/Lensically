@@ -10,6 +10,7 @@ import {
   validatePassword,
 } from "./validation.js";
 import { logAuthEvent } from "./operationalLog.js";
+import { evaluateIdentityAccess } from "./identityControl.js";
 
 const GENERIC_LOGIN_ERROR = "Invalid email or password.";
 const FAILED_LOGIN_ROUTE = "login-failed";
@@ -163,6 +164,20 @@ export async function login(request, env) {
   if (emailError) {
     logAuthEvent("login_rejected", { reason: "invalid_email" });
     return json({ success: false, error: emailError }, 400);
+  }
+
+  const identityAccess = await evaluateIdentityAccess(env.DB, [
+    { type: "email", value: email },
+  ]);
+  if (!identityAccess.allowed && identityAccess.reason === "banned") {
+    logAuthEvent("login_rejected", {
+      reason: "identity_banned",
+      identity_type: identityAccess.identity?.type ?? "email",
+    });
+    return json({
+      success: false,
+      error: "This identity is not allowed to authenticate.",
+    }, 403);
   }
 
   const passwordError = validatePassword(password, "Email and password are required");

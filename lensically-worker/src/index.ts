@@ -20,6 +20,7 @@ import {
 } from "../auth/cookies.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
+import { evaluateIdentityAccess } from "../auth/identityControl.js";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -1387,6 +1388,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           return redirectToAuthError("account_lookup_failed");
         }
 
+        const identityAccess = await evaluateIdentityAccess(env.DB, [
+          { type: provider, value: identity.providerUserId },
+          { type: "email", value: identity.email ?? "" },
+        ]);
+        if (!identityAccess.allowed) {
+          return redirectToAuthError(
+            identityAccess.reason === "banned" ? "identity_banned" : "identity_recently_deleted",
+          );
+        }
+
         const user = await getOrCreateOauthUser(
           env,
           provider,
@@ -1970,6 +1981,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       logWorkerEvent("THREADS_ME_REQUEST_RECEIVED", {
         appUserId,
@@ -1979,6 +2002,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           JSON.stringify({ error: "Missing app_user_id" }),
           {
             status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
             headers: {
               "Content-Type": "application/json",
               ...requestCorsHeaders,
@@ -2526,6 +2561,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/post-insights" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const mediaId = url.searchParams.get("id");
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!mediaId) {
@@ -2543,6 +2590,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           JSON.stringify({ error: "missing app_user_id" }),
           {
             status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
@@ -2579,12 +2635,33 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/user-insights" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!appUserId) {
         return new Response(
           JSON.stringify({ error: "missing app_user_id" }),
           {
             status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
@@ -2651,6 +2728,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return new Response(
           JSON.stringify({ error: "missing app_user_id" }),
           { status: 400 },
+        );
+      }
+      if (authUser.id !== appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
         );
       }
 
@@ -2825,9 +2911,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
+      await ensureAppThreadsTable(env);
+
       const rows = await env.DB.prepare(
-        `SELECT threads_user_id, access_token, expires_at
-         FROM threads_accounts`,
+        `SELECT DISTINCT t.threads_user_id, t.access_token, t.expires_at
+         FROM threads_accounts t
+         JOIN app_threads_accounts a
+           ON a.threads_user_id = t.threads_user_id
+         JOIN users u
+           ON u.id = a.app_user_id`,
       ).all<{ threads_user_id: string; access_token: string; expires_at: number }>();
 
       const now = Math.floor(Date.now() / 1000);
@@ -2889,9 +2981,17 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     const now = Math.floor(Date.now() / 1000);
     const threshold = now + (7 * 24 * 60 * 60);
 
+    await ensureAppThreadsTable(env);
+
     const rows = await env.DB
       .prepare(
-        "SELECT threads_user_id, access_token FROM threads_accounts WHERE expires_at <= ?",
+        `SELECT DISTINCT t.threads_user_id, t.access_token
+         FROM threads_accounts t
+         JOIN app_threads_accounts a
+           ON a.threads_user_id = t.threads_user_id
+         JOIN users u
+           ON u.id = a.app_user_id
+         WHERE t.expires_at <= ?`,
       )
       .bind(threshold)
       .all<{ threads_user_id: string; access_token: string }>();

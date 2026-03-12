@@ -21,6 +21,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   state_mismatch: "Session verification failed.",
   token_exchange_failed: "Authentication failed. Please try again.",
   account_lookup_failed: "Could not load account details.",
+  identity_banned: "This identity is not allowed to authenticate.",
+  identity_recently_deleted: "This identity is temporarily unavailable. Please try again later.",
   unexpected: "OAuth login failed.",
 }
 

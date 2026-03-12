@@ -1,8 +1,9 @@
 import { getSessionCookieValue } from "./sessions.js";
+import { evaluateIdentityAccess } from "./identityControl.js";
 
-function unauthorized(message = "Unauthorized") {
+function unauthorized(message = "Unauthorized", status = 401) {
   return new Response(JSON.stringify({ error: message }), {
-    status: 401,
+    status,
     headers: { "Content-Type": "application/json" },
   });
 }
@@ -36,6 +37,13 @@ export async function requireAuth(request, env) {
 
   if (new Date(row.expires_at) < new Date()) {
     return unauthorized("Session expired");
+  }
+
+  const identityAccess = await evaluateIdentityAccess(env.DB, [
+    { type: "email", value: row.email },
+  ]);
+  if (!identityAccess.allowed && identityAccess.reason === "banned") {
+    return unauthorized("Account access is restricted.", 403);
   }
 
   return {

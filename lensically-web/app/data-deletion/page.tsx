@@ -93,6 +93,11 @@ export default function DataDeletionPage() {
               <li key={item}>{item}</li>
             ))}
           </ul>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            Account deletion disables access immediately. For security, fraud prevention, and abuse
+            prevention, Lensically may retain limited identifiers for up to 7 days before those
+            retained identifiers expire.
+          </p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

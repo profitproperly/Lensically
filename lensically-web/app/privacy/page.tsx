@@ -114,6 +114,11 @@ export default function PrivacyPage() {
             tracking records, and scheduled posts.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
+            For security, fraud prevention, and abuse prevention, Lensically may temporarily retain
+            limited account identifiers (such as account email address and provider account
+            identifiers) for up to 7 days after deletion before those retained identifiers expire.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
             Public deletion instructions are available at{" "}
             <Link href="/data-deletion" className="font-medium text-slate-900 underline">
               https://lensically.com/data-deletion

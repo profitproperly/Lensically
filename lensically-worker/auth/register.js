@@ -9,6 +9,7 @@ import {
   validatePassword,
 } from "./validation.js";
 import { logAuthEvent } from "./operationalLog.js";
+import { evaluateIdentityAccess } from "./identityControl.js";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -128,6 +129,22 @@ export async function register(request, env) {
   if (emailError) {
     logAuthEvent("register_rejected", { reason: "invalid_email" });
     return json({ success: false, error: emailError }, 400);
+  }
+
+  const identityAccess = await evaluateIdentityAccess(env.DB, [
+    { type: "email", value: email },
+  ]);
+  if (!identityAccess.allowed) {
+    logAuthEvent("register_rejected", {
+      reason: identityAccess.reason === "banned" ? "identity_banned" : "identity_tombstoned",
+      identity_type: identityAccess.identity?.type ?? "email",
+    });
+    return json({
+      success: false,
+      error: identityAccess.reason === "banned"
+        ? "This identity is not allowed to create an account."
+        : "This identity is temporarily unavailable. Please try again later.",
+    }, 403);
   }
 
   const passwordError = validatePassword(password, "Email and password are required");

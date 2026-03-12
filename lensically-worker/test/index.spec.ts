@@ -3,6 +3,10 @@ import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../src";
 import authSchema from "../db/auth_schema.sql?raw";
+import {
+  createDeletionTombstones,
+  evaluateIdentityAccess,
+} from "../auth/identityControl.js";
 
 const schemaSql = authSchema
   .split("\n")
@@ -18,6 +22,8 @@ const resetStatements = `
   DELETE FROM password_reset_tokens;
   DELETE FROM auth_rate_limits;
   DELETE FROM account_deletion_guards;
+  DELETE FROM account_deletion_tombstones;
+  DELETE FROM banned_identities;
   DELETE FROM users;
 `
   .split(";")
@@ -489,6 +495,226 @@ describe("account deletion deduplication", () => {
     await expect(secondResponse.json()).resolves.toMatchObject({
       success: true,
       message: "Account deletion already processed",
+    });
+  });
+});
+
+describe("account lifecycle enforcement", () => {
+  it("invalidates existing sessions, blocks password login, and denies authenticated API access after deletion", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const beforeDeleteMe = await runWorker(new Request("https://api.lensically.com/api/auth/me", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+    expect(beforeDeleteMe.status).toBe(200);
+
+    const deleteResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        password: "correct-password",
+      }),
+    }));
+    expect(deleteResponse.status).toBe(200);
+
+    const afterDeleteMe = await runWorker(new Request("https://api.lensically.com/api/auth/me", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+    expect(afterDeleteMe.status).toBe(401);
+
+    const loginAfterDelete = await runWorker(new Request("https://api.lensically.com/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: "auth@example.com",
+        password: "correct-password",
+      }),
+    }));
+    expect(loginAfterDelete.status).toBe(401);
+
+    const deletedApiAccess = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+    expect(deletedApiAccess.status).toBe(401);
+
+    const sessionsCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM sessions WHERE user_id = ?")
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+    expect(Number(sessionsCount?.total ?? 0)).toBe(0);
+
+    const oauthCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM oauth_accounts WHERE user_id = ?")
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+    expect(Number(oauthCount?.total ?? 0)).toBe(0);
+
+    const tombstoneCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM account_deletion_tombstones WHERE identity_type = ? AND identity_value = ?",
+    )
+      .bind("email", "auth@example.com")
+      .first<{ total: number }>();
+    expect(Number(tombstoneCount?.total ?? 0)).toBeGreaterThan(0);
+  });
+
+  it("blocks OAuth identity recreation during tombstone retention and allows it after expiry", async () => {
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, NULL, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-oauth", "oauth-user@example.com")
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, created_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    )
+      .bind("oauth-link-1", "user-oauth", "google", "google-subject-123")
+      .run();
+
+    await createDeletionTombstones(env.DB, {
+      email: "oauth-user@example.com",
+      oauthIdentities: [{ provider: "google", provider_user_id: "google-subject-123" }],
+    });
+
+    const blockedSignupDuringWindow = await runWorker(new Request("https://api.lensically.com/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "oauth-user@example.com",
+        password: "new-password-123",
+      }),
+    }));
+    expect(blockedSignupDuringWindow.status).toBe(403);
+
+    const blockedDuringWindow = await evaluateIdentityAccess(env.DB, [
+      { type: "google", value: "google-subject-123" },
+      { type: "email", value: "oauth-user@example.com" },
+    ]);
+    expect(blockedDuringWindow).toMatchObject({
+      allowed: false,
+      reason: "tombstone",
+    });
+
+    await env.DB.prepare(
+      `UPDATE account_deletion_tombstones
+       SET expires_at = ?
+       WHERE identity_type IN ('email', 'google')`,
+    )
+      .bind(new Date(Date.now() - 60_000).toISOString())
+      .run();
+
+    const allowedAfterExpiry = await evaluateIdentityAccess(env.DB, [
+      { type: "google", value: "google-subject-123" },
+      { type: "email", value: "oauth-user@example.com" },
+    ]);
+    expect(allowedAfterExpiry).toMatchObject({
+      allowed: true,
+    });
+
+    await env.DB.prepare("DELETE FROM users WHERE id = ?")
+      .bind("user-oauth")
+      .run();
+
+    const signupAfterExpiry = await runWorker(new Request("https://api.lensically.com/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "oauth-user@example.com",
+        password: "new-password-123",
+      }),
+    }));
+    expect(signupAfterExpiry.status).toBe(200);
+  });
+
+  it("rejects banned identities for signup and login even after account deletion", async () => {
+    await env.DB.prepare(
+      `INSERT INTO banned_identities (
+        id, identity_type, identity_value, reason, created_at, expires_at, created_by
+      )
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, ?)`,
+    )
+      .bind(
+        "ban-email-1",
+        "email",
+        "banned@example.com",
+        "abuse",
+        "test-suite",
+      )
+      .run();
+
+    const signupResponse = await runWorker(new Request("https://api.lensically.com/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "banned@example.com",
+        password: "password-123",
+      }),
+    }));
+    expect(signupResponse.status).toBe(403);
+
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-banned-login", "banned@example.com", await bcrypt.hash("correct-password", 4))
+      .run();
+
+    const loginResponse = await runWorker(new Request("https://api.lensically.com/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "banned@example.com",
+        password: "correct-password",
+      }),
+    }));
+    expect(loginResponse.status).toBe(403);
+
+    await env.DB.prepare("DELETE FROM users WHERE id = ?")
+      .bind("user-banned-login")
+      .run();
+
+    const signupAfterDeletion = await runWorker(new Request("https://api.lensically.com/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "banned@example.com",
+        password: "password-123",
+      }),
+    }));
+    expect(signupAfterDeletion.status).toBe(403);
+
+    const bannedOauthIdentity = await evaluateIdentityAccess(env.DB, [
+      { type: "google", value: "google-banned-subject" },
+    ]);
+    expect(bannedOauthIdentity.allowed).toBe(true);
+
+    await env.DB.prepare(
+      `INSERT INTO banned_identities (
+        id, identity_type, identity_value, reason, created_at, expires_at, created_by
+      )
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, ?)`,
+    )
+      .bind(
+        "ban-google-1",
+        "google",
+        "google-banned-subject",
+        "abuse",
+        "test-suite",
+      )
+      .run();
+
+    const nowBannedOauthIdentity = await evaluateIdentityAccess(env.DB, [
+      { type: "google", value: "google-banned-subject" },
+    ]);
+    expect(nowBannedOauthIdentity).toMatchObject({
+      allowed: false,
+      reason: "banned",
     });
   });
 });

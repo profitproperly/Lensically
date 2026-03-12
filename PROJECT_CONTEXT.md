@@ -13,7 +13,7 @@ Tailwind CSS
 ## Architecture
 
 lensically-web
-Production frontend in `lensically-web`, built with Next.js App Router and deployed with OpenNext on Cloudflare. It serves the public landing page, login, signup, verify-email, forgot-password, reset-password, and public compliance pages at `/terms`, `/privacy`, and `/data-deletion`, plus authenticated app routes including `/dashboard`, `/connect`, `/insights`, `/account`, `/discovery`, `/search`, and `/schedule`. Session state is driven by `AuthProvider`; authenticated account settings include guarded account deletion flows for password and OAuth users, and the landing page can show a post-deletion confirmation banner via `?accountDeleted=1`.
+Production frontend in `lensically-web`, built with Next.js App Router and deployed with OpenNext on Cloudflare. It serves the public landing page, login, signup, verify-email, forgot-password, reset-password, and public compliance pages at `/terms`, `/privacy`, and `/data-deletion`, plus authenticated app routes including `/dashboard`, `/connect`, `/insights`, `/account`, `/discovery`, `/search`, and `/schedule`. Session state is driven by `AuthProvider`; the shared `(internal)` layout now centrally gates authenticated routes with login redirect behavior and a session-expired re-auth prompt. Auth flows also use centralized safe user-facing error mapping to avoid exposing technical transport/runtime failures.
 
 lensically-worker
 Production backend in `lensically-worker`, implemented as a Cloudflare Worker with D1-backed auth and Threads integration. It owns email/password auth, secure session cookies, current-user lookup, email verification, password reset, account deletion, Google/GitHub/Discord OAuth login, Threads OAuth connection, Threads disconnect, Meta Threads deletion and uninstall callbacks, usage enforcement, profile lookup, keyword search, post publishing, insights fetches, and token refresh handling. Auth request validation, D1-backed auth rate limiting, centralized safe error handling, and sanitized operational logging are part of the worker surface. Auth and OAuth origin handling are centralized through `APP_URL`, `ROOT_SITE_URL`, and `WORKER_ORIGIN`.
@@ -61,6 +61,7 @@ Usage limits and admin-aware limit enforcement
 Auth endpoint rate limiting, strict request validation, and centralized safe error handling
 Sanitized operational logging for auth, email, account deletion, and worker error paths
 Authenticated account deletion with password re-auth for password users and explicit DELETE confirmation text for OAuth-only users
+Centralized internal-route authentication gating with session-expired re-auth prompts
 Public homepage, terms of service, privacy policy, and data deletion instructions
 Reviewer guide for OAuth/provider verification
 In-product Google OAuth privacy disclosures on login, signup, and OAuth-only account settings
@@ -70,16 +71,16 @@ The authenticated dashboard and insights flow are wired to live Threads APIs. `/
 
 ## Recent Changes (Git History)
 
+- feat(auth): enforce centralized internal route auth gating and safe error messaging
+- feat(auth-ui): add password reset success banner and session-expired state in account page
+- feat(account): centralize account management and provider controls on account page
+- compliance: verify public access and homepage links for privacy, terms, and data deletion pages
+- docs: standardize OAuth provider branding references and verification checklist
+- security: minimize OAuth scopes for Google and GitHub providers
+- security: enforce production-only OAuth redirect URIs and remove legacy dev redirects
+- feat(security): add IP-based failed login throttle with cooldown protection
+- feat(security): normalize auth failure responses to prevent account enumeration
 - feat(security): add centralized log sanitization to prevent sensitive data exposure
-- feat(logging): add structured operational logging for auth, email, and account deletion events
-- feat(security): add centralized worker error handling and safe response boundary
-- fix(security): remove generated file containing secrets and ignore .open-next build artifacts
-- feat(security): sanitize OAuth errors and remove token exposure paths from logs
-- feat(security): add session-scoped guard to prevent duplicate account deletion execution
-- feat(security): add strict request validation for auth and account endpoints
-- feat(security): enforce authenticated user ownership on Threads mutation endpoints
-- feat(security): enforce secure session cookies with __Host prefix and centralized cookie helpers
-- feat(security): add auth endpoint rate limiting with D1-backed limiter
 
 ## Current Objective
-Harden the production authentication and Threads integration surfaces with safer request handling, sanitized observability, and regression-resistant account lifecycle behavior while keeping provider-facing compliance routes aligned.
+Keep production authentication and account lifecycle behavior regression-resistant while finishing internal product-route maturity (`/discovery`, `/search`, `/schedule`) and preserving provider-facing compliance consistency.

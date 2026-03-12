@@ -88,6 +88,10 @@ export default function TermsPage() {
             implemented deletion flow.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
+            Accounts that violate platform rules may be suspended or permanently banned. Banned
+            identities may be prevented from creating new accounts or accessing the service.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
             Privacy practices are described at{" "}
             <Link href="/privacy" className="font-medium text-slate-900 underline">
               https://lensically.com/privacy
