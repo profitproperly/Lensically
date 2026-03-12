@@ -4,6 +4,7 @@ import {
   getAuthRateLimitHeaders,
   type AuthRateLimitRoute,
 } from "./utils/authRateLimit";
+import { publishTextToThreads } from "./utils/threadsPublishService";
 import { register } from "../auth/register.js";
 import { login } from "../auth/login.js";
 import { verifyEmail } from "../auth/verifyEmail.js";
@@ -818,124 +819,6 @@ async function getThreadsAccessTokenForScheduledPost(
   return row?.access_token ?? null;
 }
 
-function getPublishRequestIdFromPayload(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return null;
-  }
-
-  const response = payload as { id?: unknown };
-  return typeof response.id === "string" && response.id.trim().length > 0
-    ? response.id.trim()
-    : null;
-}
-
-type ThreadsPublishFlowResult =
-  | {
-    success: true;
-    publishRequestId: string;
-    publishedPostId: string;
-    publishResponse: unknown;
-  }
-  | {
-    success: false;
-    errorCode:
-      | "threads_publish_create_failed"
-      | "threads_publish_create_invalid_response"
-      | "threads_publish_commit_failed"
-      | "threads_publish_commit_invalid_response";
-    status?: number;
-  };
-
-async function executeThreadsPublishFlow(
-  accessToken: string,
-  threadsUserId: string,
-  text: string,
-): Promise<ThreadsPublishFlowResult> {
-  const publishCreateBody = new URLSearchParams({
-    text,
-    media_type: "TEXT",
-  });
-  const createResponse = await fetch(
-    `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body: publishCreateBody,
-    },
-  );
-  if (!createResponse.ok) {
-    return {
-      success: false,
-      errorCode: "threads_publish_create_failed",
-      status: createResponse.status,
-    };
-  }
-
-  const createPayload = await readJsonSafe(createResponse);
-  if (createPayload === null) {
-    return {
-      success: false,
-      errorCode: "threads_publish_create_invalid_response",
-    };
-  }
-
-  const publishRequestId = getPublishRequestIdFromPayload(createPayload);
-  if (!publishRequestId) {
-    return {
-      success: false,
-      errorCode: "threads_publish_create_invalid_response",
-    };
-  }
-
-  const publishCommitBody = new URLSearchParams({
-    creation_id: publishRequestId,
-  });
-  const commitResponse = await fetch(
-    `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads_publish`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body: publishCommitBody,
-    },
-  );
-  if (!commitResponse.ok) {
-    return {
-      success: false,
-      errorCode: "threads_publish_commit_failed",
-      status: commitResponse.status,
-    };
-  }
-
-  const commitPayload = await readJsonSafe(commitResponse);
-  if (commitPayload === null) {
-    return {
-      success: false,
-      errorCode: "threads_publish_commit_invalid_response",
-    };
-  }
-
-  const publishedPostId = getPublishRequestIdFromPayload(commitPayload);
-  if (!publishedPostId) {
-    return {
-      success: false,
-      errorCode: "threads_publish_commit_invalid_response",
-    };
-  }
-
-  return {
-    success: true,
-    publishRequestId,
-    publishedPostId,
-    publishResponse: commitPayload,
-  };
-}
-
 async function processScheduledPost(
   env: Env,
   post: DueScheduledPost,
@@ -963,11 +846,11 @@ async function processScheduledPost(
   }
 
   try {
-    const publishResult = await executeThreadsPublishFlow(
+    const publishResult = await publishTextToThreads({
       accessToken,
-      post.threads_user_id,
-      post.post_text,
-    );
+      threadsUserId: post.threads_user_id,
+      text: post.post_text,
+    });
     if (!publishResult.success) {
       await transitionScheduledPostStatus(
         env,
@@ -3875,11 +3758,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
       }
 
-      const publishResult = await executeThreadsPublishFlow(
-        account.access_token,
-        account.threads_user_id,
-        text,
-      );
+      let publishResult: Awaited<ReturnType<typeof publishTextToThreads>>;
+      try {
+        publishResult = await publishTextToThreads({
+          accessToken: account.access_token,
+          threadsUserId: account.threads_user_id,
+          text,
+        });
+      } catch {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
       if (!publishResult.success) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
