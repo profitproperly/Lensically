@@ -17,6 +17,19 @@ type ThreadsMeResponse = {
   account?: unknown | null;
 };
 
+function formatLoginProvider(provider: "google" | "discord" | "github" | null | undefined) {
+  if (provider === "google") {
+    return "Google";
+  }
+  if (provider === "discord") {
+    return "Discord";
+  }
+  if (provider === "github") {
+    return "GitHub";
+  }
+  return null;
+}
+
 export default function AccountPage() {
   const deletePhrase = "DELETE";
   const router = useRouter();
@@ -35,6 +48,7 @@ export default function AccountPage() {
   const [isThreadsConnected, setIsThreadsConnected] = useState(false);
   const deletePhraseConfirmed = deleteConfirmationText === deletePhrase;
   const userId = user?.id;
+  const loginProviderLabel = formatLoginProvider(user?.login_provider);
 
   useEffect(() => {
     if (!userId) {
@@ -232,6 +246,12 @@ export default function AccountPage() {
             <span className="font-medium text-slate-900">Email verified:</span>{" "}
             {user.email_verified ? "Yes" : "No"}
           </p>
+          {!user.has_password && loginProviderLabel ? (
+            <p>
+              <span className="font-medium text-slate-900">Login Provider:</span>{" "}
+              {loginProviderLabel}
+            </p>
+          ) : null}
         </div>
         {!user.has_password ? (
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">

@@ -11,6 +11,7 @@ export type CurrentUser = {
   email: string;
   email_verified: boolean;
   has_password: boolean;
+  login_provider?: "google" | "discord" | "github" | null;
 };
 
 export type DeleteAccountResponse =
