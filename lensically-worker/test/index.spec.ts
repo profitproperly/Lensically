@@ -566,6 +566,75 @@ describe("public response sanitization", () => {
   });
 });
 
+describe("scheduled post API", () => {
+  it("creates an approved scheduled post and stores UTC execution time", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-schedule-api", "token-schedule-api", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-schedule-api", now)
+      .run();
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        app_user_id: "user-authenticated",
+        threads_user_id: "threads-user-schedule-api",
+        text: "Schedule this post",
+        date: "2026-01-15",
+        time: "09:30",
+        timezone: "America/New_York",
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      scheduled_post: {
+        status: "approved",
+        scheduled_time_utc: "2026-01-15T14:30:00.000Z",
+      },
+    });
+
+    const row = await env.DB.prepare(
+      `SELECT status, scheduled_time, post_text, threads_user_id
+       FROM scheduled_posts
+       WHERE user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-authenticated")
+      .first<{
+        status: string;
+        scheduled_time: string;
+        post_text: string;
+        threads_user_id: string;
+      }>();
+
+    expect(row?.status).toBe("approved");
+    expect(row?.scheduled_time).toBe("2026-01-15T14:30:00.000Z");
+    expect(row?.post_text).toBe("Schedule this post");
+    expect(row?.threads_user_id).toBe("threads-user-schedule-api");
+  });
+});
+
 describe("auth enumeration protections", () => {
   it("returns the same login failure response for missing and unverified accounts", async () => {
     const passwordHash = await bcrypt.hash("correct-password", 4);

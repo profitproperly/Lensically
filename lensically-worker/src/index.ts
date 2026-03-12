@@ -996,6 +996,163 @@ async function readJsonSafe(response: Response): Promise<unknown | null> {
   }
 }
 
+function isValidIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isValidIsoTime(value: string): boolean {
+  return /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(value);
+}
+
+function isValidIanaTimezone(value: string): boolean {
+  try {
+    // Constructing with an invalid zone throws RangeError.
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function splitLocalDateTime(date: string, time: string): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} | null {
+  if (!isValidIsoDate(date) || !isValidIsoTime(time)) {
+    return null;
+  }
+
+  const [yearRaw, monthRaw, dayRaw] = date.split("-");
+  const [hourRaw, minuteRaw, secondRaw = "00"] = time.split(":");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  const second = Number(secondRaw);
+
+  if (
+    !Number.isInteger(year)
+    || !Number.isInteger(month)
+    || !Number.isInteger(day)
+    || !Number.isInteger(hour)
+    || !Number.isInteger(minute)
+    || !Number.isInteger(second)
+  ) {
+    return null;
+  }
+
+  const dateUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (
+    dateUtc.getUTCFullYear() !== year
+    || dateUtc.getUTCMonth() !== month - 1
+    || dateUtc.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return { year, month, day, hour, minute, second };
+}
+
+function getPartsInTimeZone(
+  timestampMs: number,
+  timeZone: string,
+): { year: number; month: number; day: number; hour: number; minute: number; second: number } | null {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(new Date(timestampMs));
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  const year = Number(values.get("year"));
+  const month = Number(values.get("month"));
+  const day = Number(values.get("day"));
+  const hour = Number(values.get("hour"));
+  const minute = Number(values.get("minute"));
+  const second = Number(values.get("second"));
+  if (
+    !Number.isInteger(year)
+    || !Number.isInteger(month)
+    || !Number.isInteger(day)
+    || !Number.isInteger(hour)
+    || !Number.isInteger(minute)
+    || !Number.isInteger(second)
+  ) {
+    return null;
+  }
+  return { year, month, day, hour, minute, second };
+}
+
+function getTimeZoneOffsetMs(timeZone: string, timestampMs: number): number | null {
+  const parts = getPartsInTimeZone(timestampMs, timeZone);
+  if (!parts) {
+    return null;
+  }
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  return asUtc - timestampMs;
+}
+
+function convertLocalDateTimeToUtcIso(
+  date: string,
+  time: string,
+  timeZone: string,
+): string | null {
+  const local = splitLocalDateTime(date, time);
+  if (!local || !isValidIanaTimezone(timeZone)) {
+    return null;
+  }
+
+  const utcGuess = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second);
+  const offsetGuess = getTimeZoneOffsetMs(timeZone, utcGuess);
+  if (offsetGuess === null) {
+    return null;
+  }
+
+  let timestampMs = utcGuess - offsetGuess;
+  const refinedOffset = getTimeZoneOffsetMs(timeZone, timestampMs);
+  if (refinedOffset === null) {
+    return null;
+  }
+  if (refinedOffset !== offsetGuess) {
+    timestampMs = utcGuess - refinedOffset;
+  }
+
+  const resolved = getPartsInTimeZone(timestampMs, timeZone);
+  if (!resolved) {
+    return null;
+  }
+  if (
+    resolved.year !== local.year
+    || resolved.month !== local.month
+    || resolved.day !== local.day
+    || resolved.hour !== local.hour
+    || resolved.minute !== local.minute
+    || resolved.second !== local.second
+  ) {
+    // Invalid local time (e.g. DST spring-forward gap) or an unresolvable input.
+    return null;
+  }
+
+  return new Date(timestampMs).toISOString();
+}
+
 function logUnhandledWorkerError(error: unknown, request: Request, path: string): void {
   logWorkerEvent("UNHANDLED_WORKER_ERROR", {
     path,
@@ -1236,6 +1393,95 @@ async function ensureAppThreadsTable(env: Env): Promise<void> {
      BEGIN
        DELETE FROM app_threads_accounts
        WHERE app_user_id = OLD.id;
+     END`,
+  ).run();
+}
+
+async function ensureScheduledPostsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS scheduled_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL CHECK (length(trim(threads_user_id)) > 0),
+      post_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('approved', 'posting', 'posted')),
+      scheduled_time TEXT NOT NULL,
+      publish_request_id TEXT,
+      published_post_id TEXT,
+      publish_error_message TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processing_started_at TEXT,
+      published_at TEXT,
+      failed_at TEXT,
+      cancelled_at TEXT,
+      last_attempted_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_due
+     ON scheduled_posts (status, scheduled_time)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_user_id
+     ON scheduled_posts (user_id)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_threads_user_id
+     ON scheduled_posts (threads_user_id)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_user_exists_insert
+     BEFORE INSERT ON scheduled_posts
+     FOR EACH ROW
+     WHEN NOT EXISTS (
+       SELECT 1
+       FROM users
+       WHERE id = NEW.user_id
+     )
+     BEGIN
+       SELECT RAISE(ABORT, 'foreign_key_violation:scheduled_posts.user_id');
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_user_exists_update
+     BEFORE UPDATE OF user_id ON scheduled_posts
+     FOR EACH ROW
+     WHEN NOT EXISTS (
+       SELECT 1
+       FROM users
+       WHERE id = NEW.user_id
+     )
+     BEGIN
+       SELECT RAISE(ABORT, 'foreign_key_violation:scheduled_posts.user_id');
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_user_cleanup
+     AFTER DELETE ON users
+     FOR EACH ROW
+     BEGIN
+       DELETE FROM scheduled_posts
+       WHERE user_id = OLD.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_touch_updated_at
+     AFTER UPDATE ON scheduled_posts
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE scheduled_posts
+       SET updated_at = CURRENT_TIMESTAMP
+       WHERE id = NEW.id;
      END`,
   ).run();
 }
@@ -3557,6 +3803,121 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         status: 200,
         headers: { "content-type": "application/json; charset=UTF-8" },
       });
+    }
+
+    if (url.pathname === "/api/threads/schedule" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      let payload: {
+        app_user_id?: string;
+        threads_user_id?: string;
+        text?: string;
+        date?: string;
+        time?: string;
+        timezone?: string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
+      const threadsUserId = payload.threads_user_id?.trim();
+      const text = payload.text?.trim();
+      const date = payload.date?.trim();
+      const time = payload.time?.trim();
+      const timezone = payload.timezone?.trim();
+
+      if (!threadsUserId || !text || !date || !time || !timezone) {
+        return new Response(
+          JSON.stringify({
+            error: "threads_user_id, text, date, time, and timezone are required",
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      if (!account?.threads_user_id || account.threads_user_id !== threadsUserId) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
+      if (!scheduledUtc) {
+        return new Response(
+          JSON.stringify({ error: "Invalid date, time, or timezone" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      await ensureScheduledPostsTable(env);
+      const insert = await env.DB.prepare(
+        `INSERT INTO scheduled_posts (
+          user_id,
+          threads_user_id,
+          post_text,
+          status,
+          scheduled_time
+        )
+        VALUES (?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          ownedAppUserId,
+          threadsUserId,
+          text,
+          SCHEDULED_POST_STATUS_APPROVED,
+          scheduledUtc,
+        )
+        .run();
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scheduled_post: {
+            id: Number(insert.meta?.last_row_id ?? 0),
+            status: SCHEDULED_POST_STATUS_APPROVED,
+            scheduled_time_utc: scheduledUtc,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
     }
 
     if (url.pathname === "/api/accounts" && request.method === "GET") {
