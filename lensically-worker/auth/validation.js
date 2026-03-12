@@ -51,7 +51,7 @@ export function rejectUnexpectedFields(body, allowedFields) {
 
   return json({
     success: false,
-    error: `Unexpected field: ${unexpectedField}`,
+    error: "Request contains unsupported fields.",
   }, 400);
 }
 

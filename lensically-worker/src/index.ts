@@ -680,7 +680,10 @@ function forbiddenJsonResponse(
   });
 }
 
-function providerFailureResponse(error: string, status = 502): Response {
+function providerFailureResponse(
+  error = "Could not complete the provider request.",
+  status = 502,
+): Response {
   return new Response(JSON.stringify({ error }), {
     status,
     headers: { "content-type": "application/json; charset=UTF-8" },
@@ -1972,7 +1975,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return new Response(
         JSON.stringify({
           status: "ok",
-          service: "lensically-worker",
           time: Math.floor(Date.now() / 1000),
         }),
         {
@@ -2028,7 +2030,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const code = url.searchParams.get("code");
       if (!code) {
         return new Response(
-          JSON.stringify({ error: "Missing OAuth code" }),
+          JSON.stringify({ error: "Could not complete Threads authorization." }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -2054,7 +2056,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
 
       if (!tokenResp.ok) {
-        return providerFailureResponse("Threads token exchange failed");
+        return providerFailureResponse("Could not complete Threads authorization.");
       }
 
       const shortTokenData = await tokenResp.json() as {
@@ -2063,7 +2065,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const shortToken = shortTokenData.access_token;
       if (!shortToken) {
         return new Response(
-          JSON.stringify({ error: "Missing short-lived access token" }),
+          JSON.stringify({ error: "Could not complete Threads authorization." }),
           {
             status: 500,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -2076,7 +2078,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
 
       if (!longResp.ok) {
-        return providerFailureResponse("Threads token upgrade failed");
+        return providerFailureResponse("Could not complete Threads authorization.");
       }
 
       const longTokenData = await longResp.json() as {
@@ -2088,7 +2090,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       if (!accessToken || !expiresIn) {
         return new Response(
-          JSON.stringify({ error: "Invalid long-lived token response" }),
+          JSON.stringify({ error: "Could not complete Threads authorization." }),
           {
             status: 500,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -2100,13 +2102,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!meResp.ok) {
-        return providerFailureResponse("Threads account lookup failed");
+        return providerFailureResponse("Could not complete Threads authorization.");
       }
 
       const meData = await meResp.json() as { id?: string };
       if (!meData.id) {
         return new Response(
-          JSON.stringify({ error: "Missing Threads user id" }),
+          JSON.stringify({ error: "Could not complete Threads authorization." }),
           {
             status: 500,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -2420,7 +2422,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         JSON.stringify({
           success: true,
           disconnected: true,
-          threads_user_id: result.threadsUserId,
         }),
         {
           status: 200,

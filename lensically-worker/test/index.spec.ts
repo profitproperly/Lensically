@@ -424,7 +424,7 @@ describe("auth request validation", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
       success: false,
-      error: "Unexpected field: role",
+      error: "Request contains unsupported fields.",
     });
   });
 
@@ -489,7 +489,35 @@ describe("auth request validation", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
       success: false,
-      error: "Unexpected field: target_user_id",
+      error: "Request contains unsupported fields.",
+    });
+  });
+});
+
+describe("public response sanitization", () => {
+  it("does not expose internal service identifiers in health responses", async () => {
+    const response = await runWorker(new Request("https://api.lensically.com/health", {
+      method: "GET",
+    }));
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as Record<string, unknown>;
+    expect(payload.status).toBe("ok");
+    expect(payload).not.toHaveProperty("service");
+  });
+
+  it("returns a generic message for threads callback validation failures", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const response = await runWorker(new Request("https://api.lensically.com/auth/threads/callback", {
+      method: "GET",
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Could not complete Threads authorization.",
     });
   });
 });
