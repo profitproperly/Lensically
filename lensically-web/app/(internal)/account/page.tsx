@@ -1,12 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAccount, disconnectThreadsAccount } from "@/lib/authClient";
 import { toUserFacingAuthError } from "@/lib/authErrorMessage";
 import { useAuth } from "@/lib/AuthProvider";
-import { writeThreadsConnectionCache } from "@/lib/threadsConnectionCache";
+import {
+  readThreadsConnectionCache,
+  writeThreadsConnectionCache,
+} from "@/lib/threadsConnectionCache";
+import { THREADS_ME_URL } from "@/lib/threadsApi";
+
+type ThreadsMeResponse = {
+  connected?: boolean;
+  account?: unknown | null;
+};
 
 export default function AccountPage() {
   const deletePhrase = "DELETE";
@@ -22,10 +31,88 @@ export default function AccountPage() {
   const [providerError, setProviderError] = useState("");
   const [providerSuccessMessage, setProviderSuccessMessage] = useState("");
   const [isDisconnectingProvider, setIsDisconnectingProvider] = useState(false);
+  const [isLoadingProviderStatus, setIsLoadingProviderStatus] = useState(true);
+  const [isThreadsConnected, setIsThreadsConnected] = useState(false);
   const deletePhraseConfirmed = deleteConfirmationText === deletePhrase;
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId) {
+      setIsThreadsConnected(false);
+      setIsLoadingProviderStatus(false);
+      return;
+    }
+    const resolvedUserId = userId;
+
+    const cachedConnectionState = readThreadsConnectionCache(resolvedUserId);
+    if (cachedConnectionState !== null) {
+      setIsThreadsConnected(cachedConnectionState);
+      setIsLoadingProviderStatus(false);
+      return;
+    }
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function loadThreadsConnectionStatus() {
+      setIsLoadingProviderStatus(true);
+      setProviderError("");
+
+      try {
+        const response = await fetch(
+          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(resolvedUserId)}`,
+          {
+            cache: "no-store",
+            credentials: "include",
+            signal: controller.signal,
+          },
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        if (!response.ok) {
+          setIsThreadsConnected(false);
+          setProviderError("Could not load Threads integration status.");
+          return;
+        }
+
+        const data = (await response.json()) as ThreadsMeResponse;
+        const connected = Boolean(data.connected && data.account);
+        setIsThreadsConnected(connected);
+        writeThreadsConnectionCache(resolvedUserId, connected);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        if (isMounted) {
+          setIsThreadsConnected(false);
+          setProviderError("Could not load Threads integration status.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingProviderStatus(false);
+        }
+      }
+    }
+
+    void loadThreadsConnectionStatus();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [router, userId]);
 
   async function handleDisconnectThreadsProvider() {
-    if (!user || isDisconnectingProvider) {
+    if (!user || isDisconnectingProvider || !isThreadsConnected) {
       return;
     }
 
@@ -36,6 +123,7 @@ export default function AccountPage() {
     try {
       await disconnectThreadsAccount(user.id);
       writeThreadsConnectionCache(user.id, false);
+      setIsThreadsConnected(false);
       setProviderSuccessMessage("Threads provider has been disconnected.");
       router.refresh();
     } catch (err) {
@@ -159,26 +247,54 @@ export default function AccountPage() {
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Connected Providers</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Threads Integration</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Manage account-linked provider connections from this account settings area.
+          Manage your Threads connection used by Lensically feature pages.
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link
-            href="/connect"
-            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Open provider connections
-          </Link>
-          <button
-            type="button"
-            onClick={() => void handleDisconnectThreadsProvider()}
-            disabled={isDisconnectingProvider}
-            className="inline-flex cursor-pointer rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isDisconnectingProvider ? "Disconnecting Threads..." : "Disconnect Threads"}
-          </button>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-slate-900">Threads</p>
+            <p className="text-sm text-slate-700">
+              Status:{" "}
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                  isLoadingProviderStatus
+                    ? "bg-slate-200 text-slate-700"
+                    : isThreadsConnected
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {isLoadingProviderStatus
+                  ? "Checking..."
+                  : isThreadsConnected
+                    ? "Connected"
+                    : "Not Connected"}
+              </span>
+            </p>
+          </div>
+
+          {isThreadsConnected ? (
+            <button
+              type="button"
+              onClick={() => void handleDisconnectThreadsProvider()}
+              disabled={isDisconnectingProvider || isLoadingProviderStatus}
+              className="inline-flex cursor-pointer rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isDisconnectingProvider ? "Disconnecting Threads..." : "Disconnect Threads"}
+            </button>
+          ) : (
+            <Link
+              href="/connect"
+              className={`inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 ${
+                isLoadingProviderStatus ? "cursor-not-allowed opacity-60 pointer-events-none" : "cursor-pointer"
+              }`}
+              aria-disabled={isLoadingProviderStatus}
+            >
+              Connect Threads
+            </Link>
+          )}
         </div>
 
         {(providerError || providerSuccessMessage) ? (

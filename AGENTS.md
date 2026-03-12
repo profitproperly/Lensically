@@ -116,6 +116,13 @@ Every assistant response must start with this exact first line:
 If the correct integration point cannot be confidently determined from
 the repository, stop and ask for clarification instead of guessing.
 
+## TypeScript Null Safety Rule
+
+- All TypeScript code must satisfy strict null safety.
+- Never access properties or call methods on nullable values without narrowing first.
+- Apply type narrowing at the point of use (for example `if (!user) { ... }`, `const userId = user?.id; if (!userId) { ... }`) before accessing nested values.
+- Treat strict-null TypeScript errors as blocking and resolve them before considering a change complete.
+
 `PROJECT_CONTEXT.md` is an AI context document. Agents must not modify
 or reference `PROJECT_CONTEXT.md` unless the user explicitly instructs
 them to do so.
