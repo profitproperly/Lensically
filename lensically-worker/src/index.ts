@@ -36,7 +36,8 @@ const DUPLICATE_EMAIL_OAUTH_ERROR = "duplicate_email";
 const SCHEDULED_POST_STATUS_APPROVED = "approved";
 const SCHEDULED_POST_STATUS_POSTING = "posting";
 const SCHEDULED_POST_STATUS_POSTED = "posted";
-const SCHEDULED_POST_MAX_BATCH_SIZE = 25;
+const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;
+const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;
 const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
 
 interface Env {
@@ -53,6 +54,7 @@ interface Env {
   ROOT_SITE_URL?: string;
   WORKER_ORIGIN?: string;
   WEB_APP_URL?: string;
+  SCHEDULED_POST_BATCH_SIZE?: string;
   DB: D1Database;
 }
 
@@ -781,9 +783,18 @@ async function doesTableExist(env: Env, tableName: string): Promise<boolean> {
   return Boolean(row?.name);
 }
 
+function getScheduledPostBatchSize(env: Env): number {
+  const parsed = Number(env.SCHEDULED_POST_BATCH_SIZE);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE;
+  }
+  return Math.min(parsed, MAX_SCHEDULED_POST_MAX_BATCH_SIZE);
+}
+
 async function getDueApprovedScheduledPosts(
   env: Env,
   nowIso: string,
+  batchSize: number,
 ): Promise<DueScheduledPost[]> {
   const rows = await env.DB.prepare(
     `SELECT id, user_id, threads_user_id, post_text
@@ -793,7 +804,7 @@ async function getDueApprovedScheduledPosts(
      ORDER BY scheduled_time ASC, id ASC
      LIMIT ?`,
   )
-    .bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, SCHEDULED_POST_MAX_BATCH_SIZE)
+    .bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, batchSize)
     .all<DueScheduledPost>();
 
   return rows.results ?? [];
@@ -895,7 +906,7 @@ async function processDueScheduledPosts(env: Env): Promise<void> {
 
   await recoverStalePostingScheduledPosts(env);
   const nowIso = new Date().toISOString();
-  const posts = await getDueApprovedScheduledPosts(env, nowIso);
+  const posts = await getDueApprovedScheduledPosts(env, nowIso, getScheduledPostBatchSize(env));
 
   for (const post of posts) {
     await processScheduledPost(env, post);
