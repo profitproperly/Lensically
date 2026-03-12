@@ -639,6 +639,27 @@ function providerFailureResponse(error: string, status = 502): Response {
   });
 }
 
+function upstreamProviderErrorResponse(
+  requestCorsHeaders: Record<string, string>,
+  error = "Upstream provider request failed.",
+): Response {
+  return new Response(JSON.stringify({ error }), {
+    status: 502,
+    headers: {
+      "Content-Type": "application/json",
+      ...requestCorsHeaders,
+    },
+  });
+}
+
+async function readJsonSafe(response: Response): Promise<unknown | null> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 function logUnhandledWorkerError(error: unknown, request: Request, path: string): void {
   logWorkerEvent("UNHANDLED_WORKER_ERROR", {
     path,
@@ -2217,8 +2238,23 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
+      if (!meResp.ok) {
+        logWorkerEvent("THREADS_ME_UPSTREAM_FAILED", {
+          status: meResp.status,
+          app_user_id: appUserId,
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      const meJson = await meResp.json() as {
+      const mePayload = await readJsonSafe(meResp);
+      if (!mePayload || typeof mePayload !== "object") {
+        logWorkerEvent("THREADS_ME_UPSTREAM_INVALID_JSON", {
+          app_user_id: appUserId,
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
+
+      const meJson = mePayload as {
         name?: string;
         username?: string;
         threads_biography?: string;
@@ -2393,10 +2429,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         },
       );
+      if (!res.ok) {
+        logWorkerEvent("THREADS_PROFILE_LOOKUP_FAILED", {
+          status: res.status,
+          app_user_id: appUserId,
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      const data = await res.json();
+      const data = await readJsonSafe(res);
+      if (data === null) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
       return new Response(JSON.stringify(data), {
+        status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -2523,6 +2570,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
+      if (!postsResp.ok) {
+        logWorkerEvent("THREADS_POSTS_UPSTREAM_FAILED", {
+          status: postsResp.status,
+          app_user_id: appUserId,
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
       logWorkerEvent("THREADS_API_REQUEST", {
         endpoint: "/v1.0/:threads_user_id/threads",
         has_cursor: Boolean(cursor),
@@ -2533,7 +2587,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         hasBody: Boolean(postsResponseText),
       });
 
-      const data = JSON.parse(postsResponseText) as {
+      let data = null as {
         data?: unknown[];
         paging?: {
           next?: string;
@@ -2541,7 +2595,29 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             after?: string;
           };
         };
-      };
+      } | null;
+      try {
+        data = JSON.parse(postsResponseText) as {
+          data?: unknown[];
+          paging?: {
+            next?: string;
+            cursors?: {
+              after?: string;
+            };
+          };
+        };
+      } catch {
+        logWorkerEvent("THREADS_POSTS_UPSTREAM_INVALID_JSON", {
+          app_user_id: appUserId,
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
+      if (!data || typeof data !== "object") {
+        logWorkerEvent("THREADS_POSTS_UPSTREAM_INVALID_SHAPE", {
+          app_user_id: appUserId,
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
       const postsArray = Array.isArray(data.data) ? data.data : [];
       const profileResp = await fetch(
         "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url",
@@ -2723,9 +2799,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
+      if (!insightsResp.ok) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
+      const insightsData = await readJsonSafe(insightsResp);
+      if (insightsData === null) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      return new Response(await insightsResp.text(), {
-        status: insightsResp.status,
+      return new Response(JSON.stringify(insightsData), {
+        status: 200,
         headers: { "content-type": "application/json; charset=UTF-8" },
       });
     }
@@ -2796,10 +2879,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
+      if (!insightsRes.ok) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      const data = await insightsRes.json();
+      const data = await readJsonSafe(insightsRes);
+      if (data === null) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
       return new Response(JSON.stringify(data), {
-        status: insightsRes.status,
+        status: 200,
         headers: { "content-type": "application/json; charset=UTF-8" },
       });
     }
@@ -2859,10 +2948,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { Authorization: `Bearer ${account.access_token}` },
         },
       );
+      if (!insightsRes.ok) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      const data = await insightsRes.json();
+      const data = await readJsonSafe(insightsRes);
+      if (data === null) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
       return new Response(JSON.stringify(data), {
-        status: insightsRes.status,
+        status: 200,
         headers: { "content-type": "application/json; charset=UTF-8" },
       });
     }
@@ -2964,10 +3059,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         },
       );
+      if (!threadsRes.ok) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      const data = await threadsRes.json();
+      const data = await readJsonSafe(threadsRes);
+      if (data === null) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
       return new Response(JSON.stringify(data), {
+        status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -3049,9 +3151,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         },
         body: publishBody,
       });
+      if (!publishResp.ok) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
+      const publishData = await readJsonSafe(publishResp);
+      if (publishData === null) {
+        return upstreamProviderErrorResponse(requestCorsHeaders);
+      }
 
-      return new Response(await publishResp.text(), {
-        status: publishResp.status,
+      return new Response(JSON.stringify(publishData), {
+        status: 200,
         headers: { "content-type": "application/json; charset=UTF-8" },
       });
     }
