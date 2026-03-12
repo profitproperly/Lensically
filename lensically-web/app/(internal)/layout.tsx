@@ -2,12 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/lib/AuthProvider";
 import { disconnectThreadsAccount } from "@/lib/authClient";
+import { THREADS_ME_URL } from "@/lib/threadsApi";
+
+type ThreadsMeResponse = {
+  connected?: boolean;
+  account?: unknown | null;
+};
+
+const THREADS_GUARDED_ROUTES = ["/dashboard", "/insights", "/schedule", "/search", "/discovery"];
 
 export default function InternalLayout({
   children,
@@ -15,16 +23,76 @@ export default function InternalLayout({
   children: React.ReactNode;
 }>) {
   const { user, loading, logoutUser } = useAuth();
+  const pathname = usePathname();
   const router = useRouter();
   const appUserId = user?.id?.trim() ?? "";
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isCheckingThreadsConnection, setIsCheckingThreadsConnection] = useState(false);
+
+  const requiresThreadsConnection = useMemo(() => {
+    return THREADS_GUARDED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
     }
   }, [loading, router, user]);
+
+  useEffect(() => {
+    if (loading || !user || !requiresThreadsConnection || !appUserId) {
+      setIsCheckingThreadsConnection(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let isMounted = true;
+
+    async function enforceThreadsConnection() {
+      setIsCheckingThreadsConnection(true);
+
+      try {
+        const res = await fetch(`${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`, {
+          cache: "no-store",
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        if (!res.ok) {
+          router.replace("/connect");
+          return;
+        }
+
+        const data = (await res.json()) as ThreadsMeResponse;
+        const hasConnectedThreads = Boolean(data.connected && data.account);
+
+        if (!hasConnectedThreads) {
+          router.replace("/connect");
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingThreadsConnection(false);
+        }
+      }
+    }
+
+    void enforceThreadsConnection();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [appUserId, loading, requiresThreadsConnection, router, user]);
 
   async function handleDisconnectThreads() {
     if (!appUserId) {
@@ -79,6 +147,14 @@ export default function InternalLayout({
             </Link>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isCheckingThreadsConnection) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-700">Checking Threads connection...</p>
       </div>
     );
   }
