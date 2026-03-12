@@ -1,13 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { preloadRouteDataForNavigation } from "@/lib/routeDataPrefetch";
 
 type ProfileMenuProps = {
   avatarUrl?: string | null;
   displayName?: string | null;
   email?: string | null;
+  appUserId?: string | null;
   accountHref?: string;
   onDisconnectThreads?: () => Promise<void> | void;
   onLogout?: () => Promise<void> | void;
@@ -30,17 +32,20 @@ export function ProfileMenu({
   avatarUrl = null,
   displayName = null,
   email = null,
+  appUserId = "",
   accountHref = "/account",
   onDisconnectThreads,
   onLogout,
   isDisconnecting = false,
   isLoggingOut = false,
 }: ProfileMenuProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isNavigatingAccount, setIsNavigatingAccount] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const initials = getInitials(displayName, email);
   const label = displayName?.trim() || email?.trim() || "Account";
-  const isBusy = isDisconnecting || isLoggingOut;
+  const isBusy = isDisconnecting || isLoggingOut || isNavigatingAccount;
 
   useEffect(() => {
     if (!isOpen) {
@@ -84,6 +89,23 @@ export function ProfileMenu({
 
     setIsOpen(false);
     await onLogout();
+  }
+
+  async function handleOpenAccount() {
+    if (isNavigatingAccount || !accountHref) {
+      return;
+    }
+
+    setIsOpen(false);
+    setIsNavigatingAccount(true);
+
+    try {
+      router.prefetch(accountHref);
+      await preloadRouteDataForNavigation(accountHref, appUserId?.trim() ?? "");
+      router.push(accountHref);
+    } finally {
+      setIsNavigatingAccount(false);
+    }
   }
 
   return (
@@ -133,14 +155,16 @@ export function ProfileMenu({
           </div>
 
           <div role="menu" aria-label="Profile actions" className="pt-2">
-            <Link
-              href={accountHref}
+            <button
+              type="button"
               role="menuitem"
-              onClick={() => setIsOpen(false)}
-              className="block cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => void handleOpenAccount()}
+              disabled={isNavigatingAccount}
+              aria-busy={isNavigatingAccount}
+              className="block w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Account
-            </Link>
+              {isNavigatingAccount ? "Opening account..." : "Account"}
+            </button>
 
             <button
               type="button"

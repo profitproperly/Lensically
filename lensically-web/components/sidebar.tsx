@@ -1,11 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/AuthProvider";
 import { buildWorkerUrl } from "../lib/apiClient";
+import { preloadRouteDataForNavigation } from "../lib/routeDataPrefetch";
 import {
   readThreadsProfileCache,
   writeThreadsProfileCache,
@@ -29,6 +29,7 @@ const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const currentPath = String(pathname ?? "");
   const isActivePath = (href: string) => currentPath === String(href);
   const { user } = useAuth();
@@ -39,6 +40,7 @@ export function Sidebar() {
   const cachedProfile = appUserId ? readThreadsProfileCache(appUserId) : null;
   const [username, setUsername] = useState<string>("unknown");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const displayUsername = username || cachedProfile?.account?.username || "unknown";
   const displayProfilePictureUrl = profilePictureUrl ?? cachedProfile?.account?.threads_profile_picture_url ?? null;
 
@@ -70,6 +72,22 @@ export function Sidebar() {
 
     void loadProfile();
   }, [appUserId, showThreadsProfile]);
+
+  async function handleSidebarNavigation(href: string) {
+    if (!href || isActivePath(href) || pendingNavigationHref) {
+      return;
+    }
+
+    setPendingNavigationHref(href);
+
+    try {
+      router.prefetch(href);
+      await preloadRouteDataForNavigation(href, appUserId);
+      router.push(href);
+    } finally {
+      setPendingNavigationHref(null);
+    }
+  }
 
   return (
     <aside className="sticky top-16 h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
@@ -114,45 +132,45 @@ export function Sidebar() {
       <nav className="w-full space-y-2">
         {links.map((link) => (
           <div key={link.href} className="px-4">
-            {isConnectPage ? (
-              link.href === "/account" ? (
-                <Link
-                  href={link.href}
-                  className={[
-                    "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
-                    isActivePath(link.href)
-                      ? "bg-black text-white"
-                      : "text-black hover:bg-black hover:text-white",
-                  ].join(" ")}
-                >
-                  {link.label}
-                </Link>
-              ) : (
+            {(() => {
+              const isActive = isActivePath(link.href);
+              const isNavigatingToLink = pendingNavigationHref === link.href;
+              const isNavigationDisabled = Boolean(pendingNavigationHref);
+              const label = isNavigatingToLink ? `Loading ${link.label}...` : link.label;
+
+              if (isConnectPage && link.href !== "/account") {
+                return (
+                  <button
+                    type="button"
+                    disabled
+                    className={[
+                      "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left",
+                      isActive ? "bg-black text-white" : "text-black hover:bg-black hover:text-white",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
+                    ].join(" ")}
+                  >
+                    {link.label}
+                  </button>
+                );
+              }
+
+              return (
                 <button
                   type="button"
+                  onClick={() => void handleSidebarNavigation(link.href)}
+                  disabled={isNavigationDisabled}
+                  aria-busy={isNavigatingToLink}
                   className={[
-                    "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left",
-                    isActivePath(link.href)
-                      ? "bg-black text-white"
-                      : "text-black hover:bg-black hover:text-white",
+                    "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left cursor-pointer",
+                    isActive ? "bg-black text-white" : "text-black hover:bg-black hover:text-white",
+                    isNavigatingToLink ? "cursor-wait opacity-80" : "",
+                    isNavigationDisabled ? "disabled:cursor-not-allowed disabled:opacity-60" : "",
                   ].join(" ")}
                 >
-                  {link.label}
+                  {label}
                 </button>
-              )
-            ) : (
-              <Link
-                href={link.href}
-                className={[
-                  "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors",
-                  isActivePath(link.href)
-                    ? "bg-black text-white"
-                    : "text-black hover:bg-black hover:text-white",
-                ].join(" ")}
-              >
-                {link.label}
-              </Link>
-            )}
+              );
+            })()}
           </div>
         ))}
       </nav>

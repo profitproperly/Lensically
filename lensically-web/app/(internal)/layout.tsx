@@ -197,6 +197,7 @@ export default function InternalLayout({
           <ProfileMenu
             displayName={null}
             email={user.email}
+            appUserId={appUserId}
             accountHref="/account"
             onDisconnectThreads={handleDisconnectThreads}
             onLogout={handleLogout}
