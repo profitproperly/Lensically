@@ -633,6 +633,81 @@ describe("scheduled post API", () => {
     expect(row?.post_text).toBe("Schedule this post");
     expect(row?.threads_user_id).toBe("threads-user-schedule-api");
   });
+
+  it("returns the existing scheduled row for duplicate schedule requests", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-schedule-idempotent", "token-schedule-idempotent", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-schedule-idempotent", now)
+      .run();
+
+    const payload = JSON.stringify({
+      app_user_id: "user-authenticated",
+      threads_user_id: "threads-user-schedule-idempotent",
+      text: "Schedule idempotent",
+      date: "2026-01-15",
+      time: "09:30",
+      timezone: "America/New_York",
+    });
+
+    const firstResponse = await runWorker(new Request("https://api.lensically.com/api/threads/schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: payload,
+    }));
+
+    const secondResponse = await runWorker(new Request("https://api.lensically.com/api/threads/schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: payload,
+    }));
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+
+    const firstJson = await firstResponse.json() as {
+      scheduled_post?: { id?: number; scheduled_time_utc?: string; status?: string };
+    };
+    const secondJson = await secondResponse.json() as {
+      scheduled_post?: { id?: number; scheduled_time_utc?: string; status?: string };
+    };
+
+    expect(firstJson.scheduled_post?.id).toBeTruthy();
+    expect(secondJson.scheduled_post?.id).toBe(firstJson.scheduled_post?.id);
+    expect(secondJson.scheduled_post?.scheduled_time_utc).toBe("2026-01-15T14:30:00.000Z");
+    expect(secondJson.scheduled_post?.status).toBe("approved");
+
+    const scheduledCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM scheduled_posts
+       WHERE user_id = ?`,
+    )
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+
+    expect(Number(scheduledCount?.total ?? 0)).toBe(1);
+  });
 });
 
 describe("immediate post API", () => {
@@ -687,6 +762,79 @@ describe("immediate post API", () => {
       publish_request_id: "creation-now",
       published_post_id: "published-post-now",
     });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns the same publish response for duplicate immediate publish requests", async () => {
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-now-idempotent", "token-now-idempotent", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-now-idempotent", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/threads-user-now-idempotent/threads_publish")) {
+        return new Response(JSON.stringify({ id: "published-post-now-idempotent" }), { status: 200 });
+      }
+      if (requestUrl.includes("/v1.0/threads-user-now-idempotent/threads")) {
+        return new Response(JSON.stringify({ id: "creation-now-idempotent" }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const payload = JSON.stringify({
+      app_user_id: "user-authenticated",
+      threads_user_id: "threads-user-now-idempotent",
+      text: "Immediate idempotent message",
+    });
+
+    const firstResponse = await runWorker(new Request("https://api.lensically.com/api/threads/post-now", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: payload,
+    }));
+
+    const secondResponse = await runWorker(new Request("https://api.lensically.com/api/threads/post-now", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: payload,
+    }));
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+
+    await expect(firstResponse.json()).resolves.toMatchObject({
+      success: true,
+      publish_request_id: "creation-now-idempotent",
+      published_post_id: "published-post-now-idempotent",
+    });
+    await expect(secondResponse.json()).resolves.toMatchObject({
+      success: true,
+      publish_request_id: "creation-now-idempotent",
+      published_post_id: "published-post-now-idempotent",
+    });
+
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

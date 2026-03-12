@@ -39,6 +39,7 @@ const SCHEDULED_POST_STATUS_POSTED = "posted";
 const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;
 const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;
 const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
+const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -653,6 +654,11 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("UNIQUE constraint failed");
+}
+
 function logWorkerEvent(
   event: string,
   details: Record<string, unknown> = {},
@@ -677,6 +683,11 @@ type DueScheduledPost = {
   user_id: string;
   threads_user_id: string;
   post_text: string;
+};
+
+type ImmediatePublishIdempotencyRecord = {
+  response_status: number | null;
+  response_body: string | null;
 };
 
 const SCHEDULED_POST_ALLOWED_TRANSITIONS: Record<ScheduledPostStatus, ReadonlyArray<ScheduledPostStatus>> = {
@@ -783,6 +794,46 @@ async function doesTableExist(env: Env, tableName: string): Promise<boolean> {
   return Boolean(row?.name);
 }
 
+async function doesColumnExist(env: Env, tableName: string, columnName: string): Promise<boolean> {
+  const rows = await env.DB.prepare(`PRAGMA table_info(${tableName})`).all<{ name: string }>();
+  for (const row of rows.results ?? []) {
+    if (row.name === columnName) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function buildScheduledPostIdempotencyKey(
+  appUserId: string,
+  threadsUserId: string,
+  scheduledUtc: string,
+  text: string,
+): Promise<string> {
+  return sha256Hex(`schedule|${appUserId}|${threadsUserId}|${scheduledUtc}|${text}`);
+}
+
+async function buildImmediatePublishRequestHash(
+  appUserId: string,
+  threadsUserId: string,
+  text: string,
+): Promise<string> {
+  return sha256Hex(`post-now|${appUserId}|${threadsUserId}|${text}`);
+}
+
+function getImmediatePublishRequestBucket(nowMs: number = Date.now()): string {
+  const bucket = Math.floor(nowMs / IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS);
+  return String(bucket);
+}
+
 function getScheduledPostBatchSize(env: Env): number {
   const parsed = Number(env.SCHEDULED_POST_BATCH_SIZE);
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -801,6 +852,7 @@ async function getDueApprovedScheduledPosts(
      FROM scheduled_posts
      WHERE status = ?
        AND scheduled_time <= ?
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
      ORDER BY scheduled_time ASC, id ASC
      LIMIT ?`,
   )
@@ -845,6 +897,67 @@ async function getUserTimezonePreference(env: Env, userId: string): Promise<stri
   }
   const timezone = row.timezone.trim();
   return timezone.length > 0 ? timezone : null;
+}
+
+async function getImmediatePublishIdempotentResponse(
+  env: Env,
+  scope: string,
+  appUserId: string,
+  threadsUserId: string,
+  requestHash: string,
+  requestBucket: string,
+): Promise<ImmediatePublishIdempotencyRecord | null> {
+  const row = await env.DB.prepare(
+    `SELECT response_status, response_body
+     FROM threads_publish_idempotency
+     WHERE scope = ?
+       AND app_user_id = ?
+       AND threads_user_id = ?
+       AND request_hash = ?
+       AND request_bucket = ?
+     LIMIT 1`,
+  )
+    .bind(scope, appUserId, threadsUserId, requestHash, requestBucket)
+    .first<ImmediatePublishIdempotencyRecord>();
+
+  if (!row?.response_body || !row.response_status) {
+    return null;
+  }
+  return row;
+}
+
+async function storeImmediatePublishIdempotentResponse(
+  env: Env,
+  scope: string,
+  appUserId: string,
+  threadsUserId: string,
+  requestHash: string,
+  requestBucket: string,
+  responseStatus: number,
+  responseBody: string,
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO threads_publish_idempotency (
+      scope,
+      app_user_id,
+      threads_user_id,
+      request_hash,
+      request_bucket,
+      response_status,
+      response_body
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      scope,
+      appUserId,
+      threadsUserId,
+      requestHash,
+      requestBucket,
+      responseStatus,
+      responseBody,
+    )
+    .run();
 }
 
 async function processScheduledPost(
@@ -1411,6 +1524,7 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
       publish_request_id TEXT,
       published_post_id TEXT,
       publish_error_message TEXT,
+      idempotency_key TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       processing_started_at TEXT,
@@ -1435,6 +1549,19 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_threads_user_id
      ON scheduled_posts (threads_user_id)`,
+  ).run();
+
+  const hasIdempotencyKeyColumn = await doesColumnExist(env, "scheduled_posts", "idempotency_key");
+  if (!hasIdempotencyKeyColumn) {
+    await env.DB.prepare(
+      "ALTER TABLE scheduled_posts ADD COLUMN idempotency_key TEXT",
+    ).run();
+  }
+
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_posts_idempotency_key
+     ON scheduled_posts (idempotency_key)
+     WHERE idempotency_key IS NOT NULL`,
   ).run();
 
   await env.DB.prepare(
@@ -1484,6 +1611,53 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
        UPDATE scheduled_posts
        SET updated_at = CURRENT_TIMESTAMP
        WHERE id = NEW.id;
+     END`,
+  ).run();
+}
+
+async function ensureImmediatePublishIdempotencyTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_publish_idempotency (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope TEXT NOT NULL,
+      app_user_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      request_hash TEXT NOT NULL,
+      request_bucket TEXT NOT NULL,
+      response_status INTEGER,
+      response_body TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(scope, app_user_id, threads_user_id, request_hash, request_bucket),
+      FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_publish_idempotency_created_at
+     ON threads_publish_idempotency (created_at)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_threads_publish_idempotency_user_exists_insert
+     BEFORE INSERT ON threads_publish_idempotency
+     FOR EACH ROW
+     WHEN NOT EXISTS (
+       SELECT 1
+       FROM users
+       WHERE id = NEW.app_user_id
+     )
+     BEGIN
+       SELECT RAISE(ABORT, 'foreign_key_violation:threads_publish_idempotency.app_user_id');
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_threads_publish_idempotency_user_cleanup
+     AFTER DELETE ON users
+     FOR EACH ROW
+     BEGIN
+       DELETE FROM threads_publish_idempotency
+       WHERE app_user_id = OLD.id;
      END`,
   ).run();
 }
@@ -3787,6 +3961,29 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
       }
 
+      await ensureImmediatePublishIdempotencyTable(env);
+      const publishScope = url.pathname === "/api/threads/publish" ? "publish" : "post-now";
+      const requestHash = await buildImmediatePublishRequestHash(
+        ownedAppUserId,
+        account.threads_user_id,
+        text,
+      );
+      const requestBucket = getImmediatePublishRequestBucket();
+      const existingResponse = await getImmediatePublishIdempotentResponse(
+        env,
+        publishScope,
+        ownedAppUserId,
+        account.threads_user_id,
+        requestHash,
+        requestBucket,
+      );
+      if (existingResponse) {
+        return new Response(existingResponse.response_body, {
+          status: existingResponse.response_status,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
       let publishResult: Awaited<ReturnType<typeof publishTextToThreads>>;
       try {
         publishResult = await publishTextToThreads({
@@ -3801,25 +3998,59 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
 
+      const responsePayload = url.pathname === "/api/threads/publish"
+        ? publishResult.publishResponse
+        : {
+          success: true,
+          publish_request_id: publishResult.publishRequestId,
+          published_post_id: publishResult.publishedPostId,
+          provider_response: publishResult.publishResponse,
+        };
+      const responseBody = JSON.stringify(responsePayload);
+
+      try {
+        await storeImmediatePublishIdempotentResponse(
+          env,
+          publishScope,
+          ownedAppUserId,
+          account.threads_user_id,
+          requestHash,
+          requestBucket,
+          200,
+          responseBody,
+        );
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) {
+          throw error;
+        }
+
+        const racedResponse = await getImmediatePublishIdempotentResponse(
+          env,
+          publishScope,
+          ownedAppUserId,
+          account.threads_user_id,
+          requestHash,
+          requestBucket,
+        );
+        if (racedResponse) {
+          return new Response(racedResponse.response_body, {
+            status: racedResponse.response_status,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+      }
+
       if (url.pathname === "/api/threads/publish") {
-        return new Response(JSON.stringify(publishResult.publishResponse), {
+        return new Response(responseBody, {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          publish_request_id: publishResult.publishRequestId,
-          published_post_id: publishResult.publishedPostId,
-          provider_response: publishResult.publishResponse,
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json; charset=UTF-8" },
-        },
-      );
+      return new Response(responseBody, {
+        status: 200,
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
     }
 
     if (url.pathname === "/api/threads/schedule" && request.method === "POST") {
@@ -3915,30 +4146,101 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       await ensureScheduledPostsTable(env);
-      const insert = await env.DB.prepare(
-        `INSERT INTO scheduled_posts (
-          user_id,
-          threads_user_id,
-          post_text,
-          status,
-          scheduled_time
-        )
-        VALUES (?, ?, ?, ?, ?)`,
+      const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
+        ownedAppUserId,
+        threadsUserId,
+        scheduledUtc,
+        text,
+      );
+
+      const existingScheduledPost = await env.DB.prepare(
+        `SELECT id, status, scheduled_time
+         FROM scheduled_posts
+         WHERE idempotency_key = ?
+         LIMIT 1`,
       )
-        .bind(
-          ownedAppUserId,
-          threadsUserId,
-          text,
-          SCHEDULED_POST_STATUS_APPROVED,
-          scheduledUtc,
+        .bind(scheduleIdempotencyKey)
+        .first<{ id: number | string; status: string; scheduled_time: string }>();
+
+      if (existingScheduledPost) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            scheduled_post: {
+              id: Number(existingScheduledPost.id),
+              status: existingScheduledPost.status,
+              scheduled_time_utc: existingScheduledPost.scheduled_time,
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      let insertedScheduledPostId = 0;
+      try {
+        const insert = await env.DB.prepare(
+          `INSERT INTO scheduled_posts (
+            user_id,
+            threads_user_id,
+            post_text,
+            status,
+            scheduled_time,
+            idempotency_key
+          )
+          VALUES (?, ?, ?, ?, ?, ?)`,
         )
-        .run();
+          .bind(
+            ownedAppUserId,
+            threadsUserId,
+            text,
+            SCHEDULED_POST_STATUS_APPROVED,
+            scheduledUtc,
+            scheduleIdempotencyKey,
+          )
+          .run();
+        insertedScheduledPostId = Number(insert.meta?.last_row_id ?? 0);
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) {
+          throw error;
+        }
+
+        const racedScheduledPost = await env.DB.prepare(
+          `SELECT id, status, scheduled_time
+           FROM scheduled_posts
+           WHERE idempotency_key = ?
+           LIMIT 1`,
+        )
+          .bind(scheduleIdempotencyKey)
+          .first<{ id: number | string; status: string; scheduled_time: string }>();
+
+        if (!racedScheduledPost) {
+          throw error;
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            scheduled_post: {
+              id: Number(racedScheduledPost.id),
+              status: racedScheduledPost.status,
+              scheduled_time_utc: racedScheduledPost.scheduled_time,
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
 
       return new Response(
         JSON.stringify({
           success: true,
           scheduled_post: {
-            id: Number(insert.meta?.last_row_id ?? 0),
+            id: insertedScheduledPostId,
             status: SCHEDULED_POST_STATUS_APPROVED,
             scheduled_time_utc: scheduledUtc,
           },
