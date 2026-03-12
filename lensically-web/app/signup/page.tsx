@@ -140,13 +140,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => {
-              const isLocal =
-                window.location.hostname === "localhost" ||
-                window.location.hostname === "127.0.0.1"
-              const githubStartUrl = isLocal
-                ? `${GITHUB_START_URL}?env=dev`
-                : GITHUB_START_URL
-              window.location.href = githubStartUrl
+              window.location.href = GITHUB_START_URL
             }}
             className="w-full border border-gray-300 rounded-lg py-3 font-medium text-black hover:bg-gray-50 cursor-pointer"
           >

@@ -17,11 +17,11 @@ export default function VerifyEmailPageClient() {
   const email = searchParams.get("email")
   const [status, setStatus] = useState<VerificationState>(token ? "verifying" : "idle")
   const [message, setMessage] = useState("")
+  const displayStatus: VerificationState = token ? status : "idle"
+  const displayMessage = token ? message : ""
 
   useEffect(() => {
     if (!token) {
-      setStatus("idle")
-      setMessage("")
       return
     }
 
@@ -86,21 +86,21 @@ export default function VerifyEmailPageClient() {
           </>
         )}
 
-        {status === "verifying" && (
+        {displayStatus === "verifying" && (
           <p className="text-sm text-center text-gray-700">
             Verifying your email...
           </p>
         )}
 
-        {status === "success" && (
+        {displayStatus === "success" && (
           <p className="text-sm text-center text-green-700">
-            {message}
+            {displayMessage}
           </p>
         )}
 
-        {status === "error" && (
+        {displayStatus === "error" && (
           <p className="text-sm text-center text-red-500">
-            {message}
+            {displayMessage}
           </p>
         )}
 

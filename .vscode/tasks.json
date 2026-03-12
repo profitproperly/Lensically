@@ -67,7 +67,7 @@
     {
       "label": "CHECK: FE Lint",
       "type": "shell",
-      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npm run lint && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
+      "command": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use 20 >/dev/null && npx eslint . --quiet --ignore-pattern '.open-next/**' --ignore-pattern '.next/**' > /tmp/lensically-fe-eslint-errors.txt 2>&1; code=$?; echo \"ESLINT_LOG: /tmp/lensically-fe-eslint-errors.txt\"; echo \"FIRST_25_LINES:\"; sed -n '1,25p' /tmp/lensically-fe-eslint-errors.txt; summary=$(grep -E \"problems? \\(\" /tmp/lensically-fe-eslint-errors.txt | tail -n 1); if [ -n \"$summary\" ]; then echo \"SUMMARY: $summary\"; else echo \"SUMMARY: No lint problems line found\"; fi; if [ \"$code\" -eq 0 ]; then echo \"RESULT: SUCCESS\"; else echo \"RESULT: FAIL\"; fi; exit \"$code\"",
       "options": {
         "cwd": "/home/brian/lensically/lensically-web"
       },
@@ -85,9 +85,16 @@
     {
       "label": "CHECK: BE Auth API Smoke",
       "type": "shell",
-      "command": "verify_code=$(curl -s -o /tmp/lensically_verify_body.$$ -w \"%{http_code}\" \"https://api.lensically.com/api/auth/verify-email?token=not-a-uuid\") && reset_code=$(curl -s -o /tmp/lensically_reset_body.$$ -w \"%{http_code}\" -X POST \"https://api.lensically.com/api/auth/reset-password\" -H \"Content-Type: application/json\" -d '{\"token\":\"bad-token\",\"password\":\"new-password-123\"}') && [ \"$verify_code\" = \"400\" ] && [ \"$reset_code\" = \"400\" ] && grep -q \"Invalid or expired verification token.\" /tmp/lensically_verify_body.$$ && grep -q \"Invalid or expired reset token.\" /tmp/lensically_reset_body.$$ && rm -f /tmp/lensically_verify_body.$$ /tmp/lensically_reset_body.$$ && echo \"RESULT: SUCCESS\" || echo \"RESULT: FAIL\"",
+      "command": "bash ./scripts/be-auth-smoke.sh",
       "options": {
         "cwd": "/home/brian/lensically"
+      },
+      "presentation": {
+        "echo": false,
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
       },
       "problemMatcher": []
     },

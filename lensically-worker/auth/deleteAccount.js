@@ -45,6 +45,23 @@ function getErrorMessage(error) {
   return "unknown_error";
 }
 
+function isIgnorableCleanupError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes("no such table") || message.includes("no such column");
+}
+
+async function runDbOperation(operation, action) {
+  try {
+    return await action();
+  } catch (error) {
+    logAccountDeletionEvent("deletion_db_operation_failed", {
+      operation,
+      reason: getErrorMessage(error),
+    }, "error");
+    throw error;
+  }
+}
+
 const FORBIDDEN_TARGET_FIELDS = [
   "id",
   "user_id",
@@ -74,14 +91,16 @@ function hasForbiddenTargetingInput(body, searchParams) {
 }
 
 async function tableExists(db, tableName) {
-  const row = await db.prepare(
-    `SELECT name
-     FROM sqlite_master
-     WHERE type = 'table' AND name = ?
-     LIMIT 1`,
-  )
-    .bind(tableName)
-    .first();
+  const row = await runDbOperation(`table_exists:${tableName}`, async () =>
+    db.prepare(
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'table' AND name = ?
+       LIMIT 1`,
+    )
+      .bind(tableName)
+      .first(),
+  );
 
   return Boolean(row?.name);
 }
@@ -92,14 +111,16 @@ async function deleteThreadsAccountLink(db, userId) {
     return;
   }
 
-  const existingLink = await db.prepare(
-    `SELECT threads_user_id
-     FROM app_threads_accounts
-     WHERE app_user_id = ?
-     LIMIT 1`,
-  )
-    .bind(userId)
-    .first();
+  const existingLink = await runDbOperation("threads_link_select", async () =>
+    db.prepare(
+      `SELECT threads_user_id
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+       LIMIT 1`,
+    )
+      .bind(userId)
+      .first(),
+  );
 
   if (!existingLink?.threads_user_id) {
     return;
@@ -107,89 +128,148 @@ async function deleteThreadsAccountLink(db, userId) {
 
   const threadsUserId = existingLink.threads_user_id;
 
-  await db.prepare(
-    `DELETE FROM app_threads_accounts
-     WHERE app_user_id = ?`,
-  )
-    .bind(userId)
-    .run();
+  await runDbOperation("threads_link_delete", async () =>
+    db.prepare(
+      `DELETE FROM app_threads_accounts
+       WHERE app_user_id = ?`,
+    )
+      .bind(userId)
+      .run(),
+  );
 
   const threadsAccountsTableExists = await tableExists(db, "threads_accounts");
   if (!threadsAccountsTableExists) {
     return;
   }
 
-  const remainingLinks = await db.prepare(
-    `SELECT COUNT(*) AS total
-     FROM app_threads_accounts
-     WHERE threads_user_id = ?`,
-  )
-    .bind(threadsUserId)
-    .first();
-
-  if (Number(remainingLinks?.total ?? 0) === 0) {
-    await db.prepare(
-      `DELETE FROM threads_accounts
+  const remainingLinks = await runDbOperation("threads_link_count_remaining", async () =>
+    db.prepare(
+      `SELECT COUNT(*) AS total
+       FROM app_threads_accounts
        WHERE threads_user_id = ?`,
     )
       .bind(threadsUserId)
-      .run();
+      .first(),
+  );
+
+  if (Number(remainingLinks?.total ?? 0) === 0) {
+    await runDbOperation("threads_account_delete", async () =>
+      db.prepare(
+        `DELETE FROM threads_accounts
+         WHERE threads_user_id = ?`,
+      )
+        .bind(threadsUserId)
+        .run(),
+    );
   }
 }
 
+async function deleteByUserIdIfTableExists(db, tableName, userId) {
+  const exists = await tableExists(db, tableName);
+  if (!exists) {
+    return;
+  }
+
+  await runDbOperation(`cleanup_delete:${tableName}`, async () =>
+    db.prepare(
+      `DELETE FROM ${tableName}
+       WHERE user_id = ?`,
+    )
+      .bind(userId)
+      .run(),
+  );
+}
+
+async function deleteByUserId(db, tableName, userId) {
+  await runDbOperation(`cleanup_delete:${tableName}`, async () =>
+    db.prepare(
+      `DELETE FROM ${tableName}
+       WHERE user_id = ?`,
+    )
+      .bind(userId)
+      .run(),
+  );
+}
+
 async function ensureAccountDeletionGuardsTable(db) {
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS account_deletion_guards (
-      session_token TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      status TEXT NOT NULL CHECK (status IN ('in_progress', 'completed')),
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      completed_at DATETIME
-    )`,
-  ).run();
+  await runDbOperation("guard_table_ensure", async () =>
+    db.prepare(
+      `CREATE TABLE IF NOT EXISTS account_deletion_guards (
+        session_token TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('in_progress', 'completed')),
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME
+      )`,
+    ).run(),
+  );
 }
 
 async function getDeletionGuard(db, sessionToken) {
-  return db.prepare(
-    `SELECT session_token, user_id, status, completed_at
-     FROM account_deletion_guards
-     WHERE session_token = ?
-     LIMIT 1`,
-  )
-    .bind(sessionToken)
-    .first();
+  return runDbOperation("guard_select", async () =>
+    db.prepare(
+      `SELECT session_token, user_id, status, completed_at
+       FROM account_deletion_guards
+       WHERE session_token = ?
+       LIMIT 1`,
+    )
+      .bind(sessionToken)
+      .first(),
+  );
 }
 
 async function createDeletionGuard(db, sessionToken, userId) {
-  return db.prepare(
-    `INSERT INTO account_deletion_guards (session_token, user_id, status, created_at, updated_at)
-     VALUES (?, ?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-     ON CONFLICT(session_token) DO NOTHING`,
-  )
-    .bind(sessionToken, userId)
-    .run();
+  return runDbOperation("guard_insert", async () =>
+    db.prepare(
+      `INSERT INTO account_deletion_guards (session_token, user_id, status, created_at, updated_at)
+       VALUES (?, ?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON CONFLICT(session_token) DO NOTHING`,
+    )
+      .bind(sessionToken, userId)
+      .run(),
+  );
 }
 
 async function markDeletionGuardCompleted(db, sessionToken) {
-  await db.prepare(
-    `UPDATE account_deletion_guards
-     SET status = 'completed',
-         updated_at = CURRENT_TIMESTAMP,
-         completed_at = CURRENT_TIMESTAMP
-     WHERE session_token = ?`,
-  )
-    .bind(sessionToken)
-    .run();
+  await runDbOperation("guard_mark_completed", async () =>
+    db.prepare(
+      `UPDATE account_deletion_guards
+       SET status = 'completed',
+           updated_at = CURRENT_TIMESTAMP,
+           completed_at = CURRENT_TIMESTAMP
+       WHERE session_token = ?`,
+    )
+      .bind(sessionToken)
+      .run(),
+  );
 }
 
 async function removeDeletionGuard(db, sessionToken) {
-  await db.prepare(
-    `DELETE FROM account_deletion_guards
-     WHERE session_token = ?`,
-  )
-    .bind(sessionToken)
-    .run();
+  await runDbOperation("guard_remove", async () =>
+    db.prepare(
+      `DELETE FROM account_deletion_guards
+       WHERE session_token = ?`,
+    )
+      .bind(sessionToken)
+      .run(),
+  );
+}
+
+async function runOptionalCleanup(cleanupLabel, action) {
+  try {
+    await action();
+  } catch (error) {
+    if (isIgnorableCleanupError(error)) {
+      logAccountDeletionEvent("deletion_cleanup_skipped", {
+        cleanup: cleanupLabel,
+        reason: getErrorMessage(error),
+      });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 export async function deleteAccount(request, env) {
@@ -273,11 +353,13 @@ export async function deleteAccount(request, env) {
       }, 400);
     }
 
-    const passwordRow = await env.DB.prepare(
-      "SELECT password_hash FROM users WHERE id = ? LIMIT 1",
-    )
-      .bind(user.id)
-      .first();
+    const passwordRow = await runDbOperation("password_hash_select", async () =>
+      env.DB.prepare(
+        "SELECT password_hash FROM users WHERE id = ? LIMIT 1",
+      )
+        .bind(user.id)
+        .first(),
+    );
 
     if (!passwordRow?.password_hash) {
       logAccountDeletionEvent("deletion_rejected", { reason: "password_reauth_unavailable", account_type: "password" });
@@ -332,57 +414,46 @@ export async function deleteAccount(request, env) {
     }, 409);
   }
 
-  const dbSession = env.DB.withSession("first-primary");
-  let transactionStarted = false;
+  const db = env.DB;
   logAccountDeletionEvent("deletion_started", {
     account_type: user.has_password ? "password" : "oauth",
     session_guard: "acquired",
   });
 
   try {
-    await dbSession.prepare("BEGIN TRANSACTION").run();
-    transactionStarted = true;
+    // Delete required child rows before deleting users to avoid FK/runtime failures.
+    await deleteByUserId(db, "sessions", user.id);
+    await deleteByUserId(db, "oauth_accounts", user.id);
+    await deleteByUserId(db, "email_verification_tokens", user.id);
+    await deleteByUserId(db, "password_reset_tokens", user.id);
 
-    await deleteThreadsAccountLink(dbSession, user.id);
+    await runOptionalCleanup("threads_account_link", async () => {
+      await deleteThreadsAccountLink(db, user.id);
+    });
 
-    await dbSession.prepare("DELETE FROM user_daily_usage WHERE user_id = ?")
-      .bind(user.id)
-      .run();
+    await runOptionalCleanup("user_daily_usage", async () => {
+      await deleteByUserIdIfTableExists(db, "user_daily_usage", user.id);
+    });
+    await runOptionalCleanup("user_usage_daily", async () => {
+      await deleteByUserIdIfTableExists(db, "user_usage_daily", user.id);
+    });
+    await runOptionalCleanup("scheduled_posts", async () => {
+      await deleteByUserIdIfTableExists(db, "scheduled_posts", user.id);
+    });
 
-    await dbSession.prepare("DELETE FROM user_usage_daily WHERE user_id = ?")
-      .bind(user.id)
-      .run();
-
-    await dbSession.prepare("DELETE FROM scheduled_posts WHERE user_id = ?")
-      .bind(user.id)
-      .run();
-
-    const result = await dbSession.prepare("DELETE FROM users WHERE id = ?")
-      .bind(user.id)
-      .run();
+    const result = await runDbOperation("users_delete", async () =>
+      db.prepare("DELETE FROM users WHERE id = ?")
+        .bind(user.id)
+        .run(),
+    );
 
     if (Number(result.meta?.changes ?? 0) === 0) {
-      await dbSession.prepare("ROLLBACK").run();
-      transactionStarted = false;
       return jsonResponse({
         success: false,
         error: "Account not found",
       }, 404);
     }
-
-    await dbSession.prepare("COMMIT").run();
-    transactionStarted = false;
   } catch (error) {
-    if (transactionStarted) {
-      try {
-        await dbSession.prepare("ROLLBACK").run();
-      } catch (rollbackError) {
-        logAccountDeletionEvent("deletion_rollback_failed", {
-          reason: getErrorMessage(rollbackError),
-        }, "error");
-      }
-    }
-
     logAccountDeletionEvent("deletion_failed", {
       reason: getErrorMessage(error),
     }, "error");

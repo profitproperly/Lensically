@@ -32,22 +32,11 @@ export function Sidebar() {
   const { user } = useAuth();
   const isConnectPage = pathname === "/connect";
   const appUserId = user?.id?.trim() ?? "";
+  const cachedProfile = appUserId ? readThreadsProfileCache(appUserId) : null;
   const [username, setUsername] = useState<string>("unknown");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!appUserId) {
-      return;
-    }
-
-    const cachedProfile = readThreadsProfileCache(appUserId);
-    if (!cachedProfile?.account) {
-      return;
-    }
-
-    setUsername(cachedProfile.account.username || "unknown");
-    setProfilePictureUrl(cachedProfile.account.threads_profile_picture_url ?? null);
-  }, [appUserId]);
+  const displayUsername = username || cachedProfile?.account?.username || "unknown";
+  const displayProfilePictureUrl = profilePictureUrl ?? cachedProfile?.account?.threads_profile_picture_url ?? null;
 
   useEffect(() => {
     if (isConnectPage || !appUserId) {
@@ -84,14 +73,14 @@ export function Sidebar() {
         <div className="flex flex-col items-center w-full mt-6 mb-8">
           <div className="relative group cursor-pointer">
             <a
-              href={`https://www.threads.net/@${username}`}
+              href={`https://www.threads.net/@${displayUsername}`}
               target="_blank"
               rel="noopener noreferrer"
             >
-              {profilePictureUrl ? (
+              {displayProfilePictureUrl ? (
                 <img
-                  src={profilePictureUrl}
-                  alt={`@${username}`}
+                  src={displayProfilePictureUrl || ""}
+                  alt={`@${displayUsername}`}
                   className="h-32 w-32 rounded-full"
                 />
               ) : (
@@ -114,7 +103,7 @@ export function Sidebar() {
               Open Threads Profile
             </div>
           </div>
-          <p className="text-base font-semibold text-slate-900 mt-3">@{username}</p>
+          <p className="text-base font-semibold text-slate-900 mt-3">@{displayUsername}</p>
         </div>
       )}
 

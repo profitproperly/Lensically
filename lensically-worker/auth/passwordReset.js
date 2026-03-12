@@ -17,6 +17,10 @@ const DEFAULT_APP_URL = "https://app.lensically.com";
 const GENERIC_RESET_REQUEST_MESSAGE = "If the account is eligible, password reset instructions will be sent.";
 const GENERIC_RESET_TOKEN_ERROR = "Invalid or expired reset token.";
 
+function genericResetTokenErrorResponse() {
+  return json({ success: false, error: GENERIC_RESET_TOKEN_ERROR }, 400);
+}
+
 async function getValidResetTokenRow(env, token) {
   const tokenRow = await env.DB.prepare(
     `SELECT id, user_id, token, expires_at
@@ -103,18 +107,26 @@ export async function forgotPassword(request, env) {
 
 export async function resetPassword(request, env) {
   if (request.method === "GET") {
-    const token = new URL(request.url).searchParams.get("token")?.trim() || "";
+    try {
+      const token = new URL(request.url).searchParams.get("token")?.trim() || "";
 
-    const tokenError = validateUuidLike(token, "Reset token");
-    if (tokenError) {
-      logAuthEvent("reset_password_token_invalid", { reason: "token_format_invalid" });
-      return json({ success: false, error: GENERIC_RESET_TOKEN_ERROR }, 400);
-    }
+      const tokenError = validateUuidLike(token, "Reset token");
+      if (tokenError) {
+        logAuthEvent("reset_password_token_invalid", { reason: "token_format_invalid" });
+        return genericResetTokenErrorResponse();
+      }
 
-    const { error } = await getValidResetTokenRow(env, token);
-    if (error) {
-      logAuthEvent("reset_password_token_invalid", { reason: error });
-      return json({ success: false, error }, 400);
+      const { error } = await getValidResetTokenRow(env, token);
+      if (error) {
+        logAuthEvent("reset_password_token_invalid", { reason: error });
+        return genericResetTokenErrorResponse();
+      }
+    } catch (error) {
+      logAuthEvent("reset_password_token_invalid", {
+        reason: "token_lookup_exception",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+      return genericResetTokenErrorResponse();
     }
 
     logAuthEvent("reset_password_token_validated");
@@ -158,10 +170,20 @@ export async function resetPassword(request, env) {
     return json({ success: false, error: passwordError }, 400);
   }
 
-  const { tokenRow, error } = await getValidResetTokenRow(env, token);
-  if (error || !tokenRow) {
-    logAuthEvent("reset_password_failed", { reason: error || "invalid_reset_token" });
-    return json({ success: false, error: GENERIC_RESET_TOKEN_ERROR }, 400);
+  let tokenRow;
+  try {
+    const tokenLookup = await getValidResetTokenRow(env, token);
+    tokenRow = tokenLookup.tokenRow;
+    if (tokenLookup.error || !tokenRow) {
+      logAuthEvent("reset_password_failed", { reason: tokenLookup.error || "invalid_reset_token" });
+      return genericResetTokenErrorResponse();
+    }
+  } catch (error) {
+    logAuthEvent("reset_password_failed", {
+      reason: "token_lookup_exception",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+    return genericResetTokenErrorResponse();
   }
 
   const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);

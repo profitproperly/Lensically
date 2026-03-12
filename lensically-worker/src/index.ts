@@ -36,8 +36,6 @@ interface Env {
   THREADS_CLIENT_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
-  GITHUB_DEV_CLIENT_ID: string;
-  GITHUB_DEV_CLIENT_SECRET: string;
   GITHUB_PROD_CLIENT_ID: string;
   GITHUB_PROD_CLIENT_SECRET: string;
   DISCORD_CLIENT_ID: string;
@@ -89,6 +87,22 @@ function authRateLimitDeniedResponse(
         "Content-Type": "application/json",
         ...getCorsHeadersForRequest(request, env),
         ...getAuthRateLimitHeaders(result),
+      },
+    },
+  );
+}
+
+function resetPasswordTokenErrorResponse(request: Request, env: Env): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "Invalid or expired reset token.",
+    }),
+    {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        ...getCorsHeadersForRequest(request, env),
       },
     },
   );
@@ -276,7 +290,6 @@ function oauthStateCookieName(provider: AuthProvider): string {
 function getOauthClientCredentials(
   provider: AuthProvider,
   env: Env,
-  request: Request,
 ): { clientId: string; clientSecret: string } | null {
   if (provider === "google") {
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
@@ -336,9 +349,8 @@ async function exchangeCodeForAccessToken(
   code: string,
   callbackUrl: string,
   env: Env,
-  request: Request,
 ): Promise<string | null> {
-  const credentials = getOauthClientCredentials(provider, env, request);
+  const credentials = getOauthClientCredentials(provider, env);
   if (!credentials) {
     return null;
   }
@@ -688,11 +700,26 @@ async function enforceAuthRequestRateLimit(
   env: Env,
   route: AuthRateLimitRoute,
 ): Promise<Response | null> {
-  const result = await enforceAuthRateLimit(env, request, route);
-  if (!result.allowed) {
-    return authRateLimitDeniedResponse(request, env, result);
+  try {
+    const result = await enforceAuthRateLimit(env, request, route);
+    if (!result.allowed) {
+      return authRateLimitDeniedResponse(request, env, result);
+    }
+    return null;
+  } catch (error) {
+    console.error(JSON.stringify({
+      category: "auth",
+      event: "auth_rate_limit_unavailable",
+      route,
+      reason: sanitizeLogMessage(error instanceof Error ? error.message : String(error)),
+      request: sanitizeForLog({
+        method: request.method,
+        url: request.url,
+      }),
+    }));
+    // Fail open so auth endpoints remain available if rate-limit storage is unavailable.
+    return null;
   }
-  return null;
 }
 
 async function ensureAppThreadsTable(env: Env): Promise<void> {
@@ -1102,15 +1129,33 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (path === "/api/auth/reset-password" && request.method === "GET") {
-      return applyAuthCors(await resetPassword(request, env));
+      try {
+        return applyAuthCors(await resetPassword(request, env));
+      } catch (error) {
+        logWorkerEvent("RESET_PASSWORD_ROUTE_ERROR", {
+          method: request.method,
+          path,
+          error: getErrorMessage(error),
+        }, "error");
+        return applyAuthCors(resetPasswordTokenErrorResponse(request, env));
+      }
     }
 
     if (path === "/api/auth/reset-password" && request.method === "POST") {
-      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "reset-password");
-      if (rateLimitResponse) {
-        return applyAuthCors(rateLimitResponse);
+      try {
+        const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "reset-password");
+        if (rateLimitResponse) {
+          return applyAuthCors(rateLimitResponse);
+        }
+        return applyAuthCors(await resetPassword(request, env));
+      } catch (error) {
+        logWorkerEvent("RESET_PASSWORD_ROUTE_ERROR", {
+          method: request.method,
+          path,
+          error: getErrorMessage(error),
+        }, "error");
+        return applyAuthCors(resetPasswordTokenErrorResponse(request, env));
       }
-      return applyAuthCors(await resetPassword(request, env));
     }
 
     if (path === "/api/auth/logout" && request.method === "POST") {
@@ -1141,7 +1186,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           ? "github"
           : "discord";
       const appBaseUrl = buildOauthAppBaseUrl(url, request, env);
-      const credentials = getOauthClientCredentials(provider, env, request);
+      const credentials = getOauthClientCredentials(provider, env);
 
       if (!credentials) {
         return applyAuthCors(Response.redirect(`${appBaseUrl}/login?error=server_config`, 302));
@@ -1248,7 +1293,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             code,
             callbackUrl,
             env,
-            request,
           );
           if (!maybeToken) {
             throw new Error("token_exchange_returned_null");
@@ -1333,7 +1377,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           code,
           callbackUrl,
           env,
-          request,
         );
         if (!accessToken) {
           return redirectToAuthError("token_exchange_failed");

@@ -1,11 +1,44 @@
-import { readFileSync } from "node:fs";
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../src";
+import authSchema from "../db/auth_schema.sql?raw";
 
-const authSchema = readFileSync(new URL("../db/auth_schema.sql", import.meta.url), "utf8");
+const schemaSql = authSchema
+  .split("\n")
+  .filter((line) => !line.trim().startsWith("--"))
+  .join("\n")
+  .replace(/^\s+/, "")
+  .replace(/\r?\n+/g, " ");
+
+const resetStatements = `
+  DELETE FROM sessions;
+  DELETE FROM oauth_accounts;
+  DELETE FROM email_verification_tokens;
+  DELETE FROM password_reset_tokens;
+  DELETE FROM auth_rate_limits;
+  DELETE FROM account_deletion_guards;
+  DELETE FROM users;
+`
+  .split(";")
+  .map((statement) => statement.trim())
+  .filter((statement) => statement.length > 0);
+
+async function execStatements(statements: string[]) {
+  for (const statement of statements) {
+    await env.DB.exec(statement);
+  }
+}
+
 const SESSION_COOKIE_NAME = "__Host-session_token";
+
+async function ensureSchema() {
+  await env.DB.exec(schemaSql);
+}
+
+async function resetRows() {
+  await execStatements(resetStatements);
+}
 
 async function runWorker(request: Request) {
   const ctx = createExecutionContext();
@@ -15,16 +48,8 @@ async function runWorker(request: Request) {
 }
 
 async function resetDatabase() {
-  await env.DB.exec(authSchema);
-  await env.DB.exec(`
-    DELETE FROM sessions;
-    DELETE FROM oauth_accounts;
-    DELETE FROM email_verification_tokens;
-    DELETE FROM password_reset_tokens;
-    DELETE FROM auth_rate_limits;
-    DELETE FROM account_deletion_guards;
-    DELETE FROM users;
-  `);
+  await ensureSchema();
+  await resetRows();
 }
 
 beforeEach(async () => {

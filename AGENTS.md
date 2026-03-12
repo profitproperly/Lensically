@@ -67,7 +67,7 @@ Risks / Edge Cases
 
 `Run These Now` rules:
 
-- list exact task labels only, one per line
+- list exact task labels in execution order as a numbered list
 - include only tasks relevant to the files changed
 - treat listed tasks as mandatory
 - do not use conditional wording in the user-facing list
