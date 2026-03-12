@@ -30,6 +30,7 @@ export async function currentUser(request, env) {
     JSON.stringify({
       id: user.id,
       email: user.email,
+      timezone: user.timezone,
       email_verified: user.email_verified,
       has_password: user.has_password,
       login_provider: loginProvider,

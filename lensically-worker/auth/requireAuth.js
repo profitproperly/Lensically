@@ -20,6 +20,7 @@ export async function requireAuth(request, env) {
       sessions.user_id,
       sessions.expires_at,
       users.email,
+      users.timezone,
       users.email_verified,
       users.is_admin,
       users.password_hash
@@ -49,6 +50,7 @@ export async function requireAuth(request, env) {
   return {
     id: row.user_id,
     email: row.email,
+    timezone: typeof row.timezone === "string" && row.timezone.trim().length > 0 ? row.timezone.trim() : "UTC",
     email_verified: row.email_verified,
     is_admin: Boolean(row.is_admin),
     has_password: Boolean(row.password_hash),

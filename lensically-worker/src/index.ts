@@ -830,6 +830,23 @@ async function getThreadsAccessTokenForScheduledPost(
   return row?.access_token ?? null;
 }
 
+async function getUserTimezonePreference(env: Env, userId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT timezone
+     FROM users
+     WHERE id = ?
+     LIMIT 1`,
+  )
+    .bind(userId)
+    .first<{ timezone: string | null }>();
+
+  if (typeof row?.timezone !== "string") {
+    return null;
+  }
+  const timezone = row.timezone.trim();
+  return timezone.length > 0 ? timezone : null;
+}
+
 async function processScheduledPost(
   env: Env,
   post: DueScheduledPost,
@@ -3842,12 +3859,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const text = payload.text?.trim();
       const date = payload.date?.trim();
       const time = payload.time?.trim();
-      const timezone = payload.timezone?.trim();
+      const timezone = payload.timezone?.trim() || null;
 
-      if (!threadsUserId || !text || !date || !time || !timezone) {
+      if (!threadsUserId || !text || !date || !time) {
         return new Response(
           JSON.stringify({
-            error: "threads_user_id, text, date, time, and timezone are required",
+            error: "threads_user_id, text, date, and time are required",
           }),
           {
             status: 400,
@@ -3861,6 +3878,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return forbiddenJsonResponse(requestCorsHeaders);
       }
 
+      const preferredTimezone = await getUserTimezonePreference(env, ownedAppUserId);
+      const resolvedTimezone = timezone ?? preferredTimezone ?? "UTC";
+
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
       if (!account?.threads_user_id || account.threads_user_id !== threadsUserId) {
         return new Response(
@@ -3872,7 +3892,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
+      const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, resolvedTimezone);
       if (!scheduledUtc) {
         return new Response(
           JSON.stringify({ error: "Invalid date, time, or timezone" }),
@@ -3881,6 +3901,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
+      }
+
+      if (timezone && timezone !== preferredTimezone) {
+        await env.DB.prepare(
+          `UPDATE users
+           SET timezone = ?
+           WHERE id = ?`,
+        )
+          .bind(resolvedTimezone, ownedAppUserId)
+          .run();
       }
 
       await ensureScheduledPostsTable(env);

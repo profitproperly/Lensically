@@ -9,6 +9,7 @@ type DeletedAccountUser = {
 export type CurrentUser = {
   id: string;
   email: string;
+  timezone?: string;
   email_verified: boolean;
   has_password: boolean;
   login_provider?: "google" | "discord" | "github" | null;
