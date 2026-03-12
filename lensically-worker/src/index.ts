@@ -3950,6 +3950,79 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
+    if (url.pathname === "/api/threads/schedule" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
+      if (!scheduledPostsTableExists) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            scheduled_posts: [],
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const nowIso = new Date().toISOString();
+      const rows = await env.DB.prepare(
+        `SELECT id, post_text, status, scheduled_time
+         FROM scheduled_posts
+         WHERE user_id = ?
+           AND status IN (?, ?)
+           AND scheduled_time >= ?
+         ORDER BY scheduled_time ASC, id ASC
+         LIMIT 100`,
+      )
+        .bind(
+          ownedAppUserId,
+          SCHEDULED_POST_STATUS_APPROVED,
+          SCHEDULED_POST_STATUS_POSTING,
+          nowIso,
+        )
+        .all<{
+          id: number | string;
+          post_text: string;
+          status: string;
+          scheduled_time: string;
+        }>();
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scheduled_posts: (rows.results ?? []).map((row) => ({
+            id: Number(row.id),
+            text: row.post_text,
+            status: row.status,
+            scheduled_time_utc: row.scheduled_time,
+          })),
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
     if (url.pathname === "/api/accounts" && request.method === "GET") {
       const result = await env.DB.prepare(
         `SELECT threads_user_id, created_at

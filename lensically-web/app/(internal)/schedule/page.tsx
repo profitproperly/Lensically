@@ -18,6 +18,19 @@ const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 
+type ScheduledPost = {
+  id: number;
+  text: string;
+  status: "approved" | "posting" | "posted";
+  scheduled_time_utc: string;
+};
+
+type ScheduledPostsResponse = {
+  success?: boolean;
+  scheduled_posts?: ScheduledPost[];
+  error?: string;
+};
+
 function formatScheduledLocalTime(
   scheduledUtc: string,
   timezone: string,
@@ -60,6 +73,9 @@ export default function SchedulePage() {
   const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const [loadingScheduledPosts, setLoadingScheduledPosts] = useState(false);
+  const [scheduledPostsError, setScheduledPostsError] = useState("");
 
   useEffect(() => {
     if (!appUserId) {
@@ -130,6 +146,50 @@ export default function SchedulePage() {
       controller.abort();
     };
   }, [appUserId]);
+
+  useEffect(() => {
+    if (!appUserId || !threadsUserId) {
+      setScheduledPosts([]);
+      setScheduledPostsError("");
+      setLoadingScheduledPosts(false);
+      return;
+    }
+
+    void loadScheduledPosts();
+    // appUserId/threadsUserId changes should refresh upcoming posts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appUserId, threadsUserId]);
+
+  async function loadScheduledPosts() {
+    if (!appUserId || !threadsUserId) {
+      return;
+    }
+
+    setLoadingScheduledPosts(true);
+    setScheduledPostsError("");
+
+    try {
+      const response = await fetch(
+        `${THREADS_SCHEDULE_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+        {
+          cache: "no-store",
+          credentials: "include",
+        },
+      );
+
+      const data = (await response.json().catch(() => null)) as ScheduledPostsResponse | null;
+      if (!response.ok) {
+        setScheduledPostsError(data?.error || "Could not load scheduled posts.");
+        return;
+      }
+
+      setScheduledPosts(Array.isArray(data?.scheduled_posts) ? data.scheduled_posts : []);
+    } catch {
+      setScheduledPostsError("Could not load scheduled posts.");
+    } finally {
+      setLoadingScheduledPosts(false);
+    }
+  }
 
   async function handlePostNow() {
     const trimmedText = postText.trim();
@@ -254,6 +314,7 @@ export default function SchedulePage() {
       setPostText("");
       setScheduleDate("");
       setScheduleTime("");
+      await loadScheduledPosts();
     } catch {
       setErrorMessage("Could not schedule post.");
     } finally {
@@ -397,6 +458,58 @@ export default function SchedulePage() {
             <p className="text-sm text-green-700">{successMessage}</p>
           ) : null}
         </div>
+      </section>
+
+      <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900">Upcoming Scheduled Posts</h2>
+          <button
+            type="button"
+            onClick={() => void loadScheduledPosts()}
+            disabled={loadingScheduledPosts}
+            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loadingScheduledPosts ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+
+        {loadingScheduledPosts ? (
+          <p className="text-sm text-slate-700">Loading scheduled posts...</p>
+        ) : scheduledPostsError ? (
+          <p className="text-sm text-red-600">{scheduledPostsError}</p>
+        ) : !scheduledPosts.length ? (
+          <p className="text-sm text-slate-600">No upcoming scheduled posts.</p>
+        ) : (
+          <ul className="space-y-3">
+            {scheduledPosts.map((post) => {
+              const localTime = formatScheduledLocalTime(
+                post.scheduled_time_utc,
+                timezone,
+                user?.clock_format === "24h" ? "24h" : "12h",
+              );
+              const statusLabel = post.status === "posting" ? "Publishing" : "Scheduled";
+
+              return (
+                <li
+                  key={post.id}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+                >
+                  <p className="line-clamp-3 text-sm text-slate-900">{post.text}</p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
+                      {statusLabel}
+                    </span>
+                    <span className="text-slate-600">
+                      {localTime
+                        ? `${localTime} (${timezone})`
+                        : `${post.scheduled_time_utc} UTC`}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       {showPostNowConfirmation ? (
