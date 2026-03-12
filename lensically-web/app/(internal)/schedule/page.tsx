@@ -18,6 +18,32 @@ const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 
+function formatScheduledLocalTime(
+  scheduledUtc: string,
+  timezone: string,
+  clockFormat: "12h" | "24h",
+): string | null {
+  const date = new Date(scheduledUtc);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: clockFormat !== "24h",
+    });
+    return formatter.format(date);
+  } catch {
+    return null;
+  }
+}
+
 export default function SchedulePage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
@@ -31,6 +57,7 @@ export default function SchedulePage() {
   const [loadingConnection, setLoadingConnection] = useState(true);
   const [isPostingNow, setIsPostingNow] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -152,6 +179,22 @@ export default function SchedulePage() {
     }
   }
 
+  function handleRequestPostNowConfirmation() {
+    const trimmedText = postText.trim();
+    if (!trimmedText) {
+      setErrorMessage("Enter post text before publishing.");
+      return;
+    }
+    if (!appUserId || !threadsUserId) {
+      setErrorMessage("Threads account is not connected.");
+      return;
+    }
+
+    setErrorMessage("");
+    setSuccessMessage("");
+    setShowPostNowConfirmation(true);
+  }
+
   async function handleSchedulePost() {
     const trimmedText = postText.trim();
     if (!trimmedText) {
@@ -194,9 +237,18 @@ export default function SchedulePage() {
         return;
       }
 
+      const scheduledUtc = data?.scheduled_post?.scheduled_time_utc;
+      const localScheduledTime = scheduledUtc
+        ? formatScheduledLocalTime(
+          scheduledUtc,
+          timezone,
+          user?.clock_format === "24h" ? "24h" : "12h",
+        )
+        : null;
+
       setSuccessMessage(
-        data?.scheduled_post?.scheduled_time_utc
-          ? `Post scheduled for ${data.scheduled_post.scheduled_time_utc} UTC.`
+        localScheduledTime
+          ? `Post scheduled for ${localScheduledTime} (${timezone}).`
           : "Post scheduled successfully.",
       );
       setPostText("");
@@ -322,7 +374,7 @@ export default function SchedulePage() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => void handlePostNow()}
+              onClick={handleRequestPostNowConfirmation}
               disabled={isSubmitting || !postText.trim()}
               className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -346,6 +398,44 @@ export default function SchedulePage() {
           ) : null}
         </div>
       </section>
+
+      {showPostNowConfirmation ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Publish post now?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              This will immediately publish your post to Threads and cannot be undone.
+            </p>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isPostingNow) {
+                    return;
+                  }
+                  setShowPostNowConfirmation(false);
+                }}
+                disabled={isPostingNow}
+                className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handlePostNow();
+                  setShowPostNowConfirmation(false);
+                }}
+                disabled={isPostingNow}
+                className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPostingNow ? "Posting..." : "Confirm and Post Now"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

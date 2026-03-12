@@ -7,6 +7,21 @@ function normalizeLoginProvider(value) {
   return null;
 }
 
+function normalizeClockFormat(value) {
+  if (value === "24h") {
+    return "24h";
+  }
+  return "12h";
+}
+
+function normalizeTimezone(value) {
+  if (typeof value !== "string") {
+    return "UTC";
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "UTC";
+}
+
 export async function currentUser(request, env) {
   const user = await requireAuth(request, env);
 
@@ -30,8 +45,8 @@ export async function currentUser(request, env) {
     JSON.stringify({
       id: user.id,
       email: user.email,
-      timezone: user.timezone,
-      clock_format: user.clock_format,
+      timezone: normalizeTimezone(user.timezone),
+      clock_format: normalizeClockFormat(user.clock_format),
       email_verified: user.email_verified,
       has_password: user.has_password,
       login_provider: loginProvider,

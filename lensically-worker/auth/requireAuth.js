@@ -15,6 +15,69 @@ function normalizeClockFormat(value) {
   return "12h";
 }
 
+function isMissingPreferenceColumnError(error) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return message.includes("no such column: users.timezone")
+    || message.includes("no such column: users.clock_format")
+    || message.includes("no such column: timezone")
+    || message.includes("no such column: clock_format");
+}
+
+async function fetchAuthRow(env, sessionToken) {
+  try {
+    return await env.DB.prepare(
+      `SELECT
+        sessions.user_id,
+        sessions.expires_at,
+        users.email,
+        users.timezone,
+        users.clock_format,
+        users.email_verified,
+        users.is_admin,
+        users.password_hash
+      FROM sessions
+      JOIN users
+        ON sessions.user_id = users.id
+      WHERE sessions.session_token = ?`,
+    )
+      .bind(sessionToken)
+      .first();
+  } catch (error) {
+    if (!isMissingPreferenceColumnError(error)) {
+      throw error;
+    }
+
+    const legacyRow = await env.DB.prepare(
+      `SELECT
+        sessions.user_id,
+        sessions.expires_at,
+        users.email,
+        users.email_verified,
+        users.is_admin,
+        users.password_hash
+      FROM sessions
+      JOIN users
+        ON sessions.user_id = users.id
+      WHERE sessions.session_token = ?`,
+    )
+      .bind(sessionToken)
+      .first();
+
+    if (!legacyRow) {
+      return null;
+    }
+
+    return {
+      ...legacyRow,
+      timezone: "UTC",
+      clock_format: "12h",
+    };
+  }
+}
+
 export async function requireAuth(request, env) {
   const sessionToken = getSessionCookieValue(request);
 
@@ -22,23 +85,7 @@ export async function requireAuth(request, env) {
     return unauthorized("Unauthorized");
   }
 
-  const row = await env.DB.prepare(
-    `SELECT
-      sessions.user_id,
-      sessions.expires_at,
-      users.email,
-      users.timezone,
-      users.clock_format,
-      users.email_verified,
-      users.is_admin,
-      users.password_hash
-    FROM sessions
-    JOIN users
-      ON sessions.user_id = users.id
-    WHERE sessions.session_token = ?`,
-  )
-    .bind(sessionToken)
-    .first();
+  const row = await fetchAuthRow(env, sessionToken);
 
   if (!row) {
     return unauthorized("Unauthorized");
