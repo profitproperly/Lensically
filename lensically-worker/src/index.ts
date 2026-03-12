@@ -829,6 +829,113 @@ function getPublishRequestIdFromPayload(payload: unknown): string | null {
     : null;
 }
 
+type ThreadsPublishFlowResult =
+  | {
+    success: true;
+    publishRequestId: string;
+    publishedPostId: string;
+    publishResponse: unknown;
+  }
+  | {
+    success: false;
+    errorCode:
+      | "threads_publish_create_failed"
+      | "threads_publish_create_invalid_response"
+      | "threads_publish_commit_failed"
+      | "threads_publish_commit_invalid_response";
+    status?: number;
+  };
+
+async function executeThreadsPublishFlow(
+  accessToken: string,
+  threadsUserId: string,
+  text: string,
+): Promise<ThreadsPublishFlowResult> {
+  const publishCreateBody = new URLSearchParams({
+    text,
+    media_type: "TEXT",
+  });
+  const createResponse = await fetch(
+    `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: publishCreateBody,
+    },
+  );
+  if (!createResponse.ok) {
+    return {
+      success: false,
+      errorCode: "threads_publish_create_failed",
+      status: createResponse.status,
+    };
+  }
+
+  const createPayload = await readJsonSafe(createResponse);
+  if (createPayload === null) {
+    return {
+      success: false,
+      errorCode: "threads_publish_create_invalid_response",
+    };
+  }
+
+  const publishRequestId = getPublishRequestIdFromPayload(createPayload);
+  if (!publishRequestId) {
+    return {
+      success: false,
+      errorCode: "threads_publish_create_invalid_response",
+    };
+  }
+
+  const publishCommitBody = new URLSearchParams({
+    creation_id: publishRequestId,
+  });
+  const commitResponse = await fetch(
+    `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads_publish`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: publishCommitBody,
+    },
+  );
+  if (!commitResponse.ok) {
+    return {
+      success: false,
+      errorCode: "threads_publish_commit_failed",
+      status: commitResponse.status,
+    };
+  }
+
+  const commitPayload = await readJsonSafe(commitResponse);
+  if (commitPayload === null) {
+    return {
+      success: false,
+      errorCode: "threads_publish_commit_invalid_response",
+    };
+  }
+
+  const publishedPostId = getPublishRequestIdFromPayload(commitPayload);
+  if (!publishedPostId) {
+    return {
+      success: false,
+      errorCode: "threads_publish_commit_invalid_response",
+    };
+  }
+
+  return {
+    success: true,
+    publishRequestId,
+    publishedPostId,
+    publishResponse: commitPayload,
+  };
+}
+
 async function processScheduledPost(
   env: Env,
   post: DueScheduledPost,
@@ -856,50 +963,34 @@ async function processScheduledPost(
   }
 
   try {
-    const publishBody = new URLSearchParams({
-      text: post.post_text,
-      media_type: "TEXT",
-    });
-    const publishResp = await fetch("https://graph.threads.net/v1.0/me/threads", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body: publishBody,
-    });
-    if (!publishResp.ok) {
+    const publishResult = await executeThreadsPublishFlow(
+      accessToken,
+      post.threads_user_id,
+      post.post_text,
+    );
+    if (!publishResult.success) {
       await transitionScheduledPostStatus(
         env,
         post.id,
         SCHEDULED_POST_STATUS_POSTING,
         SCHEDULED_POST_STATUS_APPROVED,
-        { publishErrorMessage: `threads_publish_failed:${publishResp.status}` },
+        {
+          publishErrorMessage: publishResult.status
+            ? `${publishResult.errorCode}:${publishResult.status}`
+            : publishResult.errorCode,
+        },
       );
       return;
     }
 
-    const payload = await readJsonSafe(publishResp);
-    if (payload === null) {
-      await transitionScheduledPostStatus(
-        env,
-        post.id,
-        SCHEDULED_POST_STATUS_POSTING,
-        SCHEDULED_POST_STATUS_APPROVED,
-        { publishErrorMessage: "threads_publish_invalid_response" },
-      );
-      return;
-    }
-
-    const publishRequestId = getPublishRequestIdFromPayload(payload);
     await transitionScheduledPostStatus(
       env,
       post.id,
       SCHEDULED_POST_STATUS_POSTING,
       SCHEDULED_POST_STATUS_POSTED,
       {
-        publishRequestId,
-        publishedPostId: publishRequestId,
+        publishRequestId: publishResult.publishRequestId,
+        publishedPostId: publishResult.publishedPostId,
       },
     );
   } catch {
@@ -3714,7 +3805,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
-    if (url.pathname === "/api/threads/publish" && request.method === "POST") {
+    if (
+      (url.pathname === "/api/threads/publish" || url.pathname === "/api/threads/post-now")
+      && request.method === "POST"
+    ) {
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
         return new Response(authUser.body, {
@@ -3770,39 +3864,45 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-      const limit = await enforceLimit(
-        env,
-        { id: account.threads_user_id, is_admin: authUser.is_admin },
-        "publish",
-      );
-      if (!limit.allowed) {
-        return limitDeniedResponse(limit, "publish", request, env);
+      if (url.pathname === "/api/threads/publish") {
+        const limit = await enforceLimit(
+          env,
+          { id: account.threads_user_id, is_admin: authUser.is_admin },
+          "publish",
+        );
+        if (!limit.allowed) {
+          return limitDeniedResponse(limit, "publish", request, env);
+        }
       }
 
-      const publishBody = new URLSearchParams({
+      const publishResult = await executeThreadsPublishFlow(
+        account.access_token,
+        account.threads_user_id,
         text,
-        media_type: "TEXT"
-      });
-      const publishResp = await fetch("https://graph.threads.net/v1.0/me/threads", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${account.access_token}`,
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        body: publishBody,
-      });
-      if (!publishResp.ok) {
-        return upstreamProviderErrorResponse(requestCorsHeaders);
-      }
-      const publishData = await readJsonSafe(publishResp);
-      if (publishData === null) {
+      );
+      if (!publishResult.success) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
 
-      return new Response(JSON.stringify(publishData), {
-        status: 200,
-        headers: { "content-type": "application/json; charset=UTF-8" },
-      });
+      if (url.pathname === "/api/threads/publish") {
+        return new Response(JSON.stringify(publishResult.publishResponse), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          publish_request_id: publishResult.publishRequestId,
+          published_post_id: publishResult.publishedPostId,
+          provider_response: publishResult.publishResponse,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
     }
 
     if (url.pathname === "/api/threads/schedule" && request.method === "POST") {

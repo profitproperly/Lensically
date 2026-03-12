@@ -635,6 +635,62 @@ describe("scheduled post API", () => {
   });
 });
 
+describe("immediate post API", () => {
+  it("publishes immediately with the two-step Threads flow and returns published id", async () => {
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-now", "token-now", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-now", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/threads-user-now/threads_publish")) {
+        return new Response(JSON.stringify({ id: "published-post-now" }), { status: 200 });
+      }
+      if (requestUrl.includes("/v1.0/threads-user-now/threads")) {
+        return new Response(JSON.stringify({ id: "creation-now" }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/post-now", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        app_user_id: "user-authenticated",
+        threads_user_id: "threads-user-now",
+        text: "Post now message",
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      publish_request_id: "creation-now",
+      published_post_id: "published-post-now",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("auth enumeration protections", () => {
   it("returns the same login failure response for missing and unverified accounts", async () => {
     const passwordHash = await bcrypt.hash("correct-password", 4);
@@ -1346,7 +1402,10 @@ describe("scheduled post state machine", () => {
 
     const publishSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const requestUrl = typeof input === "string" ? input : input.url;
-      if (requestUrl.includes("https://graph.threads.net/v1.0/me/threads")) {
+      if (requestUrl.includes("/v1.0/threads-scheduled-1/threads_publish")) {
+        return new Response(JSON.stringify({ id: "threads-post-1" }), { status: 200 });
+      }
+      if (requestUrl.includes("/v1.0/threads-scheduled-1/threads")) {
         return new Response(JSON.stringify({ id: "threads-post-1" }), { status: 200 });
       }
       throw new Error(`Unexpected fetch call: ${requestUrl}`);
@@ -1373,7 +1432,7 @@ describe("scheduled post state machine", () => {
     expect(postRow?.publish_request_id).toBe("threads-post-1");
     expect(postRow?.published_post_id).toBe("threads-post-1");
     expect(postRow?.published_at).toBeTruthy();
-    expect(publishSpy).toHaveBeenCalledTimes(1);
+    expect(publishSpy).toHaveBeenCalledTimes(2);
   });
 
   it("recovers stale posting rows and preserves deterministic transitions", async () => {
@@ -1426,7 +1485,10 @@ describe("scheduled post state machine", () => {
 
     const publishSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const requestUrl = typeof input === "string" ? input : input.url;
-      if (requestUrl.includes("https://graph.threads.net/v1.0/me/threads")) {
+      if (requestUrl.includes("/v1.0/threads-scheduled-2/threads_publish")) {
+        return new Response(JSON.stringify({ id: "threads-post-2" }), { status: 200 });
+      }
+      if (requestUrl.includes("/v1.0/threads-scheduled-2/threads")) {
         return new Response(JSON.stringify({ id: "threads-post-2" }), { status: 200 });
       }
       throw new Error(`Unexpected fetch call: ${requestUrl}`);
@@ -1450,6 +1512,6 @@ describe("scheduled post state machine", () => {
     expect(postRow?.status).toBe("posted");
     expect(postRow?.publish_request_id).toBe("threads-post-2");
     expect(postRow?.published_post_id).toBe("threads-post-2");
-    expect(publishSpy).toHaveBeenCalledTimes(1);
+    expect(publishSpy).toHaveBeenCalledTimes(2);
   });
 });
