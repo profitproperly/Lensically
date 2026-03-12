@@ -21,6 +21,7 @@ import {
 import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 import { evaluateIdentityAccess } from "../auth/identityControl.js";
+import { logAuthEvent } from "../auth/operationalLog.js";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -757,6 +758,32 @@ async function getAuthRateLimitIdentityKeys(
   return [];
 }
 
+function getIdentityKindFromKey(identityKey: string): string {
+  const kind = identityKey.split(":")[0]?.trim().toLowerCase();
+  if (!kind) {
+    return "unknown";
+  }
+  return kind.slice(0, 32);
+}
+
+function logAuthAbuseEvent(
+  request: Request,
+  route: AuthRateLimitRoute,
+  throttleScope: "ip" | "identity",
+  reasonCode: string,
+  details: Record<string, unknown> = {},
+) {
+  logAuthEvent("auth_abuse_detected", {
+    event_type: "rate_limit_violation",
+    route,
+    throttle_scope: throttleScope,
+    reason_code: reasonCode,
+    request_method: request.method,
+    request_path: new URL(request.url).pathname,
+    ...details,
+  });
+}
+
 async function enforceAuthRequestRateLimit(
   request: Request,
   env: Env,
@@ -770,6 +797,10 @@ async function enforceAuthRequestRateLimit(
     if (includeIp) {
       const result = await enforceAuthRateLimit(env, request, route);
       if (!result.allowed) {
+        logAuthAbuseEvent(request, route, "ip", "ip_rate_limit_exceeded", {
+          retry_after_seconds: result.retryAfterSeconds,
+          limit: result.limit,
+        });
         return authRateLimitDeniedResponse(request, env, result);
       }
     }
@@ -785,6 +816,11 @@ async function enforceAuthRequestRateLimit(
         identityKey,
       });
       if (!identityResult.allowed) {
+        logAuthAbuseEvent(request, route, "identity", "identity_rate_limit_exceeded", {
+          identity_kind: getIdentityKindFromKey(identityKey),
+          retry_after_seconds: identityResult.retryAfterSeconds,
+          limit: identityResult.limit,
+        });
         return authRateLimitDeniedResponse(request, env, identityResult);
       }
     }

@@ -46,6 +46,10 @@ Verification is task-driven and user-executed through the task registry.
 Agents must not re-run equivalent local checks in-agent by default when
 the task registry is available.
 
+Agents must not run local lint/build/test commands when VS Code task
+registry equivalents exist, unless the user explicitly requests local
+execution.
+
 Required check tasks when relevant:
 
 - `CHECK: FE Build`
@@ -57,6 +61,37 @@ Required deploy tasks when relevant:
 
 - `DEPLOY: FE Cloudflare`
 - `DEPLOY: BE Worker`
+
+## Task Selection Matrix (Zero Ambiguity)
+
+Agents must derive `Run These Now` strictly from changed paths. Do not
+use judgment terms like "when relevant" for task inclusion.
+
+Rules:
+
+- If any file under `lensically-web/**` changed, include:
+  - `CHECK: FE Lint`
+  - `CHECK: FE Build`
+- If any file under `lensically-worker/**` changed, include:
+  - `CHECK: BE Test`
+- If any file under `lensically-worker/auth/**` changed, include:
+  - `CHECK: BE Auth API Smoke`
+- If `lensically-worker/src/index.ts` changed and includes auth route or
+  auth middleware behavior changes, include:
+  - `CHECK: BE Auth API Smoke`
+- If runtime code changed under `lensically-web/**`, include:
+  - `DEPLOY: FE Cloudflare`
+- If runtime code changed under `lensically-worker/**`, include:
+  - `DEPLOY: BE Worker`
+- If changes are docs-only (`**/*.md`) outside runtime directories, do not
+  include deploy tasks.
+
+Ordering:
+
+- Always list checks first, then deploys.
+- Check order: `CHECK: FE Lint`, `CHECK: FE Build`, `CHECK: BE Test`,
+  `CHECK: BE Auth API Smoke`.
+- Deploy order: `DEPLOY: FE Cloudflare`, `DEPLOY: BE Worker`.
 
 ## Required Output
 
@@ -75,6 +110,7 @@ Every assistant response must start with this exact first line:
 - include only tasks relevant to the files changed
 - treat listed tasks as mandatory
 - do not use conditional wording in the user-facing list
+- output exactly the tasks produced by the Task Selection Matrix
 
 ## Rule
 

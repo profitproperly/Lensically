@@ -188,15 +188,27 @@ export async function login(request, env) {
 
   const failedThrottleResponse = await enforceFailedLoginThrottle(env, request);
   if (failedThrottleResponse) {
-    logAuthEvent("login_failed_throttled");
+    logAuthEvent("login_failed_throttled", {
+      event_type: "abuse_detection",
+      throttle_scope: "ip",
+      reason_code: "failed_login_limit_exceeded",
+    });
     return failedThrottleResponse;
   }
 
   async function handleCredentialsFailure(reason) {
-    logAuthEvent("login_failed", { reason });
+    logAuthEvent("login_failed", {
+      reason,
+      event_type: "abuse_signal",
+      signal: "credential_failure",
+    });
     const throttledResponse = await recordFailedLoginAttempt(env, request);
     if (throttledResponse) {
-      logAuthEvent("login_failed_throttled");
+      logAuthEvent("login_failed_throttled", {
+        event_type: "abuse_detection",
+        throttle_scope: "ip",
+        reason_code: "failed_login_limit_exceeded",
+      });
       return throttledResponse;
     }
     return json({ success: false, error: GENERIC_LOGIN_ERROR }, 401);
