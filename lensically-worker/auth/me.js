@@ -31,6 +31,7 @@ export async function currentUser(request, env) {
       id: user.id,
       email: user.email,
       timezone: user.timezone,
+      clock_format: user.clock_format,
       email_verified: user.email_verified,
       has_password: user.has_password,
       login_provider: loginProvider,

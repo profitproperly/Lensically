@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT,
   timezone TEXT NOT NULL DEFAULT 'UTC',
+  clock_format TEXT NOT NULL DEFAULT '12h' CHECK (clock_format IN ('12h', '24h')),
   email_verified INTEGER NOT NULL DEFAULT 0,
   is_admin INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

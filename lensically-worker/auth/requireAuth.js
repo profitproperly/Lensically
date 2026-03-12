@@ -8,6 +8,13 @@ function unauthorized(message = "Unauthorized", status = 401) {
   });
 }
 
+function normalizeClockFormat(value) {
+  if (value === "24h") {
+    return "24h";
+  }
+  return "12h";
+}
+
 export async function requireAuth(request, env) {
   const sessionToken = getSessionCookieValue(request);
 
@@ -21,6 +28,7 @@ export async function requireAuth(request, env) {
       sessions.expires_at,
       users.email,
       users.timezone,
+      users.clock_format,
       users.email_verified,
       users.is_admin,
       users.password_hash
@@ -51,6 +59,7 @@ export async function requireAuth(request, env) {
     id: row.user_id,
     email: row.email,
     timezone: typeof row.timezone === "string" && row.timezone.trim().length > 0 ? row.timezone.trim() : "UTC",
+    clock_format: normalizeClockFormat(row.clock_format),
     email_verified: row.email_verified,
     is_admin: Boolean(row.is_admin),
     has_password: Boolean(row.password_hash),

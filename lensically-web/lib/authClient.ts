@@ -10,6 +10,7 @@ export type CurrentUser = {
   id: string;
   email: string;
   timezone?: string;
+  clock_format?: "12h" | "24h";
   email_verified: boolean;
   has_password: boolean;
   login_provider?: "google" | "discord" | "github" | null;
