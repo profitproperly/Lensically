@@ -76,8 +76,7 @@ Rules:
   - `CHECK: BE Test`
 - If any file under `lensically-worker/auth/**` changed, include:
   - `CHECK: BE Auth API Smoke`
-- If `lensically-worker/src/index.ts` changed and includes auth route or
-  auth middleware behavior changes, include:
+- If `lensically-worker/src/index.ts` changed, include:
   - `CHECK: BE Auth API Smoke`
 - If runtime code changed under `lensically-web/**`, include:
   - `DEPLOY: FE Cloudflare`

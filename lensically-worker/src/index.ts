@@ -21,7 +21,7 @@ import {
 import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 import { evaluateIdentityAccess } from "../auth/identityControl.js";
-import { logAuthEvent } from "../auth/operationalLog.js";
+import { logAuthEvent, logWorkerOperationalEvent } from "../auth/operationalLog.js";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -602,15 +602,7 @@ function logWorkerEvent(
   details: Record<string, unknown> = {},
   level: "log" | "error" = "log",
 ): void {
-  const serialized = JSON.stringify(sanitizeForLog({
-    event,
-    ...details,
-  }));
-  if (level === "error") {
-    console.error(serialized);
-    return;
-  }
-  console.log(serialized);
+  logWorkerOperationalEvent(event, details, level);
 }
 
 function withAuthCors(request: Request, env: Env, response: Response): Response {
@@ -827,16 +819,16 @@ async function enforceAuthRequestRateLimit(
 
     return null;
   } catch (error) {
-    console.error(JSON.stringify({
-      category: "auth",
-      event: "auth_rate_limit_unavailable",
+    logAuthEvent("auth_rate_limit_unavailable", {
+      event_type: "failure",
+      reason_code: "rate_limit_storage_unavailable",
       route,
       reason: sanitizeLogMessage(error instanceof Error ? error.message : String(error)),
       request: sanitizeForLog({
         method: request.method,
         url: request.url,
       }),
-    }));
+    });
     // Fail open so auth endpoints remain available if rate-limit storage is unavailable.
     return null;
   }
@@ -1501,13 +1493,32 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       try {
+        logWorkerEvent("OAUTH_CALLBACK_RECEIVED", {
+          provider,
+          hasCode: Boolean(code),
+          hasState: Boolean(state),
+          hasStateCookie: Boolean(cookieState),
+        });
+
         if (!code) {
+          logWorkerEvent("OAUTH_CALLBACK_REJECTED", {
+            provider,
+            reason_code: "access_denied",
+          });
           return redirectToAuthError("access_denied");
         }
         if (!state || !cookieState) {
+          logWorkerEvent("OAUTH_CALLBACK_REJECTED", {
+            provider,
+            reason_code: "state_missing",
+          });
           return redirectToAuthError("state_missing");
         }
         if (state !== cookieState) {
+          logWorkerEvent("OAUTH_CALLBACK_REJECTED", {
+            provider,
+            reason_code: "state_mismatch",
+          });
           return redirectToAuthError("state_mismatch");
         }
 
@@ -1518,11 +1529,19 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           env,
         );
         if (!accessToken) {
+          logWorkerEvent("OAUTH_CALLBACK_FAILED", {
+            provider,
+            reason_code: "token_exchange_failed",
+          }, "error");
           return redirectToAuthError("token_exchange_failed");
         }
 
         const identity = await fetchProviderIdentity(provider, accessToken);
         if (!identity?.providerUserId) {
+          logWorkerEvent("OAUTH_CALLBACK_FAILED", {
+            provider,
+            reason_code: "account_lookup_failed",
+          }, "error");
           return redirectToAuthError("account_lookup_failed");
         }
 
@@ -1531,6 +1550,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           { type: "email", value: identity.email ?? "" },
         ]);
         if (!identityAccess.allowed) {
+          logWorkerEvent("OAUTH_CALLBACK_REJECTED", {
+            provider,
+            reason_code: identityAccess.reason === "banned"
+              ? "identity_banned"
+              : "identity_recently_deleted",
+          });
           return redirectToAuthError(
             identityAccess.reason === "banned" ? "identity_banned" : "identity_recently_deleted",
           );
@@ -1549,8 +1574,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
         headers.append("Set-Cookie", clearOauthStateCookie(stateCookieName));
         headers.append("Set-Cookie", setSessionCookie(sessionToken));
+        logWorkerEvent("OAUTH_CALLBACK_COMPLETED", {
+          provider,
+        });
         return applyAuthCors(new Response(null, { status: 302, headers }));
       } catch (error) {
+        logWorkerEvent("OAUTH_CALLBACK_FAILED", {
+          provider,
+          reason: getErrorMessage(error),
+        }, "error");
         if (getErrorMessage(error) === DUPLICATE_EMAIL_OAUTH_ERROR) {
           return redirectToAuthError(DUPLICATE_EMAIL_OAUTH_ERROR);
         }
