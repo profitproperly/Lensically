@@ -55,6 +55,22 @@ Recommended implementation path:
 - Use Cloudflare Workflows + D1 export API + R2 storage.
 - Reference: Cloudflare "Export and save D1 database" workflow example.
 
+## Account Deletion State & Backup Recovery Rules
+
+`account_deletion_tombstones` and `banned_identities` are authoritative identity-control tables.
+
+Non-negotiable recovery rule:
+
+- After any restore, do not consider the system fully recovered until deletion-state controls are validated.
+- A restored snapshot must not allow previously deleted or banned identities to regain access because of rollback timing.
+
+Operational requirements:
+
+1. Preserve tombstone records for the active retention window used by account lifecycle enforcement.
+2. Preserve all active ban records.
+3. If restore point predates deletion/ban events, re-apply missing records from the incident ledger/change log before full go-live.
+4. Keep these controls authoritative over user recreation and authentication decisions after restore.
+
 ## Access Control Requirements
 
 ### Operational Access Model
@@ -112,7 +128,31 @@ All commands run from repository root unless noted.
    - account deletion flow
    - Threads connection read paths
 3. Validate data integrity queries against core auth tables (`users`, `sessions`, `oauth_accounts`, token tables).
-4. Monitor worker error logs and D1 query error rates for at least 30 minutes after restore.
+4. Validate deletion-state controls before full traffic cutover:
+   - Confirm `account_deletion_tombstones` exists and contains current retention-window records.
+   - Confirm `banned_identities` exists and contains active bans.
+   - Confirm deleted/banned incident sample identities remain blocked by policy.
+5. If tombstones or bans are missing, re-apply those records from incident/audit sources and re-run auth deletion smoke checks.
+6. Monitor worker error logs and D1 query error rates for at least 30 minutes after restore.
+
+### F. Deletion-State Verification Procedure (Required)
+
+Run these checks against the restored DB before declaring incident resolved.
+
+1. Verify tables exist:
+   - `npx wrangler d1 execute lensically-db --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('account_deletion_tombstones','banned_identities');"`
+2. Verify tombstones still inside retention:
+   - `npx wrangler d1 execute lensically-db --command="SELECT COUNT(*) AS active_tombstones FROM account_deletion_tombstones WHERE expires_at > CURRENT_TIMESTAMP;"`
+3. Verify active bans:
+   - `npx wrangler d1 execute lensically-db --command="SELECT COUNT(*) AS active_bans FROM banned_identities WHERE expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP;"`
+4. Spot-check affected identities from the incident window:
+   - email tombstones present
+   - provider identity tombstones present (google/github/discord) where applicable
+   - bans present for known blocked identities
+5. If any required records are missing:
+   - re-apply them from audited source-of-truth records
+   - rerun step 2-4
+   - only then proceed with full recovery sign-off
 
 ### E. Undo Restore (If Needed)
 
@@ -129,6 +169,7 @@ All commands run from repository root unless noted.
    - actual RPO/RTO
    - failure points
    - procedural improvements
+4. Include at least one drill scenario where restore point predates account deletion events, and verify tombstone/ban re-application workflow.
 
 ## Verification Checklist
 
