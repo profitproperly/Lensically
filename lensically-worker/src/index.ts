@@ -224,6 +224,54 @@ function isLocalDevelopmentRequest(request: Request): boolean {
   return isLocalDevHostname(refererUrl?.hostname);
 }
 
+function getRequestTransportScheme(request: Request): "http" | "https" | "unknown" {
+  const requestUrl = parseUrl(request.url);
+  if (requestUrl?.protocol === "https:") {
+    return "https";
+  }
+  if (requestUrl?.protocol === "http:") {
+    return "http";
+  }
+
+  const cfVisitor = request.headers.get("CF-Visitor");
+  if (cfVisitor) {
+    try {
+      const parsed = JSON.parse(cfVisitor) as { scheme?: string };
+      const scheme = parsed?.scheme?.toLowerCase();
+      if (scheme === "https") {
+        return "https";
+      }
+      if (scheme === "http") {
+        return "http";
+      }
+    } catch {
+      // Ignore malformed header and fall through.
+    }
+  }
+
+  const forwardedProto = request.headers.get("X-Forwarded-Proto")?.trim().toLowerCase();
+  if (forwardedProto === "https") {
+    return "https";
+  }
+  if (forwardedProto === "http") {
+    return "http";
+  }
+
+  return "unknown";
+}
+
+function buildHttpsRedirectResponse(request: Request): Response {
+  const url = new URL(request.url);
+  url.protocol = "https:";
+
+  return new Response(null, {
+    status: 308,
+    headers: {
+      Location: url.toString(),
+    },
+  });
+}
+
 function getAuthCorsOrigin(request: Request, env: Env): string {
   const allowedOrigins = getAllowedAppOrigins(env);
   const requestOrigin = normalizeAppBaseUrl(request.headers.get("origin"));
@@ -3313,6 +3361,16 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
 export default {
   async fetch(request, env): Promise<Response> {
     const path = new URL(request.url).pathname;
+    const scheme = getRequestTransportScheme(request);
+    if (!isLocalDevelopmentRequest(request) && scheme === "http") {
+      logWorkerEvent("INSECURE_TRANSPORT_REDIRECTED", {
+        path,
+        method: request.method,
+        reason_code: "http_not_allowed",
+      });
+      return buildHttpsRedirectResponse(request);
+    }
+
     try {
       return await handleRequest(request, env);
     } catch (error) {
