@@ -971,11 +971,29 @@ async function processScheduledPost(
     SCHEDULED_POST_STATUS_POSTING,
   );
   if (!claimed) {
+    logWorkerEvent("SCHEDULED_POST_PUBLISH_SKIPPED", {
+      scheduled_post_id: post.id,
+      user_id: post.user_id,
+      threads_user_id: post.threads_user_id,
+      reason: "claim_not_acquired",
+    });
     return;
   }
 
+  logWorkerEvent("SCHEDULED_POST_PUBLISH_ATTEMPT", {
+    scheduled_post_id: post.id,
+    user_id: post.user_id,
+    threads_user_id: post.threads_user_id,
+  });
+
   const accessToken = await getThreadsAccessTokenForScheduledPost(env, post.user_id, post.threads_user_id);
   if (!accessToken) {
+    logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+      scheduled_post_id: post.id,
+      user_id: post.user_id,
+      threads_user_id: post.threads_user_id,
+      error_code: "threads_account_not_connected",
+    });
     await transitionScheduledPostStatus(
       env,
       post.id,
@@ -993,6 +1011,13 @@ async function processScheduledPost(
       text: post.post_text,
     });
     if (!publishResult.success) {
+      logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+        scheduled_post_id: post.id,
+        user_id: post.user_id,
+        threads_user_id: post.threads_user_id,
+        error_code: publishResult.errorCode,
+        status: publishResult.status ?? null,
+      });
       await transitionScheduledPostStatus(
         env,
         post.id,
@@ -1007,7 +1032,7 @@ async function processScheduledPost(
       return;
     }
 
-    await transitionScheduledPostStatus(
+    const posted = await transitionScheduledPostStatus(
       env,
       post.id,
       SCHEDULED_POST_STATUS_POSTING,
@@ -1017,7 +1042,32 @@ async function processScheduledPost(
         publishedPostId: publishResult.publishedPostId,
       },
     );
+    if (posted) {
+      logWorkerEvent("SCHEDULED_POST_PUBLISH_SUCCESS", {
+        scheduled_post_id: post.id,
+        user_id: post.user_id,
+        threads_user_id: post.threads_user_id,
+        publish_request_id: publishResult.publishRequestId,
+        published_post_id: publishResult.publishedPostId,
+      });
+      return;
+    }
+
+    logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+      scheduled_post_id: post.id,
+      user_id: post.user_id,
+      threads_user_id: post.threads_user_id,
+      error_code: "status_transition_failed",
+      from_status: SCHEDULED_POST_STATUS_POSTING,
+      to_status: SCHEDULED_POST_STATUS_POSTED,
+    });
   } catch {
+    logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+      scheduled_post_id: post.id,
+      user_id: post.user_id,
+      threads_user_id: post.threads_user_id,
+      error_code: "threads_publish_exception",
+    });
     await transitionScheduledPostStatus(
       env,
       post.id,
@@ -4163,6 +4213,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         .first<{ id: number | string; status: string; scheduled_time: string }>();
 
       if (existingScheduledPost) {
+        logWorkerEvent("SCHEDULED_POST_CREATED", {
+          scheduled_post_id: Number(existingScheduledPost.id),
+          user_id: ownedAppUserId,
+          threads_user_id: threadsUserId,
+          idempotent_reuse: true,
+          status: existingScheduledPost.status,
+        });
         return new Response(
           JSON.stringify({
             success: true,
@@ -4220,6 +4277,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           throw error;
         }
 
+        logWorkerEvent("SCHEDULED_POST_CREATED", {
+          scheduled_post_id: Number(racedScheduledPost.id),
+          user_id: ownedAppUserId,
+          threads_user_id: threadsUserId,
+          idempotent_reuse: true,
+          status: racedScheduledPost.status,
+          source: "unique_race_recovered",
+        });
         return new Response(
           JSON.stringify({
             success: true,
@@ -4235,6 +4300,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
+
+      logWorkerEvent("SCHEDULED_POST_CREATED", {
+        scheduled_post_id: insertedScheduledPostId,
+        user_id: ownedAppUserId,
+        threads_user_id: threadsUserId,
+        idempotent_reuse: false,
+        status: SCHEDULED_POST_STATUS_APPROVED,
+      });
 
       return new Response(
         JSON.stringify({
