@@ -9,3 +9,7 @@ build
 coverage
 logs
 *.log
+.next
+.open-next
+lensically-web/.next
+lensically-web/.open-next

@@ -1,11 +1,14 @@
 const REDACTED = "[REDACTED]";
 
-const SENSITIVE_KEY_PATTERN = /(^|[_-])(password|password_hash|token|access_token|refresh_token|authorization|cookie|secret|client_secret|session|email|user_id|app_user_id|threads_user_id|platform_user_id|provider_user_id|confirmation_code)([_-]|$)/i;
+const SENSITIVE_KEY_PATTERN = /(^|[_-])(password|password_hash|token|access_token|refresh_token|authorization|cookie|secret|client_secret|api_key|internal_api_key|session|email|user_id|app_user_id|threads_user_id|platform_user_id|provider_user_id|confirmation_code)([_-]|$)/i;
 const PRIVATE_TEXT_KEY_PATTERN = /(^|[_-])(text|body|html|content)([_-]|$)/i;
 const SENSITIVE_QUERY_KEYS = new Set([
   "access_token",
   "token",
   "refresh_token",
+  "client_secret",
+  "api_key",
+  "internal_api_key",
   "authorization",
   "code",
   "state",
@@ -31,6 +34,8 @@ function sanitizeUrlLikeString(value) {
       .replace(/(Bearer\s+)[^\s"]+/gi, `$1${REDACTED}`)
       .replace(/((?:access_)?token=)[^&\s"]+/gi, `$1${REDACTED}`)
       .replace(/(refresh_token=)[^&\s"]+/gi, `$1${REDACTED}`)
+      .replace(/(client_secret=)[^&\s"]+/gi, `$1${REDACTED}`)
+      .replace(/((?:internal_)?api_key=)[^&\s"]+/gi, `$1${REDACTED}`)
       .replace(/(confirmation_code=)[^&\s"]+/gi, `$1${REDACTED}`)
       .replace(/(code=)[^&\s"]+/gi, `$1${REDACTED}`)
       .replace(/(state=)[^&\s"]+/gi, `$1${REDACTED}`)
