@@ -273,6 +273,140 @@ async function runOptionalCleanup(cleanupLabel, action) {
   }
 }
 
+async function countRowsByUserId(db, tableName, userId) {
+  const row = await runDbOperation(`integrity_count:${tableName}`, async () =>
+    db.prepare(
+      `SELECT COUNT(*) AS total
+       FROM ${tableName}
+       WHERE user_id = ?`,
+    )
+      .bind(userId)
+      .first(),
+  );
+  return Number(row?.total ?? 0);
+}
+
+async function countUserRow(db, userId) {
+  const row = await runDbOperation("integrity_count:users", async () =>
+    db.prepare(
+      `SELECT COUNT(*) AS total
+       FROM users
+       WHERE id = ?`,
+    )
+      .bind(userId)
+      .first(),
+  );
+  return Number(row?.total ?? 0);
+}
+
+async function assertNoUserLinkedRowsRemain(db, userId) {
+  if (await countUserRow(db, userId) !== 0) {
+    throw new Error("integrity_check_failed:users_row_still_exists");
+  }
+
+  const requiredTables = [
+    "sessions",
+    "oauth_accounts",
+    "email_verification_tokens",
+    "password_reset_tokens",
+  ];
+  for (const tableName of requiredTables) {
+    if (await countRowsByUserId(db, tableName, userId) !== 0) {
+      throw new Error(`integrity_check_failed:rows_remaining_in_${tableName}`);
+    }
+  }
+
+  const optionalTables = [
+    "user_daily_usage",
+    "user_usage_daily",
+    "scheduled_posts",
+  ];
+  for (const tableName of optionalTables) {
+    if (!(await tableExists(db, tableName))) {
+      continue;
+    }
+    if (await countRowsByUserId(db, tableName, userId) !== 0) {
+      throw new Error(`integrity_check_failed:rows_remaining_in_${tableName}`);
+    }
+  }
+
+  if (await tableExists(db, "app_threads_accounts")) {
+    const row = await runDbOperation("integrity_count:app_threads_accounts", async () =>
+      db.prepare(
+        `SELECT COUNT(*) AS total
+         FROM app_threads_accounts
+         WHERE app_user_id = ?`,
+      )
+        .bind(userId)
+        .first(),
+    );
+    if (Number(row?.total ?? 0) !== 0) {
+      throw new Error("integrity_check_failed:rows_remaining_in_app_threads_accounts");
+    }
+  }
+}
+
+async function countOrphansByUserReference(db, tableName, userIdColumn, userId) {
+  if (!(await tableExists(db, tableName))) {
+    return 0;
+  }
+
+  const row = await runDbOperation(`integrity_orphan_count:${tableName}`, async () =>
+    db.prepare(
+      `SELECT COUNT(*) AS total
+       FROM ${tableName} t
+       LEFT JOIN users u
+         ON u.id = t.${userIdColumn}
+       WHERE t.${userIdColumn} = ?
+         AND u.id IS NULL`,
+    )
+      .bind(userId)
+      .first(),
+  );
+
+  return Number(row?.total ?? 0);
+}
+
+async function assertNoOrphanedUserReferences(db, userId) {
+  const orphanTargets = [
+    ["sessions", "user_id"],
+    ["oauth_accounts", "user_id"],
+    ["email_verification_tokens", "user_id"],
+    ["password_reset_tokens", "user_id"],
+    ["user_daily_usage", "user_id"],
+    ["user_usage_daily", "user_id"],
+    ["scheduled_posts", "user_id"],
+    ["app_threads_accounts", "app_user_id"],
+  ];
+
+  for (const [tableName, userIdColumn] of orphanTargets) {
+    const orphanCount = await countOrphansByUserReference(db, tableName, userIdColumn, userId);
+    if (orphanCount !== 0) {
+      throw new Error(`integrity_check_failed:orphaned_rows_in_${tableName}`);
+    }
+  }
+}
+
+async function isDeletionAlreadyCompleted(db, userId) {
+  try {
+    await assertNoUserLinkedRowsRemain(db, userId);
+    await assertNoOrphanedUserReferences(db, userId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function markDeletionGuardCompletedSafely(db, sessionToken) {
+  try {
+    await markDeletionGuardCompleted(db, sessionToken);
+  } catch (error) {
+    logAccountDeletionEvent("deletion_guard_completion_failed", {
+      reason: getErrorMessage(error),
+    }, "error");
+  }
+}
+
 export async function deleteAccount(request, env) {
   if (request.method !== "POST") {
     logAccountDeletionEvent("deletion_rejected", { reason: "method_not_allowed" });
@@ -295,6 +429,15 @@ export async function deleteAccount(request, env) {
     });
   }
   if (existingGuard?.status === "in_progress") {
+    if (await isDeletionAlreadyCompleted(env.DB, existingGuard.user_id)) {
+      await markDeletionGuardCompletedSafely(env.DB, sessionToken);
+      logAccountDeletionEvent("deletion_duplicate_recovered", { status: "completed" });
+      return buildDeletionResponse({
+        success: true,
+        message: "Account deletion already processed",
+      });
+    }
+
     logAccountDeletionEvent("deletion_duplicate_blocked", { status: "in_progress" });
     return jsonResponse({
       success: false,
@@ -407,6 +550,17 @@ export async function deleteAccount(request, env) {
         message: "Account deletion already processed",
       });
     }
+    if (
+      concurrentGuard?.status === "in_progress"
+      && await isDeletionAlreadyCompleted(env.DB, user.id)
+    ) {
+      await markDeletionGuardCompletedSafely(env.DB, sessionToken);
+      logAccountDeletionEvent("deletion_duplicate_recovered", { status: "completed" });
+      return buildDeletionResponse({
+        success: true,
+        message: "Account deletion already processed",
+      });
+    }
 
     logAccountDeletionEvent("deletion_duplicate_blocked", { status: "in_progress" });
     return jsonResponse({
@@ -432,16 +586,9 @@ export async function deleteAccount(request, env) {
         .all(),
     );
 
-    await runDbOperation("deletion_tombstones_insert", async () =>
-      createDeletionTombstones(db, {
-        email: user.email,
-        oauthIdentities: oauthIdentities.results ?? [],
-      }),
-    );
-
-    // Delete required child rows before deleting users to avoid FK/runtime failures.
-    await deleteByUserId(db, "sessions", user.id);
+    // Execute required cleanups before user deletion so failed cleanup never deletes the user.
     await deleteByUserId(db, "oauth_accounts", user.id);
+    await deleteByUserId(db, "sessions", user.id);
     await deleteByUserId(db, "email_verification_tokens", user.id);
     await deleteByUserId(db, "password_reset_tokens", user.id);
 
@@ -459,6 +606,13 @@ export async function deleteAccount(request, env) {
       await deleteByUserIdIfTableExists(db, "scheduled_posts", user.id);
     });
 
+    await runDbOperation("deletion_tombstones_insert", async () =>
+      createDeletionTombstones(db, {
+        email: user.email,
+        oauthIdentities: oauthIdentities.results ?? [],
+      }),
+    );
+
     const result = await runDbOperation("users_delete", async () =>
       db.prepare("DELETE FROM users WHERE id = ?")
         .bind(user.id)
@@ -466,12 +620,30 @@ export async function deleteAccount(request, env) {
     );
 
     if (Number(result.meta?.changes ?? 0) === 0) {
-      return jsonResponse({
-        success: false,
-        error: "Account not found",
-      }, 404);
+      throw new Error("integrity_check_failed:users_delete_no_changes");
     }
+
+    await assertNoUserLinkedRowsRemain(db, user.id);
+    await assertNoOrphanedUserReferences(db, user.id);
+    await markDeletionGuardCompleted(db, sessionToken);
   } catch (error) {
+    if (await isDeletionAlreadyCompleted(env.DB, user.id)) {
+      await markDeletionGuardCompletedSafely(env.DB, sessionToken);
+      logAccountDeletionEvent("deletion_recovered_success", {
+        reason: getErrorMessage(error),
+      });
+
+      return buildDeletionResponse({
+        success: true,
+        message: "Account has been permanently deleted",
+        user: {
+          id: user.id,
+          email: user.email,
+          email_verified: user.email_verified,
+        },
+      });
+    }
+
     logAccountDeletionEvent("deletion_failed", {
       reason: getErrorMessage(error),
     }, "error");
@@ -483,7 +655,6 @@ export async function deleteAccount(request, env) {
       error: "Could not delete account. Please try again.",
     }, 500);
   }
-  await markDeletionGuardCompleted(env.DB, sessionToken);
   logAccountDeletionEvent("deletion_completed", {
     account_type: user.has_password ? "password" : "oauth",
     session_guard: "completed",

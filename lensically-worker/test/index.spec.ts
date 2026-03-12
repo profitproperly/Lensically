@@ -563,6 +563,66 @@ describe("account lifecycle enforcement", () => {
     expect(Number(tombstoneCount?.total ?? 0)).toBeGreaterThan(0);
   });
 
+  it("rolls back deletion safely when a mid-pipeline cleanup step fails", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    await env.DB.prepare(
+      `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, created_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    )
+      .bind("oauth-forced-failure", "user-authenticated", "google", "google-subject-failure")
+      .run();
+
+    await env.DB.prepare(
+      `CREATE TRIGGER fail_delete_oauth_for_test
+       BEFORE DELETE ON oauth_accounts
+       FOR EACH ROW
+       WHEN OLD.user_id = 'user-authenticated'
+       BEGIN
+         SELECT RAISE(ABORT, 'forced_delete_failure');
+       END`,
+    ).run();
+
+    try {
+      const deleteResponse = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: cookieHeader,
+        },
+        body: JSON.stringify({
+          password: "correct-password",
+        }),
+      }));
+
+      expect(deleteResponse.status).toBe(500);
+
+      const userCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM users WHERE id = ?")
+        .bind("user-authenticated")
+        .first<{ total: number }>();
+      expect(Number(userCount?.total ?? 0)).toBe(1);
+
+      const sessionCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM sessions WHERE user_id = ?")
+        .bind("user-authenticated")
+        .first<{ total: number }>();
+      expect(Number(sessionCount?.total ?? 0)).toBe(1);
+
+      const oauthCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM oauth_accounts WHERE user_id = ?")
+        .bind("user-authenticated")
+        .first<{ total: number }>();
+      expect(Number(oauthCount?.total ?? 0)).toBe(1);
+
+      const tombstoneCount = await env.DB.prepare(
+        "SELECT COUNT(*) AS total FROM account_deletion_tombstones WHERE identity_type = ? AND identity_value = ?",
+      )
+        .bind("email", "auth@example.com")
+        .first<{ total: number }>();
+      expect(Number(tombstoneCount?.total ?? 0)).toBe(0);
+    } finally {
+      await env.DB.exec("DROP TRIGGER IF EXISTS fail_delete_oauth_for_test");
+    }
+  });
+
   it("blocks OAuth identity recreation during tombstone retention and allows it after expiry", async () => {
     await env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, email_verified, created_at)
