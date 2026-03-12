@@ -22,6 +22,7 @@ export default function SchedulePage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
   const timezone = user?.timezone?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const clockFormatLabel = user?.clock_format === "24h" ? "24-hour" : "12-hour";
 
   const [postText, setPostText] = useState("");
   const [scheduleDate, setScheduleDate] = useState("");
@@ -305,7 +306,18 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          <p className="text-xs text-slate-500">Scheduling timezone: {timezone}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs text-slate-600">
+              Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezone}</span>, clock format{" "}
+              <span className="font-medium text-slate-800">{clockFormatLabel}</span>.
+            </p>
+            <Link
+              href="/account"
+              className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Change in Account Settings
+            </Link>
+          </div>
 
           <div className="flex flex-wrap gap-3">
             <button
