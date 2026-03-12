@@ -22,6 +22,15 @@ State Rule
 Track one step at a time.
 Never move to Step X+1 unless Step X is COMPLETE.
 
+Codex Response Gate
+If the user input contains a new `CODEX RESPONSE`, evaluate it first and output:
+1. Verdict: PASS or FAIL
+2. Explanation: 1-2 sentences
+
+Then continue:
+- If PASS: proceed to next required check/deploy/commit action.
+- If FAIL: return correction instructions for current step and do not ask checks.
+
 Complete Rule
 Step X is COMPLETE only when all are true:
 1. Codex output for Step X is acceptable.
@@ -56,6 +65,7 @@ When waiting on checks, output only this one line:
 Did <NEXT TASK LABEL> pass? (Y/N)
 
 No summary, no explanation, no risks, no extra labels in check-wait mode.
+This one-line mode applies only when no new `CODEX RESPONSE` is provided.
 
 Response Modes
 Use exactly one mode per response:
@@ -73,8 +83,10 @@ Instruction Type: Correction
 Step Status: BLOCKED
 Failed Task: <TASK LABEL>
 Commit: commit? no
+Verdict: FAIL
+Explanation: <1-2 sentences>
 
-Text Box Instructions For Codex:
+CODEX INSTRUCTIONS:
 ```txt
 Task
 (2-4 sentences)
@@ -94,6 +106,8 @@ Instruction Type: Execute
 Step Status: COMPLETE
 Run These Now: None
 Commit: commit? yes
+Verdict: PASS
+Explanation: <1-2 sentences>
 
 Commit Message:
 ```text
@@ -103,7 +117,7 @@ Commit Message:
 Next Step: Step X+1
 Instruction Type: Execute
 
-Text Box Instructions For Codex:
+CODEX INSTRUCTIONS:
 ```txt
 Task
 (2-4 sentences)

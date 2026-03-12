@@ -323,7 +323,7 @@ function buildProviderAuthorizationUrl(
     authURL.searchParams.set("client_id", clientId);
     authURL.searchParams.set("redirect_uri", callbackUrl);
     authURL.searchParams.set("response_type", "code");
-    authURL.searchParams.set("scope", "openid email profile");
+    authURL.searchParams.set("scope", "openid email");
     authURL.searchParams.set("state", state);
     return authURL.toString();
   }
@@ -331,7 +331,7 @@ function buildProviderAuthorizationUrl(
     const authURL = new URL("https://github.com/login/oauth/authorize");
     authURL.searchParams.set("client_id", clientId);
     authURL.searchParams.set("redirect_uri", callbackUrl);
-    authURL.searchParams.set("scope", "read:user user:email");
+    authURL.searchParams.set("scope", "user:email");
     authURL.searchParams.set("state", state);
     return authURL.toString();
   }

@@ -65,6 +65,10 @@ Files Modified
 Run These Now  
 Risks / Edge Cases
 
+Response Header
+Every assistant response must start with this exact first line:
+`CODEX RESPONSE`
+
 `Run These Now` rules:
 
 - list exact task labels in execution order as a numbered list
