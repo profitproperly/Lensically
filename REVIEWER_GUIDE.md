@@ -83,3 +83,7 @@ Providers to verify:
 ## Support
 
 - Support email: `support@lensically.com`
+
+## Operations
+
+- Production backup and disaster recovery runbook: [`BACKUP_DR_RUNBOOK.md`](./BACKUP_DR_RUNBOOK.md)

@@ -5,6 +5,10 @@ Social Signal Analytics
 
 - Reviewer guide: [`REVIEWER_GUIDE.md`](./REVIEWER_GUIDE.md)
 
+## Operations Runbooks
+
+- Production backup and disaster recovery: [`BACKUP_DR_RUNBOOK.md`](./BACKUP_DR_RUNBOOK.md)
+
 ## Public Compliance URLs
 
 - Terms of service: `https://lensically.com/terms`
