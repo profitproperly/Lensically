@@ -101,7 +101,25 @@ export default function AccountPage() {
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="max-w-3xl">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <h1 className="text-2xl font-semibold text-amber-900">Session expired</h1>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            Your account session is no longer active. Log in again to manage account details,
+            connected providers, and account deletion settings.
+          </p>
+          <div className="mt-4">
+            <Link
+              href="/login"
+              className="inline-flex cursor-pointer rounded-md border border-amber-700 bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800"
+            >
+              Log in again
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (

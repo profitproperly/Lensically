@@ -27,6 +27,14 @@ function getAuthErrorMessage(errorParam: string | null) {
   return errorParam ? AUTH_ERROR_MESSAGES[errorParam] ?? "" : ""
 }
 
+function getResetSuccessMessage(resetParam: string | null) {
+  if (resetParam !== "success") {
+    return ""
+  }
+
+  return "Password reset successful. Log in with your new password."
+}
+
 export default function LoginPageClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -37,6 +45,7 @@ export default function LoginPageClient() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
   const authError = getAuthErrorMessage(searchParams.get("error"))
+  const resetSuccessMessage = getResetSuccessMessage(searchParams.get("reset"))
 
   useEffect(() => {
     if (loading || !user) {
@@ -143,6 +152,10 @@ export default function LoginPageClient() {
           </h1>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-3">
+            {resetSuccessMessage && (
+              <p className="text-green-700 text-sm text-center">{resetSuccessMessage}</p>
+            )}
+
             {(authError || formError) && (
               <p className="text-red-500 text-sm text-center">{authError || formError}</p>
             )}
