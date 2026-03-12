@@ -700,6 +700,16 @@ function upstreamProviderErrorResponse(
   });
 }
 
+function notFoundJsonResponse(requestCorsHeaders: Record<string, string>): Response {
+  return new Response(JSON.stringify({ error: "Not found" }), {
+    status: 404,
+    headers: {
+      "Content-Type": "application/json",
+      ...requestCorsHeaders,
+    },
+  });
+}
+
 async function readJsonSafe(response: Response): Promise<unknown | null> {
   try {
     return await response.json();
@@ -1279,6 +1289,27 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           Vary: "Origin",
         },
       });
+    }
+
+    // Operational/internal routes must not be externally reachable in production.
+    if (!isLocalDevelopmentRequest(request)) {
+      if (normalizedPath.startsWith("/internal/")) {
+        logWorkerEvent("INTERNAL_ROUTE_BLOCKED", {
+          path: normalizedPath,
+          method: request.method,
+          reason_code: "internal_route_not_public",
+        }, "error");
+        return notFoundJsonResponse(requestCorsHeaders);
+      }
+
+      if (normalizedPath === "/api/accounts") {
+        logWorkerEvent("INTERNAL_ROUTE_BLOCKED", {
+          path: normalizedPath,
+          method: request.method,
+          reason_code: "admin_route_not_public",
+        }, "error");
+        return notFoundJsonResponse(requestCorsHeaders);
+      }
     }
 
     if (path === "/api/auth/register" && request.method === "POST") {
