@@ -45,7 +45,7 @@ export function ProfileMenu({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const initials = getInitials(displayName, email);
   const label = displayName?.trim() || email?.trim() || "Account";
-  const isBusy = isDisconnecting || isLoggingOut || isNavigatingAccount;
+  const isBusy = isDisconnecting || isLoggingOut;
 
   useEffect(() => {
     if (!isOpen) {
@@ -101,8 +101,8 @@ export function ProfileMenu({
 
     try {
       router.prefetch(accountHref);
-      await preloadRouteDataForNavigation(accountHref, appUserId?.trim() ?? "");
-      router.push(accountHref);
+      const destinationHref = await preloadRouteDataForNavigation(accountHref, appUserId?.trim() ?? "");
+      router.push(destinationHref);
     } finally {
       setIsNavigatingAccount(false);
     }
@@ -117,7 +117,7 @@ export function ProfileMenu({
         aria-label="Open profile menu"
         disabled={isBusy}
         onClick={() => setIsOpen((current) => !current)}
-        className="cursor-pointer rounded-full p-0 text-left transition disabled:cursor-not-allowed disabled:opacity-70"
+        className="cursor-pointer rounded-full p-0 text-left transition disabled:opacity-70"
       >
         {avatarUrl ? (
           <img
@@ -159,9 +159,8 @@ export function ProfileMenu({
               type="button"
               role="menuitem"
               onClick={() => void handleOpenAccount()}
-              disabled={isNavigatingAccount}
               aria-busy={isNavigatingAccount}
-              className="block w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`block w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${isNavigatingAccount ? "opacity-60" : ""}`}
             >
               {isNavigatingAccount ? "Opening account..." : "Account"}
             </button>

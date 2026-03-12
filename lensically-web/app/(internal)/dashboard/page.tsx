@@ -202,7 +202,7 @@ export default function DashboardPage() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-xl font-semibold text-slate-900">
-                  {profile.name || "Unknown"}
+                  {profile.name || (profile.username ? `@${profile.username}` : "")}
                 </h2>
                 {profile.is_verified ? (
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
@@ -210,12 +210,16 @@ export default function DashboardPage() {
                   </span>
                 ) : null}
               </div>
-              <p className="mt-1 text-sm text-slate-600">
-                @{profile.username || "unknown"}
-              </p>
-              <p className="mt-3 text-sm leading-6 text-slate-700">
-                {profile.threads_biography || "No biography available."}
-              </p>
+              {profile.username ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  @{profile.username}
+                </p>
+              ) : null}
+              {profile.threads_biography ? (
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {profile.threads_biography}
+                </p>
+              ) : null}
             </div>
           </div>
         </section>

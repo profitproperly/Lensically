@@ -1,8 +1,14 @@
 "use client";
 
 import { buildWorkerUrl } from "./apiClient";
-import { writeThreadsConnectionCache } from "./threadsConnectionCache";
-import { writeThreadsProfileCache } from "./threadsProfileCache";
+import {
+  writeThreadsConnectionCache,
+} from "./threadsConnectionCache";
+import {
+  clearThreadsProfileCache,
+  writeThreadsProfileCache,
+  readThreadsProfileCache,
+} from "./threadsProfileCache";
 
 type ThreadsProfileAccount = {
   threads_profile_picture_url?: string | null;
@@ -25,6 +31,13 @@ type ThreadsPostsResponse = {
 
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POSTS_URL = buildWorkerUrl("/api/threads/posts");
+const PROFILE_REQUIRED_ROUTES = new Set([
+  "/dashboard",
+  "/insights",
+  "/schedule",
+  "/search",
+  "/discovery",
+]);
 
 function isPreloadSupported(appUserId: string) {
   return typeof window !== "undefined" && appUserId.length > 0;
@@ -35,22 +48,49 @@ function buildInsightsCacheKey(appUserId: string) {
 }
 
 async function preloadThreadsStatus(appUserId: string) {
+  const cachedProfile = readThreadsProfileCache(appUserId);
+  const cachedUsername = cachedProfile?.account?.username;
+  if (typeof cachedUsername === "string" && cachedUsername.trim().length > 0) {
+    return true;
+  }
+
   const response = await fetch(
     `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
     { cache: "no-store", credentials: "include" },
   );
 
   if (!response.ok) {
-    return;
+    return false;
   }
 
   const data = (await response.json()) as ThreadsMeResponse;
   const hasConnectedThreads = Boolean(data.connected && data.account);
   writeThreadsConnectionCache(appUserId, hasConnectedThreads);
-  writeThreadsProfileCache(appUserId, hasConnectedThreads ? (data.account ?? null) : null);
+
+  if (!hasConnectedThreads) {
+    clearThreadsProfileCache(appUserId);
+    return false;
+  }
+
+  writeThreadsProfileCache(appUserId, data.account ?? null);
+  const nextCachedProfile = readThreadsProfileCache(appUserId);
+  const nextUsername = nextCachedProfile?.account?.username;
+  return typeof nextUsername === "string" && nextUsername.trim().length > 0;
 }
 
 async function preloadInsights(appUserId: string) {
+  try {
+    const cachedRaw = sessionStorage.getItem(buildInsightsCacheKey(appUserId));
+    if (cachedRaw) {
+      const cached = JSON.parse(cachedRaw) as { posts?: unknown[] };
+      if (Array.isArray(cached.posts)) {
+        return;
+      }
+    }
+  } catch {
+    // Ignore cache read errors and continue with preload fetch.
+  }
+
   const response = await fetch(
     `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
     { cache: "no-store", credentials: "include" },
@@ -78,19 +118,27 @@ async function preloadInsights(appUserId: string) {
 
 export async function preloadRouteDataForNavigation(route: string, appUserId: string) {
   if (!isPreloadSupported(appUserId)) {
-    return;
+    return route;
   }
 
   try {
-    if (route === "/dashboard" || route === "/account") {
-      await preloadThreadsStatus(appUserId);
-      return;
+    if (PROFILE_REQUIRED_ROUTES.has(route)) {
+      const hasReadyProfile = await preloadThreadsStatus(appUserId);
+      if (!hasReadyProfile) {
+        return "/connect";
+      }
     }
 
     if (route === "/insights") {
       await preloadInsights(appUserId);
     }
+
+    if (route === "/account") {
+      await preloadThreadsStatus(appUserId);
+    }
   } catch {
     // Ignore preload failures so navigation always continues.
   }
+
+  return route;
 }
