@@ -168,6 +168,40 @@ describe("auth rate limiting", () => {
     });
   });
 
+  it("rate limits login requests by identity across different client IPs", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, email_verified, created_at)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    )
+      .bind("user-login-identity", "user-login-identity@example.com", passwordHash)
+      .run();
+
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      response = await runWorker(new Request("https://api.lensically.com/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": `198.51.105.${attempt + 1}`,
+          "User-Agent": `vitest-login-identity-${attempt}`,
+        },
+        body: JSON.stringify({
+          email: "user-login-identity@example.com",
+          password: "wrong-password",
+        }),
+      }));
+
+      if (attempt < 10) {
+        expect(response.status).toBe(401);
+      }
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+  });
+
   it("rate limits repeated signup requests from the same client", async () => {
     let response: Response | null = null;
 
@@ -181,6 +215,32 @@ describe("auth rate limiting", () => {
         },
         body: JSON.stringify({
           email: `new-user-${attempt}@example.com`,
+          password: "test-password-123",
+        }),
+      }));
+
+      if (attempt < 5) {
+        expect(response.status).toBe(200);
+      }
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+  });
+
+  it("rate limits signup requests by identity across different client IPs", async () => {
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      response = await runWorker(new Request("https://api.lensically.com/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": `198.51.101.${attempt + 1}`,
+          "User-Agent": `vitest-register-identity-${attempt}`,
+        },
+        body: JSON.stringify({
+          email: "identity-signup@example.com",
           password: "test-password-123",
         }),
       }));
@@ -219,6 +279,31 @@ describe("auth rate limiting", () => {
     expect(response?.status).toBe(429);
   });
 
+  it("rate limits forgot-password requests by identity across different client IPs", async () => {
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      response = await runWorker(new Request("https://api.lensically.com/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": `198.51.102.${attempt + 1}`,
+          "User-Agent": `vitest-forgot-identity-${attempt}`,
+        },
+        body: JSON.stringify({
+          email: "identity-forgot@example.com",
+        }),
+      }));
+
+      if (attempt < 5) {
+        expect(response.status).toBe(200);
+      }
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+  });
+
   it("rate limits repeated password reset submissions from the same client", async () => {
     let response: Response | null = null;
 
@@ -232,6 +317,32 @@ describe("auth rate limiting", () => {
         },
         body: JSON.stringify({
           token: "invalid-token",
+          password: "new-password-123",
+        }),
+      }));
+
+      if (attempt < 5) {
+        expect(response.status).toBe(400);
+      }
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+  });
+
+  it("rate limits reset-password requests by token identity across different client IPs", async () => {
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      response = await runWorker(new Request("https://api.lensically.com/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": `198.51.103.${attempt + 1}`,
+          "User-Agent": `vitest-reset-identity-${attempt}`,
+        },
+        body: JSON.stringify({
+          token: "11111111-1111-4111-8111-111111111111",
           password: "new-password-123",
         }),
       }));
@@ -263,6 +374,33 @@ describe("auth rate limiting", () => {
 
       if (attempt < 3) {
         expect(response.status).toBe(401);
+      }
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+  });
+
+  it("rate limits delete-account requests by session identity across different client IPs", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      response = await runWorker(new Request("https://api.lensically.com/api/auth/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: cookieHeader,
+          "CF-Connecting-IP": `198.51.104.${attempt + 1}`,
+          "User-Agent": `vitest-delete-identity-${attempt}`,
+        },
+        body: JSON.stringify({
+          password: "correct-password",
+        }),
+      }));
+
+      if (attempt < 3) {
+        expect(response.status).toBe(200);
       }
     }
 

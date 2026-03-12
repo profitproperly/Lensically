@@ -696,16 +696,99 @@ function resolveAuthenticatedAppUserId(
   return authUserId;
 }
 
+async function readAuthRateLimitBody(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed = await request.clone().json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEmailForRateLimit(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized.length > 254 || !normalized.includes("@")) {
+    return null;
+  }
+  return normalized;
+}
+
+function normalizeResetTokenForRateLimit(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized.length > 120) {
+    return null;
+  }
+  return normalized;
+}
+
+async function getAuthRateLimitIdentityKeys(
+  request: Request,
+  route: AuthRateLimitRoute,
+): Promise<string[]> {
+  if (route === "delete-account") {
+    const sessionToken = getSessionCookieValue(request);
+    return sessionToken ? [`session:${sessionToken}`] : [];
+  }
+
+  const body = await readAuthRateLimitBody(request);
+  if (!body) {
+    return [];
+  }
+
+  if (route === "login" || route === "register" || route === "forgot-password") {
+    const email = normalizeEmailForRateLimit(body.email);
+    return email ? [`email:${email}`] : [];
+  }
+
+  if (route === "reset-password") {
+    const token = normalizeResetTokenForRateLimit(body.token);
+    return token ? [`token:${token}`] : [];
+  }
+
+  return [];
+}
+
 async function enforceAuthRequestRateLimit(
   request: Request,
   env: Env,
   route: AuthRateLimitRoute,
+  options: { includeIp?: boolean; includeIdentity?: boolean } = {},
 ): Promise<Response | null> {
+  const includeIp = options.includeIp ?? true;
+  const includeIdentity = options.includeIdentity ?? true;
+
   try {
-    const result = await enforceAuthRateLimit(env, request, route);
-    if (!result.allowed) {
-      return authRateLimitDeniedResponse(request, env, result);
+    if (includeIp) {
+      const result = await enforceAuthRateLimit(env, request, route);
+      if (!result.allowed) {
+        return authRateLimitDeniedResponse(request, env, result);
+      }
     }
+
+    if (!includeIdentity) {
+      return null;
+    }
+
+    const identityKeys = await getAuthRateLimitIdentityKeys(request, route);
+    for (const identityKey of identityKeys) {
+      const identityResult = await enforceAuthRateLimit(env, request, route, {
+        scope: "identity",
+        identityKey,
+      });
+      if (!identityResult.allowed) {
+        return authRateLimitDeniedResponse(request, env, identityResult);
+      }
+    }
+
     return null;
   } catch (error) {
     console.error(JSON.stringify({
@@ -1110,11 +1193,30 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (path === "/api/auth/login" && request.method === "POST") {
-      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "login");
+      const loginRateLimitRequest = request.clone();
+      const rateLimitResponse = await enforceAuthRequestRateLimit(request, env, "login", {
+        includeIp: true,
+        includeIdentity: false,
+      });
       if (rateLimitResponse) {
         return applyAuthCors(rateLimitResponse);
       }
-      return applyAuthCors(await login(request, env));
+      const loginResponse = await login(request, env);
+      if (loginResponse.status === 401) {
+        const identityRateLimitResponse = await enforceAuthRequestRateLimit(
+          loginRateLimitRequest,
+          env,
+          "login",
+          {
+            includeIp: false,
+            includeIdentity: true,
+          },
+        );
+        if (identityRateLimitResponse) {
+          return applyAuthCors(identityRateLimitResponse);
+        }
+      }
+      return applyAuthCors(loginResponse);
     }
 
     if (path === "/api/auth/verify-email" && request.method === "GET") {

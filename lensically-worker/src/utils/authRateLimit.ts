@@ -2,6 +2,13 @@ type AuthRateLimitEnv = {
   DB: D1Database;
 };
 
+type AuthRateLimitScope = "ip" | "identity";
+
+type EnforceAuthRateLimitOptions = {
+  scope?: AuthRateLimitScope;
+  identityKey?: string;
+};
+
 export type AuthRateLimitRoute =
   | "login"
   | "register"
@@ -67,8 +74,26 @@ function normalizeUserAgent(request: Request): string {
   return userAgent.replace(/\s+/g, " ").slice(0, 180);
 }
 
-function buildBucketKey(route: AuthRateLimitRoute, request: Request): string {
-  return `${route}:${getClientIp(request)}:${normalizeUserAgent(request)}`;
+function normalizeIdentityKey(identityKey: string): string {
+  return identityKey
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, 220);
+}
+
+function buildBucketKey(
+  route: AuthRateLimitRoute,
+  request: Request,
+  scope: AuthRateLimitScope,
+  identityKey?: string,
+): string {
+  if (scope === "identity" && identityKey) {
+    return `${route}:identity:${normalizeIdentityKey(identityKey)}`;
+  }
+
+  // Preserve legacy IP limiter behavior: bucket by IP + user agent.
+  return `${route}:ip:${getClientIp(request)}:${normalizeUserAgent(request)}`;
 }
 
 export function getAuthRateLimitHeaders(result: AuthRateLimitResult): Record<string, string> {
@@ -84,11 +109,13 @@ export async function enforceAuthRateLimit(
   env: AuthRateLimitEnv,
   request: Request,
   route: AuthRateLimitRoute,
+  options: EnforceAuthRateLimitOptions = {},
 ): Promise<AuthRateLimitResult> {
+  const scope = options.scope ?? "ip";
   const config = AUTH_RATE_LIMITS[route];
   const now = Date.now();
   const resetWindowBefore = now - config.windowMs;
-  const bucketKey = buildBucketKey(route, request);
+  const bucketKey = buildBucketKey(route, request, scope, options.identityKey);
 
   await env.DB.prepare(
     `DELETE FROM auth_rate_limits
