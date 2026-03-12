@@ -1,11 +1,14 @@
 type ThreadsPublishErrorCode =
   | "threads_publish_create_failed"
   | "threads_publish_create_invalid_response"
+  | "threads_publish_create_exception"
   | "threads_publish_status_check_failed"
+  | "threads_publish_status_check_exception"
   | "threads_publish_status_invalid_response"
   | "threads_publish_status_not_ready"
   | "threads_publish_commit_failed"
-  | "threads_publish_commit_invalid_response";
+  | "threads_publish_commit_invalid_response"
+  | "threads_publish_commit_exception";
 
 export type ThreadsPublishServiceResult =
   | {
@@ -34,10 +37,12 @@ type ThreadsPublishOptions = {
   text: string;
   readinessMaxChecks?: number;
   readinessDelayMs?: number;
+  publishMaxAttempts?: number;
 };
 
 const DEFAULT_READINESS_MAX_CHECKS = 10;
 const DEFAULT_READINESS_DELAY_MS = 1000;
+const DEFAULT_PUBLISH_MAX_ATTEMPTS = 3;
 const THREADS_READY_STATUSES = new Set(["FINISHED", "PUBLISHED"]);
 const THREADS_PENDING_STATUSES = new Set(["IN_PROGRESS", "PROCESSING"]);
 
@@ -81,14 +86,22 @@ async function waitForContainerReadiness(
   readinessDelayMs: number,
 ): Promise<{ success: true } | { success: false; errorCode: ThreadsPublishErrorCode; status?: number }> {
   for (let attempt = 0; attempt < readinessMaxChecks; attempt += 1) {
-    const statusResponse = await fetch(
-      `https://graph.threads.net/v1.0/${encodeURIComponent(publishRequestId)}?fields=status,error_message`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    let statusResponse: Response;
+    try {
+      statusResponse = await fetch(
+        `https://graph.threads.net/v1.0/${encodeURIComponent(publishRequestId)}?fields=status,error_message`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      },
-    );
+      );
+    } catch {
+      return {
+        success: false,
+        errorCode: "threads_publish_status_check_exception",
+      };
+    }
 
     if (!statusResponse.ok) {
       return {
@@ -140,24 +153,36 @@ async function publishContainer(
   accessToken: string,
   threadsUserId: string,
   publishRequestId: string,
-): Promise<{ success: true; payload: unknown } | { success: false; status?: number }> {
+): Promise<
+  { success: true; payload: unknown }
+  | { success: false; errorCode: "threads_publish_commit_failed" | "threads_publish_commit_invalid_response" | "threads_publish_commit_exception"; status?: number }
+> {
   const publishCommitBody = new URLSearchParams({
     creation_id: publishRequestId,
   });
-  const commitResponse = await fetch(
-    `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads_publish`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "content-type": "application/x-www-form-urlencoded",
+  let commitResponse: Response;
+  try {
+    commitResponse = await fetch(
+      `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads_publish`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: publishCommitBody,
       },
-      body: publishCommitBody,
-    },
-  );
+    );
+  } catch {
+    return {
+      success: false,
+      errorCode: "threads_publish_commit_exception",
+    };
+  }
   if (!commitResponse.ok) {
     return {
       success: false,
+      errorCode: "threads_publish_commit_failed",
       status: commitResponse.status,
     };
   }
@@ -166,6 +191,7 @@ async function publishContainer(
   if (commitPayload === null) {
     return {
       success: false,
+      errorCode: "threads_publish_commit_invalid_response",
     };
   }
 
@@ -181,22 +207,31 @@ export async function publishTextToThreads({
   text,
   readinessMaxChecks = DEFAULT_READINESS_MAX_CHECKS,
   readinessDelayMs = DEFAULT_READINESS_DELAY_MS,
+  publishMaxAttempts = DEFAULT_PUBLISH_MAX_ATTEMPTS,
 }: ThreadsPublishOptions): Promise<ThreadsPublishServiceResult> {
   const publishCreateBody = new URLSearchParams({
     text,
     media_type: "TEXT",
   });
-  const createResponse = await fetch(
-    `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "content-type": "application/x-www-form-urlencoded",
+  let createResponse: Response;
+  try {
+    createResponse = await fetch(
+      `https://graph.threads.net/v1.0/${encodeURIComponent(threadsUserId)}/threads`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: publishCreateBody,
       },
-      body: publishCreateBody,
-    },
-  );
+    );
+  } catch {
+    return {
+      success: false,
+      errorCode: "threads_publish_create_exception",
+    };
+  }
   if (!createResponse.ok) {
     return {
       success: false,
@@ -221,9 +256,44 @@ export async function publishTextToThreads({
     };
   }
 
-  // Attempt publish immediately; if container is not ready yet, wait and retry once.
-  let commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId);
-  if (!commitResult.success) {
+  const boundedPublishAttempts = Number.isFinite(publishMaxAttempts) && publishMaxAttempts > 0
+    ? Math.floor(publishMaxAttempts)
+    : DEFAULT_PUBLISH_MAX_ATTEMPTS;
+
+  let commitFailure: {
+    errorCode: ThreadsPublishErrorCode;
+    status?: number;
+  } | null = null;
+
+  for (let attempt = 0; attempt < boundedPublishAttempts; attempt += 1) {
+    const commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId);
+    if (commitResult.success) {
+      const commitPayload = commitResult.payload;
+      const publishedPostId = getIdFromPayload(commitPayload);
+      if (!publishedPostId) {
+        return {
+          success: false,
+          errorCode: "threads_publish_commit_invalid_response",
+        };
+      }
+
+      return {
+        success: true,
+        publishRequestId,
+        publishedPostId,
+        publishResponse: commitPayload,
+      };
+    }
+
+    commitFailure = {
+      errorCode: commitResult.errorCode,
+      status: commitResult.status,
+    };
+
+    if (attempt >= boundedPublishAttempts - 1) {
+      break;
+    }
+
     const readinessResult = await waitForContainerReadiness(
       accessToken,
       publishRequestId,
@@ -233,31 +303,18 @@ export async function publishTextToThreads({
     if (!readinessResult.success) {
       return readinessResult;
     }
-
-    commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId);
-    if (!commitResult.success) {
-      return {
-        success: false,
-        errorCode: "threads_publish_commit_failed",
-        status: commitResult.status,
-      };
-    }
   }
 
-  const commitPayload = commitResult.payload;
-
-  const publishedPostId = getIdFromPayload(commitPayload);
-  if (!publishedPostId) {
+  if (!commitFailure) {
     return {
       success: false,
-      errorCode: "threads_publish_commit_invalid_response",
+      errorCode: "threads_publish_commit_failed",
     };
   }
 
   return {
-    success: true,
-    publishRequestId,
-    publishedPostId,
-    publishResponse: commitPayload,
+    success: false,
+    errorCode: commitFailure.errorCode,
+    status: commitFailure.status,
   };
 }
