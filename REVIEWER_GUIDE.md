@@ -88,3 +88,4 @@ Providers to verify:
 
 - Production backup and disaster recovery runbook: [`BACKUP_DR_RUNBOOK.md`](./BACKUP_DR_RUNBOOK.md)
 - User support handling process: [`SUPPORT_PROCESS.md`](./SUPPORT_PROCESS.md)
+- Final production readiness audit: [`PRODUCTION_READINESS_AUDIT.md`](./PRODUCTION_READINESS_AUDIT.md)
