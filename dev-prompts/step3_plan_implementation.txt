@@ -21,13 +21,13 @@ Return format
 Goal
 [clear description]
 
-Work Item A
+Work Item 1
 Description
 
-Work Item B
+Work Item 2
 Description
 
-Work Item C
+Work Item 3
 Description
 
 Continue until the feature is complete.
