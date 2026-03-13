@@ -5,7 +5,10 @@ import {
   type AuthRateLimitRoute,
 } from "./utils/authRateLimit";
 import { publishTextToThreads } from "./utils/threadsPublishService";
-import { createThreadsKeywordSearchRequestConfig } from "./utils/threadsKeywordSearchService";
+import {
+  createThreadsKeywordSearchRequestConfig,
+  validateThreadsKeywordSearchParams,
+} from "./utils/threadsKeywordSearchService";
 import { register } from "../auth/register.js";
 import { login } from "../auth/login.js";
 import { verifyEmail } from "../auth/verifyEmail.js";
@@ -119,6 +122,25 @@ function resetPasswordTokenErrorResponse(request: Request, env: Env): Response {
       headers: {
         "Content-Type": "application/json",
         ...getCorsHeadersForRequest(request, env),
+      },
+    },
+  );
+}
+
+function keywordSearchValidationErrorResponse(
+  requestCorsHeaders: Record<string, string>,
+  errors: string[],
+): Response {
+  return new Response(
+    JSON.stringify({
+      error: "Invalid keyword search parameters.",
+      details: errors,
+    }),
+    {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        ...requestCorsHeaders,
       },
     },
   );
@@ -3913,17 +3935,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       const q = url.searchParams.get("q");
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
-      if (!q) {
-        return new Response(
-          JSON.stringify({ error: "missing query parameter q" }),
-          { status: 400 },
-        );
-      }
-
-      const searchType = url.searchParams.get("search_type") || "TOP";
-      const searchMode = url.searchParams.get("search_mode") || "KEYWORD";
+      const searchType = url.searchParams.get("search_type");
+      const searchMode = url.searchParams.get("search_mode");
       const mediaType = url.searchParams.get("media_type");
-      const limit = url.searchParams.get("limit") || "25";
+      const limit = url.searchParams.get("limit");
 
       if (!appUserId) {
         return new Response(
@@ -3936,22 +3951,22 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           JSON.stringify({ error: "Forbidden" }),
           {
             status: 403,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
             headers: {
               "Content-Type": "application/json",
               ...requestCorsHeaders,
             },
           },
         );
+      }
+
+      const validationResult = validateThreadsKeywordSearchParams({
+        query: q,
+        searchMode,
+        searchType,
+        limit,
+      });
+      if (!validationResult.valid) {
+        return keywordSearchValidationErrorResponse(requestCorsHeaders, validationResult.errors);
       }
 
       const account = await getThreadsAccountForAppUser(env, appUserId);
@@ -3973,10 +3988,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       const searchRequestConfig = createThreadsKeywordSearchRequestConfig({
         accessToken: account.access_token,
-        query: q,
-        searchType,
-        searchMode,
-        limit,
+        query: validationResult.value.query,
+        searchType: validationResult.value.searchType,
+        searchMode: validationResult.value.searchMode,
+        limit: validationResult.value.limit,
         filters: {
           mediaType,
         },
