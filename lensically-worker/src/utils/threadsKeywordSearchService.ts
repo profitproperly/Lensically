@@ -26,6 +26,22 @@ export type ThreadsKeywordSearchRequestConfig = {
   requestInit: RequestInit;
 };
 
+export type ThreadsKeywordSearchPost = {
+  id: string | null;
+  text: string | null;
+  username: string | null;
+  timestamp: string | null;
+  permalink: string | null;
+  media_type: string | null;
+  has_replies: boolean;
+  is_quote_post: boolean;
+  is_reply: boolean;
+};
+
+export type ThreadsKeywordSearchNormalizedResponse = {
+  posts: ThreadsKeywordSearchPost[];
+};
+
 export type ThreadsKeywordSearchValidatedParams = {
   query: string;
   searchMode: string;
@@ -58,6 +74,76 @@ function normalizeLimit(limit: number | string | null | undefined): string {
   }
 
   return String(DEFAULT_LIMIT);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0") {
+      return false;
+    }
+  }
+  return false;
+}
+
+function normalizePost(raw: unknown): ThreadsKeywordSearchPost | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+
+  return {
+    id: normalizeString(raw.id),
+    text: normalizeString(raw.text),
+    username: normalizeString(raw.username),
+    timestamp: normalizeString(raw.timestamp),
+    permalink: normalizeString(raw.permalink),
+    media_type: normalizeString(raw.media_type),
+    has_replies: normalizeBoolean(raw.has_replies),
+    is_quote_post: normalizeBoolean(raw.is_quote_post),
+    is_reply: normalizeBoolean(raw.is_reply),
+  };
+}
+
+export function normalizeThreadsKeywordSearchResponse(
+  payload: unknown,
+): ThreadsKeywordSearchNormalizedResponse {
+  if (!isRecord(payload)) {
+    return { posts: [] };
+  }
+
+  const rawPosts = Array.isArray(payload.data) ? payload.data : [];
+  const posts: ThreadsKeywordSearchPost[] = [];
+
+  for (const rawPost of rawPosts) {
+    const normalizedPost = normalizePost(rawPost);
+    if (!normalizedPost) {
+      continue;
+    }
+    posts.push(normalizedPost);
+  }
+
+  return { posts };
 }
 
 export function validateThreadsKeywordSearchParams(input: {

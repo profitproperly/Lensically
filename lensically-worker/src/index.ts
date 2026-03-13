@@ -7,6 +7,7 @@ import {
 import { publishTextToThreads } from "./utils/threadsPublishService";
 import {
   createThreadsKeywordSearchRequestConfig,
+  normalizeThreadsKeywordSearchResponse,
   validateThreadsKeywordSearchParams,
 } from "./utils/threadsKeywordSearchService";
 import { register } from "../auth/register.js";
@@ -4002,8 +4003,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (data === null) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
+      const normalizedSearchResponse = normalizeThreadsKeywordSearchResponse(data);
 
-      return new Response(JSON.stringify(data), {
+      return new Response(JSON.stringify(normalizedSearchResponse), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
