@@ -3969,16 +3969,24 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const account = await getThreadsAccountForAppUser(env, appUserId);
+      const threadsUserId = account?.threads_user_id?.trim();
+      const accessToken = account?.access_token?.trim();
 
-      if (!account) {
+      if (!threadsUserId || !accessToken) {
         return new Response(
-          JSON.stringify({ error: "no connected account" }),
-          { status: 400 },
+          JSON.stringify({ error: "Threads authorization required" }),
+          {
+            status: 403,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
         );
       }
       const usageLimit = await enforceLimit(
         env,
-        { id: account.threads_user_id, is_admin: authUser.is_admin },
+        { id: threadsUserId, is_admin: authUser.is_admin },
         "keyword_search",
       );
       if (!usageLimit.allowed) {
@@ -3986,7 +3994,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const searchResult = await executeThreadsKeywordSearch({
-        accessToken: account.access_token,
+        accessToken,
         query: validationResult.value.query,
         searchType: validationResult.value.searchType,
         searchMode: validationResult.value.searchMode,
