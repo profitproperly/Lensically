@@ -581,25 +581,25 @@ export default function SchedulePage() {
             <button
               type="button"
               onClick={() => {
-                setIsScheduleComposerOpen(true);
-                setErrorMessage("");
-                setSuccessMessage("");
+                if (!isScheduleComposerOpen) {
+                  setIsScheduleComposerOpen(true);
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                  return;
+                }
+                void handleSchedulePost();
               }}
-              disabled={isSubmitting || isScheduleComposerOpen || !postText.trim()}
+              disabled={
+                isSubmitting
+                || !postText.trim()
+                || (isScheduleComposerOpen && (!scheduleDate || !scheduleTime || hasPastTimeSelection))
+              }
               className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Schedule Post
+              {isScheduling ? "Scheduling..." : "Schedule Post"}
             </button>
             {isScheduleComposerOpen ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => void handleSchedulePost()}
-                  disabled={isSubmitting || !postText.trim() || !scheduleDate || !scheduleTime || hasPastTimeSelection}
-                  className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isScheduling ? "Scheduling..." : "Confirm Scheduled Post"}
-                </button>
                 <button
                   type="button"
                   onClick={() => {

@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "prebuild:cf": "node scripts/prepare-next-output.js",
-    "build:cf": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && node scripts/prepare-next-output.js && NEXT_DISABLE_TURBOPACK=1 opennextjs-cloudflare build --skipNextBuild=false",
+    "build:cf": "node scripts/build-cloudflare.js",
     "preview:cf": "npm run build:cf && opennextjs-cloudflare preview",
     "deploy:cf": "npm run build:cf && opennextjs-cloudflare deploy"
   },
