@@ -42,6 +42,18 @@ function formatTimestamp(value: string | null): string {
   }).format(parsed);
 }
 
+function toIsoFromLocalDateTime(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString();
+}
+
 export default function SearchPage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
@@ -49,6 +61,9 @@ export default function SearchPage() {
   const [keyword, setKeyword] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("KEYWORD");
   const [searchType, setSearchType] = useState<SearchType>("TOP");
+  const [authorUsername, setAuthorUsername] = useState("");
+  const [startTimestamp, setStartTimestamp] = useState("");
+  const [endTimestamp, setEndTimestamp] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -82,13 +97,50 @@ export default function SearchPage() {
       return;
     }
 
-    const payload = {
+    const payload: Record<string, string> = {
       app_user_id: appUserId,
       q: query,
       search_mode: searchMode,
       search_type: searchType,
       limit: DEFAULT_LIMIT,
     };
+
+    const normalizedAuthorUsername = authorUsername.trim().replace(/^@+/, "");
+    const normalizedStartTimestamp = startTimestamp.trim();
+    const normalizedEndTimestamp = endTimestamp.trim();
+
+    const startIso = normalizedStartTimestamp
+      ? toIsoFromLocalDateTime(normalizedStartTimestamp)
+      : null;
+    const endIso = normalizedEndTimestamp
+      ? toIsoFromLocalDateTime(normalizedEndTimestamp)
+      : null;
+
+    if (normalizedStartTimestamp && !startIso) {
+      setErrorMessage("Start timestamp is invalid.");
+      return;
+    }
+
+    if (normalizedEndTimestamp && !endIso) {
+      setErrorMessage("End timestamp is invalid.");
+      return;
+    }
+
+    if (startIso && endIso && new Date(startIso).getTime() > new Date(endIso).getTime()) {
+      setErrorMessage("Start timestamp must be before end timestamp.");
+      return;
+    }
+
+    if (normalizedAuthorUsername) {
+      payload.author_username = normalizedAuthorUsername;
+    }
+    if (startIso) {
+      payload.start_timestamp = startIso;
+    }
+    if (endIso) {
+      payload.end_timestamp = endIso;
+    }
+
     setPreparedRequest(payload);
 
     const params = new URLSearchParams(payload);
@@ -182,6 +234,54 @@ export default function SearchPage() {
                 <option value="TOP">Top</option>
                 <option value="RECENT">Recent</option>
               </select>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">Advanced Filters (Optional)</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <label htmlFor="author-username" className="block text-sm font-medium text-slate-800">
+                  Author Username
+                </label>
+                <input
+                  id="author-username"
+                  type="text"
+                  value={authorUsername}
+                  onChange={(event) => setAuthorUsername(event.target.value)}
+                  placeholder="@username"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  disabled={isSearching}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="start-timestamp" className="block text-sm font-medium text-slate-800">
+                  Start Timestamp
+                </label>
+                <input
+                  id="start-timestamp"
+                  type="datetime-local"
+                  value={startTimestamp}
+                  onChange={(event) => setStartTimestamp(event.target.value)}
+                  className="w-full cursor-pointer rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  disabled={isSearching}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="end-timestamp" className="block text-sm font-medium text-slate-800">
+                  End Timestamp
+                </label>
+                <input
+                  id="end-timestamp"
+                  type="datetime-local"
+                  value={endTimestamp}
+                  onChange={(event) => setEndTimestamp(event.target.value)}
+                  className="w-full cursor-pointer rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  disabled={isSearching}
+                />
+              </div>
             </div>
           </div>
 
