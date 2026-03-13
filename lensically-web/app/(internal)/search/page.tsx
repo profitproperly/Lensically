@@ -39,6 +39,7 @@ export default function SearchPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [results, setResults] = useState<NormalizedSearchPost[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
   const [preparedRequest, setPreparedRequest] = useState<Record<string, string> | null>(null);
 
   const trimmedKeyword = keyword.trim();
@@ -78,6 +79,8 @@ export default function SearchPage() {
 
     const params = new URLSearchParams(payload);
 
+    setHasSearched(true);
+    setResults([]);
     setIsSearching(true);
     try {
       const response = await fetch(`${THREADS_SEARCH_URL}?${params.toString()}`, {
@@ -206,15 +209,21 @@ export default function SearchPage() {
 
       {results.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Result Preview</h2>
+          <h2 className="text-base font-semibold text-slate-900">Search Results</h2>
           <ul className="mt-3 space-y-3">
-            {results.slice(0, 5).map((post, index) => (
+            {results.map((post, index) => (
               <li key={post.id ?? `search-post-${index}`} className="rounded-md border border-slate-200 p-3">
                 <p className="text-sm font-medium text-slate-900">{post.username ? `@${post.username}` : "Unknown user"}</p>
                 <p className="mt-1 text-sm text-slate-700">{post.text ?? "No text content."}</p>
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {hasSearched && !isSearching && !errorMessage && results.length === 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-slate-700">No posts matched this search.</p>
         </section>
       ) : null}
     </div>
