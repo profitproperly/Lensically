@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
   publish_request_id TEXT,
   published_post_id TEXT,
   publish_error_message TEXT,
+  idempotency_key TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   processing_started_at TEXT,
@@ -41,6 +42,10 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_posts_user_id
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_posts_threads_user_id
   ON scheduled_posts (threads_user_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_posts_idempotency_key
+  ON scheduled_posts (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 CREATE TRIGGER IF NOT EXISTS trg_user_daily_usage_user_exists_insert
 BEFORE INSERT ON user_daily_usage

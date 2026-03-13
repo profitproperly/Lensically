@@ -1,2 +1,2 @@
-ALTER TABLE users
-ADD COLUMN timezone TEXT NOT NULL DEFAULT 'UTC';
+-- timezone column already exists in users table
+-- migration intentionally left empty

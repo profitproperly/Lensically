@@ -306,8 +306,9 @@ function getCorsHeadersForRequest(request: Request, env: Env): Record<string, st
   return {
     "Access-Control-Allow-Origin": getAuthCorsOrigin(request, env),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
   };
 }
 
@@ -1099,8 +1100,30 @@ function withAuthCors(request: Request, env: Env, response: Response): Response 
   headers.set("Access-Control-Allow-Origin", getAuthCorsOrigin(request, env));
   headers.set("Access-Control-Allow-Credentials", "true");
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   headers.append("Vary", "Origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function withApiCors(request: Request, env: Env, path: string, response: Response): Response {
+  const normalizedPath = path !== "/" ? path.replace(/\/+$/, "") : path;
+  const isApiPath = normalizedPath.startsWith("/api/") || normalizedPath.startsWith("/auth/threads/");
+  if (!isApiPath) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  const corsHeaders = getCorsHeadersForRequest(request, env);
+  headers.set("Access-Control-Allow-Origin", corsHeaders["Access-Control-Allow-Origin"]);
+  headers.set("Access-Control-Allow-Methods", corsHeaders["Access-Control-Allow-Methods"]);
+  headers.set("Access-Control-Allow-Headers", corsHeaders["Access-Control-Allow-Headers"]);
+  headers.set("Access-Control-Allow-Credentials", corsHeaders["Access-Control-Allow-Credentials"]);
+  headers.set("Vary", corsHeaders.Vary);
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -2074,18 +2097,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       isAuthPath ? withAuthCors(request, env, response) : response;
 
     if (request.method === "OPTIONS") {
-      const accessControlOrigin = isApiPath
-        ? getAuthCorsOrigin(request, env)
-        : getConfiguredAppBaseUrl(env);
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": accessControlOrigin,
+      const corsHeaders = isApiPath
+        ? getCorsHeadersForRequest(request, env)
+        : {
+          "Access-Control-Allow-Origin": getConfiguredAppBaseUrl(env),
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
           "Access-Control-Allow-Credentials": "true",
           Vary: "Origin",
-        },
+        };
+      return new Response(null, {
+        status: 200,
+        headers: corsHeaders,
       });
     }
 
@@ -4581,10 +4604,12 @@ export default {
     }
 
     try {
-      return await handleRequest(request, env);
+      const response = await handleRequest(request, env);
+      return withApiCors(request, env, path, response);
     } catch (error) {
       logUnhandledWorkerError(error, request, path);
-      return buildUnhandledErrorResponse(request, env, path);
+      const errorResponse = buildUnhandledErrorResponse(request, env, path);
+      return withApiCors(request, env, path, errorResponse);
     }
   },
   async scheduled(event, env, ctx) {
