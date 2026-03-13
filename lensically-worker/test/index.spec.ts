@@ -599,7 +599,7 @@ describe("scheduled post API", () => {
         app_user_id: "user-authenticated",
         threads_user_id: "threads-user-schedule-api",
         text: "Schedule this post",
-        date: "2026-01-15",
+        date: "2099-01-15",
         time: "09:30",
         timezone: "America/New_York",
       }),
@@ -610,7 +610,7 @@ describe("scheduled post API", () => {
       success: true,
       scheduled_post: {
         status: "approved",
-        scheduled_time_utc: "2026-01-15T14:30:00.000Z",
+        scheduled_time_utc: "2099-01-15T14:30:00.000Z",
       },
     });
 
@@ -629,7 +629,7 @@ describe("scheduled post API", () => {
       }>();
 
     expect(row?.status).toBe("approved");
-    expect(row?.scheduled_time).toBe("2026-01-15T14:30:00.000Z");
+    expect(row?.scheduled_time).toBe("2099-01-15T14:30:00.000Z");
     expect(row?.post_text).toBe("Schedule this post");
     expect(row?.threads_user_id).toBe("threads-user-schedule-api");
   });
@@ -660,7 +660,7 @@ describe("scheduled post API", () => {
       app_user_id: "user-authenticated",
       threads_user_id: "threads-user-schedule-idempotent",
       text: "Schedule idempotent",
-      date: "2026-01-15",
+      date: "2099-01-15",
       time: "09:30",
       timezone: "America/New_York",
     });
@@ -695,7 +695,7 @@ describe("scheduled post API", () => {
 
     expect(firstJson.scheduled_post?.id).toBeTruthy();
     expect(secondJson.scheduled_post?.id).toBe(firstJson.scheduled_post?.id);
-    expect(secondJson.scheduled_post?.scheduled_time_utc).toBe("2026-01-15T14:30:00.000Z");
+    expect(secondJson.scheduled_post?.scheduled_time_utc).toBe("2099-01-15T14:30:00.000Z");
     expect(secondJson.scheduled_post?.status).toBe("approved");
 
     const scheduledCount = await env.DB.prepare(
@@ -707,6 +707,60 @@ describe("scheduled post API", () => {
       .first<{ total: number }>();
 
     expect(Number(scheduledCount?.total ?? 0)).toBe(1);
+  });
+
+  it("rejects scheduling requests with timestamps earlier than current UTC time", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-schedule-past", "token-schedule-past", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-schedule-past", now)
+      .run();
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        app_user_id: "user-authenticated",
+        threads_user_id: "threads-user-schedule-past",
+        text: "Past schedule request",
+        date: "2000-01-01",
+        time: "00:00",
+        timezone: "UTC",
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Scheduled time must be in the future (UTC).",
+    });
+
+    const scheduledCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM scheduled_posts
+       WHERE user_id = ?`,
+    )
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+
+    expect(Number(scheduledCount?.total ?? 0)).toBe(0);
   });
 });
 

@@ -1318,6 +1318,14 @@ function convertLocalDateTimeToUtcIso(
   return new Date(timestampMs).toISOString();
 }
 
+function isPastUtcTimestamp(utcIso: string, nowMs = Date.now()): boolean {
+  const scheduledMs = Date.parse(utcIso);
+  if (!Number.isFinite(scheduledMs)) {
+    return true;
+  }
+  return scheduledMs < nowMs;
+}
+
 function logUnhandledWorkerError(error: unknown, request: Request, path: string): void {
   logWorkerEvent("UNHANDLED_WORKER_ERROR", {
     path,
@@ -4178,6 +4186,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (!scheduledUtc) {
         return new Response(
           JSON.stringify({ error: "Invalid date, time, or timezone" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (isPastUtcTimestamp(scheduledUtc)) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled time must be in the future (UTC)." }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
