@@ -1046,6 +1046,81 @@ describe("account deletion deduplication", () => {
   });
 });
 
+describe("account scheduling preferences", () => {
+  it("persists timezone and clock format preferences and returns them in /api/auth/me", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const updateResponse = await runWorker(new Request("https://api.lensically.com/api/auth/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        timezone: "America/Los_Angeles",
+        clock_format: "24h",
+      }),
+    }));
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      success: true,
+      user: {
+        id: "user-authenticated",
+        timezone: "America/Los_Angeles",
+        clock_format: "24h",
+      },
+    });
+
+    const updatedRow = await env.DB.prepare(
+      `SELECT timezone, clock_format
+       FROM users
+       WHERE id = ?
+       LIMIT 1`,
+    )
+      .bind("user-authenticated")
+      .first<{ timezone: string; clock_format: string }>();
+
+    expect(updatedRow?.timezone).toBe("America/Los_Angeles");
+    expect(updatedRow?.clock_format).toBe("24h");
+
+    const meResponse = await runWorker(new Request("https://api.lensically.com/api/auth/me", {
+      method: "GET",
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }));
+
+    expect(meResponse.status).toBe(200);
+    await expect(meResponse.json()).resolves.toMatchObject({
+      id: "user-authenticated",
+      timezone: "America/Los_Angeles",
+      clock_format: "24h",
+    });
+  });
+
+  it("rejects invalid timezone values for preference updates", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const updateResponse = await runWorker(new Request("https://api.lensically.com/api/auth/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        timezone: "Mars/OlympusMons",
+        clock_format: "12h",
+      }),
+    }));
+
+    expect(updateResponse.status).toBe(400);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      error: "timezone must be a valid IANA timezone",
+    });
+  });
+});
+
 describe("account lifecycle enforcement", () => {
   it("invalidates existing sessions, blocks password login, and denies authenticated API access after deletion", async () => {
     const { cookieHeader } = await createAuthenticatedRequestContext();

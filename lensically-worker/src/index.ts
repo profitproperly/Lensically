@@ -12,6 +12,7 @@ import { forgotPassword, resetPassword } from "../auth/passwordReset.js";
 import { logout } from "../auth/logout.js";
 import { currentUser } from "../auth/me.js";
 import { deleteAccount } from "../auth/deleteAccount.js";
+import { updatePreferences } from "../auth/preferences.js";
 import { createSession, getSessionCookieValue } from "../auth/sessions.js";
 import {
   clearOauthStateCookie,
@@ -2192,6 +2193,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (path === "/api/auth/me" && request.method === "GET") {
       return applyAuthCors(await currentUser(request, env));
+    }
+
+    if (path === "/api/auth/preferences" && request.method === "POST") {
+      return applyAuthCors(await updatePreferences(request, env));
     }
 
     if (path === "/api/auth/delete-account" && request.method === "POST") {

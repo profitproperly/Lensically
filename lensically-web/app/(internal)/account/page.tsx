@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteAccount, disconnectThreadsAccount } from "@/lib/authClient";
+import { deleteAccount, disconnectThreadsAccount, updatePreferences } from "@/lib/authClient";
 import { toUserFacingAuthError } from "@/lib/authErrorMessage";
 import { useAuth } from "@/lib/AuthProvider";
 import {
@@ -16,6 +16,35 @@ type ThreadsMeResponse = {
   connected?: boolean;
   account?: unknown | null;
 };
+
+const FALLBACK_TIMEZONE_OPTIONS = [
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
+
+function getTimezoneOptions(): string[] {
+  const supportedValuesOf = (Intl as unknown as {
+    supportedValuesOf?: (key: string) => string[];
+  }).supportedValuesOf;
+  if (typeof supportedValuesOf === "function") {
+    try {
+      const values = supportedValuesOf("timeZone");
+      if (Array.isArray(values) && values.length > 0) {
+        return values;
+      }
+    } catch {
+      // Ignore and use fallback values.
+    }
+  }
+  return FALLBACK_TIMEZONE_OPTIONS;
+}
 
 function formatLoginProvider(provider: "google" | "discord" | "github" | null | undefined) {
   if (provider === "google") {
@@ -33,7 +62,7 @@ function formatLoginProvider(provider: "google" | "discord" | "github" | null | 
 export default function AccountPage() {
   const deletePhrase = "DELETE";
   const router = useRouter();
-  const { user, loading, logoutUser } = useAuth();
+  const { user, loading, logoutUser, refreshUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -43,12 +72,31 @@ export default function AccountPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [providerError, setProviderError] = useState("");
   const [providerSuccessMessage, setProviderSuccessMessage] = useState("");
+  const [preferencesError, setPreferencesError] = useState("");
+  const [preferencesSuccessMessage, setPreferencesSuccessMessage] = useState("");
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [timezonePreference, setTimezonePreference] = useState("UTC");
+  const [clockFormatPreference, setClockFormatPreference] = useState<"12h" | "24h">("12h");
+  const [timezoneOptions, setTimezoneOptions] = useState<string[]>(() => getTimezoneOptions());
   const [isDisconnectingProvider, setIsDisconnectingProvider] = useState(false);
   const [isLoadingProviderStatus, setIsLoadingProviderStatus] = useState(true);
   const [isThreadsConnected, setIsThreadsConnected] = useState(false);
   const deletePhraseConfirmed = deleteConfirmationText === deletePhrase;
   const userId = user?.id;
   const loginProviderLabel = formatLoginProvider(user?.login_provider);
+  const currentTimezone = user?.timezone?.trim() || "UTC";
+  const currentClockFormat: "12h" | "24h" = user?.clock_format === "24h" ? "24h" : "12h";
+  const hasPreferenceChanges = timezonePreference !== currentTimezone || clockFormatPreference !== currentClockFormat;
+
+  useEffect(() => {
+    const resolvedTimezone = user?.timezone?.trim() || "UTC";
+    const resolvedClockFormat = user?.clock_format === "24h" ? "24h" : "12h";
+    if (!timezoneOptions.includes(resolvedTimezone)) {
+      setTimezoneOptions((previous) => [resolvedTimezone, ...previous]);
+    }
+    setTimezonePreference(resolvedTimezone);
+    setClockFormatPreference(resolvedClockFormat);
+  }, [timezoneOptions, user?.clock_format, user?.timezone]);
 
   useEffect(() => {
     if (!userId) {
@@ -144,6 +192,36 @@ export default function AccountPage() {
       setProviderError(toUserFacingAuthError(err, "Could not disconnect Threads provider."));
     } finally {
       setIsDisconnectingProvider(false);
+    }
+  }
+
+  async function handleSavePreferences() {
+    if (!user || isSavingPreferences) {
+      return;
+    }
+
+    const normalizedTimezone = timezonePreference.trim();
+    if (!normalizedTimezone) {
+      setPreferencesError("Select a timezone before saving.");
+      return;
+    }
+
+    setIsSavingPreferences(true);
+    setPreferencesError("");
+    setPreferencesSuccessMessage("");
+
+    try {
+      const result = await updatePreferences(normalizedTimezone, clockFormatPreference);
+      if (!result.success) {
+        setPreferencesError(result.error || "Could not save preferences.");
+        return;
+      }
+      await refreshUser();
+      setPreferencesSuccessMessage("Scheduling preferences saved.");
+    } catch (err) {
+      setPreferencesError(toUserFacingAuthError(err, "Could not save preferences."));
+    } finally {
+      setIsSavingPreferences(false);
     }
   }
 
@@ -263,6 +341,75 @@ export default function AccountPage() {
             </a>
             .
           </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Scheduling Preferences</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Choose how scheduled post timestamps are displayed across the application.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="timezone-preference" className="block text-sm font-medium text-slate-900">
+              Timezone
+            </label>
+            <select
+              id="timezone-preference"
+              value={timezonePreference}
+              onChange={(event) => {
+                setTimezonePreference(event.target.value);
+                setPreferencesError("");
+                setPreferencesSuccessMessage("");
+              }}
+              disabled={isSavingPreferences}
+              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {timezoneOptions.map((timezoneOption) => (
+                <option key={timezoneOption} value={timezoneOption}>
+                  {timezoneOption}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="clock-format-preference" className="block text-sm font-medium text-slate-900">
+              Clock Format
+            </label>
+            <select
+              id="clock-format-preference"
+              value={clockFormatPreference}
+              onChange={(event) => {
+                const nextValue = event.target.value === "24h" ? "24h" : "12h";
+                setClockFormatPreference(nextValue);
+                setPreferencesError("");
+                setPreferencesSuccessMessage("");
+              }}
+              disabled={isSavingPreferences}
+              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="12h">12-hour</option>
+              <option value="24h">24-hour</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <button
+            type="button"
+            onClick={() => void handleSavePreferences()}
+            disabled={isSavingPreferences || !hasPreferenceChanges}
+            className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSavingPreferences ? "Saving preferences..." : "Save Preferences"}
+          </button>
+        </div>
+
+        {(preferencesError || preferencesSuccessMessage) ? (
+          <p className={`mt-4 text-sm ${preferencesError ? "text-red-600" : "text-green-700"}`}>
+            {preferencesError || preferencesSuccessMessage}
+          </p>
         ) : null}
       </section>
 

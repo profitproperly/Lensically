@@ -27,6 +27,20 @@ export type DeleteAccountResponse =
       error: string;
     };
 
+export type UpdatePreferencesResponse =
+  | {
+      success: true;
+      user: {
+        id: string;
+        timezone: string;
+        clock_format: "12h" | "24h";
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 type DeleteAccountRequest = {
   password?: string;
   confirmationText?: string;
@@ -93,4 +107,17 @@ export async function disconnectThreadsAccount(appUserId: string) {
     method: "POST",
     body: JSON.stringify({ app_user_id: appUserId }),
   });
+}
+
+export async function updatePreferences(
+  timezone: string,
+  clockFormat: "12h" | "24h",
+): Promise<UpdatePreferencesResponse> {
+  return apiRequest(buildWorkerUrl("/api/auth/preferences"), {
+    method: "POST",
+    body: JSON.stringify({
+      timezone,
+      clock_format: clockFormat,
+    }),
+  }, 0);
 }
