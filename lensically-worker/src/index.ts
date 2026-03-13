@@ -3986,7 +3986,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
       const usageLimit = await enforceLimit(
         env,
-        { id: threadsUserId, is_admin: authUser.is_admin },
+        { id: appUserId, is_admin: authUser.is_admin },
         "keyword_search",
       );
       if (!usageLimit.allowed) {
