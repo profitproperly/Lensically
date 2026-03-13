@@ -3937,7 +3937,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       const searchType = url.searchParams.get("search_type");
       const searchMode = url.searchParams.get("search_mode");
-      const mediaType = url.searchParams.get("media_type");
       const limit = url.searchParams.get("limit");
 
       if (!appUserId) {
@@ -3992,9 +3991,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         searchType: validationResult.value.searchType,
         searchMode: validationResult.value.searchMode,
         limit: validationResult.value.limit,
-        filters: {
-          mediaType,
-        },
       });
 
       const threadsRes = await fetch(searchRequestConfig.url, searchRequestConfig.requestInit);
