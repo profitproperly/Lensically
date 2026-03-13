@@ -9,7 +9,7 @@ const MAX_LIMIT = 100;
 const MAX_QUERY_LENGTH = 100;
 const DEFAULT_FIELDS = "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply";
 const ENFORCED_MEDIA_TYPE = "TEXT";
-const ALLOWED_SEARCH_MODES = new Set(["KEYWORD"]);
+const ALLOWED_SEARCH_MODES = new Set(["KEYWORD", "TAG"]);
 const ALLOWED_SEARCH_TYPES = new Set(["TOP", "RECENT"]);
 
 export type ThreadsKeywordSearchParams = {
@@ -180,7 +180,7 @@ export function validateThreadsKeywordSearchParams(input: {
 
   const normalizedSearchMode = input.searchMode?.trim().toUpperCase() || DEFAULT_SEARCH_MODE;
   if (!ALLOWED_SEARCH_MODES.has(normalizedSearchMode)) {
-    errors.push("search_mode must be KEYWORD.");
+    errors.push("search_mode must be KEYWORD or TAG.");
   }
 
   const normalizedSearchType = input.searchType?.trim().toUpperCase() || DEFAULT_SEARCH_TYPE;
