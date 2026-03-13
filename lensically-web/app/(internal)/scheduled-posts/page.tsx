@@ -34,6 +34,7 @@ type ScheduledPostsResponse = {
 
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
+const THREADS_SCHEDULE_DELETE_URL = buildWorkerUrl("/api/threads/schedule/delete");
 
 function parseScheduledTimestamp(value: string): number {
   const parsed = Date.parse(value);
@@ -51,6 +52,9 @@ export default function ScheduledPostsPage() {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loadingScheduledPosts, setLoadingScheduledPosts] = useState(false);
   const [scheduledPostsError, setScheduledPostsError] = useState("");
+  const [deleteScheduledPostError, setDeleteScheduledPostError] = useState("");
+  const [deleteScheduledPostSuccess, setDeleteScheduledPostSuccess] = useState("");
+  const [deletingScheduledPostId, setDeletingScheduledPostId] = useState<number | null>(null);
 
   const orderedScheduledPosts = useMemo(() => {
     return [...scheduledPosts].sort((left, right) => {
@@ -203,6 +207,56 @@ export default function ScheduledPostsPage() {
     }
   }
 
+  async function deleteScheduledPost(scheduledPostId: number) {
+    if (!appUserId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this scheduled post? This action cannot be undone and the post will not be published.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingScheduledPostId(scheduledPostId);
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+
+    try {
+      const response = await fetch(THREADS_SCHEDULE_DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          app_user_id: appUserId,
+          scheduled_post_id: scheduledPostId,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; deleted?: boolean }
+        | null;
+
+      if (!response.ok || data?.success === false || data?.deleted !== true) {
+        setDeleteScheduledPostError(data?.error || "Could not delete scheduled post.");
+        return;
+      }
+
+      setScheduledPosts((currentPosts) =>
+        currentPosts.filter((post) => post.id !== scheduledPostId),
+      );
+      setDeleteScheduledPostSuccess("Scheduled post deleted.");
+      setScheduledPostsError("");
+    } catch {
+      setDeleteScheduledPostError("Could not delete scheduled post.");
+    } finally {
+      setDeletingScheduledPostId(null);
+    }
+  }
+
   if (loading || loadingConnection) {
     return (
       <div className="space-y-4">
@@ -249,6 +303,12 @@ export default function ScheduledPostsPage() {
       </div>
 
       <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        {deleteScheduledPostSuccess ? (
+          <p className="mb-3 text-sm text-emerald-700">{deleteScheduledPostSuccess}</p>
+        ) : null}
+        {deleteScheduledPostError ? (
+          <p className="mb-3 text-sm text-red-600">{deleteScheduledPostError}</p>
+        ) : null}
         {loadingScheduledPosts ? (
           <p className="text-sm text-slate-700">Loading scheduled posts...</p>
         ) : scheduledPostsError ? (
@@ -284,15 +344,32 @@ export default function ScheduledPostsPage() {
                   className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
                 >
                   <p className="line-clamp-3 text-sm text-slate-900">{post.text}</p>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
-                      {statusLabel}
-                    </span>
-                    <span className="text-slate-600">
-                      {localTime
-                        ? `${localTime} (${timezone})`
-                        : "Invalid scheduled timestamp"}
-                    </span>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
+                        {statusLabel}
+                      </span>
+                      <span className="text-slate-600">
+                        {localTime
+                          ? `${localTime} (${timezone})`
+                          : "Invalid scheduled timestamp"}
+                      </span>
+                    </div>
+                    {post.status === "approved" ? (
+                      <button
+                        type="button"
+                        onClick={() => void deleteScheduledPost(post.id)}
+                        disabled={deletingScheduledPostId === post.id}
+                        className={`rounded-md border px-3 py-1 text-xs font-medium ${
+                          deletingScheduledPostId === post.id
+                            ? "cursor-not-allowed border-red-200 bg-red-50 text-red-400"
+                            : "cursor-pointer border-red-300 bg-white text-red-700 hover:bg-red-50"
+                        }`}
+                        aria-label={`Delete scheduled post ${post.id}`}
+                      >
+                        {deletingScheduledPostId === post.id ? "Deleting..." : "Delete"}
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               );

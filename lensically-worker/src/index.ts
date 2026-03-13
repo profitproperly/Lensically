@@ -40,6 +40,9 @@ const SCHEDULED_POST_STATUS_POSTED = "posted";
 const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;
 const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;
 const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
+const SCHEDULED_POST_PUBLISH_CRON = "* * * * *";
+const THREADS_TOKEN_REFRESH_CRON = "0 */12 * * *";
+const LEGACY_COMBINED_SCHEDULED_CRON = "0 3 * * *";
 const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 
 interface Env {
@@ -692,6 +695,23 @@ type ImmediatePublishIdempotencyRecord = {
   response_body: string | null;
 };
 
+type ThreadsPublishResult = Awaited<ReturnType<typeof publishTextToThreads>>;
+type ThreadsPublishSuccessResult = Extract<ThreadsPublishResult, { success: true }>;
+type ThreadsPublishFailureCode = Extract<ThreadsPublishResult, { success: false }>["errorCode"];
+
+type AppUserThreadsPublishResult =
+  | {
+    success: true;
+    accountThreadsUserId: string;
+    publishResult: ThreadsPublishSuccessResult;
+  }
+  | {
+    success: false;
+    accountThreadsUserId: string | null;
+    errorCode: ThreadsPublishFailureCode | "threads_account_not_connected" | "threads_publish_exception";
+    status?: number;
+  };
+
 const SCHEDULED_POST_ALLOWED_TRANSITIONS: Record<ScheduledPostStatus, ReadonlyArray<ScheduledPostStatus>> = {
   [SCHEDULED_POST_STATUS_APPROVED]: [SCHEDULED_POST_STATUS_POSTING],
   [SCHEDULED_POST_STATUS_POSTING]: [SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTED],
@@ -864,24 +884,48 @@ async function getDueApprovedScheduledPosts(
   return rows.results ?? [];
 }
 
-async function getThreadsAccessTokenForScheduledPost(
+async function publishThreadsTextForAppUser(
   env: Env,
   appUserId: string,
   threadsUserId: string,
-): Promise<string | null> {
-  const row = await env.DB.prepare(
-    `SELECT t.access_token
-     FROM app_threads_accounts a
-     JOIN threads_accounts t
-       ON t.threads_user_id = a.threads_user_id
-     WHERE a.app_user_id = ?
-       AND a.threads_user_id = ?
-     LIMIT 1`,
-  )
-    .bind(appUserId, threadsUserId)
-    .first<{ access_token: string }>();
+  text: string,
+): Promise<AppUserThreadsPublishResult> {
+  const account = await getThreadsAccountForAppUser(env, appUserId);
+  if (!account?.access_token || account.threads_user_id !== threadsUserId) {
+    return {
+      success: false,
+      accountThreadsUserId: account?.threads_user_id ?? null,
+      errorCode: "threads_account_not_connected",
+    };
+  }
 
-  return row?.access_token ?? null;
+  try {
+    const publishResult = await publishTextToThreads({
+      accessToken: account.access_token,
+      threadsUserId: account.threads_user_id,
+      text,
+    });
+    if (!publishResult.success) {
+      return {
+        success: false,
+        accountThreadsUserId: account.threads_user_id,
+        errorCode: publishResult.errorCode,
+        status: publishResult.status,
+      };
+    }
+
+    return {
+      success: true,
+      accountThreadsUserId: account.threads_user_id,
+      publishResult,
+    };
+  } catch {
+    return {
+      success: false,
+      accountThreadsUserId: account.threads_user_id,
+      errorCode: "threads_publish_exception",
+    };
+  }
 }
 
 async function getUserTimezonePreference(env: Env, userId: string): Promise<string | null> {
@@ -988,96 +1032,72 @@ async function processScheduledPost(
     threads_user_id: post.threads_user_id,
   });
 
-  const accessToken = await getThreadsAccessTokenForScheduledPost(env, post.user_id, post.threads_user_id);
-  if (!accessToken) {
+  const publishOutcome = await publishThreadsTextForAppUser(
+    env,
+    post.user_id,
+    post.threads_user_id,
+    post.post_text,
+  );
+  if (!publishOutcome.success) {
     logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
       scheduled_post_id: post.id,
       user_id: post.user_id,
       threads_user_id: post.threads_user_id,
-      error_code: "threads_account_not_connected",
+      error_code: publishOutcome.errorCode,
+      status: publishOutcome.status ?? null,
+      linked_threads_user_id: publishOutcome.accountThreadsUserId,
     });
     await transitionScheduledPostStatus(
       env,
       post.id,
       SCHEDULED_POST_STATUS_POSTING,
       SCHEDULED_POST_STATUS_APPROVED,
-      { publishErrorMessage: "threads_account_not_connected" },
+      {
+        publishErrorMessage: publishOutcome.status
+          ? `${publishOutcome.errorCode}:${publishOutcome.status}`
+          : publishOutcome.errorCode,
+      },
     );
     return;
   }
 
-  try {
-    const publishResult = await publishTextToThreads({
-      accessToken,
-      threadsUserId: post.threads_user_id,
-      text: post.post_text,
-    });
-    if (!publishResult.success) {
-      logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
-        scheduled_post_id: post.id,
-        user_id: post.user_id,
-        threads_user_id: post.threads_user_id,
-        error_code: publishResult.errorCode,
-        status: publishResult.status ?? null,
-      });
-      await transitionScheduledPostStatus(
-        env,
-        post.id,
-        SCHEDULED_POST_STATUS_POSTING,
-        SCHEDULED_POST_STATUS_APPROVED,
-        {
-          publishErrorMessage: publishResult.status
-            ? `${publishResult.errorCode}:${publishResult.status}`
-            : publishResult.errorCode,
-        },
-      );
-      return;
-    }
-
-    const posted = await transitionScheduledPostStatus(
-      env,
-      post.id,
-      SCHEDULED_POST_STATUS_POSTING,
-      SCHEDULED_POST_STATUS_POSTED,
-      {
-        publishRequestId: publishResult.publishRequestId,
-        publishedPostId: publishResult.publishedPostId,
-      },
-    );
-    if (posted) {
-      logWorkerEvent("SCHEDULED_POST_PUBLISH_SUCCESS", {
-        scheduled_post_id: post.id,
-        user_id: post.user_id,
-        threads_user_id: post.threads_user_id,
-        publish_request_id: publishResult.publishRequestId,
-        published_post_id: publishResult.publishedPostId,
-      });
-      return;
-    }
-
-    logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+  const { publishResult } = publishOutcome;
+  const posted = await transitionScheduledPostStatus(
+    env,
+    post.id,
+    SCHEDULED_POST_STATUS_POSTING,
+    SCHEDULED_POST_STATUS_POSTED,
+    {
+      publishRequestId: publishResult.publishRequestId,
+      publishedPostId: publishResult.publishedPostId,
+    },
+  );
+  if (posted) {
+    logWorkerEvent("SCHEDULED_POST_PUBLISH_SUCCESS", {
       scheduled_post_id: post.id,
       user_id: post.user_id,
       threads_user_id: post.threads_user_id,
-      error_code: "status_transition_failed",
-      from_status: SCHEDULED_POST_STATUS_POSTING,
-      to_status: SCHEDULED_POST_STATUS_POSTED,
+      publish_request_id: publishResult.publishRequestId,
+      published_post_id: publishResult.publishedPostId,
     });
-  } catch {
-    logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
-      scheduled_post_id: post.id,
-      user_id: post.user_id,
-      threads_user_id: post.threads_user_id,
-      error_code: "threads_publish_exception",
-    });
-    await transitionScheduledPostStatus(
-      env,
-      post.id,
-      SCHEDULED_POST_STATUS_POSTING,
-      SCHEDULED_POST_STATUS_APPROVED,
-      { publishErrorMessage: "threads_publish_exception" },
-    );
+    return;
   }
+
+  logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+    scheduled_post_id: post.id,
+    user_id: post.user_id,
+    threads_user_id: post.threads_user_id,
+    error_code: "status_transition_failed",
+    from_status: SCHEDULED_POST_STATUS_POSTING,
+    to_status: SCHEDULED_POST_STATUS_POSTED,
+  });
+  await transitionScheduledPostStatus(
+    env,
+    post.id,
+    SCHEDULED_POST_STATUS_POSTING,
+    SCHEDULED_POST_STATUS_APPROVED,
+    { publishErrorMessage: "status_transition_failed" },
+  );
 }
 
 async function processDueScheduledPosts(env: Env): Promise<void> {
@@ -4070,19 +4090,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
       }
 
-      let publishResult: Awaited<ReturnType<typeof publishTextToThreads>>;
-      try {
-        publishResult = await publishTextToThreads({
-          accessToken: account.access_token,
-          threadsUserId: account.threads_user_id,
-          text,
-        });
-      } catch {
+      const publishOutcome = await publishThreadsTextForAppUser(
+        env,
+        ownedAppUserId,
+        account.threads_user_id,
+        text,
+      );
+      if (!publishOutcome.success) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
-      if (!publishResult.success) {
-        return upstreamProviderErrorResponse(requestCorsHeaders);
-      }
+      const { publishResult } = publishOutcome;
 
       const responsePayload = url.pathname === "/api/threads/publish"
         ? publishResult.publishResponse
@@ -4534,60 +4551,85 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     });
 }
 
-async function handleScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const now = Math.floor(Date.now() / 1000);
-    const threshold = now + (7 * 24 * 60 * 60);
+async function refreshExpiringThreadsTokens(env: Env): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  const threshold = now + (7 * 24 * 60 * 60);
 
-    await ensureAppThreadsTable(env);
+  await ensureAppThreadsTable(env);
 
-    const rows = await env.DB
-      .prepare(
-        `SELECT DISTINCT t.threads_user_id, t.access_token
-         FROM threads_accounts t
-         JOIN app_threads_accounts a
-           ON a.threads_user_id = t.threads_user_id
-         JOIN users u
-           ON u.id = a.app_user_id
-         WHERE t.expires_at <= ?`,
-      )
-      .bind(threshold)
-      .all<{ threads_user_id: string; access_token: string }>();
+  const rows = await env.DB
+    .prepare(
+      `SELECT DISTINCT t.threads_user_id, t.access_token
+       FROM threads_accounts t
+       JOIN app_threads_accounts a
+         ON a.threads_user_id = t.threads_user_id
+       JOIN users u
+         ON u.id = a.app_user_id
+       WHERE t.expires_at <= ?`,
+    )
+    .bind(threshold)
+    .all<{ threads_user_id: string; access_token: string }>();
 
-    for (const row of rows.results) {
-      try {
-        const refresh = await fetch(
-          `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(row.access_token)}`,
-        );
+  for (const row of rows.results) {
+    try {
+      const refresh = await fetch(
+        `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(row.access_token)}`,
+      );
 
-        if (!refresh.ok) {
-          logWorkerEvent("THREADS_TOKEN_REFRESH_FAILED", {
-            source: "scheduled",
-            status: refresh.status,
-          });
-          continue;
-        }
-
-        const data: any = await refresh.json();
-        const newToken = data.access_token;
-        const expiresAt = now + data.expires_in;
-
-        await env.DB.prepare(
-          "UPDATE threads_accounts SET access_token = ?, expires_at = ? WHERE threads_user_id = ?",
-        )
-          .bind(newToken, expiresAt, row.threads_user_id)
-          .run();
-
-        logWorkerEvent("THREADS_TOKEN_REFRESH_SUCCEEDED", {
+      if (!refresh.ok) {
+        logWorkerEvent("THREADS_TOKEN_REFRESH_FAILED", {
           source: "scheduled",
+          status: refresh.status,
         });
-      } catch {
-        logWorkerEvent("THREADS_TOKEN_REFRESH_ERROR", {
-          source: "scheduled",
-        });
+        continue;
       }
-    }
 
+      const data: any = await refresh.json();
+      const newToken = data.access_token;
+      const expiresAt = now + data.expires_in;
+
+      await env.DB.prepare(
+        "UPDATE threads_accounts SET access_token = ?, expires_at = ? WHERE threads_user_id = ?",
+      )
+        .bind(newToken, expiresAt, row.threads_user_id)
+        .run();
+
+      logWorkerEvent("THREADS_TOKEN_REFRESH_SUCCEEDED", {
+        source: "scheduled",
+      });
+    } catch {
+      logWorkerEvent("THREADS_TOKEN_REFRESH_ERROR", {
+        source: "scheduled",
+      });
+    }
+  }
+}
+
+async function handleScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  const cron = event.cron?.trim() ?? "";
+  logWorkerEvent("SCHEDULED_CRON_TRIGGERED", {
+    cron,
+  });
+
+  if (cron === SCHEDULED_POST_PUBLISH_CRON) {
     await processDueScheduledPosts(env);
+    return;
+  }
+
+  if (cron === THREADS_TOKEN_REFRESH_CRON) {
+    await refreshExpiringThreadsTokens(env);
+    return;
+  }
+
+  if (cron === LEGACY_COMBINED_SCHEDULED_CRON) {
+    await refreshExpiringThreadsTokens(env);
+    await processDueScheduledPosts(env);
+    return;
+  }
+
+  logWorkerEvent("SCHEDULED_CRON_UNRECOGNIZED", {
+    cron,
+  }, "error");
 }
 
 export default {
