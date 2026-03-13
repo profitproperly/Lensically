@@ -9,6 +9,7 @@ import {
   resolveClockFormatPreference,
   resolveTimezonePreference,
 } from "@/lib/scheduledTimeDisplay";
+import { notifyScheduledPostsUpdated } from "@/lib/scheduledPostsRefresh";
 
 type ThreadsMeResponse = {
   connected?: boolean;
@@ -439,6 +440,7 @@ export default function SchedulePage() {
       setScheduleTime("");
       setIsScheduleComposerOpen(false);
       await loadScheduledPosts();
+      notifyScheduledPostsUpdated();
     } catch {
       setErrorMessage("Could not schedule post.");
     } finally {

@@ -9,6 +9,7 @@ import {
   resolveClockFormatPreference,
   resolveTimezonePreference,
 } from "@/lib/scheduledTimeDisplay";
+import { subscribeScheduledPostsUpdated } from "@/lib/scheduledPostsRefresh";
 
 type ThreadsMeResponse = {
   connected?: boolean;
@@ -143,6 +144,18 @@ export default function ScheduledPostsPage() {
 
     void loadScheduledPosts();
     // appUserId/threadsUserId changes should refresh upcoming posts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appUserId, threadsUserId]);
+
+  useEffect(() => {
+    if (!appUserId || !threadsUserId) {
+      return;
+    }
+
+    return subscribeScheduledPostsUpdated(() => {
+      void loadScheduledPosts();
+    });
+    // appUserId/threadsUserId changes should resubscribe the refresh listener.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUserId, threadsUserId]);
 
