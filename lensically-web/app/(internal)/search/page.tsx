@@ -321,6 +321,16 @@ export default function SearchPage() {
         </section>
       ) : null}
 
+      {isSearching ? (
+        <section
+          aria-live="polite"
+          className="rounded-xl border border-sky-200 bg-sky-50 p-6 shadow-sm"
+        >
+          <p className="text-sm font-medium text-sky-900">Searching Threads posts...</p>
+          <p className="mt-1 text-sm text-sky-700">Results will appear here when the search completes.</p>
+        </section>
+      ) : null}
+
       {results.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Search Results</h2>
@@ -356,7 +366,10 @@ export default function SearchPage() {
 
       {hasSearched && !isSearching && !errorMessage && results.length === 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-700">No posts matched this search.</p>
+          <p className="text-sm font-medium text-slate-900">No results found.</p>
+          <p className="mt-1 text-sm text-slate-700">
+            Try a different keyword, search type, or adjust your optional filters.
+          </p>
         </section>
       ) : null}
     </div>
