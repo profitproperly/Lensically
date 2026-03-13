@@ -26,6 +26,11 @@ export type ThreadsKeywordSearchRequestConfig = {
   requestInit: RequestInit;
 };
 
+type ThreadsKeywordSearchServiceErrorCode =
+  | "threads_keyword_search_failed"
+  | "threads_keyword_search_invalid_response"
+  | "threads_keyword_search_exception";
+
 export type ThreadsKeywordSearchPost = {
   id: string | null;
   text: string | null;
@@ -41,6 +46,17 @@ export type ThreadsKeywordSearchPost = {
 export type ThreadsKeywordSearchNormalizedResponse = {
   posts: ThreadsKeywordSearchPost[];
 };
+
+export type ThreadsKeywordSearchServiceResult =
+  | {
+    success: true;
+    data: ThreadsKeywordSearchNormalizedResponse;
+  }
+  | {
+    success: false;
+    errorCode: ThreadsKeywordSearchServiceErrorCode;
+    status?: number;
+  };
 
 export type ThreadsKeywordSearchValidatedParams = {
   query: string;
@@ -233,5 +249,50 @@ export function createThreadsKeywordSearchRequestConfig({
         Authorization: `Bearer ${accessToken}`,
       },
     },
+  };
+}
+
+async function readJsonSafe(response: Response): Promise<unknown | null> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function executeThreadsKeywordSearch(
+  params: ThreadsKeywordSearchParams,
+): Promise<ThreadsKeywordSearchServiceResult> {
+  const requestConfig = createThreadsKeywordSearchRequestConfig(params);
+
+  let response: Response;
+  try {
+    response = await fetch(requestConfig.url, requestConfig.requestInit);
+  } catch {
+    return {
+      success: false,
+      errorCode: "threads_keyword_search_exception",
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      errorCode: "threads_keyword_search_failed",
+      status: response.status,
+    };
+  }
+
+  const payload = await readJsonSafe(response);
+  if (payload === null) {
+    return {
+      success: false,
+      errorCode: "threads_keyword_search_invalid_response",
+    };
+  }
+
+  return {
+    success: true,
+    data: normalizeThreadsKeywordSearchResponse(payload),
   };
 }

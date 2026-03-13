@@ -6,8 +6,7 @@ import {
 } from "./utils/authRateLimit";
 import { publishTextToThreads } from "./utils/threadsPublishService";
 import {
-  createThreadsKeywordSearchRequestConfig,
-  normalizeThreadsKeywordSearchResponse,
+  executeThreadsKeywordSearch,
   validateThreadsKeywordSearchParams,
 } from "./utils/threadsKeywordSearchService";
 import { register } from "../auth/register.js";
@@ -3986,7 +3985,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return limitDeniedResponse(usageLimit, "keyword_search", request, env);
       }
 
-      const searchRequestConfig = createThreadsKeywordSearchRequestConfig({
+      const searchResult = await executeThreadsKeywordSearch({
         accessToken: account.access_token,
         query: validationResult.value.query,
         searchType: validationResult.value.searchType,
@@ -3994,18 +3993,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         limit: validationResult.value.limit,
       });
 
-      const threadsRes = await fetch(searchRequestConfig.url, searchRequestConfig.requestInit);
-      if (!threadsRes.ok) {
+      if (!searchResult.success) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
 
-      const data = await readJsonSafe(threadsRes);
-      if (data === null) {
-        return upstreamProviderErrorResponse(requestCorsHeaders);
-      }
-      const normalizedSearchResponse = normalizeThreadsKeywordSearchResponse(data);
-
-      return new Response(JSON.stringify(normalizedSearchResponse), {
+      return new Response(JSON.stringify(searchResult.data), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
