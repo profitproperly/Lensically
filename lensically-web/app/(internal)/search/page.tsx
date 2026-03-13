@@ -28,6 +28,20 @@ type ThreadsSearchResponse = {
 const THREADS_SEARCH_URL = buildWorkerUrl("/api/threads/search");
 const DEFAULT_LIMIT = "25";
 
+function formatTimestamp(value: string | null): string {
+  if (!value) {
+    return "Unknown time";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Unknown time";
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
 export default function SearchPage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
@@ -212,9 +226,28 @@ export default function SearchPage() {
           <h2 className="text-base font-semibold text-slate-900">Search Results</h2>
           <ul className="mt-3 space-y-3">
             {results.map((post, index) => (
-              <li key={post.id ?? `search-post-${index}`} className="rounded-md border border-slate-200 p-3">
-                <p className="text-sm font-medium text-slate-900">{post.username ? `@${post.username}` : "Unknown user"}</p>
-                <p className="mt-1 text-sm text-slate-700">{post.text ?? "No text content."}</p>
+              <li key={post.id ?? `search-post-${index}`} className="rounded-md border border-slate-200 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {post.username ? `@${post.username}` : "Unknown user"}
+                  </p>
+                  <p className="text-xs text-slate-500">{formatTimestamp(post.timestamp)}</p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                  {post.text ?? "No text content."}
+                </p>
+                {post.permalink ? (
+                  <a
+                    href={post.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex cursor-pointer text-sm font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                  >
+                    Open on Threads
+                  </a>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">Permalink unavailable.</p>
+                )}
               </li>
             ))}
           </ul>
