@@ -5,6 +5,7 @@ import {
   type AuthRateLimitRoute,
 } from "./utils/authRateLimit";
 import { publishTextToThreads } from "./utils/threadsPublishService";
+import { createThreadsKeywordSearchRequestConfig } from "./utils/threadsKeywordSearchService";
 import { register } from "../auth/register.js";
 import { login } from "../auth/login.js";
 import { verifyEmail } from "../auth/verifyEmail.js";
@@ -1106,6 +1107,7 @@ async function processDueScheduledPosts(env: Env): Promise<void> {
     return;
   }
 
+  await ensureScheduledPostsTable(env);
   await recoverStalePostingScheduledPosts(env);
   const nowIso = new Date().toISOString();
   const posts = await getDueApprovedScheduledPosts(env, nowIso, getScheduledPostBatchSize(env));
@@ -1653,10 +1655,21 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
      ON scheduled_posts (threads_user_id)`,
   ).run();
 
-  const hasIdempotencyKeyColumn = await doesColumnExist(env, "scheduled_posts", "idempotency_key");
-  if (!hasIdempotencyKeyColumn) {
+  const schemaAlignmentColumns: Array<{ name: string; definition: string }> = [
+    { name: "publish_request_id", definition: "TEXT" },
+    { name: "idempotency_key", definition: "TEXT" },
+    { name: "published_at", definition: "TEXT" },
+    { name: "failed_at", definition: "TEXT" },
+    { name: "cancelled_at", definition: "TEXT" },
+    { name: "last_attempted_at", definition: "TEXT" },
+  ];
+  for (const column of schemaAlignmentColumns) {
+    const columnExists = await doesColumnExist(env, "scheduled_posts", column.name);
+    if (columnExists) {
+      continue;
+    }
     await env.DB.prepare(
-      "ALTER TABLE scheduled_posts ADD COLUMN idempotency_key TEXT",
+      `ALTER TABLE scheduled_posts ADD COLUMN ${column.name} ${column.definition}`,
     ).run();
   }
 
@@ -3958,30 +3971,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return limitDeniedResponse(usageLimit, "keyword_search", request, env);
       }
 
-      const params = new URLSearchParams({
-        q,
-        search_type: searchType,
-        search_mode: searchMode,
+      const searchRequestConfig = createThreadsKeywordSearchRequestConfig({
+        accessToken: account.access_token,
+        query: q,
+        searchType,
+        searchMode,
         limit,
+        filters: {
+          mediaType,
+        },
       });
 
-      if (mediaType) {
-        params.append("media_type", mediaType);
-      }
-
-      params.append(
-        "fields",
-        "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply",
-      );
-
-      const threadsRes = await fetch(
-        `https://graph.threads.net/v1.0/keyword_search?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${account.access_token}`,
-          },
-        },
-      );
+      const threadsRes = await fetch(searchRequestConfig.url, searchRequestConfig.requestInit);
       if (!threadsRes.ok) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
@@ -4376,6 +4377,191 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           success: true,
           scheduled_post: {
             id: insertedScheduledPostId,
+            status: SCHEDULED_POST_STATUS_APPROVED,
+            scheduled_time_utc: scheduledUtc,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/schedule/update" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      let payload: {
+        app_user_id?: string;
+        scheduled_post_id?: number | string;
+        text?: string;
+        date?: string;
+        time?: string;
+        timezone?: string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
+      const scheduledPostId = Number(payload.scheduled_post_id);
+      const text = payload.text?.trim();
+      const date = payload.date?.trim();
+      const time = payload.time?.trim();
+      const timezone = payload.timezone?.trim() || null;
+
+      if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !text || !date || !time) {
+        return new Response(
+          JSON.stringify({
+            error: "scheduled_post_id, text, date, and time are required",
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const preferredTimezone = await getUserTimezonePreference(env, ownedAppUserId);
+      const resolvedTimezone = timezone ?? preferredTimezone ?? "UTC";
+      const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, resolvedTimezone);
+      if (!scheduledUtc) {
+        return new Response(
+          JSON.stringify({ error: "Invalid date, time, or timezone" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (isPastUtcTimestamp(scheduledUtc)) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled time must be in the future (UTC)." }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      if (timezone && timezone !== preferredTimezone) {
+        await env.DB.prepare(
+          `UPDATE users
+           SET timezone = ?
+           WHERE id = ?`,
+        )
+          .bind(resolvedTimezone, ownedAppUserId)
+          .run();
+      }
+
+      await ensureScheduledPostsTable(env);
+
+      const existingScheduledPost = await env.DB.prepare(
+        `SELECT id, status, threads_user_id
+         FROM scheduled_posts
+         WHERE id = ?
+           AND user_id = ?
+         LIMIT 1`,
+      )
+        .bind(scheduledPostId, ownedAppUserId)
+        .first<{ id: number | string; status: string; threads_user_id: string }>();
+      if (!existingScheduledPost) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled post not found" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (existingScheduledPost.status !== SCHEDULED_POST_STATUS_APPROVED) {
+        return new Response(
+          JSON.stringify({ error: "Only approved scheduled posts can be edited." }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
+        ownedAppUserId,
+        existingScheduledPost.threads_user_id,
+        scheduledUtc,
+        text,
+      );
+
+      try {
+        const result = await env.DB.prepare(
+          `UPDATE scheduled_posts
+           SET post_text = ?,
+               scheduled_time = ?,
+               idempotency_key = ?
+           WHERE id = ?
+             AND user_id = ?
+             AND status = ?`,
+        )
+          .bind(
+            text,
+            scheduledUtc,
+            scheduleIdempotencyKey,
+            scheduledPostId,
+            ownedAppUserId,
+            SCHEDULED_POST_STATUS_APPROVED,
+          )
+          .run();
+
+        if (Number(result.meta?.changes ?? 0) <= 0) {
+          return new Response(
+            JSON.stringify({ error: "Scheduled post could not be updated." }),
+            {
+              status: 409,
+              headers: { "content-type": "application/json; charset=UTF-8" },
+            },
+          );
+        }
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) {
+          throw error;
+        }
+        return new Response(
+          JSON.stringify({ error: "An identical scheduled post already exists." }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scheduled_post: {
+            id: scheduledPostId,
+            text,
             status: SCHEDULED_POST_STATUS_APPROVED,
             scheduled_time_utc: scheduledUtc,
           },
