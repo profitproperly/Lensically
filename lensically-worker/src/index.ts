@@ -3995,6 +3995,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const searchType = url.searchParams.get("search_type");
       const searchMode = url.searchParams.get("search_mode");
       const limit = url.searchParams.get("limit");
+      const authorUsername = url.searchParams.get("author_username")?.trim() ?? "";
+      const startTimestamp = url.searchParams.get("start_timestamp")?.trim() ?? "";
+      const endTimestamp = url.searchParams.get("end_timestamp")?.trim() ?? "";
 
       if (!appUserId) {
         return new Response(
@@ -4022,6 +4025,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         limit,
       });
       if (!validationResult.valid) {
+        logWorkerEvent("THREADS_KEYWORD_SEARCH_VALIDATION_FAILED", {
+          query: q ?? "",
+          search_mode: searchMode ?? null,
+          search_type: searchType ?? null,
+          limit: limit ?? null,
+          author_username: authorUsername || null,
+          start_timestamp: startTimestamp || null,
+          end_timestamp: endTimestamp || null,
+          errors: validationResult.errors,
+        }, "error");
         return keywordSearchValidationErrorResponse(requestCorsHeaders, validationResult.errors);
       }
 
@@ -4031,6 +4044,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const accessToken = account?.access_token?.trim();
 
         if (!threadsUserId || !accessToken) {
+          logWorkerEvent("THREADS_KEYWORD_SEARCH_AUTHORIZATION_FAILED", {
+            query: validationResult.value.query,
+            search_mode: validationResult.value.searchMode,
+            search_type: validationResult.value.searchType,
+            limit: validationResult.value.limit,
+            author_username: authorUsername || null,
+            start_timestamp: startTimestamp || null,
+            end_timestamp: endTimestamp || null,
+            reason_code: "threads_not_connected",
+          }, "error");
           return new Response(
             JSON.stringify({ error: "Threads authorization required" }),
             {
@@ -4051,6 +4074,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           return limitDeniedResponse(usageLimit, "keyword_search", request, env);
         }
 
+        const searchStartedAt = Date.now();
+        logWorkerEvent("THREADS_KEYWORD_SEARCH_REQUEST", {
+          query: validationResult.value.query,
+          search_mode: validationResult.value.searchMode,
+          search_type: validationResult.value.searchType,
+          limit: validationResult.value.limit,
+          author_username: authorUsername || null,
+          start_timestamp: startTimestamp || null,
+          end_timestamp: endTimestamp || null,
+        });
+
         const searchResult = await executeThreadsKeywordSearch({
           accessToken,
           query: validationResult.value.query,
@@ -4060,8 +4094,34 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
 
         if (!searchResult.success) {
+          logWorkerEvent("THREADS_KEYWORD_SEARCH_RESPONSE", {
+            query: validationResult.value.query,
+            search_mode: validationResult.value.searchMode,
+            search_type: validationResult.value.searchType,
+            limit: validationResult.value.limit,
+            author_username: authorUsername || null,
+            start_timestamp: startTimestamp || null,
+            end_timestamp: endTimestamp || null,
+            execution_ms: Date.now() - searchStartedAt,
+            success: false,
+            error_code: searchResult.errorCode,
+            status: searchResult.status ?? null,
+          }, "error");
           return keywordSearchServiceErrorResponse(requestCorsHeaders, searchResult.errorCode);
         }
+
+        logWorkerEvent("THREADS_KEYWORD_SEARCH_RESPONSE", {
+          query: validationResult.value.query,
+          search_mode: validationResult.value.searchMode,
+          search_type: validationResult.value.searchType,
+          limit: validationResult.value.limit,
+          author_username: authorUsername || null,
+          start_timestamp: startTimestamp || null,
+          end_timestamp: endTimestamp || null,
+          execution_ms: Date.now() - searchStartedAt,
+          success: true,
+          result_count: searchResult.data.posts.length,
+        });
 
         return new Response(JSON.stringify(searchResult.data), {
           status: 200,
