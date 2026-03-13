@@ -5,11 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "prebuild": "node scripts/prepare-next-output.js",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "prebuild:cf": "node scripts/prepare-next-output.js",
-    "build:cf": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && node scripts/prepare-next-output.js && opennextjs-cloudflare build --skipNextBuild=false",
+    "build:cf": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && node scripts/prepare-next-output.js && NEXT_DISABLE_TURBOPACK=1 opennextjs-cloudflare build --skipNextBuild=false",
     "preview:cf": "npm run build:cf && opennextjs-cloudflare preview",
     "deploy:cf": "npm run build:cf && opennextjs-cloudflare deploy"
   },

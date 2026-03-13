@@ -7,6 +7,7 @@ type AuthContextType = {
   user: CurrentUser | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
+  updateUserPreferences: (preferences: { timezone: string; clock_format: "12h" | "24h" }) => void;
   logoutUser: () => Promise<void>;
 };
 
@@ -33,6 +34,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  function updateUserPreferences(preferences: { timezone: string; clock_format: "12h" | "24h" }) {
+    setUser((previousUser) => {
+      if (!previousUser) {
+        return previousUser;
+      }
+      return {
+        ...previousUser,
+        timezone: preferences.timezone,
+        clock_format: preferences.clock_format,
+      };
+    });
+  }
+
   async function logoutUser() {
     try {
       await logout();
@@ -51,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         refreshUser,
+        updateUserPreferences,
         logoutUser,
       }}
     >

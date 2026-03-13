@@ -62,7 +62,7 @@ function formatLoginProvider(provider: "google" | "discord" | "github" | null | 
 export default function AccountPage() {
   const deletePhrase = "DELETE";
   const router = useRouter();
-  const { user, loading, logoutUser, refreshUser } = useAuth();
+  const { user, loading, logoutUser, updateUserPreferences } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -216,7 +216,10 @@ export default function AccountPage() {
         setPreferencesError(result.error || "Could not save preferences.");
         return;
       }
-      await refreshUser();
+      updateUserPreferences({
+        timezone: result.user.timezone,
+        clock_format: result.user.clock_format,
+      });
       setPreferencesSuccessMessage("Scheduling preferences saved.");
     } catch (err) {
       setPreferencesError(toUserFacingAuthError(err, "Could not save preferences."));
