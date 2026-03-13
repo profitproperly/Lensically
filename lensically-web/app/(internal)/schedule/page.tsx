@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthProvider";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import {
+  formatScheduledLocalTime,
+  resolveClockFormatPreference,
+  resolveTimezonePreference,
+} from "@/lib/scheduledTimeDisplay";
 
 type ThreadsMeResponse = {
   connected?: boolean;
@@ -72,51 +77,11 @@ function getCurrentDateTimeForTimezone(
   }
 }
 
-function resolveTimezonePreference(rawTimezone: string | null | undefined): string {
-  const candidate = rawTimezone?.trim();
-  if (!candidate) {
-    return "UTC";
-  }
-
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
-    return candidate;
-  } catch {
-    return "UTC";
-  }
-}
-
-function formatScheduledLocalTime(
-  scheduledUtc: string,
-  timezone: string,
-  clockFormat: "12h" | "24h",
-): string | null {
-  const date = new Date(scheduledUtc);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  try {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: clockFormat !== "24h",
-    });
-    return formatter.format(date);
-  } catch {
-    return null;
-  }
-}
-
 export default function SchedulePage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
   const timezone = resolveTimezonePreference(user?.timezone);
-  const clockFormatPreference: "12h" | "24h" = user?.clock_format === "24h" ? "24h" : "12h";
+  const clockFormatPreference = resolveClockFormatPreference(user?.clock_format);
   const clockFormatLabel = clockFormatPreference === "24h" ? "24-hour" : "12-hour";
 
   const [postText, setPostText] = useState("");
