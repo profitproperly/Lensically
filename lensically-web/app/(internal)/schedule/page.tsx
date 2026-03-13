@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthProvider";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import {
@@ -77,6 +77,37 @@ function getCurrentDateTimeForTimezone(
   }
 }
 
+function parseHourMinute(value: string): { hour: number; minute: number } | null {
+  const [hourRaw, minuteRaw] = value.split(":");
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return { hour, minute };
+}
+
+function toMinutesOfDay(value: string): number | null {
+  const parsed = parseHourMinute(value);
+  if (!parsed) {
+    return null;
+  }
+  return (parsed.hour * 60) + parsed.minute;
+}
+
+function formatPickerTime(value: string, clockFormat: "12h" | "24h"): string {
+  const parsed = parseHourMinute(value);
+  if (!parsed) {
+    return value;
+  }
+  if (clockFormat === "24h") {
+    return `${padTwoDigits(parsed.hour)}:${padTwoDigits(parsed.minute)}`;
+  }
+  const hour12 = parsed.hour % 12 || 12;
+  const period = parsed.hour >= 12 ? "PM" : "AM";
+  return `${hour12}:${padTwoDigits(parsed.minute)} ${period}`;
+}
+
 export default function SchedulePage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
@@ -106,6 +137,26 @@ export default function SchedulePage() {
   );
   const isSchedulingForToday = scheduleDate === minScheduleDate;
   const hasPastTimeSelection = isSchedulingForToday && Boolean(scheduleTime) && scheduleTime < minScheduleTime;
+  const minScheduleMinutes = toMinutesOfDay(minScheduleTime);
+
+  const scheduleTimeOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    const effectiveMinMinutes = isSchedulingForToday && Number.isInteger(minScheduleMinutes)
+      ? Number(minScheduleMinutes)
+      : 0;
+
+    for (let minutes = effectiveMinMinutes; minutes < 24 * 60; minutes += 1) {
+      const hour = Math.floor(minutes / 60);
+      const minute = minutes % 60;
+      const value = `${padTwoDigits(hour)}:${padTwoDigits(minute)}`;
+      options.push({
+        value,
+        label: formatPickerTime(value, clockFormatPreference),
+      });
+    }
+
+    return options;
+  }, [clockFormatPreference, isSchedulingForToday, minScheduleMinutes]);
 
   useEffect(() => {
     if (!appUserId) {
@@ -478,13 +529,11 @@ export default function SchedulePage() {
                 </div>
                 <div>
                   <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
-                    Time
+                    Time ({timezone}, {clockFormatLabel})
                   </label>
-                  <input
+                  <select
                     id="schedule-time"
-                    type="time"
                     value={scheduleTime}
-                    min={isSchedulingForToday ? minScheduleTime : undefined}
                     onChange={(event) => {
                       setScheduleTime(event.target.value);
                       setErrorMessage("");
@@ -492,7 +541,14 @@ export default function SchedulePage() {
                     }}
                     disabled={isSubmitting}
                     className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
+                  >
+                    <option value="">Select time</option>
+                    {scheduleTimeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
