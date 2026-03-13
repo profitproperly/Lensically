@@ -85,6 +85,7 @@ export default function SchedulePage() {
   const [loadingConnection, setLoadingConnection] = useState(true);
   const [isPostingNow, setIsPostingNow] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isScheduleComposerOpen, setIsScheduleComposerOpen] = useState(false);
   const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -329,6 +330,7 @@ export default function SchedulePage() {
       setPostText("");
       setScheduleDate("");
       setScheduleTime("");
+      setIsScheduleComposerOpen(false);
       await loadScheduledPosts();
     } catch {
       setErrorMessage("Could not schedule post.");
@@ -397,55 +399,59 @@ export default function SchedulePage() {
             <p className="mt-1 text-xs text-slate-500">{postText.length}/500</p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="schedule-date" className="block text-sm font-medium text-slate-900">
-                Date
-              </label>
-              <input
-                id="schedule-date"
-                type="date"
-                value={scheduleDate}
-                onChange={(event) => {
-                  setScheduleDate(event.target.value);
-                  setErrorMessage("");
-                  setSuccessMessage("");
-                }}
-                disabled={isSubmitting}
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
-                Time
-              </label>
-              <input
-                id="schedule-time"
-                type="time"
-                value={scheduleTime}
-                onChange={(event) => {
-                  setScheduleTime(event.target.value);
-                  setErrorMessage("");
-                  setSuccessMessage("");
-                }}
-                disabled={isSubmitting}
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-          </div>
+          {isScheduleComposerOpen ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="schedule-date" className="block text-sm font-medium text-slate-900">
+                    Date
+                  </label>
+                  <input
+                    id="schedule-date"
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(event) => {
+                      setScheduleDate(event.target.value);
+                      setErrorMessage("");
+                      setSuccessMessage("");
+                    }}
+                    disabled={isSubmitting}
+                    className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
+                    Time
+                  </label>
+                  <input
+                    id="schedule-time"
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(event) => {
+                      setScheduleTime(event.target.value);
+                      setErrorMessage("");
+                      setSuccessMessage("");
+                    }}
+                    disabled={isSubmitting}
+                    className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+              </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <p className="text-xs text-slate-600">
-              Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezone}</span>, clock format{" "}
-              <span className="font-medium text-slate-800">{clockFormatLabel}</span>.
-            </p>
-            <Link
-              href="/account"
-              className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Change in Account Settings
-            </Link>
-          </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-600">
+                  Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezone}</span>, clock format{" "}
+                  <span className="font-medium text-slate-800">{clockFormatLabel}</span>.
+                </p>
+                <Link
+                  href="/account"
+                  className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Change in Account Settings
+                </Link>
+              </div>
+            </>
+          ) : null}
 
           <div className="flex flex-wrap gap-3">
             <button
@@ -458,12 +464,45 @@ export default function SchedulePage() {
             </button>
             <button
               type="button"
-              onClick={() => void handleSchedulePost()}
-              disabled={isSubmitting || !postText.trim() || !scheduleDate || !scheduleTime}
+              onClick={() => {
+                setIsScheduleComposerOpen(true);
+                setErrorMessage("");
+                setSuccessMessage("");
+              }}
+              disabled={isSubmitting || isScheduleComposerOpen || !postText.trim()}
               className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isScheduling ? "Scheduling..." : "Schedule Post"}
+              Schedule Post
             </button>
+            {isScheduleComposerOpen ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleSchedulePost()}
+                  disabled={isSubmitting || !postText.trim() || !scheduleDate || !scheduleTime}
+                  className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isScheduling ? "Scheduling..." : "Confirm Scheduled Post"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSubmitting) {
+                      return;
+                    }
+                    setIsScheduleComposerOpen(false);
+                    setScheduleDate("");
+                    setScheduleTime("");
+                    setErrorMessage("");
+                    setSuccessMessage("");
+                  }}
+                  disabled={isSubmitting}
+                  className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel Scheduling
+                </button>
+              </>
+            ) : null}
           </div>
 
           {errorMessage ? (
