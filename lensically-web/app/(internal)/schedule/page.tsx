@@ -31,6 +31,47 @@ type ScheduledPostsResponse = {
   error?: string;
 };
 
+function padTwoDigits(value: number): string {
+  return value.toString().padStart(2, "0");
+}
+
+function getCurrentDateTimeForTimezone(
+  timezone: string,
+  now: Date,
+): { currentDate: string; currentTime: string } {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    const hour = parts.find((part) => part.type === "hour")?.value;
+    const minute = parts.find((part) => part.type === "minute")?.value;
+
+    if (!year || !month || !day || !hour || !minute) {
+      throw new Error("Missing date time parts");
+    }
+
+    return {
+      currentDate: `${year}-${month}-${day}`,
+      currentTime: `${hour}:${minute}`,
+    };
+  } catch {
+    return {
+      currentDate: `${now.getFullYear()}-${padTwoDigits(now.getMonth() + 1)}-${padTwoDigits(now.getDate())}`,
+      currentTime: `${padTwoDigits(now.getHours())}:${padTwoDigits(now.getMinutes())}`,
+    };
+  }
+}
+
 function resolveTimezonePreference(rawTimezone: string | null | undefined): string {
   const candidate = rawTimezone?.trim();
   if (!candidate) {
@@ -92,6 +133,14 @@ export default function SchedulePage() {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loadingScheduledPosts, setLoadingScheduledPosts] = useState(false);
   const [scheduledPostsError, setScheduledPostsError] = useState("");
+  const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
+
+  const { currentDate: minScheduleDate, currentTime: minScheduleTime } = getCurrentDateTimeForTimezone(
+    timezone,
+    new Date(currentTimestamp),
+  );
+  const isSchedulingForToday = scheduleDate === minScheduleDate;
+  const hasPastTimeSelection = isSchedulingForToday && Boolean(scheduleTime) && scheduleTime < minScheduleTime;
 
   useEffect(() => {
     if (!appUserId) {
@@ -175,6 +224,40 @@ export default function SchedulePage() {
     // appUserId/threadsUserId changes should refresh upcoming posts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUserId, threadsUserId]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTimestamp(Date.now());
+    }, 30_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!scheduleDate) {
+      return;
+    }
+    if (scheduleDate >= minScheduleDate) {
+      return;
+    }
+
+    setScheduleDate(minScheduleDate);
+    setScheduleTime("");
+    setErrorMessage("Scheduling date cannot be in the past.");
+    setSuccessMessage("");
+  }, [minScheduleDate, scheduleDate]);
+
+  useEffect(() => {
+    if (!isSchedulingForToday || !scheduleTime || scheduleTime >= minScheduleTime) {
+      return;
+    }
+
+    setScheduleTime("");
+    setErrorMessage("Select a future time when scheduling for today.");
+    setSuccessMessage("");
+  }, [isSchedulingForToday, minScheduleTime, scheduleTime]);
 
   async function loadScheduledPosts() {
     if (!appUserId || !threadsUserId) {
@@ -283,6 +366,14 @@ export default function SchedulePage() {
     }
     if (!appUserId || !threadsUserId) {
       setErrorMessage("Threads account is not connected.");
+      return;
+    }
+    if (scheduleDate < minScheduleDate) {
+      setErrorMessage("Scheduling date cannot be in the past.");
+      return;
+    }
+    if (scheduleDate === minScheduleDate && scheduleTime < minScheduleTime) {
+      setErrorMessage("Select a future time when scheduling for today.");
       return;
     }
 
@@ -410,6 +501,7 @@ export default function SchedulePage() {
                     id="schedule-date"
                     type="date"
                     value={scheduleDate}
+                    min={minScheduleDate}
                     onChange={(event) => {
                       setScheduleDate(event.target.value);
                       setErrorMessage("");
@@ -427,6 +519,7 @@ export default function SchedulePage() {
                     id="schedule-time"
                     type="time"
                     value={scheduleTime}
+                    min={isSchedulingForToday ? minScheduleTime : undefined}
                     onChange={(event) => {
                       setScheduleTime(event.target.value);
                       setErrorMessage("");
@@ -479,7 +572,7 @@ export default function SchedulePage() {
                 <button
                   type="button"
                   onClick={() => void handleSchedulePost()}
-                  disabled={isSubmitting || !postText.trim() || !scheduleDate || !scheduleTime}
+                  disabled={isSubmitting || !postText.trim() || !scheduleDate || !scheduleTime || hasPastTimeSelection}
                   className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isScheduling ? "Scheduling..." : "Confirm Scheduled Post"}
