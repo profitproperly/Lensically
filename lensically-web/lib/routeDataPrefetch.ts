@@ -35,6 +35,7 @@ const PROFILE_REQUIRED_ROUTES = new Set([
   "/dashboard",
   "/insights",
   "/schedule",
+  "/scheduled-posts",
   "/search",
   "/discovery",
 ]);

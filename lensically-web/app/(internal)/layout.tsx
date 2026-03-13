@@ -20,7 +20,7 @@ type ThreadsMeResponse = {
   account?: unknown | null;
 };
 
-const THREADS_GUARDED_ROUTES = ["/dashboard", "/insights", "/schedule", "/search", "/discovery"];
+const THREADS_GUARDED_ROUTES = ["/dashboard", "/insights", "/schedule", "/scheduled-posts", "/search", "/discovery"];
 
 export default function InternalLayout({
   children,
