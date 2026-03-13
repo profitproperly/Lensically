@@ -27,7 +27,8 @@ export type ThreadsKeywordSearchRequestConfig = {
 };
 
 type ThreadsKeywordSearchServiceErrorCode =
-  | "threads_keyword_search_failed"
+  | "threads_keyword_search_invalid_token"
+  | "threads_keyword_search_provider_failed"
   | "threads_keyword_search_invalid_response"
   | "threads_keyword_search_exception";
 
@@ -260,6 +261,25 @@ async function readJsonSafe(response: Response): Promise<unknown | null> {
   }
 }
 
+function isInvalidTokenProviderError(payload: unknown): boolean {
+  if (!isRecord(payload)) {
+    return false;
+  }
+
+  const errorValue = payload.error;
+  if (!isRecord(errorValue)) {
+    return false;
+  }
+
+  const code = errorValue.code;
+  if (typeof code === "number" && code === 190) {
+    return true;
+  }
+
+  const type = errorValue.type;
+  return typeof type === "string" && type.trim().toLowerCase() === "oauthexception";
+}
+
 export async function executeThreadsKeywordSearch(
   params: ThreadsKeywordSearchParams,
 ): Promise<ThreadsKeywordSearchServiceResult> {
@@ -276,9 +296,18 @@ export async function executeThreadsKeywordSearch(
   }
 
   if (!response.ok) {
+    const failedPayload = await readJsonSafe(response);
+    if (isInvalidTokenProviderError(failedPayload)) {
+      return {
+        success: false,
+        errorCode: "threads_keyword_search_invalid_token",
+        status: response.status,
+      };
+    }
+
     return {
       success: false,
-      errorCode: "threads_keyword_search_failed",
+      errorCode: "threads_keyword_search_provider_failed",
       status: response.status,
     };
   }

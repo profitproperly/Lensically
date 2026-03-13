@@ -146,6 +146,63 @@ function keywordSearchValidationErrorResponse(
   );
 }
 
+function keywordSearchServiceErrorResponse(
+  requestCorsHeaders: Record<string, string>,
+  errorCode:
+    | "threads_keyword_search_invalid_token"
+    | "threads_keyword_search_provider_failed"
+    | "threads_keyword_search_invalid_response"
+    | "threads_keyword_search_exception",
+): Response {
+  if (errorCode === "threads_keyword_search_invalid_token") {
+    return new Response(
+      JSON.stringify({
+        error: "Keyword search authorization failed.",
+        code: "keyword_search_invalid_token",
+      }),
+      {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+          ...requestCorsHeaders,
+        },
+      },
+    );
+  }
+
+  return new Response(
+    JSON.stringify({
+      error: "Keyword search provider request failed.",
+      code: "keyword_search_provider_error",
+    }),
+    {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        ...requestCorsHeaders,
+      },
+    },
+  );
+}
+
+function keywordSearchUnexpectedErrorResponse(
+  requestCorsHeaders: Record<string, string>,
+): Response {
+  return new Response(
+    JSON.stringify({
+      error: "Keyword search failed.",
+      code: "keyword_search_unexpected_error",
+    }),
+    {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        ...requestCorsHeaders,
+      },
+    },
+  );
+}
+
 function getCookieValue(request: Request, name: string): string | null {
   const cookieHeader = request.headers.get("cookie");
   if (!cookieHeader) {
@@ -3968,47 +4025,55 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return keywordSearchValidationErrorResponse(requestCorsHeaders, validationResult.errors);
       }
 
-      const account = await getThreadsAccountForAppUser(env, appUserId);
-      const threadsUserId = account?.threads_user_id?.trim();
-      const accessToken = account?.access_token?.trim();
+      try {
+        const account = await getThreadsAccountForAppUser(env, appUserId);
+        const threadsUserId = account?.threads_user_id?.trim();
+        const accessToken = account?.access_token?.trim();
 
-      if (!threadsUserId || !accessToken) {
-        return new Response(
-          JSON.stringify({ error: "Threads authorization required" }),
-          {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
+        if (!threadsUserId || !accessToken) {
+          return new Response(
+            JSON.stringify({ error: "Threads authorization required" }),
+            {
+              status: 403,
+              headers: {
+                "Content-Type": "application/json",
+                ...requestCorsHeaders,
+              },
             },
-          },
+          );
+        }
+        const usageLimit = await enforceLimit(
+          env,
+          { id: appUserId, is_admin: authUser.is_admin },
+          "keyword_search",
         );
-      }
-      const usageLimit = await enforceLimit(
-        env,
-        { id: appUserId, is_admin: authUser.is_admin },
-        "keyword_search",
-      );
-      if (!usageLimit.allowed) {
-        return limitDeniedResponse(usageLimit, "keyword_search", request, env);
-      }
+        if (!usageLimit.allowed) {
+          return limitDeniedResponse(usageLimit, "keyword_search", request, env);
+        }
 
-      const searchResult = await executeThreadsKeywordSearch({
-        accessToken,
-        query: validationResult.value.query,
-        searchType: validationResult.value.searchType,
-        searchMode: validationResult.value.searchMode,
-        limit: validationResult.value.limit,
-      });
+        const searchResult = await executeThreadsKeywordSearch({
+          accessToken,
+          query: validationResult.value.query,
+          searchType: validationResult.value.searchType,
+          searchMode: validationResult.value.searchMode,
+          limit: validationResult.value.limit,
+        });
 
-      if (!searchResult.success) {
-        return upstreamProviderErrorResponse(requestCorsHeaders);
+        if (!searchResult.success) {
+          return keywordSearchServiceErrorResponse(requestCorsHeaders, searchResult.errorCode);
+        }
+
+        return new Response(JSON.stringify(searchResult.data), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        logWorkerEvent("THREADS_KEYWORD_SEARCH_UNEXPECTED_ERROR", {
+          app_user_id: appUserId,
+          error: getErrorMessage(error),
+        }, "error");
+        return keywordSearchUnexpectedErrorResponse(requestCorsHeaders);
       }
-
-      return new Response(JSON.stringify(searchResult.data), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
     }
 
     if (
