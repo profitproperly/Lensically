@@ -1,10 +1,11 @@
 "use strict";
 
-const fs = require("node:fs");
-const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+async function main() {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
 
-function run(command, args, env = process.env) {
+  function run(command, args, env = process.env) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
     env,
@@ -18,15 +19,13 @@ function run(command, args, env = process.env) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
-}
-
-function ensureFileExists(filePath) {
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Required build artifact missing: ${filePath}`);
   }
-}
 
-function main() {
+  function ensureFileExists(filePath) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Required build artifact missing: ${filePath}`);
+    }
+  }
   const appRoot = process.cwd();
   const nextDir = path.join(appRoot, ".next");
   const pagesManifestPath = path.join(nextDir, "server", "pages-manifest.json");
@@ -44,4 +43,4 @@ function main() {
   });
 }
 
-main();
+void main();

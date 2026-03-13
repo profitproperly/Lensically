@@ -6,6 +6,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(configDir);
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   turbopack: {
     root: workspaceRoot,
   },

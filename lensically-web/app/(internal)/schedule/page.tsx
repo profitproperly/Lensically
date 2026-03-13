@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthProvider";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import {
+  formatTimezoneLabel,
   formatScheduledLocalTime,
   resolveClockFormatPreference,
   resolveTimezonePreference,
@@ -23,19 +24,6 @@ type ThreadsMeResponse = {
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
-
-type ScheduledPost = {
-  id: number;
-  text: string;
-  status: "approved" | "posting" | "posted";
-  scheduled_time_utc: string;
-};
-
-type ScheduledPostsResponse = {
-  success?: boolean;
-  scheduled_posts?: ScheduledPost[];
-  error?: string;
-};
 
 function padTwoDigits(value: number): string {
   return value.toString().padStart(2, "0");
@@ -109,10 +97,36 @@ function formatPickerTime(value: string, clockFormat: "12h" | "24h"): string {
   return `${hour12}:${padTwoDigits(parsed.minute)} ${period}`;
 }
 
+function normalizeTimePayload(value: string): string | null {
+  const trimmed = value.trim();
+  const direct = parseHourMinute(trimmed);
+  if (direct) {
+    return `${padTwoDigits(direct.hour)}:${padTwoDigits(direct.minute)}`;
+  }
+
+  const meridiemMatch = trimmed.match(/^(\d{1,2}):([0-5]\d)\s*([AaPp][Mm])$/);
+  if (!meridiemMatch) {
+    return null;
+  }
+
+  const hour12 = Number(meridiemMatch[1]);
+  const minute = Number(meridiemMatch[2]);
+  const period = meridiemMatch[3].toUpperCase();
+  if (!Number.isInteger(hour12) || hour12 < 1 || hour12 > 12 || !Number.isInteger(minute)) {
+    return null;
+  }
+
+  const hour24 = period === "PM"
+    ? (hour12 % 12) + 12
+    : hour12 % 12;
+  return `${padTwoDigits(hour24)}:${padTwoDigits(minute)}`;
+}
+
 export default function SchedulePage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
   const timezone = resolveTimezonePreference(user?.timezone);
+  const timezoneLabel = formatTimezoneLabel(timezone);
   const clockFormatPreference = resolveClockFormatPreference(user?.clock_format);
   const clockFormatLabel = clockFormatPreference === "24h" ? "24-hour" : "12-hour";
 
@@ -127,14 +141,15 @@ export default function SchedulePage() {
   const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [loadingScheduledPosts, setLoadingScheduledPosts] = useState(false);
-  const [scheduledPostsError, setScheduledPostsError] = useState("");
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
 
   const { currentDate: minScheduleDate, currentTime: minScheduleTime } = getCurrentDateTimeForTimezone(
     timezone,
     new Date(currentTimestamp),
+  );
+  const { currentDate: defaultScheduleDate, currentTime: defaultScheduleTime } = getCurrentDateTimeForTimezone(
+    timezone,
+    new Date(currentTimestamp + 60_000),
   );
   const isSchedulingForToday = scheduleDate === minScheduleDate;
   const hasPastTimeSelection = isSchedulingForToday && Boolean(scheduleTime) && scheduleTime < minScheduleTime;
@@ -230,19 +245,6 @@ export default function SchedulePage() {
   }, [appUserId]);
 
   useEffect(() => {
-    if (!appUserId || !threadsUserId) {
-      setScheduledPosts([]);
-      setScheduledPostsError("");
-      setLoadingScheduledPosts(false);
-      return;
-    }
-
-    void loadScheduledPosts();
-    // appUserId/threadsUserId changes should refresh upcoming posts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUserId, threadsUserId]);
-
-  useEffect(() => {
     const intervalId = window.setInterval(() => {
       setCurrentTimestamp(Date.now());
     }, 30_000);
@@ -275,37 +277,6 @@ export default function SchedulePage() {
     setErrorMessage("Select a future time when scheduling for today.");
     setSuccessMessage("");
   }, [isSchedulingForToday, minScheduleTime, scheduleTime]);
-
-  async function loadScheduledPosts() {
-    if (!appUserId || !threadsUserId) {
-      return;
-    }
-
-    setLoadingScheduledPosts(true);
-    setScheduledPostsError("");
-
-    try {
-      const response = await fetch(
-        `${THREADS_SCHEDULE_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
-        {
-          cache: "no-store",
-          credentials: "include",
-        },
-      );
-
-      const data = (await response.json().catch(() => null)) as ScheduledPostsResponse | null;
-      if (!response.ok) {
-        setScheduledPostsError(data?.error || "Could not load scheduled posts.");
-        return;
-      }
-
-      setScheduledPosts(Array.isArray(data?.scheduled_posts) ? data.scheduled_posts : []);
-    } catch {
-      setScheduledPostsError("Could not load scheduled posts.");
-    } finally {
-      setLoadingScheduledPosts(false);
-    }
-  }
 
   async function handlePostNow() {
     const trimmedText = postText.trim();
@@ -373,11 +344,13 @@ export default function SchedulePage() {
 
   async function handleSchedulePost() {
     const trimmedText = postText.trim();
+    const machineTimezone = resolveTimezonePreference(timezone);
+    const machineTime = normalizeTimePayload(scheduleTime);
     if (!trimmedText) {
       setErrorMessage("Enter post text before scheduling.");
       return;
     }
-    if (!scheduleDate || !scheduleTime) {
+    if (!scheduleDate || !machineTime) {
       setErrorMessage("Select both date and time to schedule a post.");
       return;
     }
@@ -389,7 +362,7 @@ export default function SchedulePage() {
       setErrorMessage("Scheduling date cannot be in the past.");
       return;
     }
-    if (scheduleDate === minScheduleDate && scheduleTime < minScheduleTime) {
+    if (scheduleDate === minScheduleDate && machineTime < minScheduleTime) {
       setErrorMessage("Select a future time when scheduling for today.");
       return;
     }
@@ -410,8 +383,8 @@ export default function SchedulePage() {
           threads_user_id: threadsUserId,
           text: trimmedText,
           date: scheduleDate,
-          time: scheduleTime,
-          timezone,
+          time: machineTime,
+          timezone: machineTimezone,
         }),
       });
 
@@ -425,21 +398,20 @@ export default function SchedulePage() {
       const localScheduledTime = scheduledUtc
         ? formatScheduledLocalTime(
           scheduledUtc,
-          timezone,
+          machineTimezone,
           clockFormatPreference,
         )
         : null;
 
       setSuccessMessage(
         localScheduledTime
-          ? `Post scheduled for ${localScheduledTime} (${timezone}).`
+          ? `Post scheduled for ${localScheduledTime} (${timezoneLabel}).`
           : "Post scheduled successfully.",
       );
       setPostText("");
       setScheduleDate("");
       setScheduleTime("");
       setIsScheduleComposerOpen(false);
-      await loadScheduledPosts();
       notifyScheduledPostsUpdated();
     } catch {
       setErrorMessage("Could not schedule post.");
@@ -453,7 +425,7 @@ export default function SchedulePage() {
   if (loading || loadingConnection) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-semibold text-slate-900">Schedule Posts</h1>
+        <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
         <p className="text-sm text-slate-700">Loading composer...</p>
       </div>
     );
@@ -462,7 +434,7 @@ export default function SchedulePage() {
   if (!threadsUserId) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-semibold text-slate-900">Schedule Posts</h1>
+        <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-700">
             Connect your Threads account to publish or schedule posts.
@@ -483,7 +455,15 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-semibold text-slate-900">Schedule Posts</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
+        <Link
+          href="/scheduled-posts"
+          className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Scheduled Posts
+        </Link>
+      </div>
 
       <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="space-y-5">
@@ -531,7 +511,7 @@ export default function SchedulePage() {
                 </div>
                 <div>
                   <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
-                    Time ({timezone}, {clockFormatLabel})
+                    Time ({timezoneLabel}, {clockFormatLabel})
                   </label>
                   <select
                     id="schedule-time"
@@ -556,7 +536,7 @@ export default function SchedulePage() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                 <p className="text-xs text-slate-600">
-                  Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezone}</span>, clock format{" "}
+                  Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezoneLabel}</span>, clock format{" "}
                   <span className="font-medium text-slate-800">{clockFormatLabel}</span>.
                 </p>
                 <Link
@@ -570,18 +550,22 @@ export default function SchedulePage() {
           ) : null}
 
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleRequestPostNowConfirmation}
-              disabled={isSubmitting || !postText.trim()}
-              className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isPostingNow ? "Posting..." : "Post Now"}
-            </button>
+            {!isScheduleComposerOpen ? (
+              <button
+                type="button"
+                onClick={handleRequestPostNowConfirmation}
+                disabled={isSubmitting || !postText.trim()}
+                className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPostingNow ? "Posting..." : "Post Now"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
                 if (!isScheduleComposerOpen) {
+                  setScheduleDate(defaultScheduleDate);
+                  setScheduleTime(defaultScheduleTime);
                   setIsScheduleComposerOpen(true);
                   setErrorMessage("");
                   setSuccessMessage("");
@@ -615,7 +599,7 @@ export default function SchedulePage() {
                   disabled={isSubmitting}
                   className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Cancel Scheduling
+                  Cancel Schedule
                 </button>
               </>
             ) : null}
@@ -628,58 +612,6 @@ export default function SchedulePage() {
             <p className="text-sm text-green-700">{successMessage}</p>
           ) : null}
         </div>
-      </section>
-
-      <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">Upcoming Scheduled Posts</h2>
-          <button
-            type="button"
-            onClick={() => void loadScheduledPosts()}
-            disabled={loadingScheduledPosts}
-            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loadingScheduledPosts ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-
-        {loadingScheduledPosts ? (
-          <p className="text-sm text-slate-700">Loading scheduled posts...</p>
-        ) : scheduledPostsError ? (
-          <p className="text-sm text-red-600">{scheduledPostsError}</p>
-        ) : !scheduledPosts.length ? (
-          <p className="text-sm text-slate-600">No upcoming scheduled posts.</p>
-        ) : (
-          <ul className="space-y-3">
-            {scheduledPosts.map((post) => {
-              const localTime = formatScheduledLocalTime(
-                post.scheduled_time_utc,
-                timezone,
-                clockFormatPreference,
-              );
-              const statusLabel = post.status === "posting" ? "Publishing" : "Scheduled";
-
-              return (
-                <li
-                  key={post.id}
-                  className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
-                >
-                  <p className="line-clamp-3 text-sm text-slate-900">{post.text}</p>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
-                      {statusLabel}
-                    </span>
-                    <span className="text-slate-600">
-                      {localTime
-                        ? `${localTime} (${timezone})`
-                        : "Invalid scheduled timestamp"}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </section>
 
       {showPostNowConfirmation ? (

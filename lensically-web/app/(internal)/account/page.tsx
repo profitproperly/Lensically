@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAccount, disconnectThreadsAccount, updatePreferences } from "@/lib/authClient";
 import { toUserFacingAuthError } from "@/lib/authErrorMessage";
@@ -11,10 +11,17 @@ import {
   writeThreadsConnectionCache,
 } from "@/lib/threadsConnectionCache";
 import { THREADS_ME_URL } from "@/lib/threadsApi";
+import { formatTimezoneLabel, normalizeIanaTimezone } from "@/lib/scheduledTimeDisplay";
 
 type ThreadsMeResponse = {
   connected?: boolean;
   account?: unknown | null;
+};
+
+type TimezoneOption = {
+  value: string;
+  label: string;
+  searchText: string;
 };
 
 const FALLBACK_TIMEZONE_OPTIONS = [
@@ -29,7 +36,21 @@ const FALLBACK_TIMEZONE_OPTIONS = [
   "Australia/Sydney",
 ];
 
-function getTimezoneOptions(): string[] {
+function getDeviceTimezone(): string {
+  const resolved = normalizeIanaTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  return resolved ?? "UTC";
+}
+
+function buildTimezoneOption(timezone: string): TimezoneOption {
+  const label = formatTimezoneLabel(timezone);
+  return {
+    value: timezone,
+    label,
+    searchText: `${label} ${timezone}`.toLowerCase(),
+  };
+}
+
+function getTimezoneOptions(): TimezoneOption[] {
   const supportedValuesOf = (Intl as unknown as {
     supportedValuesOf?: (key: string) => string[];
   }).supportedValuesOf;
@@ -37,13 +58,13 @@ function getTimezoneOptions(): string[] {
     try {
       const values = supportedValuesOf("timeZone");
       if (Array.isArray(values) && values.length > 0) {
-        return values;
+        return values.map((timezone) => buildTimezoneOption(timezone));
       }
     } catch {
       // Ignore and use fallback values.
     }
   }
-  return FALLBACK_TIMEZONE_OPTIONS;
+  return FALLBACK_TIMEZONE_OPTIONS.map((timezone) => buildTimezoneOption(timezone));
 }
 
 function formatLoginProvider(provider: "google" | "discord" | "github" | null | undefined) {
@@ -63,6 +84,7 @@ export default function AccountPage() {
   const deletePhrase = "DELETE";
   const router = useRouter();
   const { user, loading, logoutUser, updateUserPreferences } = useAuth();
+  const deviceTimezone = useMemo(() => getDeviceTimezone(), []);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -75,9 +97,11 @@ export default function AccountPage() {
   const [preferencesError, setPreferencesError] = useState("");
   const [preferencesSuccessMessage, setPreferencesSuccessMessage] = useState("");
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
-  const [timezonePreference, setTimezonePreference] = useState("UTC");
+  const [timezonePreference, setTimezonePreference] = useState(() => deviceTimezone);
   const [clockFormatPreference, setClockFormatPreference] = useState<"12h" | "24h">("12h");
-  const [timezoneOptions, setTimezoneOptions] = useState<string[]>(() => getTimezoneOptions());
+  const [timezoneOptions, setTimezoneOptions] = useState<TimezoneOption[]>(() => getTimezoneOptions());
+  const [timezoneSearch, setTimezoneSearch] = useState("");
+  const [showTimezonePicker, setShowTimezonePicker] = useState(false);
   const [isDisconnectingProvider, setIsDisconnectingProvider] = useState(false);
   const [isLoadingProviderStatus, setIsLoadingProviderStatus] = useState(true);
   const [isThreadsConnected, setIsThreadsConnected] = useState(false);
@@ -87,16 +111,40 @@ export default function AccountPage() {
   const currentTimezone = user?.timezone?.trim() || "UTC";
   const currentClockFormat: "12h" | "24h" = user?.clock_format === "24h" ? "24h" : "12h";
   const hasPreferenceChanges = timezonePreference !== currentTimezone || clockFormatPreference !== currentClockFormat;
+  const selectedTimezoneOption = timezoneOptions.find((option) => option.value === timezonePreference) ?? null;
+  const filteredTimezoneOptions = useMemo(() => {
+    const query = timezoneSearch.trim().toLowerCase();
+    if (!query) {
+      return timezoneOptions;
+    }
+    return timezoneOptions.filter((option) => option.searchText.includes(query));
+  }, [timezoneOptions, timezoneSearch]);
 
   useEffect(() => {
-    const resolvedTimezone = user?.timezone?.trim() || "UTC";
+    const normalizedUserTimezone = normalizeIanaTimezone(user?.timezone);
+    const resolvedTimezone = !normalizedUserTimezone || normalizedUserTimezone === "UTC"
+      ? deviceTimezone
+      : normalizedUserTimezone;
     const resolvedClockFormat = user?.clock_format === "24h" ? "24h" : "12h";
-    if (!timezoneOptions.includes(resolvedTimezone)) {
-      setTimezoneOptions((previous) => [resolvedTimezone, ...previous]);
+    const hasOption = timezoneOptions.some((option) => option.value === resolvedTimezone);
+    if (!hasOption) {
+      setTimezoneOptions((previous) => [buildTimezoneOption(resolvedTimezone), ...previous]);
     }
     setTimezonePreference(resolvedTimezone);
+    setTimezoneSearch(buildTimezoneOption(resolvedTimezone).label);
     setClockFormatPreference(resolvedClockFormat);
-  }, [timezoneOptions, user?.clock_format, user?.timezone]);
+  }, [deviceTimezone, timezoneOptions, user?.clock_format, user?.timezone]);
+
+  useEffect(() => {
+    if (showTimezonePicker) {
+      return;
+    }
+    if (!selectedTimezoneOption) {
+      setTimezoneSearch(timezonePreference);
+      return;
+    }
+    setTimezoneSearch(selectedTimezoneOption.label);
+  }, [selectedTimezoneOption, showTimezonePicker, timezonePreference]);
 
   useEffect(() => {
     if (!userId) {
@@ -220,9 +268,42 @@ export default function AccountPage() {
         timezone: result.user.timezone,
         clock_format: result.user.clock_format,
       });
+      setShowTimezonePicker(false);
       setPreferencesSuccessMessage("Scheduling preferences saved.");
     } catch (err) {
       setPreferencesError(toUserFacingAuthError(err, "Could not save preferences."));
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  }
+
+  async function handleUseDeviceTimezone() {
+    if (!user || isSavingPreferences) {
+      return;
+    }
+
+    const defaultClockFormat: "12h" | "24h" = "12h";
+    setTimezonePreference(deviceTimezone);
+    setClockFormatPreference(defaultClockFormat);
+    setShowTimezonePicker(false);
+    setTimezoneSearch(buildTimezoneOption(deviceTimezone).label);
+    setIsSavingPreferences(true);
+    setPreferencesError("");
+    setPreferencesSuccessMessage("");
+
+    try {
+      const result = await updatePreferences(deviceTimezone, defaultClockFormat);
+      if (!result.success) {
+        setPreferencesError(result.error || "Could not reset preferences.");
+        return;
+      }
+      updateUserPreferences({
+        timezone: result.user.timezone,
+        clock_format: result.user.clock_format,
+      });
+      setPreferencesSuccessMessage("Preferences reset to your device timezone.");
+    } catch (err) {
+      setPreferencesError(toUserFacingAuthError(err, "Could not reset preferences."));
     } finally {
       setIsSavingPreferences(false);
     }
@@ -358,23 +439,58 @@ export default function AccountPage() {
             <label htmlFor="timezone-preference" className="block text-sm font-medium text-slate-900">
               Timezone
             </label>
-            <select
-              id="timezone-preference"
-              value={timezonePreference}
-              onChange={(event) => {
-                setTimezonePreference(event.target.value);
-                setPreferencesError("");
-                setPreferencesSuccessMessage("");
-              }}
-              disabled={isSavingPreferences}
-              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {timezoneOptions.map((timezoneOption) => (
-                <option key={timezoneOption} value={timezoneOption}>
-                  {timezoneOption}
-                </option>
-              ))}
-            </select>
+            <div className="relative mt-2">
+              <input
+                id="timezone-preference"
+                type="text"
+                value={timezoneSearch}
+                onFocus={() => {
+                  setShowTimezonePicker(true);
+                  setTimezoneSearch("");
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setShowTimezonePicker(false);
+                  }, 100);
+                }}
+                onChange={(event) => {
+                  setTimezoneSearch(event.target.value);
+                  setShowTimezonePicker(true);
+                  setPreferencesError("");
+                  setPreferencesSuccessMessage("");
+                }}
+                disabled={isSavingPreferences}
+                placeholder="Search timezone"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              {showTimezonePicker ? (
+                <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-slate-300 bg-white shadow-md">
+                  {filteredTimezoneOptions.length ? (
+                    filteredTimezoneOptions.map((timezoneOption) => (
+                      <button
+                        key={timezoneOption.value}
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                        }}
+                        onClick={() => {
+                          setTimezonePreference(timezoneOption.value);
+                          setTimezoneSearch(timezoneOption.label);
+                          setShowTimezonePicker(false);
+                          setPreferencesError("");
+                          setPreferencesSuccessMessage("");
+                        }}
+                        className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                      >
+                        {timezoneOption.label}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-2 text-sm text-slate-500">No matching timezones.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
           <div>
             <label htmlFor="clock-format-preference" className="block text-sm font-medium text-slate-900">
@@ -398,7 +514,7 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={() => void handleSavePreferences()}
@@ -406,6 +522,14 @@ export default function AccountPage() {
             className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSavingPreferences ? "Saving preferences..." : "Save Preferences"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleUseDeviceTimezone()}
+            disabled={isSavingPreferences}
+            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Use Device Timezone
           </button>
         </div>
 

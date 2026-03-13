@@ -26,6 +26,28 @@ function normalizeClockFormat(value) {
   return null;
 }
 
+async function listUserColumns(env) {
+  const result = await env.DB.prepare("PRAGMA table_info(users)").all();
+  const rows = Array.isArray(result?.results) ? result.results : [];
+  return rows
+    .map((row) => (typeof row?.name === "string" ? row.name : ""))
+    .filter((name) => name.length > 0);
+}
+
+async function ensurePreferenceColumns(env) {
+  const columns = await listUserColumns(env);
+
+  if (!columns.includes("timezone")) {
+    await env.DB.prepare("ALTER TABLE users ADD COLUMN timezone TEXT NOT NULL DEFAULT 'UTC'").run();
+  }
+
+  if (!columns.includes("clock_format")) {
+    await env.DB.prepare(
+      "ALTER TABLE users ADD COLUMN clock_format TEXT NOT NULL DEFAULT '12h' CHECK (clock_format IN ('12h', '24h'))",
+    ).run();
+  }
+}
+
 export async function updatePreferences(request, env) {
   const authUser = await requireAuth(request, env);
   if (authUser instanceof Response) {
@@ -58,6 +80,8 @@ export async function updatePreferences(request, env) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  await ensurePreferenceColumns(env);
 
   await env.DB.prepare(
     `UPDATE users

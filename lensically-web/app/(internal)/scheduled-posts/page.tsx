@@ -27,6 +27,7 @@ type ScheduledPost = {
 };
 
 type ScheduledPostsResponse = {
+  success?: boolean;
   scheduled_posts?: ScheduledPost[];
   error?: string;
 };
@@ -177,8 +178,19 @@ export default function ScheduledPostsPage() {
       );
 
       const data = (await response.json().catch(() => null)) as ScheduledPostsResponse | null;
+      if (Array.isArray(data?.scheduled_posts)) {
+        setScheduledPosts(data.scheduled_posts);
+        setScheduledPostsError("");
+        return;
+      }
+
       if (!response.ok) {
         setScheduledPostsError(data?.error || "Could not load scheduled posts.");
+        return;
+      }
+
+      if (data?.success === false) {
+        setScheduledPostsError(data.error || "Could not load scheduled posts.");
         return;
       }
 
@@ -228,22 +240,12 @@ export default function ScheduledPostsPage() {
         <h1 className="text-3xl font-semibold text-slate-900">
           Scheduled Posts ({orderedScheduledPosts.length})
         </h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/schedule"
-            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Create Scheduled Post
-          </Link>
-          <button
-            type="button"
-            onClick={() => void loadScheduledPosts()}
-            disabled={loadingScheduledPosts}
-            className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loadingScheduledPosts ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
+        <Link
+          href="/schedule"
+          className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Create Scheduled Post
+        </Link>
       </div>
 
       <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -255,7 +257,7 @@ export default function ScheduledPostsPage() {
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
             <h2 className="text-base font-semibold text-slate-900">No scheduled posts yet</h2>
             <p className="mt-2 text-sm text-slate-600">
-              You have 0 upcoming scheduled posts. Create your first post to start building your schedule.
+              You have no scheduled posts yet. Create your first post to start building your schedule.
             </p>
             <div className="mt-4">
               <Link

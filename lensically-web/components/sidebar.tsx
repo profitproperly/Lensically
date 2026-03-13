@@ -14,6 +14,7 @@ import {
 const links = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/insights", label: "Insights" },
+  { href: "/schedule", label: "Create Post" },
   { href: "/scheduled-posts", label: "Scheduled Posts" },
   { href: "/search", label: "Keyword Search" },
   { href: "/discovery", label: "Profile Discovery" },
@@ -97,9 +98,9 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sticky top-16 h-[calc(100vh-4rem)] w-72 shrink-0 border-r border-slate-200 bg-white pt-6 flex flex-col items-start">
+    <aside className="w-full shrink-0 border-b border-slate-200 bg-white pt-4 xl:sticky xl:top-16 xl:h-[calc(100vh-4rem)] xl:w-72 xl:border-b-0 xl:border-r xl:pt-6 flex flex-col items-start">
       {showThreadsProfile && (
-        <div className="flex flex-col items-center w-full mt-6 mb-8">
+        <div className="flex flex-col items-center w-full mt-4 mb-6 xl:mt-6 xl:mb-8">
           <div className="relative group cursor-pointer">
             {displayUsername ? (
               <a
@@ -146,7 +147,7 @@ export function Sidebar() {
         </div>
       )}
 
-      <nav className="w-full space-y-2">
+      <nav className="w-full space-y-2 pb-4 xl:pb-0">
         {links.map((link) => (
           <div key={link.href} className="px-4">
             {(() => {

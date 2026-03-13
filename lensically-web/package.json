@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "prebuild": "node scripts/prepare-next-output.js",
-    "build": "next build --webpack",
+    "build": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "prebuild:cf": "node scripts/prepare-next-output.js",
