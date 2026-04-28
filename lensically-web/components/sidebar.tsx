@@ -28,7 +28,12 @@ type ThreadsMeResponse = {
 
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 
-export function Sidebar() {
+type SidebarProps = {
+  mobile?: boolean;
+  onNavigate?: () => void;
+};
+
+export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const currentPath = String(pathname ?? "");
@@ -88,14 +93,19 @@ export function Sidebar() {
       router.prefetch(href);
       const destinationHref = await preloadRouteDataForNavigation(href, WORKSPACE_APP_USER_ID);
       router.push(destinationHref);
+      onNavigate?.();
     } finally {
       setPendingNavigationHref(null);
     }
   }
 
+  const asideClassName = mobile
+    ? "flex h-full w-full flex-col bg-white"
+    : "hidden w-72 shrink-0 border-r border-slate-200 bg-white xl:sticky xl:top-16 xl:flex xl:h-[calc(100vh-4rem)]";
+
   return (
-    <aside className="w-full shrink-0 border-b border-slate-200 bg-white pt-4 xl:sticky xl:top-16 xl:h-[calc(100vh-4rem)] xl:w-72 xl:border-b-0 xl:border-r xl:pt-6 flex flex-col items-start">
-      <div className="flex flex-col items-center w-full mt-4 mb-6 xl:mt-6 xl:mb-8">
+    <aside className={asideClassName}>
+      <div className={`flex w-full flex-col items-center ${mobile ? "border-b border-slate-200 px-5 pb-5 pt-6" : "mb-8 mt-6"}`}>
         <div className="relative group cursor-pointer">
           {displayUsername ? (
             <a
@@ -107,10 +117,10 @@ export function Sidebar() {
                 <img
                   src={displayProfilePictureUrl || ""}
                   alt={`@${displayUsername}`}
-                  className="h-32 w-32 rounded-full"
+                  className={`${mobile ? "h-24 w-24" : "h-32 w-32"} rounded-full`}
                 />
               ) : (
-                <div className="flex h-32 w-32 items-center justify-center rounded-full bg-slate-900 text-3xl font-semibold text-white">
+                <div className={`flex items-center justify-center rounded-full bg-slate-900 font-semibold text-white ${mobile ? "h-24 w-24 text-2xl" : "h-32 w-32 text-3xl"}`}>
                   MM
                 </div>
               )}
@@ -143,9 +153,9 @@ export function Sidebar() {
         )}
       </div>
 
-      <nav className="w-full space-y-2 pb-4 xl:pb-0">
+      <nav className={`w-full space-y-2 ${mobile ? "px-4 py-4" : "pb-4"}`}>
         {links.map((link) => (
-          <div key={link.href} className="px-4">
+          <div key={link.href} className={mobile ? undefined : "px-4"}>
             {(() => {
               const isActive = isActivePath(link.href);
               const isNavigatingToLink = pendingNavigationHref === link.href;
@@ -159,7 +169,7 @@ export function Sidebar() {
                   disabled={isNavigationDisabled}
                   aria-busy={isNavigatingToLink}
                   className={[
-                    "block w-full px-6 py-3 text-[15px] font-medium rounded-xl transition-colors text-left cursor-pointer",
+                    "block w-full rounded-xl px-6 py-3 text-left text-[15px] font-medium transition-colors cursor-pointer",
                     isActive ? "bg-black text-white" : "text-black hover:bg-black hover:text-white",
                     isNavigatingToLink ? "opacity-80" : "",
                     isNavigationDisabled ? "disabled:cursor-not-allowed disabled:opacity-60" : "",

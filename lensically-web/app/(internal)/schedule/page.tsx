@@ -562,17 +562,17 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
         <Link
           href="/scheduled-posts"
-          className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
         >
           Scheduled Posts
         </Link>
       </div>
 
-      <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="space-y-5">
           <div>
             <label htmlFor="post-text" className="block text-sm font-medium text-slate-900">
@@ -602,12 +602,12 @@ export default function SchedulePage() {
                   <label htmlFor="schedule-date" className="block text-sm font-medium text-slate-900">
                     Date
                   </label>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => shiftScheduleDate(-1)}
                       disabled={isSubmitting || (scheduleDate || defaultScheduleDate) <= minScheduleDate}
-                      className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Previous Day
                     </button>
@@ -615,7 +615,7 @@ export default function SchedulePage() {
                       type="button"
                       onClick={() => shiftScheduleDate(1)}
                       disabled={isSubmitting}
-                      className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Next Day
                     </button>
@@ -656,7 +656,7 @@ export default function SchedulePage() {
 
               <div>
                 <p className="block text-sm font-medium text-slate-900">Quick Times</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                   {quickTimeOptions.map((option) => {
                     const isPastQuickTime = isSchedulingForToday && option.value < minScheduleTime;
                     const isSelected = scheduleTime === option.value;
@@ -670,7 +670,7 @@ export default function SchedulePage() {
                           setSuccessMessage("");
                         }}
                         disabled={isSubmitting || isPastQuickTime}
-                        className={`inline-flex rounded-md border px-3 py-2 text-xs font-medium ${
+                        className={`inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 text-xs font-medium ${
                           isSelected
                             ? "border-slate-900 bg-slate-900 text-white"
                             : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -683,14 +683,14 @@ export default function SchedulePage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <p className="text-xs text-slate-600">
+              <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs leading-5 text-slate-600">
                   Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezoneLabel}</span>, clock format{" "}
                   <span className="font-medium text-slate-800">{clockFormatLabel}</span>.
                 </p>
                 <Link
                   href="/account"
-                  className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 sm:w-auto"
                 >
                   Change in Account Settings
                 </Link>
@@ -698,13 +698,13 @@ export default function SchedulePage() {
             </>
           ) : null}
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {!isScheduleComposerOpen ? (
               <button
                 type="button"
                 onClick={handleRequestPostNowConfirmation}
                 disabled={isSubmitting || !postText.trim()}
-                className="inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 {isPostingNow ? "Posting..." : "Post Now"}
               </button>
@@ -727,7 +727,7 @@ export default function SchedulePage() {
                 || !postText.trim()
                 || (isScheduleComposerOpen && (!scheduleDate || !scheduleTime || hasPastTimeSelection))
               }
-              className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isScheduling ? "Scheduling..." : "Schedule Post"}
             </button>
@@ -746,7 +746,7 @@ export default function SchedulePage() {
                     setSuccessMessage("");
                   }}
                   disabled={isSubmitting}
-                  className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   Cancel Schedule
                 </button>
