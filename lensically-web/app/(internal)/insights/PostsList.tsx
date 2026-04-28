@@ -228,6 +228,10 @@ export default function PostsList() {
     return "Click to sort.";
   };
 
+  function formatMetricValue(value: number | undefined): string {
+    return String(value ?? 0);
+  }
+
   if (loadingInitial) return <p className="text-sm text-slate-700">Loading posts...</p>;
 
   if (needsConnection) {
@@ -244,7 +248,7 @@ export default function PostsList() {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs font-medium text-slate-500">
           Showing {posts.length} {posts.length === 1 ? "post" : "posts"}
         </p>
@@ -252,13 +256,63 @@ export default function PostsList() {
           type="button"
           onClick={handleRefresh}
           disabled={refreshing}
-          className="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center rounded border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
         >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full border-collapse table-fixed">
+
+      <div className="space-y-4 md:hidden">
+        {sortedPosts.map((post) => {
+          const formattedTime = post.timestamp
+            ? new Date(post.timestamp).toLocaleString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+              })
+            : "Unknown time";
+
+          return (
+            <article
+              key={post.id ?? post.permalink ?? `${post.username}-${post.timestamp}`}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <p className="text-sm leading-6 text-slate-900">
+                {post.text || "No text content."}
+              </p>
+
+              <p className="mt-3 text-xs text-slate-500">{formattedTime}</p>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {[
+                  { label: "Views", value: formatMetricValue(post.views) },
+                  { label: "Likes", value: formatMetricValue(post.likes) },
+                  { label: "Replies", value: formatMetricValue(post.replies) },
+                  { label: "Reposts", value: formatMetricValue(post.reposts) },
+                  { label: "Quotes", value: formatMetricValue(post.quotes) },
+                  { label: "Shares", value: formatMetricValue(post.shares) },
+                ].map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                  >
+                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+                      {metric.label}
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+        <table className="w-full min-w-[920px] border-collapse table-fixed">
           <thead className="sticky top-16 z-20 bg-white border-b border-slate-200 text-xs uppercase text-slate-500">
             <tr>
               <th
@@ -482,7 +536,7 @@ export default function PostsList() {
         <button
           onClick={loadMore}
           disabled={loadingMore}
-          className="mt-6 rounded bg-black px-4 py-2 text-white"
+          className="mt-6 inline-flex w-full items-center justify-center rounded bg-black px-4 py-2 text-white sm:w-auto"
         >
           {loadingMore ? "Loading..." : "Load More"}
         </button>
