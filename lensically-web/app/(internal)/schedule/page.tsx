@@ -84,14 +84,6 @@ function parseHourMinute(value: string): { hour: number; minute: number } | null
   return { hour, minute };
 }
 
-function toMinutesOfDay(value: string): number | null {
-  const parsed = parseHourMinute(value);
-  if (!parsed) {
-    return null;
-  }
-  return (parsed.hour * 60) + parsed.minute;
-}
-
 function formatPickerTime(value: string, clockFormat: "12h" | "24h"): string {
   const parsed = parseHourMinute(value);
   if (!parsed) {
@@ -128,6 +120,23 @@ function normalizeTimePayload(value: string): string | null {
     ? (hour12 % 12) + 12
     : hour12 % 12;
   return `${padTwoDigits(hour24)}:${padTwoDigits(minute)}`;
+}
+
+function addDaysToIsoDate(date: string, days: number): string | null {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match || !Number.isInteger(days)) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return `${shifted.getUTCFullYear()}-${padTwoDigits(shifted.getUTCMonth() + 1)}-${padTwoDigits(shifted.getUTCDate())}`;
 }
 
 function formatPublishErrorMessage(raw: string | null | undefined): string {
@@ -219,17 +228,11 @@ export default function SchedulePage() {
   );
   const isSchedulingForToday = scheduleDate === minScheduleDate;
   const hasPastTimeSelection = isSchedulingForToday && Boolean(scheduleTime) && scheduleTime < minScheduleTime;
-  const minScheduleMinutes = toMinutesOfDay(minScheduleTime);
 
-  const scheduleTimeOptions = useMemo(() => {
+  const quickTimeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
-    const effectiveMinMinutes = isSchedulingForToday && Number.isInteger(minScheduleMinutes)
-      ? Number(minScheduleMinutes)
-      : 0;
-
-    for (let minutes = effectiveMinMinutes; minutes < 24 * 60; minutes += 1) {
-      const hour = Math.floor(minutes / 60);
-      const minute = minutes % 60;
+    for (let hour = 0; hour < 24; hour += 1) {
+      const minute = 0;
       const value = `${padTwoDigits(hour)}:${padTwoDigits(minute)}`;
       options.push({
         value,
@@ -238,7 +241,7 @@ export default function SchedulePage() {
     }
 
     return options;
-  }, [clockFormatPreference, isSchedulingForToday, minScheduleMinutes]);
+  }, [clockFormatPreference]);
 
   useEffect(() => {
     if (!appUserId) {
@@ -512,6 +515,24 @@ export default function SchedulePage() {
     }
   }
 
+  function shiftScheduleDate(days: number) {
+    const baseDate = scheduleDate || defaultScheduleDate;
+    const shiftedDate = addDaysToIsoDate(baseDate, days);
+    if (!shiftedDate) {
+      return;
+    }
+    if (shiftedDate < minScheduleDate) {
+      setScheduleDate(minScheduleDate);
+      setErrorMessage("Scheduling date cannot be in the past.");
+      setSuccessMessage("");
+      return;
+    }
+
+    setScheduleDate(shiftedDate);
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
   const isSubmitting = isPostingNow || isScheduling;
 
   if (loadingConnection) {
@@ -581,6 +602,24 @@ export default function SchedulePage() {
                   <label htmlFor="schedule-date" className="block text-sm font-medium text-slate-900">
                     Date
                   </label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => shiftScheduleDate(-1)}
+                      disabled={isSubmitting || (scheduleDate || defaultScheduleDate) <= minScheduleDate}
+                      className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Previous Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shiftScheduleDate(1)}
+                      disabled={isSubmitting}
+                      className="inline-flex cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Next Day
+                    </button>
+                  </div>
                   <input
                     id="schedule-date"
                     type="date"
@@ -599,8 +638,9 @@ export default function SchedulePage() {
                   <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
                     Time ({timezoneLabel}, {clockFormatLabel})
                   </label>
-                  <select
+                  <input
                     id="schedule-time"
+                    type="time"
                     value={scheduleTime}
                     onChange={(event) => {
                       setScheduleTime(event.target.value);
@@ -608,15 +648,38 @@ export default function SchedulePage() {
                       setSuccessMessage("");
                     }}
                     disabled={isSubmitting}
+                    step={60}
                     className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <option value="">Select time</option>
-                    {scheduleTimeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="block text-sm font-medium text-slate-900">Quick Times</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {quickTimeOptions.map((option) => {
+                    const isPastQuickTime = isSchedulingForToday && option.value < minScheduleTime;
+                    const isSelected = scheduleTime === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setScheduleTime(option.value);
+                          setErrorMessage("");
+                          setSuccessMessage("");
+                        }}
+                        disabled={isSubmitting || isPastQuickTime}
+                        className={`inline-flex rounded-md border px-3 py-2 text-xs font-medium ${
+                          isSelected
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                        } disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400`}
+                      >
                         {option.label}
-                      </option>
-                    ))}
-                  </select>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
