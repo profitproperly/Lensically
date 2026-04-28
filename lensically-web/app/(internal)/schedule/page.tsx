@@ -590,7 +590,7 @@ export default function SchedulePage() {
               maxLength={500}
               disabled={isSubmitting}
               placeholder="Write your Threads post..."
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
             />
             <p className="mt-1 text-xs text-slate-500">{postText.length}/500</p>
           </div>
@@ -598,7 +598,7 @@ export default function SchedulePage() {
           {isScheduleComposerOpen ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
+                <div className="min-w-0">
                   <label htmlFor="schedule-date" className="block text-sm font-medium text-slate-900">
                     Date
                   </label>
@@ -631,10 +631,10 @@ export default function SchedulePage() {
                       setSuccessMessage("");
                     }}
                     disabled={isSubmitting}
-                    className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-2 box-border w-full min-w-0 max-w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
                     Time ({timezoneLabel}, {clockFormatLabel})
                   </label>
@@ -649,7 +649,7 @@ export default function SchedulePage() {
                     }}
                     disabled={isSubmitting}
                     step={60}
-                    className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-2 box-border w-full min-w-0 max-w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
                   />
                 </div>
               </div>
