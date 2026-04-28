@@ -14,9 +14,10 @@ const deletedDataItems = [
   "Your Lensically user account record",
   "Active sessions and authentication cookies",
   "Connected OAuth provider linkages",
+  "Connected Threads account linkage records and related cached profile data",
   "Email verification and password reset tokens",
-  "Usage tracking records associated with your account",
-  "Scheduled posts stored for your account",
+  "Usage tracking and feature usage records associated with your account",
+  "Scheduled posts and publish status records stored for your account",
 ];
 
 export default function DataDeletionPage() {
@@ -47,6 +48,7 @@ export default function DataDeletionPage() {
             area. Deletion is permanent and removes the account data associated with your use of the
             application.
           </p>
+          <p className="text-sm text-slate-500">Effective date: March 14, 2026</p>
         </div>
 
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-medium leading-6 text-rose-900">
@@ -74,6 +76,10 @@ export default function DataDeletionPage() {
             <li>Sign in to your Lensically account.</li>
             <li>Open the account settings page.</li>
             <li>Select the delete account action.</li>
+            <li>
+              If your account uses password authentication, confirm with your current password. For
+              OAuth-only accounts, confirm by entering the required deletion confirmation text.
+            </li>
             <li>Confirm the permanent deletion prompt.</li>
             <li>
               After confirmation, Lensically runs the deletion process and removes your account from
@@ -94,9 +100,15 @@ export default function DataDeletionPage() {
             ))}
           </ul>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            Account deletion disables access immediately. For security, fraud prevention, and abuse
-            prevention, Lensically may retain limited identifiers for up to 7 days before those
-            retained identifiers expire.
+            Account deletion disables access immediately and clears active sessions. For security,
+            fraud prevention, and abuse prevention, Lensically may retain limited identity
+            tombstones (such as email and OAuth provider identifiers) for up to 7 days before
+            expiring.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            If a Threads account is disconnected (without full account deletion), Lensically may
+            retain temporary connection tombstone metadata for a short reconnect window as part of
+            product safety and lifecycle handling.
           </p>
         </section>
 
@@ -109,15 +121,18 @@ export default function DataDeletionPage() {
             returns a confirmation status response.
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">
+            If you cannot access your account and need manual deletion support, contact{" "}
+            <a className="font-medium text-slate-900 underline" href="mailto:support@lensically.com">
+              support@lensically.com
+            </a>{" "}
+            and include the email address associated with your Lensically account.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
             The related public privacy policy used for provider review is available at{" "}
             <Link href="/privacy" className="font-medium text-slate-900 underline">
               https://lensically.com/privacy
             </Link>
             .
-          </p>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            If you cannot access your account and need assistance with deletion, contact Lensically
-            support and include the email address associated with your account.
           </p>
           <p className="mt-4 text-sm font-medium text-slate-900">
             Support: <a className="underline" href="mailto:support@lensically.com">support@lensically.com</a>

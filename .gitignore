@@ -13,3 +13,4 @@ logs
 .open-next
 lensically-web/.next
 lensically-web/.open-next
+lensically-worker/.cloudflare.deploy.ps1

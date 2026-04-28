@@ -1,6 +1,12 @@
 # Lensically
 Social Signal Analytics
 
+## Repository Status
+
+This repository now represents the current single-user Auto Threads build for Manifest Mental.
+
+It was originally cloned from an older Lensically SaaS-oriented codebase to preserve scaffolding, but the active local build and deployed product have been repurposed around the new workflow. As a result, inherited Git history and older repo structure may not reflect the current product direction.
+
 ## Reviewer Guide
 
 - Reviewer guide: [`REVIEWER_GUIDE.md`](./REVIEWER_GUIDE.md)

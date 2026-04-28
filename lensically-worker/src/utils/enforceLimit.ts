@@ -101,8 +101,8 @@ export async function enforceLimit(
   const limit = DAILY_USAGE_LIMITS[column];
 
   try {
-    const usage = await getDailyUsage(env, normalizedUserId);
-    const currentUsage = Number(usage[column] ?? 0);
+    const usage = await getDailyUsage(env, normalizedUserId, column);
+    const currentUsage = Number(usage.usage_count ?? 0);
 
     if (currentUsage >= limit) {
       console.log("limit_exceeded", sanitizeForLog({
@@ -121,7 +121,7 @@ export async function enforceLimit(
     }
 
     const updatedUsage = await incrementDailyUsage(env, normalizedUserId, column);
-    const newUsage = Number(updatedUsage[column] ?? currentUsage + 1);
+    const newUsage = Number(updatedUsage.usage_count ?? currentUsage + 1);
 
     return {
       allowed: true,

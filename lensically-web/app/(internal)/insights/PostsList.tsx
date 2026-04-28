@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "../../../lib/AuthProvider";
 import { buildWorkerUrl } from "../../../lib/apiClient";
-import { markThreadsOauthPending } from "../../../lib/threadsOauth";
 
 type ThreadsPost = {
   id?: string;
@@ -27,15 +25,11 @@ type PostsResponse = {
   error?: string;
 };
 
-const CONNECT_THREADS_URL = buildWorkerUrl("/api/auth/threads/start");
 const THREADS_POSTS_URL = buildWorkerUrl("/api/threads/posts");
+const WORKSPACE_APP_USER_ID = "workspace-owner";
 
 export default function PostsList() {
-  const { user, loading } = useAuth();
-  const appUserId = user?.id?.trim() ?? "";
-  const cacheKey = appUserId
-    ? `lensically_insights_cache_${appUserId}`
-    : "lensically_insights_cache";
+  const appUserId = WORKSPACE_APP_USER_ID;
   const [posts, setPosts] = useState<ThreadsPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [cursorDepth, setCursorDepth] = useState(1);
@@ -45,37 +39,10 @@ export default function PostsList() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [needsConnection, setNeedsConnection] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [cacheChecked, setCacheChecked] = useState(false);
-  const [restoredFromCache, setRestoredFromCache] = useState(false);
   const [sortMetric, setSortMetric] = useState<
     "views" | "likes" | "replies" | "reposts" | "quotes" | "shares" | "timestamp" | null
   >(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-
-  const persistInsightsCache = useCallback((
-    nextPosts: ThreadsPost[],
-    nextCursor: string | null,
-    nextCursorDepth: number,
-    nextHasMore: boolean,
-  ) => {
-    if (!appUserId) {
-      return;
-    }
-
-    const payload = {
-      posts: nextPosts,
-      cursor: nextCursor,
-      cursorDepth: nextCursorDepth,
-      hasMore: nextHasMore,
-      timestamp: Date.now(),
-    };
-
-    try {
-      sessionStorage.setItem(cacheKey, JSON.stringify(payload));
-    } catch {
-      // Ignore storage errors (e.g., quota exceeded) and keep runtime behavior unchanged.
-    }
-  }, [appUserId, cacheKey]);
 
   const loadPosts = useCallback(async () => {
     if (!appUserId) {
@@ -135,8 +102,13 @@ export default function PostsList() {
 
       setPosts((prev) => {
         const mergedPosts = [...prev, ...newPosts];
-        persistInsightsCache(mergedPosts, nextCursor, nextDepth, nextHasMore);
-        return mergedPosts;
+        const dedupedPosts = mergedPosts.filter((post, index, arr) => {
+          if (!post.id) {
+            return true;
+          }
+          return arr.findIndex((candidate) => candidate.id === post.id) === index;
+        });
+        return dedupedPosts;
       });
       setCursor(nextCursor);
       setHasMore(nextHasMore);
@@ -170,22 +142,12 @@ export default function PostsList() {
       }
 
       const fetchedPosts = Array.isArray(data.posts) ? data.posts : [];
-
-      setPosts((prev) => {
-        const cachedIds = new Set(prev.map((post) => post.id));
-        const newPosts = fetchedPosts.filter((post) => !cachedIds.has(post.id));
-        const mergedPosts = [...newPosts, ...prev];
-        const dedupedById = mergedPosts.filter((post, index, arr) => {
-          if (!post.id) {
-            return true;
-          }
-          return arr.findIndex((candidate) => candidate.id === post.id) === index;
-        });
-        const cappedPosts = dedupedById.slice(0, 320);
-
-        persistInsightsCache(cappedPosts, cursor, cursorDepth, hasMore);
-        return cappedPosts;
-      });
+      const nextCursor = data.next_cursor || null;
+      const nextHasMore = Boolean(data.has_more);
+      setPosts(fetchedPosts);
+      setCursor(nextCursor);
+      setHasMore(nextHasMore);
+      setCursorDepth(1);
 
       setNeedsConnection(false);
       setHasError(false);
@@ -197,9 +159,6 @@ export default function PostsList() {
   };
 
   useEffect(() => {
-    if (loading) {
-      return;
-    }
     if (!appUserId) {
       setPosts([]);
       setCursor(null);
@@ -207,74 +166,11 @@ export default function PostsList() {
       setCursorDepth(1);
       setNeedsConnection(true);
       setHasError(false);
-      setCacheChecked(true);
-      setRestoredFromCache(false);
       setLoadingInitial(false);
-      return;
-    }
-
-    setCacheChecked(false);
-    setRestoredFromCache(false);
-
-    try {
-      const raw = sessionStorage.getItem(cacheKey);
-      if (!raw) {
-        setCacheChecked(true);
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as {
-        posts?: ThreadsPost[];
-        cursor?: string | null;
-        cursorDepth?: number;
-        hasMore?: boolean;
-        timestamp?: number;
-      };
-
-      if (!Array.isArray(parsed.posts)) {
-        setCacheChecked(true);
-        return;
-      }
-
-      setPosts(parsed.posts);
-      setCursor(parsed.cursor ?? null);
-      setCursorDepth(Number.isFinite(parsed.cursorDepth) ? Number(parsed.cursorDepth) : 1);
-      setHasMore(Boolean(parsed.hasMore));
-      setNeedsConnection(false);
-      setHasError(false);
-      setLoadingInitial(false);
-      setRestoredFromCache(true);
-    } catch {
-      // Ignore invalid cache payloads and continue with normal fetch flow.
-    } finally {
-      setCacheChecked(true);
-    }
-  }, [appUserId, cacheKey, loading]);
-
-  useEffect(() => {
-    if (loading) {
-      return;
-    }
-    if (!appUserId) {
-      return;
-    }
-    if (!cacheChecked || restoredFromCache) {
       return;
     }
     void loadPosts();
-  }, [appUserId, cacheChecked, restoredFromCache, loadPosts, loading]);
-
-  useEffect(() => {
-    if (!appUserId || loadingInitial) {
-      return;
-    }
-
-    if (!posts.length && !cursor && !hasMore && cursorDepth === 1) {
-      return;
-    }
-
-    persistInsightsCache(posts, cursor, cursorDepth, hasMore);
-  }, [appUserId, posts, cursor, cursorDepth, hasMore, loadingInitial, persistInsightsCache]);
+  }, [appUserId, loadPosts]);
 
   const sortedPosts = [...posts].sort((a, b) => {
     if (!sortMetric) {
@@ -332,28 +228,14 @@ export default function PostsList() {
     return "Click to sort.";
   };
 
-  const handleConnectRedirect = () => {
-    const returnTo = encodeURIComponent(window.location.origin);
-    markThreadsOauthPending();
-    window.location.href =
-      `${CONNECT_THREADS_URL}?return_to=${returnTo}&app_user_id=${encodeURIComponent(appUserId ?? "")}`;
-  };
-
   if (loadingInitial) return <p className="text-sm text-slate-700">Loading posts...</p>;
 
   if (needsConnection) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm text-slate-700">
-          Connect your Threads account to view Insights.
+          The configured Threads account could not be loaded for Insights.
         </p>
-        <button
-          type="button"
-          onClick={handleConnectRedirect}
-          className="mt-4 inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          Connect Threads
-        </button>
       </div>
     );
   }

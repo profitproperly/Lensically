@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/lib/AuthProvider";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import { useAuth } from "@/lib/AuthProvider";
 import {
   formatTimezoneLabel,
   formatScheduledLocalTime,
@@ -13,7 +13,11 @@ import {
 import { notifyScheduledPostsUpdated } from "@/lib/scheduledPostsRefresh";
 
 type ThreadsMeResponse = {
-  connected?: boolean;
+  active_threads_user_id?: string | null;
+  accounts?: Array<{
+    threads_user_id?: string | null;
+    is_active?: boolean;
+  }> | null;
   account?: {
     threads_user_id?: string | null;
   } | null;
@@ -21,9 +25,13 @@ type ThreadsMeResponse = {
   error?: string;
 };
 
+const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
+const WORKSPACE_APP_USER_ID = "workspace-owner";
+const FALLBACK_TIMEZONE = "America/New_York";
+const FALLBACK_CLOCK_FORMAT = "12h";
 
 function padTwoDigits(value: number): string {
   return value.toString().padStart(2, "0");
@@ -122,12 +130,70 @@ function normalizeTimePayload(value: string): string | null {
   return `${padTwoDigits(hour24)}:${padTwoDigits(minute)}`;
 }
 
+function formatPublishErrorMessage(raw: string | null | undefined): string {
+  const normalizedRaw = typeof raw === "string" ? raw.trim() : "";
+  if (!normalizedRaw) {
+    return "Could not publish post.";
+  }
+
+  const segments = normalizedRaw.split(":");
+  const code = (segments[0] ?? "").trim();
+  const maybeStatus = (segments[1] ?? "").trim();
+  const statusCode = maybeStatus.match(/^\d+$/) ? maybeStatus : "";
+  const providerDetail = statusCode
+    ? segments.slice(2).join(":").trim()
+    : segments.slice(1).join(":").trim();
+  const providerSuffix = providerDetail ? ` ${providerDetail}` : "";
+  const providerDetailLower = providerDetail.toLowerCase();
+  const needsReconnect = providerDetailLower.includes("does not have permission")
+    || providerDetailLower.includes("missing permission")
+    || providerDetailLower.includes("permission");
+
+  switch (code) {
+    case "threads_publish_create_failed":
+      if (needsReconnect) {
+        return "Threads publish permission is missing for the configured account. Update the account token, then retry.";
+      }
+      return statusCode
+        ? `Threads rejected post creation (HTTP ${statusCode}). Please retry.${providerSuffix}`
+        : `Threads rejected post creation. Please retry.${providerSuffix}`;
+    case "threads_publish_create_invalid_response":
+      return "Threads returned an invalid response while creating the post. Please retry.";
+    case "threads_publish_create_exception":
+      return "Could not reach Threads while creating the post. Please retry.";
+    case "threads_publish_status_check_failed":
+      return statusCode
+        ? `Threads status check failed (HTTP ${statusCode}). Please retry.${providerSuffix}`
+        : `Threads status check failed. Please retry.${providerSuffix}`;
+    case "threads_publish_status_check_exception":
+      return "Could not confirm publish status from Threads. Please retry.";
+    case "threads_publish_status_invalid_response":
+      return "Threads returned an invalid publish status response. Please retry.";
+    case "threads_publish_status_not_ready":
+      return "Threads did not finish publishing in time. Please retry.";
+    case "threads_publish_commit_failed":
+      return statusCode
+        ? `Threads publish commit failed (HTTP ${statusCode}). Please retry.${providerSuffix}`
+        : `Threads publish commit failed. Please retry.${providerSuffix}`;
+    case "threads_publish_commit_invalid_response":
+      return "Threads returned an invalid publish confirmation response. Please retry.";
+    case "threads_publish_commit_exception":
+      return "Could not finalize publishing with Threads. Please retry.";
+    case "threads_account_not_connected":
+      return "The configured Threads account token is not available. Update the account token, then retry.";
+    case "threads_publish_exception":
+      return "Could not reach Threads to publish this post. Please retry.";
+    default:
+      return normalizedRaw || "Could not publish post.";
+  }
+}
+
 export default function SchedulePage() {
-  const { user, loading } = useAuth();
-  const appUserId = user?.id?.trim() ?? "";
-  const timezone = resolveTimezonePreference(user?.timezone);
+  const { user } = useAuth();
+  const appUserId = WORKSPACE_APP_USER_ID;
+  const timezone = resolveTimezonePreference(user?.timezone ?? FALLBACK_TIMEZONE);
   const timezoneLabel = formatTimezoneLabel(timezone);
-  const clockFormatPreference = resolveClockFormatPreference(user?.clock_format);
+  const clockFormatPreference = resolveClockFormatPreference(user?.clock_format ?? FALLBACK_CLOCK_FORMAT);
   const clockFormatLabel = clockFormatPreference === "24h" ? "24-hour" : "12-hour";
 
   const [postText, setPostText] = useState("");
@@ -189,28 +255,54 @@ export default function SchedulePage() {
       setErrorMessage("");
 
       try {
-        const response = await fetch(
-          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
-          {
-            cache: "no-store",
-            credentials: "include",
-            signal: controller.signal,
-          },
-        );
+        const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
+          const accountsResponse = await fetch(
+            `${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            {
+              cache: "no-store",
+              credentials: "include",
+              signal: controller.signal,
+            },
+          );
+          if (accountsResponse.ok) {
+            return (await accountsResponse.json()) as ThreadsMeResponse;
+          }
+
+          const meResponse = await fetch(
+            `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            {
+              cache: "no-store",
+              credentials: "include",
+              signal: controller.signal,
+            },
+          );
+          if (!meResponse.ok) {
+            return null;
+          }
+          return (await meResponse.json()) as ThreadsMeResponse;
+        };
+        const data = await fetchConnectionPayload();
 
         if (!isMounted) {
           return;
         }
 
-        if (!response.ok) {
+        if (!data) {
           setThreadsUserId("");
           setErrorMessage("Could not load Threads connection.");
           return;
         }
-
-        const data = (await response.json()) as ThreadsMeResponse;
+        const activeFromList = Array.isArray(data.accounts)
+          ? data.accounts.find((account) => account?.is_active)?.threads_user_id?.trim()
+          : "";
+        const firstFromList = Array.isArray(data.accounts)
+          ? data.accounts.find((account) => account?.threads_user_id)?.threads_user_id?.trim()
+          : "";
         const resolvedThreadsUserId =
-          data.account?.threads_user_id?.trim()
+          data.active_threads_user_id?.trim()
+          || activeFromList
+          || firstFromList
+          || data.account?.threads_user_id?.trim()
           || data.threads_user_id?.trim()
           || "";
 
@@ -309,7 +401,7 @@ export default function SchedulePage() {
 
       const data = (await response.json().catch(() => null)) as { error?: string; published_post_id?: string } | null;
       if (!response.ok) {
-        setErrorMessage(data?.error || "Could not publish post.");
+        setErrorMessage(formatPublishErrorMessage(data?.error));
         return;
       }
 
@@ -422,7 +514,7 @@ export default function SchedulePage() {
 
   const isSubmitting = isPostingNow || isScheduling;
 
-  if (loading || loadingConnection) {
+  if (loadingConnection) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
@@ -437,14 +529,8 @@ export default function SchedulePage() {
         <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-700">
-            Connect your Threads account to publish or schedule posts.
+            The configured Threads account could not be loaded.
           </p>
-          <Link
-            href="/connect"
-            className="mt-4 inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            Connect Threads
-          </Link>
           {errorMessage ? (
             <p className="mt-4 text-sm text-red-600">{errorMessage}</p>
           ) : null}

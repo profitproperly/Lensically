@@ -11,7 +11,7 @@
     "prebuild:cf": "node scripts/prepare-next-output.js",
     "build:cf": "node scripts/build-cloudflare.js",
     "preview:cf": "npm run build:cf && opennextjs-cloudflare preview",
-    "deploy:cf": "npm run build:cf && opennextjs-cloudflare deploy"
+    "deploy:cf": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-web.ps1"
   },
   "dependencies": {
     "next": "16.1.6",

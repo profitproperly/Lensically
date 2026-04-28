@@ -34,6 +34,7 @@ const THREADS_POSTS_URL = buildWorkerUrl("/api/threads/posts");
 const PROFILE_REQUIRED_ROUTES = new Set([
   "/dashboard",
   "/insights",
+  "/post-archive",
   "/schedule",
   "/scheduled-posts",
   "/search",

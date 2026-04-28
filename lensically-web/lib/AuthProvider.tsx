@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { getCurrentUser, logout, type CurrentUser } from "./authClient";
+import type { CurrentUser } from "./authClient";
 
 type AuthContextType = {
   user: CurrentUser | null;
@@ -13,25 +13,23 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const WORKSPACE_USER: CurrentUser = {
+  id: "workspace-owner",
+  email: "workspace@lensically.local",
+  timezone: "America/New_York",
+  clock_format: "12h",
+  email_verified: true,
+  has_password: true,
+  login_provider: null,
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<CurrentUser | null>(WORKSPACE_USER);
+  const [loading, setLoading] = useState(false);
 
   async function refreshUser() {
-    setLoading(true);
-    try {
-      const data = await getCurrentUser();
-
-      if (data?.id) {
-        setUser(data);
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
+    setUser(WORKSPACE_USER);
   }
 
   function updateUserPreferences(preferences: { timezone: string; clock_format: "12h" | "24h" }) {
@@ -48,11 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logoutUser() {
-    try {
-      await logout();
-    } finally {
-      setUser(null);
-    }
+    setUser(WORKSPACE_USER);
   }
 
   useEffect(() => {

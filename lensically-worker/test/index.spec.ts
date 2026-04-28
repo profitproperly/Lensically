@@ -6,6 +6,7 @@ import authSchema from "../db/auth_schema.sql?raw";
 import accountDeletionGuardsMigration from "../migrations/account_deletion_guards.sql?raw";
 import appThreadsAccountsMigration from "../migrations/app_threads_accounts.sql?raw";
 import limitsMigration from "../migrations/limits.sql?raw";
+import threadsProfileCacheMigration from "../migrations/threads_profile_cache.sql?raw";
 import usageDailyMigration from "../migrations/usage_daily.sql?raw";
 import {
   createDeletionTombstones,
@@ -31,6 +32,7 @@ function normalizeSqlScript(script: string): string {
 const accountDeletionGuardsSql = normalizeSqlScript(accountDeletionGuardsMigration);
 const appThreadsAccountsSql = normalizeSqlScript(appThreadsAccountsMigration);
 const limitsSql = normalizeSqlScript(limitsMigration);
+const threadsProfileCacheSql = normalizeSqlScript(threadsProfileCacheMigration);
 const usageDailySql = normalizeSqlScript(usageDailyMigration);
 const createThreadsAccountsTableSql = [
   "CREATE TABLE IF NOT EXISTS threads_accounts (",
@@ -563,6 +565,879 @@ describe("public response sanitization", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: "Could not complete Threads authorization.",
     });
+  });
+});
+
+describe("threads me API", () => {
+  it("enforces the me daily usage limit when the cache is stale", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+    await env.DB.exec(threadsProfileCacheSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-me-limit", "token-me-limit", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-me-limit", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url")) {
+        return new Response(JSON.stringify({
+          id: "threads-user-me-limit",
+          username: "lensically_test",
+          name: "Lensically Test",
+          threads_biography: "bio",
+          is_verified: false,
+          threads_profile_picture_url: "https://example.com/avatar.jpg",
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const firstResponse = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+    expect(firstResponse.status).toBe(200);
+
+    await env.DB.prepare(
+      `UPDATE threads_profile_cache
+       SET last_refreshed_at = datetime('now', '-25 hours')
+       WHERE threads_user_id = ?`,
+    )
+      .bind("threads-user-me-limit")
+      .run();
+
+    const secondResponse = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+    expect(secondResponse.status).toBe(429);
+    await expect(secondResponse.json()).resolves.toMatchObject({
+      error: "daily_limit_reached",
+      feature: "me",
+      limit: 1,
+      used: 1,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns cached Threads profile data when refreshed within 24 hours", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+    await env.DB.exec(threadsProfileCacheSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-me-fresh-cache", "token-me-fresh-cache", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-me-fresh-cache", now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO threads_profile_cache (
+        threads_user_id,
+        username,
+        name,
+        threads_biography,
+        is_verified,
+        threads_profile_picture_url,
+        last_refreshed_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now', '-23 hours'))`,
+    )
+      .bind(
+        "threads-user-me-fresh-cache",
+        "fresh_cached_user",
+        "Fresh Cached Name",
+        "Fresh cached bio",
+        1,
+        "https://example.com/fresh-cached-avatar.jpg",
+      )
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      connected: true,
+      account: {
+        threads_user_id: "threads-user-me-fresh-cache",
+        username: "fresh_cached_user",
+        name: "Fresh Cached Name",
+        threads_biography: "Fresh cached bio",
+        is_verified: true,
+        threads_profile_picture_url: "https://example.com/fresh-cached-avatar.jpg",
+      },
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("calls Threads API when cached profile is older than 24 hours", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+    await env.DB.exec(threadsProfileCacheSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-me-stale-cache", "token-me-stale-cache", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-me-stale-cache", now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO threads_profile_cache (
+        threads_user_id,
+        username,
+        name,
+        threads_biography,
+        is_verified,
+        threads_profile_picture_url,
+        last_refreshed_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now', '-25 hours'))`,
+    )
+      .bind(
+        "threads-user-me-stale-cache",
+        "stale_cached_user",
+        "Stale Cached Name",
+        "Stale cached bio",
+        0,
+        "https://example.com/stale-cached-avatar.jpg",
+      )
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url")) {
+        return new Response(JSON.stringify({
+          id: "threads-user-me-stale-cache",
+          username: "fresh_user_from_api",
+          name: "Fresh Name From API",
+          threads_biography: "Fresh bio from API",
+          is_verified: false,
+          threads_profile_picture_url: "https://example.com/fresh-from-api.jpg",
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      connected: true,
+      account: {
+        threads_user_id: "threads-user-me-stale-cache",
+        username: "fresh_user_from_api",
+        name: "Fresh Name From API",
+      },
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists the refreshed Threads profile in the profile cache table", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-me-cache", "token-me-cache", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-me-cache", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url")) {
+        return new Response(JSON.stringify({
+          id: "threads-user-me-cache",
+          username: "cached_username",
+          name: "Cached Display Name",
+          threads_biography: "Cached bio",
+          is_verified: true,
+          threads_profile_picture_url: "https://example.com/cached-avatar.jpg",
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const cacheRow = await env.DB.prepare(
+      `SELECT threads_user_id, username, name, threads_biography, is_verified, threads_profile_picture_url, last_refreshed_at
+       FROM threads_profile_cache
+       WHERE threads_user_id = ?
+       LIMIT 1`,
+    )
+      .bind("threads-user-me-cache")
+      .first<{
+        threads_user_id: string;
+        username: string | null;
+        name: string | null;
+        threads_biography: string | null;
+        is_verified: number;
+        threads_profile_picture_url: string | null;
+        last_refreshed_at: string;
+      }>();
+
+    expect(cacheRow).toBeTruthy();
+    expect(cacheRow?.threads_user_id).toBe("threads-user-me-cache");
+    expect(cacheRow?.username).toBe("cached_username");
+    expect(cacheRow?.name).toBe("Cached Display Name");
+    expect(cacheRow?.threads_biography).toBe("Cached bio");
+    expect(cacheRow?.is_verified).toBe(1);
+    expect(cacheRow?.threads_profile_picture_url).toBe("https://example.com/cached-avatar.jpg");
+    expect(cacheRow?.last_refreshed_at).toBeTruthy();
+  });
+});
+
+describe("threads profile lookup API", () => {
+  it("returns normalized profile data when username is provided without app_user_id", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-profile-lookup", "token-profile-lookup", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-profile-lookup", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/profile_lookup?username=target-user")) {
+        return new Response(JSON.stringify({
+          data: [{
+            id: "threads-user-profile-lookup",
+            username: "target-user",
+            name: "Target User",
+            biography: "Bio from Threads",
+            profile_picture_url: "https://example.com/avatar.jpg",
+            is_verified: true,
+            follower_count: 1200,
+            likes_count: 4500,
+            quotes_count: 21,
+            replies_count: 98,
+            reposts_count: 77,
+            views_count: 90000,
+          }],
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/discovery/profile?username=target-user", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "threads-user-profile-lookup",
+      username: "target-user",
+      name: "Target User",
+      biography: "Bio from Threads",
+      profile_picture_url: "https://example.com/avatar.jpg",
+      is_verified: true,
+      follower_count: 1200,
+      likes_count: 4500,
+      quotes_count: 21,
+      replies_count: 98,
+      reposts_count: 77,
+      views_count: 90000,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 400 when username is missing", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/discovery/profile", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "missing username",
+    });
+  });
+});
+
+describe("threads profile posts API", () => {
+  it("returns normalized posts and next cursor when username is provided without app_user_id", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-profile-posts", "token-profile-posts", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-profile-posts", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/profile_posts?username=target-user")) {
+        return new Response(JSON.stringify({
+          data: [
+            {
+              id: "post-1",
+              username: "target-user",
+              text: "First profile post",
+              timestamp: "2026-03-14T12:00:00Z",
+              permalink: "https://threads.net/@target-user/post/post-1",
+              media_type: "TEXT",
+              media_url: null,
+              has_replies: false,
+            },
+          ],
+          paging: {
+            cursors: {
+              after: "cursor-next-1",
+            },
+          },
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(
+      new Request("https://api.lensically.com/api/threads/discovery/profile_posts?username=target-user", {
+        method: "GET",
+        headers: { Cookie: cookieHeader },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      posts: [
+        {
+          id: "post-1",
+          username: "target-user",
+          text: "First profile post",
+          timestamp: "2026-03-14T12:00:00Z",
+          permalink: "https://threads.net/@target-user/post/post-1",
+          media_type: "TEXT",
+          media_url: null,
+          has_replies: false,
+        },
+      ],
+      next_cursor: "cursor-next-1",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards cursor and returns the next page of normalized posts", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-profile-posts-cursor", "token-profile-posts-cursor", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-profile-posts-cursor", now)
+      .run();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      if (requestUrl.includes("/v1.0/profile_posts?username=target-user&after=cursor-1")) {
+        return new Response(JSON.stringify({
+          data: [
+            {
+              id: "post-2",
+              username: "target-user",
+              text: "Second profile post",
+              timestamp: "2026-03-14T12:30:00Z",
+              permalink: "https://threads.net/@target-user/post/post-2",
+              media_type: "IMAGE",
+              media_url: "https://example.com/post-2.jpg",
+              has_replies: true,
+            },
+          ],
+          paging: {
+            cursors: {
+              after: "cursor-2",
+            },
+          },
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const response = await runWorker(
+      new Request("https://api.lensically.com/api/threads/discovery/profile_posts?username=target-user&cursor=cursor-1", {
+        method: "GET",
+        headers: { Cookie: cookieHeader },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      posts: [
+        {
+          id: "post-2",
+          username: "target-user",
+          text: "Second profile post",
+          timestamp: "2026-03-14T12:30:00Z",
+          permalink: "https://threads.net/@target-user/post/post-2",
+          media_type: "IMAGE",
+          media_url: "https://example.com/post-2.jpg",
+          has_replies: true,
+        },
+      ],
+      next_cursor: "cursor-2",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 400 when username is missing", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const response = await runWorker(
+      new Request("https://api.lensically.com/api/threads/discovery/profile_posts", {
+        method: "GET",
+        headers: { Cookie: cookieHeader },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "missing username",
+    });
+  });
+});
+
+describe("threads connection tombstones", () => {
+  it("marks a disconnected Threads link inactive with a tombstone expiry while retaining the Threads user id", async () => {
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-tombstone", "token-tombstone", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-tombstone", now)
+      .run();
+
+    const disconnectResponse = await runWorker(new Request("https://api.lensically.com/api/threads/disconnect", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        app_user_id: "user-authenticated",
+      }),
+    }));
+
+    expect(disconnectResponse.status).toBe(200);
+    await expect(disconnectResponse.json()).resolves.toMatchObject({
+      success: true,
+      disconnected: true,
+    });
+
+    const linkRow = await env.DB.prepare(
+      `SELECT app_user_id, threads_user_id, connection_active, tombstone_expires_at
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-authenticated")
+      .first<{
+        app_user_id: string;
+        threads_user_id: string;
+        connection_active: number;
+        tombstone_expires_at: string | null;
+      }>();
+
+    expect(linkRow).toBeTruthy();
+    expect(linkRow?.app_user_id).toBe("user-authenticated");
+    expect(linkRow?.threads_user_id).toBe("threads-user-tombstone");
+    expect(linkRow?.connection_active).toBe(0);
+    expect(linkRow?.tombstone_expires_at).toBeTruthy();
+    const tombstoneExpiryMs = Date.parse(linkRow?.tombstone_expires_at ?? "");
+    const msUntilExpiry = tombstoneExpiryMs - Date.now();
+    expect(msUntilExpiry).toBeGreaterThan(23 * 60 * 60 * 1000);
+    expect(msUntilExpiry).toBeLessThan(25 * 60 * 60 * 1000);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const meResponse = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(meResponse.status).toBe(200);
+    await expect(meResponse.json()).resolves.toMatchObject({
+      connected: false,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("reactivates a tombstoned Threads link and clears tombstone expiry on reconnect upsert", async () => {
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+    await createAuthenticatedRequestContext();
+
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-tombstone-reconnect", "token-tombstone-reconnect", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (
+        app_user_id,
+        threads_user_id,
+        connection_active,
+        is_active,
+        tombstone_expires_at,
+        created_at
+      )
+       VALUES (?, ?, 0, 0, datetime('now', '+7 days'), ?)`,
+    )
+      .bind("user-authenticated", "threads-user-tombstone-reconnect", now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(app_user_id) DO UPDATE SET
+         threads_user_id = excluded.threads_user_id,
+         connection_active = 1,
+         is_active = 1,
+         tombstone_expires_at = NULL`,
+    )
+      .bind("user-authenticated", "threads-user-tombstone-reconnect", now + 1)
+      .run();
+
+    const linkRow = await env.DB.prepare(
+      `SELECT app_user_id, threads_user_id, connection_active, tombstone_expires_at
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-authenticated")
+      .first<{
+        app_user_id: string;
+        threads_user_id: string;
+        connection_active: number;
+        tombstone_expires_at: string | null;
+      }>();
+
+    expect(linkRow).toBeTruthy();
+    expect(linkRow?.app_user_id).toBe("user-authenticated");
+    expect(linkRow?.threads_user_id).toBe("threads-user-tombstone-reconnect");
+    expect(linkRow?.connection_active).toBe(1);
+    expect(linkRow?.tombstone_expires_at).toBeNull();
+  });
+
+  it("preserves usage buckets and restores tombstoned connection on reconnect within window with observable lifecycle logs", async () => {
+    await env.DB.exec(usageDailySql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+    await env.DB.exec(threadsProfileCacheSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+    const threadsUserId = "threads-user-lifecycle-e2e";
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const usageKey = `${threadsUserId}:me:${todayUtc}`;
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind(threadsUserId, "token-initial", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", threadsUserId, now)
+      .run();
+
+    const workerLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const workerErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const requestUrl = typeof input === "string" ? input : input.url;
+      const method = init?.method ?? "GET";
+
+      if (
+        (
+          requestUrl.includes("/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url")
+          || requestUrl.includes("/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url")
+        )
+        && method === "GET"
+        && requestUrl.includes("graph.threads.net")
+      ) {
+        // Supports both bearer-based /api/threads/me refresh and access-token based OAuth profile fetch.
+        return new Response(JSON.stringify({
+          id: threadsUserId,
+          username: "lifecycle_user",
+          name: "Lifecycle User",
+          threads_biography: "Lifecycle bio",
+          is_verified: false,
+          threads_profile_picture_url: "https://example.com/lifecycle-avatar.jpg",
+        }), { status: 200 });
+      }
+
+      if (requestUrl === "https://graph.threads.net/oauth/access_token" && method === "POST") {
+        return new Response(JSON.stringify({ access_token: "short-token" }), { status: 200 });
+      }
+
+      if (requestUrl.startsWith("https://graph.threads.net/access_token?grant_type=th_exchange_token")) {
+        return new Response(JSON.stringify({ access_token: "long-token", expires_in: 5184000 }), { status: 200 });
+      }
+
+      throw new Error(`Unexpected fetch call: ${requestUrl}`);
+    });
+
+    const firstMeResponse = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+
+    expect(firstMeResponse.status).toBe(200);
+
+    const firstUsageRow = await env.DB.prepare(
+      `SELECT usage_key, usage_count
+       FROM user_usage_feature_daily
+       WHERE usage_key = ?
+       LIMIT 1`,
+    )
+      .bind(usageKey)
+      .first<{ usage_key: string; usage_count: number }>();
+    expect(firstUsageRow?.usage_key).toBe(usageKey);
+    expect(Number(firstUsageRow?.usage_count ?? 0)).toBe(1);
+
+    const disconnectResponse = await runWorker(new Request("https://api.lensically.com/api/threads/disconnect", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({ app_user_id: "user-authenticated" }),
+    }));
+    expect(disconnectResponse.status).toBe(200);
+
+    const tombstoneRow = await env.DB.prepare(
+      `SELECT threads_user_id, connection_active, tombstone_expires_at
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-authenticated")
+      .first<{
+        threads_user_id: string;
+        connection_active: number;
+        tombstone_expires_at: string | null;
+      }>();
+    expect(tombstoneRow?.threads_user_id).toBe(threadsUserId);
+    expect(tombstoneRow?.connection_active).toBe(0);
+    expect(tombstoneRow?.tombstone_expires_at).toBeTruthy();
+
+    const encodedStateContext = Buffer.from(JSON.stringify({
+      appBaseUrl: "https://app.lensically.com",
+      appUserId: "user-authenticated",
+    })).toString("base64");
+    const reconnectState = `nonce.${encodedStateContext}`;
+
+    // Callback validation requires configured Threads OAuth credentials.
+    env.THREADS_CLIENT_ID = "test-threads-client-id";
+    env.THREADS_CLIENT_SECRET = "test-threads-client-secret";
+
+    const reconnectResponse = await runWorker(new Request(
+      `https://api.lensically.com/api/auth/threads/callback?code=reconnect-code&state=${encodeURIComponent(reconnectState)}`,
+      {
+        method: "GET",
+        headers: {
+          Cookie: `${cookieHeader}; lensically_oauth_state=${reconnectState}`,
+        },
+      },
+    ));
+
+    expect(reconnectResponse.status).toBe(302);
+    expect(reconnectResponse.headers.get("Location")).toBe("https://app.lensically.com/dashboard");
+
+    const reconnectRow = await env.DB.prepare(
+      `SELECT threads_user_id, connection_active, tombstone_expires_at
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+       LIMIT 1`,
+    )
+      .bind("user-authenticated")
+      .first<{
+        threads_user_id: string;
+        connection_active: number;
+        tombstone_expires_at: string | null;
+      }>();
+    expect(reconnectRow?.threads_user_id).toBe(threadsUserId);
+    expect(reconnectRow?.connection_active).toBe(1);
+    expect(reconnectRow?.tombstone_expires_at).toBeNull();
+
+    const linksForThreadsUser = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM app_threads_accounts
+       WHERE threads_user_id = ?`,
+    )
+      .bind(threadsUserId)
+      .first<{ total: number | string }>();
+    expect(Number(linksForThreadsUser?.total ?? 0)).toBe(1);
+
+    const secondMeResponse = await runWorker(new Request("https://api.lensically.com/api/threads/me?app_user_id=user-authenticated", {
+      method: "GET",
+      headers: { Cookie: cookieHeader },
+    }));
+    expect(secondMeResponse.status).toBe(200);
+
+    const usageAfterReconnect = await env.DB.prepare(
+      `SELECT usage_count
+       FROM user_usage_feature_daily
+       WHERE usage_key = ?
+       LIMIT 1`,
+    )
+      .bind(usageKey)
+      .first<{ usage_count: number }>();
+    expect(Number(usageAfterReconnect?.usage_count ?? 0)).toBe(1);
+
+    const loggedEvents = workerLogSpy.mock.calls
+      .map((call) => {
+        const message = call[0];
+        if (typeof message !== "string") {
+          return null;
+        }
+        try {
+          return JSON.parse(message) as { event?: string };
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry): entry is { event?: string } => entry !== null);
+
+    expect(loggedEvents.some((entry) => entry.event === "THREADS_CONNECTION_TOMBSTONE_CREATED")).toBe(true);
+    expect(loggedEvents.some((entry) => entry.event === "THREADS_CONNECTION_TOMBSTONE_RESTORED")).toBe(true);
+    expect(loggedEvents.some((entry) => entry.event === "THREADS_PROFILE_CACHE_REFRESHED")).toBe(true);
+    expect(loggedEvents.some((entry) => entry.event === "THREADS_PROFILE_CACHE_HIT")).toBe(true);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(workerErrorSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -1532,6 +2407,12 @@ describe("database integrity safeguards", () => {
       .bind("user-integrity-1", "2026-03-12")
       .run();
     await env.DB.prepare(
+      `INSERT INTO user_usage_feature_daily (usage_key, user_id, feature, date, usage_count)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind("user-integrity-1:me:2026-03-12", "user-integrity-1", "me", "2026-03-12", 1)
+      .run();
+    await env.DB.prepare(
       `INSERT INTO user_daily_usage (user_id, date)
        VALUES (?, ?)`,
     )
@@ -1578,6 +2459,11 @@ describe("database integrity safeguards", () => {
     )
       .bind("user-integrity-1")
       .first<{ total: number }>();
+    const usageFeatureDailyCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM user_usage_feature_daily WHERE user_id = ?",
+    )
+      .bind("user-integrity-1")
+      .first<{ total: number }>();
     const legacyUsageCount = await env.DB.prepare(
       "SELECT COUNT(*) AS total FROM user_daily_usage WHERE user_id = ?",
     )
@@ -1590,6 +2476,7 @@ describe("database integrity safeguards", () => {
       .first<{ total: number }>();
 
     expect(Number(usageDailyCount?.total ?? 0)).toBe(0);
+    expect(Number(usageFeatureDailyCount?.total ?? 0)).toBe(0);
     expect(Number(legacyUsageCount?.total ?? 0)).toBe(0);
     expect(Number(scheduledCount?.total ?? 0)).toBe(0);
   });

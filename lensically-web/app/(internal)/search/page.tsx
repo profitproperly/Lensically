@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthProvider";
 import { buildWorkerUrl } from "@/lib/apiClient";
 
@@ -25,8 +25,21 @@ type ThreadsSearchResponse = {
   code?: string;
 };
 
+type KeywordSearchCacheEntry = {
+  id: string;
+  query: string;
+  search_mode: SearchMode;
+  search_type: SearchType;
+  timestamp: string;
+  results: NormalizedSearchPost[];
+  favorite: boolean;
+};
+
 const THREADS_SEARCH_URL = buildWorkerUrl("/api/threads/search");
 const DEFAULT_LIMIT = "25";
+const KEYWORD_SEARCH_CACHE_STORAGE_KEY = "lensically_keyword_search_cache";
+const MAX_CACHED_SEARCHES = 25;
+const MAX_FAVORITES = 10;
 
 function formatTimestamp(value: string | null): string {
   if (!value) {
@@ -54,6 +67,57 @@ function toIsoFromLocalDateTime(value: string): string | null {
   return parsed.toISOString();
 }
 
+function parseKeywordSearchCache(raw: string | null): KeywordSearchCacheEntry[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item): KeywordSearchCacheEntry => {
+        const candidate = item as Partial<KeywordSearchCacheEntry>;
+        const normalizedSearchMode: SearchMode = candidate.search_mode === "TAG" ? "TAG" : "KEYWORD";
+        const normalizedSearchType: SearchType = candidate.search_type === "RECENT" ? "RECENT" : "TOP";
+        return {
+          id: typeof candidate.id === "string" ? candidate.id : crypto.randomUUID(),
+          query: typeof candidate.query === "string" ? candidate.query : "",
+          search_mode: normalizedSearchMode,
+          search_type: normalizedSearchType,
+          timestamp: typeof candidate.timestamp === "string" ? candidate.timestamp : new Date().toISOString(),
+          results: Array.isArray(candidate.results) ? candidate.results as NormalizedSearchPost[] : [],
+          favorite: candidate.favorite === true,
+        };
+      })
+      .filter((item) => item.query.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function persistKeywordSearchCache(entries: KeywordSearchCacheEntry[]): void {
+  try {
+    sessionStorage.setItem(KEYWORD_SEARCH_CACHE_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Ignore storage write failures for degraded client environments.
+  }
+}
+
+function enforceCacheSize(entries: KeywordSearchCacheEntry[]): KeywordSearchCacheEntry[] {
+  const working = [...entries];
+  while (working.length > MAX_CACHED_SEARCHES) {
+    const removeIndex = working.map((entry) => entry.favorite).lastIndexOf(false);
+    if (removeIndex === -1) {
+      break;
+    }
+    working.splice(removeIndex, 1);
+  }
+  return working;
+}
+
 export default function SearchPage() {
   const { user, loading } = useAuth();
   const appUserId = user?.id?.trim() ?? "";
@@ -69,17 +133,91 @@ export default function SearchPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [results, setResults] = useState<NormalizedSearchPost[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
-  const [preparedRequest, setPreparedRequest] = useState<Record<string, string> | null>(null);
+  const [cacheEntries, setCacheEntries] = useState<KeywordSearchCacheEntry[]>([]);
+  const [isCacheOpen, setIsCacheOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const parsed = parseKeywordSearchCache(sessionStorage.getItem(KEYWORD_SEARCH_CACHE_STORAGE_KEY));
+    setCacheEntries(enforceCacheSize(parsed));
+  }, []);
+
+  function upsertCacheEntry(query: string, mode: SearchMode, type: SearchType, posts: NormalizedSearchPost[]): void {
+    setCacheEntries((previousEntries) => {
+      const existingIndex = previousEntries.findIndex(
+        (entry) => entry.query === query && entry.search_mode === mode && entry.search_type === type,
+      );
+      const existingFavorite = existingIndex >= 0 ? previousEntries[existingIndex]?.favorite === true : false;
+      const nextEntry: KeywordSearchCacheEntry = {
+        id: existingIndex >= 0 ? previousEntries[existingIndex].id : crypto.randomUUID(),
+        query,
+        search_mode: mode,
+        search_type: type,
+        timestamp: new Date().toISOString(),
+        results: posts,
+        favorite: existingFavorite,
+      };
+      const withoutDuplicate = previousEntries.filter((_, index) => index !== existingIndex);
+      const nextEntries = enforceCacheSize([nextEntry, ...withoutDuplicate]);
+      persistKeywordSearchCache(nextEntries);
+      return nextEntries;
+    });
+  }
+
+  function handleLoadCachedSearch(entry: KeywordSearchCacheEntry): void {
+    setKeyword(entry.query);
+    setSearchMode(entry.search_mode);
+    setSearchType(entry.search_type);
+    setAuthorUsername("");
+    setStartTimestamp("");
+    setEndTimestamp("");
+    setErrorMessage("");
+    setHasSearched(true);
+    setResults(entry.results);
+    setSuccessMessage(
+      `Loaded cached search from ${formatTimestamp(entry.timestamp)}. ${entry.results.length} result${entry.results.length === 1 ? "" : "s"} shown.`,
+    );
+    setIsCacheOpen(false);
+  }
+
+  function handleDeleteCachedSearch(entryId: string): void {
+    setCacheEntries((previousEntries) => {
+      const nextEntries = previousEntries.filter((entry) => entry.id !== entryId);
+      persistKeywordSearchCache(nextEntries);
+      return nextEntries;
+    });
+  }
+
+  function handleToggleFavorite(entryId: string): void {
+    setCacheEntries((previousEntries) => {
+      const favoriteCount = previousEntries.filter((entry) => entry.favorite).length;
+      const targetEntry = previousEntries.find((entry) => entry.id === entryId);
+      if (!targetEntry) {
+        return previousEntries;
+      }
+
+      if (!targetEntry.favorite && favoriteCount >= MAX_FAVORITES) {
+        setErrorMessage("Maximum of 10 favorites allowed.");
+        return previousEntries;
+      }
+
+      setErrorMessage("");
+      const nextEntries = previousEntries.map((entry) => (
+        entry.id === entryId
+          ? { ...entry, favorite: !entry.favorite }
+          : entry
+      ));
+      persistKeywordSearchCache(nextEntries);
+      return nextEntries;
+    });
+  }
 
   const trimmedKeyword = keyword.trim();
   const canSubmit = Boolean(appUserId && trimmedKeyword && !isSearching);
-
-  const requestPreview = useMemo(() => {
-    if (!preparedRequest) {
-      return null;
-    }
-    return JSON.stringify(preparedRequest, null, 2);
-  }, [preparedRequest]);
+  const favoriteEntries = cacheEntries.filter((entry) => entry.favorite);
+  const recentEntries = cacheEntries.filter((entry) => !entry.favorite);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -141,8 +279,6 @@ export default function SearchPage() {
       payload.end_timestamp = endIso;
     }
 
-    setPreparedRequest(payload);
-
     const params = new URLSearchParams(payload);
 
     setHasSearched(true);
@@ -166,6 +302,7 @@ export default function SearchPage() {
       const posts = Array.isArray(data?.posts) ? data.posts : [];
       setResults(posts);
       setSuccessMessage(`Search completed. ${posts.length} post${posts.length === 1 ? "" : "s"} found.`);
+      upsertCacheEntry(query, searchMode, searchType, posts);
     } catch {
       setResults([]);
       setErrorMessage("Keyword search failed due to a network error.");
@@ -192,15 +329,118 @@ export default function SearchPage() {
             <label htmlFor="keyword-input" className="block text-sm font-medium text-slate-800">
               Keyword
             </label>
-            <input
-              id="keyword-input"
-              type="text"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Enter a keyword or phrase"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-              disabled={isSearching}
-            />
+            <div className="relative">
+              <input
+                id="keyword-input"
+                type="text"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="Enter a keyword or phrase"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 pr-36 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                disabled={isSearching}
+              />
+              <button
+                type="button"
+                onClick={() => setIsCacheOpen((current) => !current)}
+                className="absolute right-2 top-1/2 inline-flex -translate-y-1/2 cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSearching || cacheEntries.length === 0}
+                aria-expanded={isCacheOpen}
+                aria-controls="keyword-search-history"
+              >
+                Search History
+              </button>
+              {isCacheOpen ? (
+                <div
+                  id="keyword-search-history"
+                  className="absolute z-20 mt-2 max-h-96 w-full overflow-auto rounded-md border border-slate-200 bg-white p-3 shadow-lg"
+                >
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Favorites
+                      </p>
+                      {favoriteEntries.length === 0 ? (
+                        <p className="mt-2 text-xs text-slate-500">No favorites yet.</p>
+                      ) : (
+                        <ul className="mt-2 space-y-2">
+                          {favoriteEntries.map((entry) => (
+                            <li key={entry.id} className="rounded-md border border-slate-200 p-2">
+                              <button
+                                type="button"
+                                onClick={() => handleLoadCachedSearch(entry)}
+                                className="w-full cursor-pointer text-left"
+                              >
+                                <p className="text-sm font-medium text-slate-900">{entry.query}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {entry.search_mode} • {entry.search_type} • {formatTimestamp(entry.timestamp)}
+                                </p>
+                              </button>
+                              <div className="mt-2 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFavorite(entry.id)}
+                                  className="inline-flex cursor-pointer rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-100"
+                                >
+                                  Unfavorite
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCachedSearch(entry.id)}
+                                  className="inline-flex cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 transition hover:bg-red-50"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Recent Searches
+                      </p>
+                      {recentEntries.length === 0 ? (
+                        <p className="mt-2 text-xs text-slate-500">No recent searches yet.</p>
+                      ) : (
+                        <ul className="mt-2 space-y-2">
+                          {recentEntries.map((entry) => (
+                            <li key={entry.id} className="rounded-md border border-slate-200 p-2">
+                              <button
+                                type="button"
+                                onClick={() => handleLoadCachedSearch(entry)}
+                                className="w-full cursor-pointer text-left"
+                              >
+                                <p className="text-sm font-medium text-slate-900">{entry.query}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {entry.search_mode} • {entry.search_type} • {formatTimestamp(entry.timestamp)}
+                                </p>
+                              </button>
+                              <div className="mt-2 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFavorite(entry.id)}
+                                  className="inline-flex cursor-pointer rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-100"
+                                >
+                                  Favorite
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCachedSearch(entry.id)}
+                                  className="inline-flex cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 transition hover:bg-red-50"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -310,15 +550,6 @@ export default function SearchPage() {
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {successMessage}
         </div>
-      ) : null}
-
-      {requestPreview ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Prepared Request</h2>
-          <pre className="mt-3 overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-            {requestPreview}
-          </pre>
-        </section>
       ) : null}
 
       {isSearching ? (

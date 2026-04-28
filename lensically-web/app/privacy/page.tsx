@@ -11,21 +11,23 @@ export const metadata: Metadata = {
 };
 
 const collectedData = [
-  "Account information such as email address and authentication credentials",
-  "OAuth account linkages used to sign in or connect supported providers",
-  "Session records and security-related authentication state",
-  "Usage and feature records needed to operate the application and enforce product limits",
-  "Scheduled post records and related app content created within Lensically",
-  "Threads connection and account metadata required for supported product features",
+  "Account information, including email address and password hash (for password-based accounts)",
+  "OAuth identity linkages for supported sign-in providers (Google, GitHub, Discord)",
+  "Session and cookie records used to authenticate requests and protect account access",
+  "Connected Threads account identifiers, access tokens, and profile metadata needed for product functionality",
+  "Feature usage records, limit counters, and operational metadata used for reliability and abuse prevention",
+  "Profile discovery, keyword search, insights, publish, and scheduling request/response data needed to perform requested actions",
+  "Scheduled posts and related publishing status records created by the user",
+  "Email delivery metadata for verification and password reset workflows (via configured provider infrastructure)",
 ];
 
 const useCases = [
   "Create and secure your account",
-  "Authenticate access to the application",
-  "Provide Threads-related product functionality",
-  "Support scheduling, discovery, search, and analytics features",
-  "Maintain service integrity, abuse prevention, and usage enforcement",
-  "Respond to account support and deletion requests",
+  "Authenticate and maintain active sessions for authorized users",
+  "Provide Threads connection, profile discovery, keyword search, insights, publishing, and scheduling functionality",
+  "Operate and secure account settings, account deletion, and lifecycle workflows",
+  "Maintain service integrity, prevent abuse, and enforce feature usage limits",
+  "Process support requests, deletion requests, and provider-required compliance callbacks",
 ];
 
 export default function PrivacyPage() {
@@ -55,6 +57,7 @@ export default function PrivacyPage() {
             This page explains what information Lensically collects, how that information is used,
             how it is stored within the application, and how users can delete their data.
           </p>
+          <p className="text-sm text-slate-500">Effective date: March 14, 2026</p>
         </div>
 
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-medium leading-6 text-rose-900">
@@ -97,11 +100,38 @@ export default function PrivacyPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">How data is stored</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically stores application data in its production database and supporting
-            authentication records needed to operate the service. Session and account access are
-            protected through authenticated application flows and server-managed session handling.
-            Data is retained only as needed to provide the product and associated account lifecycle
-            features until the account is deleted.
+            Lensically stores application data in production infrastructure used to operate the
+            service (including hosted database and API runtime components). Authentication uses
+            server-managed sessions and secure cookies. Requests to third-party platforms are made
+            only as needed to execute user-requested product actions and connected account features.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            Lensically also uses third-party services where applicable for product operation,
+            including Threads/Meta APIs, OAuth provider APIs (Google, GitHub, Discord), Cloudflare
+            hosting/runtime infrastructure, and email delivery infrastructure.
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Cookies and sessions</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Lensically uses secure authentication cookies and server-side session records to keep
+            users signed in and to authorize protected API routes. Session cookies are required for
+            account access and authenticated functionality.
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Data retention and deletion</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Lensically retains account and feature data while your account is active and as needed
+            to provide product functionality. You can initiate permanent deletion from authenticated
+            account settings.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            After account deletion, Lensically removes account-linked application records. For
+            security and abuse prevention, limited identity tombstones may be retained for up to 7
+            days before expiring.
           </p>
         </section>
 
@@ -111,12 +141,7 @@ export default function PrivacyPage() {
             Signed-in users can delete their account from the account settings page. That deletion
             flow permanently removes the Lensically account and associated application records tied
             to the user, including sessions, OAuth linkages, reset and verification tokens, usage
-            tracking records, and scheduled posts.
-          </p>
-          <p className="mt-4 text-sm leading-6 text-slate-600">
-            For security, fraud prevention, and abuse prevention, Lensically may temporarily retain
-            limited account identifiers (such as account email address and provider account
-            identifiers) for up to 7 days after deletion before those retained identifiers expire.
+            tracking records, Threads linkage records, and scheduled posts.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Public deletion instructions are available at{" "}
@@ -131,6 +156,14 @@ export default function PrivacyPage() {
               support@lensically.com
             </a>{" "}
             for assistance.
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Children and sensitive data</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Lensically is not intended for children under 13. Please do not submit sensitive
+            personal data that is not required for account authentication or core service use.
           </p>
         </section>
       </main>

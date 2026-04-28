@@ -1,6 +1,9 @@
 CREATE TABLE IF NOT EXISTS app_threads_accounts (
   app_user_id TEXT PRIMARY KEY,
   threads_user_id TEXT NOT NULL,
+  connection_active INTEGER NOT NULL DEFAULT 1,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  tombstone_expires_at TEXT,
   created_at INTEGER NOT NULL,
   FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
 );

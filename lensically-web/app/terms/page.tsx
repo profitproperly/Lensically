@@ -11,9 +11,11 @@ export const metadata: Metadata = {
 };
 
 const usageRules = [
-  "Use the application only for lawful purposes and only with accounts and data you are authorized to access.",
-  "Do not attempt to bypass authentication, access controls, rate limits, or provider restrictions.",
-  "Do not interfere with the service, abuse platform features, or use Lensically to violate third-party terms.",
+  "Use Lensically only for lawful purposes and only with accounts and data you are authorized to access.",
+  "Do not bypass authentication, access controls, rate limits, quotas, or platform restrictions.",
+  "Do not use Lensically to spam, scrape, misrepresent identity, or violate third-party platform terms.",
+  "Do not upload or schedule unlawful, infringing, deceptive, or harmful content.",
+  "You are responsible for posts you create, publish now, or schedule through Lensically.",
 ];
 
 export default function TermsPage() {
@@ -40,10 +42,11 @@ export default function TermsPage() {
             Terms of service
           </h1>
           <p className="max-w-3xl text-base leading-7 text-slate-600">
-            These terms describe the basic rules for accessing and using Lensically. By
-            using the application, you agree to follow these terms and any applicable
-            provider platform requirements connected to your use of the service.
+            These Terms of Service govern your access to and use of Lensically. By using
+            Lensically, you agree to these terms and to the terms of any connected provider
+            services used through the product.
           </p>
+          <p className="text-sm text-slate-500">Effective date: March 14, 2026</p>
         </div>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -61,7 +64,7 @@ export default function TermsPage() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Using Lensically</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Permitted use</h2>
           <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-6 text-slate-700">
             {usageRules.map((rule) => (
               <li key={rule}>{rule}</li>
@@ -70,37 +73,66 @@ export default function TermsPage() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Accounts and connected services</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Service functionality</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Some Lensically features require an authenticated account and a connected Threads
-            account or supported OAuth sign-in provider. You are responsible for maintaining
-            the accuracy of your account information and for using connected services in
-            compliance with the applicable provider terms.
+            Lensically currently provides account authentication, Threads account connection,
+            profile discovery, keyword search, account and post insights, immediate publishing,
+            scheduled posting, and account settings management.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            Certain features require a connected Threads account with valid provider permissions.
+            Lensically depends on third-party APIs and may limit, modify, or remove features if
+            provider policies, access scopes, quotas, or endpoint behavior changes.
           </p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Account deletion and access</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Accounts, authentication, and sessions</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically provides self-serve account deletion from the authenticated account
-            settings area. When an account is permanently deleted, associated application
-            records tied to that user are removed from the system according to the product’s
-            implemented deletion flow.
+            You may sign in with email/password or supported OAuth providers. You are
+            responsible for maintaining account security and for activity performed under
+            your account session. Lensically may invalidate sessions, limit usage, or block
+            access when required for security, abuse prevention, or policy compliance.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            Accounts that violate platform rules may be suspended or permanently banned. Banned
-            identities may be prevented from creating new accounts or accessing the service.
+            Accounts that violate these terms or third-party platform requirements may be
+            restricted, suspended, or permanently removed.
           </p>
-          <p className="mt-4 text-sm leading-6 text-slate-600">
-            Privacy practices are described at{" "}
-            <Link href="/privacy" className="font-medium text-slate-900 underline">
-              https://lensically.com/privacy
-            </Link>
-            , and public deletion instructions are available at{" "}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Account deletion and retention</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Lensically provides self-serve account deletion from authenticated account settings.
+            Deletion is permanent and removes account-linked application data according to the
+            implemented deletion flow described at{" "}
             <Link href="/data-deletion" className="font-medium text-slate-900 underline">
               https://lensically.com/data-deletion
             </Link>
             .
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            For fraud and abuse prevention, limited identity tombstones may be retained for up to
+            7 days after deletion. Privacy practices are described at{" "}
+            <Link href="/privacy" className="font-medium text-slate-900 underline">
+              https://lensically.com/privacy
+            </Link>
+            .
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Disclaimers and limitation of liability</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Lensically is provided on an "as is" and "as available" basis. To the maximum extent
+            permitted by law, Lensically disclaims warranties of merchantability, fitness for a
+            particular purpose, and non-infringement. Lensically is not responsible for third-party
+            platform outages, API failures, policy changes, or user-generated content.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            To the maximum extent permitted by law, Lensically will not be liable for indirect,
+            incidental, special, consequential, or punitive damages, or for loss of data, profits,
+            or goodwill arising from use of the service.
           </p>
         </section>
 

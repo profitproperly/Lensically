@@ -4,8 +4,11 @@
 	"private": true,
 	"scripts": {
 		"deploy": "wrangler deploy",
+		"deploy:cf": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-worker.ps1",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
+		"cf:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/set-cloudflare-deploy-credentials.ps1",
+		"threads:token": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1",
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},

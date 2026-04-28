@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/lib/AuthProvider";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import { useAuth } from "@/lib/AuthProvider";
 import {
   formatTimezoneLabel,
   formatScheduledLocalTime,
@@ -13,11 +13,16 @@ import {
 import { subscribeScheduledPostsUpdated } from "@/lib/scheduledPostsRefresh";
 
 type ThreadsMeResponse = {
-  connected?: boolean;
+  active_threads_user_id?: string | null;
+  accounts?: Array<{
+    threads_user_id?: string | null;
+    is_active?: boolean;
+  }> | null;
   account?: {
     threads_user_id?: string | null;
   } | null;
   threads_user_id?: string | null;
+  error?: string;
 };
 
 type ScheduledPost = {
@@ -25,6 +30,9 @@ type ScheduledPost = {
   text: string;
   status: "approved" | "posting" | "posted";
   scheduled_time_utc: string;
+  publish_error_message?: string | null;
+  last_attempted_at?: string | null;
+  processing_started_at?: string | null;
 };
 
 type ScheduledPostsResponse = {
@@ -33,10 +41,15 @@ type ScheduledPostsResponse = {
   error?: string;
 };
 
+const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 const THREADS_SCHEDULE_UPDATE_URL = buildWorkerUrl("/api/threads/schedule/update");
+const THREADS_SCHEDULE_RETRY_URL = buildWorkerUrl("/api/threads/schedule/retry");
 const THREADS_SCHEDULE_DELETE_URL = buildWorkerUrl("/api/threads/schedule/delete");
+const WORKSPACE_APP_USER_ID = "workspace-owner";
+const FALLBACK_TIMEZONE = "America/New_York";
+const FALLBACK_CLOCK_FORMAT = "12h";
 
 function parseScheduledTimestamp(value: string): number {
   const parsed = Date.parse(value);
@@ -129,12 +142,114 @@ function normalizeTimePayload(value: string): string | null {
   return `${padTwoDigits(hour)}:${padTwoDigits(minute)}`;
 }
 
+function formatPublishErrorMessage(raw: string | null | undefined): string {
+  const normalizedRaw = typeof raw === "string" ? raw.trim() : "";
+  if (!normalizedRaw) {
+    return "Publishing failed. Please try again.";
+  }
+
+  const segments = normalizedRaw.split(":");
+  const code = (segments[0] ?? "").trim();
+  const maybeStatus = (segments[1] ?? "").trim();
+  const statusCode = maybeStatus.match(/^\d+$/) ? maybeStatus : "";
+  const providerDetail = statusCode
+    ? segments.slice(2).join(":").trim()
+    : segments.slice(1).join(":").trim();
+  const providerSuffix = providerDetail ? ` ${providerDetail}` : "";
+  const providerDetailLower = providerDetail.toLowerCase();
+  const needsReconnect = providerDetailLower.includes("does not have permission")
+    || providerDetailLower.includes("missing permission")
+    || providerDetailLower.includes("permission");
+
+  switch (code) {
+    case "threads_publish_create_failed":
+      if (needsReconnect) {
+        return "Threads publish permission is missing for the configured account. Update the account token, then retry.";
+      }
+      return statusCode
+        ? `Threads rejected post creation (HTTP ${statusCode}). Please retry.${providerSuffix}`
+        : `Threads rejected post creation. Please retry.${providerSuffix}`;
+    case "threads_publish_create_invalid_response":
+      return "Threads returned an invalid response while creating the post. Please retry.";
+    case "threads_publish_create_exception":
+      return "Could not reach Threads while creating the post. Please retry.";
+    case "threads_publish_status_check_failed":
+      return statusCode
+        ? `Threads status check failed (HTTP ${statusCode}). Please retry.${providerSuffix}`
+        : `Threads status check failed. Please retry.${providerSuffix}`;
+    case "threads_publish_status_check_exception":
+      return "Could not confirm publish status from Threads. Please retry.";
+    case "threads_publish_status_invalid_response":
+      return "Threads returned an invalid publish status response. Please retry.";
+    case "threads_publish_status_not_ready":
+      return "Threads did not finish publishing in time. Please retry.";
+    case "threads_publish_commit_failed":
+      return statusCode
+        ? `Threads publish commit failed (HTTP ${statusCode}). Please retry.${providerSuffix}`
+        : `Threads publish commit failed. Please retry.${providerSuffix}`;
+    case "threads_publish_commit_invalid_response":
+      return "Threads returned an invalid publish confirmation response. Please retry.";
+    case "threads_publish_commit_exception":
+      return "Could not finalize publishing with Threads. Please retry.";
+    case "threads_account_not_connected":
+      return "The configured Threads account token is not available. Update the account token, then retry.";
+    case "threads_publish_exception":
+      return "Could not reach Threads to publish this post. Please retry.";
+    case "publish_interrupted_retry":
+      return "Publishing was interrupted before completion. Retry now.";
+    case "status_transition_failed":
+      return "Post publish state could not be finalized. Retry now.";
+    case "scheduled_publish_retry_failed":
+      return "Retry attempt did not complete successfully. Please try again.";
+    default:
+      return "Publishing failed. Please try again.";
+  }
+}
+
+function formatDebugTimestamp(value: string | null | undefined): string | null {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.includes("T") ? trimmed : `${trimmed.replace(" ", "T")}Z`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return trimmed;
+  }
+
+  return parsed.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function getNeedsAssistanceReason(post: ScheduledPost, isOverdue: boolean): string | null {
+  if (post.status === "posting") {
+    return "This post is still marked as publishing.";
+  }
+  if (!isOverdue && !post.publish_error_message) {
+    return null;
+  }
+  if (post.publish_error_message) {
+    return formatPublishErrorMessage(post.publish_error_message);
+  }
+  if (!post.last_attempted_at) {
+    return "The scheduled time passed, but no publish attempt was recorded. This points to the automatic scheduler not picking it up.";
+  }
+  return "The scheduled time passed and the post still needs a manual retry.";
+}
+
 export default function ScheduledPostsPage() {
-  const { user, loading } = useAuth();
-  const appUserId = user?.id?.trim() ?? "";
-  const timezone = resolveTimezonePreference(user?.timezone);
+  const { user } = useAuth();
+  const appUserId = WORKSPACE_APP_USER_ID;
+  const timezone = resolveTimezonePreference(user?.timezone ?? FALLBACK_TIMEZONE);
   const timezoneLabel = formatTimezoneLabel(timezone);
-  const clockFormatPreference = resolveClockFormatPreference(user?.clock_format);
+  const clockFormatPreference = resolveClockFormatPreference(user?.clock_format ?? FALLBACK_CLOCK_FORMAT);
   const { currentDate: minScheduleDate, currentTime: minScheduleTime } = useMemo(
     () => getCurrentDateTimeForTimezone(timezone, new Date()),
     [timezone],
@@ -153,8 +268,11 @@ export default function ScheduledPostsPage() {
   const [editScheduleDate, setEditScheduleDate] = useState("");
   const [editScheduleTime, setEditScheduleTime] = useState("");
   const [savingScheduledPostId, setSavingScheduledPostId] = useState<number | null>(null);
+  const [retryingScheduledPostId, setRetryingScheduledPostId] = useState<number | null>(null);
   const [editScheduledPostError, setEditScheduledPostError] = useState("");
   const [editScheduledPostSuccess, setEditScheduledPostSuccess] = useState("");
+  const [retryScheduledPostError, setRetryScheduledPostError] = useState("");
+  const [retryScheduledPostSuccess, setRetryScheduledPostSuccess] = useState("");
 
   const orderedScheduledPosts = useMemo(() => {
     return [...scheduledPosts].sort((left, right) => {
@@ -183,28 +301,54 @@ export default function ScheduledPostsPage() {
       setConnectionError("");
 
       try {
-        const response = await fetch(
-          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
-          {
-            cache: "no-store",
-            credentials: "include",
-            signal: controller.signal,
-          },
-        );
+        const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
+          const accountsResponse = await fetch(
+            `${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            {
+              cache: "no-store",
+              credentials: "include",
+              signal: controller.signal,
+            },
+          );
+          if (accountsResponse.ok) {
+            return (await accountsResponse.json()) as ThreadsMeResponse;
+          }
+
+          const meResponse = await fetch(
+            `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            {
+              cache: "no-store",
+              credentials: "include",
+              signal: controller.signal,
+            },
+          );
+          if (!meResponse.ok) {
+            return null;
+          }
+          return (await meResponse.json()) as ThreadsMeResponse;
+        };
+        const data = await fetchConnectionPayload();
 
         if (!isMounted) {
           return;
         }
 
-        if (!response.ok) {
+        if (!data) {
           setThreadsUserId("");
           setConnectionError("Could not load Threads connection.");
           return;
         }
-
-        const data = (await response.json()) as ThreadsMeResponse;
+        const activeFromList = Array.isArray(data.accounts)
+          ? data.accounts.find((account) => account?.is_active)?.threads_user_id?.trim()
+          : "";
+        const firstFromList = Array.isArray(data.accounts)
+          ? data.accounts.find((account) => account?.threads_user_id)?.threads_user_id?.trim()
+          : "";
         const resolvedThreadsUserId =
-          data.account?.threads_user_id?.trim()
+          data.active_threads_user_id?.trim()
+          || activeFromList
+          || firstFromList
+          || data.account?.threads_user_id?.trim()
           || data.threads_user_id?.trim()
           || "";
 
@@ -373,6 +517,8 @@ export default function ScheduledPostsPage() {
     setEditScheduledPostSuccess("");
     setDeleteScheduledPostError("");
     setDeleteScheduledPostSuccess("");
+    setRetryScheduledPostError("");
+    setRetryScheduledPostSuccess("");
   }
 
   function cancelEditingScheduledPost() {
@@ -381,6 +527,73 @@ export default function ScheduledPostsPage() {
     setEditScheduleDate("");
     setEditScheduleTime("");
     setEditScheduledPostError("");
+    setRetryScheduledPostError("");
+  }
+
+  async function retryScheduledPost(scheduledPostId: number) {
+    if (!appUserId) {
+      return;
+    }
+
+    setRetryingScheduledPostId(scheduledPostId);
+    setRetryScheduledPostError("");
+    setRetryScheduledPostSuccess("");
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+    setEditScheduledPostError("");
+    setEditScheduledPostSuccess("");
+
+    try {
+      const response = await fetch(THREADS_SCHEDULE_RETRY_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          app_user_id: appUserId,
+          scheduled_post_id: scheduledPostId,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | {
+          success?: boolean;
+          error?: string;
+          posted?: boolean;
+          published_post_id?: string;
+          publish_error_message?: string | null;
+        }
+        | null;
+
+      if (!response.ok || data?.success === false || data?.posted !== true) {
+        const rawError = data?.publish_error_message ?? data?.error ?? null;
+        setRetryScheduledPostError(formatPublishErrorMessage(rawError));
+        setScheduledPosts((currentPosts) =>
+          currentPosts.map((post) => {
+            if (post.id !== scheduledPostId) {
+              return post;
+            }
+            return {
+              ...post,
+              publish_error_message: typeof rawError === "string" ? rawError : post.publish_error_message ?? null,
+            };
+          }),
+        );
+        return;
+      }
+
+      setScheduledPosts((currentPosts) => currentPosts.filter((post) => post.id !== scheduledPostId));
+      setRetryScheduledPostSuccess(
+        data.published_post_id
+          ? `Post published successfully (${data.published_post_id}).`
+          : "Post published successfully.",
+      );
+    } catch {
+      setRetryScheduledPostError("Could not retry publishing this scheduled post.");
+    } finally {
+      setRetryingScheduledPostId(null);
+    }
   }
 
   async function saveEditedScheduledPost(scheduledPostId: number) {
@@ -473,7 +686,7 @@ export default function ScheduledPostsPage() {
     }
   }
 
-  if (loading || loadingConnection) {
+  if (loadingConnection) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold text-slate-900">Scheduled Posts (0)</h1>
@@ -488,14 +701,8 @@ export default function ScheduledPostsPage() {
         <h1 className="text-3xl font-semibold text-slate-900">Scheduled Posts (0)</h1>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-700">
-            Connect your Threads account to view and manage scheduled posts.
+            The configured Threads account could not be loaded.
           </p>
-          <Link
-            href="/connect"
-            className="mt-4 inline-flex cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            Connect Threads
-          </Link>
           {connectionError ? (
             <p className="mt-4 text-sm text-red-600">{connectionError}</p>
           ) : null}
@@ -534,6 +741,12 @@ export default function ScheduledPostsPage() {
         {editScheduledPostError ? (
           <p className="mb-3 text-sm text-red-600">{editScheduledPostError}</p>
         ) : null}
+        {retryScheduledPostSuccess ? (
+          <p className="mb-3 text-sm text-emerald-700">{retryScheduledPostSuccess}</p>
+        ) : null}
+        {retryScheduledPostError ? (
+          <p className="mb-3 text-sm text-red-600">{retryScheduledPostError}</p>
+        ) : null}
         {loadingScheduledPosts ? (
           <p className="text-sm text-slate-700">Loading scheduled posts...</p>
         ) : scheduledPostsError ? (
@@ -561,7 +774,16 @@ export default function ScheduledPostsPage() {
                 timezone,
                 clockFormatPreference,
               );
-              const statusLabel = post.status === "posting" ? "Publishing" : "Scheduled";
+              const scheduledTimestamp = Date.parse(post.scheduled_time_utc);
+              const isOverdue = Number.isFinite(scheduledTimestamp) && scheduledTimestamp < Date.now();
+              const needsAssistanceReason = getNeedsAssistanceReason(post, isOverdue);
+              const lastAttemptedLabel = formatDebugTimestamp(post.last_attempted_at);
+              const processingStartedLabel = formatDebugTimestamp(post.processing_started_at);
+              const statusLabel = post.status === "posting"
+                ? "Publishing"
+                : isOverdue
+                  ? "Needs Attention"
+                  : "Scheduled";
 
               return (
                 <li
@@ -582,13 +804,32 @@ export default function ScheduledPostsPage() {
                     </div>
                     {post.status === "approved" ? (
                       <div className="flex items-center gap-2">
+                        {isOverdue || post.publish_error_message ? (
+                          <button
+                            type="button"
+                            onClick={() => void retryScheduledPost(post.id)}
+                            disabled={
+                              retryingScheduledPostId === post.id
+                              || deletingScheduledPostId === post.id
+                              || savingScheduledPostId === post.id
+                            }
+                            className={`rounded-md border px-3 py-1 text-xs font-medium ${
+                              retryingScheduledPostId === post.id
+                                ? "cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-400"
+                                : "cursor-pointer border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                            }`}
+                            aria-label={`Retry publishing scheduled post ${post.id}`}
+                          >
+                            {retryingScheduledPostId === post.id ? "Retrying..." : "Retry Now"}
+                          </button>
+                        ) : null}
                         {editingScheduledPostId === post.id ? null : (
                           <button
                             type="button"
                             onClick={() => startEditingScheduledPost(post)}
-                            disabled={deletingScheduledPostId === post.id}
+                            disabled={deletingScheduledPostId === post.id || retryingScheduledPostId === post.id}
                             className={`rounded-md border px-3 py-1 text-xs font-medium ${
-                              deletingScheduledPostId === post.id
+                              deletingScheduledPostId === post.id || retryingScheduledPostId === post.id
                                 ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                                 : "cursor-pointer border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                             }`}
@@ -600,9 +841,13 @@ export default function ScheduledPostsPage() {
                         <button
                           type="button"
                           onClick={() => void deleteScheduledPost(post.id)}
-                          disabled={deletingScheduledPostId === post.id || savingScheduledPostId === post.id}
-                          className={`rounded-md border px-3 py-1 text-xs font-medium ${
+                          disabled={
                             deletingScheduledPostId === post.id
+                            || savingScheduledPostId === post.id
+                            || retryingScheduledPostId === post.id
+                          }
+                          className={`rounded-md border px-3 py-1 text-xs font-medium ${
+                            deletingScheduledPostId === post.id || retryingScheduledPostId === post.id
                               ? "cursor-not-allowed border-red-200 bg-red-50 text-red-400"
                               : "cursor-pointer border-red-300 bg-white text-red-700 hover:bg-red-50"
                           }`}
@@ -613,6 +858,35 @@ export default function ScheduledPostsPage() {
                       </div>
                     ) : null}
                   </div>
+                  {post.publish_error_message ? (
+                    <p className="mt-2 text-xs text-red-700">
+                      Last publish error: {formatPublishErrorMessage(post.publish_error_message)}
+                    </p>
+                  ) : null}
+                  {needsAssistanceReason ? (
+                    <details className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      <summary className="cursor-pointer font-medium">
+                        Why this needs assistance
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        <p>{needsAssistanceReason}</p>
+                        <p>
+                          Scheduled for: {localTime ? `${localTime} (${timezoneLabel})` : post.scheduled_time_utc}
+                        </p>
+                        <p>
+                          Last attempted: {lastAttemptedLabel ?? "No publish attempt recorded"}
+                        </p>
+                        <p>
+                          Processing started: {processingStartedLabel ?? "No processing start recorded"}
+                        </p>
+                        {!post.last_attempted_at && isOverdue ? (
+                          <p>
+                            Debug hint: this usually means the automatic scheduler did not pick up the post after its scheduled time.
+                          </p>
+                        ) : null}
+                      </div>
+                    </details>
+                  ) : null}
                   {editingScheduledPostId === post.id ? (
                     <form
                       className="mt-3 space-y-3 rounded-md border border-slate-200 bg-white p-3"

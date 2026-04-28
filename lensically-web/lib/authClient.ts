@@ -41,6 +41,36 @@ export type UpdatePreferencesResponse =
       error: string;
     };
 
+export type ThreadsConnectedAccount = {
+  threads_user_id: string;
+  is_active: boolean;
+  created_at: number;
+  username: string | null;
+  name: string | null;
+  threads_biography: string | null;
+  is_verified: boolean;
+  threads_profile_picture_url: string | null;
+};
+
+export type ThreadsAccountsResponse = {
+  connected: boolean;
+  accounts: ThreadsConnectedAccount[];
+  active_threads_user_id: string | null;
+};
+
+type ThreadsMeFallbackResponse = {
+  connected?: boolean;
+  account?: {
+    threads_user_id?: string | null;
+    username?: string | null;
+    name?: string | null;
+    threads_biography?: string | null;
+    is_verified?: boolean;
+    threads_profile_picture_url?: string | null;
+  } | null;
+  threads_user_id?: string | null;
+};
+
 type DeleteAccountRequest = {
   password?: string;
   confirmationText?: string;
@@ -102,10 +132,62 @@ export async function deleteAccount({
   }, 0);
 }
 
-export async function disconnectThreadsAccount(appUserId: string) {
+export async function disconnectThreadsAccount(appUserId: string, threadsUserId?: string) {
   return apiRequest(buildWorkerUrl("/api/threads/disconnect"), {
     method: "POST",
-    body: JSON.stringify({ app_user_id: appUserId }),
+    body: JSON.stringify({
+      app_user_id: appUserId,
+      ...(threadsUserId ? { threads_user_id: threadsUserId } : {}),
+    }),
+  });
+}
+
+export async function getThreadsAccounts(appUserId: string): Promise<ThreadsAccountsResponse> {
+  const url = `${buildWorkerUrl("/api/threads/accounts")}?app_user_id=${encodeURIComponent(appUserId)}`;
+  return apiRequest(url);
+}
+
+export async function getThreadsAccountsWithFallback(appUserId: string): Promise<ThreadsAccountsResponse> {
+  try {
+    return await getThreadsAccounts(appUserId);
+  } catch {
+    const meUrl = `${buildWorkerUrl("/api/threads/me")}?app_user_id=${encodeURIComponent(appUserId)}`;
+    const me = await apiRequest(meUrl) as ThreadsMeFallbackResponse;
+    const threadsUserId = me.account?.threads_user_id?.trim() || me.threads_user_id?.trim() || null;
+    if (!threadsUserId) {
+      return {
+        connected: false,
+        accounts: [],
+        active_threads_user_id: null,
+      };
+    }
+
+    return {
+      connected: true,
+      active_threads_user_id: threadsUserId,
+      accounts: [
+        {
+          threads_user_id: threadsUserId,
+          is_active: true,
+          created_at: 0,
+          username: me.account?.username ?? null,
+          name: me.account?.name ?? null,
+          threads_biography: me.account?.threads_biography ?? null,
+          is_verified: me.account?.is_verified === true,
+          threads_profile_picture_url: me.account?.threads_profile_picture_url ?? null,
+        },
+      ],
+    };
+  }
+}
+
+export async function setActiveThreadsAccount(appUserId: string, threadsUserId: string) {
+  return apiRequest(buildWorkerUrl("/api/threads/accounts/active"), {
+    method: "POST",
+    body: JSON.stringify({
+      app_user_id: appUserId,
+      threads_user_id: threadsUserId,
+    }),
   });
 }
 

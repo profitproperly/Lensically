@@ -21,6 +21,8 @@ export type ThreadsPublishServiceResult =
     success: false;
     errorCode: ThreadsPublishErrorCode;
     status?: number;
+    errorMessage?: string;
+    responseBody?: string;
   };
 
 type ThreadsCreatePayload = {
@@ -45,6 +47,8 @@ const DEFAULT_READINESS_DELAY_MS = 1000;
 const DEFAULT_PUBLISH_MAX_ATTEMPTS = 3;
 const THREADS_READY_STATUSES = new Set(["FINISHED", "PUBLISHED"]);
 const THREADS_PENDING_STATUSES = new Set(["IN_PROGRESS", "PROCESSING"]);
+const MAX_PROVIDER_ERROR_BODY_LENGTH = 400;
+const MAX_PROVIDER_ERROR_MESSAGE_LENGTH = 220;
 
 function getIdFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -75,6 +79,76 @@ async function readJsonSafe(response: Response): Promise<unknown | null> {
   }
 }
 
+async function readTextSafe(response: Response): Promise<string | null> {
+  try {
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+function truncate(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function normalizeMessage(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return truncate(trimmed, MAX_PROVIDER_ERROR_MESSAGE_LENGTH);
+}
+
+function extractProviderErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  const root = payload as Record<string, unknown>;
+  const nestedError = root.error;
+  if (nestedError && typeof nestedError === "object" && !Array.isArray(nestedError)) {
+    const nestedErrorMessage = normalizeMessage((nestedError as Record<string, unknown>).message);
+    if (nestedErrorMessage) {
+      return nestedErrorMessage;
+    }
+  }
+
+  const directErrorMessage = normalizeMessage(root.error_message);
+  if (directErrorMessage) {
+    return directErrorMessage;
+  }
+
+  const directMessage = normalizeMessage(root.message);
+  if (directMessage) {
+    return directMessage;
+  }
+
+  return null;
+}
+
+async function readProviderFailureDetails(response: Response): Promise<{ errorMessage: string | null; responseBody: string | null }> {
+  const rawText = await readTextSafe(response);
+  const trimmedRawText = rawText?.trim() ?? "";
+  if (!trimmedRawText) {
+    return { errorMessage: null, responseBody: null };
+  }
+
+  let parsedPayload: unknown = null;
+  try {
+    parsedPayload = JSON.parse(trimmedRawText);
+  } catch {
+    parsedPayload = null;
+  }
+
+  const errorMessage = extractProviderErrorMessage(parsedPayload);
+  return {
+    errorMessage,
+    responseBody: truncate(trimmedRawText, MAX_PROVIDER_ERROR_BODY_LENGTH),
+  };
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -84,7 +158,15 @@ async function waitForContainerReadiness(
   publishRequestId: string,
   readinessMaxChecks: number,
   readinessDelayMs: number,
-): Promise<{ success: true } | { success: false; errorCode: ThreadsPublishErrorCode; status?: number }> {
+): Promise<{
+  success: true;
+} | {
+  success: false;
+  errorCode: ThreadsPublishErrorCode;
+  status?: number;
+  errorMessage?: string;
+  responseBody?: string;
+}> {
   for (let attempt = 0; attempt < readinessMaxChecks; attempt += 1) {
     let statusResponse: Response;
     try {
@@ -104,10 +186,13 @@ async function waitForContainerReadiness(
     }
 
     if (!statusResponse.ok) {
+      const details = await readProviderFailureDetails(statusResponse);
       return {
         success: false,
         errorCode: "threads_publish_status_check_failed",
         status: statusResponse.status,
+        errorMessage: details.errorMessage ?? undefined,
+        responseBody: details.responseBody ?? undefined,
       };
     }
 
@@ -155,7 +240,13 @@ async function publishContainer(
   publishRequestId: string,
 ): Promise<
   { success: true; payload: unknown }
-  | { success: false; errorCode: "threads_publish_commit_failed" | "threads_publish_commit_invalid_response" | "threads_publish_commit_exception"; status?: number }
+  | {
+    success: false;
+    errorCode: "threads_publish_commit_failed" | "threads_publish_commit_invalid_response" | "threads_publish_commit_exception";
+    status?: number;
+    errorMessage?: string;
+    responseBody?: string;
+  }
 > {
   const publishCommitBody = new URLSearchParams({
     creation_id: publishRequestId,
@@ -180,10 +271,13 @@ async function publishContainer(
     };
   }
   if (!commitResponse.ok) {
+    const details = await readProviderFailureDetails(commitResponse);
     return {
       success: false,
       errorCode: "threads_publish_commit_failed",
       status: commitResponse.status,
+      errorMessage: details.errorMessage ?? undefined,
+      responseBody: details.responseBody ?? undefined,
     };
   }
 
@@ -233,10 +327,13 @@ export async function publishTextToThreads({
     };
   }
   if (!createResponse.ok) {
+    const details = await readProviderFailureDetails(createResponse);
     return {
       success: false,
       errorCode: "threads_publish_create_failed",
       status: createResponse.status,
+      errorMessage: details.errorMessage ?? undefined,
+      responseBody: details.responseBody ?? undefined,
     };
   }
 
@@ -263,6 +360,8 @@ export async function publishTextToThreads({
   let commitFailure: {
     errorCode: ThreadsPublishErrorCode;
     status?: number;
+    errorMessage?: string;
+    responseBody?: string;
   } | null = null;
 
   for (let attempt = 0; attempt < boundedPublishAttempts; attempt += 1) {
@@ -288,6 +387,8 @@ export async function publishTextToThreads({
     commitFailure = {
       errorCode: commitResult.errorCode,
       status: commitResult.status,
+      errorMessage: commitResult.errorMessage,
+      responseBody: commitResult.responseBody,
     };
 
     if (attempt >= boundedPublishAttempts - 1) {
@@ -316,5 +417,7 @@ export async function publishTextToThreads({
     success: false,
     errorCode: commitFailure.errorCode,
     status: commitFailure.status,
+    errorMessage: commitFailure.errorMessage,
+    responseBody: commitFailure.responseBody,
   };
 }

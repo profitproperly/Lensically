@@ -9,6 +9,8 @@ import {
   executeThreadsKeywordSearch,
   validateThreadsKeywordSearchParams,
 } from "./utils/threadsKeywordSearchService";
+import { executeThreadsProfileLookup } from "./utils/threadsProfileLookupService";
+import { executeThreadsProfilePosts } from "./utils/threadsProfilePostsService";
 import { register } from "../auth/register.js";
 import { login } from "../auth/login.js";
 import { verifyEmail } from "../auth/verifyEmail.js";
@@ -34,6 +36,7 @@ const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
 const DEFAULT_WORKER_ORIGIN = "https://api.lensically.com";
 const THREADS_OAUTH_SCOPES = [
   "threads_basic",
+  "threads_content_publish",
   "threads_manage_insights",
 ].join(",");
 const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
@@ -47,7 +50,14 @@ const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
 const SCHEDULED_POST_PUBLISH_CRON = "* * * * *";
 const THREADS_TOKEN_REFRESH_CRON = "0 */12 * * *";
 const LEGACY_COMBINED_SCHEDULED_CRON = "0 3 * * *";
+const THREADS_INSIGHTS_DAILY_WINDOW_CRON = "0 7,8 * * *";
+const THREADS_INSIGHTS_TIME_ZONE = "America/New_York";
+const THREADS_INSIGHTS_TARGET_HOUR = 3;
+const THREADS_INSIGHTS_TARGET_MINUTE = 0;
+const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;
+const MAX_THREADS_POST_CURSOR_DEPTH = 250;
 const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -64,8 +74,38 @@ interface Env {
   WORKER_ORIGIN?: string;
   WEB_APP_URL?: string;
   SCHEDULED_POST_BATCH_SIZE?: string;
+  THREADS_TOKEN_MANIFEST_MENTAL?: string;
   DB: D1Database;
 }
+
+type ConfiguredThreadsAccount = {
+  id: string;
+  label: string;
+  username: string;
+  tokenEnv: keyof Env;
+};
+
+type ConfiguredThreadsAccountProfile = {
+  threads_user_id: string;
+  is_active: boolean;
+  created_at: number;
+  username: string | null;
+  name: string | null;
+  label: string;
+  account_id: string;
+  threads_biography: string | null;
+  is_verified: boolean;
+  threads_profile_picture_url: string | null;
+};
+
+const CONFIGURED_THREADS_ACCOUNTS: ConfiguredThreadsAccount[] = [
+  {
+    id: "manifest-mental",
+    label: "Manifest Mental",
+    username: "manifestmental",
+    tokenEnv: "THREADS_TOKEN_MANIFEST_MENTAL",
+  },
+];
 
 function limitDeniedResponse(
   result: Exclude<EnforceLimitResult, { allowed: true }>,
@@ -241,9 +281,113 @@ function normalizeAppUserId(raw: string | null | undefined): string | null {
   return value;
 }
 
+function getConfiguredThreadsAccounts(env: Env): Array<ConfiguredThreadsAccount & { accessToken: string }> {
+  return CONFIGURED_THREADS_ACCOUNTS.flatMap((account) => {
+    const accessToken = env[account.tokenEnv];
+    if (typeof accessToken !== "string" || !accessToken.trim()) {
+      return [];
+    }
+
+    return [{
+      ...account,
+      accessToken: accessToken.trim(),
+    }];
+  });
+}
+
+function getConfiguredThreadsAccountById(
+  env: Env,
+  accountId: string | null | undefined,
+): (ConfiguredThreadsAccount & { accessToken: string }) | null {
+  const normalizedId = accountId?.trim().toLowerCase();
+  if (!normalizedId) {
+    return getConfiguredThreadsAccounts(env)[0] ?? null;
+  }
+
+  return getConfiguredThreadsAccounts(env).find((account) => account.id === normalizedId) ?? null;
+}
+
+function configuredThreadsAccountFallbackPayload(
+  account: ConfiguredThreadsAccount,
+  index: number,
+): ConfiguredThreadsAccountProfile {
+  return {
+    threads_user_id: account.id,
+    is_active: index === 0,
+    created_at: 0,
+    username: account.username,
+    name: account.label,
+    label: account.label,
+    account_id: account.id,
+    threads_biography: null,
+    is_verified: false,
+    threads_profile_picture_url: null,
+  };
+}
+
+async function fetchConfiguredThreadsProfile(
+  account: ConfiguredThreadsAccount & { accessToken: string },
+  index: number,
+): Promise<ConfiguredThreadsAccountProfile> {
+  const fallback = configuredThreadsAccountFallbackPayload(account, index);
+
+  try {
+    const response = await fetch(
+      "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url",
+      {
+        headers: {
+          Authorization: `Bearer ${account.accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const payload = await readJsonSafe(response);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return fallback;
+    }
+
+    const data = payload as {
+      id?: unknown;
+      username?: unknown;
+      name?: unknown;
+      threads_biography?: unknown;
+      is_verified?: unknown;
+      threads_profile_picture_url?: unknown;
+    };
+
+    return {
+      threads_user_id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallback.threads_user_id,
+      is_active: index === 0,
+      created_at: 0,
+      username: typeof data.username === "string" && data.username.trim() ? data.username.trim() : fallback.username,
+      name: typeof data.name === "string" && data.name.trim() ? data.name.trim() : fallback.name,
+      label: account.label,
+      account_id: account.id,
+      threads_biography: typeof data.threads_biography === "string" ? data.threads_biography : null,
+      is_verified: data.is_verified === true,
+      threads_profile_picture_url: typeof data.threads_profile_picture_url === "string"
+        ? data.threads_profile_picture_url
+        : null,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function getConfiguredThreadsProfiles(env: Env): Promise<ConfiguredThreadsAccountProfile[]> {
+  const accounts = getConfiguredThreadsAccounts(env);
+  return Promise.all(accounts.map((account, index) => fetchConfiguredThreadsProfile(account, index)));
+}
+
 type OauthStateContext = {
   appBaseUrl: string;
   appUserId: string | null;
+  connectionMode?: "add" | null;
+  expectedThreadsUsername?: string | null;
 };
 
 type AuthProvider = "google" | "github" | "discord";
@@ -253,9 +397,30 @@ type OAuthIdentity = {
   email: string | null;
 };
 
-function buildOauthState(appBaseUrl: string, appUserId: string): string {
+function encodeBase64Url(raw: string): string {
+  return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeOauthStateBase64Url(raw: string): string {
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const remainder = normalized.length % 4;
+  const padded = remainder === 0 ? normalized : `${normalized}${"=".repeat(4 - remainder)}`;
+  return atob(padded);
+}
+
+function buildOauthState(
+  appBaseUrl: string,
+  appUserId: string,
+  connectionMode: "add" | null = null,
+  expectedThreadsUsername: string | null = null,
+): string {
   const nonce = crypto.randomUUID().replace(/-/g, "");
-  const encodedContext = btoa(JSON.stringify({ appBaseUrl, appUserId }));
+  const encodedContext = encodeBase64Url(JSON.stringify({
+    appBaseUrl,
+    appUserId,
+    connectionMode,
+    expectedThreadsUsername,
+  }));
   return `${nonce}.${encodedContext}`;
 }
 
@@ -405,23 +570,32 @@ function contextFromState(state: string | null): OauthStateContext | null {
   }
   const encodedState = state.slice(dotIndex + 1);
   try {
-    const decoded = atob(encodedState);
+    const decoded = decodeOauthStateBase64Url(encodedState);
     if (decoded.startsWith("{")) {
-      const parsed = JSON.parse(decoded) as { appBaseUrl?: string; appUserId?: string };
+      const parsed = JSON.parse(decoded) as {
+        appBaseUrl?: string;
+        appUserId?: string;
+        connectionMode?: string | null;
+        expectedThreadsUsername?: string | null;
+      };
       const appBaseUrl = normalizeAppBaseUrl(parsed.appBaseUrl ?? null);
       if (!appBaseUrl) {
         return null;
       }
+      const normalizedConnectionMode = parsed.connectionMode?.trim().toLowerCase() === "add" ? "add" : null;
+      const normalizedExpectedUsername = parsed.expectedThreadsUsername?.trim().toLowerCase() ?? null;
       return {
         appBaseUrl,
         appUserId: normalizeAppUserId(parsed.appUserId ?? null),
+        connectionMode: normalizedConnectionMode,
+        expectedThreadsUsername: normalizedExpectedUsername,
       };
     }
     const appBaseUrl = normalizeAppBaseUrl(decoded);
     if (!appBaseUrl) {
       return null;
     }
-    return { appBaseUrl, appUserId: null };
+    return { appBaseUrl, appUserId: null, connectionMode: null, expectedThreadsUsername: null };
   } catch {
     return null;
   }
@@ -790,7 +964,31 @@ type AppUserThreadsPublishResult =
     accountThreadsUserId: string | null;
     errorCode: ThreadsPublishFailureCode | "threads_account_not_connected" | "threads_publish_exception";
     status?: number;
+    providerErrorMessage?: string;
+    providerResponseBody?: string;
   };
+
+function sanitizePublishErrorDetail(value: string): string {
+  return value
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 180);
+}
+
+function buildPublishErrorStorageValue(
+  errorCode: string,
+  status?: number,
+  providerErrorMessage?: string,
+): string {
+  const statusPart = typeof status === "number" ? `:${status}` : "";
+  const providerDetail = typeof providerErrorMessage === "string"
+    ? sanitizePublishErrorDetail(providerErrorMessage)
+    : "";
+  return providerDetail
+    ? `${errorCode}${statusPart}:${providerDetail}`
+    : `${errorCode}${statusPart}`;
+}
 
 const SCHEDULED_POST_ALLOWED_TRANSITIONS: Record<ScheduledPostStatus, ReadonlyArray<ScheduledPostStatus>> = {
   [SCHEDULED_POST_STATUS_APPROVED]: [SCHEDULED_POST_STATUS_POSTING],
@@ -991,6 +1189,8 @@ async function publishThreadsTextForAppUser(
         accountThreadsUserId: account.threads_user_id,
         errorCode: publishResult.errorCode,
         status: publishResult.status,
+        providerErrorMessage: publishResult.errorMessage,
+        providerResponseBody: publishResult.responseBody,
       };
     }
 
@@ -1125,6 +1325,8 @@ async function processScheduledPost(
       threads_user_id: post.threads_user_id,
       error_code: publishOutcome.errorCode,
       status: publishOutcome.status ?? null,
+      provider_error_message: publishOutcome.providerErrorMessage ?? null,
+      provider_response_body: publishOutcome.providerResponseBody ?? null,
       linked_threads_user_id: publishOutcome.accountThreadsUserId,
     });
     await transitionScheduledPostStatus(
@@ -1133,9 +1335,11 @@ async function processScheduledPost(
       SCHEDULED_POST_STATUS_POSTING,
       SCHEDULED_POST_STATUS_APPROVED,
       {
-        publishErrorMessage: publishOutcome.status
-          ? `${publishOutcome.errorCode}:${publishOutcome.status}`
-          : publishOutcome.errorCode,
+        publishErrorMessage: buildPublishErrorStorageValue(
+          publishOutcome.errorCode,
+          publishOutcome.status,
+          publishOutcome.providerErrorMessage,
+        ),
       },
     );
     return;
@@ -1286,12 +1490,40 @@ async function readJsonSafe(response: Response): Promise<unknown | null> {
   }
 }
 
+function safeParseJsonString(value: string): unknown | null {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function isInternalRequestAuthorized(request: Request, env: Env): boolean {
+  const internalKey = request.headers.get("x-internal-key")?.trim();
+  return Boolean(internalKey && env.INTERNAL_API_KEY && internalKey === env.INTERNAL_API_KEY);
+}
+
 function isValidIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function isValidIsoTime(value: string): boolean {
   return /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(value);
+}
+
+function parseHourMinute(value: string): { hour: number; minute: number } | null {
+  const match = value.trim().match(/^(\d{2}):(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  return { hour, minute };
 }
 
 function isValidIanaTimezone(value: string): boolean {
@@ -1494,7 +1726,12 @@ function resolveAuthenticatedAppUserId(
   authUserId: string,
   requestedAppUserId: string | null,
 ) {
-  if (requestedAppUserId && requestedAppUserId !== authUserId) {
+  const normalizedAuthUserId = normalizeAppUserId(authUserId);
+  if (!normalizedAuthUserId) {
+    return null;
+  }
+
+  if (requestedAppUserId && requestedAppUserId !== normalizedAuthUserId) {
     return null;
   }
 
@@ -1647,13 +1884,221 @@ async function enforceAuthRequestRateLimit(
 }
 
 async function ensureAppThreadsTable(env: Env): Promise<void> {
+  const appThreadsTableExists = await doesTableExist(env, "app_threads_accounts");
+  if (!appThreadsTableExists) {
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS app_threads_accounts (
+        app_user_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        connection_active INTEGER NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        tombstone_expires_at TEXT,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (app_user_id, threads_user_id),
+        FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`,
+    ).run();
+  }
+
+  const appThreadsTableInfo = await env.DB.prepare("PRAGMA table_info(app_threads_accounts)").all<{
+    name: string;
+    pk: number;
+  }>();
+  const appThreadsColumnNames = new Set((appThreadsTableInfo.results ?? []).map((column) => column.name));
+  const hasLegacyConnectionActive = appThreadsColumnNames.has("connection_active");
+  const hasLegacyIsActive = appThreadsColumnNames.has("is_active");
+  const hasLegacyTombstoneExpiresAt = appThreadsColumnNames.has("tombstone_expires_at");
+  const hasLegacyCreatedAt = appThreadsColumnNames.has("created_at");
+  const legacyConnectionActiveExpr = hasLegacyConnectionActive && hasLegacyIsActive
+    ? "COALESCE(connection_active, is_active, 1)"
+    : hasLegacyConnectionActive
+      ? "COALESCE(connection_active, 1)"
+      : hasLegacyIsActive
+        ? "COALESCE(is_active, 1)"
+        : "1";
+  const legacyIsActiveExpr = hasLegacyIsActive && hasLegacyConnectionActive
+    ? "COALESCE(is_active, connection_active, 1)"
+    : hasLegacyIsActive
+      ? "COALESCE(is_active, 1)"
+      : hasLegacyConnectionActive
+        ? "COALESCE(connection_active, 1)"
+        : "1";
+  const legacyTombstoneExpr = hasLegacyTombstoneExpiresAt ? "tombstone_expires_at" : "NULL";
+  const legacyCreatedAtExpr = hasLegacyCreatedAt
+    ? "created_at"
+    : "CAST(strftime('%s','now') AS INTEGER)";
+  const appUserIdPkOrdinal = (appThreadsTableInfo.results ?? []).find((column) => column.name === "app_user_id")?.pk ?? 0;
+  const threadsUserIdPkOrdinal = (appThreadsTableInfo.results ?? []).find((column) => column.name === "threads_user_id")?.pk ?? 0;
+  const legacyPrimaryKeyOnAppUserId = Number(appUserIdPkOrdinal) > 0 && Number(threadsUserIdPkOrdinal) === 0;
+
+  if (legacyPrimaryKeyOnAppUserId) {
+    const dbSession = env.DB.withSession("first-primary");
+    let transactionStarted = false;
+    try {
+      await dbSession.prepare("BEGIN TRANSACTION").run();
+      transactionStarted = true;
+
+      await dbSession.prepare(
+        `CREATE TABLE IF NOT EXISTS app_threads_accounts_multi (
+          app_user_id TEXT NOT NULL,
+          threads_user_id TEXT NOT NULL,
+          connection_active INTEGER NOT NULL DEFAULT 1,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          tombstone_expires_at TEXT,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (app_user_id, threads_user_id),
+          FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
+        )`,
+      ).run();
+
+      await dbSession.prepare(
+        `INSERT OR REPLACE INTO app_threads_accounts_multi (
+          app_user_id,
+          threads_user_id,
+          connection_active,
+          is_active,
+          tombstone_expires_at,
+          created_at
+        )
+        SELECT
+          app_user_id,
+          threads_user_id,
+          ${legacyConnectionActiveExpr},
+          ${legacyIsActiveExpr},
+          ${legacyTombstoneExpr},
+          ${legacyCreatedAtExpr}
+        FROM app_threads_accounts`,
+      ).run();
+
+      await dbSession.prepare("DROP TABLE app_threads_accounts").run();
+      await dbSession.prepare("ALTER TABLE app_threads_accounts_multi RENAME TO app_threads_accounts").run();
+
+      await dbSession.prepare("COMMIT").run();
+      transactionStarted = false;
+    } catch (error) {
+      if (transactionStarted) {
+        await dbSession.prepare("ROLLBACK").run();
+      }
+      throw error;
+    }
+  }
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS app_threads_accounts (
-      app_user_id TEXT PRIMARY KEY,
+      app_user_id TEXT NOT NULL,
       threads_user_id TEXT NOT NULL,
+      connection_active INTEGER NOT NULL DEFAULT 1,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      tombstone_expires_at TEXT,
       created_at INTEGER NOT NULL,
+      PRIMARY KEY (app_user_id, threads_user_id),
       FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
     )`,
+  ).run();
+
+  const appThreadsColumns: Array<{ name: string; definition: string }> = [
+    { name: "connection_active", definition: "INTEGER NOT NULL DEFAULT 1" },
+    { name: "is_active", definition: "INTEGER NOT NULL DEFAULT 1" },
+    { name: "tombstone_expires_at", definition: "TEXT" },
+    { name: "created_at", definition: "INTEGER NOT NULL DEFAULT 0" },
+  ];
+  for (const column of appThreadsColumns) {
+    const columnExists = await doesColumnExist(env, "app_threads_accounts", column.name);
+    if (columnExists) {
+      continue;
+    }
+    await env.DB.prepare(
+      `ALTER TABLE app_threads_accounts ADD COLUMN ${column.name} ${column.definition}`,
+    ).run();
+  }
+
+  await env.DB.prepare(
+    `UPDATE app_threads_accounts
+     SET connection_active = COALESCE(connection_active, is_active, 1),
+         is_active = COALESCE(is_active, connection_active, 1)
+     WHERE connection_active IS NULL
+        OR is_active IS NULL`,
+  ).run();
+
+  // Admin accounts should never retain reconnect tombstones.
+  // Guard this for older DBs where users.is_admin may not exist yet.
+  const usersHasIsAdminColumn = await doesColumnExist(env, "users", "is_admin");
+  if (usersHasIsAdminColumn) {
+    await env.DB.prepare(
+      `UPDATE app_threads_accounts
+       SET tombstone_expires_at = NULL
+       WHERE app_user_id IN (
+         SELECT id
+         FROM users
+         WHERE is_admin = 1
+       )
+         AND tombstone_expires_at IS NOT NULL`,
+    ).run();
+  }
+
+  await env.DB.prepare(
+    `UPDATE app_threads_accounts
+     SET is_active = 0
+     WHERE COALESCE(connection_active, is_active, 1) = 0
+       AND COALESCE(is_active, 1) != 0`,
+  ).run();
+
+  const usersNeedingSingleActiveNormalization = await env.DB.prepare(
+    `SELECT app_user_id
+     FROM app_threads_accounts
+     WHERE COALESCE(connection_active, is_active, 1) = 1
+     GROUP BY app_user_id
+     HAVING SUM(CASE WHEN COALESCE(is_active, 1) = 1 THEN 1 ELSE 0 END) != 1`,
+  ).all<{ app_user_id: string }>();
+
+  for (const row of usersNeedingSingleActiveNormalization.results ?? []) {
+    const appUserId = row.app_user_id?.trim();
+    if (!appUserId) {
+      continue;
+    }
+
+    const preferredRow = await env.DB.prepare(
+      `SELECT threads_user_id
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+         AND COALESCE(connection_active, is_active, 1) = 1
+       ORDER BY created_at DESC, threads_user_id ASC
+       LIMIT 1`,
+    )
+      .bind(appUserId)
+      .first<{ threads_user_id: string }>();
+
+    if (!preferredRow?.threads_user_id) {
+      continue;
+    }
+
+    await env.DB.prepare(
+      `UPDATE app_threads_accounts
+       SET is_active = CASE
+         WHEN threads_user_id = ? AND COALESCE(connection_active, is_active, 1) = 1 THEN 1
+         ELSE 0
+       END
+       WHERE app_user_id = ?`,
+    )
+      .bind(preferredRow.threads_user_id, appUserId)
+      .run();
+  }
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_app_threads_accounts_app_user_active
+     ON app_threads_accounts (app_user_id, connection_active, is_active, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_app_threads_accounts_threads_user_id
+     ON app_threads_accounts (threads_user_id)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_app_threads_accounts_one_active_per_user
+     ON app_threads_accounts (app_user_id)
+     WHERE COALESCE(connection_active, is_active, 1) = 1
+       AND COALESCE(is_active, 1) = 1`,
   ).run();
 
   await env.DB.prepare(
@@ -1693,6 +2138,226 @@ async function ensureAppThreadsTable(env: Env): Promise<void> {
        WHERE app_user_id = OLD.id;
      END`,
   ).run();
+}
+
+async function rebuildAppThreadsTableForMultiAccount(env: Env): Promise<void> {
+  const legacyTableInfo = await env.DB.prepare("PRAGMA table_info(app_threads_accounts)").all<{ name: string }>();
+  const legacyColumnNames = new Set((legacyTableInfo.results ?? []).map((column) => column.name));
+  const hasLegacyConnectionActive = legacyColumnNames.has("connection_active");
+  const hasLegacyIsActive = legacyColumnNames.has("is_active");
+  const hasLegacyTombstoneExpiresAt = legacyColumnNames.has("tombstone_expires_at");
+  const hasLegacyCreatedAt = legacyColumnNames.has("created_at");
+  const legacyConnectionActiveExpr = hasLegacyConnectionActive && hasLegacyIsActive
+    ? "COALESCE(connection_active, is_active, 1)"
+    : hasLegacyConnectionActive
+      ? "COALESCE(connection_active, 1)"
+      : hasLegacyIsActive
+        ? "COALESCE(is_active, 1)"
+        : "1";
+  const legacyIsActiveExpr = hasLegacyIsActive && hasLegacyConnectionActive
+    ? "COALESCE(is_active, connection_active, 1)"
+    : hasLegacyIsActive
+      ? "COALESCE(is_active, 1)"
+      : hasLegacyConnectionActive
+        ? "COALESCE(connection_active, 1)"
+        : "1";
+  const legacyTombstoneExpr = hasLegacyTombstoneExpiresAt ? "tombstone_expires_at" : "NULL";
+  const legacyCreatedAtExpr = hasLegacyCreatedAt
+    ? "created_at"
+    : "CAST(strftime('%s','now') AS INTEGER)";
+
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
+
+    await dbSession.prepare(
+      `CREATE TABLE IF NOT EXISTS app_threads_accounts_multi_rebuild (
+        app_user_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        connection_active INTEGER NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        tombstone_expires_at TEXT,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (app_user_id, threads_user_id),
+        FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`,
+    ).run();
+
+    await dbSession.prepare(
+      `INSERT OR REPLACE INTO app_threads_accounts_multi_rebuild (
+        app_user_id,
+        threads_user_id,
+        connection_active,
+        is_active,
+        tombstone_expires_at,
+        created_at
+      )
+      SELECT
+        app_user_id,
+        threads_user_id,
+        ${legacyConnectionActiveExpr},
+        ${legacyIsActiveExpr},
+        ${legacyTombstoneExpr},
+        ${legacyCreatedAtExpr}
+      FROM app_threads_accounts`,
+    ).run();
+
+    await dbSession.prepare("DROP TABLE app_threads_accounts").run();
+    await dbSession.prepare("ALTER TABLE app_threads_accounts_multi_rebuild RENAME TO app_threads_accounts").run();
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      await dbSession.prepare("ROLLBACK").run();
+    }
+    throw error;
+  }
+
+  await ensureAppThreadsTable(env);
+}
+
+async function upsertAppThreadsAccountLink(
+  env: Env,
+  appUserId: string,
+  threadsUserId: string,
+  createdAt: number,
+): Promise<void> {
+  const upsertSql = `INSERT INTO app_threads_accounts (
+      app_user_id,
+      threads_user_id,
+      connection_active,
+      is_active,
+      tombstone_expires_at,
+      created_at
+    )
+    VALUES (?, ?, 1, 0, NULL, ?)
+    ON CONFLICT(app_user_id, threads_user_id) DO UPDATE SET
+      connection_active = 1,
+      is_active = 0,
+      tombstone_expires_at = NULL`;
+
+  try {
+    await ensureAppThreadsTable(env);
+    await env.DB.prepare(upsertSql)
+      .bind(appUserId, threadsUserId, createdAt)
+      .run();
+  } catch (error) {
+    const message = getErrorMessage(error);
+    const shouldForceRebuild = message.includes("ON CONFLICT clause does not match")
+      || message.includes("no such column")
+      || message.includes("UNIQUE constraint failed: app_threads_accounts.app_user_id");
+    if (!shouldForceRebuild) {
+      throw error;
+    }
+
+    await rebuildAppThreadsTableForMultiAccount(env);
+    await env.DB.prepare(upsertSql)
+      .bind(appUserId, threadsUserId, createdAt)
+      .run();
+  }
+}
+
+async function linkThreadsAccountWithSchemaFallback(
+  env: Env,
+  appUserId: string,
+  threadsUserId: string,
+  createdAt: number,
+): Promise<boolean> {
+  const writeAttempts: Array<{ sql: string; bindings: Array<string | number> }> = [
+    {
+      sql: `INSERT INTO app_threads_accounts (
+              app_user_id,
+              threads_user_id,
+              connection_active,
+              is_active,
+              tombstone_expires_at,
+              created_at
+            )
+            VALUES (?, ?, 1, 0, NULL, ?)
+            ON CONFLICT(app_user_id, threads_user_id) DO UPDATE SET
+              connection_active = 1,
+              is_active = 0,
+              tombstone_expires_at = NULL`,
+      bindings: [appUserId, threadsUserId, createdAt],
+    },
+    {
+      sql: `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(app_user_id, threads_user_id) DO UPDATE SET
+              threads_user_id = excluded.threads_user_id`,
+      bindings: [appUserId, threadsUserId, createdAt],
+    },
+    {
+      sql: `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(app_user_id) DO UPDATE SET
+              threads_user_id = excluded.threads_user_id`,
+      bindings: [appUserId, threadsUserId, createdAt],
+    },
+    {
+      sql: `INSERT INTO app_threads_accounts (app_user_id, threads_user_id)
+            VALUES (?, ?)
+            ON CONFLICT(app_user_id) DO UPDATE SET
+              threads_user_id = excluded.threads_user_id`,
+      bindings: [appUserId, threadsUserId],
+    },
+    {
+      sql: `INSERT INTO app_threads_accounts (app_user_id, threads_user_id)
+            VALUES (?, ?)
+            ON CONFLICT(app_user_id, threads_user_id) DO NOTHING`,
+      bindings: [appUserId, threadsUserId],
+    },
+  ];
+
+  for (const attempt of writeAttempts) {
+    try {
+      await env.DB.prepare(attempt.sql).bind(...attempt.bindings).run();
+      return true;
+    } catch {
+      // Try the next legacy-compatible write shape.
+    }
+  }
+
+  try {
+    const updateResult = await env.DB.prepare(
+      `UPDATE app_threads_accounts
+       SET threads_user_id = ?
+       WHERE app_user_id = ?`,
+    )
+      .bind(threadsUserId, appUserId)
+      .run();
+    if (Number(updateResult.meta?.changes ?? 0) > 0) {
+      return true;
+    }
+  } catch {
+    // Fall through to insert-only attempt.
+  }
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id)
+       VALUES (?, ?)`,
+    )
+      .bind(appUserId, threadsUserId)
+      .run();
+    return true;
+  } catch {
+    // Try created_at variant as final fallback.
+  }
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind(appUserId, threadsUserId, createdAt)
+      .run();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function ensureScheduledPostsTable(env: Env): Promise<void> {
@@ -1809,6 +2474,56 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
   ).run();
 }
 
+async function listUserTableColumns(env: Env): Promise<string[]> {
+  const result = await env.DB.prepare("PRAGMA table_info(users)").all<{ name?: string }>();
+  return (result.results ?? [])
+    .map((row) => (typeof row?.name === "string" ? row.name : ""))
+    .filter((name) => name.length > 0);
+}
+
+async function ensureWorkspaceUserRecord(
+  env: Env,
+  user: {
+    id: string;
+    email: string;
+    timezone?: string | null;
+    clock_format?: string | null;
+  },
+): Promise<void> {
+  const usersTableExists = await doesTableExist(env, "users");
+  if (!usersTableExists) {
+    throw new Error("users_table_missing");
+  }
+
+  const columns = await listUserTableColumns(env);
+  const insertColumns = ["id", "email", "password_hash", "email_verified", "created_at"];
+  const insertValues = ["?", "?", "NULL", "1", "CURRENT_TIMESTAMP"];
+  const bindings: Array<string> = [user.id, user.email];
+  const updateAssignments = ["email = excluded.email"];
+
+  if (columns.includes("timezone")) {
+    insertColumns.push("timezone");
+    insertValues.push("?");
+    bindings.push(user.timezone?.trim() || "America/New_York");
+    updateAssignments.push("timezone = excluded.timezone");
+  }
+
+  if (columns.includes("clock_format")) {
+    insertColumns.push("clock_format");
+    insertValues.push("?");
+    bindings.push(user.clock_format?.trim() || "12h");
+    updateAssignments.push("clock_format = excluded.clock_format");
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO users (${insertColumns.join(", ")})
+     VALUES (${insertValues.join(", ")})
+     ON CONFLICT(id) DO UPDATE SET ${updateAssignments.join(", ")}`,
+  )
+    .bind(...bindings)
+    .run();
+}
+
 async function ensureImmediatePublishIdempotencyTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS threads_publish_idempotency (
@@ -1856,9 +2571,224 @@ async function ensureImmediatePublishIdempotencyTable(env: Env): Promise<void> {
   ).run();
 }
 
+async function ensureThreadsAccountsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_accounts (
+      threads_user_id TEXT PRIMARY KEY,
+      access_token TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )`,
+  ).run();
+
+  const tableInfo = await env.DB.prepare("PRAGMA table_info(threads_accounts)").all<{
+    name: string;
+    pk: number;
+  }>();
+  const tableColumns = tableInfo.results ?? [];
+  const columnNames = new Set(tableColumns.map((column) => column.name));
+  const hasThreadsUserId = columnNames.has("threads_user_id");
+  const threadsUserIdPkOrdinal = tableColumns.find((column) => column.name === "threads_user_id")?.pk ?? 0;
+  const needsPrimaryKeyRebuild = !hasThreadsUserId || Number(threadsUserIdPkOrdinal) === 0;
+
+  if (needsPrimaryKeyRebuild) {
+    const hasUserId = columnNames.has("user_id");
+    const hasAppUserId = columnNames.has("app_user_id");
+    const hasAccessToken = columnNames.has("access_token");
+    const hasExpiresAt = columnNames.has("expires_at");
+    const hasCreatedAt = columnNames.has("created_at");
+
+    const threadsUserIdExpr = hasThreadsUserId
+      ? "threads_user_id"
+      : hasUserId
+        ? "user_id"
+        : hasAppUserId
+          ? "app_user_id"
+          : "NULL";
+    const accessTokenExpr = hasAccessToken ? "access_token" : "''";
+    const expiresAtExpr = hasExpiresAt ? "expires_at" : "0";
+    const createdAtExpr = hasCreatedAt ? "created_at" : "CAST(strftime('%s','now') AS INTEGER)";
+
+    const dbSession = env.DB.withSession("first-primary");
+    let transactionStarted = false;
+    try {
+      await dbSession.prepare("BEGIN TRANSACTION").run();
+      transactionStarted = true;
+
+      await dbSession.prepare(
+        `CREATE TABLE IF NOT EXISTS threads_accounts_rebuild (
+          threads_user_id TEXT PRIMARY KEY,
+          access_token TEXT NOT NULL,
+          expires_at INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        )`,
+      ).run();
+
+      await dbSession.prepare(
+        `INSERT OR REPLACE INTO threads_accounts_rebuild (
+          threads_user_id,
+          access_token,
+          expires_at,
+          created_at
+        )
+        SELECT
+          ${threadsUserIdExpr},
+          ${accessTokenExpr},
+          ${expiresAtExpr},
+          ${createdAtExpr}
+        FROM threads_accounts
+        WHERE ${threadsUserIdExpr} IS NOT NULL
+          AND length(trim(${threadsUserIdExpr})) > 0`,
+      ).run();
+
+      await dbSession.prepare("DROP TABLE threads_accounts").run();
+      await dbSession.prepare("ALTER TABLE threads_accounts_rebuild RENAME TO threads_accounts").run();
+
+      await dbSession.prepare("COMMIT").run();
+      transactionStarted = false;
+    } catch (error) {
+      if (transactionStarted) {
+        await dbSession.prepare("ROLLBACK").run();
+      }
+      throw error;
+    }
+  }
+
+  const requiredColumns: Array<{ name: string; definition: string }> = [
+    { name: "access_token", definition: "TEXT NOT NULL DEFAULT ''" },
+    { name: "expires_at", definition: "INTEGER NOT NULL DEFAULT 0" },
+    { name: "created_at", definition: "INTEGER NOT NULL DEFAULT 0" },
+  ];
+
+  for (const column of requiredColumns) {
+    const exists = await doesColumnExist(env, "threads_accounts", column.name);
+    if (exists) {
+      continue;
+    }
+    await env.DB.prepare(`ALTER TABLE threads_accounts ADD COLUMN ${column.name} ${column.definition}`).run();
+  }
+}
+
 type ThreadsAccount = {
   threads_user_id: string;
   access_token: string;
+};
+
+type LinkedThreadsAccount = {
+  threads_user_id: string;
+  is_active: number;
+  created_at: number;
+  username: string | null;
+  name: string | null;
+  threads_profile_picture_url: string | null;
+  threads_biography: string | null;
+  is_verified: number | null;
+};
+
+type ThreadsProfileCachePayload = {
+  threads_user_id: string;
+  username: string | null;
+  name: string | null;
+  threads_biography: string | null;
+  is_verified: boolean;
+  threads_profile_picture_url: string | null;
+};
+
+type ThreadsProfileCacheRow = {
+  threads_user_id: string;
+  username: string | null;
+  name: string | null;
+  threads_biography: string | null;
+  is_verified: number;
+  threads_profile_picture_url: string | null;
+  last_refreshed_at: string;
+};
+
+type ThreadsInsightsMetricName =
+  | "views"
+  | "likes"
+  | "replies"
+  | "reposts"
+  | "quotes"
+  | "shares"
+  | "clicks"
+  | "followers_count";
+
+type ThreadsMetricMap = Record<ThreadsInsightsMetricName, number>;
+
+type ThreadsUserInsightsCachePayload = {
+  threads_user_id: string;
+  insights_json: string;
+};
+
+type ThreadsUserInsightsCacheRow = {
+  threads_user_id: string;
+  insights_json: string;
+  last_refreshed_at: string;
+};
+
+type CachedThreadsPost = {
+  id: string;
+  text: string | null;
+  timestamp: string | null;
+  permalink: string | null;
+  username: string | null;
+  profile_picture_url: string | null;
+  views: number;
+  likes: number;
+  replies: number;
+  reposts: number;
+  quotes: number;
+  shares: number;
+  engagement_total: number;
+};
+
+type ThreadsPostsCacheStatePayload = {
+  threads_user_id: string;
+  next_cursor: string | null;
+  has_more: boolean;
+};
+
+type ThreadsPostsArchiveRow = {
+  threads_user_id: string;
+  post_id: string;
+  post_text: string | null;
+  post_timestamp: string | null;
+  post_permalink: string | null;
+  post_username: string | null;
+  profile_picture_url: string | null;
+  views: number | string | null;
+  likes: number | string | null;
+  replies: number | string | null;
+  reposts: number | string | null;
+  quotes: number | string | null;
+  shares: number | string | null;
+  engagement_total: number | string | null;
+  source_rank: number | string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_synced_at: string;
+};
+
+type AutomationDailyRunLockRow = {
+  automation_id: string;
+  account_id: string;
+  run_date: string;
+  first_source: string;
+  first_claimed_at: string;
+  last_claimed_at: string;
+  manual_claim_count: number | string | null;
+  scheduled_claim_count: number | string | null;
+  last_result: string | null;
+  successful_completed_at: string | null;
+  last_finished_at: string | null;
+};
+
+type ThreadsPostsCacheStateRow = {
+  threads_user_id: string;
+  next_cursor: string | null;
+  has_more: number;
+  last_refreshed_at: string;
 };
 
 type MetaDeletionRequestRecord = {
@@ -1873,16 +2803,41 @@ async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise
   logWorkerEvent("THREADS_ACCOUNT_LOOKUP", {
     appUserId,
   });
-  await ensureAppThreadsTable(env);
-  return env.DB.prepare(
-    `SELECT t.threads_user_id, t.access_token
-     FROM app_threads_accounts a
-     JOIN threads_accounts t ON t.threads_user_id = a.threads_user_id
-     WHERE a.app_user_id = ?
-     LIMIT 1`,
-  )
-    .bind(appUserId)
-    .first<ThreadsAccount>();
+  const configuredAccount = getConfiguredThreadsAccounts(env)[0];
+  if (configuredAccount) {
+    const profile = await fetchConfiguredThreadsProfile(configuredAccount, 0);
+    return {
+      threads_user_id: profile.threads_user_id,
+      access_token: configuredAccount.accessToken,
+    };
+  }
+
+  return null;
+}
+
+async function listConnectedThreadsAccountsForAppUser(
+  env: Env,
+  appUserId: string,
+): Promise<LinkedThreadsAccount[]> {
+  const configuredProfiles = await getConfiguredThreadsProfiles(env);
+  if (configuredProfiles.length > 0) {
+    return configuredProfiles.map((profile, index) => ({
+      threads_user_id: profile.threads_user_id,
+      is_active: index === 0 ? 1 : 0,
+      created_at: 0,
+      username: profile.username ?? null,
+      name: profile.name ?? profile.label ?? null,
+      threads_profile_picture_url: profile.threads_profile_picture_url ?? null,
+      threads_biography: profile.threads_biography ?? null,
+      is_verified: profile.is_verified ? 1 : 0,
+    }));
+  }
+
+  return [];
+}
+
+function getThreadsConnectionTombstoneExpiresAt(nowMs = Date.now()): string {
+  return new Date(nowMs + THREADS_CONNECTION_TOMBSTONE_WINDOW_MS).toISOString();
 }
 
 async function ensureMetaDeletionRequestsTable(env: Env): Promise<void> {
@@ -1895,6 +2850,1446 @@ async function ensureMetaDeletionRequestsTable(env: Env): Promise<void> {
       completed_at TEXT
     )`,
   ).run();
+}
+
+async function ensureThreadsProfileCacheTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_profile_cache (
+      threads_user_id TEXT PRIMARY KEY CHECK (length(trim(threads_user_id)) > 0),
+      username TEXT,
+      name TEXT,
+      threads_biography TEXT,
+      is_verified INTEGER NOT NULL DEFAULT 0,
+      threads_profile_picture_url TEXT,
+      last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (threads_user_id) REFERENCES threads_accounts(threads_user_id) ON DELETE CASCADE
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_profile_cache_last_refreshed_at
+     ON threads_profile_cache (last_refreshed_at)`,
+  ).run();
+}
+
+async function upsertThreadsProfileCache(env: Env, payload: ThreadsProfileCachePayload): Promise<void> {
+  await ensureThreadsProfileCacheTable(env);
+
+  await env.DB.prepare(
+    `INSERT INTO threads_profile_cache (
+      threads_user_id,
+      username,
+      name,
+      threads_biography,
+      is_verified,
+      threads_profile_picture_url,
+      last_refreshed_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(threads_user_id) DO UPDATE SET
+      username = excluded.username,
+      name = excluded.name,
+      threads_biography = excluded.threads_biography,
+      is_verified = excluded.is_verified,
+      threads_profile_picture_url = excluded.threads_profile_picture_url,
+      last_refreshed_at = CURRENT_TIMESTAMP`,
+  )
+    .bind(
+      payload.threads_user_id,
+      payload.username,
+      payload.name,
+      payload.threads_biography,
+      payload.is_verified ? 1 : 0,
+      payload.threads_profile_picture_url,
+    )
+    .run();
+}
+
+async function getFreshThreadsProfileCache(
+  env: Env,
+  threadsUserId: string,
+): Promise<ThreadsProfileCacheRow | null> {
+  await ensureThreadsProfileCacheTable(env);
+
+  return env.DB.prepare(
+    `SELECT threads_user_id, username, name, threads_biography, is_verified, threads_profile_picture_url, last_refreshed_at
+     FROM threads_profile_cache
+     WHERE threads_user_id = ?
+       AND datetime(last_refreshed_at) >= datetime('now', '-24 hours')
+     LIMIT 1`,
+  )
+    .bind(threadsUserId)
+    .first<ThreadsProfileCacheRow>();
+}
+
+async function ensureThreadsUserInsightsCacheTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_user_insights_cache (
+      threads_user_id TEXT PRIMARY KEY CHECK (length(trim(threads_user_id)) > 0),
+      insights_json TEXT NOT NULL,
+      last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_user_insights_cache_last_refreshed_at
+     ON threads_user_insights_cache (last_refreshed_at)`,
+  ).run();
+}
+
+async function upsertThreadsUserInsightsCache(
+  env: Env,
+  payload: ThreadsUserInsightsCachePayload,
+): Promise<void> {
+  await ensureThreadsUserInsightsCacheTable(env);
+
+  await env.DB.prepare(
+    `INSERT INTO threads_user_insights_cache (
+      threads_user_id,
+      insights_json,
+      last_refreshed_at
+    )
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(threads_user_id) DO UPDATE SET
+      insights_json = excluded.insights_json,
+      last_refreshed_at = CURRENT_TIMESTAMP`,
+  )
+    .bind(payload.threads_user_id, payload.insights_json)
+    .run();
+}
+
+async function getFreshThreadsUserInsightsCache(
+  env: Env,
+  threadsUserId: string,
+): Promise<ThreadsUserInsightsCacheRow | null> {
+  await ensureThreadsUserInsightsCacheTable(env);
+
+  return env.DB.prepare(
+    `SELECT threads_user_id, insights_json, last_refreshed_at
+     FROM threads_user_insights_cache
+     WHERE threads_user_id = ?
+       AND datetime(last_refreshed_at) >= datetime('now', '-${THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS} hours')
+     LIMIT 1`,
+  )
+    .bind(threadsUserId)
+    .first<ThreadsUserInsightsCacheRow>();
+}
+
+async function ensureThreadsPostsCacheTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_post_insights_cache (
+      threads_user_id TEXT NOT NULL,
+      post_id TEXT PRIMARY KEY CHECK (length(trim(post_id)) > 0),
+      post_text TEXT,
+      post_timestamp TEXT,
+      post_permalink TEXT,
+      post_username TEXT,
+      profile_picture_url TEXT,
+      views INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      quotes INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_post_insights_cache_user_refresh
+     ON threads_post_insights_cache (threads_user_id, last_refreshed_at)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_post_insights_cache_user_sort_order
+     ON threads_post_insights_cache (threads_user_id, sort_order)`,
+  ).run();
+
+  const tableInfo = await env.DB.prepare(
+    `PRAGMA table_info(threads_post_insights_cache)`,
+  ).all<{ name: string }>();
+
+  const columnNames = new Set((tableInfo.results ?? []).map((column) => column.name));
+  if (!columnNames.has("engagement_total")) {
+    await env.DB.prepare(
+      `ALTER TABLE threads_post_insights_cache
+       ADD COLUMN engagement_total INTEGER NOT NULL DEFAULT 0`,
+    ).run();
+  }
+}
+
+async function ensureThreadsPostsCacheStateTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_posts_cache_state (
+      threads_user_id TEXT PRIMARY KEY CHECK (length(trim(threads_user_id)) > 0),
+      next_cursor TEXT,
+      has_more INTEGER NOT NULL DEFAULT 0,
+      last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_posts_cache_state_last_refreshed_at
+     ON threads_posts_cache_state (last_refreshed_at)`,
+  ).run();
+}
+
+async function ensureThreadsPostsArchiveTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_posts_archive (
+      threads_user_id TEXT NOT NULL,
+      post_id TEXT NOT NULL CHECK (length(trim(post_id)) > 0),
+      post_text TEXT,
+      post_timestamp TEXT,
+      post_permalink TEXT,
+      post_username TEXT,
+      profile_picture_url TEXT,
+      views INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      quotes INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      engagement_total INTEGER NOT NULL DEFAULT 0,
+      source_rank INTEGER NOT NULL DEFAULT 0,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (threads_user_id, post_id)
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_posts_archive_user_timestamp
+     ON threads_posts_archive (threads_user_id, post_timestamp DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_posts_archive_user_engagement
+     ON threads_posts_archive (threads_user_id, engagement_total DESC, likes DESC, views DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_posts_archive_user_synced
+     ON threads_posts_archive (threads_user_id, last_synced_at DESC)`,
+  ).run();
+}
+
+async function ensureAutomationDailyRunLocksTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS automation_daily_run_locks (
+      automation_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      run_date TEXT NOT NULL,
+      first_source TEXT NOT NULL,
+      first_claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      manual_claim_count INTEGER NOT NULL DEFAULT 0,
+      scheduled_claim_count INTEGER NOT NULL DEFAULT 0,
+      last_result TEXT NOT NULL DEFAULT 'started',
+      successful_completed_at TEXT,
+      last_finished_at TEXT,
+      PRIMARY KEY (automation_id, account_id, run_date)
+    )`,
+  ).run();
+
+  const missingColumns: Array<{ name: string; definition: string }> = [];
+  if (!(await doesColumnExist(env, "automation_daily_run_locks", "last_result"))) {
+    missingColumns.push({ name: "last_result", definition: "TEXT NOT NULL DEFAULT 'started'" });
+  }
+  if (!(await doesColumnExist(env, "automation_daily_run_locks", "successful_completed_at"))) {
+    missingColumns.push({ name: "successful_completed_at", definition: "TEXT" });
+  }
+  if (!(await doesColumnExist(env, "automation_daily_run_locks", "last_finished_at"))) {
+    missingColumns.push({ name: "last_finished_at", definition: "TEXT" });
+  }
+
+  for (const column of missingColumns) {
+    await env.DB.prepare(
+      `ALTER TABLE automation_daily_run_locks ADD COLUMN ${column.name} ${column.definition}`,
+    ).run();
+  }
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_automation_daily_run_locks_run_date
+     ON automation_daily_run_locks (run_date, automation_id, account_id)`,
+  ).run();
+}
+
+async function getAutomationDailyRunLock(
+  env: Env,
+  automationId: string,
+  accountId: string,
+  runDate: string,
+): Promise<AutomationDailyRunLockRow | null> {
+  await ensureAutomationDailyRunLocksTable(env);
+
+  return env.DB.prepare(
+    `SELECT
+       automation_id,
+       account_id,
+       run_date,
+       first_source,
+       first_claimed_at,
+       last_claimed_at,
+       manual_claim_count,
+       scheduled_claim_count,
+       last_result,
+       successful_completed_at,
+       last_finished_at
+     FROM automation_daily_run_locks
+     WHERE automation_id = ?
+       AND account_id = ?
+       AND run_date = ?
+     LIMIT 1`,
+  )
+    .bind(automationId, accountId, runDate)
+    .first<AutomationDailyRunLockRow>();
+}
+
+async function claimAutomationDailyRun(
+  env: Env,
+  automationId: string,
+  accountId: string,
+  runDate: string,
+  source: "manual" | "scheduled",
+): Promise<{
+  acquired: boolean;
+  lock: AutomationDailyRunLockRow | null;
+  reason: "already_ran_today" | "claimed";
+}> {
+  await ensureAutomationDailyRunLocksTable(env);
+
+  const existing = await getAutomationDailyRunLock(env, automationId, accountId, runDate);
+  if (!existing) {
+    await env.DB.prepare(
+      `INSERT INTO automation_daily_run_locks (
+        automation_id,
+        account_id,
+        run_date,
+        first_source,
+        manual_claim_count,
+        scheduled_claim_count,
+        last_result
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        automationId,
+        accountId,
+        runDate,
+        source,
+        source === "manual" ? 1 : 0,
+        source === "scheduled" ? 1 : 0,
+        "started",
+      )
+      .run();
+
+    const lock = await getAutomationDailyRunLock(env, automationId, accountId, runDate);
+    return { acquired: true, lock, reason: "claimed" };
+  }
+
+  if (source === "scheduled" && Boolean(existing.successful_completed_at)) {
+    return { acquired: false, lock: existing, reason: "already_ran_today" };
+  }
+
+  await env.DB.prepare(
+    `UPDATE automation_daily_run_locks
+     SET manual_claim_count = manual_claim_count + ?,
+         scheduled_claim_count = scheduled_claim_count + ?,
+         last_claimed_at = CURRENT_TIMESTAMP,
+         last_result = 'started'
+     WHERE automation_id = ?
+       AND account_id = ?
+       AND run_date = ?`,
+  )
+    .bind(
+      source === "manual" ? 1 : 0,
+      source === "scheduled" ? 1 : 0,
+      automationId,
+      accountId,
+      runDate,
+    )
+    .run();
+
+  const updated = await getAutomationDailyRunLock(env, automationId, accountId, runDate);
+  return { acquired: true, lock: updated, reason: "claimed" };
+}
+
+async function completeAutomationDailyRun(
+  env: Env,
+  automationId: string,
+  accountId: string,
+  runDate: string,
+  success: boolean,
+  result: string,
+): Promise<AutomationDailyRunLockRow | null> {
+  await ensureAutomationDailyRunLocksTable(env);
+
+  await env.DB.prepare(
+    `UPDATE automation_daily_run_locks
+     SET last_result = ?,
+         last_finished_at = CURRENT_TIMESTAMP,
+         successful_completed_at = CASE
+           WHEN ? = 1 THEN CURRENT_TIMESTAMP
+           ELSE successful_completed_at
+         END
+     WHERE automation_id = ?
+       AND account_id = ?
+       AND run_date = ?`,
+  )
+    .bind(
+      result,
+      success ? 1 : 0,
+      automationId,
+      accountId,
+      runDate,
+    )
+    .run();
+
+  return getAutomationDailyRunLock(env, automationId, accountId, runDate);
+}
+
+async function upsertThreadsPostsArchive(
+  env: Env,
+  threadsUserId: string,
+  posts: CachedThreadsPost[],
+): Promise<void> {
+  await ensureThreadsPostsArchiveTable(env);
+
+  for (const [index, post] of posts.entries()) {
+    if (!post.id) {
+      continue;
+    }
+
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id,
+        post_id,
+        post_text,
+        post_timestamp,
+        post_permalink,
+        post_username,
+        profile_picture_url,
+        views,
+        likes,
+        replies,
+        reposts,
+        quotes,
+        shares,
+        engagement_total,
+        source_rank,
+        first_seen_at,
+        last_seen_at,
+        last_synced_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(threads_user_id, post_id) DO UPDATE SET
+        post_text = excluded.post_text,
+        post_timestamp = excluded.post_timestamp,
+        post_permalink = excluded.post_permalink,
+        post_username = excluded.post_username,
+        profile_picture_url = excluded.profile_picture_url,
+        views = excluded.views,
+        likes = excluded.likes,
+        replies = excluded.replies,
+        reposts = excluded.reposts,
+        quotes = excluded.quotes,
+        shares = excluded.shares,
+        engagement_total = excluded.engagement_total,
+        source_rank = excluded.source_rank,
+        last_seen_at = CURRENT_TIMESTAMP,
+        last_synced_at = CURRENT_TIMESTAMP`,
+    )
+      .bind(
+        threadsUserId,
+        post.id,
+        post.text,
+        post.timestamp,
+        post.permalink,
+        post.username,
+        post.profile_picture_url,
+        post.views,
+        post.likes,
+        post.replies,
+        post.reposts,
+        post.quotes,
+        post.shares,
+        post.engagement_total,
+        index,
+      )
+      .run();
+  }
+}
+
+async function replaceThreadsPostsCache(
+  env: Env,
+  threadsUserId: string,
+  posts: CachedThreadsPost[],
+  state: ThreadsPostsCacheStatePayload,
+): Promise<void> {
+  await ensureThreadsPostsCacheTable(env);
+  await ensureThreadsPostsCacheStateTable(env);
+
+  await env.DB.prepare(
+    `DELETE FROM threads_post_insights_cache
+     WHERE threads_user_id = ?`,
+  )
+    .bind(threadsUserId)
+    .run();
+
+  for (const [index, post] of posts.entries()) {
+    await env.DB.prepare(
+      `INSERT INTO threads_post_insights_cache (
+        threads_user_id,
+        post_id,
+        post_text,
+        post_timestamp,
+        post_permalink,
+        post_username,
+        profile_picture_url,
+        views,
+        likes,
+        replies,
+        reposts,
+        quotes,
+        shares,
+        sort_order,
+        last_refreshed_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    )
+      .bind(
+        threadsUserId,
+        post.id,
+        post.text,
+        post.timestamp,
+        post.permalink,
+        post.username,
+        post.profile_picture_url,
+        post.views,
+        post.likes,
+        post.replies,
+        post.reposts,
+        post.quotes,
+        post.shares,
+        index,
+      )
+      .run();
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO threads_posts_cache_state (
+      threads_user_id,
+      next_cursor,
+      has_more,
+      last_refreshed_at
+    )
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(threads_user_id) DO UPDATE SET
+      next_cursor = excluded.next_cursor,
+      has_more = excluded.has_more,
+      last_refreshed_at = CURRENT_TIMESTAMP`,
+  )
+    .bind(threadsUserId, state.next_cursor, state.has_more ? 1 : 0)
+    .run();
+}
+
+async function getFreshThreadsPostsCache(
+  env: Env,
+  threadsUserId: string,
+): Promise<{ posts: CachedThreadsPost[]; nextCursor: string | null; hasMore: boolean } | null> {
+  await ensureThreadsPostsCacheTable(env);
+  await ensureThreadsPostsCacheStateTable(env);
+
+  const state = await env.DB.prepare(
+    `SELECT threads_user_id, next_cursor, has_more, last_refreshed_at
+     FROM threads_posts_cache_state
+     WHERE threads_user_id = ?
+       AND datetime(last_refreshed_at) >= datetime('now', '-${THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS} hours')
+     LIMIT 1`,
+  )
+    .bind(threadsUserId)
+    .first<ThreadsPostsCacheStateRow>();
+
+  if (!state) {
+    return null;
+  }
+
+  const postsResult = await env.DB.prepare(
+    `SELECT
+       post_id,
+       post_text,
+       post_timestamp,
+       post_permalink,
+       post_username,
+      profile_picture_url,
+      views,
+      likes,
+      replies,
+      reposts,
+      quotes,
+      shares,
+      engagement_total
+     FROM threads_post_insights_cache
+     WHERE threads_user_id = ?
+       AND datetime(last_refreshed_at) >= datetime('now', '-${THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS} hours')
+     ORDER BY sort_order ASC`,
+  )
+    .bind(threadsUserId)
+    .all<{
+      post_id: string;
+      post_text: string | null;
+      post_timestamp: string | null;
+      post_permalink: string | null;
+      post_username: string | null;
+      profile_picture_url: string | null;
+      views: number | string | null;
+      likes: number | string | null;
+      replies: number | string | null;
+      reposts: number | string | null;
+      quotes: number | string | null;
+      shares: number | string | null;
+      engagement_total: number | string | null;
+    }>();
+
+  const posts = (postsResult.results ?? []).map((row) => ({
+    id: row.post_id,
+    text: row.post_text,
+    timestamp: row.post_timestamp,
+    permalink: row.post_permalink,
+    username: row.post_username,
+    profile_picture_url: row.profile_picture_url,
+    views: Number(row.views ?? 0),
+    likes: Number(row.likes ?? 0),
+    replies: Number(row.replies ?? 0),
+    reposts: Number(row.reposts ?? 0),
+    quotes: Number(row.quotes ?? 0),
+    shares: Number(row.shares ?? 0),
+    engagement_total: Number(row.engagement_total ?? 0),
+  }));
+
+  return {
+    posts,
+    nextCursor: state.next_cursor ?? null,
+    hasMore: state.has_more === 1,
+  };
+}
+
+async function getThreadsPostsCache(
+  env: Env,
+  threadsUserId: string,
+  options: { allowStale?: boolean } = {},
+): Promise<{ posts: CachedThreadsPost[]; nextCursor: string | null; hasMore: boolean } | null> {
+  await ensureThreadsPostsCacheTable(env);
+  await ensureThreadsPostsCacheStateTable(env);
+
+  const freshnessClause = options.allowStale
+    ? ""
+    : `AND datetime(last_refreshed_at) >= datetime('now', '-${THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS} hours')`;
+
+  const state = await env.DB.prepare(
+    `SELECT threads_user_id, next_cursor, has_more, last_refreshed_at
+     FROM threads_posts_cache_state
+     WHERE threads_user_id = ?
+       ${freshnessClause}
+     ORDER BY datetime(last_refreshed_at) DESC
+     LIMIT 1`,
+  )
+    .bind(threadsUserId)
+    .first<ThreadsPostsCacheStateRow>();
+
+  if (!state) {
+    return null;
+  }
+
+  const postsResult = await env.DB.prepare(
+    `SELECT
+       post_id,
+       post_text,
+       post_timestamp,
+       post_permalink,
+       post_username,
+       profile_picture_url,
+       views,
+       likes,
+       replies,
+       reposts,
+       quotes,
+       shares,
+       engagement_total
+     FROM threads_post_insights_cache
+     WHERE threads_user_id = ?
+       ${freshnessClause}
+     ORDER BY sort_order ASC`,
+  )
+    .bind(threadsUserId)
+    .all<{
+      post_id: string;
+      post_text: string | null;
+      post_timestamp: string | null;
+      post_permalink: string | null;
+      post_username: string | null;
+      profile_picture_url: string | null;
+      views: number | string | null;
+      likes: number | string | null;
+      replies: number | string | null;
+      reposts: number | string | null;
+      quotes: number | string | null;
+      shares: number | string | null;
+      engagement_total: number | string | null;
+    }>();
+
+  const posts = (postsResult.results ?? []).map((row) => ({
+    id: row.post_id,
+    text: row.post_text,
+    timestamp: row.post_timestamp,
+    permalink: row.post_permalink,
+    username: row.post_username,
+    profile_picture_url: row.profile_picture_url,
+    views: Number(row.views ?? 0),
+    likes: Number(row.likes ?? 0),
+    replies: Number(row.replies ?? 0),
+    reposts: Number(row.reposts ?? 0),
+    quotes: Number(row.quotes ?? 0),
+    shares: Number(row.shares ?? 0),
+    engagement_total: Number(row.engagement_total ?? 0),
+  }));
+
+  return {
+    posts,
+    nextCursor: state.next_cursor ?? null,
+    hasMore: state.has_more === 1,
+  };
+}
+
+async function listArchivedThreadsPosts(
+  env: Env,
+  threadsUserId: string,
+  order: "recent" | "top",
+  limit: number,
+  offset: number,
+): Promise<{ posts: CachedThreadsPost[]; totalCount: number }> {
+  await ensureThreadsPostsArchiveTable(env);
+
+  const orderClause = order === "top"
+    ? "engagement_total DESC, likes DESC, views DESC, post_timestamp DESC"
+    : "post_timestamp DESC, engagement_total DESC, last_synced_at DESC";
+
+  const postsResult = await env.DB.prepare(
+    `SELECT
+       threads_user_id,
+       post_id,
+       post_text,
+       post_timestamp,
+       post_permalink,
+       post_username,
+       profile_picture_url,
+       views,
+       likes,
+       replies,
+       reposts,
+       quotes,
+       shares,
+       engagement_total,
+       source_rank,
+       first_seen_at,
+       last_seen_at,
+       last_synced_at
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?
+     ORDER BY ${orderClause}
+     LIMIT ?
+     OFFSET ?`,
+  )
+    .bind(threadsUserId, limit, offset)
+    .all<ThreadsPostsArchiveRow>();
+
+  const countRow = await env.DB.prepare(
+    `SELECT COUNT(*) AS total_count
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?`,
+  )
+    .bind(threadsUserId)
+    .first<{ total_count: number | string }>();
+
+  return {
+    posts: (postsResult.results ?? []).map((row) => ({
+      id: row.post_id,
+      text: row.post_text,
+      timestamp: row.post_timestamp,
+      permalink: row.post_permalink,
+      username: row.post_username,
+      profile_picture_url: row.profile_picture_url,
+      views: Number(row.views ?? 0),
+      likes: Number(row.likes ?? 0),
+      replies: Number(row.replies ?? 0),
+      reposts: Number(row.reposts ?? 0),
+      quotes: Number(row.quotes ?? 0),
+      shares: Number(row.shares ?? 0),
+      engagement_total: Number(row.engagement_total ?? 0),
+    })),
+    totalCount: Number(countRow?.total_count ?? 0),
+  };
+}
+
+async function deleteScheduledPostForAppUser(
+  env: Env,
+  appUserId: string,
+  scheduledPostId: number,
+): Promise<"deleted" | "not_found" | "not_deletable"> {
+  await ensureScheduledPostsTable(env);
+
+  const existing = await env.DB.prepare(
+    `SELECT id, status
+     FROM scheduled_posts
+     WHERE id = ?
+       AND user_id = ?
+     LIMIT 1`,
+  )
+    .bind(scheduledPostId, appUserId)
+    .first<{ id: number | string; status: string }>();
+
+  if (!existing) {
+    return "not_found";
+  }
+
+  if (existing.status !== SCHEDULED_POST_STATUS_APPROVED) {
+    return "not_deletable";
+  }
+
+  await env.DB.prepare(
+    `DELETE FROM scheduled_posts
+     WHERE id = ?
+       AND user_id = ?
+       AND status = ?`,
+  )
+    .bind(scheduledPostId, appUserId, SCHEDULED_POST_STATUS_APPROVED)
+    .run();
+
+  return "deleted";
+}
+
+async function listScheduledPostsForThreadsAccountOnLocalDate(
+  env: Env,
+  threadsUserId: string,
+  date: string,
+  timeZone: string,
+): Promise<Array<{
+  id: number;
+  post_text: string;
+  status: string;
+  scheduled_time_utc: string;
+  scheduled_time_local: string;
+  local_time: string;
+}>> {
+  const startUtc = convertLocalDateTimeToUtcIso(date, "00:00", timeZone);
+  const nextDate = addDaysToIsoDate(date, 1);
+  const endUtcExclusive = nextDate ? convertLocalDateTimeToUtcIso(nextDate, "00:00", timeZone) : null;
+  if (!startUtc || !endUtcExclusive) {
+    return [];
+  }
+
+  await ensureScheduledPostsTable(env);
+  const rows = await env.DB.prepare(
+    `SELECT id, post_text, status, scheduled_time
+     FROM scheduled_posts
+     WHERE threads_user_id = ?
+       AND scheduled_time >= ?
+       AND scheduled_time < ?
+       AND status IN (?, ?)
+     ORDER BY scheduled_time ASC, id ASC`,
+  )
+    .bind(
+      threadsUserId,
+      startUtc,
+      endUtcExclusive,
+      SCHEDULED_POST_STATUS_APPROVED,
+      SCHEDULED_POST_STATUS_POSTING,
+    )
+    .all<{
+      id: number | string;
+      post_text: string;
+      status: string;
+      scheduled_time: string;
+    }>();
+
+  return (rows.results ?? []).map((row) => {
+    const utcMs = Date.parse(row.scheduled_time);
+    const parts = Number.isFinite(utcMs) ? getPartsInTimeZone(utcMs, timeZone) : null;
+    const localTime = parts
+      ? `${parts.hour.toString().padStart(2, "0")}:${parts.minute.toString().padStart(2, "0")}`
+      : "";
+
+    return {
+      id: Number(row.id),
+      post_text: row.post_text,
+      status: row.status,
+      scheduled_time_utc: row.scheduled_time,
+      scheduled_time_local: parts
+        ? `${formatIsoDateParts(parts.year, parts.month, parts.day)} ${localTime}`
+        : row.scheduled_time,
+      local_time: localTime,
+    };
+  });
+}
+
+async function createScheduledPostForAppUser(
+  env: Env,
+  appUserId: string,
+  threadsUserId: string,
+  text: string,
+  date: string,
+  time: string,
+  timeZone: string,
+): Promise<{
+  success: boolean;
+  scheduledPostId?: number;
+  scheduledTimeUtc?: string;
+  reused?: boolean;
+  error?: string;
+}> {
+  const trimmedText = text.trim();
+  if (!trimmedText || !threadsUserId || !date || !time) {
+    return { success: false, error: "missing_required_fields" };
+  }
+
+  const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timeZone);
+  if (!scheduledUtc) {
+    return { success: false, error: "invalid_date_time" };
+  }
+  if (isPastUtcTimestamp(scheduledUtc)) {
+    return { success: false, error: "scheduled_time_in_past" };
+  }
+
+  await ensureWorkspaceUserRecord(env, {
+    id: appUserId,
+    email: "workspace@lensically.local",
+    timezone: timeZone,
+    clock_format: "12h",
+  });
+
+  await ensureScheduledPostsTable(env);
+  const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
+    appUserId,
+    threadsUserId,
+    scheduledUtc,
+    trimmedText,
+  );
+
+  const existingScheduledPost = await env.DB.prepare(
+    `SELECT id, status, scheduled_time
+     FROM scheduled_posts
+     WHERE idempotency_key = ?
+     LIMIT 1`,
+  )
+    .bind(scheduleIdempotencyKey)
+    .first<{ id: number | string; status: string; scheduled_time: string }>();
+
+  if (existingScheduledPost) {
+    return {
+      success: true,
+      scheduledPostId: Number(existingScheduledPost.id),
+      scheduledTimeUtc: existingScheduledPost.scheduled_time,
+      reused: true,
+    };
+  }
+
+  try {
+    const insert = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (
+        user_id,
+        threads_user_id,
+        post_text,
+        status,
+        scheduled_time,
+        idempotency_key
+      )
+      VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        appUserId,
+        threadsUserId,
+        trimmedText,
+        SCHEDULED_POST_STATUS_APPROVED,
+        scheduledUtc,
+        scheduleIdempotencyKey,
+      )
+      .run();
+
+    return {
+      success: true,
+      scheduledPostId: Number(insert.meta?.last_row_id ?? 0),
+      scheduledTimeUtc: scheduledUtc,
+      reused: false,
+    };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const racedScheduledPost = await env.DB.prepare(
+      `SELECT id, status, scheduled_time
+       FROM scheduled_posts
+       WHERE idempotency_key = ?
+       LIMIT 1`,
+    )
+      .bind(scheduleIdempotencyKey)
+      .first<{ id: number | string; status: string; scheduled_time: string }>();
+
+    if (!racedScheduledPost) {
+      throw error;
+    }
+
+    return {
+      success: true,
+      scheduledPostId: Number(racedScheduledPost.id),
+      scheduledTimeUtc: racedScheduledPost.scheduled_time,
+      reused: true,
+    };
+  }
+}
+
+function getThreadsMetricValue(
+  metric: {
+    values?: Array<{ value?: number }>;
+    total_value?: { value?: number };
+    link_total_values?: Array<{ value?: number }>;
+  },
+): number {
+  const value =
+    metric.values?.[0]?.value ??
+    metric.total_value?.value ??
+    metric.link_total_values?.[0]?.value ??
+    0;
+  return Number(value ?? 0);
+}
+
+function buildThreadsMetricMap(
+  metrics: Array<{
+    name?: string;
+    values?: Array<{ value?: number }>;
+    total_value?: { value?: number };
+    link_total_values?: Array<{ value?: number }>;
+  }> | undefined,
+): ThreadsMetricMap {
+  const defaults: ThreadsMetricMap = {
+    views: 0,
+    likes: 0,
+    replies: 0,
+    reposts: 0,
+    quotes: 0,
+    shares: 0,
+    clicks: 0,
+    followers_count: 0,
+  };
+
+  for (const metric of metrics ?? []) {
+    const name = metric?.name;
+    if (!name || !(name in defaults)) {
+      continue;
+    }
+    defaults[name as ThreadsInsightsMetricName] = getThreadsMetricValue(metric);
+  }
+
+  return defaults;
+}
+
+function formatIsoDateParts(year: number, month: number, day: number): string {
+  return `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+}
+
+function getLocalDateInTimeZone(timeZone: string, timestampMs = Date.now()): string | null {
+  const parts = getPartsInTimeZone(timestampMs, timeZone);
+  if (!parts) {
+    return null;
+  }
+
+  return formatIsoDateParts(parts.year, parts.month, parts.day);
+}
+
+function addDaysToIsoDate(date: string, days: number): string | null {
+  if (!isValidIsoDate(date) || !Number.isInteger(days)) {
+    return null;
+  }
+
+  const [yearRaw, monthRaw, dayRaw] = date.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return formatIsoDateParts(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth() + 1,
+    shifted.getUTCDate(),
+  );
+}
+
+function buildHourlySlotTimes(startHour: number, endHour: number): string[] {
+  const slots: string[] = [];
+  for (let hour = startHour; hour <= endHour; hour += 1) {
+    slots.push(`${hour.toString().padStart(2, "0")}:00`);
+  }
+  return slots;
+}
+
+function buildDefaultTomorrowSlotPlan(
+  timeZone: string,
+  timestampMs = Date.now(),
+): { date: string; slots: string[] } | null {
+  const today = getLocalDateInTimeZone(timeZone, timestampMs);
+  if (!today) {
+    return null;
+  }
+
+  const tomorrow = addDaysToIsoDate(today, 1);
+  if (!tomorrow) {
+    return null;
+  }
+
+  return {
+    date: tomorrow,
+    slots: buildHourlySlotTimes(7, 23),
+  };
+}
+
+async function fetchThreadsProfileByAccessToken(
+  accessToken: string,
+): Promise<{
+  threads_user_id: string | null;
+  username: string | null;
+  name: string | null;
+  threads_biography: string | null;
+  is_verified: boolean;
+  threads_profile_picture_url: string | null;
+} | null> {
+  try {
+    const response = await fetch(
+      "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await readJsonSafe(response);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return null;
+    }
+
+    const data = payload as {
+      id?: unknown;
+      username?: unknown;
+      name?: unknown;
+      threads_biography?: unknown;
+      is_verified?: unknown;
+      threads_profile_picture_url?: unknown;
+    };
+
+    return {
+      threads_user_id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : null,
+      username: typeof data.username === "string" && data.username.trim() ? data.username.trim() : null,
+      name: typeof data.name === "string" && data.name.trim() ? data.name.trim() : null,
+      threads_biography: typeof data.threads_biography === "string" ? data.threads_biography : null,
+      is_verified: data.is_verified === true,
+      threads_profile_picture_url: typeof data.threads_profile_picture_url === "string"
+        ? data.threads_profile_picture_url
+        : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchThreadsUserInsightsByAccount(
+  accessToken: string,
+  threadsUserId: string,
+): Promise<unknown | null> {
+  const params = new URLSearchParams({
+    metric: "views,likes,replies,reposts,quotes,clicks,followers_count",
+  });
+
+  const response = await fetch(
+    `https://graph.threads.net/v1.0/${threadsUserId}/threads_insights?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return readJsonSafe(response);
+}
+
+async function fetchThreadsPostsPageWithInsights(
+  accessToken: string,
+  threadsUserId: string,
+  cursor: string | null,
+): Promise<{
+  posts: CachedThreadsPost[];
+  nextCursor: string | null;
+  hasMore: boolean;
+} | null> {
+  try {
+    const params = new URLSearchParams({
+      fields: "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply",
+      limit: "40",
+    });
+
+    if (cursor) {
+      params.set("after", cursor);
+    }
+
+    const response = await fetch(
+      `https://graph.threads.net/v1.0/${threadsUserId}/threads?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await readJsonSafe(response);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return null;
+    }
+
+    const data = payload as {
+      data?: Array<{
+        id?: string;
+        text?: string;
+        timestamp?: string;
+        permalink?: string;
+        username?: string;
+      }>;
+      paging?: {
+        next?: string;
+        cursors?: {
+          after?: string;
+        };
+      };
+    };
+
+    const profile = await fetchThreadsProfileByAccessToken(accessToken);
+    const profilePicture = profile?.threads_profile_picture_url ?? null;
+    const posts = Array.isArray(data.data) ? data.data : [];
+    const enrichedPosts: CachedThreadsPost[] = [];
+    const batchSize = 10;
+
+    for (let index = 0; index < posts.length; index += batchSize) {
+      const batch = posts.slice(index, index + batchSize);
+      const results = await Promise.all(
+        batch.map(async (post) => {
+          const postId = typeof post.id === "string" ? post.id.trim() : "";
+          const basePost: CachedThreadsPost = {
+            id: postId,
+            text: typeof post.text === "string" ? post.text : null,
+            timestamp: typeof post.timestamp === "string" ? post.timestamp : null,
+            permalink: typeof post.permalink === "string" ? post.permalink : null,
+            username: typeof post.username === "string" ? post.username : null,
+            profile_picture_url: profilePicture,
+            views: 0,
+            likes: 0,
+            replies: 0,
+            reposts: 0,
+            quotes: 0,
+            shares: 0,
+            engagement_total: 0,
+          };
+
+          if (!postId) {
+            return basePost;
+          }
+
+          try {
+            const metricsResponse = await fetch(
+              `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(accessToken)}`,
+            );
+
+            if (!metricsResponse.ok) {
+              return basePost;
+            }
+
+            const metricsPayload = await readJsonSafe(metricsResponse);
+            if (!metricsPayload || typeof metricsPayload !== "object" || Array.isArray(metricsPayload)) {
+              return basePost;
+            }
+
+            const metricsJson = metricsPayload as {
+              data?: Array<{
+                name?: string;
+                values?: Array<{ value?: number }>;
+                total_value?: { value?: number };
+                link_total_values?: Array<{ value?: number }>;
+              }>;
+            };
+            const metricMap = buildThreadsMetricMap(metricsJson.data);
+
+            return {
+              ...basePost,
+              views: metricMap.views,
+              likes: metricMap.likes,
+              replies: metricMap.replies,
+              reposts: metricMap.reposts,
+              quotes: metricMap.quotes,
+              shares: metricMap.shares,
+              engagement_total:
+                metricMap.likes +
+                metricMap.replies +
+                metricMap.reposts +
+                metricMap.quotes +
+                metricMap.shares,
+            };
+          } catch {
+            return basePost;
+          }
+        }),
+      );
+
+      enrichedPosts.push(...results);
+    }
+
+    return {
+      posts: enrichedPosts,
+      nextCursor: data.paging?.cursors?.after ?? null,
+      hasMore: Boolean(data.paging?.next),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: THREADS_INSIGHTS_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(timestampMs));
+
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "-1");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "-1");
+
+  return hour === THREADS_INSIGHTS_TARGET_HOUR && minute === THREADS_INSIGHTS_TARGET_MINUTE;
+}
+
+async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
+  const accounts = getConfiguredThreadsAccounts(env);
+
+  for (const configuredAccount of accounts) {
+    try {
+      const profile = await fetchThreadsProfileByAccessToken(configuredAccount.accessToken);
+      const threadsUserId = profile?.threads_user_id;
+
+      if (!threadsUserId) {
+        logWorkerEvent("THREADS_DAILY_INSIGHTS_PROFILE_SKIPPED", {
+          configured_account_id: configuredAccount.id,
+          configured_username: configuredAccount.username,
+        }, "error");
+        continue;
+      }
+
+      await upsertThreadsProfileCache(env, {
+        threads_user_id: threadsUserId,
+        username: profile?.username ?? configuredAccount.username,
+        name: profile?.name ?? configuredAccount.label,
+        threads_biography: profile?.threads_biography ?? null,
+        is_verified: profile?.is_verified ?? false,
+        threads_profile_picture_url: profile?.threads_profile_picture_url ?? null,
+      });
+
+      const userInsights = await fetchThreadsUserInsightsByAccount(configuredAccount.accessToken, threadsUserId);
+      if (userInsights !== null) {
+        await upsertThreadsUserInsightsCache(env, {
+          threads_user_id: threadsUserId,
+          insights_json: JSON.stringify(userInsights),
+        });
+      }
+
+      const postsPage = await fetchThreadsPostsPageWithInsights(
+        configuredAccount.accessToken,
+        threadsUserId,
+        null,
+      );
+
+      if (postsPage) {
+        await upsertThreadsPostsArchive(env, threadsUserId, postsPage.posts);
+        await replaceThreadsPostsCache(env, threadsUserId, postsPage.posts, {
+          threads_user_id: threadsUserId,
+          next_cursor: postsPage.nextCursor,
+          has_more: postsPage.hasMore,
+        });
+      }
+
+      logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_SUCCEEDED", {
+        configured_account_id: configuredAccount.id,
+        configured_username: configuredAccount.username,
+        threads_user_id: threadsUserId,
+        posts_count: postsPage?.posts.length ?? 0,
+        user_insights_cached: userInsights !== null,
+      });
+    } catch (error) {
+      logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_FAILED", {
+        configured_account_id: configuredAccount.id,
+        configured_username: configuredAccount.username,
+        error: getErrorMessage(error),
+      }, "error");
+    }
+  }
+}
+
+async function restoreTombstonedThreadsConnectionForAppUser(
+  env: Env,
+  appUserId: string,
+  threadsUserId: string,
+): Promise<boolean> {
+  await ensureAppThreadsTable(env);
+
+  const restored = await env.DB.prepare(
+    `UPDATE app_threads_accounts
+     SET connection_active = 1,
+         is_active = 0,
+         tombstone_expires_at = NULL
+     WHERE app_user_id = ?
+       AND threads_user_id = ?
+       AND COALESCE(connection_active, is_active, 1) = 0
+       AND tombstone_expires_at IS NOT NULL
+       AND datetime(tombstone_expires_at) >= datetime('now')
+     RETURNING app_user_id`,
+  )
+    .bind(appUserId, threadsUserId)
+    .first<{ app_user_id: string }>();
+
+  if (restored?.app_user_id) {
+    await env.DB.prepare(
+      `UPDATE app_threads_accounts
+       SET is_active = CASE
+         WHEN threads_user_id = ? AND COALESCE(connection_active, is_active, 1) = 1 THEN 1
+         ELSE 0
+       END
+       WHERE app_user_id = ?`,
+    )
+      .bind(threadsUserId, appUserId)
+      .run();
+  }
+
+  return Boolean(restored?.app_user_id);
 }
 
 function decodeBase64Url(value: string): string {
@@ -2053,24 +4448,78 @@ async function processMetaDeletionRequest(
 async function removeThreadsLinkageForPlatformUser(
   db: D1DatabaseSession | D1Database,
   platformUserId: string,
-): Promise<void> {
-  await db.prepare(
-    `DELETE FROM app_threads_accounts
-     WHERE threads_user_id = ?`,
+): Promise<string | null> {
+  const tombstoneExpiresAt = getThreadsConnectionTombstoneExpiresAt();
+
+  const affectedRows = await db.prepare(
+    `SELECT a.app_user_id, COALESCE(u.is_admin, 0) AS is_admin
+     FROM app_threads_accounts a
+     LEFT JOIN users u
+       ON u.id = a.app_user_id
+     WHERE threads_user_id = ?
+       AND COALESCE(a.connection_active, a.is_active, 1) = 1`,
   )
     .bind(platformUserId)
-    .run();
+    .all<{ app_user_id: string; is_admin: number }>();
 
   await db.prepare(
-    `DELETE FROM threads_accounts
+    `UPDATE app_threads_accounts
+     SET connection_active = 0,
+         is_active = 0,
+         tombstone_expires_at = CASE
+           WHEN EXISTS (
+             SELECT 1
+             FROM users
+             WHERE users.id = app_threads_accounts.app_user_id
+               AND users.is_admin = 1
+           ) THEN NULL
+           ELSE ?
+         END
      WHERE threads_user_id = ?`,
   )
-    .bind(platformUserId)
+    .bind(tombstoneExpiresAt, platformUserId)
     .run();
+
+  const affectedAppUserIds = [...new Set((affectedRows.results ?? [])
+    .map((row) => row.app_user_id?.trim())
+    .filter((value): value is string => Boolean(value)))];
+
+  const hasNonAdminAffectedRows = (affectedRows.results ?? []).some((row) => Number(row.is_admin ?? 0) !== 1);
+
+  for (const appUserId of affectedAppUserIds) {
+    const fallbackRow = await db.prepare(
+      `SELECT threads_user_id
+       FROM app_threads_accounts
+       WHERE app_user_id = ?
+         AND COALESCE(connection_active, is_active, 1) = 1
+       ORDER BY created_at DESC, threads_user_id ASC
+       LIMIT 1`,
+    )
+      .bind(appUserId)
+      .first<{ threads_user_id: string }>();
+
+    if (!fallbackRow?.threads_user_id) {
+      continue;
+    }
+
+    await db.prepare(
+      `UPDATE app_threads_accounts
+       SET is_active = CASE
+         WHEN threads_user_id = ? AND COALESCE(connection_active, is_active, 1) = 1 THEN 1
+         ELSE 0
+       END
+       WHERE app_user_id = ?`,
+    )
+      .bind(fallbackRow.threads_user_id, appUserId)
+      .run();
+  }
+
+  return hasNonAdminAffectedRows ? tombstoneExpiresAt : null;
 }
 
 async function processThreadsUninstallRequest(env: Env, platformUserId: string): Promise<void> {
   await ensureAppThreadsTable(env);
+  await ensureThreadsProfileCacheTable(env);
 
   const dbSession = env.DB.withSession("first-primary");
   let transactionStarted = false;
@@ -2079,7 +4528,12 @@ async function processThreadsUninstallRequest(env: Env, platformUserId: string):
     await dbSession.prepare("BEGIN TRANSACTION").run();
     transactionStarted = true;
 
-    await removeThreadsLinkageForPlatformUser(dbSession, platformUserId);
+    const tombstoneExpiresAt = await removeThreadsLinkageForPlatformUser(dbSession, platformUserId);
+    logWorkerEvent(tombstoneExpiresAt ? "THREADS_CONNECTION_TOMBSTONE_CREATED" : "THREADS_CONNECTION_TOMBSTONE_SKIPPED", {
+      source: "threads_uninstall_callback",
+      platform_user_id: platformUserId,
+      tombstone_expires_at: tombstoneExpiresAt,
+    });
 
     await dbSession.prepare("COMMIT").run();
     transactionStarted = false;
@@ -2122,55 +4576,154 @@ async function getThreadsAccountForAppUserWithRetry(
 async function disconnectThreadsAccountForAppUser(
   env: Env,
   appUserId: string,
-): Promise<{ disconnected: boolean; threadsUserId: string | null }> {
+  targetThreadsUserId: string | null = null,
+  options: { disableTombstone?: boolean } = {},
+): Promise<{ disconnected: boolean; threadsUserId: string | null; tombstoneExpiresAt: string | null }> {
+  await ensureAppThreadsTable(env);
+  await ensureThreadsProfileCacheTable(env);
+
+  const existingLink = await env.DB.prepare(
+    `SELECT threads_user_id
+     FROM app_threads_accounts
+     WHERE app_user_id = ?
+       AND (? IS NULL OR threads_user_id = ?)
+       AND COALESCE(connection_active, is_active, 1) = 1
+     ORDER BY COALESCE(is_active, 1) DESC, created_at DESC
+     LIMIT 1`,
+  )
+    .bind(appUserId, targetThreadsUserId, targetThreadsUserId)
+    .first<{ threads_user_id: string }>();
+
+  if (!existingLink?.threads_user_id) {
+    return { disconnected: false, threadsUserId: null, tombstoneExpiresAt: null };
+  }
+
+  const threadsUserId = existingLink.threads_user_id;
+  const tombstoneExpiresAt = getThreadsConnectionTombstoneExpiresAt();
+  const disableTombstone = options.disableTombstone === true;
+
+  if (!targetThreadsUserId) {
+    await env.DB.prepare(
+      `UPDATE app_threads_accounts
+       SET connection_active = 0,
+           is_active = 0,
+           tombstone_expires_at = ?
+       WHERE app_user_id = ?
+         AND COALESCE(connection_active, is_active, 1) = 1`,
+    )
+      .bind(disableTombstone ? null : tombstoneExpiresAt, appUserId)
+      .run();
+
+    return { disconnected: true, threadsUserId, tombstoneExpiresAt: disableTombstone ? null : tombstoneExpiresAt };
+  }
+
+  await env.DB.prepare(
+    `UPDATE app_threads_accounts
+     SET connection_active = 0,
+         is_active = 0,
+         tombstone_expires_at = ?
+     WHERE app_user_id = ?
+       AND threads_user_id = ?`,
+  )
+    .bind(disableTombstone ? null : tombstoneExpiresAt, appUserId, threadsUserId)
+    .run();
+
+  const fallbackRow = await env.DB.prepare(
+    `SELECT threads_user_id
+     FROM app_threads_accounts
+     WHERE app_user_id = ?
+       AND COALESCE(connection_active, is_active, 1) = 1
+     ORDER BY created_at DESC, threads_user_id ASC
+     LIMIT 1`,
+  )
+    .bind(appUserId)
+    .first<{ threads_user_id: string }>();
+
+  if (fallbackRow?.threads_user_id) {
+    await env.DB.prepare(
+      `UPDATE app_threads_accounts
+       SET is_active = CASE
+         WHEN threads_user_id = ? AND COALESCE(connection_active, is_active, 1) = 1 THEN 1
+         ELSE 0
+       END
+       WHERE app_user_id = ?`,
+    )
+      .bind(fallbackRow.threads_user_id, appUserId)
+      .run();
+  }
+
+  return { disconnected: true, threadsUserId, tombstoneExpiresAt: disableTombstone ? null : tombstoneExpiresAt };
+}
+
+async function setActiveThreadsAccountForAppUser(
+  env: Env,
+  appUserId: string,
+  threadsUserId: string,
+): Promise<boolean> {
   await ensureAppThreadsTable(env);
 
   const existingLink = await env.DB.prepare(
     `SELECT threads_user_id
      FROM app_threads_accounts
      WHERE app_user_id = ?
+       AND threads_user_id = ?
+       AND COALESCE(connection_active, is_active, 1) = 1
      LIMIT 1`,
   )
-    .bind(appUserId)
+    .bind(appUserId, threadsUserId)
     .first<{ threads_user_id: string }>();
 
   if (!existingLink?.threads_user_id) {
-    return { disconnected: false, threadsUserId: null };
+    return false;
   }
 
-  const threadsUserId = existingLink.threads_user_id;
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
 
-  await env.DB.prepare(
-    `DELETE FROM app_threads_accounts
-     WHERE app_user_id = ?`,
-  )
-    .bind(appUserId)
-    .run();
-
-  const remainingLinks = await env.DB.prepare(
-    `SELECT COUNT(*) AS total
-     FROM app_threads_accounts
-     WHERE threads_user_id = ?`,
-  )
-    .bind(threadsUserId)
-    .first<{ total: number | string }>();
-
-  if (Number(remainingLinks?.total ?? 0) === 0) {
-    await env.DB.prepare(
-      `DELETE FROM threads_accounts
-       WHERE threads_user_id = ?`,
+    await dbSession.prepare(
+      `UPDATE app_threads_accounts
+       SET is_active = 0
+       WHERE app_user_id = ?`,
     )
-      .bind(threadsUserId)
+      .bind(appUserId)
       .run();
+
+    await dbSession.prepare(
+      `UPDATE app_threads_accounts
+       SET is_active = 1
+       WHERE app_user_id = ?
+         AND threads_user_id = ?
+         AND COALESCE(connection_active, is_active, 1) = 1`,
+    )
+      .bind(appUserId, threadsUserId)
+      .run();
+
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      await dbSession.prepare("ROLLBACK").run();
+    }
+    throw error;
   }
 
-  return { disconnected: true, threadsUserId };
+  return true;
 }
 
 async function checkUserCapacity(
   env: Env,
   threadsUserId: string,
+  options: { bypassCapacityLimit?: boolean } = {},
 ): Promise<Response | null> {
+  if (options.bypassCapacityLimit) {
+    return null;
+  }
+
+  await ensureAppThreadsTable(env);
+
   const existing = await env.DB.prepare(
     "SELECT threads_user_id FROM threads_accounts WHERE threads_user_id = ? LIMIT 1",
   )
@@ -2182,7 +4735,9 @@ async function checkUserCapacity(
   }
 
   const users = await env.DB.prepare(
-    "SELECT COUNT(*) AS total FROM threads_accounts",
+    `SELECT COUNT(DISTINCT threads_user_id) AS total
+     FROM app_threads_accounts
+     WHERE COALESCE(connection_active, is_active, 1) = 1`,
   ).first<{ total: number | string }>();
 
   if (Number(users?.total ?? 0) >= 500) {
@@ -2429,6 +4984,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             ...extra,
           }, "error");
         };
+        const oauthProviderError = url.searchParams.get("error")?.trim().toLowerCase() ?? "";
 
         logEvent("GOOGLE_OAUTH_CALLBACK_RECEIVED", {
           hasCode: Boolean(code),
@@ -2436,22 +4992,27 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           hasStateCookie: Boolean(cookieState),
         });
 
-        try {
-          logEvent("GOOGLE_OAUTH_STATE_VALIDATION_STARTED");
-          if (!code) {
-            throw new Error("missing_code");
-          }
-          if (!state || !cookieState) {
-            throw new Error("missing_state_or_cookie_state");
-          }
-          if (state !== cookieState) {
-            throw new Error("state_mismatch");
-          }
-          logEvent("GOOGLE_OAUTH_STATE_VALIDATION_SUCCEEDED");
-        } catch (error) {
-          logError("GOOGLE_OAUTH_STATE_VALIDATION_FAILED", error);
-          return redirectToAuthError("unexpected");
+        logEvent("GOOGLE_OAUTH_STATE_VALIDATION_STARTED");
+        if (oauthProviderError === "access_denied" || !code) {
+          logEvent("GOOGLE_OAUTH_CALLBACK_REJECTED", {
+            reason_code: "access_denied",
+            oauth_error: oauthProviderError || null,
+          });
+          return redirectToAuthError("access_denied");
         }
+        if (!state || !cookieState) {
+          logEvent("GOOGLE_OAUTH_CALLBACK_REJECTED", {
+            reason_code: "state_missing",
+          });
+          return redirectToAuthError("state_missing");
+        }
+        if (state !== cookieState) {
+          logEvent("GOOGLE_OAUTH_CALLBACK_REJECTED", {
+            reason_code: "state_mismatch",
+          });
+          return redirectToAuthError("state_mismatch");
+        }
+        logEvent("GOOGLE_OAUTH_STATE_VALIDATION_SUCCEEDED");
 
         let accessToken = "";
         try {
@@ -2469,7 +5030,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           logEvent("GOOGLE_OAUTH_TOKEN_EXCHANGE_SUCCEEDED");
         } catch (error) {
           logError("GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", error);
-          return redirectToAuthError("unexpected");
+          return redirectToAuthError("token_exchange_failed");
         }
 
         let identity = null as OAuthIdentity | null;
@@ -2484,7 +5045,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           });
         } catch (error) {
           logError("GOOGLE_OAUTH_PROFILE_FETCH_FAILED", error);
-          return redirectToAuthError("unexpected");
+          return redirectToAuthError("account_lookup_failed");
         }
 
         let user = null as { id: string; email: string } | null;
@@ -2651,13 +5212,31 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return applyAuthCors(forbiddenJsonResponse(requestCorsHeaders));
       }
 
-      const state = buildOauthState(requestAppBase, effectiveAppUserId);
+      const modeParam = url.searchParams.get("mode")?.trim().toLowerCase() ?? "";
+      const connectionMode: "add" | null = modeParam === "add" ? "add" : null;
+      const expectedThreadsUsernameRaw = url.searchParams.get("expected_threads_username")?.trim().toLowerCase() ?? "";
+      const expectedThreadsUsername = /^[a-z0-9._]{1,30}$/.test(expectedThreadsUsernameRaw)
+        ? expectedThreadsUsernameRaw
+        : null;
+      const state = buildOauthState(
+        requestAppBase,
+        effectiveAppUserId,
+        connectionMode,
+        expectedThreadsUsername,
+      );
       const authURL = new URL("https://www.threads.net/oauth/authorize");
+      const forceFreshLogin = true;
       authURL.searchParams.set("client_id", env.THREADS_CLIENT_ID);
       authURL.searchParams.set("redirect_uri", buildWorkerCallbackUrl(env, "/api/auth/threads/callback"));
       authURL.searchParams.set("scope", THREADS_OAUTH_SCOPES);
       authURL.searchParams.set("response_type", "code");
       authURL.searchParams.set("state", state);
+      if (forceFreshLogin) {
+        // Ask the OAuth provider to show account re-auth/selection rather than silently reusing a cached session.
+        authURL.searchParams.set("auth_type", "reauthenticate");
+        authURL.searchParams.set("prompt", "select_account");
+        authURL.searchParams.set("force_reauth", "true");
+      }
 
       return applyAuthCors(new Response(null, {
         status: 302,
@@ -2677,14 +5256,26 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         stateContext?.appBaseUrl
         ?? getConfiguredAppBaseUrl(env);
       const appUserId = stateContext?.appUserId;
-      const redirectToConnectError = (error: string): Response =>
-        applyAuthCors(new Response(null, {
+      const modeQuerySuffix = stateContext?.connectionMode === "add" ? "&mode=add" : "";
+      const expectedUsernameQuerySuffix = stateContext?.expectedThreadsUsername
+        ? `&expected_threads_username=${encodeURIComponent(stateContext.expectedThreadsUsername)}`
+        : "";
+      const redirectToConnectError = (
+        error: string,
+        options: { returnedThreadsUsername?: string | null } = {},
+      ): Response => {
+        const returnedUsernameQuerySuffix = options.returnedThreadsUsername
+          ? `&returned_threads_username=${encodeURIComponent(options.returnedThreadsUsername)}`
+          : "";
+        return applyAuthCors(new Response(null, {
           status: 302,
           headers: {
-            Location: `${appBaseUrl}/connect?error=${error}`,
+            Location:
+              `${appBaseUrl}/connect?error=${error}${modeQuerySuffix}${expectedUsernameQuerySuffix}${returnedUsernameQuerySuffix}`,
             "Set-Cookie": clearOauthStateCookie(THREADS_OAUTH_STATE_COOKIE_NAME),
           },
         }));
+      };
       logWorkerEvent("THREADS_SESSION_RESOLUTION_STARTED", {
         provider: "threads",
         has_session_cookie: Boolean(getSessionCookieValue(request)),
@@ -2732,6 +5323,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         hasState: Boolean(state),
         hasStateCookie: Boolean(cookieState),
         hasAppUserId: Boolean(appUserId),
+        connectionMode: stateContext?.connectionMode ?? null,
+        expectedThreadsUsername: stateContext?.expectedThreadsUsername ?? null,
       });
 
       let resolvedAppUserId = "";
@@ -2749,7 +5342,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (!appUserId) {
           throw new Error("state_missing");
         }
-        if (authUser.id !== appUserId) {
+        if (!resolveAuthenticatedAppUserId(authUser.id, appUserId)) {
           throw new Error("state_user_mismatch");
         }
         if (!env.THREADS_CLIENT_ID || !env.THREADS_CLIENT_SECRET) {
@@ -2769,7 +5362,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         ) {
           return redirectToConnectError(errorCode);
         }
-        return redirectToConnectError("unexpected");
+        return redirectToConnectError("state_missing");
       }
 
       let accessToken = "";
@@ -2825,30 +5418,86 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (errorCode === "token_exchange_failed" || errorCode === "token_upgrade_failed") {
           return redirectToConnectError(errorCode);
         }
-        return redirectToConnectError("unexpected");
+        return redirectToConnectError("token_exchange_failed");
       }
 
       let threadsUserId = "";
+      let threadsProfileForCache: Omit<ThreadsProfileCachePayload, "threads_user_id"> | null = null;
       try {
         logEvent("THREADS_OAUTH_PROFILE_FETCH_STARTED");
-        const meResp = await fetch(
-          `https://graph.threads.net/me?fields=id&access_token=${accessToken}`,
-        );
-        if (!meResp.ok) {
-          throw new Error("account_lookup_failed");
-        }
+        const readThreadsProfile = async () => {
+          const primaryResponse = await fetch(
+            "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url",
+            {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            },
+          );
+          if (primaryResponse.ok) {
+            return await primaryResponse.json() as {
+              id?: string;
+              username?: string;
+              name?: string;
+              threads_biography?: string;
+              is_verified?: boolean;
+              threads_profile_picture_url?: string;
+            };
+          }
 
-        const meData = await meResp.json() as { id?: string };
+          const fallbackResponse = await fetch(
+            `https://graph.threads.net/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url&access_token=${encodeURIComponent(accessToken)}`,
+          );
+          if (!fallbackResponse.ok) {
+            throw new Error("account_lookup_failed");
+          }
+
+          return await fallbackResponse.json() as {
+            id?: string;
+            username?: string;
+            name?: string;
+            threads_biography?: string;
+            is_verified?: boolean;
+            threads_profile_picture_url?: string;
+          };
+        };
+
+        const meData = await readThreadsProfile();
         if (!meData.id) {
           throw new Error("account_lookup_failed");
         }
 
-        const userCapacityResponse = await checkUserCapacity(env, meData.id);
+        const userCapacityResponse = await checkUserCapacity(env, meData.id, {
+          bypassCapacityLimit: authUser.is_admin === true,
+        });
         if (userCapacityResponse) {
           throw new Error("account_lookup_failed");
         }
 
         threadsUserId = meData.id;
+        const returnedUsername = meData.username?.trim().toLowerCase() ?? "";
+        const expectedThreadsUsername = stateContext?.expectedThreadsUsername?.trim().toLowerCase() ?? "";
+        const isAddAnotherFlow = stateContext?.connectionMode === "add";
+        if (
+          isAddAnotherFlow
+          && expectedThreadsUsername
+          && returnedUsername
+          && returnedUsername !== expectedThreadsUsername
+        ) {
+          logEvent("THREADS_OAUTH_UNEXPECTED_ACCOUNT_SELECTED", {
+            app_user_id: resolvedAppUserId,
+            expected_threads_username: expectedThreadsUsername,
+            returned_threads_username: returnedUsername,
+          });
+          return redirectToConnectError("wrong_account_selected", {
+            returnedThreadsUsername: returnedUsername,
+          });
+        }
+        threadsProfileForCache = {
+          username: meData.username ?? null,
+          name: meData.name ?? null,
+          threads_biography: meData.threads_biography ?? null,
+          is_verified: meData.is_verified === true,
+          threads_profile_picture_url: meData.threads_profile_picture_url ?? null,
+        };
         logEvent("THREADS_OAUTH_PROFILE_FETCH_SUCCEEDED", {
           hasThreadsUserId: Boolean(threadsUserId),
         });
@@ -2858,13 +5507,39 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (errorCode === "account_lookup_failed") {
           return redirectToConnectError(errorCode);
         }
-        return redirectToConnectError("unexpected");
+        return redirectToConnectError("account_lookup_failed");
+      }
+
+      try {
+        const existingSameConnection = await env.DB.prepare(
+          `SELECT 1
+           FROM app_threads_accounts
+           WHERE app_user_id = ?
+             AND threads_user_id = ?
+             AND COALESCE(connection_active, is_active, 1) = 1
+           LIMIT 1`,
+        )
+          .bind(resolvedAppUserId, threadsUserId)
+          .first<{ "1": number }>();
+
+        const isAddAnotherFlow = stateContext?.connectionMode === "add";
+        if (isAddAnotherFlow && existingSameConnection) {
+          logEvent("THREADS_OAUTH_ACCOUNT_ALREADY_CONNECTED", {
+            app_user_id: resolvedAppUserId,
+            threads_user_id: threadsUserId,
+            reason_code: "same_account_selected_for_add_mode",
+          });
+          return redirectToConnectError("same_account_selected");
+        }
+      } catch (error) {
+        logError("THREADS_OAUTH_ACCOUNT_DUPLICATE_CHECK_FAILED", error);
       }
 
       try {
         logEvent("THREADS_OAUTH_ACCOUNT_SAVE_STARTED");
         const now = Math.floor(Date.now() / 1000);
         const expiresAt = now + expiresIn;
+        await ensureThreadsAccountsTable(env);
 
         await env.DB.prepare(
           `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
@@ -2876,23 +5551,100 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           .bind(threadsUserId, accessToken, expiresAt, now)
           .run();
 
-        await ensureAppThreadsTable(env);
-        await env.DB.prepare(
-          `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
-           VALUES (?, ?, ?)
-           ON CONFLICT(app_user_id) DO UPDATE SET
-             threads_user_id = excluded.threads_user_id`,
-        )
-          .bind(resolvedAppUserId, threadsUserId, now)
-          .run();
+        const restoredConnection = await restoreTombstonedThreadsConnectionForAppUser(
+          env,
+          resolvedAppUserId,
+          threadsUserId,
+        );
+        if (restoredConnection) {
+          logEvent("THREADS_CONNECTION_TOMBSTONE_RESTORED", {
+            source: "threads_oauth_reconnect",
+            app_user_id: resolvedAppUserId,
+            threads_user_id: threadsUserId,
+          });
+        }
+        if (!restoredConnection) {
+          await upsertAppThreadsAccountLink(env, resolvedAppUserId, threadsUserId, now);
+        }
+        await setActiveThreadsAccountForAppUser(env, resolvedAppUserId, threadsUserId);
         logEvent("THREADS_OAUTH_ACCOUNT_LINK_SAVED", {
           resolvedAppUserId,
           threadsUserId,
+          restoredConnection,
         });
+        if (threadsProfileForCache) {
+          try {
+            await upsertThreadsProfileCache(env, {
+              threads_user_id: threadsUserId,
+              ...threadsProfileForCache,
+            });
+            logEvent("THREADS_PROFILE_CACHE_REFRESHED", {
+              source: "threads_oauth_connect",
+              app_user_id: resolvedAppUserId,
+              threads_user_id: threadsUserId,
+            });
+          } catch (error) {
+            logError("THREADS_OAUTH_PROFILE_CACHE_SAVE_FAILED", error);
+          }
+        }
         logEvent("THREADS_OAUTH_ACCOUNT_SAVE_SUCCEEDED");
       } catch (error) {
         logError("THREADS_OAUTH_ACCOUNT_SAVE_FAILED", error);
-        return redirectToConnectError("save_failed");
+        const now = Math.floor(Date.now() / 1000);
+        const fallbackExpiresAt = now + expiresIn;
+
+        let recoveredTokenWrite = false;
+        try {
+          await ensureThreadsAccountsTable(env);
+          await env.DB.prepare(
+            `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(threads_user_id) DO UPDATE SET
+               access_token = excluded.access_token,
+               expires_at = excluded.expires_at`,
+          )
+            .bind(threadsUserId, accessToken, fallbackExpiresAt, now)
+            .run();
+          recoveredTokenWrite = true;
+        } catch {
+          recoveredTokenWrite = false;
+        }
+
+        const recoveredViaLegacyLink = await linkThreadsAccountWithSchemaFallback(
+          env,
+          resolvedAppUserId,
+          threadsUserId,
+          now,
+        );
+        if (recoveredTokenWrite && recoveredViaLegacyLink) {
+          try {
+            await setActiveThreadsAccountForAppUser(env, resolvedAppUserId, threadsUserId);
+          } catch {
+            // Legacy schemas may not support active-switch semantics yet.
+          }
+          logEvent("THREADS_OAUTH_ACCOUNT_SAVE_RECOVERED_VIA_LEGACY_LINK", {
+            resolvedAppUserId,
+            threadsUserId,
+          });
+          return applyAuthCors(new Response(null, {
+            status: 302,
+            headers: {
+              Location: `${appBaseUrl}/dashboard`,
+              "Set-Cookie": clearOauthStateCookie(THREADS_OAUTH_STATE_COOKIE_NAME),
+            },
+          }));
+        }
+
+        const saveErrorMessage = getErrorMessage(error);
+        let saveErrorCode = "save_failed";
+        if (saveErrorMessage.includes("no such column")) {
+          saveErrorCode = "save_schema_mismatch";
+        } else if (saveErrorMessage.includes("ON CONFLICT clause does not match")) {
+          saveErrorCode = "save_conflict_target";
+        } else if (saveErrorMessage.includes("UNIQUE constraint failed")) {
+          saveErrorCode = "save_conflict";
+        }
+        return redirectToConnectError(saveErrorCode);
       }
 
       logEvent("THREADS_OAUTH_CALLBACK_COMPLETED");
@@ -3187,6 +5939,28 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
+      const configuredAccounts = await getConfiguredThreadsProfiles(env);
+      if (configuredAccounts.length > 0) {
+        const activeAccount = configuredAccounts.find((account) => account.is_active) ?? configuredAccounts[0];
+
+        return new Response(
+          JSON.stringify({
+            connected: true,
+            account: activeAccount,
+            accounts: configuredAccounts,
+            active_threads_user_id: activeAccount.threads_user_id,
+            ...activeAccount,
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
         return new Response(authUser.body, {
@@ -3215,11 +5989,64 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-      if (authUser.id !== appUserId) {
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const linkedAccounts = await listConnectedThreadsAccountsForAppUser(env, ownedAppUserId);
+      const linkedAccountsPayload = linkedAccounts.map((linkedAccount) => ({
+        threads_user_id: linkedAccount.threads_user_id,
+        is_active: linkedAccount.is_active === 1,
+        created_at: linkedAccount.created_at,
+        username: linkedAccount.username ?? null,
+        name: linkedAccount.name ?? null,
+        threads_biography: linkedAccount.threads_biography ?? null,
+        is_verified: linkedAccount.is_verified === 1,
+        threads_profile_picture_url: linkedAccount.threads_profile_picture_url ?? null,
+      }));
+      const activeThreadsUserId = linkedAccounts.find((linkedAccount) => linkedAccount.is_active === 1)?.threads_user_id
+        ?? linkedAccounts[0]?.threads_user_id
+        ?? null;
+
+      const account = await getThreadsAccountForAppUserWithRetry(env, ownedAppUserId);
+      logWorkerEvent("THREADS_ME_LOOKUP_RESULT", {
+        appUserId: ownedAppUserId,
+        found: Boolean(account),
+        threadsUserId: account?.threads_user_id ?? null,
+      });
+
+      if (!account) {
+        const fallbackLinkedAccount = linkedAccountsPayload.find((linkedAccount) => linkedAccount.is_active)
+          ?? linkedAccountsPayload[0]
+          ?? null;
+        if (fallbackLinkedAccount) {
+          return new Response(
+            JSON.stringify({
+              connected: true,
+              account: fallbackLinkedAccount,
+              accounts: linkedAccountsPayload,
+              active_threads_user_id: activeThreadsUserId ?? fallbackLinkedAccount.threads_user_id,
+              ...fallbackLinkedAccount,
+            }),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                ...requestCorsHeaders,
+              },
+            },
+          );
+        }
+
         return new Response(
-          JSON.stringify({ error: "Forbidden" }),
+          JSON.stringify({
+            connected: false,
+            accounts: linkedAccountsPayload,
+            active_threads_user_id: activeThreadsUserId,
+          }),
           {
-            status: 403,
+            status: 200,
             headers: {
               "Content-Type": "application/json",
               ...requestCorsHeaders,
@@ -3227,16 +6054,66 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-      const account = await getThreadsAccountForAppUserWithRetry(env, appUserId);
-      logWorkerEvent("THREADS_ME_LOOKUP_RESULT", {
-        appUserId,
-        found: Boolean(account),
-        threadsUserId: account?.threads_user_id ?? null,
-      });
 
-      if (!account) {
+      const cachedProfile = await getFreshThreadsProfileCache(env, account.threads_user_id);
+      if (cachedProfile) {
+        logWorkerEvent("THREADS_PROFILE_CACHE_HIT", {
+          app_user_id: ownedAppUserId,
+          threads_user_id: account.threads_user_id,
+          last_refreshed_at: cachedProfile.last_refreshed_at,
+        });
+        const cachedAccountPayload = {
+          threads_user_id: cachedProfile.threads_user_id,
+          name: cachedProfile.name,
+          username: cachedProfile.username,
+          threads_biography: cachedProfile.threads_biography,
+          is_verified: cachedProfile.is_verified === 1,
+          threads_profile_picture_url: cachedProfile.threads_profile_picture_url,
+        };
+
         return new Response(
-          JSON.stringify({ connected: false }),
+          JSON.stringify({
+            connected: true,
+            account: cachedAccountPayload,
+            accounts: linkedAccountsPayload,
+            active_threads_user_id: activeThreadsUserId,
+            ...cachedAccountPayload,
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const fallbackAccountPayload = {
+        threads_user_id: account.threads_user_id,
+        name: linkedAccounts.find((linkedAccount) => linkedAccount.threads_user_id === account.threads_user_id)?.name ?? null,
+        username: linkedAccounts.find((linkedAccount) => linkedAccount.threads_user_id === account.threads_user_id)?.username ?? null,
+        threads_biography: linkedAccounts.find((linkedAccount) => linkedAccount.threads_user_id === account.threads_user_id)?.threads_biography ?? null,
+        is_verified: linkedAccounts.find((linkedAccount) => linkedAccount.threads_user_id === account.threads_user_id)?.is_verified === 1,
+        threads_profile_picture_url: linkedAccounts.find((linkedAccount) =>
+          linkedAccount.threads_user_id === account.threads_user_id
+        )?.threads_profile_picture_url ?? null,
+      };
+
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id, is_admin: authUser.is_admin },
+        "me",
+      );
+      if (!limit.allowed) {
+        return new Response(
+          JSON.stringify({
+            connected: true,
+            account: fallbackAccountPayload,
+            accounts: linkedAccountsPayload,
+            active_threads_user_id: activeThreadsUserId,
+            ...fallbackAccountPayload,
+          }),
           {
             status: 200,
             headers: {
@@ -3256,17 +6133,47 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (!meResp.ok) {
         logWorkerEvent("THREADS_ME_UPSTREAM_FAILED", {
           status: meResp.status,
-          app_user_id: appUserId,
+          app_user_id: ownedAppUserId,
         }, "error");
-        return upstreamProviderErrorResponse(requestCorsHeaders);
+        return new Response(
+          JSON.stringify({
+            connected: true,
+            account: fallbackAccountPayload,
+            accounts: linkedAccountsPayload,
+            active_threads_user_id: activeThreadsUserId,
+            ...fallbackAccountPayload,
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
       }
 
       const mePayload = await readJsonSafe(meResp);
       if (!mePayload || typeof mePayload !== "object") {
         logWorkerEvent("THREADS_ME_UPSTREAM_INVALID_JSON", {
-          app_user_id: appUserId,
+          app_user_id: ownedAppUserId,
         }, "error");
-        return upstreamProviderErrorResponse(requestCorsHeaders);
+        return new Response(
+          JSON.stringify({
+            connected: true,
+            account: fallbackAccountPayload,
+            accounts: linkedAccountsPayload,
+            active_threads_user_id: activeThreadsUserId,
+            ...fallbackAccountPayload,
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
       }
 
       const meJson = mePayload as {
@@ -3286,10 +6193,34 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         threads_profile_picture_url: meJson.threads_profile_picture_url ?? null,
       };
 
+      try {
+        await upsertThreadsProfileCache(env, {
+          threads_user_id: account.threads_user_id,
+          username: accountPayload.username,
+          name: accountPayload.name,
+          threads_biography: accountPayload.threads_biography,
+          is_verified: accountPayload.is_verified,
+          threads_profile_picture_url: accountPayload.threads_profile_picture_url,
+        });
+        logWorkerEvent("THREADS_PROFILE_CACHE_REFRESHED", {
+          source: "threads_me_upstream_refresh",
+          app_user_id: ownedAppUserId,
+          threads_user_id: account.threads_user_id,
+        });
+      } catch (error) {
+        logWorkerEvent("THREADS_PROFILE_CACHE_UPSERT_FAILED", {
+          app_user_id: ownedAppUserId,
+          threads_user_id: account.threads_user_id,
+          error: getErrorMessage(error),
+        }, "error");
+      }
+
       return new Response(
         JSON.stringify({
           connected: true,
           account: accountPayload,
+          accounts: linkedAccountsPayload,
+          active_threads_user_id: activeThreadsUserId,
           ...accountPayload,
         }),
         {
@@ -3302,7 +6233,27 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    if (url.pathname === "/api/threads/disconnect" && request.method === "POST") {
+    if (url.pathname === "/api/threads/accounts" && request.method === "GET") {
+      const configuredAccounts = await getConfiguredThreadsProfiles(env);
+      if (configuredAccounts.length > 0) {
+        const activeAccount = configuredAccounts.find((account) => account.is_active) ?? configuredAccounts[0];
+
+        return new Response(
+          JSON.stringify({
+            connected: true,
+            accounts: configuredAccounts,
+            active_threads_user_id: activeAccount.threads_user_id,
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
         return new Response(authUser.body, {
@@ -3315,7 +6266,69 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
       }
 
-      let payload: { app_user_id?: string } = {};
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Missing app_user_id" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const linkedAccounts = await listConnectedThreadsAccountsForAppUser(env, ownedAppUserId);
+      const linkedAccountsPayload = linkedAccounts.map((linkedAccount) => ({
+        threads_user_id: linkedAccount.threads_user_id,
+        is_active: linkedAccount.is_active === 1,
+        created_at: linkedAccount.created_at,
+        username: linkedAccount.username ?? null,
+        name: linkedAccount.name ?? null,
+        threads_biography: linkedAccount.threads_biography ?? null,
+        is_verified: linkedAccount.is_verified === 1,
+        threads_profile_picture_url: linkedAccount.threads_profile_picture_url ?? null,
+      }));
+      const activeThreadsUserId = linkedAccounts.find((linkedAccount) => linkedAccount.is_active === 1)?.threads_user_id
+        ?? linkedAccounts[0]?.threads_user_id
+        ?? null;
+
+      return new Response(
+        JSON.stringify({
+          connected: linkedAccountsPayload.length > 0,
+          accounts: linkedAccountsPayload,
+          active_threads_user_id: activeThreadsUserId,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/accounts/active" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      let payload: { app_user_id?: string; threads_user_id?: string } = {};
       try {
         payload = await request.json();
       } catch {
@@ -3339,7 +6352,90 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return forbiddenJsonResponse(requestCorsHeaders);
       }
 
-      const result = await disconnectThreadsAccountForAppUser(env, appUserId);
+      const threadsUserId = payload.threads_user_id?.trim();
+      if (!threadsUserId) {
+        return new Response(
+          JSON.stringify({ error: "threads_user_id is required" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const switched = await setActiveThreadsAccountForAppUser(env, appUserId, threadsUserId);
+      if (!switched) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          active_threads_user_id: threadsUserId,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/disconnect" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      let payload: { app_user_id?: string; threads_user_id?: string } = {};
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const appUserId = resolveAuthenticatedAppUserId(
+        authUser.id,
+        normalizeAppUserId(payload.app_user_id ?? null),
+      );
+      if (!appUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const targetThreadsUserId = payload.threads_user_id?.trim() || null;
+      const result = await disconnectThreadsAccountForAppUser(env, appUserId, targetThreadsUserId, {
+        disableTombstone: authUser.is_admin === true,
+      });
       if (!result.disconnected) {
         return new Response(
           JSON.stringify({ error: "Threads account not connected" }),
@@ -3352,6 +6448,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
+
+      logWorkerEvent(result.tombstoneExpiresAt ? "THREADS_CONNECTION_TOMBSTONE_CREATED" : "THREADS_CONNECTION_TOMBSTONE_SKIPPED", {
+        source: "threads_disconnect",
+        app_user_id: appUserId,
+        threads_user_id: result.threadsUserId,
+        tombstone_expires_at: result.tombstoneExpiresAt,
+      });
 
       return new Response(
         JSON.stringify({
@@ -3369,7 +6472,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (
-      (url.pathname === "/api/threads/profile" || url.pathname === "/api/threads/profile_lookup")
+      (
+        url.pathname === "/api/threads/profile"
+        || url.pathname === "/api/threads/profile_lookup"
+        || url.pathname === "/api/threads/discovery/profile"
+      )
       && request.method === "GET"
     ) {
       const authUser = await requireAuth(request, env);
@@ -3385,11 +6492,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const username = url.searchParams.get("username");
-      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const normalizedUsername = username?.trim() ?? "";
+      const requestedAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const appUserId = requestedAppUserId ?? authUser.id;
 
-      if (!username || !appUserId) {
+      if (!normalizedUsername) {
         return new Response(
-          JSON.stringify({ error: "missing username or app_user_id" }),
+          JSON.stringify({ error: "missing username" }),
           {
             status: 400,
             headers: {
@@ -3400,7 +6509,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      if (authUser.id !== appUserId) {
+      if (requestedAppUserId && authUser.id !== requestedAppUserId) {
         return new Response(
           JSON.stringify({ error: "Forbidden" }),
           {
@@ -3436,28 +6545,114 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return limitDeniedResponse(limit, "profile_discovery", request, env);
       }
 
-      const res = await fetch(
-        `https://graph.threads.net/v1.0/profile_lookup?username=${username}`,
-        {
-          headers: {
-            Authorization: `Bearer ${account.access_token}`,
-          },
-        },
-      );
-      if (!res.ok) {
+      const profileLookupResult = await executeThreadsProfileLookup({
+        accessToken: account.access_token,
+        username: normalizedUsername,
+      });
+      if (!profileLookupResult.success) {
         logWorkerEvent("THREADS_PROFILE_LOOKUP_FAILED", {
-          status: res.status,
+          status: profileLookupResult.status ?? null,
+          error_code: profileLookupResult.errorCode,
+          upstream_response_body: profileLookupResult.responseBody ?? null,
+          error_message: profileLookupResult.errorMessage ?? null,
+          username: normalizedUsername,
           app_user_id: appUserId,
         }, "error");
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
 
-      const data = await readJsonSafe(res);
-      if (data === null) {
+      return new Response(JSON.stringify(profileLookupResult.data), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (
+      (url.pathname === "/api/threads/profile_posts" || url.pathname === "/api/threads/discovery/profile_posts")
+      && request.method === "GET"
+    ) {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const username = url.searchParams.get("username");
+      const normalizedUsername = username?.trim() ?? "";
+      const cursor = url.searchParams.get("cursor");
+      const requestedAppUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const appUserId = requestedAppUserId ?? authUser.id;
+
+      if (!normalizedUsername) {
+        return new Response(
+          JSON.stringify({ error: "missing username" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      if (requestedAppUserId && authUser.id !== requestedAppUserId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          {
+            status: 403,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const account = await getThreadsAccountForAppUser(env, appUserId);
+
+      if (!account) {
+        return new Response(
+          JSON.stringify({ error: "no connected account" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+      const limit = await enforceLimit(
+        env,
+        { id: account.threads_user_id, is_admin: authUser.is_admin },
+        "profile_discovery",
+      );
+      if (!limit.allowed) {
+        return limitDeniedResponse(limit, "profile_discovery", request, env);
+      }
+
+      const profilePostsResult = await executeThreadsProfilePosts({
+        accessToken: account.access_token,
+        username: normalizedUsername,
+        cursor,
+      });
+      if (!profilePostsResult.success) {
+        logWorkerEvent("THREADS_PROFILE_POSTS_FAILED", {
+          status: profilePostsResult.status ?? null,
+          error_code: profilePostsResult.errorCode,
+          app_user_id: appUserId,
+        }, "error");
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
 
-      return new Response(JSON.stringify(data), {
+      return new Response(JSON.stringify(profilePostsResult.data), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -3486,7 +6681,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         app_user_id: appUserId,
       });
 
-      if (cursorDepth > 3) {
+      if (cursorDepth > MAX_THREADS_POST_CURSOR_DEPTH) {
         return new Response(
           JSON.stringify({
             posts: [],
@@ -3515,20 +6710,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
-            },
-          },
-        );
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
       }
 
-      const account = await getThreadsAccountForAppUser(env, appUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
       logWorkerEvent("THREADS_ACCOUNT_LOOKUP_RESULT", {
         found: Boolean(account),
         threads_user_id: account?.threads_user_id ?? null,
@@ -3546,6 +6733,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
+
       let limitCheck = null as EnforceLimitResult | null;
       try {
         limitCheck = await enforceLimit(
@@ -3568,183 +6756,137 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           error: getErrorMessage(error),
         });
       }
-
-      const params = new URLSearchParams({
-        fields:
-          "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply",
-        limit: "40",
-      });
-      if (cursor) {
-        params.set("after", cursor);
-      }
-
-      const requestUrl = `https://graph.threads.net/v1.0/${account.threads_user_id}/threads?${params.toString()}`;
-      const postsResp = await fetch(
-        requestUrl,
-        {
-          headers: { Authorization: `Bearer ${account.access_token}` },
-        },
-      );
-      if (!postsResp.ok) {
-        logWorkerEvent("THREADS_POSTS_UPSTREAM_FAILED", {
-          status: postsResp.status,
-          app_user_id: appUserId,
-        }, "error");
-        return upstreamProviderErrorResponse(requestCorsHeaders);
-      }
       logWorkerEvent("THREADS_API_REQUEST", {
         endpoint: "/v1.0/:threads_user_id/threads",
         has_cursor: Boolean(cursor),
       });
-      const postsResponseText = await postsResp.text();
-      logWorkerEvent("THREADS_API_RESPONSE", {
-        status: postsResp.status,
-        hasBody: Boolean(postsResponseText),
-      });
-
-      let data = null as {
-        data?: unknown[];
-        paging?: {
-          next?: string;
-          cursors?: {
-            after?: string;
-          };
-        };
-      } | null;
-      try {
-        data = JSON.parse(postsResponseText) as {
-          data?: unknown[];
-          paging?: {
-            next?: string;
-            cursors?: {
-              after?: string;
-            };
-          };
-        };
-      } catch {
-        logWorkerEvent("THREADS_POSTS_UPSTREAM_INVALID_JSON", {
-          app_user_id: appUserId,
-        }, "error");
-        return upstreamProviderErrorResponse(requestCorsHeaders);
-      }
-      if (!data || typeof data !== "object") {
-        logWorkerEvent("THREADS_POSTS_UPSTREAM_INVALID_SHAPE", {
-          app_user_id: appUserId,
-        }, "error");
-        return upstreamProviderErrorResponse(requestCorsHeaders);
-      }
-      const postsArray = Array.isArray(data.data) ? data.data : [];
-      const profileResp = await fetch(
-        "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url",
-        {
-          headers: { Authorization: `Bearer ${account.access_token}` },
-        },
+      const postsPage = await fetchThreadsPostsPageWithInsights(
+        account.access_token,
+        account.threads_user_id,
+        cursor,
       );
-      const profileJson = await profileResp.json() as { threads_profile_picture_url?: string };
-      const profilePicture = profileJson?.threads_profile_picture_url ?? null;
-      logWorkerEvent("THREADS_POSTS_COUNT", { count: postsArray.length });
-      const enrichedPosts = [];
-      const batchSize = 10;
-      for (let i = 0; i < postsArray.length; i += batchSize) {
-        const batch = postsArray.slice(i, i + batchSize);
-
-        const results = await Promise.all(
-          batch.map(async (post) => {
-            const postId = String((post as { id?: string })?.id ?? "");
-            const basePost = {
-              id: (post as { id?: string })?.id,
-              text: (post as { text?: string })?.text,
-              timestamp: (post as { timestamp?: string })?.timestamp,
-              permalink: (post as { permalink?: string })?.permalink,
-              username: (post as { username?: string })?.username,
-            };
-
-            if (!postId) {
-              return {
-                ...basePost,
-                profile_picture_url: profilePicture,
-                views: 0,
-                likes: 0,
-                replies: 0,
-                reposts: 0,
-                quotes: 0,
-                shares: 0,
-              };
-            }
-
-            try {
-              const metricsResp = await fetch(
-                `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
-              );
-              if (!metricsResp.ok) {
-                logWorkerEvent("INSIGHTS_REQUEST_FAILED", {
-                  status: metricsResp.status,
-                });
-              }
-
-              const metricsJson = await metricsResp.json() as {
-                data?: Array<{
-                  name?: string;
-                  values?: Array<{ value?: number }>;
-                  total_value?: { value?: number };
-                  link_total_values?: Array<{ value?: number }>;
-                }>;
-              };
-              logWorkerEvent("THREADS_INSIGHTS_DEBUG", {
-                status: metricsResp.status,
-                metricCount: Array.isArray(metricsJson.data) ? metricsJson.data.length : 0,
-              });
-
-              const metricMap: Record<string, number> = {};
-
-              for (const m of metricsJson.data ?? []) {
-                const value =
-                  m?.values?.[0]?.value ??
-                  m?.total_value?.value ??
-                  m?.link_total_values?.[0]?.value ??
-                  0;
-
-                if (m?.name) {
-                  metricMap[m.name] = Number(value ?? 0);
-                }
-              }
-
-              return {
-                ...basePost,
-                profile_picture_url: profilePicture,
-                views: metricMap.views ?? 0,
-                likes: metricMap.likes ?? 0,
-                replies: metricMap.replies ?? 0,
-                reposts: metricMap.reposts ?? 0,
-                quotes: metricMap.quotes ?? 0,
-                shares: metricMap.shares ?? 0,
-              };
-            } catch {
-              return {
-                ...basePost,
-                profile_picture_url: profilePicture,
-                views: 0,
-                likes: 0,
-                replies: 0,
-                reposts: 0,
-                quotes: 0,
-                shares: 0,
-              };
-            }
-          }),
-        );
-
-        enrichedPosts.push(...results);
+      if (!postsPage) {
+        logWorkerEvent("THREADS_POSTS_UPSTREAM_FAILED", {
+          app_user_id: appUserId,
+          has_cursor: Boolean(cursor),
+        }, "error");
+        return upstreamProviderErrorResponse(requestCorsHeaders);
       }
-      const hasMore = Boolean(data.paging?.next) && cursorDepth < 3;
-      const nextCursor = cursorDepth < 3 ? (data.paging?.cursors?.after || null) : null;
+
+      const hasMore = postsPage.hasMore && cursorDepth < MAX_THREADS_POST_CURSOR_DEPTH;
+      const nextCursor = cursorDepth < MAX_THREADS_POST_CURSOR_DEPTH ? postsPage.nextCursor : null;
+
+      try {
+        await upsertThreadsPostsArchive(env, account.threads_user_id, postsPage.posts);
+      } catch (error) {
+        logWorkerEvent("THREADS_POSTS_ARCHIVE_UPSERT_FAILED", {
+          app_user_id: ownedAppUserId,
+          threads_user_id: account.threads_user_id,
+          has_cursor: Boolean(cursor),
+          error: getErrorMessage(error),
+        }, "error");
+      }
+
+      if (!cursor) {
+        try {
+          await replaceThreadsPostsCache(env, account.threads_user_id, postsPage.posts, {
+            threads_user_id: account.threads_user_id,
+            next_cursor: nextCursor,
+            has_more: hasMore,
+          });
+        } catch (error) {
+          logWorkerEvent("THREADS_POSTS_CACHE_UPSERT_FAILED", {
+            app_user_id: ownedAppUserId,
+            threads_user_id: account.threads_user_id,
+            error: getErrorMessage(error),
+          }, "error");
+        }
+      }
 
       return new Response(JSON.stringify({
-        posts: enrichedPosts,
+        posts: postsPage.posts,
         next_cursor: nextCursor,
         has_more: hasMore,
       }), {
-        status: postsResp.status,
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
+    if (url.pathname === "/api/threads/posts/archive" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!appUserId) {
+        return new Response(
+          JSON.stringify({ error: "Missing app_user_id" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      if (!account || !account.threads_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Threads access token missing" }),
+          {
+            status: 500,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const requestedOrder = url.searchParams.get("order")?.trim().toLowerCase();
+      const order = requestedOrder === "top" ? "top" : "recent";
+      const rawLimit = Number(url.searchParams.get("limit") ?? "200");
+      const limit = Number.isFinite(rawLimit)
+        ? Math.min(Math.max(Math.trunc(rawLimit), 1), 1000)
+        : 200;
+      const rawPage = Number(url.searchParams.get("page") ?? "1");
+      const page = Number.isFinite(rawPage)
+        ? Math.max(Math.trunc(rawPage), 1)
+        : 1;
+      const offset = (page - 1) * limit;
+
+      const archive = await listArchivedThreadsPosts(env, account.threads_user_id, order, limit, offset);
+      const totalPages = Math.max(1, Math.ceil(archive.totalCount / limit));
+
+      return new Response(JSON.stringify({
+        posts: archive.posts,
+        total_count: archive.totalCount,
+        order,
+        page,
+        page_size: limit,
+        total_pages: totalPages,
+      }), {
+        status: 200,
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
@@ -3778,17 +6920,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
       }
 
-      const account = await getThreadsAccountForAppUser(env, appUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
       if (!account?.access_token || (threadsUserId && threadsUserId !== account.threads_user_id)) {
         return new Response(
@@ -3862,17 +6999,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
       }
 
-      const account = await getThreadsAccountForAppUser(env, appUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
       if (!account?.access_token) {
         return new Response(
@@ -3931,17 +7063,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
       }
 
-      const account = await getThreadsAccountForAppUser(env, appUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
       if (!account) {
         return new Response(
@@ -3953,24 +7080,41 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const params = new URLSearchParams({
-        metric: "views,likes,replies,reposts,quotes,clicks,followers_count",
-      });
+      const cachedInsights = await getFreshThreadsUserInsightsCache(env, account.threads_user_id);
+      if (cachedInsights) {
+        const cachedPayload = safeParseJsonString(cachedInsights.insights_json);
+        if (cachedPayload !== null) {
+          logWorkerEvent("THREADS_USER_INSIGHTS_CACHE_HIT", {
+            app_user_id: ownedAppUserId,
+            threads_user_id: account.threads_user_id,
+            last_refreshed_at: cachedInsights.last_refreshed_at,
+          });
 
-      const insightsRes = await fetch(
-        `https://graph.threads.net/v1.0/${account.threads_user_id}/threads_insights?${params.toString()}`,
-        {
-          headers: { Authorization: `Bearer ${account.access_token}` },
-        },
-      );
-      if (!insightsRes.ok) {
-        return upstreamProviderErrorResponse(requestCorsHeaders);
+          return new Response(JSON.stringify(cachedPayload), {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
       }
 
-      const data = await readJsonSafe(insightsRes);
+      const data = await fetchThreadsUserInsightsByAccount(account.access_token, account.threads_user_id);
       if (data === null) {
         return upstreamProviderErrorResponse(requestCorsHeaders);
       }
+
+      try {
+        await upsertThreadsUserInsightsCache(env, {
+          threads_user_id: account.threads_user_id,
+          insights_json: JSON.stringify(data),
+        });
+      } catch (error) {
+        logWorkerEvent("THREADS_USER_INSIGHTS_CACHE_UPSERT_FAILED", {
+          app_user_id: ownedAppUserId,
+          threads_user_id: account.threads_user_id,
+          error: getErrorMessage(error),
+        }, "error");
+      }
+
       return new Response(JSON.stringify(data), {
         status: 200,
         headers: { "content-type": "application/json; charset=UTF-8" },
@@ -4005,17 +7149,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           { status: 400 },
         );
       }
-      if (authUser.id !== appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
-            },
-          },
-        );
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
       }
 
       const validationResult = validateThreadsKeywordSearchParams({
@@ -4039,7 +7175,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       try {
-        const account = await getThreadsAccountForAppUser(env, appUserId);
+        const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
         const threadsUserId = account?.threads_user_id?.trim();
         const accessToken = account?.access_token?.trim();
 
@@ -4067,7 +7203,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
         const usageLimit = await enforceLimit(
           env,
-          { id: appUserId, is_admin: authUser.is_admin },
+          { id: threadsUserId, is_admin: authUser.is_admin },
           "keyword_search",
         );
         if (!usageLimit.allowed) {
@@ -4223,8 +7359,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         requestBucket,
       );
       if (existingResponse) {
+        const cachedStatus = typeof existingResponse.response_status === "number"
+          ? existingResponse.response_status
+          : 200;
         return new Response(existingResponse.response_body, {
-          status: existingResponse.response_status,
+          status: cachedStatus,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }
@@ -4236,7 +7375,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         text,
       );
       if (!publishOutcome.success) {
-        return upstreamProviderErrorResponse(requestCorsHeaders);
+        const publishErrorMessage = buildPublishErrorStorageValue(
+          publishOutcome.errorCode,
+          publishOutcome.status,
+          publishOutcome.providerErrorMessage,
+        );
+        logWorkerEvent("IMMEDIATE_THREADS_PUBLISH_FAILURE", {
+          scope: publishScope,
+          app_user_id: ownedAppUserId,
+          threads_user_id: account.threads_user_id,
+          error_code: publishOutcome.errorCode,
+          status: publishOutcome.status ?? null,
+          provider_error_message: publishOutcome.providerErrorMessage ?? null,
+          provider_response_body: publishOutcome.providerResponseBody ?? null,
+        });
+        return upstreamProviderErrorResponse(requestCorsHeaders, publishErrorMessage);
       }
       const { publishResult } = publishOutcome;
 
@@ -4275,8 +7428,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           requestBucket,
         );
         if (racedResponse) {
+          const racedStatus = typeof racedResponse.response_status === "number"
+            ? racedResponse.response_status
+            : 200;
           return new Response(racedResponse.response_body, {
-            status: racedResponse.response_status,
+            status: racedStatus,
             headers: { "content-type": "application/json; charset=UTF-8" },
           });
         }
@@ -4365,6 +7521,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
+
+      await ensureWorkspaceUserRecord(env, {
+        id: ownedAppUserId,
+        email: "workspace@lensically.local",
+        timezone: resolvedTimezone,
+        clock_format: "12h",
+      });
 
       const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, resolvedTimezone);
       if (!scheduledUtc) {
@@ -4711,6 +7874,237 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
+    if (url.pathname === "/api/threads/schedule/delete" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      let payload: {
+        app_user_id?: string;
+        scheduled_post_id?: number | string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
+      const scheduledPostId = Number(payload.scheduled_post_id);
+      if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
+        return new Response(
+          JSON.stringify({ error: "scheduled_post_id is required" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      const deleted = await deleteScheduledPostForAppUser(env, ownedAppUserId, scheduledPostId);
+      if (deleted === "not_found") {
+        return new Response(
+          JSON.stringify({ error: "Scheduled post not found" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      if (deleted === "not_deletable") {
+        return new Response(
+          JSON.stringify({ error: "Only approved scheduled posts can be deleted." }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          deleted: true,
+          scheduled_post_id: scheduledPostId,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/schedule/retry" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return new Response(authUser.body, {
+          status: authUser.status,
+          statusText: authUser.statusText,
+          headers: {
+            "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      let payload: {
+        app_user_id?: string;
+        scheduled_post_id?: number | string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
+      const scheduledPostId = Number(payload.scheduled_post_id);
+      if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
+        return new Response(
+          JSON.stringify({ error: "scheduled_post_id is required" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
+      if (!ownedAppUserId) {
+        return forbiddenJsonResponse(requestCorsHeaders);
+      }
+
+      await ensureScheduledPostsTable(env);
+      const scheduledPost = await env.DB.prepare(
+        `SELECT id, user_id, threads_user_id, post_text, status
+         FROM scheduled_posts
+         WHERE id = ?
+           AND user_id = ?
+         LIMIT 1`,
+      )
+        .bind(scheduledPostId, ownedAppUserId)
+        .first<{
+          id: number | string;
+          user_id: string;
+          threads_user_id: string;
+          post_text: string;
+          status: string;
+        }>();
+
+      if (!scheduledPost) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled post not found" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      if (scheduledPost.status === SCHEDULED_POST_STATUS_POSTED) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled post has already been posted." }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (scheduledPost.status === SCHEDULED_POST_STATUS_POSTING) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled post is already publishing." }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      if (scheduledPost.status !== SCHEDULED_POST_STATUS_APPROVED) {
+        return new Response(
+          JSON.stringify({ error: "Only approved scheduled posts can be retried." }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      await processScheduledPost(env, {
+        id: Number(scheduledPost.id),
+        user_id: scheduledPost.user_id,
+        threads_user_id: scheduledPost.threads_user_id,
+        post_text: scheduledPost.post_text,
+      });
+
+      const refreshed = await env.DB.prepare(
+        `SELECT status, published_post_id, publish_error_message
+         FROM scheduled_posts
+         WHERE id = ?
+           AND user_id = ?
+         LIMIT 1`,
+      )
+        .bind(scheduledPostId, ownedAppUserId)
+        .first<{
+          status: string;
+          published_post_id: string | null;
+          publish_error_message: string | null;
+        }>();
+
+      const publishedPostId = refreshed?.published_post_id?.trim() || null;
+      if (refreshed?.status === SCHEDULED_POST_STATUS_POSTED && publishedPostId) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            posted: true,
+            published_post_id: publishedPostId,
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const publishErrorMessage = refreshed?.publish_error_message?.trim() || "scheduled_publish_retry_failed";
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: publishErrorMessage,
+          publish_error_message: publishErrorMessage,
+        }),
+        {
+          status: 502,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
     if (url.pathname === "/api/threads/schedule" && request.method === "GET") {
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
@@ -4744,13 +8138,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const nowIso = new Date().toISOString();
       const rows = await env.DB.prepare(
-        `SELECT id, post_text, status, scheduled_time
+        `SELECT id, post_text, status, scheduled_time, publish_error_message, last_attempted_at, processing_started_at
          FROM scheduled_posts
          WHERE user_id = ?
            AND status IN (?, ?)
-           AND scheduled_time >= ?
          ORDER BY scheduled_time ASC, id ASC
          LIMIT 100`,
       )
@@ -4758,13 +8150,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           ownedAppUserId,
           SCHEDULED_POST_STATUS_APPROVED,
           SCHEDULED_POST_STATUS_POSTING,
-          nowIso,
         )
         .all<{
           id: number | string;
           post_text: string;
           status: string;
           scheduled_time: string;
+          publish_error_message: string | null;
+          last_attempted_at: string | null;
+          processing_started_at: string | null;
         }>();
 
       return new Response(
@@ -4775,6 +8169,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             text: row.post_text,
             status: row.status,
             scheduled_time_utc: row.scheduled_time,
+            publish_error_message: row.publish_error_message ?? null,
+            last_attempted_at: row.last_attempted_at ?? null,
+            processing_started_at: row.processing_started_at ?? null,
           })),
         }),
         {
@@ -4793,6 +8190,327 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       return new Response(
         JSON.stringify({ accounts: result.results ?? [] }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/automation/claim-daily-run" && request.method === "POST") {
+      let payload: {
+        automation_id?: string;
+        account_id?: string;
+        run_date?: string;
+        timezone?: string;
+        source?: string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const automationId = payload.automation_id?.trim() ?? "";
+      const accountId = payload.account_id?.trim().toLowerCase() ?? "";
+      const source = payload.source?.trim().toLowerCase() === "manual" ? "manual" : "scheduled";
+      const requestedTimeZone = payload.timezone?.trim() || "America/New_York";
+      const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : "America/New_York";
+      const runDate = payload.run_date?.trim() && isValidIsoDate(payload.run_date.trim())
+        ? payload.run_date.trim()
+        : getLocalDateInTimeZone(timeZone);
+
+      if (!automationId || !accountId || !runDate) {
+        return new Response(
+          JSON.stringify({ error: "automation_id, account_id, and resolvable run_date are required" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const claim = await claimAutomationDailyRun(env, automationId, accountId, runDate, source);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          acquired: claim.acquired,
+          reason: claim.reason,
+          run_date: runDate,
+          source,
+          lock: claim.lock,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/automation/complete-daily-run" && request.method === "POST") {
+      let payload: {
+        automation_id?: string;
+        account_id?: string;
+        run_date?: string;
+        success?: boolean;
+        result?: string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const automationId = payload.automation_id?.trim() ?? "";
+      const accountId = payload.account_id?.trim().toLowerCase() ?? "";
+      const runDate = payload.run_date?.trim() ?? "";
+      const success = payload.success === true;
+      const result = payload.result?.trim() || (success ? "success" : "failure");
+
+      if (!automationId || !accountId || !isValidIsoDate(runDate)) {
+        return new Response(
+          JSON.stringify({ error: "automation_id, account_id, and valid run_date are required" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const lock = await completeAutomationDailyRun(
+        env,
+        automationId,
+        accountId,
+        runDate,
+        success,
+        result,
+      );
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          completed: true,
+          lock,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/internal/automation/context" && request.method === "GET") {
+      if (!isInternalRequestAuthorized(request, env)) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const requestedTimeZone = url.searchParams.get("timezone")?.trim() || "America/New_York";
+      const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : "America/New_York";
+      const requestedDate = url.searchParams.get("date")?.trim() || null;
+      const requestedAccountId = url.searchParams.get("account_id")?.trim() || null;
+      const configuredAccount = getConfiguredThreadsAccountById(env, requestedAccountId);
+
+      if (!configuredAccount) {
+        return new Response(
+          JSON.stringify({ error: "Configured Threads account not found" }),
+          { status: 404, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const configuredProfile = await fetchConfiguredThreadsProfile(configuredAccount, 0);
+      const targetDate = requestedDate && isValidIsoDate(requestedDate)
+        ? requestedDate
+        : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? null;
+
+      if (!targetDate) {
+        return new Response(
+          JSON.stringify({ error: "Could not resolve target date" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const desiredSlots = buildHourlySlotTimes(7, 23);
+      const [recentArchive, topArchive, scheduledPosts] = await Promise.all([
+        listArchivedThreadsPosts(env, configuredProfile.threads_user_id, "recent", 48, 0),
+        listArchivedThreadsPosts(env, configuredProfile.threads_user_id, "top", 48, 0),
+        listScheduledPostsForThreadsAccountOnLocalDate(
+          env,
+          configuredProfile.threads_user_id,
+          targetDate,
+          timeZone,
+        ),
+      ]);
+
+      const occupiedSlots = new Set(
+        scheduledPosts
+          .map((post) => post.local_time)
+          .filter((slot) => Boolean(slot)),
+      );
+      const missingSlots = desiredSlots.filter((slot) => !occupiedSlots.has(slot));
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          account: {
+            id: configuredAccount.id,
+            label: configuredAccount.label,
+            username: configuredProfile.username ?? configuredAccount.username,
+            threads_user_id: configuredProfile.threads_user_id,
+          },
+          date: targetDate,
+          timezone: timeZone,
+          desired_slots: desiredSlots,
+          occupied_slots: Array.from(occupiedSlots),
+          missing_slots: missingSlots,
+          scheduled_posts: scheduledPosts,
+          archive_summary: {
+            total_posts: recentArchive.totalCount,
+            recent_sample_count: recentArchive.posts.length,
+            top_sample_count: topArchive.posts.length,
+          },
+          archive_recent: recentArchive.posts,
+          archive_top: topArchive.posts,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/internal/automation/schedule-plan" && request.method === "POST") {
+      if (!isInternalRequestAuthorized(request, env)) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      let payload: {
+        account_id?: string;
+        date?: string;
+        timezone?: string;
+        posts?: Array<{ slot?: string; text?: string }>;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const requestedTimeZone = payload.timezone?.trim() || "America/New_York";
+      const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : "America/New_York";
+      const targetDate = payload.date?.trim() && isValidIsoDate(payload.date.trim())
+        ? payload.date.trim()
+        : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? null;
+      const configuredAccount = getConfiguredThreadsAccountById(env, payload.account_id ?? null);
+
+      if (!targetDate) {
+        return new Response(
+          JSON.stringify({ error: "Invalid or missing target date" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      if (!configuredAccount) {
+        return new Response(
+          JSON.stringify({ error: "Configured Threads account not found" }),
+          { status: 404, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      if (!Array.isArray(payload.posts) || payload.posts.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "posts array is required" }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const configuredProfile = await fetchConfiguredThreadsProfile(configuredAccount, 0);
+      const existingScheduledPosts = await listScheduledPostsForThreadsAccountOnLocalDate(
+        env,
+        configuredProfile.threads_user_id,
+        targetDate,
+        timeZone,
+      );
+      const occupiedSlots = new Set(
+        existingScheduledPosts
+          .map((post) => post.local_time)
+          .filter((slot) => Boolean(slot)),
+      );
+
+      const seenRequestSlots = new Set<string>();
+      const created: Array<{ slot: string; scheduled_post_id: number; scheduled_time_utc: string | null; reused: boolean }> = [];
+      const skipped: Array<{ slot: string; reason: string }> = [];
+
+      for (const entry of payload.posts) {
+        const slot = entry?.slot?.trim() ?? "";
+        const text = entry?.text?.trim() ?? "";
+
+        if (!parseHourMinute(slot)) {
+          skipped.push({ slot, reason: "invalid_slot" });
+          continue;
+        }
+        if (!text) {
+          skipped.push({ slot, reason: "missing_text" });
+          continue;
+        }
+        if (seenRequestSlots.has(slot)) {
+          skipped.push({ slot, reason: "duplicate_slot_in_request" });
+          continue;
+        }
+        seenRequestSlots.add(slot);
+
+        if (occupiedSlots.has(slot)) {
+          skipped.push({ slot, reason: "slot_already_scheduled" });
+          continue;
+        }
+
+        const scheduled = await createScheduledPostForAppUser(
+          env,
+          "workspace-owner",
+          configuredProfile.threads_user_id,
+          text,
+          targetDate,
+          slot,
+          timeZone,
+        );
+
+        if (!scheduled.success || !scheduled.scheduledPostId) {
+          skipped.push({ slot, reason: scheduled.error ?? "schedule_failed" });
+          continue;
+        }
+
+        occupiedSlots.add(slot);
+        created.push({
+          slot,
+          scheduled_post_id: scheduled.scheduledPostId,
+          scheduled_time_utc: scheduled.scheduledTimeUtc ?? null,
+          reused: scheduled.reused === true,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          account: {
+            id: configuredAccount.id,
+            label: configuredAccount.label,
+            username: configuredProfile.username ?? configuredAccount.username,
+            threads_user_id: configuredProfile.threads_user_id,
+          },
+          date: targetDate,
+          timezone: timeZone,
+          created,
+          skipped,
+        }),
         {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -4948,6 +8666,21 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
   if (cron === LEGACY_COMBINED_SCHEDULED_CRON) {
     await refreshExpiringThreadsTokens(env);
     await processDueScheduledPosts(env);
+    return;
+  }
+
+  if (cron === THREADS_INSIGHTS_DAILY_WINDOW_CRON) {
+    const scheduledTime = typeof event.scheduledTime === "number" ? event.scheduledTime : Date.now();
+    if (!isDailyInsightsRefreshWindow(scheduledTime)) {
+      logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_SKIPPED", {
+        cron,
+        scheduled_time: new Date(scheduledTime).toISOString(),
+        target_time_zone: THREADS_INSIGHTS_TIME_ZONE,
+      });
+      return;
+    }
+
+    await refreshInsightsForConfiguredAccounts(env);
     return;
   }
 
