@@ -294,8 +294,8 @@ export default function DashboardPage() {
               <>
                 <p className="mt-3 text-sm leading-7 text-slate-800">{topPost.preview}</p>
                 <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
-                  <span>Likes {formatMetric(topPost.likes)}</span>
                   <span>Views {formatMetric(topPost.views)}</span>
+                  <span>Likes {formatMetric(topPost.likes)}</span>
                   <span>Replies {formatMetric(topPost.replies)}</span>
                   <span>Reposts {formatMetric(topPost.reposts)}</span>
                 </div>
@@ -389,11 +389,7 @@ export default function DashboardPage() {
       <section className="space-y-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">Yesterday&apos;s Winners</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {dashboard.winners_yesterday?.date
-              ? `Best posts from ${formatShortDate(dashboard.winners_yesterday.date)} ranked by metric.`
-              : "Best posts from yesterday ranked by metric."}
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Best posts ranked by metric.</p>
         </div>
         <div className="grid gap-4 xl:grid-cols-4">
           <RankedPostsColumn title="By Likes" posts={dashboard.winners_yesterday?.by_likes} timeZone={timeZone} />
@@ -406,7 +402,7 @@ export default function DashboardPage() {
       <section className="space-y-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">Last 7 Days Winners</h2>
-          <p className="mt-1 text-sm text-slate-600">Posts that kept moving after the day ended.</p>
+          <p className="mt-1 text-sm text-slate-600">Best posts ranked by metric.</p>
         </div>
         <div className="grid gap-4 xl:grid-cols-4">
           <RankedPostsColumn title="By Likes" posts={dashboard.winners_7d?.by_likes} timeZone={timeZone} />
