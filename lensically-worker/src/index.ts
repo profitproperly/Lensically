@@ -3348,10 +3348,22 @@ function createPostPreview(text: string | null, maxLength = DASHBOARD_POST_PREVI
 
 function normalizeDashboardText(text: string | null): string {
   return (text ?? "")
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, "\"")
+    .replace(/[–—]/g, " ")
     .toLowerCase()
     .replace(/https?:\/\/\S+/g, " ")
     .replace(/[@#][\p{L}\p{N}_]+/gu, " ")
     .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeDashboardDisplayText(text: string | null): string {
+  return (text ?? "")
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, "\"")
+    .replace(/[–—]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -3365,6 +3377,15 @@ function getDashboardWords(text: string | null): string[] {
 
 function getOpeningKey(text: string | null, wordCount = 5): string | null {
   const words = normalizeDashboardText(text)
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, wordCount);
+
+  return words.length >= Math.min(3, wordCount) ? words.join(" ") : null;
+}
+
+function getOpeningDisplay(text: string | null, wordCount = 5): string | null {
+  const words = normalizeDashboardDisplayText(text)
     .split(" ")
     .filter(Boolean)
     .slice(0, wordCount);
@@ -3390,6 +3411,22 @@ function getSentenceShell(text: string | null): string | null {
   return words.length >= 4 ? words.slice(0, 7).join(" ") : null;
 }
 
+function getSentenceShellDisplay(text: string | null): string | null {
+  const displayText = normalizeDashboardDisplayText(text);
+  if (!displayText) {
+    return null;
+  }
+
+  const firstSentenceMatch = displayText.match(/^[^.!?]+[.!?]?/);
+  const firstSentence = firstSentenceMatch?.[0]?.trim() ?? "";
+  if (!firstSentence) {
+    return null;
+  }
+
+  const words = firstSentence.split(" ").filter(Boolean);
+  return words.length >= 4 ? words.slice(0, 7).join(" ") : null;
+}
+
 function pickTopCounts(
   counts: Map<string, number>,
   limit: number,
@@ -3402,6 +3439,23 @@ function pickTopCounts(
     .map(([value, count]) => ({ value, count }));
 }
 
+function pickTopCountsWithDisplay(
+  counts: Map<string, number>,
+  displays: Map<string, string>,
+  limit: number,
+  minimumCount = 2,
+): Array<{ value: string; display: string; count: number }> {
+  return Array.from(counts.entries())
+    .filter(([, count]) => count >= minimumCount)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, limit)
+    .map(([value, count]) => ({
+      value,
+      display: displays.get(value) ?? value,
+      count,
+    }));
+}
+
 function summarizeWinningLanguage(posts: CachedThreadsPost[]): {
   repeated_terms: string[];
   repeated_phrases: string[];
@@ -3410,6 +3464,8 @@ function summarizeWinningLanguage(posts: CachedThreadsPost[]): {
   const wordCounts = new Map<string, number>();
   const phraseCounts = new Map<string, number>();
   const openingCounts = new Map<string, number>();
+  const phraseDisplays = new Map<string, string>();
+  const openingDisplays = new Map<string, string>();
 
   for (const post of posts) {
     const words = getDashboardWords(post.text);
@@ -3420,18 +3476,29 @@ function summarizeWinningLanguage(posts: CachedThreadsPost[]): {
     for (let index = 0; index < words.length - 1; index += 1) {
       const phrase = `${words[index]} ${words[index + 1]}`;
       phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1);
+      if (!phraseDisplays.has(phrase)) {
+        phraseDisplays.set(phrase, phrase);
+      }
     }
 
-    const opening = getOpeningKey(post.text, 5);
-    if (opening) {
-      openingCounts.set(opening, (openingCounts.get(opening) ?? 0) + 1);
+    const openingKey = getOpeningKey(post.text, 5);
+    const openingDisplay = getOpeningDisplay(post.text, 5);
+    if (openingKey) {
+      openingCounts.set(openingKey, (openingCounts.get(openingKey) ?? 0) + 1);
+      if (openingDisplay && !openingDisplays.has(openingKey)) {
+        openingDisplays.set(openingKey, openingDisplay);
+      }
     }
   }
 
   return {
     repeated_terms: pickTopCounts(wordCounts, DASHBOARD_WINNING_TERM_LIMIT).map((entry) => entry.value),
-    repeated_phrases: pickTopCounts(phraseCounts, DASHBOARD_WINNING_PHRASE_LIMIT).map((entry) => entry.value),
-    repeated_openings: pickTopCounts(openingCounts, 4).map((entry) => entry.value),
+    repeated_phrases: pickTopCountsWithDisplay(
+      phraseCounts,
+      phraseDisplays,
+      DASHBOARD_WINNING_PHRASE_LIMIT,
+    ).map((entry) => entry.display),
+    repeated_openings: pickTopCountsWithDisplay(openingCounts, openingDisplays, 4).map((entry) => entry.display),
   };
 }
 
@@ -3443,16 +3510,26 @@ function summarizeContentFatigue(posts: CachedThreadsPost[]): {
   const openingCounts = new Map<string, number>();
   const shellCounts = new Map<string, number>();
   const wordCounts = new Map<string, number>();
+  const openingDisplays = new Map<string, string>();
+  const shellDisplays = new Map<string, string>();
 
   for (const post of posts) {
-    const opening = getOpeningKey(post.text, 6);
-    if (opening) {
-      openingCounts.set(opening, (openingCounts.get(opening) ?? 0) + 1);
+    const openingKey = getOpeningKey(post.text, 6);
+    const openingDisplay = getOpeningDisplay(post.text, 6);
+    if (openingKey) {
+      openingCounts.set(openingKey, (openingCounts.get(openingKey) ?? 0) + 1);
+      if (openingDisplay && !openingDisplays.has(openingKey)) {
+        openingDisplays.set(openingKey, openingDisplay);
+      }
     }
 
-    const shell = getSentenceShell(post.text);
-    if (shell) {
-      shellCounts.set(shell, (shellCounts.get(shell) ?? 0) + 1);
+    const shellKey = getSentenceShell(post.text);
+    const shellDisplay = getSentenceShellDisplay(post.text);
+    if (shellKey) {
+      shellCounts.set(shellKey, (shellCounts.get(shellKey) ?? 0) + 1);
+      if (shellDisplay && !shellDisplays.has(shellKey)) {
+        shellDisplays.set(shellKey, shellDisplay);
+      }
     }
 
     const seenWords = new Set<string>();
@@ -3466,12 +3543,12 @@ function summarizeContentFatigue(posts: CachedThreadsPost[]): {
   }
 
   return {
-    duplicate_openings: pickTopCounts(openingCounts, 5).map((entry) => ({
-      phrase: entry.value,
+    duplicate_openings: pickTopCountsWithDisplay(openingCounts, openingDisplays, 5).map((entry) => ({
+      phrase: entry.display,
       count: entry.count,
     })),
-    repeated_sentence_shells: pickTopCounts(shellCounts, 5).map((entry) => ({
-      pattern: entry.value,
+    repeated_sentence_shells: pickTopCountsWithDisplay(shellCounts, shellDisplays, 5).map((entry) => ({
+      pattern: entry.display,
       count: entry.count,
     })),
     overused_words: pickTopCounts(wordCounts, DASHBOARD_FATIGUE_WORD_LIMIT, 3).map((entry) => ({
