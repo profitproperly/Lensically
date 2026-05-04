@@ -33,6 +33,17 @@ function formatSignedMetric(value: number | undefined | null): string {
   return safeValue > 0 ? `+${formatMetric(safeValue)}` : formatMetric(safeValue);
 }
 
+function getNetChangeClassName(value: number | undefined | null): string {
+  const safeValue = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  if (safeValue > 0) {
+    return "text-emerald-600";
+  }
+  if (safeValue < 0) {
+    return "text-rose-600";
+  }
+  return "text-slate-900";
+}
+
 function formatSnapshotDate(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) {
@@ -148,7 +159,7 @@ export default function FollowersPage() {
       <div>
         <h1 className="text-3xl font-semibold text-slate-900">Followers</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Daily follower counts and gains, stored automatically from the Threads refresh job.
+          Daily follower counts and net change, stored automatically from the Threads refresh job.
         </p>
       </div>
 
@@ -203,7 +214,7 @@ export default function FollowersPage() {
                         Captured {formatTimestamp(row.captured_at, timeZone)}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold text-slate-900">{formatSignedMetric(row.gain)}</p>
+                    <p className={`text-sm font-semibold ${getNetChangeClassName(row.gain)}`}>{formatSignedMetric(row.gain)}</p>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
@@ -211,8 +222,8 @@ export default function FollowersPage() {
                       <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(row.followers_count)}</p>
                     </div>
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Daily Gain</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatSignedMetric(row.gain)}</p>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Net Change</p>
+                      <p className={`mt-1 text-sm font-semibold ${getNetChangeClassName(row.gain)}`}>{formatSignedMetric(row.gain)}</p>
                     </div>
                   </div>
                 </article>
@@ -226,7 +237,7 @@ export default function FollowersPage() {
                     <th className="px-4 py-3 text-left font-semibold">Date</th>
                     <th className="px-4 py-3 text-left font-semibold">Captured</th>
                     <th className="px-4 py-3 text-right font-semibold">Followers</th>
-                    <th className="px-4 py-3 text-right font-semibold">Daily Gain</th>
+                    <th className="px-4 py-3 text-right font-semibold">Net Change</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -237,7 +248,7 @@ export default function FollowersPage() {
                       <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">
                         {formatMetric(row.followers_count)}
                       </td>
-                      <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">
+                      <td className={`px-4 py-4 text-right text-sm font-semibold ${getNetChangeClassName(row.gain)}`}>
                         {formatSignedMetric(row.gain)}
                       </td>
                     </tr>
