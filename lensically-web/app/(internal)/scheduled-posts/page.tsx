@@ -47,7 +47,6 @@ const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 const THREADS_SCHEDULE_UPDATE_URL = buildWorkerUrl("/api/threads/schedule/update");
 const THREADS_SCHEDULE_RETRY_URL = buildWorkerUrl("/api/threads/schedule/retry");
 const THREADS_SCHEDULE_DELETE_URL = buildWorkerUrl("/api/threads/schedule/delete");
-const WORKSPACE_APP_USER_ID = "workspace-owner";
 const FALLBACK_TIMEZONE = "America/New_York";
 const FALLBACK_CLOCK_FORMAT = "12h";
 
@@ -246,7 +245,6 @@ function getNeedsAssistanceReason(post: ScheduledPost, isOverdue: boolean): stri
 
 export default function ScheduledPostsPage() {
   const { user } = useAuth();
-  const appUserId = WORKSPACE_APP_USER_ID;
   const timezone = resolveTimezonePreference(user?.timezone ?? FALLBACK_TIMEZONE);
   const timezoneLabel = formatTimezoneLabel(timezone);
   const clockFormatPreference = resolveClockFormatPreference(user?.clock_format ?? FALLBACK_CLOCK_FORMAT);
@@ -263,6 +261,9 @@ export default function ScheduledPostsPage() {
   const [deleteScheduledPostError, setDeleteScheduledPostError] = useState("");
   const [deleteScheduledPostSuccess, setDeleteScheduledPostSuccess] = useState("");
   const [deletingScheduledPostId, setDeletingScheduledPostId] = useState<number | null>(null);
+  const [selectedScheduledPostIds, setSelectedScheduledPostIds] = useState<number[]>([]);
+  const [isBulkSelectionMode, setIsBulkSelectionMode] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [editingScheduledPostId, setEditingScheduledPostId] = useState<number | null>(null);
   const [editPostText, setEditPostText] = useState("");
   const [editScheduleDate, setEditScheduleDate] = useState("");
@@ -286,13 +287,6 @@ export default function ScheduledPostsPage() {
   }, [scheduledPosts]);
 
   useEffect(() => {
-    if (!appUserId) {
-      setThreadsUserId("");
-      setLoadingConnection(false);
-      setConnectionError("");
-      return;
-    }
-
     let isMounted = true;
     const controller = new AbortController();
 
@@ -303,7 +297,7 @@ export default function ScheduledPostsPage() {
       try {
         const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
           const accountsResponse = await fetch(
-            `${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            THREADS_ACCOUNTS_URL,
             {
               cache: "no-store",
               credentials: "include",
@@ -315,7 +309,7 @@ export default function ScheduledPostsPage() {
           }
 
           const meResponse = await fetch(
-            `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            THREADS_ME_URL,
             {
               cache: "no-store",
               credentials: "include",
@@ -381,11 +375,13 @@ export default function ScheduledPostsPage() {
       isMounted = false;
       controller.abort();
     };
-  }, [appUserId]);
+  }, []);
 
   useEffect(() => {
-    if (!appUserId || !threadsUserId) {
+    if (!threadsUserId) {
       setScheduledPosts([]);
+      setSelectedScheduledPostIds([]);
+      setIsBulkSelectionMode(false);
       setScheduledPostsError("");
       setLoadingScheduledPosts(false);
       return;
@@ -394,10 +390,10 @@ export default function ScheduledPostsPage() {
     void loadScheduledPosts();
     // appUserId/threadsUserId changes should refresh upcoming posts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUserId, threadsUserId]);
+  }, [threadsUserId]);
 
   useEffect(() => {
-    if (!appUserId || !threadsUserId) {
+    if (!threadsUserId) {
       return;
     }
 
@@ -406,10 +402,10 @@ export default function ScheduledPostsPage() {
     });
     // appUserId/threadsUserId changes should resubscribe the refresh listener.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUserId, threadsUserId]);
+  }, [threadsUserId]);
 
   async function loadScheduledPosts() {
-    if (!appUserId || !threadsUserId) {
+    if (!threadsUserId) {
       return;
     }
 
@@ -418,7 +414,7 @@ export default function ScheduledPostsPage() {
 
     try {
       const response = await fetch(
-        `${THREADS_SCHEDULE_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+        THREADS_SCHEDULE_URL,
         {
           cache: "no-store",
           credentials: "include",
@@ -452,10 +448,6 @@ export default function ScheduledPostsPage() {
   }
 
   async function deleteScheduledPost(scheduledPostId: number) {
-    if (!appUserId) {
-      return;
-    }
-
     const confirmed = window.confirm(
       "Delete this scheduled post? This action cannot be undone and the post will not be published.",
     );
@@ -475,7 +467,6 @@ export default function ScheduledPostsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          app_user_id: appUserId,
           scheduled_post_id: scheduledPostId,
         }),
       });
@@ -499,6 +490,141 @@ export default function ScheduledPostsPage() {
     } finally {
       setDeletingScheduledPostId(null);
     }
+  }
+
+  function handleToggleBulkSelectionMode() {
+    setIsBulkSelectionMode((current) => {
+      if (current) {
+        setSelectedScheduledPostIds([]);
+      }
+      return !current;
+    });
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+  }
+
+  function toggleSelectedScheduledPostId(scheduledPostId: number) {
+    setSelectedScheduledPostIds((currentIds) => (
+      currentIds.includes(scheduledPostId)
+        ? currentIds.filter((id) => id !== scheduledPostId)
+        : [...currentIds, scheduledPostId]
+    ));
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+  }
+
+  function selectAllScheduledPosts() {
+    setSelectedScheduledPostIds(
+      orderedScheduledPosts
+        .filter((post) => post.status === "approved")
+        .map((post) => post.id),
+    );
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+  }
+
+  function clearSelectedScheduledPosts() {
+    setSelectedScheduledPostIds([]);
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+  }
+
+  async function deleteScheduledPostRequest(scheduledPostId: number): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      const response = await fetch(THREADS_SCHEDULE_DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scheduled_post_id: scheduledPostId,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; deleted?: boolean }
+        | null;
+
+      if (!response.ok || data?.success === false || data?.deleted !== true) {
+        return {
+          success: false,
+          error: data?.error || "Could not delete scheduled post.",
+        };
+      }
+
+      return { success: true };
+    } catch {
+      return {
+        success: false,
+        error: "Could not delete scheduled post.",
+      };
+    }
+  }
+
+  async function handleBulkDeleteSelectedPosts() {
+    const selectedIds = [...selectedScheduledPostIds];
+    if (!selectedIds.length) {
+      setDeleteScheduledPostError("Select at least one scheduled post to delete.");
+      setDeleteScheduledPostSuccess("");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${selectedIds.length} scheduled post${selectedIds.length === 1 ? "" : "s"}? This action cannot be undone and the selected posts will not be published.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    setDeleteScheduledPostError("");
+    setDeleteScheduledPostSuccess("");
+
+    const deletedIds: number[] = [];
+    const failedIds: number[] = [];
+    let lastError = "";
+
+    for (const scheduledPostId of selectedIds) {
+      const result = await deleteScheduledPostRequest(scheduledPostId);
+      if (result.success) {
+        deletedIds.push(scheduledPostId);
+      } else {
+        failedIds.push(scheduledPostId);
+        lastError = result.error || "Could not delete scheduled post.";
+      }
+    }
+
+    if (deletedIds.length > 0) {
+      setScheduledPosts((currentPosts) =>
+        currentPosts.filter((post) => !deletedIds.includes(post.id)),
+      );
+      setSelectedScheduledPostIds((currentIds) =>
+        currentIds.filter((id) => !deletedIds.includes(id)),
+      );
+      setScheduledPostsError("");
+    }
+
+    if (failedIds.length > 0) {
+      setDeleteScheduledPostError(
+        deletedIds.length > 0
+          ? `Deleted ${deletedIds.length} scheduled post${deletedIds.length === 1 ? "" : "s"}, but ${failedIds.length} failed. ${lastError}`
+          : lastError || `Could not delete ${failedIds.length} scheduled post${failedIds.length === 1 ? "" : "s"}.`,
+      );
+      setDeleteScheduledPostSuccess("");
+    } else {
+      setDeleteScheduledPostSuccess(
+        `Deleted ${deletedIds.length} scheduled post${deletedIds.length === 1 ? "" : "s"}.`,
+      );
+      setDeleteScheduledPostError("");
+      setIsBulkSelectionMode(false);
+      setSelectedScheduledPostIds([]);
+    }
+
+    setIsBulkDeleting(false);
   }
 
   function startEditingScheduledPost(post: ScheduledPost) {
@@ -531,10 +657,6 @@ export default function ScheduledPostsPage() {
   }
 
   async function retryScheduledPost(scheduledPostId: number) {
-    if (!appUserId) {
-      return;
-    }
-
     setRetryingScheduledPostId(scheduledPostId);
     setRetryScheduledPostError("");
     setRetryScheduledPostSuccess("");
@@ -551,7 +673,6 @@ export default function ScheduledPostsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          app_user_id: appUserId,
           scheduled_post_id: scheduledPostId,
         }),
       });
@@ -597,10 +718,6 @@ export default function ScheduledPostsPage() {
   }
 
   async function saveEditedScheduledPost(scheduledPostId: number) {
-    if (!appUserId) {
-      return;
-    }
-
     const trimmedText = editPostText.trim();
     const normalizedTime = normalizeTimePayload(editScheduleTime);
     if (!trimmedText) {
@@ -631,7 +748,6 @@ export default function ScheduledPostsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          app_user_id: appUserId,
           scheduled_post_id: scheduledPostId,
           text: trimmedText,
           date: editScheduleDate,
@@ -767,7 +883,54 @@ export default function ScheduledPostsPage() {
             </div>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <>
+            <div className="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="text-sm text-slate-700">
+                {isBulkSelectionMode
+                  ? `${selectedScheduledPostIds.length} selected`
+                  : "Use selection mode to delete multiple scheduled posts at once."}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleToggleBulkSelectionMode}
+                  disabled={isBulkDeleting}
+                  className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isBulkSelectionMode ? "Cancel Selection" : "Select Posts"}
+                </button>
+                {isBulkSelectionMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={selectAllScheduledPosts}
+                      disabled={isBulkDeleting}
+                      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearSelectedScheduledPosts}
+                      disabled={isBulkDeleting || selectedScheduledPostIds.length === 0}
+                      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleBulkDeleteSelectedPosts()}
+                      disabled={isBulkDeleting || selectedScheduledPostIds.length === 0}
+                      className="inline-flex items-center justify-center rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBulkDeleting ? "Deleting..." : `Delete Selected (${selectedScheduledPostIds.length})`}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <ul className="space-y-3">
             {orderedScheduledPosts.map((post) => {
               const localTime = formatScheduledLocalTime(
                 post.scheduled_time_utc,
@@ -784,12 +947,28 @@ export default function ScheduledPostsPage() {
                 : isOverdue
                   ? "Needs Attention"
                   : "Scheduled";
+              const isSelected = selectedScheduledPostIds.includes(post.id);
+              const canSelectPost = post.status === "approved";
 
               return (
                 <li
                   key={post.id}
                   className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
                 >
+                  {isBulkSelectionMode ? (
+                    <label className={`mb-3 flex items-center gap-2 text-xs font-medium ${
+                      canSelectPost ? "cursor-pointer text-slate-700" : "cursor-not-allowed text-slate-400"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={!canSelectPost || isBulkDeleting}
+                        onChange={() => toggleSelectedScheduledPostId(post.id)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      {canSelectPost ? "Select for bulk delete" : "Only approved posts can be bulk deleted"}
+                    </label>
+                  ) : null}
                   <p className="line-clamp-3 text-sm text-slate-900">{post.text}</p>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -802,7 +981,7 @@ export default function ScheduledPostsPage() {
                           : "Invalid scheduled timestamp"}
                       </span>
                     </div>
-                    {post.status === "approved" ? (
+                    {post.status === "approved" && !isBulkSelectionMode ? (
                       <div className="flex items-center gap-2">
                         {isOverdue || post.publish_error_message ? (
                           <button
@@ -964,7 +1143,8 @@ export default function ScheduledPostsPage() {
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </>
         )}
       </section>
     </div>
