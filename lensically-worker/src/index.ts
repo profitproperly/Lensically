@@ -2969,6 +2969,7 @@ type ThreadsFollowerSnapshotRow = {
   threads_user_id: string;
   snapshot_date: string;
   followers_count: number | string;
+  baseline_followers_count?: number | string | null;
   captured_at: string;
 };
 
@@ -3228,11 +3229,24 @@ async function ensureThreadsFollowerSnapshotsTable(env: Env): Promise<void> {
       threads_user_id TEXT NOT NULL CHECK (length(trim(threads_user_id)) > 0),
       snapshot_date TEXT NOT NULL CHECK (length(trim(snapshot_date)) = 10),
       followers_count INTEGER NOT NULL DEFAULT 0,
+      baseline_followers_count INTEGER,
       captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (threads_user_id, snapshot_date)
     )`,
   ).run();
+
+  const tableInfo = await env.DB.prepare(
+    `PRAGMA table_info(threads_follower_snapshots)`,
+  ).all<{ name: string }>();
+
+  const columnNames = new Set((tableInfo.results ?? []).map((column) => column.name));
+  if (!columnNames.has("baseline_followers_count")) {
+    await env.DB.prepare(
+      `ALTER TABLE threads_follower_snapshots
+       ADD COLUMN baseline_followers_count INTEGER`,
+    ).run();
+  }
 
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_threads_follower_snapshots_captured_at
@@ -3248,20 +3262,56 @@ async function upsertThreadsFollowerSnapshot(
 ): Promise<void> {
   await ensureThreadsFollowerSnapshotsTable(env);
 
-  await env.DB.prepare(
-    `INSERT INTO threads_follower_snapshots (
-      threads_user_id,
-      snapshot_date,
-      followers_count,
-      captured_at
-    )
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(threads_user_id, snapshot_date) DO UPDATE SET
-      followers_count = excluded.followers_count,
-      captured_at = CURRENT_TIMESTAMP`,
+  const normalizedFollowersCount = Math.max(0, Math.trunc(followersCount));
+  const existingSnapshot = await env.DB.prepare(
+    `SELECT threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at
+     FROM threads_follower_snapshots
+     WHERE threads_user_id = ?
+       AND snapshot_date = ?
+     LIMIT 1`,
   )
-    .bind(threadsUserId, snapshotDate, Math.max(0, Math.trunc(followersCount)))
-    .run();
+    .bind(threadsUserId, snapshotDate)
+    .first<ThreadsFollowerSnapshotRow>();
+
+  const baselineFollowersCount = existingSnapshot
+    ? Number(existingSnapshot.baseline_followers_count ?? existingSnapshot.followers_count ?? normalizedFollowersCount)
+    : await env.DB.prepare(
+      `SELECT followers_count
+       FROM threads_follower_snapshots
+       WHERE threads_user_id = ?
+         AND snapshot_date < ?
+       ORDER BY snapshot_date DESC
+       LIMIT 1`,
+    )
+      .bind(threadsUserId, snapshotDate)
+      .first<{ followers_count?: number | string }>()
+      .then((row) => Number(row?.followers_count ?? normalizedFollowersCount));
+
+  if (existingSnapshot) {
+    await env.DB.prepare(
+      `UPDATE threads_follower_snapshots
+       SET followers_count = ?,
+           baseline_followers_count = ?,
+           captured_at = CURRENT_TIMESTAMP
+       WHERE threads_user_id = ?
+         AND snapshot_date = ?`,
+    )
+      .bind(normalizedFollowersCount, baselineFollowersCount, threadsUserId, snapshotDate)
+      .run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO threads_follower_snapshots (
+        threads_user_id,
+        snapshot_date,
+        followers_count,
+        baseline_followers_count,
+        captured_at
+      )
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    )
+      .bind(threadsUserId, snapshotDate, normalizedFollowersCount, baselineFollowersCount)
+      .run();
+  }
 
   await env.DB.prepare(
     `DELETE FROM threads_follower_snapshots
@@ -3276,11 +3326,11 @@ async function listThreadsFollowerSnapshots(
   env: Env,
   threadsUserId: string,
   limit = 30,
-): Promise<Array<{ snapshot_date: string; followers_count: number; captured_at: string }>> {
+): Promise<Array<{ snapshot_date: string; followers_count: number; baseline_followers_count: number | null; captured_at: string }>> {
   await ensureThreadsFollowerSnapshotsTable(env);
 
   const rows = await env.DB.prepare(
-    `SELECT threads_user_id, snapshot_date, followers_count, captured_at
+    `SELECT threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at
      FROM threads_follower_snapshots
      WHERE threads_user_id = ?
      ORDER BY snapshot_date DESC
@@ -3293,6 +3343,9 @@ async function listThreadsFollowerSnapshots(
     .map((row) => ({
       snapshot_date: row.snapshot_date,
       followers_count: Number(row.followers_count ?? 0),
+      baseline_followers_count: row.baseline_followers_count === null || row.baseline_followers_count === undefined
+        ? null
+        : Number(row.baseline_followers_count),
       captured_at: row.captured_at,
     }))
     .reverse();
@@ -3320,11 +3373,11 @@ async function listThreadsFollowerSnapshotsPage(
   threadsUserId: string,
   limit: number,
   offset: number,
-): Promise<Array<{ snapshot_date: string; followers_count: number; captured_at: string }>> {
+): Promise<Array<{ snapshot_date: string; followers_count: number; baseline_followers_count: number | null; captured_at: string }>> {
   await ensureThreadsFollowerSnapshotsTable(env);
 
   const rows = await env.DB.prepare(
-    `SELECT threads_user_id, snapshot_date, followers_count, captured_at
+    `SELECT threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at
      FROM threads_follower_snapshots
      WHERE threads_user_id = ?
      ORDER BY snapshot_date DESC
@@ -3337,6 +3390,9 @@ async function listThreadsFollowerSnapshotsPage(
   return (rows.results ?? []).map((row) => ({
     snapshot_date: row.snapshot_date,
     followers_count: Number(row.followers_count ?? 0),
+    baseline_followers_count: row.baseline_followers_count === null || row.baseline_followers_count === undefined
+      ? null
+      : Number(row.baseline_followers_count),
     captured_at: row.captured_at,
   }));
 }
@@ -3374,6 +3430,42 @@ async function resolveCurrentThreadsFollowerCount(
     if (discovery.success && typeof discovery.data.follower_count === "number") {
       currentFollowersCount = discovery.data.follower_count;
     }
+  }
+
+  return currentFollowersCount;
+}
+
+async function refreshCurrentThreadsFollowerSnapshot(
+  env: Env,
+  account: ThreadsAccount,
+  snapshotTimeZone: string,
+): Promise<number | null> {
+  const snapshotDate = getLocalDateInTimeZone(snapshotTimeZone, Date.now());
+  if (!snapshotDate) {
+    return null;
+  }
+
+  const profile = await fetchThreadsProfileByAccessToken(account.access_token);
+  let userInsightsPayload = await fetchThreadsUserInsightsByAccount(account.access_token, account.threads_user_id);
+
+  if (userInsightsPayload !== null) {
+    await upsertThreadsUserInsightsCache(env, {
+      threads_user_id: account.threads_user_id,
+      insights_json: JSON.stringify(userInsightsPayload),
+    });
+  } else {
+    const cachedInsights = await getFreshThreadsUserInsightsCache(env, account.threads_user_id);
+    userInsightsPayload = cachedInsights ? safeParseJsonString(cachedInsights.insights_json) : null;
+  }
+
+  const currentFollowersCount = await resolveCurrentThreadsFollowerCount(
+    account.access_token,
+    profile?.username,
+    userInsightsPayload,
+  );
+
+  if (currentFollowersCount !== null) {
+    await upsertThreadsFollowerSnapshot(env, account.threads_user_id, snapshotDate, currentFollowersCount);
   }
 
   return currentFollowersCount;
@@ -3712,7 +3804,9 @@ async function buildThreadsDashboardPayload(
     : [];
   const followerTrend = followerSnapshots.map((snapshot, index) => {
     const previous = index > 0 ? followerSnapshots[index - 1] : null;
-    const gain = previous ? snapshot.followers_count - previous.followers_count : 0;
+    const gain = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
+      ? snapshot.followers_count - snapshot.baseline_followers_count
+      : (previous ? snapshot.followers_count - previous.followers_count : 0);
     return {
       date: snapshot.snapshot_date,
       followers_count: snapshot.followers_count,
@@ -7380,6 +7474,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         : 1;
       const offset = (page - 1) * limit;
 
+      await refreshCurrentThreadsFollowerSnapshot(env, account, THREADS_INSIGHTS_TIME_ZONE);
+
       const totalCount = await countThreadsFollowerSnapshots(env, account.threads_user_id);
       const snapshotRows = await listThreadsFollowerSnapshotsPage(
         env,
@@ -7390,8 +7486,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const currentPageRows = snapshotRows.slice(0, limit);
 
       const rows = currentPageRows.map((row, index) => {
-        const olderSnapshot = snapshotRows[index + 1] ?? null;
-        const gain = olderSnapshot ? row.followers_count - olderSnapshot.followers_count : 0;
+      const olderSnapshot = snapshotRows[index + 1] ?? null;
+        const gain = row.baseline_followers_count !== null && row.baseline_followers_count !== undefined
+          ? row.followers_count - row.baseline_followers_count
+          : (olderSnapshot ? row.followers_count - olderSnapshot.followers_count : 0);
 
         return {
           date: row.snapshot_date,
