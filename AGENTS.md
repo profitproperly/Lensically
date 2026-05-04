@@ -132,6 +132,7 @@ When implementing a task:
 3. Modify only files necessary for the change.
 4. Do not break authentication, routes, or database logic.
 5. Prefer minimal and production-safe implementations.
+6. If the user approves implementation work and does not say `talk only` or otherwise opt out, carry the task through verification, commit, push, and deploy for the affected runtime surfaces by default.
 
 ## Implementation Procedure
 
@@ -164,6 +165,39 @@ Before any commit:
 4. Stage only exact task files.
 5. Verify only the surfaces affected by the change.
 6. Do not bundle unrelated local work into the commit.
+
+## Commit Message Rule
+
+Agents must use clear commit messages for every commit.
+
+Commit message expectations:
+
+- use a concise imperative summary
+- make the purpose obvious from the git history
+- prefer conventional prefixes such as `feat:`, `fix:`, `docs:`, `refactor:`, or `chore:` when they fit
+- do not use vague messages such as `update`, `changes`, `misc`, or `wip` for production task commits
+
+Examples:
+
+- `feat: add manual batch scheduling`
+- `fix: add bulk delete for scheduled posts`
+- `docs: refresh repo context guidance`
+
+## Default Completion Behavior
+
+Unless the user explicitly says `talk only`, asks only for analysis, or tells the agent not to commit or deploy, approved implementation tasks should default to this path:
+
+1. implement the change
+2. verify the affected surfaces
+3. commit with a clear message
+4. push to the configured git remote
+5. deploy the affected runtime surface or surfaces
+
+Default deployment rule:
+
+- frontend runtime changes -> deploy `lensically-web`
+- backend runtime changes -> deploy `lensically-worker`
+- docs-only changes -> commit and push only, no deploy unless the user explicitly asks
 
 ## Context Maintenance Loop
 

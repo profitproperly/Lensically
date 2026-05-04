@@ -38,6 +38,8 @@
 - keep mobile usability first-class for internal product pages
 - user-triggered async actions should always show loading, success, error, and empty states when applicable
 - destructive flows require explicit confirmation and backend enforcement
+- approved implementation tasks should normally be carried through verification, commit, push, and deploy unless the user explicitly says `talk only` or opts out
+- commits should always use clear, descriptive commit messages
 
 ## Known Deploy Targets
 
