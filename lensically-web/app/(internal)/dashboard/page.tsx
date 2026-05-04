@@ -254,19 +254,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.16),_transparent_28%),linear-gradient(135deg,_#0f172a_0%,_#111827_38%,_#f8fafc_38%,_#f8fafc_100%)] p-6 shadow-sm sm:p-8">
+      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.12),_transparent_32%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-sm sm:p-8">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <div className="text-white">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-200">Growth Control Room</p>
+          <div className="text-slate-950">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Growth Control Room</p>
             <div className="mt-4 flex flex-wrap items-center gap-4">
               {profile?.threads_profile_picture_url ? (
                 <img
                   src={profile.threads_profile_picture_url}
                   alt={`${profile.username || "Threads"} avatar`}
-                  className="h-16 w-16 rounded-full border border-white/20 object-cover"
+                  className="h-16 w-16 rounded-full border border-slate-200 object-cover"
                 />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/10 text-lg font-semibold">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-lg font-semibold text-slate-950">
                   {(profile?.name || profile?.username || "MM").slice(0, 2).toUpperCase()}
                 </div>
               )}
@@ -274,21 +274,21 @@ export default function DashboardPage() {
                 <h1 className="text-3xl font-semibold tracking-tight">
                   {profile?.name || profile?.username || "Operator Dashboard"}
                 </h1>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-600">
                   {profile?.username ? <span>@{profile.username}</span> : null}
                   {profile?.is_verified ? (
-                    <span className="rounded-full border border-sky-300/30 bg-sky-400/10 px-2 py-0.5 text-sky-200">Verified</span>
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-700">Verified</span>
                   ) : null}
                   <span>Followers {formatMetric(profile?.follower_count)}</span>
                 </div>
               </div>
             </div>
             {profile?.biography ? (
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300">{profile.biography}</p>
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-600">{profile.biography}</p>
             ) : null}
           </div>
 
-          <div className="rounded-3xl border border-slate-200/80 bg-white/96 p-5">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Top Post All Time</p>
             {topPost ? (
               <>
