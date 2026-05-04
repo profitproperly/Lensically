@@ -50,8 +50,11 @@ const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
 const SCHEDULED_POST_PUBLISH_CRON = "* * * * *";
 const THREADS_TOKEN_REFRESH_CRON = "0 */12 * * *";
 const LEGACY_COMBINED_SCHEDULED_CRON = "0 3 * * *";
+const THREADS_FOLLOWER_START_OF_DAY_CRON = "1 4,5 * * *";
 const THREADS_INSIGHTS_DAILY_WINDOW_CRON = "59 3,4 * * *";
 const THREADS_INSIGHTS_TIME_ZONE = "America/New_York";
+const THREADS_FOLLOWER_START_OF_DAY_HOUR = 0;
+const THREADS_FOLLOWER_START_OF_DAY_MINUTE = 1;
 const THREADS_INSIGHTS_TARGET_HOUR = 23;
 const THREADS_INSIGHTS_TARGET_MINUTE = 59;
 const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;
@@ -5146,7 +5149,11 @@ async function fetchThreadsPostsPageWithInsights(
   }
 }
 
-function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
+function isThreadsRefreshWindow(
+  timestampMs: number,
+  targetHour: number,
+  targetMinute: number,
+): boolean {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: THREADS_INSIGHTS_TIME_ZONE,
     hour: "2-digit",
@@ -5157,7 +5164,78 @@ function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "-1");
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "-1");
 
-  return hour === THREADS_INSIGHTS_TARGET_HOUR && minute === THREADS_INSIGHTS_TARGET_MINUTE;
+  return hour === targetHour && minute === targetMinute;
+}
+
+function isFollowerStartOfDayRefreshWindow(timestampMs: number): boolean {
+  return isThreadsRefreshWindow(
+    timestampMs,
+    THREADS_FOLLOWER_START_OF_DAY_HOUR,
+    THREADS_FOLLOWER_START_OF_DAY_MINUTE,
+  );
+}
+
+function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
+  return isThreadsRefreshWindow(
+    timestampMs,
+    THREADS_INSIGHTS_TARGET_HOUR,
+    THREADS_INSIGHTS_TARGET_MINUTE,
+  );
+}
+
+async function refreshFollowerBaselinesForConfiguredAccounts(env: Env): Promise<void> {
+  const snapshotDate = getLocalDateInTimeZone(THREADS_INSIGHTS_TIME_ZONE, Date.now());
+  if (!snapshotDate) {
+    return;
+  }
+
+  const accounts = await Promise.all(
+    getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
+  );
+
+  for (const configuredAccount of accounts) {
+    if (!configuredAccount) {
+      continue;
+    }
+
+    try {
+      const profile = await fetchThreadsProfileByAccessToken(configuredAccount.accessToken);
+      const threadsUserId = profile?.threads_user_id;
+
+      if (!threadsUserId) {
+        logWorkerEvent("THREADS_FOLLOWER_BASELINE_PROFILE_SKIPPED", {
+          configured_account_id: configuredAccount.id,
+          configured_username: configuredAccount.username,
+        }, "error");
+        continue;
+      }
+
+      await upsertConfiguredThreadsAccountToken(env, configuredAccount, threadsUserId);
+
+      const currentFollowersCount = await resolveCurrentThreadsFollowerCount(
+        configuredAccount.accessToken,
+        profile?.username ?? configuredAccount.username,
+        null,
+      );
+
+      if (currentFollowersCount !== null) {
+        await upsertThreadsFollowerSnapshot(env, threadsUserId, snapshotDate, currentFollowersCount);
+      }
+
+      logWorkerEvent("THREADS_FOLLOWER_BASELINE_REFRESH_SUCCEEDED", {
+        configured_account_id: configuredAccount.id,
+        configured_username: configuredAccount.username,
+        threads_user_id: threadsUserId,
+        baseline_saved: currentFollowersCount !== null,
+      });
+    } catch (error) {
+      logWorkerEvent("THREADS_FOLLOWER_BASELINE_REFRESH_FAILED", {
+        configured_account_id: configuredAccount.id,
+        configured_username: configuredAccount.username,
+        error: getErrorMessage(error),
+      }, "error");
+    }
+  }
 }
 
 async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
@@ -7493,9 +7571,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
         return {
           date: row.snapshot_date,
-          followers_count: row.followers_count,
-          gain,
-          captured_at: row.captured_at,
+          start_of_day_followers: row.baseline_followers_count ?? row.followers_count,
+          latest_followers: row.followers_count,
+          net_change: gain,
+          updated_at: row.captured_at,
         };
       });
 
@@ -9856,6 +9935,28 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
   if (cron === LEGACY_COMBINED_SCHEDULED_CRON) {
     await refreshExpiringThreadsTokens(env);
     await processDueScheduledPosts(env);
+    return;
+  }
+
+  if (cron === THREADS_FOLLOWER_START_OF_DAY_CRON) {
+    const scheduledTime = event.scheduledTime;
+    if (!isFollowerStartOfDayRefreshWindow(scheduledTime)) {
+      logWorkerEvent("THREADS_FOLLOWER_BASELINE_WINDOW_SKIPPED", {
+        scheduled_time_ms: scheduledTime,
+        target_time_zone: THREADS_INSIGHTS_TIME_ZONE,
+        target_hour: THREADS_FOLLOWER_START_OF_DAY_HOUR,
+        target_minute: THREADS_FOLLOWER_START_OF_DAY_MINUTE,
+      });
+      return;
+    }
+
+    logWorkerEvent("THREADS_FOLLOWER_BASELINE_REFRESH_STARTED", {
+      scheduled_time_ms: scheduledTime,
+      target_time_zone: THREADS_INSIGHTS_TIME_ZONE,
+      target_hour: THREADS_FOLLOWER_START_OF_DAY_HOUR,
+      target_minute: THREADS_FOLLOWER_START_OF_DAY_MINUTE,
+    });
+    await refreshFollowerBaselinesForConfiguredAccounts(env);
     return;
   }
 

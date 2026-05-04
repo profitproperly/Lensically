@@ -5,9 +5,10 @@ import { buildWorkerUrl } from "@/lib/apiClient";
 
 type FollowerRow = {
   date: string;
-  followers_count: number;
-  gain: number;
-  captured_at: string;
+  start_of_day_followers: number;
+  latest_followers: number;
+  net_change: number;
+  updated_at: string;
 };
 
 type FollowersResponse = {
@@ -87,16 +88,18 @@ function escapeCsvCell(value: string | number | null | undefined) {
 function buildFollowersCsvExport(rows: FollowerRow[]) {
   const header = [
     "date",
-    "captured_at",
-    "followers_count",
+    "updated_at",
+    "start_of_day_followers",
+    "latest_followers",
     "net_change",
   ];
 
   const dataRows = rows.map((row) => [
     row.date,
-    row.captured_at,
-    row.followers_count,
-    row.gain,
+    row.updated_at,
+    row.start_of_day_followers,
+    row.latest_followers,
+    row.net_change,
   ]);
 
   return [header, ...dataRows].map((row) => row.map(escapeCsvCell).join(",")).join("\n");
@@ -107,9 +110,10 @@ function buildFollowersTxtExport(rows: FollowerRow[], timeZone: string) {
     const lines = [
       `Snapshot ${index + 1}`,
       `Date: ${formatSnapshotDate(row.date)}`,
-      `Captured: ${formatTimestamp(row.captured_at, timeZone)}`,
-      `Followers: ${formatMetric(row.followers_count)}`,
-      `Net Change: ${formatSignedMetric(row.gain)}`,
+      `Updated: ${formatTimestamp(row.updated_at, timeZone)}`,
+      `Start: ${formatMetric(row.start_of_day_followers)}`,
+      `Latest: ${formatMetric(row.latest_followers)}`,
+      `Net Change: ${formatSignedMetric(row.net_change)}`,
     ];
     return lines.join("\n");
   }).join("\n\n---\n\n");
@@ -298,19 +302,23 @@ export default function FollowersPage() {
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{formatSnapshotDate(row.date)}</p>
                       <p className="mt-1 text-xs text-slate-500">
-                        Captured {formatTimestamp(row.captured_at, timeZone)}
+                        Updated {formatTimestamp(row.updated_at, timeZone)}
                       </p>
                     </div>
-                    <p className={`text-sm font-semibold ${getNetChangeClassName(row.gain)}`}>{formatSignedMetric(row.gain)}</p>
+                    <p className={`text-sm font-semibold ${getNetChangeClassName(row.net_change)}`}>{formatSignedMetric(row.net_change)}</p>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-3 gap-3">
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Followers</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(row.followers_count)}</p>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Start</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(row.start_of_day_followers)}</p>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Latest</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(row.latest_followers)}</p>
                     </div>
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Net Change</p>
-                      <p className={`mt-1 text-sm font-semibold ${getNetChangeClassName(row.gain)}`}>{formatSignedMetric(row.gain)}</p>
+                      <p className={`mt-1 text-sm font-semibold ${getNetChangeClassName(row.net_change)}`}>{formatSignedMetric(row.net_change)}</p>
                     </div>
                   </div>
                 </article>
@@ -322,8 +330,9 @@ export default function FollowersPage() {
                 <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold">Captured</th>
-                    <th className="px-4 py-3 text-right font-semibold">Followers</th>
+                    <th className="px-4 py-3 text-left font-semibold">Updated</th>
+                    <th className="px-4 py-3 text-right font-semibold">Start</th>
+                    <th className="px-4 py-3 text-right font-semibold">Latest</th>
                     <th className="px-4 py-3 text-right font-semibold">Net Change</th>
                   </tr>
                 </thead>
@@ -331,12 +340,15 @@ export default function FollowersPage() {
                   {rows.map((row) => (
                     <tr key={row.date} className="border-b border-slate-100 last:border-b-0">
                       <td className="px-4 py-4 text-sm font-medium text-slate-900">{formatSnapshotDate(row.date)}</td>
-                      <td className="px-4 py-4 text-sm text-slate-600">{formatTimestamp(row.captured_at, timeZone)}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{formatTimestamp(row.updated_at, timeZone)}</td>
                       <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">
-                        {formatMetric(row.followers_count)}
+                        {formatMetric(row.start_of_day_followers)}
                       </td>
-                      <td className={`px-4 py-4 text-right text-sm font-semibold ${getNetChangeClassName(row.gain)}`}>
-                        {formatSignedMetric(row.gain)}
+                      <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">
+                        {formatMetric(row.latest_followers)}
+                      </td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold ${getNetChangeClassName(row.net_change)}`}>
+                        {formatSignedMetric(row.net_change)}
                       </td>
                     </tr>
                   ))}
