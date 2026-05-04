@@ -31,9 +31,9 @@
 - `/dashboard` is the growth control room for the connected Threads account.
 - It aggregates:
   - today summary metrics
+  - all-time top archived post by likes in the hero card
   - yesterday and 7-day winner rankings
   - follower gain trend from persisted daily snapshots
-  - winning language signals from strong posts
 
 ## Persistence Defaults
 

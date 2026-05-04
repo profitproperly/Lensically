@@ -3588,15 +3588,14 @@ async function buildThreadsDashboardPayload(
   );
 
   const posts = archive.posts.filter((post) => getPostTimestampMs(post) !== null);
-  const last24hStartMs = nowMs - (24 * 60 * 60 * 1000);
   const last7dStartMs = nowMs - (7 * 24 * 60 * 60 * 1000);
-  const postsLast24h = posts.filter((post) => isPostWithinWindow(post, last24hStartMs, nowMs));
   const postsLast7d = posts.filter((post) => isPostWithinWindow(post, last7dStartMs, nowMs));
   const postsToday = posts.filter((post) => getPostLocalDate(post, DASHBOARD_TIME_ZONE) === todayDate);
   const yesterdayDate = addDaysToIsoDate(todayDate, -1);
   const postsYesterday = yesterdayDate
     ? posts.filter((post) => getPostLocalDate(post, DASHBOARD_TIME_ZONE) === yesterdayDate)
     : [];
+  const topPost = await getTopArchivedPostByLikes(env, account.threads_user_id);
 
   const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
   const scheduledRows = scheduledPostsTableExists
@@ -3661,7 +3660,6 @@ async function buildThreadsDashboardPayload(
       gain,
     };
   });
-  const followerGains = followerTrend.map((entry) => entry.gain);
   const todayFollowerGain = followerTrend.find((entry) => entry.date === todayDate)?.gain ?? 0;
   const yesterdayFollowerGain = yesterdayDate
     ? (followerTrend.find((entry) => entry.date === yesterdayDate)?.gain ?? 0)
@@ -3673,11 +3671,6 @@ async function buildThreadsDashboardPayload(
   const bestFollowerDay = followerTrend.length > 0
     ? followerTrend.reduce((best, entry) => (entry.gain > best.gain ? entry : best), followerTrend[0])
     : null;
-
-  const winningLanguageSource = [...postsLast7d]
-    .sort((left, right) => right.engagement_total - left.engagement_total || right.views - left.views)
-    .slice(0, 10);
-  const winningLanguage = summarizeWinningLanguage(winningLanguageSource);
 
   return {
     generated_at: new Date(nowMs).toISOString(),
@@ -3691,6 +3684,16 @@ async function buildThreadsDashboardPayload(
       threads_profile_picture_url: profile?.threads_profile_picture_url ?? null,
       follower_count: currentFollowersCount,
     },
+    top_post: topPost ? {
+      id: topPost.id,
+      preview: createPostPreview(topPost.text, 180),
+      timestamp: topPost.timestamp,
+      permalink: topPost.permalink,
+      likes: topPost.likes,
+      views: topPost.views,
+      replies: topPost.replies,
+      reposts: topPost.reposts,
+    } : null,
     today: {
       date: todayDate,
       followers_gained: todayFollowerGain,
@@ -3724,9 +3727,6 @@ async function buildThreadsDashboardPayload(
       by_views: buildMetricRanking(postsLast7d, "views"),
       by_replies: buildMetricRanking(postsLast7d, "replies"),
       by_reposts: buildMetricRanking(postsLast7d, "reposts"),
-    },
-    batch_health: {
-      winning_language: winningLanguage,
     },
   };
 }
@@ -4389,6 +4389,70 @@ async function listArchivedThreadsPosts(
       engagement_total: Number(row.engagement_total ?? 0),
     })),
     totalCount: Number(countRow?.total_count ?? 0),
+  };
+}
+
+async function getTopArchivedPostByLikes(
+  env: Env,
+  threadsUserId: string,
+): Promise<CachedThreadsPost | null> {
+  await ensureThreadsPostsArchiveTable(env);
+
+  const row = await env.DB.prepare(
+    `SELECT
+       post_id,
+       post_text,
+       post_timestamp,
+       post_permalink,
+       post_username,
+       profile_picture_url,
+       views,
+       likes,
+       replies,
+       reposts,
+       quotes,
+       shares,
+       engagement_total
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?
+     ORDER BY likes DESC, views DESC, engagement_total DESC, post_timestamp DESC
+     LIMIT 1`,
+  )
+    .bind(threadsUserId)
+    .first<{
+      post_id: string;
+      post_text: string | null;
+      post_timestamp: string | null;
+      post_permalink: string | null;
+      post_username: string | null;
+      profile_picture_url: string | null;
+      views: number | string | null;
+      likes: number | string | null;
+      replies: number | string | null;
+      reposts: number | string | null;
+      quotes: number | string | null;
+      shares: number | string | null;
+      engagement_total: number | string | null;
+    }>();
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.post_id,
+    text: row.post_text,
+    timestamp: row.post_timestamp,
+    permalink: row.post_permalink,
+    username: row.post_username,
+    profile_picture_url: row.profile_picture_url,
+    views: Number(row.views ?? 0),
+    likes: Number(row.likes ?? 0),
+    replies: Number(row.replies ?? 0),
+    reposts: Number(row.reposts ?? 0),
+    quotes: Number(row.quotes ?? 0),
+    shares: Number(row.shares ?? 0),
+    engagement_total: Number(row.engagement_total ?? 0),
   };
 }
 

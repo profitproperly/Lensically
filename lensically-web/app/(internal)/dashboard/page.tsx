@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
 
 type RankedPost = {
@@ -21,6 +21,16 @@ type DashboardResponse = {
     is_verified?: boolean;
     threads_profile_picture_url?: string | null;
     follower_count?: number | null;
+  } | null;
+  top_post?: {
+    id: string;
+    preview: string;
+    timestamp: string | null;
+    permalink: string | null;
+    likes: number;
+    views: number;
+    replies: number;
+    reposts: number;
   } | null;
   today?: {
     date?: string;
@@ -44,11 +54,6 @@ type DashboardResponse = {
       date?: string;
       gain?: number;
     } | null;
-    trend?: Array<{
-      date: string;
-      followers_count: number;
-      gain: number;
-    }>;
   } | null;
   winners_yesterday?: {
     date?: string | null;
@@ -63,13 +68,6 @@ type DashboardResponse = {
     by_replies?: RankedPost[];
     by_reposts?: RankedPost[];
   } | null;
-  batch_health?: {
-    winning_language?: {
-      repeated_terms?: string[];
-      repeated_phrases?: string[];
-      repeated_openings?: string[];
-    } | null;
-  } | null;
   error?: string;
 };
 
@@ -82,10 +80,7 @@ function formatMetric(value: number | null | undefined): string {
 
 function formatSignedMetric(value: number | null | undefined): string {
   const safeValue = typeof value === "number" && Number.isFinite(value) ? value : 0;
-  if (safeValue > 0) {
-    return `+${formatMetric(safeValue)}`;
-  }
-  return formatMetric(safeValue);
+  return safeValue > 0 ? `+${formatMetric(safeValue)}` : formatMetric(safeValue);
 }
 
 function formatTimestamp(value: string | null | undefined, timeZone = "America/New_York"): string {
@@ -119,14 +114,6 @@ function formatShortDate(value: string | null | undefined): string {
     month: "short",
     day: "numeric",
   }).format(new Date(parsed));
-}
-
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-6 text-sm text-slate-500">
-      {label}
-    </div>
-  );
 }
 
 function MetricCard({
@@ -234,22 +221,8 @@ export default function DashboardPage() {
 
     void loadDashboard();
 
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, []);
-
-  const timeZone = dashboard?.timezone || "America/New_York";
-  const profile = dashboard?.profile;
-  const today = dashboard?.today;
-  const followerGrowth = dashboard?.follower_growth;
-  const batchHealth = dashboard?.batch_health;
-
-  const trend = useMemo(() => dashboard?.follower_growth?.trend ?? [], [dashboard]);
-  const maxGain = useMemo(
-    () => Math.max(1, ...trend.map((entry) => Math.max(0, entry.gain))),
-    [trend],
-  );
 
   if (loading) {
     return (
@@ -272,6 +245,12 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const timeZone = dashboard.timezone || "America/New_York";
+  const profile = dashboard.profile;
+  const topPost = dashboard.top_post;
+  const today = dashboard.today;
+  const followerGrowth = dashboard.follower_growth;
 
   return (
     <div className="space-y-8">
@@ -310,17 +289,33 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-3xl border border-slate-200/80 bg-white/96 p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Winning Language</p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
-              Repeated language from the strongest posts in the last 7 days, shown without opinionated scoring.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {batchHealth?.winning_language?.repeated_terms?.slice(0, 6).map((term) => (
-                <span key={term} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
-                  {term}
-                </span>
-              ))}
-            </div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Top Post All Time</p>
+            {topPost ? (
+              <>
+                <p className="mt-3 text-sm leading-7 text-slate-800">{topPost.preview}</p>
+                <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
+                  <span>Likes {formatMetric(topPost.likes)}</span>
+                  <span>Views {formatMetric(topPost.views)}</span>
+                  <span>Replies {formatMetric(topPost.replies)}</span>
+                  <span>Reposts {formatMetric(topPost.reposts)}</span>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span>{formatTimestamp(topPost.timestamp, timeZone)}</span>
+                  {topPost.permalink ? (
+                    <a
+                      href={topPost.permalink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-950"
+                    >
+                      Open
+                    </a>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">No archived post available yet.</p>
+            )}
           </div>
         </div>
       </section>
@@ -358,97 +353,35 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-950">Growth Trend</h2>
-              <p className="mt-1 text-sm text-slate-600">Follower gains by day.</p>
-            </div>
-            {followerGrowth?.best_day ? (
-              <div className="text-right text-xs text-slate-500">
-                <p className="font-medium text-slate-900">Best day</p>
-                <p>{formatShortDate(followerGrowth.best_day.date)} • {formatSignedMetric(followerGrowth.best_day.gain)}</p>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Today</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">{formatSignedMetric(followerGrowth?.today_gain)}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Yesterday</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">{formatSignedMetric(followerGrowth?.yesterday_gain)}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">7 Day Avg</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">{formatSignedMetric(followerGrowth?.seven_day_average_gain)}</p>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            {!trend.length ? (
-              <EmptyState label="Follower history will appear after daily snapshots accumulate." />
-            ) : (
-              <div className="grid grid-cols-7 gap-2">
-                {trend.slice(-7).map((entry) => (
-                  <div key={entry.date} className="flex flex-col items-center gap-2">
-                    <div className="flex h-36 w-full items-end rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                      <div
-                        className="w-full rounded-xl bg-[linear-gradient(180deg,_#1d4ed8_0%,_#22c55e_100%)]"
-                        style={{ height: `${Math.max(10, (Math.max(0, entry.gain) / maxGain) * 100)}%` }}
-                      />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-slate-900">{formatSignedMetric(entry.gain)}</p>
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500">{formatShortDate(entry.date)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">Growth Trend</h2>
+            <p className="mt-1 text-sm text-slate-600">Follower gains without scoring.</p>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-950">Winning Language</h2>
-          <p className="mt-1 text-sm text-slate-600">Repeated patterns from strong posts in the last 7 days.</p>
-
-          <div className="mt-5 space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Terms</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {batchHealth?.winning_language?.repeated_terms?.length ? batchHealth.winning_language.repeated_terms.map((term) => (
-                  <span key={term} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
-                    {term}
-                  </span>
-                )) : <p className="text-sm text-slate-500">No repeated winning terms yet.</p>}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Phrases</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {batchHealth?.winning_language?.repeated_phrases?.length ? batchHealth.winning_language.repeated_phrases.map((phrase) => (
-                  <span key={phrase} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm text-sky-800">
-                    {phrase}
-                  </span>
-                )) : <p className="text-sm text-slate-500">No repeated phrases yet.</p>}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Openings</p>
-              <div className="mt-2 space-y-2">
-                {batchHealth?.winning_language?.repeated_openings?.length ? batchHealth.winning_language.repeated_openings.map((opening) => (
-                  <div key={opening} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    {opening}
-                  </div>
-                )) : <p className="text-sm text-slate-500">No repeated openings yet.</p>}
-              </div>
-            </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Today</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{formatSignedMetric(followerGrowth?.today_gain)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Yesterday</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{formatSignedMetric(followerGrowth?.yesterday_gain)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500">7 Day Avg</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{formatSignedMetric(followerGrowth?.seven_day_average_gain)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Best Day</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">
+              {followerGrowth?.best_day?.gain !== undefined ? formatSignedMetric(followerGrowth.best_day.gain) : "0"}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              {followerGrowth?.best_day?.date ? formatShortDate(followerGrowth.best_day.date) : "No history yet"}
+            </p>
           </div>
         </div>
       </section>
@@ -480,46 +413,6 @@ export default function DashboardPage() {
           <RankedPostsColumn title="By Views" posts={dashboard.winners_7d?.by_views} timeZone={timeZone} />
           <RankedPostsColumn title="By Replies" posts={dashboard.winners_7d?.by_replies} timeZone={timeZone} />
           <RankedPostsColumn title="By Reposts" posts={dashboard.winners_7d?.by_reposts} timeZone={timeZone} />
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-950">Winning Language</h2>
-        <p className="mt-1 text-sm text-slate-600">Repeated phrases, openings, and themes from strong posts in the last 7 days.</p>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Terms</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {batchHealth?.winning_language?.repeated_terms?.length ? batchHealth.winning_language.repeated_terms.map((term) => (
-                <span key={term} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
-                  {term}
-                </span>
-              )) : <p className="text-sm text-slate-500">No repeated terms yet.</p>}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Phrases</p>
-            <div className="mt-3 space-y-2">
-              {batchHealth?.winning_language?.repeated_phrases?.length ? batchHealth.winning_language.repeated_phrases.map((phrase) => (
-                <div key={phrase} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800">
-                  {phrase}
-                </div>
-              )) : <p className="text-sm text-slate-500">No repeated phrases yet.</p>}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Openings</p>
-            <div className="mt-3 space-y-2">
-              {batchHealth?.winning_language?.repeated_openings?.length ? batchHealth.winning_language.repeated_openings.map((opening) => (
-                <div key={opening} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800">
-                  {opening}
-                </div>
-              )) : <p className="text-sm text-slate-500">No repeated openings yet.</p>}
-            </div>
-          </div>
         </div>
       </section>
     </div>
