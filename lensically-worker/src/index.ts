@@ -64,6 +64,23 @@ const WORKSPACE_DEFAULT_TIMEZONE = "America/New_York";
 const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;
 const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;
 const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;
+const DASHBOARD_TIME_ZONE = "America/New_York";
+const DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS = 45;
+const DASHBOARD_HIT_RATE_LIKES_THRESHOLD = 30;
+const DASHBOARD_WEAK_POST_VIEWS_THRESHOLD = 100;
+const DASHBOARD_WEAK_POST_VIEWS_HOURS = 6;
+const DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS = 3;
+const DASHBOARD_POST_PREVIEW_LENGTH = 140;
+const DASHBOARD_RECENT_POST_LIMIT = 250;
+const DASHBOARD_WINNING_TERM_LIMIT = 8;
+const DASHBOARD_WINNING_PHRASE_LIMIT = 5;
+const DASHBOARD_FATIGUE_WORD_LIMIT = 6;
+const DASHBOARD_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "been", "but", "by", "for", "from", "had", "has", "have",
+  "he", "her", "his", "i", "if", "in", "into", "is", "it", "its", "me", "my", "of", "on", "or", "our",
+  "so", "that", "the", "their", "them", "there", "they", "this", "to", "was", "we", "were", "will",
+  "with", "you", "your",
+]);
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -2948,6 +2965,13 @@ type ThreadsUserInsightsCacheRow = {
   last_refreshed_at: string;
 };
 
+type ThreadsFollowerSnapshotRow = {
+  threads_user_id: string;
+  snapshot_date: string;
+  followers_count: number | string;
+  captured_at: string;
+};
+
 type CachedThreadsPost = {
   id: string;
   text: string | null;
@@ -3196,6 +3220,573 @@ async function getFreshThreadsUserInsightsCache(
   )
     .bind(threadsUserId)
     .first<ThreadsUserInsightsCacheRow>();
+}
+
+async function ensureThreadsFollowerSnapshotsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_follower_snapshots (
+      threads_user_id TEXT NOT NULL CHECK (length(trim(threads_user_id)) > 0),
+      snapshot_date TEXT NOT NULL CHECK (length(trim(snapshot_date)) = 10),
+      followers_count INTEGER NOT NULL DEFAULT 0,
+      captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (threads_user_id, snapshot_date)
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_follower_snapshots_captured_at
+     ON threads_follower_snapshots (captured_at)`,
+  ).run();
+}
+
+async function upsertThreadsFollowerSnapshot(
+  env: Env,
+  threadsUserId: string,
+  snapshotDate: string,
+  followersCount: number,
+): Promise<void> {
+  await ensureThreadsFollowerSnapshotsTable(env);
+
+  await env.DB.prepare(
+    `INSERT INTO threads_follower_snapshots (
+      threads_user_id,
+      snapshot_date,
+      followers_count,
+      captured_at
+    )
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(threads_user_id, snapshot_date) DO UPDATE SET
+      followers_count = excluded.followers_count,
+      captured_at = CURRENT_TIMESTAMP`,
+  )
+    .bind(threadsUserId, snapshotDate, Math.max(0, Math.trunc(followersCount)))
+    .run();
+
+  await env.DB.prepare(
+    `DELETE FROM threads_follower_snapshots
+     WHERE threads_user_id = ?
+       AND datetime(captured_at) < datetime('now', '-${DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS} days')`,
+  )
+    .bind(threadsUserId)
+    .run();
+}
+
+async function listThreadsFollowerSnapshots(
+  env: Env,
+  threadsUserId: string,
+  limit = 30,
+): Promise<Array<{ snapshot_date: string; followers_count: number; captured_at: string }>> {
+  await ensureThreadsFollowerSnapshotsTable(env);
+
+  const rows = await env.DB.prepare(
+    `SELECT threads_user_id, snapshot_date, followers_count, captured_at
+     FROM threads_follower_snapshots
+     WHERE threads_user_id = ?
+     ORDER BY snapshot_date DESC
+     LIMIT ?`,
+  )
+    .bind(threadsUserId, limit)
+    .all<ThreadsFollowerSnapshotRow>();
+
+  return (rows.results ?? [])
+    .map((row) => ({
+      snapshot_date: row.snapshot_date,
+      followers_count: Number(row.followers_count ?? 0),
+      captured_at: row.captured_at,
+    }))
+    .reverse();
+}
+
+function extractFollowersCountFromInsightsPayload(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const data = (payload as {
+    data?: Array<{
+      name?: string;
+      values?: Array<{ value?: number }>;
+      total_value?: { value?: number };
+      link_total_values?: Array<{ value?: number }>;
+    }>;
+  }).data;
+
+  const metricMap = buildThreadsMetricMap(data);
+  return Number.isFinite(metricMap.followers_count) ? metricMap.followers_count : null;
+}
+
+function getPostTimestampMs(post: Pick<CachedThreadsPost, "timestamp">): number | null {
+  if (!post.timestamp) {
+    return null;
+  }
+
+  const parsed = Date.parse(post.timestamp);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isPostWithinWindow(post: Pick<CachedThreadsPost, "timestamp">, startMs: number, endMs: number): boolean {
+  const timestampMs = getPostTimestampMs(post);
+  return timestampMs !== null && timestampMs >= startMs && timestampMs < endMs;
+}
+
+function getPostLocalDate(post: Pick<CachedThreadsPost, "timestamp">, timeZone: string): string | null {
+  const timestampMs = getPostTimestampMs(post);
+  if (timestampMs === null) {
+    return null;
+  }
+  return getLocalDateInTimeZone(timeZone, timestampMs);
+}
+
+function createPostPreview(text: string | null, maxLength = DASHBOARD_POST_PREVIEW_LENGTH): string {
+  const normalized = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "(No post text)";
+  }
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function normalizeDashboardText(text: string | null): string {
+  return (text ?? "")
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[@#][\p{L}\p{N}_]+/gu, " ")
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getDashboardWords(text: string | null): string[] {
+  return normalizeDashboardText(text)
+    .split(" ")
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 4 && !DASHBOARD_STOP_WORDS.has(word));
+}
+
+function getOpeningKey(text: string | null, wordCount = 5): string | null {
+  const words = normalizeDashboardText(text)
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, wordCount);
+
+  return words.length >= Math.min(3, wordCount) ? words.join(" ") : null;
+}
+
+function getSentenceShell(text: string | null): string | null {
+  const firstSentence = (text ?? "")
+    .split(/[.!?]/, 1)[0]
+    ?.toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\d+/g, "#")
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!firstSentence) {
+    return null;
+  }
+
+  const words = firstSentence.split(" ");
+  return words.length >= 4 ? words.slice(0, 7).join(" ") : null;
+}
+
+function pickTopCounts(
+  counts: Map<string, number>,
+  limit: number,
+  minimumCount = 2,
+): Array<{ value: string; count: number }> {
+  return Array.from(counts.entries())
+    .filter(([, count]) => count >= minimumCount)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, limit)
+    .map(([value, count]) => ({ value, count }));
+}
+
+function summarizeWinningLanguage(posts: CachedThreadsPost[]): {
+  repeated_terms: string[];
+  repeated_phrases: string[];
+  repeated_openings: string[];
+} {
+  const wordCounts = new Map<string, number>();
+  const phraseCounts = new Map<string, number>();
+  const openingCounts = new Map<string, number>();
+
+  for (const post of posts) {
+    const words = getDashboardWords(post.text);
+    for (const word of words) {
+      wordCounts.set(word, (wordCounts.get(word) ?? 0) + 1);
+    }
+
+    for (let index = 0; index < words.length - 1; index += 1) {
+      const phrase = `${words[index]} ${words[index + 1]}`;
+      phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1);
+    }
+
+    const opening = getOpeningKey(post.text, 5);
+    if (opening) {
+      openingCounts.set(opening, (openingCounts.get(opening) ?? 0) + 1);
+    }
+  }
+
+  return {
+    repeated_terms: pickTopCounts(wordCounts, DASHBOARD_WINNING_TERM_LIMIT).map((entry) => entry.value),
+    repeated_phrases: pickTopCounts(phraseCounts, DASHBOARD_WINNING_PHRASE_LIMIT).map((entry) => entry.value),
+    repeated_openings: pickTopCounts(openingCounts, 4).map((entry) => entry.value),
+  };
+}
+
+function summarizeContentFatigue(posts: CachedThreadsPost[]): {
+  duplicate_openings: Array<{ phrase: string; count: number }>;
+  repeated_sentence_shells: Array<{ pattern: string; count: number }>;
+  overused_words: Array<{ word: string; count: number }>;
+} {
+  const openingCounts = new Map<string, number>();
+  const shellCounts = new Map<string, number>();
+  const wordCounts = new Map<string, number>();
+
+  for (const post of posts) {
+    const opening = getOpeningKey(post.text, 6);
+    if (opening) {
+      openingCounts.set(opening, (openingCounts.get(opening) ?? 0) + 1);
+    }
+
+    const shell = getSentenceShell(post.text);
+    if (shell) {
+      shellCounts.set(shell, (shellCounts.get(shell) ?? 0) + 1);
+    }
+
+    const seenWords = new Set<string>();
+    for (const word of getDashboardWords(post.text)) {
+      if (seenWords.has(word)) {
+        continue;
+      }
+      seenWords.add(word);
+      wordCounts.set(word, (wordCounts.get(word) ?? 0) + 1);
+    }
+  }
+
+  return {
+    duplicate_openings: pickTopCounts(openingCounts, 5).map((entry) => ({
+      phrase: entry.value,
+      count: entry.count,
+    })),
+    repeated_sentence_shells: pickTopCounts(shellCounts, 5).map((entry) => ({
+      pattern: entry.value,
+      count: entry.count,
+    })),
+    overused_words: pickTopCounts(wordCounts, DASHBOARD_FATIGUE_WORD_LIMIT, 3).map((entry) => ({
+      word: entry.value,
+      count: entry.count,
+    })),
+  };
+}
+
+function buildMetricRanking(
+  posts: CachedThreadsPost[],
+  metric: "views" | "likes" | "replies" | "reposts",
+  limit = 5,
+): Array<{
+  id: string;
+  preview: string;
+  timestamp: string | null;
+  permalink: string | null;
+  metric: number;
+}> {
+  return [...posts]
+    .sort((left, right) => right[metric] - left[metric] || right.engagement_total - left.engagement_total)
+    .slice(0, limit)
+    .map((post) => ({
+      id: post.id,
+      preview: createPostPreview(post.text),
+      timestamp: post.timestamp,
+      permalink: post.permalink,
+      metric: post[metric] ?? 0,
+    }));
+}
+
+function clampScore(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function summarizeScoreLabel(score: number): "weak" | "medium" | "strong" {
+  if (score >= 7.5) {
+    return "strong";
+  }
+  if (score >= 4.5) {
+    return "medium";
+  }
+  return "weak";
+}
+
+async function buildThreadsDashboardPayload(
+  env: Env,
+  account: ThreadsAccount,
+): Promise<Record<string, unknown>> {
+  const nowMs = Date.now();
+  const todayDate = getLocalDateInTimeZone(DASHBOARD_TIME_ZONE, nowMs) ?? getLocalDateInTimeZone(WORKSPACE_DEFAULT_TIMEZONE, nowMs);
+  if (!todayDate) {
+    throw new Error("Could not resolve dashboard local date.");
+  }
+
+  let profile = await fetchThreadsProfileByAccessToken(account.access_token);
+  let userInsightsPayload = await fetchThreadsUserInsightsByAccount(account.access_token, account.threads_user_id);
+  let currentFollowersCount = extractFollowersCountFromInsightsPayload(userInsightsPayload);
+
+  if (currentFollowersCount === null) {
+    const cachedInsights = await getFreshThreadsUserInsightsCache(env, account.threads_user_id);
+    const cachedPayload = cachedInsights ? safeParseJsonString(cachedInsights.insights_json) : null;
+    currentFollowersCount = extractFollowersCountFromInsightsPayload(cachedPayload);
+    if (userInsightsPayload === null && cachedPayload !== null) {
+      userInsightsPayload = cachedPayload;
+    }
+  }
+
+  if (profile?.username) {
+    const discovery = await executeThreadsProfileLookup({
+      accessToken: account.access_token,
+      username: profile.username,
+    });
+    if (discovery.success && typeof discovery.data.follower_count === "number") {
+      currentFollowersCount = discovery.data.follower_count;
+    }
+  }
+
+  if (currentFollowersCount !== null) {
+    await upsertThreadsFollowerSnapshot(env, account.threads_user_id, todayDate, currentFollowersCount);
+  }
+
+  if (userInsightsPayload !== null) {
+    await upsertThreadsUserInsightsCache(env, {
+      threads_user_id: account.threads_user_id,
+      insights_json: JSON.stringify(userInsightsPayload),
+    });
+  }
+
+  let latestPosts = await fetchThreadsPostsPageWithInsights(account.access_token, account.threads_user_id, null);
+  if (latestPosts) {
+    await upsertThreadsPostsArchive(env, account.threads_user_id, latestPosts.posts);
+    await replaceThreadsPostsCache(env, account.threads_user_id, latestPosts.posts, {
+      threads_user_id: account.threads_user_id,
+      next_cursor: latestPosts.nextCursor,
+      has_more: latestPosts.hasMore,
+    });
+  }
+
+  const archive = await listArchivedThreadsPosts(
+    env,
+    account.threads_user_id,
+    "recent",
+    DASHBOARD_RECENT_POST_LIMIT,
+    0,
+  );
+
+  const posts = archive.posts.filter((post) => getPostTimestampMs(post) !== null);
+  const last24hStartMs = nowMs - (24 * 60 * 60 * 1000);
+  const last7dStartMs = nowMs - (7 * 24 * 60 * 60 * 1000);
+  const last3dStartMs = nowMs - (3 * 24 * 60 * 60 * 1000);
+  const postsLast24h = posts.filter((post) => isPostWithinWindow(post, last24hStartMs, nowMs));
+  const postsLast7d = posts.filter((post) => isPostWithinWindow(post, last7dStartMs, nowMs));
+  const postsLast3d = posts.filter((post) => isPostWithinWindow(post, last3dStartMs, nowMs));
+  const postsToday = posts.filter((post) => getPostLocalDate(post, DASHBOARD_TIME_ZONE) === todayDate);
+
+  const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
+  const scheduledRows = scheduledPostsTableExists
+    ? await env.DB.prepare(
+      `SELECT id, post_text, status, scheduled_time
+       FROM scheduled_posts
+       WHERE user_id = ?
+         AND status IN (?, ?)
+       ORDER BY scheduled_time ASC, id ASC
+       LIMIT 100`,
+    )
+      .bind(
+        WORKSPACE_APP_USER_ID,
+        SCHEDULED_POST_STATUS_APPROVED,
+        SCHEDULED_POST_STATUS_POSTING,
+      )
+      .all<{
+        id: number | string;
+        post_text: string;
+        status: string;
+        scheduled_time: string;
+      }>()
+    : { results: [] as Array<{ id: number | string; post_text: string; status: string; scheduled_time: string }> };
+
+  const scheduledPosts = (scheduledRows.results ?? []).map((row) => ({
+    id: Number(row.id),
+    text: row.post_text,
+    status: row.status,
+    scheduled_time_utc: row.scheduled_time,
+    local_date: getPostLocalDate({ timestamp: row.scheduled_time } as Pick<CachedThreadsPost, "timestamp">, DASHBOARD_TIME_ZONE),
+  }));
+
+  const remainingPostsToday = scheduledPosts.filter((post) => post.local_date === todayDate).length;
+  const nextScheduledPost = scheduledPosts.find((post) => {
+    const timestampMs = Date.parse(post.scheduled_time_utc);
+    return Number.isFinite(timestampMs) && timestampMs >= nowMs;
+  }) ?? null;
+
+  const dailyPerformance = postsToday.reduce((accumulator, post) => ({
+    views: accumulator.views + post.views,
+    likes: accumulator.likes + post.likes,
+    replies: accumulator.replies + post.replies,
+    reposts: accumulator.reposts + post.reposts,
+    engagement_total: accumulator.engagement_total + post.engagement_total,
+  }), {
+    views: 0,
+    likes: 0,
+    replies: 0,
+    reposts: 0,
+    engagement_total: 0,
+  });
+
+  const hitRateNumerator = postsLast24h.filter((post) => post.likes >= DASHBOARD_HIT_RATE_LIKES_THRESHOLD).length;
+  const hitRateDenominator = postsLast24h.length;
+
+  const weakPosts = postsLast24h
+    .map((post) => {
+      const timestampMs = getPostTimestampMs(post);
+      if (timestampMs === null) {
+        return null;
+      }
+
+      const ageHours = (nowMs - timestampMs) / (60 * 60 * 1000);
+      const reasons: string[] = [];
+
+      if (ageHours >= DASHBOARD_WEAK_POST_VIEWS_HOURS && post.views < DASHBOARD_WEAK_POST_VIEWS_THRESHOLD) {
+        reasons.push(`Under ${DASHBOARD_WEAK_POST_VIEWS_THRESHOLD} views after ${DASHBOARD_WEAK_POST_VIEWS_HOURS} hours`);
+      }
+      if (ageHours >= DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS && post.likes <= 0) {
+        reasons.push(`0 likes after ${DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS} hours`);
+      }
+
+      if (reasons.length === 0) {
+        return null;
+      }
+
+      return {
+        id: post.id,
+        preview: createPostPreview(post.text),
+        timestamp: post.timestamp,
+        permalink: post.permalink,
+        views: post.views,
+        likes: post.likes,
+        replies: post.replies,
+        reposts: post.reposts,
+        reasons,
+      };
+    })
+    .filter((post): post is NonNullable<typeof post> => post !== null)
+    .slice(0, 8);
+
+  const followerSnapshots = currentFollowersCount !== null
+    ? await listThreadsFollowerSnapshots(env, account.threads_user_id, 30)
+    : [];
+  const followerTrend = followerSnapshots.map((snapshot, index) => {
+    const previous = index > 0 ? followerSnapshots[index - 1] : null;
+    const gain = previous ? snapshot.followers_count - previous.followers_count : 0;
+    return {
+      date: snapshot.snapshot_date,
+      followers_count: snapshot.followers_count,
+      gain,
+    };
+  });
+  const followerGains = followerTrend.map((entry) => entry.gain);
+  const todayFollowerGain = followerTrend.find((entry) => entry.date === todayDate)?.gain ?? 0;
+  const yesterdayDate = addDaysToIsoDate(todayDate, -1);
+  const yesterdayFollowerGain = yesterdayDate
+    ? (followerTrend.find((entry) => entry.date === yesterdayDate)?.gain ?? 0)
+    : 0;
+  const recentFollowerGains = followerTrend.slice(-7).map((entry) => entry.gain);
+  const followerGainSevenDayAverage = recentFollowerGains.length > 0
+    ? recentFollowerGains.reduce((sum, value) => sum + value, 0) / recentFollowerGains.length
+    : 0;
+  const bestFollowerDay = followerTrend.length > 0
+    ? followerTrend.reduce((best, entry) => (entry.gain > best.gain ? entry : best), followerTrend[0])
+    : null;
+
+  const winningLanguageSource = [...postsLast7d]
+    .sort((left, right) => right.engagement_total - left.engagement_total || right.views - left.views)
+    .slice(0, 10);
+  const winningLanguage = summarizeWinningLanguage(winningLanguageSource);
+  const contentFatigue = summarizeContentFatigue(postsLast3d);
+
+  const avgViews24h = hitRateDenominator > 0
+    ? postsLast24h.reduce((sum, post) => sum + post.views, 0) / hitRateDenominator
+    : 0;
+  const avgEngagement24h = hitRateDenominator > 0
+    ? postsLast24h.reduce((sum, post) => sum + post.engagement_total, 0) / hitRateDenominator
+    : 0;
+  const followerConversionPerPost = hitRateDenominator > 0
+    ? todayFollowerGain / hitRateDenominator
+    : 0;
+  const reachScore = clampScore((avgViews24h / 1200) * 10, 0, 10);
+  const engagementScore = clampScore((avgEngagement24h / 80) * 10, 0, 10);
+  const conversionScore = clampScore((followerConversionPerPost / 2) * 10, 0, 10);
+  const overallBatchScore = Number(((reachScore + engagementScore + conversionScore) / 3).toFixed(1));
+
+  return {
+    generated_at: new Date(nowMs).toISOString(),
+    timezone: DASHBOARD_TIME_ZONE,
+    profile: {
+      threads_user_id: account.threads_user_id,
+      username: profile?.username ?? null,
+      name: profile?.name ?? null,
+      biography: profile?.threads_biography ?? null,
+      is_verified: profile?.is_verified ?? false,
+      threads_profile_picture_url: profile?.threads_profile_picture_url ?? null,
+      follower_count: currentFollowersCount,
+    },
+    today: {
+      date: todayDate,
+      followers_gained: todayFollowerGain,
+      posts_published: postsToday.length,
+      posts_scheduled: postsToday.length + remainingPostsToday,
+      remaining_posts: remainingPostsToday,
+      next_scheduled_post_utc: nextScheduledPost?.scheduled_time_utc ?? null,
+      total_engagement: dailyPerformance.engagement_total,
+      total_views: dailyPerformance.views,
+      total_likes: dailyPerformance.likes,
+      total_replies: dailyPerformance.replies,
+      total_reposts: dailyPerformance.reposts,
+      total_follower_gain: todayFollowerGain,
+    },
+    follower_growth: {
+      today_gain: todayFollowerGain,
+      yesterday_gain: yesterdayFollowerGain,
+      seven_day_average_gain: Number(followerGainSevenDayAverage.toFixed(1)),
+      best_day: bestFollowerDay,
+      trend: followerTrend,
+    },
+    winners_24h: {
+      by_likes: buildMetricRanking(postsLast24h, "likes"),
+      by_views: buildMetricRanking(postsLast24h, "views"),
+      by_replies: buildMetricRanking(postsLast24h, "replies"),
+      by_reposts: buildMetricRanking(postsLast24h, "reposts"),
+    },
+    winners_7d: {
+      by_likes: buildMetricRanking(postsLast7d, "likes"),
+      by_views: buildMetricRanking(postsLast7d, "views"),
+      by_replies: buildMetricRanking(postsLast7d, "replies"),
+      by_reposts: buildMetricRanking(postsLast7d, "reposts"),
+    },
+    batch_health: {
+      hit_rate: {
+        threshold_likes: DASHBOARD_HIT_RATE_LIKES_THRESHOLD,
+        hits: hitRateNumerator,
+        total: hitRateDenominator,
+      },
+      weak_posts: weakPosts,
+      winning_language: winningLanguage,
+      content_fatigue: contentFatigue,
+      batch_score: {
+        reach: summarizeScoreLabel(reachScore),
+        engagement: summarizeScoreLabel(engagementScore),
+        follower_conversion: summarizeScoreLabel(conversionScore),
+        overall: overallBatchScore,
+      },
+    },
+  };
 }
 
 async function ensureThreadsPostsCacheTable(env: Env): Promise<void> {
@@ -6648,6 +7239,37 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           status: meResp.status,
           headers: {
             "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/dashboard" && request.method === "GET") {
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+
+      if (!account?.access_token || !account.threads_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const dashboard = await buildThreadsDashboardPayload(env, account);
+      return new Response(
+        JSON.stringify(dashboard),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
             ...requestCorsHeaders,
           },
         },

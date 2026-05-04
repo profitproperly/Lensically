@@ -5,6 +5,7 @@
 - Lensically is operating as a production app with `lensically-web/` as the frontend and `lensically-worker/` as the backend.
 - Main active user workflows currently center on Create Post, Scheduled Posts, dashboard/insights, discovery, search, and archive flows.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
+- `/dashboard` now targets an operator-dashboard role rather than a simple profile/stats card.
 
 ## Core Scheduling State
 
@@ -24,6 +25,17 @@
 - `/scheduled-posts` is the management surface for upcoming scheduled posts.
 - It supports edit, retry, single delete, and bulk delete selection mode.
 - bulk delete currently reuses the existing delete API in a controlled client loop.
+
+## Dashboard State
+
+- `/dashboard` is the growth control room for the connected Threads account.
+- It aggregates:
+  - today summary metrics
+  - 24-hour and 7-day winner rankings
+  - hit-rate and weak-post detection
+  - follower gain trend from persisted daily snapshots
+  - winning language and content fatigue signals
+  - a simple batch score
 
 ## Persistence Defaults
 
