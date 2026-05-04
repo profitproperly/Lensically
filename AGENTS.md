@@ -1,5 +1,128 @@
 # Lensically — Agent Execution Rules
 
+## Fast-Start Context
+
+Lensically is a production SaaS with:
+
+- `lensically-web/` for the Next.js web app
+- `lensically-worker/` for the Cloudflare Worker backend
+
+Default assumption for new tasks:
+
+- user requests usually target the production app, not a prototype
+- preserve existing production behavior unless the task explicitly changes it
+- prefer extending current flows over introducing parallel systems
+
+Primary product surfaces agents should already understand:
+
+- `/schedule` = Create Post flow
+- `/scheduled-posts` = manage scheduled posts
+- `/dashboard`, `/insights`, `/discovery`, `/search`, `/post-archive` = authenticated product surfaces
+- public compliance routes include `/privacy`, `/terms`, and `/data-deletion`
+
+Backend ownership defaults:
+
+- scheduling, auth, persistence, and destructive actions belong to `lensically-worker/`
+- page UX, form state, rendering, and client integration belong to `lensically-web/`
+
+Default execution mindset:
+
+1. Determine whether the task is frontend, backend, or full-stack.
+2. Locate the existing user flow or endpoint before inventing a new one.
+3. Reuse existing request/response patterns, helpers, and storage conventions whenever possible.
+4. Keep changes narrow, production-safe, and mobile-aware.
+
+Known deployment targets:
+
+- Git remote: `origin` on the Lensically GitHub repository
+- frontend deploy target: Cloudflare project `lensically-web`
+- backend deploy target: Cloudflare project `lensically-worker`
+
+Default verification mindset:
+
+- web changes should normally be linted and built
+- worker changes should normally be tested
+- deploy only the surfaces affected by the task
+
+Do not spend time re-discovering high-level repo intent if the task is straightforward. Start from the assumptions above, then inspect only the specific files and flows needed for the request.
+
+## Current Product Map
+
+Primary frontend routes and source files:
+
+- `/schedule` -> `lensically-web/app/(internal)/schedule/page.tsx`
+- `/scheduled-posts` -> `lensically-web/app/(internal)/scheduled-posts/page.tsx`
+- `/dashboard` -> `lensically-web/app/(internal)/dashboard/page.tsx`
+- `/insights` -> `lensically-web/app/(internal)/insights/page.tsx`
+- `/discovery` -> `lensically-web/app/(internal)/discovery/page.tsx`
+- `/search` -> `lensically-web/app/(internal)/search/page.tsx`
+- `/post-archive` -> `lensically-web/app/(internal)/post-archive/page.tsx`
+
+Primary backend ownership and source files:
+
+- auth/session/account lifecycle -> `lensically-worker/auth/**` and `lensically-worker/src/index.ts`
+- scheduling and scheduled posts APIs -> `lensically-worker/src/index.ts`
+- D1 auth schema -> `lensically-worker/db/auth_schema.sql`
+- worker migrations -> `lensically-worker/migrations/**`
+
+Shared frontend helpers commonly involved in product flows:
+
+- auth state -> `lensically-web/lib/AuthProvider.tsx`
+- auth API client -> `lensically-web/lib/authClient.ts`
+- worker URL builder -> `lensically-web/lib/apiClient.ts`
+- scheduled post refresh events -> `lensically-web/lib/scheduledPostsRefresh.ts`
+- scheduled time display helpers -> `lensically-web/lib/scheduledTimeDisplay.ts`
+
+## Known Patterns
+
+Agents should reuse these repo patterns before creating new ones:
+
+- use existing route pages and extend the current user flow instead of introducing duplicate surfaces
+- use `buildWorkerUrl(...)` for frontend-to-worker API calls
+- use `useAuth()` for current-user preferences and authenticated client behavior
+- use explicit typed request and response shapes for frontend/backend integration
+- use visible loading, success, empty, and error states for all user-triggered async actions
+- use existing scheduling endpoints and scheduling helpers before inventing new scheduling logic
+- keep destructive actions confirmed on the frontend and validated on the backend
+- prefer backend persistence for cross-device product settings and frontend-local state only for session-local convenience
+
+## Change Routing Guide
+
+Use this routing guide before broad repo exploration:
+
+- UI/layout/copy/form-state task -> inspect `lensically-web/**` first
+- persistence, API, auth, scheduling, deletion, or data-integrity task -> inspect `lensically-worker/**` first
+- scheduling-related task -> inspect `/schedule`, `/scheduled-posts`, and scheduling routes in `lensically-worker/src/index.ts` first
+- auth/account-lifecycle task -> inspect `lensically-worker/auth/**`, `lensically-worker/src/index.ts`, `lensically-web/lib/AuthProvider.tsx`, and affected auth pages first
+- compliance/public-page task -> inspect `lensically-web/app/privacy/page.tsx`, `terms/page.tsx`, `data-deletion/page.tsx`, and related docs first
+
+## Do Not Re-Discover
+
+Unless the current task shows otherwise, agents should assume:
+
+- `lensically-web` is the production frontend
+- `lensically-worker` is the production backend
+- Cloudflare D1 is the main persisted datastore
+- Git remote is `origin` for the Lensically GitHub repository
+- frontend deploy target is Cloudflare project `lensically-web`
+- backend deploy target is Cloudflare project `lensically-worker`
+- public compliance routes are `/privacy`, `/terms`, and `/data-deletion`
+- product changes should preserve production behavior by default
+
+## Active Decisions
+
+Current product decisions agents should preserve unless the user changes them explicitly:
+
+- Batch Schedule is a manual helper only and must remain isolated from AI generation, taste analysis, and autonomous posting logic.
+- Batch Schedule presets are backend-stored per user for cross-device access.
+- favorite presets are optional convenience, not a required workflow
+- saving a batch preset is optional; one-off manual batch structures are supported
+- Batch Schedule opens from the Create Post flow as its own dedicated section/panel
+- existing single-post creation and scheduling flow must continue to work
+- Scheduled Posts supports both single-item actions and bulk delete selection mode
+
+See `CURRENT_STATE.md` for a compact handoff summary of the current product state.
+
 ## Execution Model
 
 When implementing a task:
@@ -15,6 +138,57 @@ When implementing a task:
 1. Locate the relevant files in the repository.
 2. Identify the safest integration point.
 3. Implement the change with minimal modifications.
+
+## Git Safety Procedure
+
+Before making changes for any task:
+
+1. Check the current git working tree state.
+2. Assume existing local modifications are intentional unless explicitly told otherwise.
+3. Inspect any target file that already has local edits before modifying it.
+4. Stage only the exact files required for the current task.
+
+Agents must NOT:
+
+- use broad staging commands such as `git add .` or `git add -A`
+- reset, discard, or overwrite unrelated local changes without explicit user approval
+- assume a working repository with local changes is broken just because it differs from the last commit
+
+## Before Commit Checklist
+
+Before any commit:
+
+1. Check `git status`.
+2. Confirm which files belong to the current task.
+3. Inspect any already-modified target file before staging it.
+4. Stage only exact task files.
+5. Verify only the surfaces affected by the change.
+6. Do not bundle unrelated local work into the commit.
+
+## Context Maintenance Loop
+
+Agents must keep repository context docs current as part of normal product work.
+
+Update `AGENTS.md` when:
+
+- a default workflow changes
+- a core product rule or decision changes
+- deployment, verification, or repo-navigation assumptions change
+- a new recurring engineering rule would save future exploration time
+
+Update `CURRENT_STATE.md` when:
+
+- user-visible product behavior changes
+- a new feature becomes part of the normal workflow
+- a meaningful architectural decision is made
+- a route gains a clearer real-world responsibility
+- an old assumption in the file is no longer true
+
+Context update rule:
+
+- if a task changes product behavior, default workflow, important repo conventions, or current product truth, agents should update the relevant context docs in the same change unless the user explicitly says not to
+- keep context docs compact, high-signal, and current; remove stale guidance rather than endlessly appending
+- do not force a context-doc edit for tiny implementation details that do not change future decision-making
 
 ## Environment Consistency
 
