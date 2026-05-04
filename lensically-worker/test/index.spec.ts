@@ -52,6 +52,7 @@ const resetStatements = `
   DELETE FROM account_deletion_guards;
   DELETE FROM account_deletion_tombstones;
   DELETE FROM banned_identities;
+  DELETE FROM batch_schedule_presets;
   DELETE FROM users;
 `
   .split(";")
@@ -1993,6 +1994,212 @@ describe("account scheduling preferences", () => {
     await expect(updateResponse.json()).resolves.toMatchObject({
       error: "timezone must be a valid IANA timezone",
     });
+  });
+});
+
+describe("batch schedule presets API", () => {
+  it("creates, favorites, and lists batch schedule presets for the authenticated user", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const createResponse = await runWorker(new Request("https://api.lensically.com/api/batch-schedule/presets", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        name: "Daily 17",
+        times: ["08:00", "08:45", "09:30"],
+        is_favorite: true,
+      }),
+    }));
+
+    expect(createResponse.status).toBe(200);
+    await expect(createResponse.json()).resolves.toMatchObject({
+      success: true,
+      preset: {
+        name: "Daily 17",
+        times: ["08:00", "08:45", "09:30"],
+        is_favorite: true,
+      },
+    });
+
+    const listResponse = await runWorker(new Request("https://api.lensically.com/api/batch-schedule/presets", {
+      method: "GET",
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }));
+
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toMatchObject({
+      success: true,
+      presets: [
+        {
+          name: "Daily 17",
+          times: ["08:00", "08:45", "09:30"],
+          is_favorite: true,
+        },
+      ],
+    });
+  });
+
+  it("keeps only one favorite preset per user", async () => {
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+
+    const firstResponse = await runWorker(new Request("https://api.lensically.com/api/batch-schedule/presets", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        name: "Morning",
+        times: ["08:00"],
+        is_favorite: true,
+      }),
+    }));
+
+    const firstJson = await firstResponse.json() as { preset?: { id?: string } };
+    expect(firstJson.preset?.id).toBeTruthy();
+
+    const secondResponse = await runWorker(new Request("https://api.lensically.com/api/batch-schedule/presets", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        name: "Afternoon",
+        times: ["14:00"],
+        is_favorite: false,
+      }),
+    }));
+
+    const secondJson = await secondResponse.json() as { preset?: { id?: string } };
+    expect(secondJson.preset?.id).toBeTruthy();
+
+    const favoriteResponse = await runWorker(new Request(`https://api.lensically.com/api/batch-schedule/presets/${secondJson.preset?.id}/favorite`, {
+      method: "POST",
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }));
+
+    expect(favoriteResponse.status).toBe(200);
+
+    const listResponse = await runWorker(new Request("https://api.lensically.com/api/batch-schedule/presets", {
+      method: "GET",
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }));
+
+    await expect(listResponse.json()).resolves.toMatchObject({
+      success: true,
+      presets: [
+        {
+          name: "Afternoon",
+          is_favorite: true,
+        },
+        {
+          name: "Morning",
+          is_favorite: false,
+        },
+      ],
+    });
+  });
+});
+
+describe("manual batch scheduling API", () => {
+  it("creates scheduled posts for each provided batch row and reuses exact duplicates", async () => {
+    await env.DB.exec(limitsSql);
+    await env.DB.exec(appThreadsAccountsSql);
+    await env.DB.exec(createThreadsAccountsTableSql);
+
+    const { cookieHeader } = await createAuthenticatedRequestContext();
+    const now = Math.floor(Date.now() / 1000);
+
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind("threads-user-batch-api", "token-batch-api", now + (30 * 24 * 60 * 60), now)
+      .run();
+
+    await env.DB.prepare(
+      `INSERT INTO app_threads_accounts (app_user_id, threads_user_id, created_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind("user-authenticated", "threads-user-batch-api", now)
+      .run();
+
+    const payload = {
+      app_user_id: "user-authenticated",
+      threads_user_id: "threads-user-batch-api",
+      timezone: "America/New_York",
+      entries: [
+        {
+          text: "Batch post 1",
+          date: "2099-01-15",
+          time: "08:00",
+        },
+        {
+          text: "Batch post 2",
+          date: "2099-01-15",
+          time: "08:45",
+        },
+        {
+          text: "Batch post 1",
+          date: "2099-01-15",
+          time: "08:00",
+        },
+      ],
+    };
+
+    const response = await runWorker(new Request("https://api.lensically.com/api/threads/schedule/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify(payload),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      results: [
+        {
+          row_number: 1,
+          success: true,
+          reused: false,
+          scheduled_time_utc: "2099-01-15T13:00:00.000Z",
+        },
+        {
+          row_number: 2,
+          success: true,
+          reused: false,
+          scheduled_time_utc: "2099-01-15T13:45:00.000Z",
+        },
+        {
+          row_number: 3,
+          success: true,
+          reused: true,
+          scheduled_time_utc: "2099-01-15T13:00:00.000Z",
+        },
+      ],
+    });
+
+    const scheduledCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM scheduled_posts
+       WHERE user_id = ?`,
+    )
+      .bind("user-authenticated")
+      .first<{ total: number }>();
+
+    expect(Number(scheduledCount?.total ?? 0)).toBe(2);
   });
 });
 

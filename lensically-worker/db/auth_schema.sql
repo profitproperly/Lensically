@@ -94,3 +94,17 @@ CREATE TABLE IF NOT EXISTS banned_identities (
 
 CREATE INDEX IF NOT EXISTS idx_banned_identity_expires
   ON banned_identities (identity_type, identity_value, expires_at);
+
+CREATE TABLE IF NOT EXISTS batch_schedule_presets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  times_json TEXT NOT NULL,
+  is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0, 1)),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_id
+  ON batch_schedule_presets (user_id, is_favorite DESC, updated_at DESC);

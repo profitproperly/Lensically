@@ -58,6 +58,12 @@ const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;
 const MAX_THREADS_POST_CURSOR_DEPTH = 250;
 const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const WORKSPACE_APP_USER_ID = "workspace-owner";
+const WORKSPACE_IS_ADMIN = true;
+const WORKSPACE_DEFAULT_TIMEZONE = "America/New_York";
+const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;
+const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;
+const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;
 
 interface Env {
   THREADS_CLIENT_ID: string;
@@ -83,6 +89,12 @@ type ConfiguredThreadsAccount = {
   label: string;
   username: string;
   tokenEnv: keyof Env;
+};
+
+type ResolvedConfiguredThreadsAccount = ConfiguredThreadsAccount & {
+  accessToken: string;
+  expiresAt: number | null;
+  createdAt: number | null;
 };
 
 type ConfiguredThreadsAccountProfile = {
@@ -281,30 +293,66 @@ function normalizeAppUserId(raw: string | null | undefined): string | null {
   return value;
 }
 
-function getConfiguredThreadsAccounts(env: Env): Array<ConfiguredThreadsAccount & { accessToken: string }> {
-  return CONFIGURED_THREADS_ACCOUNTS.flatMap((account) => {
+function getConfiguredThreadsAccountDefinitions(env: Env): ConfiguredThreadsAccount[] {
+  return CONFIGURED_THREADS_ACCOUNTS.filter((account) => {
     const accessToken = env[account.tokenEnv];
-    if (typeof accessToken !== "string" || !accessToken.trim()) {
-      return [];
-    }
-
-    return [{
-      ...account,
-      accessToken: accessToken.trim(),
-    }];
+    return typeof accessToken === "string" && accessToken.trim().length > 0;
   });
 }
 
-function getConfiguredThreadsAccountById(
+async function resolveConfiguredThreadsAccount(
   env: Env,
-  accountId: string | null | undefined,
-): (ConfiguredThreadsAccount & { accessToken: string }) | null {
-  const normalizedId = accountId?.trim().toLowerCase();
-  if (!normalizedId) {
-    return getConfiguredThreadsAccounts(env)[0] ?? null;
+  account: ConfiguredThreadsAccount,
+): Promise<ResolvedConfiguredThreadsAccount | null> {
+  await ensureThreadsAccountsTable(env);
+
+  const storedAccount = await env.DB.prepare(
+    `SELECT access_token, expires_at, created_at
+     FROM threads_accounts
+     WHERE configured_account_id = ?
+     LIMIT 1`,
+  ).bind(account.id).first<{
+    access_token: string | null;
+    expires_at: number | string | null;
+    created_at: number | string | null;
+  }>();
+
+  const storedAccessToken = storedAccount?.access_token?.trim() ?? "";
+  if (storedAccessToken) {
+    return {
+      ...account,
+      accessToken: storedAccessToken,
+      expiresAt: Number(storedAccount?.expires_at ?? 0) || 0,
+      createdAt: Number(storedAccount?.created_at ?? 0) || 0,
+    };
   }
 
-  return getConfiguredThreadsAccounts(env).find((account) => account.id === normalizedId) ?? null;
+  const bootstrapAccessToken = env[account.tokenEnv];
+  if (typeof bootstrapAccessToken !== "string" || !bootstrapAccessToken.trim()) {
+    return null;
+  }
+
+  return {
+    ...account,
+    accessToken: bootstrapAccessToken.trim(),
+    expiresAt: null,
+    createdAt: null,
+  };
+}
+
+async function getConfiguredThreadsAccountById(
+  env: Env,
+  accountId: string | null | undefined,
+): Promise<ResolvedConfiguredThreadsAccount | null> {
+  const normalizedId = accountId?.trim().toLowerCase();
+  const accounts = getConfiguredThreadsAccountDefinitions(env);
+
+  if (!normalizedId) {
+    return accounts.length > 0 ? resolveConfiguredThreadsAccount(env, accounts[0]) : null;
+  }
+
+  const matchedAccount = accounts.find((account) => account.id === normalizedId) ?? null;
+  return matchedAccount ? resolveConfiguredThreadsAccount(env, matchedAccount) : null;
 }
 
 function configuredThreadsAccountFallbackPayload(
@@ -325,62 +373,102 @@ function configuredThreadsAccountFallbackPayload(
   };
 }
 
+async function upsertConfiguredThreadsAccountToken(
+  env: Env,
+  account: ResolvedConfiguredThreadsAccount,
+  threadsUserId: string,
+): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  const createdAt = account.createdAt && account.createdAt > 0 ? account.createdAt : now;
+  const expiresAt = account.expiresAt && account.expiresAt > 0 ? account.expiresAt : 0;
+
+  await ensureThreadsAccountsTable(env);
+  await env.DB.prepare(
+    `DELETE FROM threads_accounts
+     WHERE configured_account_id = ?
+       AND threads_user_id <> ?`,
+  )
+    .bind(account.id, threadsUserId)
+    .run();
+
+  await env.DB.prepare(
+    `INSERT INTO threads_accounts (
+      threads_user_id,
+      access_token,
+      expires_at,
+      created_at,
+      configured_account_id
+    )
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(threads_user_id) DO UPDATE SET
+       access_token = excluded.access_token,
+       expires_at = excluded.expires_at,
+       configured_account_id = excluded.configured_account_id`,
+  )
+    .bind(threadsUserId, account.accessToken, expiresAt, createdAt, account.id)
+    .run();
+}
+
 async function fetchConfiguredThreadsProfile(
-  account: ConfiguredThreadsAccount & { accessToken: string },
+  env: Env,
+  account: ResolvedConfiguredThreadsAccount,
   index: number,
 ): Promise<ConfiguredThreadsAccountProfile> {
   const fallback = configuredThreadsAccountFallbackPayload(account, index);
-
-  try {
-    const response = await fetch(
-      "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_biography,is_verified,threads_profile_picture_url",
-      {
-        headers: {
-          Authorization: `Bearer ${account.accessToken}`,
-        },
-      },
-    );
-
-    if (!response.ok) {
-      return fallback;
-    }
-
-    const payload = await readJsonSafe(response);
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-      return fallback;
-    }
-
-    const data = payload as {
-      id?: unknown;
-      username?: unknown;
-      name?: unknown;
-      threads_biography?: unknown;
-      is_verified?: unknown;
-      threads_profile_picture_url?: unknown;
-    };
-
-    return {
-      threads_user_id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallback.threads_user_id,
-      is_active: index === 0,
-      created_at: 0,
-      username: typeof data.username === "string" && data.username.trim() ? data.username.trim() : fallback.username,
-      name: typeof data.name === "string" && data.name.trim() ? data.name.trim() : fallback.name,
-      label: account.label,
-      account_id: account.id,
-      threads_biography: typeof data.threads_biography === "string" ? data.threads_biography : null,
-      is_verified: data.is_verified === true,
-      threads_profile_picture_url: typeof data.threads_profile_picture_url === "string"
-        ? data.threads_profile_picture_url
-        : null,
-    };
-  } catch {
+  const data = await fetchThreadsProfileByAccessToken(account.accessToken);
+  if (!data) {
     return fallback;
   }
+
+  try {
+    if (data.threads_user_id) {
+      await upsertConfiguredThreadsAccountToken(env, account, data.threads_user_id);
+    }
+  } catch {
+    // Refresh bootstrap should not break configured account reads.
+  }
+
+  return {
+    threads_user_id: data.threads_user_id ?? fallback.threads_user_id,
+    is_active: index === 0,
+    created_at: 0,
+    username: data.username ?? fallback.username,
+    name: data.name ?? fallback.name,
+    label: account.label,
+    account_id: account.id,
+    threads_biography: data.threads_biography,
+    is_verified: data.is_verified,
+    threads_profile_picture_url: data.threads_profile_picture_url,
+  };
 }
 
 async function getConfiguredThreadsProfiles(env: Env): Promise<ConfiguredThreadsAccountProfile[]> {
-  const accounts = getConfiguredThreadsAccounts(env);
-  return Promise.all(accounts.map((account, index) => fetchConfiguredThreadsProfile(account, index)));
+  const configuredAccounts = await Promise.all(
+    getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
+  );
+  const accounts = configuredAccounts.filter((account): account is ResolvedConfiguredThreadsAccount => account !== null);
+  return Promise.all(accounts.map((account, index) => fetchConfiguredThreadsProfile(env, account, index)));
+}
+
+async function bootstrapConfiguredThreadsAccounts(env: Env): Promise<void> {
+  const accounts = await Promise.all(
+    getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
+  );
+
+  for (const account of accounts) {
+    if (!account) {
+      continue;
+    }
+    try {
+      const profile = await fetchThreadsProfileByAccessToken(account.accessToken);
+      if (!profile?.threads_user_id) {
+        continue;
+      }
+      await upsertConfiguredThreadsAccountToken(env, account, profile.threads_user_id);
+    } catch {
+      // Best-effort bootstrap only.
+    }
+  }
 }
 
 type OauthStateContext = {
@@ -2474,6 +2562,127 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
   ).run();
 }
 
+function normalizeBatchSchedulePresetName(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH) {
+    return null;
+  }
+  return trimmed;
+}
+
+function normalizeBatchSchedulePresetTimes(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_BATCH_SCHEDULE_PRESET_SLOTS) {
+    return null;
+  }
+
+  const normalized = value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .map((entry) => {
+      const parsed = parseHourMinute(entry);
+      if (!parsed) {
+        return "";
+      }
+      return `${parsed.hour.toString().padStart(2, "0")}:${parsed.minute.toString().padStart(2, "0")}`;
+    });
+
+  if (normalized.some((entry) => !entry)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+async function ensureBatchSchedulePresetsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS batch_schedule_presets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      times_json TEXT NOT NULL,
+      is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_id
+     ON batch_schedule_presets (user_id, is_favorite DESC, updated_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_batch_schedule_presets_favorite_per_user
+     ON batch_schedule_presets (user_id)
+     WHERE is_favorite = 1`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_batch_schedule_presets_touch_updated_at
+     AFTER UPDATE ON batch_schedule_presets
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE batch_schedule_presets
+       SET updated_at = CURRENT_TIMESTAMP
+       WHERE id = NEW.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_batch_schedule_presets_user_cleanup
+     AFTER DELETE ON users
+     FOR EACH ROW
+     BEGIN
+       DELETE FROM batch_schedule_presets
+       WHERE user_id = OLD.id;
+     END`,
+  ).run();
+}
+
+async function listBatchSchedulePresetsForUser(
+  env: Env,
+  userId: string,
+): Promise<Array<{ id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string }>> {
+  await ensureBatchSchedulePresetsTable(env);
+  const rows = await env.DB.prepare(
+    `SELECT id, name, times_json, is_favorite, created_at, updated_at
+     FROM batch_schedule_presets
+     WHERE user_id = ?
+     ORDER BY is_favorite DESC, updated_at DESC, created_at DESC, id DESC`,
+  )
+    .bind(userId)
+    .all<{
+      id: string;
+      name: string;
+      times_json: string;
+      is_favorite: number;
+      created_at: string;
+      updated_at: string;
+    }>();
+
+  return (rows.results ?? []).map((row) => {
+    let parsedTimes: unknown = [];
+    try {
+      parsedTimes = JSON.parse(row.times_json);
+    } catch {
+      parsedTimes = [];
+    }
+    const normalizedTimes = normalizeBatchSchedulePresetTimes(parsedTimes) ?? [];
+    return {
+      id: row.id,
+      name: row.name,
+      times: normalizedTimes,
+      is_favorite: Number(row.is_favorite) === 1,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  });
+}
+
 async function listUserTableColumns(env: Env): Promise<string[]> {
   const result = await env.DB.prepare("PRAGMA table_info(users)").all<{ name?: string }>();
   return (result.results ?? [])
@@ -2577,7 +2786,8 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
       threads_user_id TEXT PRIMARY KEY,
       access_token TEXT NOT NULL,
       expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      configured_account_id TEXT
     )`,
   ).run();
 
@@ -2597,6 +2807,7 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
     const hasAccessToken = columnNames.has("access_token");
     const hasExpiresAt = columnNames.has("expires_at");
     const hasCreatedAt = columnNames.has("created_at");
+    const hasConfiguredAccountId = columnNames.has("configured_account_id");
 
     const threadsUserIdExpr = hasThreadsUserId
       ? "threads_user_id"
@@ -2608,6 +2819,7 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
     const accessTokenExpr = hasAccessToken ? "access_token" : "''";
     const expiresAtExpr = hasExpiresAt ? "expires_at" : "0";
     const createdAtExpr = hasCreatedAt ? "created_at" : "CAST(strftime('%s','now') AS INTEGER)";
+    const configuredAccountIdExpr = hasConfiguredAccountId ? "configured_account_id" : "NULL";
 
     const dbSession = env.DB.withSession("first-primary");
     let transactionStarted = false;
@@ -2620,7 +2832,8 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
           threads_user_id TEXT PRIMARY KEY,
           access_token TEXT NOT NULL,
           expires_at INTEGER NOT NULL,
-          created_at INTEGER NOT NULL
+          created_at INTEGER NOT NULL,
+          configured_account_id TEXT
         )`,
       ).run();
 
@@ -2629,13 +2842,15 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
           threads_user_id,
           access_token,
           expires_at,
-          created_at
+          created_at,
+          configured_account_id
         )
         SELECT
           ${threadsUserIdExpr},
           ${accessTokenExpr},
           ${expiresAtExpr},
-          ${createdAtExpr}
+          ${createdAtExpr},
+          ${configuredAccountIdExpr}
         FROM threads_accounts
         WHERE ${threadsUserIdExpr} IS NOT NULL
           AND length(trim(${threadsUserIdExpr})) > 0`,
@@ -2658,6 +2873,7 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
     { name: "access_token", definition: "TEXT NOT NULL DEFAULT ''" },
     { name: "expires_at", definition: "INTEGER NOT NULL DEFAULT 0" },
     { name: "created_at", definition: "INTEGER NOT NULL DEFAULT 0" },
+    { name: "configured_account_id", definition: "TEXT" },
   ];
 
   for (const column of requiredColumns) {
@@ -2667,6 +2883,11 @@ async function ensureThreadsAccountsTable(env: Env): Promise<void> {
     }
     await env.DB.prepare(`ALTER TABLE threads_accounts ADD COLUMN ${column.name} ${column.definition}`).run();
   }
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_threads_accounts_configured_account_id
+     ON threads_accounts (configured_account_id)`,
+  ).run();
 }
 
 type ThreadsAccount = {
@@ -2803,9 +3024,9 @@ async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise
   logWorkerEvent("THREADS_ACCOUNT_LOOKUP", {
     appUserId,
   });
-  const configuredAccount = getConfiguredThreadsAccounts(env)[0];
+  const configuredAccount = await getConfiguredThreadsAccountById(env, null);
   if (configuredAccount) {
-    const profile = await fetchConfiguredThreadsProfile(configuredAccount, 0);
+    const profile = await fetchConfiguredThreadsProfile(env, configuredAccount, 0);
     return {
       threads_user_id: profile.threads_user_id,
       access_token: configuredAccount.accessToken,
@@ -4190,9 +4411,14 @@ function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
 }
 
 async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
-  const accounts = getConfiguredThreadsAccounts(env);
+  const accounts = await Promise.all(
+    getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
+  );
 
   for (const configuredAccount of accounts) {
+    if (!configuredAccount) {
+      continue;
+    }
     try {
       const profile = await fetchThreadsProfileByAccessToken(configuredAccount.accessToken);
       const threadsUserId = profile?.threads_user_id;
@@ -4204,6 +4430,8 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         }, "error");
         continue;
       }
+
+      await upsertConfiguredThreadsAccountToken(env, configuredAccount, threadsUserId);
 
       await upsertThreadsProfileCache(env, {
         threads_user_id: threadsUserId,
@@ -4887,6 +5115,199 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (path === "/api/auth/preferences" && request.method === "POST") {
       return applyAuthCors(await updatePreferences(request, env));
+    }
+
+    if (normalizedPath === "/api/batch-schedule/presets" && request.method === "GET") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return applyAuthCors(authUser);
+      }
+
+      const presets = await listBatchSchedulePresetsForUser(env, authUser.id);
+      return applyAuthCors(new Response(JSON.stringify({
+        success: true,
+        presets,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    }
+
+    if (normalizedPath === "/api/batch-schedule/presets" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return applyAuthCors(authUser);
+      }
+
+      let payload: {
+        name?: string;
+        times?: unknown;
+        is_favorite?: boolean;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      const name = normalizeBatchSchedulePresetName(payload.name);
+      const times = normalizeBatchSchedulePresetTimes(payload.times);
+      if (!name || !times) {
+        return applyAuthCors(new Response(JSON.stringify({
+          error: "name and a valid ordered times array are required",
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      await ensureWorkspaceUserRecord(env, {
+        id: authUser.id,
+        email: authUser.email ?? "workspace@lensically.local",
+        timezone: authUser.timezone ?? WORKSPACE_DEFAULT_TIMEZONE,
+        clock_format: authUser.clock_format ?? "12h",
+      });
+      await ensureBatchSchedulePresetsTable(env);
+
+      const existingCount = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM batch_schedule_presets
+         WHERE user_id = ?`,
+      )
+        .bind(authUser.id)
+        .first<{ total: number | string }>();
+
+      if (Number(existingCount?.total ?? 0) >= MAX_BATCH_SCHEDULE_PRESET_COUNT) {
+        return applyAuthCors(new Response(JSON.stringify({
+          error: `Maximum of ${MAX_BATCH_SCHEDULE_PRESET_COUNT} batch schedule presets allowed.`,
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      const isFavorite = payload.is_favorite === true;
+      if (isFavorite) {
+        await env.DB.prepare(
+          `UPDATE batch_schedule_presets
+           SET is_favorite = 0
+           WHERE user_id = ?`,
+        )
+          .bind(authUser.id)
+          .run();
+      }
+
+      const presetId = crypto.randomUUID();
+      await env.DB.prepare(
+        `INSERT INTO batch_schedule_presets (id, user_id, name, times_json, is_favorite)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          presetId,
+          authUser.id,
+          name,
+          JSON.stringify(times),
+          isFavorite ? 1 : 0,
+        )
+        .run();
+
+      const presets = await listBatchSchedulePresetsForUser(env, authUser.id);
+      const preset = presets.find((entry) => entry.id === presetId) ?? null;
+
+      return applyAuthCors(new Response(JSON.stringify({
+        success: true,
+        preset,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    }
+
+    const favoritePresetMatch = normalizedPath.match(/^\/api\/batch-schedule\/presets\/([^/]+)\/favorite$/);
+    if (favoritePresetMatch && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return applyAuthCors(authUser);
+      }
+
+      const presetId = favoritePresetMatch[1];
+      await ensureBatchSchedulePresetsTable(env);
+      const existingPreset = await env.DB.prepare(
+        `SELECT id
+         FROM batch_schedule_presets
+         WHERE id = ?
+           AND user_id = ?
+         LIMIT 1`,
+      )
+        .bind(presetId, authUser.id)
+        .first<{ id: string }>();
+
+      if (!existingPreset) {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Batch preset not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      await env.DB.prepare(
+        `UPDATE batch_schedule_presets
+         SET is_favorite = 0
+         WHERE user_id = ?`,
+      )
+        .bind(authUser.id)
+        .run();
+
+      await env.DB.prepare(
+        `UPDATE batch_schedule_presets
+         SET is_favorite = 1
+         WHERE id = ?
+           AND user_id = ?`,
+      )
+        .bind(presetId, authUser.id)
+        .run();
+
+      const presets = await listBatchSchedulePresetsForUser(env, authUser.id);
+      const preset = presets.find((entry) => entry.id === presetId) ?? null;
+
+      return applyAuthCors(new Response(JSON.stringify({
+        success: true,
+        preset,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    }
+
+    const deletePresetMatch = normalizedPath.match(/^\/api\/batch-schedule\/presets\/([^/]+)$/);
+    if (deletePresetMatch && request.method === "DELETE") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return applyAuthCors(authUser);
+      }
+
+      await ensureBatchSchedulePresetsTable(env);
+      const deleteResult = await env.DB.prepare(
+        `DELETE FROM batch_schedule_presets
+         WHERE id = ?
+           AND user_id = ?`,
+      )
+        .bind(deletePresetMatch[1], authUser.id)
+        .run();
+
+      if (Number(deleteResult.meta?.changes ?? 0) === 0) {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Batch preset not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return applyAuthCors(new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
     }
 
     if (path === "/api/auth/delete-account" && request.method === "POST") {
@@ -6659,19 +7080,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/posts" && request.method === "GET") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
-      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const appUserId = WORKSPACE_APP_USER_ID;
       const cursor = url.searchParams.get("cursor");
       const cursorDepthParam = Number(url.searchParams.get("cursor_depth") || 0);
       const cursorDepth = Number.isFinite(cursorDepthParam) && cursorDepthParam > 0
@@ -6697,23 +7106,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      if (!appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Missing app_user_id" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
-            },
-          },
-        );
-      }
-
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
       logWorkerEvent("THREADS_ACCOUNT_LOOKUP_RESULT", {
@@ -6738,7 +7131,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       try {
         limitCheck = await enforceLimit(
           env,
-          { id: account.threads_user_id, is_admin: authUser.is_admin },
+          { id: account.threads_user_id, is_admin: WORKSPACE_IS_ADMIN },
           "insights",
         );
         if (limitCheck && limitCheck.allowed === false) {
@@ -6818,36 +7211,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/posts/archive" && request.method === "GET") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
-      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
-      if (!appUserId) {
-        return new Response(
-          JSON.stringify({ error: "Missing app_user_id" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              ...requestCorsHeaders,
-            },
-          },
-        );
-      }
-
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
       if (!account || !account.threads_user_id) {
@@ -6896,34 +7260,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/insights" && request.method === "GET") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
-      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const appUserId = WORKSPACE_APP_USER_ID;
       const threadsUserId = url.searchParams.get("threads_user_id");
-      if (!appUserId) {
-        return new Response(
-          JSON.stringify({ error: "missing app_user_id" }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
@@ -6938,7 +7277,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
       const limit = await enforceLimit(
         env,
-        { id: account.threads_user_id, is_admin: authUser.is_admin },
+        { id: account.threads_user_id, is_admin: WORKSPACE_IS_ADMIN },
         "insights",
       );
       if (!limit.allowed) {
@@ -6966,20 +7305,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/post-insights" && request.method === "GET") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
       const mediaId = url.searchParams.get("id");
-      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       if (!mediaId) {
         return new Response(
           JSON.stringify({ error: "missing media id" }),
@@ -6990,19 +7316,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      if (!appUserId) {
-        return new Response(
-          JSON.stringify({ error: "missing app_user_id" }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
@@ -7276,18 +7590,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       (url.pathname === "/api/threads/publish" || url.pathname === "/api/threads/post-now")
       && request.method === "POST"
     ) {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
       let payload: { app_user_id?: string; threads_user_id?: string; text?: string };
       try {
         payload = await request.json();
@@ -7301,7 +7603,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
       const threadsUserId = payload.threads_user_id?.trim();
       const text = payload.text?.trim();
 
@@ -7315,10 +7616,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse({ "content-type": "application/json; charset=UTF-8" });
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
 
@@ -7334,7 +7632,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (url.pathname === "/api/threads/publish") {
         const limit = await enforceLimit(
           env,
-          { id: account.threads_user_id, is_admin: authUser.is_admin },
+          { id: account.threads_user_id, is_admin: WORKSPACE_IS_ADMIN },
           "publish",
         );
         if (!limit.allowed) {
@@ -7451,19 +7749,135 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
-    if (url.pathname === "/api/threads/schedule" && request.method === "POST") {
+    if (url.pathname === "/api/threads/schedule/batch" && request.method === "POST") {
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
+        return authUser;
+      }
+
+      let payload: {
+        app_user_id?: string;
+        threads_user_id?: string;
+        timezone?: string;
+        date?: string;
+        entries?: Array<{
+          text?: string;
+          time?: string;
+          date?: string;
+        }>;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
           },
+        );
+      }
+
+      const ownedAppUserId = payload.app_user_id?.trim() || authUser.id || WORKSPACE_APP_USER_ID;
+      const threadsUserId = payload.threads_user_id?.trim();
+      const timezone = payload.timezone?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
+      const sharedDate = payload.date?.trim() || "";
+      const entries = Array.isArray(payload.entries) ? payload.entries : [];
+
+      if (!threadsUserId || entries.length === 0 || entries.length > MAX_SCHEDULED_POST_MAX_BATCH_SIZE) {
+        return new Response(
+          JSON.stringify({ error: "threads_user_id and a non-empty entries array are required" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const directThreadsAccount = account?.threads_user_id === threadsUserId
+        ? account
+        : await env.DB.prepare(
+          `SELECT threads_user_id
+           FROM threads_accounts
+           WHERE threads_user_id = ?
+           LIMIT 1`,
+        )
+          .bind(threadsUserId)
+          .first<{ threads_user_id: string }>();
+
+      if (!directThreadsAccount?.threads_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const results: Array<{
+        row_number: number;
+        success: boolean;
+        reused: boolean;
+        scheduled_post_id: number | null;
+        scheduled_time_utc: string | null;
+        error: string | null;
+      }> = [];
+
+      for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index];
+        const text = typeof entry?.text === "string" ? entry.text : "";
+        const time = typeof entry?.time === "string" ? entry.time.trim() : "";
+        const date = typeof entry?.date === "string" && entry.date.trim()
+          ? entry.date.trim()
+          : sharedDate;
+
+        if (!date || !time || typeof text !== "string") {
+          results.push({
+            row_number: index + 1,
+            success: false,
+            reused: false,
+            scheduled_post_id: null,
+            scheduled_time_utc: null,
+            error: "missing_required_fields",
+          });
+          continue;
+        }
+
+        const scheduled = await createScheduledPostForAppUser(
+          env,
+          ownedAppUserId,
+          threadsUserId,
+          text,
+          date,
+          time,
+          timezone,
+        );
+
+        results.push({
+          row_number: index + 1,
+          success: scheduled.success,
+          reused: scheduled.reused === true,
+          scheduled_post_id: scheduled.scheduledPostId ?? null,
+          scheduled_time_utc: scheduled.scheduledTimeUtc ?? null,
+          error: scheduled.success ? null : scheduled.error ?? "schedule_failed",
         });
       }
 
+      return new Response(
+        JSON.stringify({
+          success: true,
+          results,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/schedule" && request.method === "POST") {
       let payload: {
         app_user_id?: string;
         threads_user_id?: string;
@@ -7484,7 +7898,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
       const threadsUserId = payload.threads_user_id?.trim();
       const text = payload.text?.trim();
       const date = payload.date?.trim();
@@ -7503,13 +7916,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
-
-      const preferredTimezone = await getUserTimezonePreference(env, ownedAppUserId);
-      const resolvedTimezone = timezone ?? preferredTimezone ?? "UTC";
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const resolvedTimezone = timezone ?? WORKSPACE_DEFAULT_TIMEZONE;
 
       const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
       if (!account?.threads_user_id || account.threads_user_id !== threadsUserId) {
@@ -7521,13 +7929,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-
-      await ensureWorkspaceUserRecord(env, {
-        id: ownedAppUserId,
-        email: "workspace@lensically.local",
-        timezone: resolvedTimezone,
-        clock_format: "12h",
-      });
 
       const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, resolvedTimezone);
       if (!scheduledUtc) {
@@ -7547,16 +7948,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
-      }
-
-      if (timezone && timezone !== preferredTimezone) {
-        await env.DB.prepare(
-          `UPDATE users
-           SET timezone = ?
-           WHERE id = ?`,
-        )
-          .bind(resolvedTimezone, ownedAppUserId)
-          .run();
       }
 
       await ensureScheduledPostsTable(env);
@@ -7690,18 +8081,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/schedule/update" && request.method === "POST") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
       let payload: {
         app_user_id?: string;
         scheduled_post_id?: number | string;
@@ -7722,7 +8101,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
       const scheduledPostId = Number(payload.scheduled_post_id);
       const text = payload.text?.trim();
       const date = payload.date?.trim();
@@ -7741,13 +8119,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
-
-      const preferredTimezone = await getUserTimezonePreference(env, ownedAppUserId);
-      const resolvedTimezone = timezone ?? preferredTimezone ?? "UTC";
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const resolvedTimezone = timezone ?? WORKSPACE_DEFAULT_TIMEZONE;
       const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, resolvedTimezone);
       if (!scheduledUtc) {
         return new Response(
@@ -7766,16 +8139,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
-      }
-
-      if (timezone && timezone !== preferredTimezone) {
-        await env.DB.prepare(
-          `UPDATE users
-           SET timezone = ?
-           WHERE id = ?`,
-        )
-          .bind(resolvedTimezone, ownedAppUserId)
-          .run();
       }
 
       await ensureScheduledPostsTable(env);
@@ -7875,18 +8238,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/schedule/delete" && request.method === "POST") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
       let payload: {
         app_user_id?: string;
         scheduled_post_id?: number | string;
@@ -7903,7 +8254,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
       const scheduledPostId = Number(payload.scheduled_post_id);
       if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
         return new Response(
@@ -7915,10 +8265,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const deleted = await deleteScheduledPostForAppUser(env, ownedAppUserId, scheduledPostId);
       if (deleted === "not_found") {
@@ -7955,18 +8302,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/schedule/retry" && request.method === "POST") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
       let payload: {
         app_user_id?: string;
         scheduled_post_id?: number | string;
@@ -7983,7 +8318,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const appUserId = normalizeAppUserId(payload.app_user_id ?? null);
       const scheduledPostId = Number(payload.scheduled_post_id);
       if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
         return new Response(
@@ -7995,10 +8329,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       await ensureScheduledPostsTable(env);
       const scheduledPost = await env.DB.prepare(
@@ -8106,23 +8437,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/schedule" && request.method === "GET") {
-      const authUser = await requireAuth(request, env);
-      if (authUser instanceof Response) {
-        return new Response(authUser.body, {
-          status: authUser.status,
-          statusText: authUser.statusText,
-          headers: {
-            "Content-Type": "application/json",
-            ...requestCorsHeaders,
-          },
-        });
-      }
-
-      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
-      const ownedAppUserId = resolveAuthenticatedAppUserId(authUser.id, appUserId);
-      if (!ownedAppUserId) {
-        return forbiddenJsonResponse(requestCorsHeaders);
-      }
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
       const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
       if (!scheduledPostsTableExists) {
@@ -8312,7 +8627,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : "America/New_York";
       const requestedDate = url.searchParams.get("date")?.trim() || null;
       const requestedAccountId = url.searchParams.get("account_id")?.trim() || null;
-      const configuredAccount = getConfiguredThreadsAccountById(env, requestedAccountId);
+      const configuredAccount = await getConfiguredThreadsAccountById(env, requestedAccountId);
 
       if (!configuredAccount) {
         return new Response(
@@ -8321,7 +8636,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const configuredProfile = await fetchConfiguredThreadsProfile(configuredAccount, 0);
+      const configuredProfile = await fetchConfiguredThreadsProfile(env, configuredAccount, 0);
       const targetDate = requestedDate && isValidIsoDate(requestedDate)
         ? requestedDate
         : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? null;
@@ -8410,7 +8725,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const targetDate = payload.date?.trim() && isValidIsoDate(payload.date.trim())
         ? payload.date.trim()
         : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? null;
-      const configuredAccount = getConfiguredThreadsAccountById(env, payload.account_id ?? null);
+      const configuredAccount = await getConfiguredThreadsAccountById(env, payload.account_id ?? null);
 
       if (!targetDate) {
         return new Response(
@@ -8433,7 +8748,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const configuredProfile = await fetchConfiguredThreadsProfile(configuredAccount, 0);
+      const configuredProfile = await fetchConfiguredThreadsProfile(env, configuredAccount, 0);
       const existingScheduledPosts = await listScheduledPostsForThreadsAccountOnLocalDate(
         env,
         configuredProfile.threads_user_id,
@@ -8528,14 +8843,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       await ensureAppThreadsTable(env);
+      await bootstrapConfiguredThreadsAccounts(env);
 
       const rows = await env.DB.prepare(
         `SELECT DISTINCT t.threads_user_id, t.access_token, t.expires_at
          FROM threads_accounts t
-         JOIN app_threads_accounts a
+         LEFT JOIN app_threads_accounts a
            ON a.threads_user_id = t.threads_user_id
-         JOIN users u
-           ON u.id = a.app_user_id`,
+         LEFT JOIN users u
+           ON u.id = a.app_user_id
+         WHERE t.configured_account_id IS NOT NULL
+            OR u.id IS NOT NULL`,
       ).all<{ threads_user_id: string; access_token: string; expires_at: number }>();
 
       const now = Math.floor(Date.now() / 1000);
@@ -8598,16 +8916,21 @@ async function refreshExpiringThreadsTokens(env: Env): Promise<void> {
   const threshold = now + (7 * 24 * 60 * 60);
 
   await ensureAppThreadsTable(env);
+  await bootstrapConfiguredThreadsAccounts(env);
 
   const rows = await env.DB
     .prepare(
       `SELECT DISTINCT t.threads_user_id, t.access_token
        FROM threads_accounts t
-       JOIN app_threads_accounts a
+       LEFT JOIN app_threads_accounts a
          ON a.threads_user_id = t.threads_user_id
-       JOIN users u
+       LEFT JOIN users u
          ON u.id = a.app_user_id
-       WHERE t.expires_at <= ?`,
+       WHERE t.expires_at <= ?
+         AND (
+           t.configured_account_id IS NOT NULL
+           OR u.id IS NOT NULL
+         )`,
     )
     .bind(threshold)
     .all<{ threads_user_id: string; access_token: string }>();

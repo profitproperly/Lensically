@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import BatchSchedulePanel from "@/components/BatchSchedulePanel";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import { useAuth } from "@/lib/AuthProvider";
 import {
@@ -29,7 +30,6 @@ const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
-const WORKSPACE_APP_USER_ID = "workspace-owner";
 const FALLBACK_TIMEZONE = "America/New_York";
 const FALLBACK_CLOCK_FORMAT = "12h";
 
@@ -199,7 +199,6 @@ function formatPublishErrorMessage(raw: string | null | undefined): string {
 
 export default function SchedulePage() {
   const { user } = useAuth();
-  const appUserId = WORKSPACE_APP_USER_ID;
   const timezone = resolveTimezonePreference(user?.timezone ?? FALLBACK_TIMEZONE);
   const timezoneLabel = formatTimezoneLabel(timezone);
   const clockFormatPreference = resolveClockFormatPreference(user?.clock_format ?? FALLBACK_CLOCK_FORMAT);
@@ -244,12 +243,6 @@ export default function SchedulePage() {
   }, [clockFormatPreference]);
 
   useEffect(() => {
-    if (!appUserId) {
-      setThreadsUserId("");
-      setLoadingConnection(false);
-      return;
-    }
-
     let isMounted = true;
     const controller = new AbortController();
 
@@ -260,7 +253,7 @@ export default function SchedulePage() {
       try {
         const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
           const accountsResponse = await fetch(
-            `${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            THREADS_ACCOUNTS_URL,
             {
               cache: "no-store",
               credentials: "include",
@@ -272,7 +265,7 @@ export default function SchedulePage() {
           }
 
           const meResponse = await fetch(
-            `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+            THREADS_ME_URL,
             {
               cache: "no-store",
               credentials: "include",
@@ -337,7 +330,7 @@ export default function SchedulePage() {
       isMounted = false;
       controller.abort();
     };
-  }, [appUserId]);
+  }, []);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -379,7 +372,7 @@ export default function SchedulePage() {
       setErrorMessage("Enter post text before publishing.");
       return;
     }
-    if (!appUserId || !threadsUserId) {
+    if (!threadsUserId) {
       setErrorMessage("Threads account is not connected.");
       return;
     }
@@ -396,7 +389,6 @@ export default function SchedulePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          app_user_id: appUserId,
           threads_user_id: threadsUserId,
           text: trimmedText,
         }),
@@ -427,7 +419,7 @@ export default function SchedulePage() {
       setErrorMessage("Enter post text before publishing.");
       return;
     }
-    if (!appUserId || !threadsUserId) {
+    if (!threadsUserId) {
       setErrorMessage("Threads account is not connected.");
       return;
     }
@@ -449,7 +441,7 @@ export default function SchedulePage() {
       setErrorMessage("Select both date and time to schedule a post.");
       return;
     }
-    if (!appUserId || !threadsUserId) {
+    if (!threadsUserId) {
       setErrorMessage("Threads account is not connected.");
       return;
     }
@@ -474,7 +466,6 @@ export default function SchedulePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          app_user_id: appUserId,
           threads_user_id: threadsUserId,
           text: trimmedText,
           date: scheduleDate,
@@ -561,7 +552,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-full space-y-6 overflow-x-hidden">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h1 className="text-3xl font-semibold text-slate-900">Create Post</h1>
         <Link
@@ -572,7 +563,7 @@ export default function SchedulePage() {
         </Link>
       </div>
 
-      <section className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <section className="w-full max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:max-w-2xl sm:p-6">
         <div className="space-y-5">
           <div>
             <label htmlFor="post-text" className="block text-sm font-medium text-slate-900">
@@ -620,37 +611,41 @@ export default function SchedulePage() {
                       Next Day
                     </button>
                   </div>
-                  <input
-                    id="schedule-date"
-                    type="date"
-                    value={scheduleDate}
-                    min={minScheduleDate}
-                    onChange={(event) => {
-                      setScheduleDate(event.target.value);
-                      setErrorMessage("");
-                      setSuccessMessage("");
-                    }}
-                    disabled={isSubmitting}
-                    className="mt-2 box-border w-full min-w-0 max-w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-                  />
+                  <div className="mt-2 w-full overflow-hidden rounded-md border border-slate-300 bg-white">
+                    <input
+                      id="schedule-date"
+                      type="date"
+                      value={scheduleDate}
+                      min={minScheduleDate}
+                      onChange={(event) => {
+                        setScheduleDate(event.target.value);
+                        setErrorMessage("");
+                        setSuccessMessage("");
+                      }}
+                      disabled={isSubmitting}
+                      className="block w-full min-w-0 appearance-none border-0 bg-transparent px-3 py-2 text-base text-slate-900 outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+                    />
+                  </div>
                 </div>
                 <div className="min-w-0">
                   <label htmlFor="schedule-time" className="block text-sm font-medium text-slate-900">
                     Time ({timezoneLabel}, {clockFormatLabel})
                   </label>
-                  <input
-                    id="schedule-time"
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(event) => {
-                      setScheduleTime(event.target.value);
-                      setErrorMessage("");
-                      setSuccessMessage("");
-                    }}
-                    disabled={isSubmitting}
-                    step={60}
-                    className="mt-2 box-border w-full min-w-0 max-w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-                  />
+                  <div className="mt-2 w-full overflow-hidden rounded-md border border-slate-300 bg-white">
+                    <input
+                      id="schedule-time"
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(event) => {
+                        setScheduleTime(event.target.value);
+                        setErrorMessage("");
+                        setSuccessMessage("");
+                      }}
+                      disabled={isSubmitting}
+                      step={60}
+                      className="block w-full min-w-0 appearance-none border-0 bg-transparent px-3 py-2 text-base text-slate-900 outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -688,12 +683,9 @@ export default function SchedulePage() {
                   Scheduling preferences: timezone <span className="font-medium text-slate-800">{timezoneLabel}</span>, clock format{" "}
                   <span className="font-medium text-slate-800">{clockFormatLabel}</span>.
                 </p>
-                <Link
-                  href="/account"
-                  className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 sm:w-auto"
-                >
-                  Change in Account Settings
-                </Link>
+                <span className="inline-flex w-full items-center justify-center rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-medium text-slate-500 sm:w-auto">
+                  Workspace timezone is managed in this private build.
+                </span>
               </div>
             </>
           ) : null}
@@ -762,6 +754,13 @@ export default function SchedulePage() {
           ) : null}
         </div>
       </section>
+
+      <BatchSchedulePanel
+        threadsUserId={threadsUserId}
+        timezone={timezone}
+        timezoneLabel={timezoneLabel}
+        clockFormatPreference={clockFormatPreference}
+      />
 
       {showPostNowConfirmation ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
