@@ -78,6 +78,55 @@ function formatTimestamp(value: string, timeZone: string): string {
   }).format(new Date(parsed));
 }
 
+function escapeCsvCell(value: string | number | null | undefined) {
+  const stringValue = typeof value === "number" ? String(value) : value ?? "";
+  const escapedValue = stringValue.replace(/"/g, "\"\"");
+  return `"${escapedValue}"`;
+}
+
+function buildFollowersCsvExport(rows: FollowerRow[]) {
+  const header = [
+    "date",
+    "captured_at",
+    "followers_count",
+    "net_change",
+  ];
+
+  const dataRows = rows.map((row) => [
+    row.date,
+    row.captured_at,
+    row.followers_count,
+    row.gain,
+  ]);
+
+  return [header, ...dataRows].map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function buildFollowersTxtExport(rows: FollowerRow[], timeZone: string) {
+  return rows.map((row, index) => {
+    const lines = [
+      `Snapshot ${index + 1}`,
+      `Date: ${formatSnapshotDate(row.date)}`,
+      `Captured: ${formatTimestamp(row.captured_at, timeZone)}`,
+      `Followers: ${formatMetric(row.followers_count)}`,
+      `Net Change: ${formatSignedMetric(row.gain)}`,
+    ];
+    return lines.join("\n");
+  }).join("\n\n---\n\n");
+}
+
+function triggerDownload(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(objectUrl);
+}
+
 export default function FollowersPage() {
   const [rows, setRows] = useState<FollowerRow[]>([]);
   const [page, setPage] = useState(1);
@@ -154,6 +203,28 @@ export default function FollowersPage() {
     return `Showing ${formatMetric(startIndex)}-${formatMetric(endIndex)} of ${formatMetric(totalCount)} daily snapshots`;
   }, [page, rows.length, totalCount]);
 
+  function handleDownload(format: "csv" | "txt") {
+    if (!rows.length) {
+      return;
+    }
+
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    if (format === "csv") {
+      triggerDownload(
+        `lensically-followers-page-${page}-${dateStamp}.csv`,
+        buildFollowersCsvExport(rows),
+        "text/csv;charset=utf-8",
+      );
+      return;
+    }
+
+    triggerDownload(
+      `lensically-followers-page-${page}-${dateStamp}.txt`,
+      buildFollowersTxtExport(rows, timeZone),
+      "text/plain;charset=utf-8",
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -167,6 +238,22 @@ export default function FollowersPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-slate-700">{summaryLabel}</p>
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleDownload("csv")}
+              disabled={!rows.length || loading}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Download CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDownload("txt")}
+              disabled={!rows.length || loading}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Download TXT
+            </button>
             <span className="text-sm text-slate-600">
               Page {formatMetric(page)} of {formatMetric(totalPages)}
             </span>
