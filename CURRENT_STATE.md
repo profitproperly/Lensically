@@ -6,6 +6,7 @@
 - Main active user workflows currently center on Create Post, Scheduled Posts, dashboard/insights, discovery, search, and archive flows.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
 - `/dashboard` now targets an operator-dashboard role rather than a simple profile/stats card.
+- `/followers` is a dedicated paginated follower-history surface for daily snapshot tracking.
 
 ## Core Scheduling State
 
@@ -29,6 +30,7 @@
 ## Dashboard State
 
 - `/dashboard` is the growth control room for the connected Threads account.
+- `/followers` shows persisted daily follower snapshots in a paginated table.
 - It aggregates:
   - today summary metrics
   - all-time top archived post by likes in the hero card

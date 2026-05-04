@@ -50,10 +50,10 @@ const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
 const SCHEDULED_POST_PUBLISH_CRON = "* * * * *";
 const THREADS_TOKEN_REFRESH_CRON = "0 */12 * * *";
 const LEGACY_COMBINED_SCHEDULED_CRON = "0 3 * * *";
-const THREADS_INSIGHTS_DAILY_WINDOW_CRON = "0 7,8 * * *";
+const THREADS_INSIGHTS_DAILY_WINDOW_CRON = "59 3,4 * * *";
 const THREADS_INSIGHTS_TIME_ZONE = "America/New_York";
-const THREADS_INSIGHTS_TARGET_HOUR = 3;
-const THREADS_INSIGHTS_TARGET_MINUTE = 0;
+const THREADS_INSIGHTS_TARGET_HOUR = 23;
+const THREADS_INSIGHTS_TARGET_MINUTE = 59;
 const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;
 const MAX_THREADS_POST_CURSOR_DEPTH = 250;
 const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
@@ -3298,6 +3298,49 @@ async function listThreadsFollowerSnapshots(
     .reverse();
 }
 
+async function countThreadsFollowerSnapshots(
+  env: Env,
+  threadsUserId: string,
+): Promise<number> {
+  await ensureThreadsFollowerSnapshotsTable(env);
+
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total_count
+     FROM threads_follower_snapshots
+     WHERE threads_user_id = ?`,
+  )
+    .bind(threadsUserId)
+    .first<{ total_count?: number | string }>();
+
+  return Number(row?.total_count ?? 0);
+}
+
+async function listThreadsFollowerSnapshotsPage(
+  env: Env,
+  threadsUserId: string,
+  limit: number,
+  offset: number,
+): Promise<Array<{ snapshot_date: string; followers_count: number; captured_at: string }>> {
+  await ensureThreadsFollowerSnapshotsTable(env);
+
+  const rows = await env.DB.prepare(
+    `SELECT threads_user_id, snapshot_date, followers_count, captured_at
+     FROM threads_follower_snapshots
+     WHERE threads_user_id = ?
+     ORDER BY snapshot_date DESC
+     LIMIT ?
+     OFFSET ?`,
+  )
+    .bind(threadsUserId, limit, offset)
+    .all<ThreadsFollowerSnapshotRow>();
+
+  return (rows.results ?? []).map((row) => ({
+    snapshot_date: row.snapshot_date,
+    followers_count: Number(row.followers_count ?? 0),
+    captured_at: row.captured_at,
+  }));
+}
+
 function extractFollowersCountFromInsightsPayload(payload: unknown): number | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return null;
@@ -3314,6 +3357,26 @@ function extractFollowersCountFromInsightsPayload(payload: unknown): number | nu
 
   const metricMap = buildThreadsMetricMap(data);
   return Number.isFinite(metricMap.followers_count) ? metricMap.followers_count : null;
+}
+
+async function resolveCurrentThreadsFollowerCount(
+  accessToken: string,
+  profileUsername: string | null | undefined,
+  userInsightsPayload: unknown,
+): Promise<number | null> {
+  let currentFollowersCount = extractFollowersCountFromInsightsPayload(userInsightsPayload);
+
+  if (profileUsername) {
+    const discovery = await executeThreadsProfileLookup({
+      accessToken,
+      username: profileUsername,
+    });
+    if (discovery.success && typeof discovery.data.follower_count === "number") {
+      currentFollowersCount = discovery.data.follower_count;
+    }
+  }
+
+  return currentFollowersCount;
 }
 
 function getPostTimestampMs(post: Pick<CachedThreadsPost, "timestamp">): number | null {
@@ -3548,15 +3611,11 @@ async function buildThreadsDashboardPayload(
     }
   }
 
-  if (profile?.username) {
-    const discovery = await executeThreadsProfileLookup({
-      accessToken: account.access_token,
-      username: profile.username,
-    });
-    if (discovery.success && typeof discovery.data.follower_count === "number") {
-      currentFollowersCount = discovery.data.follower_count;
-    }
-  }
+  currentFollowersCount = await resolveCurrentThreadsFollowerCount(
+    account.access_token,
+    profile?.username,
+    userInsightsPayload,
+  );
 
   if (currentFollowersCount !== null) {
     await upsertThreadsFollowerSnapshot(env, account.threads_user_id, todayDate, currentFollowersCount);
@@ -5008,6 +5067,8 @@ function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
 }
 
 async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
+  const snapshotDate = getLocalDateInTimeZone(THREADS_INSIGHTS_TIME_ZONE, Date.now());
+
   const accounts = await Promise.all(
     getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
   );
@@ -5047,6 +5108,15 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         });
       }
 
+      const currentFollowersCount = await resolveCurrentThreadsFollowerCount(
+        configuredAccount.accessToken,
+        profile?.username ?? configuredAccount.username,
+        userInsights,
+      );
+      if (snapshotDate && currentFollowersCount !== null) {
+        await upsertThreadsFollowerSnapshot(env, threadsUserId, snapshotDate, currentFollowersCount);
+      }
+
       const postsPage = await fetchThreadsPostsPageWithInsights(
         configuredAccount.accessToken,
         threadsUserId,
@@ -5068,6 +5138,7 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         threads_user_id: threadsUserId,
         posts_count: postsPage?.posts.length ?? 0,
         user_insights_cached: userInsights !== null,
+        follower_snapshot_saved: snapshotDate !== null && currentFollowersCount !== null,
       });
     } catch (error) {
       logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_FAILED", {
@@ -7271,6 +7342,76 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const dashboard = await buildThreadsDashboardPayload(env, account);
       return new Response(
         JSON.stringify(dashboard),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            ...requestCorsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/threads/followers" && request.method === "GET") {
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+
+      if (!account?.threads_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const rawLimit = Number(url.searchParams.get("limit") ?? "100");
+      const limit = Number.isFinite(rawLimit)
+        ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100)
+        : 100;
+      const rawPage = Number(url.searchParams.get("page") ?? "1");
+      const page = Number.isFinite(rawPage)
+        ? Math.max(Math.trunc(rawPage), 1)
+        : 1;
+      const offset = (page - 1) * limit;
+
+      const totalCount = await countThreadsFollowerSnapshots(env, account.threads_user_id);
+      const snapshotRows = await listThreadsFollowerSnapshotsPage(
+        env,
+        account.threads_user_id,
+        limit + 1,
+        offset,
+      );
+      const currentPageRows = snapshotRows.slice(0, limit);
+
+      const rows = currentPageRows.map((row, index) => {
+        const olderSnapshot = snapshotRows[index + 1] ?? null;
+        const gain = olderSnapshot ? row.followers_count - olderSnapshot.followers_count : 0;
+
+        return {
+          date: row.snapshot_date,
+          followers_count: row.followers_count,
+          gain,
+          captured_at: row.captured_at,
+        };
+      });
+
+      const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+
+      return new Response(
+        JSON.stringify({
+          rows,
+          total_count: totalCount,
+          page,
+          page_size: limit,
+          total_pages: totalPages,
+          timezone: THREADS_INSIGHTS_TIME_ZONE,
+        }),
         {
           status: 200,
           headers: {
