@@ -3502,62 +3502,6 @@ function summarizeWinningLanguage(posts: CachedThreadsPost[]): {
   };
 }
 
-function summarizeContentFatigue(posts: CachedThreadsPost[]): {
-  duplicate_openings: Array<{ phrase: string; count: number }>;
-  repeated_sentence_shells: Array<{ pattern: string; count: number }>;
-  overused_words: Array<{ word: string; count: number }>;
-} {
-  const openingCounts = new Map<string, number>();
-  const shellCounts = new Map<string, number>();
-  const wordCounts = new Map<string, number>();
-  const openingDisplays = new Map<string, string>();
-  const shellDisplays = new Map<string, string>();
-
-  for (const post of posts) {
-    const openingKey = getOpeningKey(post.text, 6);
-    const openingDisplay = getOpeningDisplay(post.text, 6);
-    if (openingKey) {
-      openingCounts.set(openingKey, (openingCounts.get(openingKey) ?? 0) + 1);
-      if (openingDisplay && !openingDisplays.has(openingKey)) {
-        openingDisplays.set(openingKey, openingDisplay);
-      }
-    }
-
-    const shellKey = getSentenceShell(post.text);
-    const shellDisplay = getSentenceShellDisplay(post.text);
-    if (shellKey) {
-      shellCounts.set(shellKey, (shellCounts.get(shellKey) ?? 0) + 1);
-      if (shellDisplay && !shellDisplays.has(shellKey)) {
-        shellDisplays.set(shellKey, shellDisplay);
-      }
-    }
-
-    const seenWords = new Set<string>();
-    for (const word of getDashboardWords(post.text)) {
-      if (seenWords.has(word)) {
-        continue;
-      }
-      seenWords.add(word);
-      wordCounts.set(word, (wordCounts.get(word) ?? 0) + 1);
-    }
-  }
-
-  return {
-    duplicate_openings: pickTopCountsWithDisplay(openingCounts, openingDisplays, 5).map((entry) => ({
-      phrase: entry.display,
-      count: entry.count,
-    })),
-    repeated_sentence_shells: pickTopCountsWithDisplay(shellCounts, shellDisplays, 5).map((entry) => ({
-      pattern: entry.display,
-      count: entry.count,
-    })),
-    overused_words: pickTopCounts(wordCounts, DASHBOARD_FATIGUE_WORD_LIMIT, 3).map((entry) => ({
-      word: entry.value,
-      count: entry.count,
-    })),
-  };
-}
-
 function buildMetricRanking(
   posts: CachedThreadsPost[],
   metric: "views" | "likes" | "replies" | "reposts",
@@ -3579,20 +3523,6 @@ function buildMetricRanking(
       permalink: post.permalink,
       metric: post[metric] ?? 0,
     }));
-}
-
-function clampScore(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function summarizeScoreLabel(score: number): "weak" | "medium" | "strong" {
-  if (score >= 7.5) {
-    return "strong";
-  }
-  if (score >= 4.5) {
-    return "medium";
-  }
-  return "weak";
 }
 
 async function buildThreadsDashboardPayload(
@@ -3660,11 +3590,13 @@ async function buildThreadsDashboardPayload(
   const posts = archive.posts.filter((post) => getPostTimestampMs(post) !== null);
   const last24hStartMs = nowMs - (24 * 60 * 60 * 1000);
   const last7dStartMs = nowMs - (7 * 24 * 60 * 60 * 1000);
-  const last3dStartMs = nowMs - (3 * 24 * 60 * 60 * 1000);
   const postsLast24h = posts.filter((post) => isPostWithinWindow(post, last24hStartMs, nowMs));
   const postsLast7d = posts.filter((post) => isPostWithinWindow(post, last7dStartMs, nowMs));
-  const postsLast3d = posts.filter((post) => isPostWithinWindow(post, last3dStartMs, nowMs));
   const postsToday = posts.filter((post) => getPostLocalDate(post, DASHBOARD_TIME_ZONE) === todayDate);
+  const yesterdayDate = addDaysToIsoDate(todayDate, -1);
+  const postsYesterday = yesterdayDate
+    ? posts.filter((post) => getPostLocalDate(post, DASHBOARD_TIME_ZONE) === yesterdayDate)
+    : [];
 
   const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
   const scheduledRows = scheduledPostsTableExists
@@ -3717,45 +3649,6 @@ async function buildThreadsDashboardPayload(
     engagement_total: 0,
   });
 
-  const hitRateNumerator = postsLast24h.filter((post) => post.likes >= DASHBOARD_HIT_RATE_LIKES_THRESHOLD).length;
-  const hitRateDenominator = postsLast24h.length;
-
-  const weakPosts = postsLast24h
-    .map((post) => {
-      const timestampMs = getPostTimestampMs(post);
-      if (timestampMs === null) {
-        return null;
-      }
-
-      const ageHours = (nowMs - timestampMs) / (60 * 60 * 1000);
-      const reasons: string[] = [];
-
-      if (ageHours >= DASHBOARD_WEAK_POST_VIEWS_HOURS && post.views < DASHBOARD_WEAK_POST_VIEWS_THRESHOLD) {
-        reasons.push(`Under ${DASHBOARD_WEAK_POST_VIEWS_THRESHOLD} views after ${DASHBOARD_WEAK_POST_VIEWS_HOURS} hours`);
-      }
-      if (ageHours >= DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS && post.likes <= 0) {
-        reasons.push(`0 likes after ${DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS} hours`);
-      }
-
-      if (reasons.length === 0) {
-        return null;
-      }
-
-      return {
-        id: post.id,
-        preview: createPostPreview(post.text),
-        timestamp: post.timestamp,
-        permalink: post.permalink,
-        views: post.views,
-        likes: post.likes,
-        replies: post.replies,
-        reposts: post.reposts,
-        reasons,
-      };
-    })
-    .filter((post): post is NonNullable<typeof post> => post !== null)
-    .slice(0, 8);
-
   const followerSnapshots = currentFollowersCount !== null
     ? await listThreadsFollowerSnapshots(env, account.threads_user_id, 30)
     : [];
@@ -3770,7 +3663,6 @@ async function buildThreadsDashboardPayload(
   });
   const followerGains = followerTrend.map((entry) => entry.gain);
   const todayFollowerGain = followerTrend.find((entry) => entry.date === todayDate)?.gain ?? 0;
-  const yesterdayDate = addDaysToIsoDate(todayDate, -1);
   const yesterdayFollowerGain = yesterdayDate
     ? (followerTrend.find((entry) => entry.date === yesterdayDate)?.gain ?? 0)
     : 0;
@@ -3786,21 +3678,6 @@ async function buildThreadsDashboardPayload(
     .sort((left, right) => right.engagement_total - left.engagement_total || right.views - left.views)
     .slice(0, 10);
   const winningLanguage = summarizeWinningLanguage(winningLanguageSource);
-  const contentFatigue = summarizeContentFatigue(postsLast3d);
-
-  const avgViews24h = hitRateDenominator > 0
-    ? postsLast24h.reduce((sum, post) => sum + post.views, 0) / hitRateDenominator
-    : 0;
-  const avgEngagement24h = hitRateDenominator > 0
-    ? postsLast24h.reduce((sum, post) => sum + post.engagement_total, 0) / hitRateDenominator
-    : 0;
-  const followerConversionPerPost = hitRateDenominator > 0
-    ? todayFollowerGain / hitRateDenominator
-    : 0;
-  const reachScore = clampScore((avgViews24h / 1200) * 10, 0, 10);
-  const engagementScore = clampScore((avgEngagement24h / 80) * 10, 0, 10);
-  const conversionScore = clampScore((followerConversionPerPost / 2) * 10, 0, 10);
-  const overallBatchScore = Number(((reachScore + engagementScore + conversionScore) / 3).toFixed(1));
 
   return {
     generated_at: new Date(nowMs).toISOString(),
@@ -3835,11 +3712,12 @@ async function buildThreadsDashboardPayload(
       best_day: bestFollowerDay,
       trend: followerTrend,
     },
-    winners_24h: {
-      by_likes: buildMetricRanking(postsLast24h, "likes"),
-      by_views: buildMetricRanking(postsLast24h, "views"),
-      by_replies: buildMetricRanking(postsLast24h, "replies"),
-      by_reposts: buildMetricRanking(postsLast24h, "reposts"),
+    winners_yesterday: {
+      date: yesterdayDate,
+      by_likes: buildMetricRanking(postsYesterday, "likes"),
+      by_views: buildMetricRanking(postsYesterday, "views"),
+      by_replies: buildMetricRanking(postsYesterday, "replies"),
+      by_reposts: buildMetricRanking(postsYesterday, "reposts"),
     },
     winners_7d: {
       by_likes: buildMetricRanking(postsLast7d, "likes"),
@@ -3848,20 +3726,7 @@ async function buildThreadsDashboardPayload(
       by_reposts: buildMetricRanking(postsLast7d, "reposts"),
     },
     batch_health: {
-      hit_rate: {
-        threshold_likes: DASHBOARD_HIT_RATE_LIKES_THRESHOLD,
-        hits: hitRateNumerator,
-        total: hitRateDenominator,
-      },
-      weak_posts: weakPosts,
       winning_language: winningLanguage,
-      content_fatigue: contentFatigue,
-      batch_score: {
-        reach: summarizeScoreLabel(reachScore),
-        engagement: summarizeScoreLabel(engagementScore),
-        follower_conversion: summarizeScoreLabel(conversionScore),
-        overall: overallBatchScore,
-      },
     },
   };
 }

@@ -50,7 +50,8 @@ type DashboardResponse = {
       gain: number;
     }>;
   } | null;
-  winners_24h?: {
+  winners_yesterday?: {
+    date?: string | null;
     by_likes?: RankedPost[];
     by_views?: RankedPost[];
     by_replies?: RankedPost[];
@@ -63,37 +64,10 @@ type DashboardResponse = {
     by_reposts?: RankedPost[];
   } | null;
   batch_health?: {
-    hit_rate?: {
-      threshold_likes?: number;
-      hits?: number;
-      total?: number;
-    } | null;
-    weak_posts?: Array<{
-      id: string;
-      preview: string;
-      timestamp: string | null;
-      permalink: string | null;
-      views: number;
-      likes: number;
-      replies: number;
-      reposts: number;
-      reasons: string[];
-    }>;
     winning_language?: {
       repeated_terms?: string[];
       repeated_phrases?: string[];
       repeated_openings?: string[];
-    } | null;
-    content_fatigue?: {
-      duplicate_openings?: Array<{ phrase: string; count: number }>;
-      repeated_sentence_shells?: Array<{ pattern: string; count: number }>;
-      overused_words?: Array<{ word: string; count: number }>;
-    } | null;
-    batch_score?: {
-      reach?: "weak" | "medium" | "strong";
-      engagement?: "weak" | "medium" | "strong";
-      follower_conversion?: "weak" | "medium" | "strong";
-      overall?: number;
     } | null;
   } | null;
   error?: string;
@@ -145,16 +119,6 @@ function formatShortDate(value: string | null | undefined): string {
     month: "short",
     day: "numeric",
   }).format(new Date(parsed));
-}
-
-function statusClasses(value: "weak" | "medium" | "strong" | null | undefined): string {
-  if (value === "strong") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  }
-  if (value === "medium") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
-  }
-  return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
 function EmptyState({ label }: { label: string }) {
@@ -345,30 +309,17 @@ export default function DashboardPage() {
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-3xl border border-slate-200/80 bg-white/96 p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Batch Score</p>
-              <div className="mt-3 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-4xl font-semibold text-slate-950">{batchHealth?.batch_score?.overall?.toFixed(1) ?? "0.0"}</p>
-                  <p className="mt-2 text-sm text-slate-600">Overall batch grade</p>
-                </div>
-                <div className="space-y-2 text-right text-xs text-slate-600">
-                  <p>Reach: <span className="font-semibold text-slate-900">{batchHealth?.batch_score?.reach ?? "weak"}</span></p>
-                  <p>Engagement: <span className="font-semibold text-slate-900">{batchHealth?.batch_score?.engagement ?? "weak"}</span></p>
-                  <p>Conversion: <span className="font-semibold text-slate-900">{batchHealth?.batch_score?.follower_conversion ?? "weak"}</span></p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200/80 bg-white/96 p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Hit Rate</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-950">
-                {formatMetric(batchHealth?.hit_rate?.hits)} / {formatMetric(batchHealth?.hit_rate?.total)}
-              </p>
-              <p className="mt-2 text-sm text-slate-600">
-                Posts crossed {formatMetric(batchHealth?.hit_rate?.threshold_likes)} likes in the last 24h batch.
-              </p>
+          <div className="rounded-3xl border border-slate-200/80 bg-white/96 p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Winning Language</p>
+            <p className="mt-3 text-sm leading-7 text-slate-700">
+              Repeated language from the strongest posts in the last 7 days, shown without opinionated scoring.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {batchHealth?.winning_language?.repeated_terms?.slice(0, 6).map((term) => (
+                <span key={term} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
+                  {term}
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -504,14 +455,18 @@ export default function DashboardPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-950">Last 24h Winners</h2>
-          <p className="mt-1 text-sm text-slate-600">Best posts ranked by metric with preview and post time.</p>
+          <h2 className="text-2xl font-semibold text-slate-950">Yesterday&apos;s Winners</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {dashboard.winners_yesterday?.date
+              ? `Best posts from ${formatShortDate(dashboard.winners_yesterday.date)} ranked by metric.`
+              : "Best posts from yesterday ranked by metric."}
+          </p>
         </div>
         <div className="grid gap-4 xl:grid-cols-4">
-          <RankedPostsColumn title="By Likes" posts={dashboard.winners_24h?.by_likes} timeZone={timeZone} />
-          <RankedPostsColumn title="By Views" posts={dashboard.winners_24h?.by_views} timeZone={timeZone} />
-          <RankedPostsColumn title="By Replies" posts={dashboard.winners_24h?.by_replies} timeZone={timeZone} />
-          <RankedPostsColumn title="By Reposts" posts={dashboard.winners_24h?.by_reposts} timeZone={timeZone} />
+          <RankedPostsColumn title="By Likes" posts={dashboard.winners_yesterday?.by_likes} timeZone={timeZone} />
+          <RankedPostsColumn title="By Views" posts={dashboard.winners_yesterday?.by_views} timeZone={timeZone} />
+          <RankedPostsColumn title="By Replies" posts={dashboard.winners_yesterday?.by_replies} timeZone={timeZone} />
+          <RankedPostsColumn title="By Reposts" posts={dashboard.winners_yesterday?.by_reposts} timeZone={timeZone} />
         </div>
       </section>
 
@@ -528,108 +483,42 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-950">Weak Post Detector</h2>
-              <p className="mt-1 text-sm text-slate-600">Posts below baseline after a time threshold.</p>
-            </div>
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-              {formatMetric(batchHealth?.weak_posts?.length)} flagged
-            </span>
-          </div>
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-slate-950">Winning Language</h2>
+        <p className="mt-1 text-sm text-slate-600">Repeated phrases, openings, and themes from strong posts in the last 7 days.</p>
 
-          <div className="mt-5 space-y-3">
-            {!batchHealth?.weak_posts?.length ? (
-              <EmptyState label="No weak posts flagged in the last 24 hours." />
-            ) : (
-              batchHealth.weak_posts.map((post) => (
-                <article key={post.id} className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-amber-800">{formatTimestamp(post.timestamp, timeZone)}</p>
-                    {post.permalink ? (
-                      <a
-                        href={post.permalink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-medium text-amber-900 underline decoration-amber-300 underline-offset-2"
-                      >
-                        Open
-                      </a>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-800">{post.preview}</p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-                    <span>Views {formatMetric(post.views)}</span>
-                    <span>Likes {formatMetric(post.likes)}</span>
-                    <span>Replies {formatMetric(post.replies)}</span>
-                    <span>Reposts {formatMetric(post.reposts)}</span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {post.reasons.map((reason) => (
-                      <span key={reason} className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs text-amber-900">
-                        {reason}
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-950">Content Fatigue Warning</h2>
-          <p className="mt-1 text-sm text-slate-600">Detect repeated openings, sentence shells, and overused words.</p>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Duplicate Openings</p>
-              <div className="mt-3 space-y-2">
-                {batchHealth?.content_fatigue?.duplicate_openings?.length ? batchHealth.content_fatigue.duplicate_openings.map((entry) => (
-                  <div key={entry.phrase} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                    <p className="text-sm text-slate-800">{entry.phrase}</p>
-                    <p className="mt-1 text-xs text-slate-500">{entry.count} uses</p>
-                  </div>
-                )) : <p className="text-sm text-slate-500">No duplicate openings flagged.</p>}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sentence Shells</p>
-              <div className="mt-3 space-y-2">
-                {batchHealth?.content_fatigue?.repeated_sentence_shells?.length ? batchHealth.content_fatigue.repeated_sentence_shells.map((entry) => (
-                  <div key={entry.pattern} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                    <p className="text-sm text-slate-800">{entry.pattern}</p>
-                    <p className="mt-1 text-xs text-slate-500">{entry.count} repeats</p>
-                  </div>
-                )) : <p className="text-sm text-slate-500">No repeated sentence shells flagged.</p>}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Overused Words</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {batchHealth?.content_fatigue?.overused_words?.length ? batchHealth.content_fatigue.overused_words.map((entry) => (
-                  <span key={entry.word} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-800">
-                    {entry.word} ×{entry.count}
-                  </span>
-                )) : <p className="text-sm text-slate-500">No overused words flagged.</p>}
-              </div>
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Terms</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {batchHealth?.winning_language?.repeated_terms?.length ? batchHealth.winning_language.repeated_terms.map((term) => (
+                <span key={term} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
+                  {term}
+                </span>
+              )) : <p className="text-sm text-slate-500">No repeated terms yet.</p>}
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span className={`rounded-full border px-3 py-1 text-sm font-medium ${statusClasses(batchHealth?.batch_score?.reach ?? "weak")}`}>
-              Reach: {batchHealth?.batch_score?.reach ?? "weak"}
-            </span>
-            <span className={`rounded-full border px-3 py-1 text-sm font-medium ${statusClasses(batchHealth?.batch_score?.engagement ?? "weak")}`}>
-              Engagement: {batchHealth?.batch_score?.engagement ?? "weak"}
-            </span>
-            <span className={`rounded-full border px-3 py-1 text-sm font-medium ${statusClasses(batchHealth?.batch_score?.follower_conversion ?? "weak")}`}>
-              Follower conversion: {batchHealth?.batch_score?.follower_conversion ?? "weak"}
-            </span>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Phrases</p>
+            <div className="mt-3 space-y-2">
+              {batchHealth?.winning_language?.repeated_phrases?.length ? batchHealth.winning_language.repeated_phrases.map((phrase) => (
+                <div key={phrase} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800">
+                  {phrase}
+                </div>
+              )) : <p className="text-sm text-slate-500">No repeated phrases yet.</p>}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Openings</p>
+            <div className="mt-3 space-y-2">
+              {batchHealth?.winning_language?.repeated_openings?.length ? batchHealth.winning_language.repeated_openings.map((opening) => (
+                <div key={opening} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800">
+                  {opening}
+                </div>
+              )) : <p className="text-sm text-slate-500">No repeated openings yet.</p>}
+            </div>
           </div>
         </div>
       </section>
