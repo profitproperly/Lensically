@@ -254,7 +254,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.12),_transparent_32%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-sm sm:p-8">
+      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <div className="text-slate-950">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Growth Control Room</p>
