@@ -6,6 +6,7 @@ import { buildWorkerUrl } from "@/lib/apiClient";
 type FollowerRow = {
   date: string;
   start_of_day_followers: number;
+  gap_carry: number;
   latest_followers: number;
   net_change: number;
   updated_at: string;
@@ -90,6 +91,7 @@ function buildFollowersCsvExport(rows: FollowerRow[]) {
     "date",
     "updated_at",
     "start_of_day_followers",
+    "gap_carry",
     "latest_followers",
     "net_change",
   ];
@@ -98,6 +100,7 @@ function buildFollowersCsvExport(rows: FollowerRow[]) {
     row.date,
     row.updated_at,
     row.start_of_day_followers,
+    row.gap_carry,
     row.latest_followers,
     row.net_change,
   ]);
@@ -112,6 +115,7 @@ function buildFollowersTxtExport(rows: FollowerRow[], timeZone: string) {
       `Date: ${formatSnapshotDate(row.date)}`,
       `Updated: ${formatTimestamp(row.updated_at, timeZone)}`,
       `Start: ${formatMetric(row.start_of_day_followers)}`,
+      `Gap Carry: ${formatSignedMetric(row.gap_carry)}`,
       `Latest: ${formatMetric(row.latest_followers)}`,
       `Net Change: ${formatSignedMetric(row.net_change)}`,
     ];
@@ -307,10 +311,14 @@ export default function FollowersPage() {
                     </div>
                     <p className={`text-sm font-semibold ${getNetChangeClassName(row.net_change)}`}>{formatSignedMetric(row.net_change)}</p>
                   </div>
-                  <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Start</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(row.start_of_day_followers)}</p>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Gap Carry</p>
+                      <p className={`mt-1 text-sm font-semibold ${getNetChangeClassName(row.gap_carry)}`}>{formatSignedMetric(row.gap_carry)}</p>
                     </div>
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Latest</p>
@@ -332,6 +340,7 @@ export default function FollowersPage() {
                     <th className="px-4 py-3 text-left font-semibold">Date</th>
                     <th className="px-4 py-3 text-left font-semibold">Updated</th>
                     <th className="px-4 py-3 text-right font-semibold">Start</th>
+                    <th className="px-4 py-3 text-right font-semibold">Gap Carry</th>
                     <th className="px-4 py-3 text-right font-semibold">Latest</th>
                     <th className="px-4 py-3 text-right font-semibold">Net Change</th>
                   </tr>
@@ -343,6 +352,9 @@ export default function FollowersPage() {
                       <td className="px-4 py-4 text-sm text-slate-600">{formatTimestamp(row.updated_at, timeZone)}</td>
                       <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">
                         {formatMetric(row.start_of_day_followers)}
+                      </td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold ${getNetChangeClassName(row.gap_carry)}`}>
+                        {formatSignedMetric(row.gap_carry)}
                       </td>
                       <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">
                         {formatMetric(row.latest_followers)}

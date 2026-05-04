@@ -7564,16 +7564,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const currentPageRows = snapshotRows.slice(0, limit);
 
       const rows = currentPageRows.map((row, index) => {
-      const olderSnapshot = snapshotRows[index + 1] ?? null;
-        const gain = row.baseline_followers_count !== null && row.baseline_followers_count !== undefined
-          ? row.followers_count - row.baseline_followers_count
-          : (olderSnapshot ? row.followers_count - olderSnapshot.followers_count : 0);
+        const olderSnapshot = snapshotRows[index + 1] ?? null;
+        const startOfDayFollowers = row.baseline_followers_count ?? row.followers_count;
+        const gapCarry = olderSnapshot
+          ? startOfDayFollowers - olderSnapshot.followers_count
+          : 0;
+        const netChange = olderSnapshot
+          ? row.followers_count - olderSnapshot.followers_count
+          : row.followers_count - startOfDayFollowers;
 
         return {
           date: row.snapshot_date,
-          start_of_day_followers: row.baseline_followers_count ?? row.followers_count,
+          start_of_day_followers: startOfDayFollowers,
+          gap_carry: gapCarry,
           latest_followers: row.followers_count,
-          net_change: gain,
+          net_change: netChange,
           updated_at: row.captured_at,
         };
       });
