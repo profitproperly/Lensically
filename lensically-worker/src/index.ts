@@ -3569,6 +3569,37 @@ async function importExternalPattern(
   return row;
 }
 
+async function deleteExternalPatterns(
+  env: Env,
+  appUserId: string,
+  ids: number[],
+): Promise<number> {
+  await ensureExternalPatternsTable(env);
+
+  const normalizedIds = Array.from(
+    new Set(
+      ids
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0),
+    ),
+  );
+
+  if (!normalizedIds.length) {
+    return 0;
+  }
+
+  const placeholders = normalizedIds.map(() => "?").join(", ");
+  const result = await env.DB.prepare(
+    `DELETE FROM external_patterns
+     WHERE app_user_id = ?
+       AND id IN (${placeholders})`,
+  )
+    .bind(appUserId, ...normalizedIds)
+    .run();
+
+  return Number(result.meta.changes ?? 0);
+}
+
 async function ensureAutomationDailyRunLocksTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS automation_daily_run_locks (
@@ -5606,6 +5637,43 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         app_user_id: appUserId,
         total: Number(totalRow?.total ?? 0),
         patterns: rows.results ?? [],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (normalizedPath === "/api/patterns/delete" && request.method === "POST") {
+      let payload: {
+        app_user_id?: unknown;
+        ids?: unknown;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const appUserId = normalizeAppUserId(
+        typeof payload.app_user_id === "string" ? payload.app_user_id : null,
+      );
+      if (!appUserId) {
+        return new Response(JSON.stringify({ error: "app_user_id is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const ids = Array.isArray(payload.ids) ? payload.ids.map((value) => Number(value)) : [];
+      const deleted = await deleteExternalPatterns(env, appUserId, ids);
+
+      return new Response(JSON.stringify({
+        success: true,
+        app_user_id: appUserId,
+        deleted,
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

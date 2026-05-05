@@ -98,4 +98,52 @@ describe("patterns import routes", () => {
       ],
     });
   });
+
+  it("deletes selected saved patterns", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "chrome-extension://exampleextensionid",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@example/post/delete-me",
+        post_text: "Delete me",
+      }),
+    });
+
+    const imported = (await importResponse.json()) as {
+      pattern?: { id?: number };
+    };
+    const patternId = Number(imported.pattern?.id ?? 0);
+    expect(patternId).toBeGreaterThan(0);
+
+    const deleteResponse = await fetchFromWorker("/api/patterns/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "chrome-extension://exampleextensionid",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        ids: [patternId],
+      }),
+    });
+
+    expect(deleteResponse.status).toBe(200);
+    await expect(deleteResponse.json()).resolves.toMatchObject({
+      success: true,
+      app_user_id: "lensically_test",
+      deleted: 1,
+    });
+
+    const listResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&limit=10");
+    await expect(listResponse.json()).resolves.toMatchObject({
+      success: true,
+      total: 0,
+      patterns: [],
+    });
+  });
 });
