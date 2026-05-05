@@ -3897,8 +3897,6 @@ async function getArchivedThreadsPostsMetricsMap(
   threadsUserId: string,
   postIds: string[],
 ): Promise<Map<string, CachedThreadsPost>> {
-  await ensureThreadsPostsArchiveTable(env);
-
   const normalizedPostIds = Array.from(
     new Set(
       postIds
@@ -3911,62 +3909,13 @@ async function getArchivedThreadsPostsMetricsMap(
     return new Map();
   }
 
-  const placeholders = normalizedPostIds.map(() => "?").join(", ");
-  const rows = await env.DB.prepare(
-    `SELECT
-       post_id,
-       post_text,
-       post_timestamp,
-       post_permalink,
-       post_username,
-       profile_picture_url,
-       views,
-       likes,
-       replies,
-       reposts,
-       quotes,
-       shares,
-       engagement_total
-     FROM threads_posts_archive
-     WHERE threads_user_id = ?
-       AND post_id IN (${placeholders})`,
-  )
-    .bind(threadsUserId, ...normalizedPostIds)
-    .all<{
-      post_id: string;
-      post_text: string | null;
-      post_timestamp: string | null;
-      post_permalink: string | null;
-      post_username: string | null;
-      profile_picture_url: string | null;
-      views: number | string | null;
-      likes: number | string | null;
-      replies: number | string | null;
-      reposts: number | string | null;
-      quotes: number | string | null;
-      shares: number | string | null;
-      engagement_total: number | string | null;
-    }>();
+  const cachedPosts = await getThreadsPostsCache(env, threadsUserId, { allowStale: true });
+  const allowedIds = new Set(normalizedPostIds);
 
   return new Map(
-    (rows.results ?? []).map((row) => [
-      row.post_id,
-      {
-        id: row.post_id,
-        text: row.post_text,
-        timestamp: row.post_timestamp,
-        permalink: row.post_permalink,
-        username: row.post_username,
-        profile_picture_url: row.profile_picture_url,
-        views: Number(row.views ?? 0),
-        likes: Number(row.likes ?? 0),
-        replies: Number(row.replies ?? 0),
-        reposts: Number(row.reposts ?? 0),
-        quotes: Number(row.quotes ?? 0),
-        shares: Number(row.shares ?? 0),
-        engagement_total: Number(row.engagement_total ?? 0),
-      },
-    ]),
+    (cachedPosts?.posts ?? [])
+      .filter((post) => allowedIds.has(post.id))
+      .map((post) => [post.id, post]),
   );
 }
 
