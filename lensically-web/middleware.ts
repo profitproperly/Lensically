@@ -6,6 +6,7 @@ const DEFAULT_WORKSPACE_PASSWORD = "Lensically$$$$";
 const PROTECTED_PATHS = [
   "/dashboard",
   "/insights",
+  "/saved-patterns",
   "/followers",
   "/post-archive",
   "/schedule",
@@ -52,6 +53,7 @@ export const config = {
     "/dashboard/:path*",
     "/followers/:path*",
     "/insights/:path*",
+    "/saved-patterns/:path*",
     "/post-archive/:path*",
     "/schedule/:path*",
     "/scheduled-posts/:path*",
