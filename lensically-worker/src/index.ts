@@ -2332,6 +2332,10 @@ type CachedThreadsPost = {
   engagement_total: number;
 };
 
+type HydratedThreadsPost = CachedThreadsPost & {
+  metrics_loaded: boolean;
+};
+
 type ThreadsPostsCacheStatePayload = {
   threads_user_id: string;
   next_cursor: string | null;
@@ -3063,7 +3067,7 @@ async function buildThreadsDashboardPayload(
     });
   }
 
-  let latestPosts = await fetchThreadsPostsPageWithInsights(account.access_token, account.threads_user_id, null);
+  let latestPosts = await fetchThreadsPostsPageWithInsights(env, account.access_token, account.threads_user_id, null);
   if (latestPosts) {
     await upsertThreadsPostsArchive(env, account.threads_user_id, latestPosts.posts);
     await replaceThreadsPostsCache(env, account.threads_user_id, latestPosts.posts, {
@@ -3888,6 +3892,84 @@ async function listArchivedThreadsPosts(
   };
 }
 
+async function getArchivedThreadsPostsMetricsMap(
+  env: Env,
+  threadsUserId: string,
+  postIds: string[],
+): Promise<Map<string, CachedThreadsPost>> {
+  await ensureThreadsPostsArchiveTable(env);
+
+  const normalizedPostIds = Array.from(
+    new Set(
+      postIds
+        .map((postId) => postId.trim())
+        .filter((postId) => postId.length > 0),
+    ),
+  );
+
+  if (normalizedPostIds.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = normalizedPostIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT
+       post_id,
+       post_text,
+       post_timestamp,
+       post_permalink,
+       post_username,
+       profile_picture_url,
+       views,
+       likes,
+       replies,
+       reposts,
+       quotes,
+       shares,
+       engagement_total
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?
+       AND post_id IN (${placeholders})`,
+  )
+    .bind(threadsUserId, ...normalizedPostIds)
+    .all<{
+      post_id: string;
+      post_text: string | null;
+      post_timestamp: string | null;
+      post_permalink: string | null;
+      post_username: string | null;
+      profile_picture_url: string | null;
+      views: number | string | null;
+      likes: number | string | null;
+      replies: number | string | null;
+      reposts: number | string | null;
+      quotes: number | string | null;
+      shares: number | string | null;
+      engagement_total: number | string | null;
+    }>();
+
+  return new Map(
+    (rows.results ?? []).map((row) => [
+      row.post_id,
+      {
+        id: row.post_id,
+        text: row.post_text,
+        timestamp: row.post_timestamp,
+        permalink: row.post_permalink,
+        username: row.post_username,
+        profile_picture_url: row.profile_picture_url,
+        views: Number(row.views ?? 0),
+        likes: Number(row.likes ?? 0),
+        replies: Number(row.replies ?? 0),
+        reposts: Number(row.reposts ?? 0),
+        quotes: Number(row.quotes ?? 0),
+        shares: Number(row.shares ?? 0),
+        engagement_total: Number(row.engagement_total ?? 0),
+      },
+    ]),
+  );
+}
+
 async function getTopArchivedPostByLikes(
   env: Env,
   threadsUserId: string,
@@ -4350,6 +4432,7 @@ async function fetchThreadsUserInsightsByAccount(
 }
 
 async function fetchThreadsPostsPageWithInsights(
+  env: Env,
   accessToken: string,
   threadsUserId: string,
   cursor: string | null,
@@ -4403,8 +4486,13 @@ async function fetchThreadsPostsPageWithInsights(
     const profile = await fetchThreadsProfileByAccessToken(accessToken);
     const profilePicture = profile?.threads_profile_picture_url ?? null;
     const posts = Array.isArray(data.data) ? data.data : [];
-    const enrichedPosts: CachedThreadsPost[] = [];
-    const batchSize = 10;
+    const fallbackMetricsByPostId = await getArchivedThreadsPostsMetricsMap(
+      env,
+      threadsUserId,
+      posts.map((post) => (typeof post.id === "string" ? post.id : "")),
+    );
+    const enrichedPosts: HydratedThreadsPost[] = [];
+    const batchSize = 4;
 
     for (let index = 0; index < posts.length; index += batchSize) {
       const batch = posts.slice(index, index + batchSize);
@@ -4428,21 +4516,52 @@ async function fetchThreadsPostsPageWithInsights(
           };
 
           if (!postId) {
-            return basePost;
+            return {
+              ...basePost,
+              metrics_loaded: false,
+            };
           }
 
-          try {
-            const metricsResponse = await fetch(
-              `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(accessToken)}`,
-            );
+          const fallbackPost = fallbackMetricsByPostId.get(postId);
+          const hydratedFromFallback = (): HydratedThreadsPost => ({
+            ...basePost,
+            views: fallbackPost?.views ?? basePost.views,
+            likes: fallbackPost?.likes ?? basePost.likes,
+            replies: fallbackPost?.replies ?? basePost.replies,
+            reposts: fallbackPost?.reposts ?? basePost.reposts,
+            quotes: fallbackPost?.quotes ?? basePost.quotes,
+            shares: fallbackPost?.shares ?? basePost.shares,
+            engagement_total: fallbackPost?.engagement_total ?? basePost.engagement_total,
+            metrics_loaded: false,
+          });
 
-            if (!metricsResponse.ok) {
-              return basePost;
+          try {
+            let metricsResponse: Response | null = null;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              metricsResponse = await fetch(
+                `https://graph.threads.net/v1.0/${postId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(accessToken)}`,
+              );
+
+              if (metricsResponse.ok) {
+                break;
+              }
+
+              if (metricsResponse.status !== 429 && metricsResponse.status < 500) {
+                break;
+              }
+
+              if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+              }
+            }
+
+            if (!metricsResponse?.ok) {
+              return hydratedFromFallback();
             }
 
             const metricsPayload = await readJsonSafe(metricsResponse);
             if (!metricsPayload || typeof metricsPayload !== "object" || Array.isArray(metricsPayload)) {
-              return basePost;
+              return hydratedFromFallback();
             }
 
             const metricsJson = metricsPayload as {
@@ -4469,9 +4588,10 @@ async function fetchThreadsPostsPageWithInsights(
                 metricMap.reposts +
                 metricMap.quotes +
                 metricMap.shares,
+              metrics_loaded: true,
             };
           } catch {
-            return basePost;
+            return hydratedFromFallback();
           }
         }),
       );
@@ -4479,8 +4599,17 @@ async function fetchThreadsPostsPageWithInsights(
       enrichedPosts.push(...results);
     }
 
+    const metricsLoadedCount = enrichedPosts.filter((post) => post.metrics_loaded).length;
+    logWorkerEvent("THREADS_POSTS_METRICS_HYDRATION", {
+      threads_user_id: threadsUserId,
+      requested_posts: posts.length,
+      metrics_loaded: metricsLoadedCount,
+      metrics_fallback: posts.length - metricsLoadedCount,
+      has_cursor: Boolean(cursor),
+    });
+
     return {
-      posts: enrichedPosts,
+      posts: enrichedPosts.map(({ metrics_loaded: _metricsLoaded, ...post }) => post),
       nextCursor: data.paging?.cursors?.after ?? null,
       hasMore: Boolean(data.paging?.next),
     };
@@ -4630,6 +4759,7 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
       }
 
       const postsPage = await fetchThreadsPostsPageWithInsights(
+        env,
         configuredAccount.accessToken,
         threadsUserId,
         null,
@@ -6092,6 +6222,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         has_cursor: Boolean(cursor),
       });
       const postsPage = await fetchThreadsPostsPageWithInsights(
+        env,
         account.access_token,
         account.threads_user_id,
         cursor,
