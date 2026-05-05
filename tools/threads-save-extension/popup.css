@@ -1,0 +1,105 @@
+body {
+  margin: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  font: 13px/1.4 Arial, sans-serif;
+}
+
+.wrap {
+  width: 320px;
+  padding: 16px;
+}
+
+h1,
+h2 {
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+h2 {
+  font-size: 14px;
+}
+
+.hint {
+  margin: 0 0 14px;
+  color: #94a3b8;
+}
+
+.field,
+.checkbox {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.field span,
+.checkbox span {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox span {
+  margin: 0;
+}
+
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #111827;
+  color: #e2e8f0;
+}
+
+.card {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: #111827;
+}
+
+button {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+#saveLabelSettingsBtn {
+  background: #334155;
+}
+
+#saveLabelSettingsBtn:hover {
+  background: #475569;
+}
+
+.status {
+  min-height: 18px;
+  margin: 12px 0 0;
+  color: #a7f3d0;
+}

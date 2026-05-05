@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Lensically Threads Saver",
+  "description": "Save the current Threads post into a Lensically-compatible patterns endpoint.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://www.threads.com/*",
+    "https://threads.com/*",
+    "https://threads.net/*",
+    "https://api.lensically.com/*"
+  ],
+  "action": {
+    "default_title": "Save Threads Post",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.threads.com/*", "https://threads.com/*", "https://threads.net/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

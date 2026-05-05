@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lensically Threads Saver</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Threads Saver</h1>
+      <p class="hint">Open one Threads post page, then click save.</p>
+
+      <label class="field">
+        <span>Worker URL</span>
+        <input id="workerUrl" type="text" autocomplete="off" />
+      </label>
+
+      <label class="field">
+        <span>App User ID</span>
+        <input id="appUserId" type="text" autocomplete="off" />
+      </label>
+
+      <section class="card">
+        <h2>Label Settings</h2>
+        <label class="checkbox">
+          <input id="labelEnabled" type="checkbox" />
+          <span>Enable Labels</span>
+        </label>
+
+        <label class="field">
+          <span>Minimum Likes</span>
+          <input id="labelThreshold" type="number" min="1" step="1" />
+        </label>
+
+        <label class="field">
+          <span>Label Text</span>
+          <input id="labelText" type="text" autocomplete="off" />
+        </label>
+
+        <button id="saveLabelSettingsBtn" type="button">Save Label Settings</button>
+      </section>
+
+      <button id="saveBtn" type="button">Save Current Post</button>
+      <p id="status" class="status"></p>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

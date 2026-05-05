@@ -94,6 +94,27 @@ type ConfiguredThreadsAccountProfile = {
   threads_profile_picture_url: string | null;
 };
 
+type ExternalPatternRow = {
+  id: number;
+  app_user_id: string;
+  platform: string;
+  source_url: string;
+  post_id: string | null;
+  author_handle: string | null;
+  author_display_name: string | null;
+  post_text: string;
+  likes: number;
+  replies: number;
+  reposts: number;
+  shares: number;
+  views: number | null;
+  posted_at: string | null;
+  capture_confidence: string;
+  raw_payload: string | null;
+  saved_at: string;
+  updated_at: string;
+};
+
 const CONFIGURED_THREADS_ACCOUNTS: ConfiguredThreadsAccount[] = [
   {
     id: "manifest-mental",
@@ -468,9 +489,41 @@ function getAuthCorsOrigin(request: Request, env: Env): string {
   return getConfiguredAppBaseUrl(env);
 }
 
-function getCorsHeadersForRequest(request: Request, env: Env): Record<string, string> {
+function isThreadsPageOrigin(origin: string | null | undefined): boolean {
+  const normalizedOrigin = normalizeAppBaseUrl(origin);
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  const hostname = parseUrl(normalizedOrigin)?.hostname?.toLowerCase() ?? "";
+  return hostname === "www.threads.com" || hostname === "threads.com" || hostname === "threads.net";
+}
+
+function isBrowserExtensionOrigin(origin: string | null | undefined): boolean {
+  if (!origin) {
+    return false;
+  }
+  return origin.startsWith("chrome-extension://") || origin.startsWith("moz-extension://");
+}
+
+function getPatternsCorsOrigin(request: Request, env: Env): string {
+  const requestOrigin = request.headers.get("origin");
+  if (isBrowserExtensionOrigin(requestOrigin)) {
+    return String(requestOrigin);
+  }
+  if (isThreadsPageOrigin(requestOrigin)) {
+    return normalizeAppBaseUrl(requestOrigin) ?? getConfiguredAppBaseUrl(env);
+  }
+  return getAuthCorsOrigin(request, env);
+}
+
+function getCorsHeadersForRequest(request: Request, env: Env, path?: string): Record<string, string> {
+  const normalizedPath = path && path !== "/" ? path.replace(/\/+$/, "") : path ?? "";
+  const corsOrigin = normalizedPath.startsWith("/api/patterns/")
+    ? getPatternsCorsOrigin(request, env)
+    : getAuthCorsOrigin(request, env);
   return {
-    "Access-Control-Allow-Origin": getAuthCorsOrigin(request, env),
+    "Access-Control-Allow-Origin": corsOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": "true",
@@ -1001,7 +1054,7 @@ function withApiCors(request: Request, env: Env, path: string, response: Respons
   }
 
   const headers = new Headers(response.headers);
-  const corsHeaders = getCorsHeadersForRequest(request, env);
+  const corsHeaders = getCorsHeadersForRequest(request, env, normalizedPath);
   headers.set("Access-Control-Allow-Origin", corsHeaders["Access-Control-Allow-Origin"]);
   headers.set("Access-Control-Allow-Methods", corsHeaders["Access-Control-Allow-Methods"]);
   headers.set("Access-Control-Allow-Headers", corsHeaders["Access-Control-Allow-Headers"]);
@@ -3334,6 +3387,188 @@ async function ensureThreadsPostsArchiveTable(env: Env): Promise<void> {
   ).run();
 }
 
+async function ensureExternalPatternsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS external_patterns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_user_id TEXT NOT NULL,
+      platform TEXT NOT NULL DEFAULT 'threads',
+      source_url TEXT NOT NULL,
+      post_id TEXT,
+      author_handle TEXT,
+      author_display_name TEXT,
+      post_text TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      views INTEGER,
+      posted_at TEXT,
+      capture_confidence TEXT NOT NULL DEFAULT 'medium',
+      raw_payload TEXT,
+      saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(app_user_id, source_url)
+    )`,
+  ).run();
+}
+
+function normalizePatternString(
+  value: unknown,
+  options: { maxLength?: number; allowEmpty?: boolean } = {},
+): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!options.allowEmpty && !trimmed) {
+    return null;
+  }
+
+  const maxLength = options.maxLength ?? 0;
+  if (maxLength > 0 && trimmed.length > maxLength) {
+    return trimmed.slice(0, maxLength);
+  }
+
+  return trimmed;
+}
+
+function normalizePatternMetric(value: unknown): number {
+  const numericValue = Number(value ?? 0);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return 0;
+  }
+  return Math.floor(numericValue);
+}
+
+function normalizePatternViews(value: unknown): number | null {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return null;
+  }
+  return Math.floor(numericValue);
+}
+
+function normalizePatternPostedAt(value: unknown): string | null {
+  const normalized = normalizePatternString(value, { maxLength: 100 });
+  if (!normalized) {
+    return null;
+  }
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString();
+}
+
+function normalizePatternConfidence(value: unknown): "low" | "medium" | "high" {
+  const normalized = normalizePatternString(value, { maxLength: 16 })?.toLowerCase();
+  if (normalized === "low" || normalized === "high") {
+    return normalized;
+  }
+  return "medium";
+}
+
+function normalizePatternRawPayload(value: unknown): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+async function importExternalPattern(
+  env: Env,
+  appUserId: string,
+  payload: Record<string, unknown>,
+): Promise<ExternalPatternRow> {
+  await ensureExternalPatternsTable(env);
+
+  const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
+  const sourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
+  const postText = normalizePatternString(payload.post_text, { maxLength: 20000 });
+  const postId = normalizePatternString(payload.post_id, { maxLength: 255 });
+  const authorHandle = normalizePatternString(payload.author_handle, { maxLength: 255 });
+  const authorDisplayName = normalizePatternString(payload.author_display_name, { maxLength: 255 });
+  const likes = normalizePatternMetric(payload.likes);
+  const replies = normalizePatternMetric(payload.replies);
+  const reposts = normalizePatternMetric(payload.reposts);
+  const shares = normalizePatternMetric(payload.shares);
+  const views = normalizePatternViews(payload.views);
+  const postedAt = normalizePatternPostedAt(payload.posted_at);
+  const captureConfidence = normalizePatternConfidence(payload.capture_confidence);
+  const rawPayload = normalizePatternRawPayload(payload.raw_payload);
+
+  if (!sourceUrl || !postText) {
+    throw new Error("source_url and post_text are required");
+  }
+
+  const nowIso = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO external_patterns (
+      app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+      post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+      raw_payload, saved_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(app_user_id, source_url) DO UPDATE SET
+      platform = excluded.platform,
+      post_id = excluded.post_id,
+      author_handle = excluded.author_handle,
+      author_display_name = excluded.author_display_name,
+      post_text = excluded.post_text,
+      likes = excluded.likes,
+      replies = excluded.replies,
+      reposts = excluded.reposts,
+      shares = excluded.shares,
+      views = excluded.views,
+      posted_at = excluded.posted_at,
+      capture_confidence = excluded.capture_confidence,
+      raw_payload = excluded.raw_payload,
+      updated_at = excluded.updated_at`,
+  )
+    .bind(
+      appUserId,
+      platform,
+      sourceUrl,
+      postId,
+      authorHandle,
+      authorDisplayName,
+      postText,
+      likes,
+      replies,
+      reposts,
+      shares,
+      views,
+      postedAt,
+      captureConfidence,
+      rawPayload,
+      nowIso,
+      nowIso,
+    )
+    .run();
+
+  const row = await env.DB.prepare(
+    `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+            post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+            raw_payload, saved_at, updated_at
+     FROM external_patterns
+     WHERE app_user_id = ? AND source_url = ?
+     LIMIT 1`,
+  )
+    .bind(appUserId, sourceUrl)
+    .first<ExternalPatternRow>();
+
+  if (!row) {
+    throw new Error("pattern_import_failed");
+  }
+
+  return row;
+}
+
 async function ensureAutomationDailyRunLocksTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS automation_daily_run_locks (
@@ -5248,13 +5483,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const isAuthPath =
       normalizedPath.startsWith("/api/batch-schedule/")
       || normalizedPath.startsWith("/auth/threads/");
-    const requestCorsHeaders = getCorsHeadersForRequest(request, env);
+    const requestCorsHeaders = getCorsHeadersForRequest(request, env, normalizedPath);
     const applyAuthCors = (response: Response): Response =>
       isAuthPath ? withAuthCors(request, env, response) : response;
 
     if (request.method === "OPTIONS") {
       const corsHeaders = isApiPath
-        ? getCorsHeadersForRequest(request, env)
+        ? getCorsHeadersForRequest(request, env, normalizedPath)
         : {
           "Access-Control-Allow-Origin": getConfiguredAppBaseUrl(env),
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -5287,6 +5522,94 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }, "error");
         return notFoundJsonResponse(requestCorsHeaders);
       }
+    }
+
+    if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const appUserId = normalizeAppUserId(
+        typeof payload.app_user_id === "string" ? payload.app_user_id : null,
+      );
+      if (!appUserId) {
+        return new Response(JSON.stringify({ error: "app_user_id is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        const imported = await importExternalPattern(env, appUserId, payload);
+        return new Response(JSON.stringify({
+          success: true,
+          app_user_id: appUserId,
+          updated_at: imported.updated_at,
+          pattern: imported,
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        const status = message === "source_url and post_text are required" ? 400 : 500;
+        return new Response(JSON.stringify({ error: message }), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (normalizedPath === "/api/patterns/list" && request.method === "GET") {
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!appUserId) {
+        return new Response(JSON.stringify({ error: "app_user_id is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const rawLimit = Number(url.searchParams.get("limit") ?? "50");
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(Math.floor(rawLimit), 200)
+        : 50;
+
+      await ensureExternalPatternsTable(env);
+      const rows = await env.DB.prepare(
+        `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+                post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+                raw_payload, saved_at, updated_at
+         FROM external_patterns
+         WHERE app_user_id = ?
+         ORDER BY datetime(updated_at) DESC, id DESC
+         LIMIT ?`,
+      )
+        .bind(appUserId, limit)
+        .all<ExternalPatternRow>();
+
+      const totalRow = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM external_patterns
+         WHERE app_user_id = ?`,
+      )
+        .bind(appUserId)
+        .first<{ total: number | string }>();
+
+      return new Response(JSON.stringify({
+        success: true,
+        app_user_id: appUserId,
+        total: Number(totalRow?.total ?? 0),
+        patterns: rows.results ?? [],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (normalizedPath === "/api/batch-schedule/presets" && request.method === "GET") {
