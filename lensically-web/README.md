@@ -2,51 +2,27 @@
 
 Frontend application for Lensically, built with Next.js App Router and deployed with OpenNext on Cloudflare.
 
-## Reviewer Guide
-
-- Repository reviewer guide: [`../REVIEWER_GUIDE.md`](../REVIEWER_GUIDE.md)
-
 ## Public Review References
 
 - Terms of service: `https://lensically.com/terms`
 - Privacy policy: `https://lensically.com/privacy`
 - Data deletion instructions: `https://lensically.com/data-deletion`
 
-These URLs are the official public pages for provider review. The terms page explains the basic usage framework, the privacy policy explains data handling, and the data deletion page explains how users can delete their Lensically account and associated application data.
+These URLs are the official public pages for the current private workspace build. The terms page explains usage rules, the privacy policy explains data handling, and the data deletion page explains how deletion requests are handled.
 
-## Meta Compliance Values
+## Public App Shape
 
-Copy these values directly into the Meta app configuration:
-
-- Data deletion callback URL: `https://api.lensically.com/auth/threads/delete`
-- Data deletion instructions URL: `https://lensically.com/data-deletion`
-- Support contact email: `support@lensically.com`
-
-## Google OAuth Consent Values
-
-Copy these values directly into the Google OAuth consent screen:
-
-- Application name: `Lensically`
-- Homepage URL: `https://lensically.com`
-- Privacy policy URL: `https://lensically.com/privacy`
-- Support email: `support@lensically.com`
-- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
-
-## OAuth Branding Values (All Providers)
-
-Keep branding values aligned across Google, GitHub, Discord, and Threads provider dashboards:
-
-- Application name: `Lensically`
-- Homepage URL: `https://lensically.com`
-- Support email: `support@lensically.com`
-- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
+- Root route is a password gate for the private workspace.
+- Active internal routes are `/dashboard`, `/insights`, `/followers`, `/post-archive`, `/schedule`, and `/scheduled-posts`.
+- Public routes are `/terms`, `/privacy`, and `/data-deletion`.
 
 ## Application Scope
 
-- Public marketing and landing pages
-- Public authentication flows
-- Authenticated product routes
-- Account settings and self-serve account deletion
+- Password-gated workspace access
+- Threads dashboard and insights surfaces
+- Followers and post archive reporting
+- Immediate publishing and scheduled posting
+- Public compliance pages
 
 ## Development
 

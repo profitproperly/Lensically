@@ -1,16 +1,12 @@
 export type UsageCounterColumn =
   | "me_calls"
   | "insights_calls"
-  | "publish_calls"
-  | "keyword_calls"
-  | "profile_calls";
+  | "publish_calls";
 
 export type UsageFeatureName =
   | "me"
   | "insights"
-  | "publish"
-  | "keyword_search"
-  | "profile_discovery";
+  | "publish";
 
 export type UsageEnv = {
   DB: D1Database;
@@ -28,24 +24,18 @@ export const DAILY_USAGE_LIMITS: Record<UsageCounterColumn, number> = {
   me_calls: 1,
   insights_calls: 11,
   publish_calls: 25,
-  keyword_calls: 72,
-  profile_calls: 50,
 };
 
 const ALLOWED_USAGE_COLUMNS: ReadonlySet<UsageCounterColumn> = new Set([
   "me_calls",
   "insights_calls",
   "publish_calls",
-  "keyword_calls",
-  "profile_calls",
 ]);
 
 const USAGE_COLUMN_TO_FEATURE: Record<UsageCounterColumn, UsageFeatureName> = {
   me_calls: "me",
   insights_calls: "insights",
   publish_calls: "publish",
-  keyword_calls: "keyword_search",
-  profile_calls: "profile_discovery",
 };
 
 export function getTodayDate(): string {

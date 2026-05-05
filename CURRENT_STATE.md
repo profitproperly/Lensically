@@ -2,8 +2,8 @@
 
 ## Product Shape
 
-- Lensically is operating as a production app with `lensically-web/` as the frontend and `lensically-worker/` as the backend.
-- Main active user workflows currently center on Create Post, Scheduled Posts, dashboard/insights, discovery, search, and archive flows.
+- Lensically is operating as a private workspace build with `lensically-web/` as the frontend and `lensically-worker/` as the backend.
+- Main active user workflows currently center on the password gate, Create Post, Scheduled Posts, dashboard, insights, followers, and post archive flows.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
 - `/dashboard` now targets an operator-dashboard role rather than a simple profile/stats card.
 - `/followers` is a dedicated paginated follower-history surface for daily snapshot tracking.
@@ -50,7 +50,7 @@
 - keep mobile usability first-class for internal product pages
 - user-triggered async actions should always show loading, success, error, and empty states when applicable
 - destructive flows require explicit confirmation and backend enforcement
-- approved implementation tasks should normally be carried through verification, commit, push, and deploy unless the user explicitly says `talk only` or opts out
+- approved implementation tasks should normally be carried through verification, commit, push, and deploy
 - commits should always use clear, descriptive commit messages
 
 ## Known Deploy Targets

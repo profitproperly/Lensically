@@ -38,8 +38,6 @@ const PROFILE_REQUIRED_ROUTES = new Set([
   "/post-archive",
   "/schedule",
   "/scheduled-posts",
-  "/search",
-  "/discovery",
 ]);
 
 function isPreloadSupported(appUserId: string) {
@@ -58,7 +56,7 @@ async function preloadThreadsStatus(appUserId: string) {
   }
 
   const response = await fetch(
-    `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+    THREADS_ME_URL,
     { cache: "no-store", credentials: "include" },
   );
 
@@ -95,7 +93,7 @@ async function preloadInsights(appUserId: string) {
   }
 
   const response = await fetch(
-    `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+    THREADS_POSTS_URL,
     { cache: "no-store", credentials: "include" },
   );
 
@@ -128,16 +126,12 @@ export async function preloadRouteDataForNavigation(route: string, appUserId: st
     if (PROFILE_REQUIRED_ROUTES.has(route)) {
       const hasReadyProfile = await preloadThreadsStatus(appUserId);
       if (!hasReadyProfile) {
-        return "/connect";
+        return route;
       }
     }
 
     if (route === "/insights") {
       await preloadInsights(appUserId);
-    }
-
-    if (route === "/account") {
-      await preloadThreadsStatus(appUserId);
     }
   } catch {
     // Ignore preload failures so navigation always continues.

@@ -1,0 +1,20 @@
+{
+  "name": "Lensically",
+  "short_name": "Lensically",
+  "description": "Lensically platform",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/lensically-logo-black-with-white-bg.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/lensically-logo-black-with-white-bg.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

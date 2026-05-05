@@ -32,7 +32,6 @@ type ArchiveResponse = {
   error?: string;
 };
 
-const WORKSPACE_APP_USER_ID = "workspace-owner";
 const THREADS_POSTS_ARCHIVE_URL = buildWorkerUrl("/api/threads/posts/archive");
 const ARCHIVE_PAGE_SIZE = 100;
 
@@ -151,7 +150,7 @@ export default function PostArchivePage() {
 
       try {
         const response = await fetch(
-          `${THREADS_POSTS_ARCHIVE_URL}?app_user_id=${encodeURIComponent(WORKSPACE_APP_USER_ID)}&order=${encodeURIComponent(order)}&limit=${ARCHIVE_PAGE_SIZE}&page=${page}`,
+          `${THREADS_POSTS_ARCHIVE_URL}?order=${encodeURIComponent(order)}&limit=${ARCHIVE_PAGE_SIZE}&page=${page}`,
           {
             cache: "no-store",
             credentials: "include",

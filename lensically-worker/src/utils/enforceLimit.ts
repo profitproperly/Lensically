@@ -10,9 +10,7 @@ import { sanitizeForLog } from "../../auth/logSanitizer.js";
 export type UsageFeature =
   | "me"
   | "insights"
-  | "publish"
-  | "keyword_search"
-  | "profile_discovery";
+  | "publish";
 
 export type LimitUser = {
   id: string;
@@ -50,8 +48,6 @@ const FEATURE_TO_COLUMN: Record<UsageFeature, UsageCounterColumn> = {
   me: "me_calls",
   insights: "insights_calls",
   publish: "publish_calls",
-  keyword_search: "keyword_calls",
-  profile_discovery: "profile_calls",
 };
 
 function isUsageFeature(value: string): value is UsageFeature {

@@ -11,21 +11,16 @@ export const metadata: Metadata = {
 };
 
 const collectedData = [
-  "Account information, including email address and password hash (for password-based accounts)",
-  "OAuth identity linkages for supported sign-in providers (Google, GitHub, Discord)",
-  "Session and cookie records used to authenticate requests and protect account access",
+  "Workspace access cookie used to unlock the private Lensically workspace",
   "Connected Threads account identifiers, access tokens, and profile metadata needed for product functionality",
   "Feature usage records, limit counters, and operational metadata used for reliability and abuse prevention",
-  "Profile discovery, keyword search, insights, publish, and scheduling request/response data needed to perform requested actions",
+  "Insights, follower history, archive, publish, and scheduling request/response data needed to perform requested actions",
   "Scheduled posts and related publishing status records created by the user",
-  "Email delivery metadata for verification and password reset workflows (via configured provider infrastructure)",
 ];
 
 const useCases = [
-  "Create and secure your account",
-  "Authenticate and maintain active sessions for authorized users",
-  "Provide Threads connection, profile discovery, keyword search, insights, publishing, and scheduling functionality",
-  "Operate and secure account settings, account deletion, and lifecycle workflows",
+  "Unlock and operate the private workspace",
+  "Provide Threads connection, insights, follower tracking, publishing, archive, and scheduling functionality",
   "Maintain service integrity, prevent abuse, and enforce feature usage limits",
   "Process support requests, deletion requests, and provider-required compliance callbacks",
 ];
@@ -55,14 +50,15 @@ export default function PrivacyPage() {
           </h1>
           <p className="max-w-3xl text-base leading-7 text-slate-600">
             This page explains what information Lensically collects, how that information is used,
-            how it is stored within the application, and how users can delete their data.
+            how it is stored within the application, and how deletion requests are handled for the
+            current private workspace build.
           </p>
           <p className="text-sm text-slate-500">Effective date: March 14, 2026</p>
         </div>
 
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-medium leading-6 text-rose-900">
-          Deleting your Lensically account permanently removes associated user data from the system.
-          This action cannot be undone.
+          Lensically currently operates as a private workspace build. Removal requests are handled
+          through the documented deletion process and support contact.
         </div>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -101,47 +97,43 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold text-slate-900">How data is stored</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Lensically stores application data in production infrastructure used to operate the
-            service (including hosted database and API runtime components). Authentication uses
-            server-managed sessions and secure cookies. Requests to third-party platforms are made
+            service (including hosted database and API runtime components). The current build uses
+            a workspace access cookie rather than a public multi-user sign-in system. Requests to
+            third-party platforms are made
             only as needed to execute user-requested product actions and connected account features.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Lensically also uses third-party services where applicable for product operation,
-            including Threads/Meta APIs, OAuth provider APIs (Google, GitHub, Discord), Cloudflare
-            hosting/runtime infrastructure, and email delivery infrastructure.
+            including Threads/Meta APIs and Cloudflare hosting/runtime infrastructure.
           </p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Cookies and sessions</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically uses secure authentication cookies and server-side session records to keep
-            users signed in and to authorize protected API routes. Session cookies are required for
-            account access and authenticated functionality.
+            Lensically uses a secure workspace access cookie to unlock protected routes for the
+            private workspace. That cookie is required for workspace access.
           </p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Data retention and deletion</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically retains account and feature data while your account is active and as needed
-            to provide product functionality. You can initiate permanent deletion from authenticated
-            account settings.
+            Lensically retains workspace and feature data while the private workspace remains in
+            operation and as needed to provide product functionality. Deletion or data removal
+            requests are handled through the documented public deletion channel.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            After account deletion, Lensically removes account-linked application records. For
-            security and abuse prevention, limited identity tombstones may be retained for up to 7
-            days before expiring.
+            Limited operational metadata may be retained for security, abuse prevention, and audit
+            purposes where required.
           </p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">How users can delete data</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Signed-in users can delete their account from the account settings page. That deletion
-            flow permanently removes the Lensically account and associated application records tied
-            to the user, including sessions, OAuth linkages, reset and verification tokens, usage
-            tracking records, Threads linkage records, and scheduled posts.
+            The current private workspace build does not expose a public self-serve account settings
+            flow. Deletion and data removal instructions are available at the public URL below.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Public deletion instructions are available at{" "}
@@ -151,7 +143,7 @@ export default function PrivacyPage() {
             .
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            If you cannot access your account, contact{" "}
+            If you need deletion or data removal support, contact{" "}
             <a className="font-medium text-slate-900 underline" href="mailto:support@lensically.com">
               support@lensically.com
             </a>{" "}
@@ -163,7 +155,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold text-slate-900">Children and sensitive data</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Lensically is not intended for children under 13. Please do not submit sensitive
-            personal data that is not required for account authentication or core service use.
+            personal data that is not required for core service use.
           </p>
         </section>
       </main>

@@ -102,7 +102,7 @@ export default function InternalLayout({
 
       <div className="flex flex-1 flex-col xl:flex-row">
         <Sidebar />
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

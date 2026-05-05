@@ -1,7 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import type { CurrentUser } from "./authClient";
+import { createContext, useContext, useState } from "react";
+
+export type CurrentUser = {
+  id: string;
+  email: string;
+  timezone?: string;
+  clock_format?: "12h" | "24h";
+  email_verified: boolean;
+  has_password: boolean;
+};
 
 type AuthContextType = {
   user: CurrentUser | null;
@@ -20,7 +28,6 @@ const WORKSPACE_USER: CurrentUser = {
   clock_format: "12h",
   email_verified: true,
   has_password: true,
-  login_provider: null,
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -48,10 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function logoutUser() {
     setUser(WORKSPACE_USER);
   }
-
-  useEffect(() => {
-    void refreshUser();
-  }, []);
 
   return (
     <AuthContext.Provider

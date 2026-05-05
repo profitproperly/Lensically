@@ -16,6 +16,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Lensically",
   description: "Lensically platform",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/lensically-logo-black-with-white-bg.png", type: "image/png" },
+    ],
+    shortcut: [
+      { url: "/lensically-logo-black-with-white-bg.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/lensically-logo-black-with-white-bg.png", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Lensically",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

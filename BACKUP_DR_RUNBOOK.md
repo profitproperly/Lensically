@@ -121,19 +121,15 @@ All commands run from repository root unless noted.
 
 ### D. Post-Restore Validation
 
-1. Run backend auth/API smoke checks via VS Code task registry.
-2. Validate critical user journeys:
-   - login
-   - authenticated API access
-   - account deletion flow
-   - Threads connection read paths
-3. Validate data integrity queries against core auth tables (`users`, `sessions`, `oauth_accounts`, token tables).
-4. Validate deletion-state controls before full traffic cutover:
-   - Confirm `account_deletion_tombstones` exists and contains current retention-window records.
-   - Confirm `banned_identities` exists and contains active bans.
-   - Confirm deleted/banned incident sample identities remain blocked by policy.
-5. If tombstones or bans are missing, re-apply those records from incident/audit sources and re-run auth deletion smoke checks.
-6. Monitor worker error logs and D1 query error rates for at least 30 minutes after restore.
+1. Run backend worker checks via the normal task registry.
+2. Validate critical workspace journeys:
+   - workspace unlock and protected route access
+   - Threads account read paths
+   - dashboard, insights, followers, and archive loads
+   - publish and scheduling flows
+3. Validate data integrity queries against current workspace tables (`users`, `threads_accounts`, `app_threads_accounts`, `scheduled_posts`, and related insights/follower caches).
+4. Confirm scheduled jobs resume normally after restore and that recent worker logs show successful Threads reads and scheduled task execution.
+5. Monitor worker error logs and D1 query error rates for at least 30 minutes after restore.
 
 ### F. Deletion-State Verification Procedure (Required)
 

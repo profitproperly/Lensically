@@ -10,7 +10,6 @@ import {
   writeThreadsProfileCache,
 } from "../lib/threadsProfileCache";
 
-const WORKSPACE_APP_USER_ID = "workspace-owner";
 const DEFAULT_THREADS_USERNAME = "manifestmental";
 
 const links = [
@@ -39,8 +38,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const router = useRouter();
   const currentPath = String(pathname ?? "");
   const isActivePath = (href: string) => currentPath === String(href);
-  const appUserId = WORKSPACE_APP_USER_ID;
-  const cachedProfile = appUserId ? readThreadsProfileCache(appUserId) : null;
+  const cachedProfile = readThreadsProfileCache("workspace-owner");
   const [username, setUsername] = useState<string | null>(DEFAULT_THREADS_USERNAME);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
@@ -48,14 +46,10 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const displayProfilePictureUrl = profilePictureUrl ?? cachedProfile?.account?.threads_profile_picture_url ?? null;
 
   useEffect(() => {
-    if (!appUserId) {
-      return;
-    }
-
     const loadProfile = async () => {
       try {
         const res = await fetch(
-          `${THREADS_ME_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+          THREADS_ME_URL,
           { cache: "no-store", credentials: "include" },
         );
         if (!res.ok) {
@@ -64,7 +58,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         const data = (await res.json()) as ThreadsMeResponse;
         setUsername(data.username?.trim() || null);
         setProfilePictureUrl(data.threads_profile_picture_url ?? null);
-        writeThreadsProfileCache(appUserId, {
+        writeThreadsProfileCache("workspace-owner", {
           username: data.username ?? null,
           threads_profile_picture_url: data.threads_profile_picture_url ?? null,
         });
@@ -74,7 +68,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     };
 
     void loadProfile();
-  }, [appUserId]);
+  }, []);
 
   useEffect(() => {
     if (!displayUsername) {
@@ -92,7 +86,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
     try {
       router.prefetch(href);
-      const destinationHref = await preloadRouteDataForNavigation(href, WORKSPACE_APP_USER_ID);
+      const destinationHref = await preloadRouteDataForNavigation(href, "workspace-owner");
       router.push(destinationHref);
       onNavigate?.();
     } finally {
@@ -102,11 +96,15 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
   const asideClassName = mobile
     ? "flex h-full w-full flex-col bg-white"
-    : "hidden w-72 shrink-0 border-r border-slate-200 bg-white xl:sticky xl:top-16 xl:flex xl:h-[calc(100vh-4rem)]";
+    : "hidden shrink-0 bg-white xl:sticky xl:top-16 xl:flex xl:h-[calc(100vh-4rem)] xl:w-72 xl:flex-col xl:items-start xl:border-r xl:border-slate-200 xl:pt-6";
 
   return (
     <aside className={asideClassName}>
-      <div className={`flex w-full flex-col items-center ${mobile ? "border-b border-slate-200 px-5 pb-5 pt-6" : "mb-8 mt-6"}`}>
+      <div
+        className={`flex w-full flex-col items-center ${
+          mobile ? "border-b border-slate-200 px-5 pb-5 pt-6" : "mb-8 mt-6"
+        }`}
+      >
         <div className="relative group cursor-pointer">
           {displayUsername ? (
             <a
@@ -154,7 +152,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         )}
       </div>
 
-      <nav className={`w-full space-y-2 ${mobile ? "px-4 py-4" : "pb-4"}`}>
+      <nav className={`w-full space-y-2 ${mobile ? "px-4 py-4" : "pb-4 xl:pb-0"}`}>
         {links.map((link) => (
           <div key={link.href} className={mobile ? undefined : "px-4"}>
             {(() => {

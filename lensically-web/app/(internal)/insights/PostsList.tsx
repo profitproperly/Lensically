@@ -26,10 +26,8 @@ type PostsResponse = {
 };
 
 const THREADS_POSTS_URL = buildWorkerUrl("/api/threads/posts");
-const WORKSPACE_APP_USER_ID = "workspace-owner";
 
 export default function PostsList() {
-  const appUserId = WORKSPACE_APP_USER_ID;
   const [posts, setPosts] = useState<ThreadsPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [cursorDepth, setCursorDepth] = useState(1);
@@ -45,17 +43,13 @@ export default function PostsList() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const loadPosts = useCallback(async () => {
-    if (!appUserId) {
-      setLoadingInitial(false);
-      return;
-    }
     try {
       setLoadingInitial(true);
       setNeedsConnection(false);
       setHasError(false);
 
       const res = await fetch(
-        `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId ?? "")}`,
+        THREADS_POSTS_URL,
         { cache: "no-store", credentials: "include" },
       );
       const data = (await res.json()) as PostsResponse;
@@ -80,7 +74,7 @@ export default function PostsList() {
       setNeedsConnection(false);
       setLoadingInitial(false);
     }
-  }, [appUserId]);
+  }, []);
 
   const loadMore = async () => {
     if (!cursor || !hasMore) return;
@@ -91,7 +85,7 @@ export default function PostsList() {
 
     try {
       const res = await fetch(
-        `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId ?? "")}&cursor=${encodeURIComponent(cursor)}&cursor_depth=${nextDepth}`,
+        `${THREADS_POSTS_URL}?cursor=${encodeURIComponent(cursor)}&cursor_depth=${nextDepth}`,
         { credentials: "include" },
       );
 
@@ -119,7 +113,7 @@ export default function PostsList() {
   };
 
   const handleRefresh = async () => {
-    if (!appUserId || refreshing) {
+    if (refreshing) {
       return;
     }
 
@@ -128,7 +122,7 @@ export default function PostsList() {
 
     try {
       const res = await fetch(
-        `${THREADS_POSTS_URL}?app_user_id=${encodeURIComponent(appUserId)}`,
+        THREADS_POSTS_URL,
         { cache: "no-store", credentials: "include" },
       );
 
@@ -159,18 +153,8 @@ export default function PostsList() {
   };
 
   useEffect(() => {
-    if (!appUserId) {
-      setPosts([]);
-      setCursor(null);
-      setHasMore(false);
-      setCursorDepth(1);
-      setNeedsConnection(true);
-      setHasError(false);
-      setLoadingInitial(false);
-      return;
-    }
     void loadPosts();
-  }, [appUserId, loadPosts]);
+  }, [loadPosts]);
 
   const sortedPosts = [...posts].sort((a, b) => {
     if (!sortMetric) {
@@ -313,7 +297,7 @@ export default function PostsList() {
 
       <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full min-w-[920px] border-collapse table-fixed">
-          <thead className="sticky top-16 z-20 bg-white border-b border-slate-200 text-xs uppercase text-slate-500">
+          <thead className="border-b border-slate-200 bg-white text-xs uppercase text-slate-500">
             <tr>
               <th
                 className={[

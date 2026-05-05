@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 
 const BASE_URL = "https://api.lensically.com";
-const APP_USER_ID = "workspace-owner";
 const ACCOUNT_ID = "manifest-mental";
 const AUTOMATION_ID = "manifest-mental-tomorrow-planner";
 const TIMEZONE = "America/New_York";
@@ -602,7 +601,7 @@ async function main() {
     baseResult.dailyLock = "ACQUIRED";
 
     const { response: scheduleResponse, data: scheduleData } = await fetchJson(
-      `${BASE_URL}/api/threads/schedule?app_user_id=${encodeURIComponent(APP_USER_ID)}`,
+      `${BASE_URL}/api/threads/schedule`,
     );
     if (!scheduleResponse.ok) {
       throw new Error(`schedule GET HTTP ${scheduleResponse.status}`);
@@ -649,8 +648,8 @@ async function main() {
     }
 
     const [{ response: recentResponse, data: recentData }, { response: topResponse, data: topData }] = await Promise.all([
-      fetchJson(`${BASE_URL}/api/threads/posts/archive?app_user_id=${encodeURIComponent(APP_USER_ID)}&order=recent&limit=60&page=1`),
-      fetchJson(`${BASE_URL}/api/threads/posts/archive?app_user_id=${encodeURIComponent(APP_USER_ID)}&order=top&limit=60&page=1`),
+      fetchJson(`${BASE_URL}/api/threads/posts/archive?order=recent&limit=60&page=1`),
+      fetchJson(`${BASE_URL}/api/threads/posts/archive?order=top&limit=60&page=1`),
     ]);
 
     if (!recentResponse.ok) {
@@ -672,7 +671,6 @@ async function main() {
       const { response: createResponse, data: createData } = await fetchJson(`${BASE_URL}/api/threads/schedule`, {
         method: "POST",
         body: JSON.stringify({
-          app_user_id: APP_USER_ID,
           threads_user_id: THREADS_USER_ID,
           text: item.text,
           date: targetDate,
@@ -694,7 +692,7 @@ async function main() {
     }
 
     const finalSchedule = await fetchJson(
-      `${BASE_URL}/api/threads/schedule?app_user_id=${encodeURIComponent(APP_USER_ID)}`,
+      `${BASE_URL}/api/threads/schedule`,
     );
     if (!finalSchedule.response.ok) {
       throw new Error(`schedule verification HTTP ${finalSchedule.response.status}`);

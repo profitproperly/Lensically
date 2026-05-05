@@ -11,13 +11,10 @@ export const metadata: Metadata = {
 };
 
 const deletedDataItems = [
-  "Your Lensically user account record",
-  "Active sessions and authentication cookies",
-  "Connected OAuth provider linkages",
-  "Connected Threads account linkage records and related cached profile data",
-  "Email verification and password reset tokens",
-  "Usage tracking and feature usage records associated with your account",
-  "Scheduled posts and publish status records stored for your account",
+  "Workspace-managed Threads account linkage records and related cached profile data",
+  "Workspace usage tracking and feature usage records",
+  "Scheduled posts and publish status records stored by the workspace",
+  "Archived post records and follower history snapshots where deletion is requested",
 ];
 
 export default function DataDeletionPage() {
@@ -44,16 +41,15 @@ export default function DataDeletionPage() {
             How to delete your Lensically account
           </h1>
           <p className="max-w-3xl text-base leading-7 text-slate-600">
-            Lensically provides self-serve account deletion from the authenticated account settings
-            area. Deletion is permanent and removes the account data associated with your use of the
-            application.
+            Lensically currently operates as a private workspace build. Deletion and data removal
+            requests are handled through support and the documented provider review callbacks.
           </p>
           <p className="text-sm text-slate-500">Effective date: March 14, 2026</p>
         </div>
 
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-medium leading-6 text-rose-900">
-          Deleting your Lensically account permanently removes associated user data from the system.
-          This action cannot be undone.
+          Deletion requests permanently remove the requested Lensically data from the system where
+          applicable. This action cannot be undone.
         </div>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -71,28 +67,20 @@ export default function DataDeletionPage() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Delete your account</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Request deletion</h2>
           <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm leading-6 text-slate-700">
-            <li>Sign in to your Lensically account.</li>
-            <li>Open the account settings page.</li>
-            <li>Select the delete account action.</li>
-            <li>
-              If your account uses password authentication, confirm with your current password. For
-              OAuth-only accounts, confirm by entering the required deletion confirmation text.
-            </li>
-            <li>Confirm the permanent deletion prompt.</li>
-            <li>
-              After confirmation, Lensically runs the deletion process and removes your account from
-              the system.
-            </li>
+            <li>Email <a className="font-medium text-slate-900 underline" href="mailto:support@lensically.com">support@lensically.com</a> with your deletion request.</li>
+            <li>Include the Threads account or dataset details needed to identify the stored records.</li>
+            <li>Lensically verifies the request and removes the applicable workspace-managed data.</li>
+            <li>If a provider-initiated deletion callback applies, Lensically processes that callback and returns the required confirmation response.</li>
           </ol>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">What data is removed</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            When account deletion completes, Lensically permanently removes the account and related
-            application records tied to that user, including:
+            When deletion completes, Lensically permanently removes the applicable workspace data,
+            including:
           </p>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
             {deletedDataItems.map((item) => (
@@ -100,15 +88,8 @@ export default function DataDeletionPage() {
             ))}
           </ul>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            Account deletion disables access immediately and clears active sessions. For security,
-            fraud prevention, and abuse prevention, Lensically may retain limited identity
-            tombstones (such as email and OAuth provider identifiers) for up to 7 days before
-            expiring.
-          </p>
-          <p className="mt-4 text-sm leading-6 text-slate-600">
-            If a Threads account is disconnected (without full account deletion), Lensically may
-            retain temporary connection tombstone metadata for a short reconnect window as part of
-            product safety and lifecycle handling.
+            Lensically may retain limited operational metadata where required for security, abuse
+            prevention, or audit purposes.
           </p>
         </section>
 
@@ -121,11 +102,11 @@ export default function DataDeletionPage() {
             returns a confirmation status response.
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            If you cannot access your account and need manual deletion support, contact{" "}
+            If you need manual deletion support, contact{" "}
             <a className="font-medium text-slate-900 underline" href="mailto:support@lensically.com">
               support@lensically.com
             </a>{" "}
-            and include the email address associated with your Lensically account.
+            and include the relevant Threads account or dataset details.
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             The related public privacy policy used for provider review is available at{" "}

@@ -1,160 +1,25 @@
 EVAL / NEXT TASK
 
+Status
+This legacy VS Code handoff prompt is deprecated.
+
 Purpose
-Control step progression with strict run gating and minimal responses.
+If this file is still used anywhere, keep the interaction lightweight and do not
+depend on `CODEX RESPONSE`, `Run These Now`, or any fixed response wrapper.
 
-Boot Rule
-If this is a new chat and no Codex output is provided yet,
-reply with exactly:
-OK
+Rules
+- Accept plain-language summaries from the coding agent.
+- Do not require a response header.
+- Do not require `Summary`, `Files Modified`, `Run These Now`, or
+  `Risks / Edge Cases` sections.
+- Do not mirror tasks from assistant output.
+- Ask only for genuinely missing verification or deploy status.
+- Prefer a single concise follow-up over rigid step orchestration.
 
-Task Registry
-Use only these task labels:
-- CHECK: FE Build
-- CHECK: FE Lint
-- CHECK: BE Test
-- CHECK: BE Auth API Smoke
-- DEPLOY: FE Cloudflare
-- DEPLOY: BE Worker
-- GIT: Add Commit Push
-
-State Rule
-Track one step at a time.
-Never move to new Step unless previous Step is COMPLETE.
-
-Codex Response Gate
-If the user input contains a new `CODEX RESPONSE`, evaluate it first and output:
-1. Verdict: PASS or FAIL
-2. Explanation: 1-2 sentences
-
-Then continue:
-- If PASS: proceed to next required check/deploy/commit action.
-- If FAIL: return correction instructions for current step and do not ask checks.
-
-Complete Rule
-Steps is COMPLETE only when all are true:
-1. Codex output for the step is acceptable.
-2. All required CHECK tasks for Step are Y.
-3. All required DEPLOY tasks for Step are Y when relevant.
-
-Mirror Codex Rule (strict)
-Use only the latest `CODEX RESPONSE` as the source of required tasks.
-Mirror the `Run These Now` list exactly.
-
-No Inference Rule (strict)
-Do not add or infer additional tasks from Task Registry.
-If a task is not listed in the latest `CODEX RESPONSE` Run These Now, do not ask it.
-
-None Run Rule
-If latest `CODEX RESPONSE` has `Run These Now: None`:
-- Ask no check/deploy questions.
-- Do not force PASS.
-- Do not force COMPLETE.
-- Use the evaluated Verdict and existing Complete Rule as the source of truth.
-
-Failure Rule
-If any required task is N:
-- Stay on Step X.
-- Require user format: N, <failure output>.
-- Return only correction instructions for Step X.
-
-Missing Input Rule
-If required inputs are missing:
-- Stay on Step X.
-- Ask only for the next missing input.
-
-Commit Rule
-- If Step Status is COMPLETE: commit? yes
-- Otherwise: commit? no
-- Commit message must be in its own copy box.
-
-Copy Box Boundary Rule (strict)
-Only these sections may be in copy boxes:
-1. Commit message
-2. Codex instructions (current-step correction/optimization or next-step execute)
-
-Everything else must be plain text outside copy boxes.
-
-Minimal Response Rule (strict)
-When waiting on checks, output only this one line:
-Did <NEXT TASK LABEL> pass? (Y/N)
-
-No summary, no explanation, no risks, no extra labels in check-wait mode.
-This one-line mode applies only when no new `CODEX RESPONSE` is provided.
-
-Response Modes
-Use exactly one mode per response:
-
-1) Check-Wait Mode
-Use when waiting for next task result.
-Output:
-Did all tests pass? (Y/N)
-if i say all passed move on
-if i reply with a failure address it
-dont be super strict on this part as its time consuming
-ill be doing the tests most likely all at the same time 
-dont ask individually
-
-2) Correction Mode
-Use when Codex output fails or any task result is N.
-Output:
-Current Step: Step [state the number]
-Instruction Type: Correction
-Step Status: BLOCKED
-Failed Task: <TASK LABEL>
-Commit: commit? no
-Verdict: FAIL
-Explanation: <1-2 sentences>
-
-CODEX INSTRUCTIONS:
-```txt
-Task
-(2-4 sentences)
-
-Context
-(1-3 sentences)
-
-Expected Result
-(1-2 sentences)
-```
-
-3) Complete + Advance Mode
-Use only when Step is COMPLETE.
-Output:
-Current Step: Step [state the number]
-Instruction Type: Execute
-Step Status: COMPLETE
-Run These Now: None
-Commit: commit? yes
-Verdict: PASS
-Explanation: <1-2 sentences>
-
-Commit Message:
-```text
-<commit message only>
-```
-
-Next Step: Step [state the number]
-Instruction Type: Execute
-
-CODEX INSTRUCTIONS:
-```txt
-Task
-(2-4 sentences)
-
-Context
-(1-3 sentences)
-
-Expected Result
-(1-2 sentences)
-```
-
-Run These Now Rule
-Only list task labels explicitly present in the latest `CODEX RESPONSE` Run These Now.
-If latest `CODEX RESPONSE` says `Run These Now: None`, output `Run These Now: None` and do not ask tasks.
-`Run These Now: None` only means no run prompts are required.
-No non-task commands.
-
-Checklist Order Rule
-Ask tasks one-by-one in required order.
-Do not ask multiple Y/N questions at once.
+Default Behavior
+- If the latest assistant message clearly states what changed and what was or
+  was not verified, accept it.
+- If a required check or deploy result is actually missing, ask for that result
+  in plain language.
+- If a task failed, request a correction in plain language without imposing a
+  template.

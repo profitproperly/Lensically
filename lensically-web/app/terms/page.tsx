@@ -50,9 +50,9 @@ export default function TermsPage() {
         </div>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Official public review URL</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Official public URL</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            The canonical public terms page for reviewer access is available at{" "}
+            The canonical public terms page is available at{" "}
             <a
               className="font-medium text-slate-900 underline"
               href="https://lensically.com/terms"
@@ -75,9 +75,9 @@ export default function TermsPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Service functionality</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically currently provides account authentication, Threads account connection,
-            profile discovery, keyword search, account and post insights, immediate publishing,
-            scheduled posting, and account settings management.
+            Lensically currently provides a private workspace for Threads account connection,
+            dashboard and insights review, follower history, post archive review, immediate
+            publishing, and scheduled posting.
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Certain features require a connected Threads account with valid provider permissions.
@@ -87,33 +87,26 @@ export default function TermsPage() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Accounts, authentication, and sessions</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Workspace access</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            You may sign in with email/password or supported OAuth providers. You are
-            responsible for maintaining account security and for activity performed under
-            your account session. Lensically may invalidate sessions, limit usage, or block
-            access when required for security, abuse prevention, or policy compliance.
-          </p>
-          <p className="mt-4 text-sm leading-6 text-slate-600">
-            Accounts that violate these terms or third-party platform requirements may be
-            restricted, suspended, or permanently removed.
+            The current build uses a private workspace access flow rather than public multi-user
+            account registration. You are responsible for maintaining the confidentiality of any
+            workspace credentials and for activity performed through the unlocked workspace.
           </p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Account deletion and retention</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically provides self-serve account deletion from authenticated account settings.
-            Deletion is permanent and removes account-linked application data according to the
-            implemented deletion flow described at{" "}
+            The current build handles deletion and data removal through the documented public
+            deletion process described at{" "}
             <Link href="/data-deletion" className="font-medium text-slate-900 underline">
               https://lensically.com/data-deletion
             </Link>
             .
           </p>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            For fraud and abuse prevention, limited identity tombstones may be retained for up to
-            7 days after deletion. Privacy practices are described at{" "}
+            Privacy practices are described at{" "}
             <Link href="/privacy" className="font-medium text-slate-900 underline">
               https://lensically.com/privacy
             </Link>
@@ -124,7 +117,7 @@ export default function TermsPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">Disclaimers and limitation of liability</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Lensically is provided on an "as is" and "as available" basis. To the maximum extent
+            Lensically is provided on an &quot;as is&quot; and &quot;as available&quot; basis. To the maximum extent
             permitted by law, Lensically disclaims warranties of merchantability, fitness for a
             particular purpose, and non-infringement. Lensically is not responsible for third-party
             platform outages, API failures, policy changes, or user-generated content.

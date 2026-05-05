@@ -1,15 +1,8 @@
 # Lensically
-Social Signal Analytics
 
 ## Repository Status
 
 This repository now represents the current single-user Auto Threads build for Manifest Mental.
-
-It was originally cloned from an older Lensically SaaS-oriented codebase to preserve scaffolding, but the active local build and deployed product have been repurposed around the new workflow. As a result, inherited Git history and older repo structure may not reflect the current product direction.
-
-## Reviewer Guide
-
-- Reviewer guide: [`REVIEWER_GUIDE.md`](./REVIEWER_GUIDE.md)
 
 ## Operations Runbooks
 
@@ -23,36 +16,10 @@ It was originally cloned from an older Lensically SaaS-oriented codebase to pres
 - Privacy policy: `https://lensically.com/privacy`
 - Data deletion instructions: `https://lensically.com/data-deletion`
 
-## Meta App Review Values
+## Current Product Shape
 
-Use these exact values in the Meta developer dashboard:
-
-- Data deletion callback URL: `https://api.lensically.com/auth/threads/delete`
-- Data deletion instructions URL: `https://lensically.com/data-deletion`
-- Support contact email: `support@lensically.com`
-
-## Google OAuth Consent Values
-
-Use these exact values in the Google Cloud OAuth consent screen:
-
-- Application name: `Lensically`
-- Homepage URL: `https://lensically.com`
-- Privacy policy URL: `https://lensically.com/privacy`
-- Support email: `support@lensically.com`
-- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
-
-## OAuth Branding Values (All Providers)
-
-Use these branding values consistently across Google, GitHub, Discord, and Threads provider dashboards:
-
-- Application name: `Lensically`
-- Homepage URL: `https://lensically.com`
-- Support email: `support@lensically.com`
-- App logo URL: `https://lensically.com/lensically-logo-black-no-border.png`
-
-Verification checklist:
-
-1. Google OAuth consent screen branding matches the values above.
-2. GitHub OAuth app branding matches the values above.
-3. Discord OAuth app branding matches the values above.
-4. Threads/Meta app branding matches the values above.
+- Password-gated private workspace at `/`
+- Active internal surfaces: `/dashboard`, `/insights`, `/followers`, `/post-archive`, `/schedule`, `/scheduled-posts`
+- Public compliance surfaces: `/terms`, `/privacy`, `/data-deletion`
+- Backend runtime: `lensically-worker`
+- Frontend runtime: `lensically-web`
