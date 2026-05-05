@@ -18,7 +18,6 @@ type SavedPatternRow = {
   shares: number;
   views?: number | null;
   posted_at?: string | null;
-  capture_confidence: string;
   saved_at: string;
   updated_at: string;
 };
@@ -175,10 +174,7 @@ export default function SavedPatternsPage() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-slate-700">{summaryLabel}</p>
-          <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-            <span>Default extension bucket: {DEFAULT_APP_USER_ID}</span>
-            <span>Sort: newest first</span>
-          </div>
+          <span className="text-xs text-slate-500">Default extension bucket: {DEFAULT_APP_USER_ID}</span>
         </div>
       </section>
 
@@ -197,56 +193,60 @@ export default function SavedPatternsPage() {
         ) : (
           <div className="space-y-4">
             {patterns.map((pattern) => (
-              <article key={pattern.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
+              <article key={pattern.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 md:p-6">
+                <div className="space-y-5">
+                  <div className="max-w-4xl space-y-3">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                       <h2 className="text-sm font-semibold text-slate-900">
                         {pattern.author_display_name || pattern.author_handle || "Unknown author"}
                       </h2>
                       {pattern.author_handle ? (
                         <span className="text-xs text-slate-500">@{pattern.author_handle}</span>
                       ) : null}
-                      <span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-700">
-                        {pattern.capture_confidence}
-                      </span>
                     </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                    <p className="whitespace-pre-wrap text-base leading-7 text-slate-800">
                       {truncateText(pattern.post_text)}
                     </p>
                   </div>
 
-                  <div className="grid min-w-[15rem] grid-cols-2 gap-3 md:w-[18rem]">
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Likes</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(pattern.likes)}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{formatMetric(pattern.likes)}</p>
                     </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Replies</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(pattern.replies)}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{formatMetric(pattern.replies)}</p>
                     </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Reposts</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(pattern.reposts)}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{formatMetric(pattern.reposts)}</p>
                     </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Shares</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(pattern.shares)}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{formatMetric(pattern.shares)}</p>
                     </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Views</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatMetric(pattern.views)}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{formatMetric(pattern.views)}</p>
                     </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Captured</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatDateTime(pattern.updated_at)}</p>
+                      <p className="mt-2 text-sm font-semibold leading-5 text-slate-900">{formatDateTime(pattern.updated_at)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-2 text-xs text-slate-500">
-                  <span>Source: <a className="text-slate-700 underline" href={pattern.source_url} target="_blank" rel="noopener noreferrer">{pattern.source_url}</a></span>
+                <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-500">
+                  <div className="flex flex-col gap-2">
+                    <span>
+                      Source:{" "}
+                      <a className="break-all text-slate-700 underline" href={pattern.source_url} target="_blank" rel="noopener noreferrer">
+                        {pattern.source_url}
+                      </a>
+                    </span>
                   {pattern.posted_at ? <span>Posted: {formatDateTime(pattern.posted_at)}</span> : null}
+                  </div>
                 </div>
               </article>
             ))}
