@@ -3832,7 +3832,7 @@ async function listArchivedThreadsPosts(
   await ensureThreadsPostsArchiveTable(env);
 
   const orderClause = order === "top"
-    ? "engagement_total DESC, likes DESC, views DESC, post_timestamp DESC"
+    ? "likes DESC, engagement_total DESC, views DESC, post_timestamp DESC"
     : "post_timestamp DESC, engagement_total DESC, last_synced_at DESC";
 
   const postsResult = await env.DB.prepare(
