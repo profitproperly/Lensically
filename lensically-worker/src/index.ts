@@ -4393,7 +4393,7 @@ async function fetchThreadsPostsPageWithInsights(
   try {
     const params = new URLSearchParams({
       fields: "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply",
-      limit: "100",
+      limit: "40",
     });
 
     if (cursor) {
