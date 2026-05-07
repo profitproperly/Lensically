@@ -7874,7 +7874,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    if (url.pathname === "/internal/automation/context" && request.method === "GET") {
+    if (
+      (url.pathname === "/api/automation/context" || url.pathname === "/internal/automation/context")
+      && request.method === "GET"
+    ) {
       if (!isInternalRequestAuthorized(request, env)) {
         return new Response(
           JSON.stringify({ error: "Unauthorized" }),
@@ -7956,7 +7959,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    if (url.pathname === "/internal/automation/schedule-plan" && request.method === "POST") {
+    if (
+      (url.pathname === "/api/automation/schedule-plan" || url.pathname === "/internal/automation/schedule-plan")
+      && request.method === "POST"
+    ) {
       if (!isInternalRequestAuthorized(request, env)) {
         return new Response(
           JSON.stringify({ error: "Unauthorized" }),

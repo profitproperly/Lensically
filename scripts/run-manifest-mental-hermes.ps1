@@ -67,7 +67,7 @@ Required operating loop:
 1. Read the vault files first, especially 00-Operating-Rules.md, 01-Brand-Voice.md, 02-Growth-Targets.md, 03-Fatigue-Ledger.md, and 04-Post-Rubric.md.
 2. Inspect the existing planner and available Lensically scripts/API routes before changing behavior.
 3. Pull current account state through the Lensically API bridge: node scripts/lensically-agent-api.mjs context
-   - This calls the first-party Lensically internal automation context endpoint.
+   - This calls the first-party Lensically key-protected automation context endpoint.
    - It writes the latest context JSON into the Obsidian vault.
    - Do not scrape Threads. Do not automate logged-in browser activity on Threads.
 4. Build a 17-post campaign slate for tomorrow from 07:00 through 23:00 ET.

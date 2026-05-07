@@ -96,7 +96,7 @@ async function commandContext(args) {
   const internalKey = requireInternalKey();
   const accountId = args.account || DEFAULT_ACCOUNT_ID;
   const timezone = args.timezone || DEFAULT_TIMEZONE;
-  const url = buildUrl("/internal/automation/context", {
+  const url = buildUrl("/api/automation/context", {
     account_id: accountId,
     timezone,
     date: args.date,
@@ -133,7 +133,7 @@ async function commandSchedulePlan(args) {
 
   const raw = await fs.readFile(path.resolve(planFile), "utf8");
   const payload = JSON.parse(raw);
-  const url = buildUrl("/internal/automation/schedule-plan");
+  const url = buildUrl("/api/automation/schedule-plan");
   const data = await fetchJson(url, {
     method: "POST",
     headers: {
