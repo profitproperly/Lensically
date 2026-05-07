@@ -1,7 +1,7 @@
 param(
   [ValidateSet("draft", "schedule", "auto")]
   [string]$Mode = "draft",
-  [ValidateSet("", "openrouter", "openai", "anthropic", "nous")]
+  [ValidateSet("", "openrouter", "openai", "openai-codex", "anthropic", "nous")]
   [string]$Provider = "",
   [string]$Model = "",
   [switch]$Yolo
@@ -83,13 +83,24 @@ $modelArg = if ($Model.Trim()) { "--model `"$Model`"" } else { "" }
 $providerArg = if ($Provider.Trim()) { "--provider `"$Provider`"" } else { "" }
 $yoloArg = if ($Yolo) { "--yolo" } else { "" }
 $promptPath = Join-Path $env:TEMP "manifest-mental-hermes-prompt.txt"
-Set-Content -LiteralPath $promptPath -Value $prompt -Encoding UTF8
+[IO.File]::WriteAllText($promptPath, $prompt, [Text.UTF8Encoding]::new($false))
 $wslPromptPath = Convert-ToWslPath $promptPath
+$scriptPath = Join-Path $env:TEMP "manifest-mental-hermes-run.sh"
 
-$command = @"
-cd '$wslRoot' && \
-source ~/.bashrc >/dev/null 2>&1 || true && \
-hermes $yoloArg chat --toolsets "terminal,web,skills" $providerArg $modelArg -q "`$(cat '$wslPromptPath')"
+$script = @"
+#!/usr/bin/env bash
+set -euo pipefail
+cd '$wslRoot'
+source ~/.bashrc >/dev/null 2>&1 || true
+export PATH="`$HOME/.local/bin:`$PATH"
+PROMPT=`$(python3 - <<'PY'
+from pathlib import Path
+print(Path("$wslPromptPath").read_text(encoding="utf-8-sig"))
+PY
+)
+hermes $yoloArg chat --toolsets "terminal,web,skills" $providerArg $modelArg -q "`$PROMPT"
 "@
 
-wsl bash -lc $command
+[IO.File]::WriteAllText($scriptPath, $script, [Text.UTF8Encoding]::new($false))
+$wslScriptPath = Convert-ToWslPath $scriptPath
+wsl bash "$wslScriptPath"
