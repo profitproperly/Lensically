@@ -2,6 +2,7 @@ node_modules
 .env
 .env.*
 *.env
+.lensically-agent.env
 .wrangler
 .DS_Store
 dist
@@ -18,3 +19,4 @@ manifest-mental-vault/Daily/*.md
 manifest-mental-vault/Reports/*.md
 manifest-mental-vault/Candidates/*.md
 manifest-mental-vault/Experiments/*.md
+manifest-mental-vault/Context/*.json

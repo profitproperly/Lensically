@@ -2,8 +2,8 @@ param(
   [ValidateSet("draft", "schedule", "auto")]
   [string]$Mode = "draft",
   [ValidateSet("", "openrouter", "openai", "openai-codex", "anthropic", "nous")]
-  [string]$Provider = "",
-  [string]$Model = "",
+  [string]$Provider = "openai-codex",
+  [string]$Model = "gpt-5.5",
   [switch]$Yolo
 )
 
@@ -57,6 +57,7 @@ Workspace:
 - Repo: $wslRoot
 - Obsidian vault memory: $wslVault
 - Existing Lensically manual planner script: $wslRoot/scripts/run-manifest-mental-planner.mjs
+- Lensically API bridge: $wslRoot/scripts/lensically-agent-api.mjs
 - Existing npm script: planner:manifestmental
 
 Mission:
@@ -65,12 +66,15 @@ Get @manifestmental to 1,000,000 followers by winning the 17 posts per day. Your
 Required operating loop:
 1. Read the vault files first, especially 00-Operating-Rules.md, 01-Brand-Voice.md, 02-Growth-Targets.md, 03-Fatigue-Ledger.md, and 04-Post-Rubric.md.
 2. Inspect the existing planner and available Lensically scripts/API routes before changing behavior.
-3. Pull current account state from allowed first-party Lensically endpoints or local scripts only. Do not scrape Threads. Do not automate logged-in browser activity on Threads.
+3. Pull current account state through the Lensically API bridge: node scripts/lensically-agent-api.mjs context
+   - This calls the first-party Lensically internal automation context endpoint.
+   - It writes the latest context JSON into the Obsidian vault.
+   - Do not scrape Threads. Do not automate logged-in browser activity on Threads.
 4. Build a 17-post campaign slate for tomorrow from 07:00 through 23:00 ET.
 5. Generate more candidates than needed, reject weak candidates, and choose one winner per slot.
 6. Each final post needs a slot, objective, bet type, topic, fatigue check, and expected win condition.
 7. Update the vault with a daily report under Reports/ and a compact learning note under Daily/.
-8. In draft mode, do not schedule. In schedule or auto mode, schedule only through the existing Lensically scheduling path.
+8. In draft mode, do not schedule. In schedule or auto mode, schedule only through the Lensically API bridge schedule-plan command.
 9. Exit after the run is complete. This is not an always-on agent.
 
 Output:
