@@ -4,6 +4,9 @@
   "private": true,
   "description": "Private Threads workspace tooling",
   "scripts": {
+    "hermes:configure-openrouter": "powershell -ExecutionPolicy Bypass -File ./scripts/configure-hermes-openrouter.ps1",
+    "hermes:install": "powershell -ExecutionPolicy Bypass -File ./scripts/install-hermes-wsl.ps1",
+    "agent:manifestmental": "powershell -ExecutionPolicy Bypass -File ./scripts/run-manifest-mental-hermes.ps1",
     "planner:manifestmental": "powershell -ExecutionPolicy Bypass -File ./scripts/run-manifest-mental-planner.ps1"
   },
   "repository": {
