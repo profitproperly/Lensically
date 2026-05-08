@@ -5,6 +5,7 @@ const DEFAULT_WORKSPACE_PASSWORD = "Lensically$$$$";
 
 const PROTECTED_PATHS = [
   "/dashboard",
+  "/agent-control",
   "/insights",
   "/saved-patterns",
   "/followers",
@@ -51,6 +52,7 @@ export const config = {
   matcher: [
     "/",
     "/dashboard/:path*",
+    "/agent-control/:path*",
     "/followers/:path*",
     "/insights/:path*",
     "/saved-patterns/:path*",
