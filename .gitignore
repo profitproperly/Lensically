@@ -21,6 +21,7 @@ manifest-mental-vault/Candidates/*.md
 manifest-mental-vault/Experiments/*.md
 manifest-mental-vault/Context/*.json
 manifest-mental-vault/Context/*.txt
+manifest-mental-vault/Context/*.py
 manifest-mental-vault/Runs/*.json
 manifest-mental-vault/Rejections/*.json
 manifest-mental-vault/Lessons/*.json

@@ -279,13 +279,44 @@ function toWslPath(windowsPath) {
 
 async function runHermesJson(prompt) {
   const promptPath = path.join(VAULT, "Context", "latest-hermes-prompt.txt");
+  const runnerPath = path.join(VAULT, "Context", "hermes-runner.py");
   await fs.writeFile(promptPath, prompt, "utf8");
+  await fs.writeFile(runnerPath, [
+    "import subprocess",
+    "import sys",
+    "",
+    "prompt_path = sys.argv[1]",
+    "with open(prompt_path, 'r', encoding='utf-8') as prompt_file:",
+    "    prompt = prompt_file.read()",
+    "",
+    "cmd = [",
+    `    ${JSON.stringify(HERMES_BIN)},`,
+    "    '-z',",
+    "    prompt,",
+    "    '--provider',",
+    `    ${JSON.stringify(HERMES_PROVIDER)},`,
+    "    '--model',",
+    `    ${JSON.stringify(HERMES_MODEL)},`,
+    "]",
+    "result = subprocess.run(",
+    "    cmd,",
+    "    cwd='/mnt/c/Auto-Threads/lensically',",
+    "    text=True,",
+    "    stdout=subprocess.PIPE,",
+    "    stderr=subprocess.PIPE,",
+    ")",
+    "sys.stdout.write(result.stdout)",
+    "sys.stderr.write(result.stderr)",
+    "sys.exit(result.returncode)",
+    "",
+  ].join("\n"), "utf8");
   const wslPromptPath = toWslPath(promptPath);
+  const wslRunnerPath = toWslPath(runnerPath);
   return new Promise((resolve, reject) => {
     const child = spawn("wsl.exe", [
-      "bash",
-      "-lc",
-      `cd /mnt/c/Auto-Threads/lensically && PROMPT="$(cat '${wslPromptPath}')" && ${HERMES_BIN} -z "$PROMPT" --provider ${HERMES_PROVIDER} --model ${HERMES_MODEL}`,
+      "python3",
+      wslRunnerPath,
+      wslPromptPath,
     ], { windowsHide: true });
     let stdout = "";
     let stderr = "";

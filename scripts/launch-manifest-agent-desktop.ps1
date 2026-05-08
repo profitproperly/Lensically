@@ -11,7 +11,7 @@ $url = "http://127.0.0.1:$Port"
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
 
 $existing = Get-CimInstance Win32_Process | Where-Object {
-  $_.CommandLine -like "*manifest-agent-desktop.mjs*"
+  $_.Name -match "^node(\.exe)?$" -and $_.CommandLine -like "*manifest-agent-desktop.mjs*"
 }
 
 if (-not $existing) {
