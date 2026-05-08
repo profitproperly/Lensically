@@ -16,6 +16,7 @@ const GOAL_FOLLOWERS = 1_000_000;
 const HERMES_BIN = "/home/brian/.local/bin/hermes";
 const HERMES_MODEL = "gpt-5.5";
 const HERMES_PROVIDER = "openai-codex";
+const MAX_SELECTED_REGEN = 3;
 
 let activeRun = null;
 let activeHermesChild = null;
@@ -23,6 +24,10 @@ let activeHermesKilled = false;
 
 function nowStamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function log(message, data = {}) {
+  console.log(JSON.stringify({ at: new Date().toISOString(), message, ...data }));
 }
 
 async function ensureDirs() {
@@ -271,6 +276,25 @@ function compactContext(context) {
   };
 }
 
+function compactRegenContext(context) {
+  return {
+    target_date: context.target_date,
+    desired_slots: context.desired_slots,
+    metrics: context.metrics,
+    archive_recent: context.archive_recent.slice(0, 40).map((post) => ({
+      text: post.text,
+      likes: post.likes,
+      views: post.views,
+    })),
+    archive_top: context.archive_top.slice(0, 40).map((post) => ({
+      text: post.text,
+      likes: post.likes,
+      views: post.views,
+    })),
+    rules: context.agent_rules,
+  };
+}
+
 function buildGeneratePrompt(context, lessons) {
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
@@ -306,9 +330,14 @@ function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, less
     "Rejection:",
     JSON.stringify({ slot, reason, previousPost }),
     "Prior rejection lessons:",
-    JSON.stringify(lessons.slice(-40)),
+    JSON.stringify(lessons.slice(-20).map((lesson) => ({
+      slot: lesson.slot,
+      reason: lesson.reason,
+      replacement_post: lesson.replacement_post,
+      memory_note: lesson.memory_note,
+    }))),
     "Cached context:",
-    JSON.stringify(compactContext(context)),
+    JSON.stringify(compactRegenContext(context)),
     "Current slate:",
     JSON.stringify(latestRun?.posts ?? []),
   ].join("\n\n");
@@ -404,6 +433,7 @@ async function runHermesJson(prompt) {
   const wslRunnerPath = toWslPath(runnerPath);
   return new Promise((resolve, reject) => {
     activeHermesKilled = false;
+    log("hermes_start", { prompt_bytes: Buffer.byteLength(prompt, "utf8") });
     const child = spawn("wsl.exe", [
       "python3",
       wslRunnerPath,
@@ -427,9 +457,16 @@ async function runHermesJson(prompt) {
     child.on("close", (code) => {
       clearTimeout(timeout);
       if (activeHermesChild === child) activeHermesChild = null;
-      if (activeHermesKilled) reject(new Error("Hermes was stopped by kill switch."));
-      else if (code !== 0) reject(new Error(`Hermes exited ${code}: ${stderr || stdout}`));
-      else resolve(extractJson(stdout));
+      if (activeHermesKilled) {
+        log("hermes_stopped", { code });
+        reject(new Error("Hermes was stopped by kill switch."));
+      } else if (code !== 0) {
+        log("hermes_failed", { code, stderr: stderr.slice(0, 500) });
+        reject(new Error(`Hermes exited ${code}: ${stderr || stdout}`));
+      } else {
+        log("hermes_complete", { stdout_bytes: Buffer.byteLength(stdout, "utf8") });
+        resolve(extractJson(stdout));
+      }
     });
   });
 }
@@ -499,30 +536,13 @@ async function regenSlot({ slot, reason }) {
   if (!previousPost) throw new Error(`Slot ${slot} was not found.`);
   const lessons = await loadLessons();
   activeRun = { id: nowStamp(), phase: `regenerating_${slot}`, started_at: new Date().toISOString() };
-  let hermes;
-  let nextPost;
-  let finalReason = reason.trim();
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason: finalReason, previousPost, lessons }));
-    nextPost = {
-      slot,
-      text: String(hermes.text ?? "").trim(),
-    };
-    try {
-      assertFreshReplacement(previousPost.text, nextPost.text);
-      break;
-    } catch (error) {
-      if (attempt === 2) throw error;
-      activeRun = { ...activeRun, phase: `regenerating_${slot}_freshness_retry` };
-      finalReason = [
-        reason.trim(),
-        "The last replacement was rejected by the local freshness guard because it reused too much of the rejected post.",
-        "Try again with a totally different premise, vocabulary set, emotional turn, and ending.",
-        `Rejected post: ${previousPost.text}`,
-        `Too-close replacement: ${nextPost.text}`,
-      ].join("\n");
-    }
-  }
+  log("regen_slot_start", { slot });
+  const hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason: reason.trim(), previousPost, lessons }));
+  const nextPost = {
+    slot,
+    text: String(hermes.text ?? "").trim(),
+  };
+  assertFreshReplacement(previousPost.text, nextPost.text);
   const rejection = {
     rejected_at: new Date().toISOString(),
     slot,
@@ -538,11 +558,13 @@ async function regenSlot({ slot, reason }) {
   await writeJson(path.join(VAULT, "Rejections", `rejection-${nowStamp()}-${slot.replace(":", "-")}.json`), rejection);
   await saveLessons([...lessons, rejection].slice(-300));
   activeRun = null;
+  log("regen_slot_complete", { slot });
   return { run: latestRun, post: nextPost, learned_response: rejection.learned_response };
 }
 
 async function regenSlots(rejections) {
   if (!Array.isArray(rejections) || !rejections.length) throw new Error("Select at least one post to regenerate.");
+  if (rejections.length > MAX_SELECTED_REGEN) throw new Error(`Regenerate at most ${MAX_SELECTED_REGEN} selected posts at a time. This protects your model usage.`);
   const results = [];
   let run = null;
   for (const rejection of rejections) {
@@ -612,7 +634,7 @@ function render(){const run=state.run||{},m=run.metrics||{},posts=run.posts||[],
 async function refresh(){const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;render();if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.run?'Agent ready. Latest run loaded.':'Agent ready. No run yet.','ok')}
 async function generate(){msg('Generating. Hermes is working locally; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:'{}'});state.run=d.run;msg('Generated 17 posts.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.learned_response||'Regenerated and learned from rejection.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function regenSelectedPosts(){const slots=selectedSlots();const rejections=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const missing=rejections.filter(item=>!item.reason).map(item=>item.slot);if(missing.length){msg('Add feedback for selected slots: '+missing.join(', '),'error');return}msg('Regenerating '+slots.length+' selected slot'+(slots.length===1?'':'s')+'. Only checked posts spend usage.');state.active={phase:'regenerating_selected'};render();try{const d=await api('/regen-selected',{method:'POST',body:JSON.stringify({rejections})});state.run=d.run;slots.forEach(slot=>{state.reasons[slot]='';state.selected[slot]=false});msg('Regenerated '+slots.length+' selected slot'+(slots.length===1?'':'s')+' and wrote memory.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
+async function regenSelectedPosts(){const slots=selectedSlots();if(slots.length>${MAX_SELECTED_REGEN}){msg('Select at most ${MAX_SELECTED_REGEN} posts per regen. This protects your usage.','error');return}const rejections=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const missing=rejections.filter(item=>!item.reason).map(item=>item.slot);if(missing.length){msg('Add feedback for selected slots: '+missing.join(', '),'error');return}state.active={phase:'regenerating_selected'};render();try{let done=0;for(const item of rejections){msg('Regenerating '+item.slot+' ('+(done+1)+'/'+rejections.length+').');const d=await api('/regen',{method:'POST',body:JSON.stringify(item)});state.run=d.run;state.reasons[item.slot]='';state.selected[item.slot]=false;done+=1;render()}msg('Regenerated '+done+' selected slot'+(done===1?'':'s')+' and wrote memory.','ok')}catch(e){msg(e.message+' Latest successful slots were saved; press Refresh to reload them.','error');await refresh()}finally{state.active=null;render()}}
 async function schedule(){msg('Scheduling latest 17-post slate through Lensically.');try{const d=await api('/schedule',{method:'POST',body:'{}'});state.run=d.run;msg('Scheduled latest slate. It did not publish.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function stopAgent(){msg('Stopping active Hermes run.');try{const d=await api('/kill',{method:'POST',body:'{}'});state.active=null;msg(d.killed?'Stopped active Hermes run.':'No active Hermes process found.','ok');await refresh()}catch(e){msg(e.message,'error')}finally{render()}}
 document.getElementById('generate').onclick=generate;document.getElementById('stop').onclick=stopAgent;document.getElementById('schedule').onclick=schedule;document.getElementById('refresh').onclick=refresh;refresh();
