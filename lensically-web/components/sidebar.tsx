@@ -14,7 +14,6 @@ const DEFAULT_THREADS_USERNAME = "manifestmental";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/agent-control", label: "Agent Control" },
   { href: "/insights", label: "Insights" },
   { href: "/saved-patterns", label: "Saved Patterns" },
   { href: "/followers", label: "Followers" },

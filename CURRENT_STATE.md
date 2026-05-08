@@ -27,15 +27,6 @@
 - It supports edit, retry, single delete, and bulk delete selection mode.
 - bulk delete currently reuses the existing delete API in a controlled client loop.
 
-## Manifest Mental Agent State
-
-- `/agent-control` is the local Hermes agent command and review surface.
-- The page talks to a local-only bridge at `127.0.0.1:4127`; the hosted web app does not run Hermes directly.
-- The local bridge owns fresh context pulls, Hermes generation, rejection learning memory, regeneration, and schedule-plan submission.
-- The agent must never publish directly. Its only production action is scheduling posts through Lensically.
-- Generate pulls fresh Lensically data and caches it in the vault. Regenerate uses the cached generate context plus the user's rejection reason.
-- Manual review happens by regenerating disliked slots or deleting/editing scheduled posts inside Lensically.
-
 ## Dashboard State
 
 - `/dashboard` is the growth control room for the connected Threads account.
