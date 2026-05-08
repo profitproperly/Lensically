@@ -123,6 +123,47 @@ function computeMetrics({ dashboard, followers, archiveRecent, archiveTop }) {
   };
 }
 
+function normalizeMetrics(baseMetrics = {}, incomingMetrics = {}) {
+  const base = baseMetrics && typeof baseMetrics === "object" ? baseMetrics : {};
+  const incoming = incomingMetrics && typeof incomingMetrics === "object" ? incomingMetrics : {};
+  const baseTopPost = base.top_post && typeof base.top_post === "object" ? base.top_post : {};
+  const incomingTopPost = incoming.top_post && typeof incoming.top_post === "object" ? incoming.top_post : {};
+  const baselines = {
+    ...(base.baselines ?? {}),
+    ...(incoming.baselines ?? {}),
+  };
+  const goals = {
+    ...(base.goals ?? {}),
+    ...(incoming.goals ?? {}),
+  };
+
+  if (incoming.archive_average_likes !== undefined) baselines.average_likes = numberValue(incoming.archive_average_likes);
+  if (incoming.archive_average_views !== undefined) baselines.average_views = numberValue(incoming.archive_average_views);
+  if (incoming.recent_sample_size !== undefined) baselines.recent_sample_size = numberValue(incoming.recent_sample_size);
+  if (incoming.archive_total_seen !== undefined) baselines.archive_total_seen = numberValue(incoming.archive_total_seen);
+  if (incoming.follower_snapshots_seen !== undefined) baselines.follower_snapshots_seen = numberValue(incoming.follower_snapshots_seen);
+
+  if (incoming.top_post_likes_2x_target !== undefined) goals.top_post_likes_2x = numberValue(incoming.top_post_likes_2x_target);
+  if (incoming.top_post_views_2x_target !== undefined) goals.top_post_views_2x = numberValue(incoming.top_post_views_2x_target);
+  if (incoming.average_likes_2x_target !== undefined) goals.average_likes_2x = numberValue(incoming.average_likes_2x_target);
+  if (incoming.average_views_2x_target !== undefined) goals.average_views_2x = numberValue(incoming.average_views_2x_target);
+
+  const topPost = {
+    ...baseTopPost,
+    ...incomingTopPost,
+  };
+  if (incoming.top_post_likes !== undefined) topPost.likes = numberValue(incoming.top_post_likes);
+  if (incoming.top_post_views !== undefined) topPost.views = numberValue(incoming.top_post_views);
+
+  return {
+    ...base,
+    ...incoming,
+    top_post: Object.keys(topPost).length ? topPost : null,
+    goals,
+    baselines,
+  };
+}
+
 async function writeJson(filePath, data) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
@@ -134,7 +175,13 @@ async function readJson(filePath) {
 
 async function loadLatestRun() {
   try {
-    return await readJson(path.join(VAULT, "Runs", "latest-run.json"));
+    const run = await readJson(path.join(VAULT, "Runs", "latest-run.json"));
+    try {
+      const context = await readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
+      return { ...run, metrics: normalizeMetrics(context.metrics, run.metrics) };
+    } catch {
+      return { ...run, metrics: normalizeMetrics({}, run.metrics) };
+    }
   } catch {
     return null;
   }
@@ -404,7 +451,7 @@ async function generateRun() {
     status: "generated",
     generated_at: new Date().toISOString(),
     target_date: context.target_date,
-    metrics: hermes.metrics ?? context.metrics,
+    metrics: normalizeMetrics(context.metrics, hermes.metrics),
     strategy_summary: String(hermes.strategy_summary ?? ""),
     fatigue_summary: String(hermes.fatigue_summary ?? ""),
     memory_notes: Array.isArray(hermes.memory_notes) ? hermes.memory_notes.map(String) : [],
