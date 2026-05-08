@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VAULT = path.join(ROOT, "manifest-mental-vault");
-const SKILLS_ROOT = path.join(ROOT, "hermes-skills");
 const LOCAL_ENV_PATH = path.join(ROOT, ".lensically-agent.env");
 const TASTE_MEMORY_PATH = path.join(VAULT, "Lessons", "manifest_mental_taste_memory.json");
 const PORT = Number(process.env.MANIFEST_AGENT_DESKTOP_PORT || 4317);
@@ -449,27 +448,8 @@ const CONTROL_FILES = {
   "context/latest-hermes-prompt": { title: "Latest Hermes Prompt", file: path.join(VAULT, "Context", "latest-hermes-prompt.txt"), editable: false, type: "text" },
 };
 
-async function listSkillControls() {
-  try {
-    const dirs = await fs.readdir(SKILLS_ROOT, { withFileTypes: true });
-    return dirs
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => ({
-        id: `skill/${entry.name}`,
-        title: entry.name,
-        file: path.join(SKILLS_ROOT, entry.name, "SKILL.md"),
-        editable: true,
-        type: "markdown",
-      }));
-  } catch {
-    return [];
-  }
-}
-
 async function controlRegistry() {
-  const skills = await listSkillControls();
   return [
-    { group: "Skills", items: skills.map(({ file, ...item }) => item) },
     { group: "Memory", items: Object.entries(CONTROL_FILES).filter(([id]) => id.startsWith("memory/")).map(([id, item]) => ({ id, title: item.title, editable: item.editable, type: item.type })) },
     { group: "Run Evidence", items: Object.entries(CONTROL_FILES).filter(([id]) => !id.startsWith("memory/")).map(([id, item]) => ({ id, title: item.title, editable: item.editable, type: item.type })) },
   ];
@@ -477,14 +457,6 @@ async function controlRegistry() {
 
 async function resolveControlFile(id) {
   if (CONTROL_FILES[id]) return CONTROL_FILES[id];
-  if (id?.startsWith("skill/")) {
-    const name = id.slice("skill/".length);
-    if (!/^[a-z0-9-]+$/.test(name)) throw new Error("Invalid skill id.");
-    const file = path.join(SKILLS_ROOT, name, "SKILL.md");
-    const resolved = path.resolve(file);
-    if (!resolved.startsWith(path.resolve(SKILLS_ROOT))) throw new Error("Invalid skill path.");
-    return { title: name, file: resolved, editable: true, type: "markdown" };
-  }
   throw new Error("Unknown control file.");
 }
 
@@ -597,7 +569,6 @@ function compactRegenContext(context) {
 function buildGeneratePrompt(context, lessons, guidance, tasteMemory) {
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
-    "Use these Hermes skills before answering: /manifest-mental-winner-analysis, /manifest-mental-slate-builder, /manifest-mental-post-craft, /manifest-mental-fatigue.",
     "Output valid JSON only. No markdown.",
     "Generate exactly 17 post candidates from 07:00 through 23:00 ET.",
     "Never publish. Never call a publish endpoint. Only create candidates; scheduling is a later explicit user action.",
@@ -625,7 +596,6 @@ function buildGeneratePrompt(context, lessons, guidance, tasteMemory) {
 function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, lessons, guidance, tasteMemory }) {
   return [
     "You are the standalone Manifest Mental recursive learning agent regenerating one rejected post.",
-    "Use these Hermes skills before answering: /manifest-mental-regen, /manifest-mental-post-craft, /manifest-mental-fatigue, /manifest-mental-winner-analysis.",
     "Output valid JSON only. No markdown.",
     "Use cached context only. Do not fetch fresh insights, follower, or archive data.",
     "The user gave a rejection reason. Explain what you understood, write a memory note, and regenerate only that slot.",
