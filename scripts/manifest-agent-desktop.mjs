@@ -246,6 +246,8 @@ function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, less
     "Output valid JSON only. No markdown.",
     "Use cached context only. Do not fetch fresh insights, follower, or archive data.",
     "The user gave a rejection reason. Explain what you understood, write a memory note, and regenerate only that slot.",
+    "You are not allowed to lightly revise the rejected post. Create a whole brand new post with a different premise, image, payoff, sentence path, and emotional turn.",
+    "Do not reuse the rejected post's main nouns, core metaphor, ending logic, or sentence resolution unless the user explicitly asked to keep them.",
     "Audience fatigue rule: openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close.",
     "Return JSON: {\"slot\":\"09:00\",\"text\":\"...\",\"objective\":\"...\",\"bet_type\":\"...\",\"fatigue_check\":\"...\",\"expected_win_condition\":\"...\",\"learned_response\":\"...\", \"memory_note\":\"...\"}",
     "Rejection:",
@@ -257,6 +259,41 @@ function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, less
     "Current slate:",
     JSON.stringify(latestRun?.posts ?? []),
   ].join("\n\n");
+}
+
+function words(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function sharedWordRatio(a, b) {
+  const aWords = new Set(words(a).filter((word) => word.length > 3));
+  const bWords = new Set(words(b).filter((word) => word.length > 3));
+  if (!aWords.size || !bWords.size) return 0;
+  let shared = 0;
+  for (const word of aWords) if (bWords.has(word)) shared += 1;
+  return shared / Math.min(aWords.size, bWords.size);
+}
+
+function phrase(value, start, count) {
+  const allWords = words(value);
+  return allWords.slice(start < 0 ? Math.max(0, allWords.length + start) : start, start < 0 ? allWords.length : start + count).join(" ");
+}
+
+function assertFreshReplacement(previousText, nextText) {
+  const previous = String(previousText ?? "").trim();
+  const next = String(nextText ?? "").trim();
+  if (!next) throw new Error("Hermes returned an empty regenerated post.");
+  if (previous.toLowerCase() === next.toLowerCase()) throw new Error("Hermes repeated the rejected post exactly.");
+  const sameOpening = phrase(previous, 0, 6) && phrase(previous, 0, 6) === phrase(next, 0, 6);
+  const sameEnding = phrase(previous, -7, 7) && phrase(previous, -7, 7) === phrase(next, -7, 7);
+  const overlap = sharedWordRatio(previous, next);
+  if (sameOpening || sameEnding || overlap > 0.55) {
+    throw new Error(`Replacement is too close to rejected post. overlap=${overlap.toFixed(2)}`);
+  }
 }
 
 function extractJson(text) {
@@ -381,6 +418,7 @@ async function generateRun() {
 
 async function regenSlot({ slot, reason }) {
   if (!slot || !reason?.trim()) throw new Error("slot and reason are required.");
+  if (activeRun) throw new Error(`Agent is already running: ${activeRun.phase}`);
   const context = await readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
   const latestRun = await loadLatestRun();
   if (!latestRun?.posts?.length) throw new Error("No generated run is available. Press Generate first.");
@@ -388,16 +426,34 @@ async function regenSlot({ slot, reason }) {
   if (!previousPost) throw new Error(`Slot ${slot} was not found.`);
   const lessons = await loadLessons();
   activeRun = { id: nowStamp(), phase: `regenerating_${slot}`, started_at: new Date().toISOString() };
-  const hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason, previousPost, lessons }));
-  const nextPost = {
-    slot,
-    text: String(hermes.text ?? "").trim(),
-    objective: String(hermes.objective ?? "").trim(),
-    bet_type: String(hermes.bet_type ?? "").trim(),
-    fatigue_check: String(hermes.fatigue_check ?? "").trim(),
-    expected_win_condition: String(hermes.expected_win_condition ?? "").trim(),
-  };
-  if (!nextPost.text) throw new Error("Hermes returned an empty regenerated post.");
+  let hermes;
+  let nextPost;
+  let finalReason = reason.trim();
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason: finalReason, previousPost, lessons }));
+    nextPost = {
+      slot,
+      text: String(hermes.text ?? "").trim(),
+      objective: String(hermes.objective ?? "").trim(),
+      bet_type: String(hermes.bet_type ?? "").trim(),
+      fatigue_check: String(hermes.fatigue_check ?? "").trim(),
+      expected_win_condition: String(hermes.expected_win_condition ?? "").trim(),
+    };
+    try {
+      assertFreshReplacement(previousPost.text, nextPost.text);
+      break;
+    } catch (error) {
+      if (attempt === 2) throw error;
+      activeRun = { ...activeRun, phase: `regenerating_${slot}_freshness_retry` };
+      finalReason = [
+        reason.trim(),
+        "The last replacement was rejected by the local freshness guard because it reused too much of the rejected post.",
+        "Try again with a totally different premise, vocabulary set, emotional turn, and ending.",
+        `Rejected post: ${previousPost.text}`,
+        `Too-close replacement: ${nextPost.text}`,
+      ].join("\n");
+    }
+  }
   const rejection = {
     rejected_at: new Date().toISOString(),
     slot,
@@ -414,6 +470,21 @@ async function regenSlot({ slot, reason }) {
   await saveLessons([...lessons, rejection].slice(-300));
   activeRun = null;
   return { run: latestRun, post: nextPost, learned_response: rejection.learned_response };
+}
+
+async function regenSlots(rejections) {
+  if (!Array.isArray(rejections) || !rejections.length) throw new Error("Select at least one post to regenerate.");
+  const results = [];
+  let run = null;
+  for (const rejection of rejections) {
+    const slot = String(rejection?.slot ?? "");
+    const reason = String(rejection?.reason ?? "").trim();
+    if (!slot || !reason) throw new Error("Every selected post needs a feedback reason.");
+    const result = await regenSlot({ slot, reason });
+    run = result.run;
+    results.push({ slot, learned_response: result.learned_response });
+  }
+  return { run, results };
 }
 
 async function scheduleLatestRun() {
@@ -459,18 +530,20 @@ function html() {
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Manifest Mental Agent</title>
 <style>
-:root{--ink:#111827;--muted:#64748b;--line:#d7dde8;--paper:#fbfaf7;--card:#fff;--accent:#111827;--good:#0f766e;--bad:#b42318}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#fbfaf7,#eef4f1 46%,#f8efe6);color:var(--ink);font-family:Segoe UI,ui-sans-serif,sans-serif}main{width:min(1440px,calc(100vw - 32px));margin:0 auto;padding:28px 0 48px}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:22px;border:1px solid var(--line);background:rgba(255,255,255,.86);border-radius:14px;box-shadow:0 18px 60px rgba(31,41,55,.08)}h1{margin:0;font-size:30px}.sub{margin:8px 0 0;color:var(--muted);line-height:1.5;max-width:820px}.actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9px;padding:12px 16px;font-weight:750;font-size:14px;cursor:pointer}button.secondary{background:#fff;color:var(--ink);border-color:var(--line)}button:disabled{opacity:.55;cursor:not-allowed}.banner{margin-top:16px;border-radius:10px;padding:12px 14px;border:1px solid var(--line);background:#fff;color:var(--muted)}.banner.error{border-color:#f1b8b2;color:var(--bad);background:#fff4f2}.banner.ok{border-color:#9fd8cf;color:var(--good);background:#eefbf8}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.metric{border:1px solid var(--line);background:rgba(255,255,255,.88);border-radius:12px;padding:16px}.metric p{margin:0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:800}.metric strong{display:block;margin-top:10px;font-size:26px}.metric span{display:block;margin-top:8px;color:var(--muted);font-size:13px;line-height:1.45}.summary{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.panel,.post{border:1px solid var(--line);background:rgba(255,255,255,.9);border-radius:12px;padding:18px}.panel h2,.posts h2{margin:0 0 10px;font-size:16px}.panel p{margin:0;color:#334155;line-height:1.6}.posts{margin-top:18px;border:1px solid var(--line);background:rgba(255,255,255,.7);border-radius:14px;overflow:hidden}.posts-head{display:flex;justify-content:space-between;align-items:center;padding:18px;border-bottom:1px solid var(--line)}.post{border:0;border-bottom:1px solid var(--line);border-radius:0;display:grid;grid-template-columns:92px 1fr 320px;gap:18px}.post:last-child{border-bottom:0}.slot{font-weight:900}.bet{color:var(--muted);font-size:12px;margin-top:6px}.text{font-size:17px;line-height:1.65;margin:0}.details{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;color:#475569;font-size:12px;line-height:1.45}textarea{width:100%;min-height:94px;resize:vertical;border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit;font-size:14px}.empty{padding:36px 18px;color:var(--muted)}@media(max-width:980px){header,.summary{display:block}.actions{justify-content:flex-start;margin-top:16px}.metrics{grid-template-columns:1fr 1fr}.post{grid-template-columns:1fr}}
+:root{--ink:#08111f;--muted:#5d6f89;--line:#d9e1ec;--paper:#f6f3ea;--card:#fffdf8;--accent:#0b1220;--soft:#eef3ef;--good:#0f766e;--bad:#b42318;--gold:#b87503}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 8%,#fff7df 0 18%,transparent 34%),linear-gradient(135deg,#f9f6ed,#edf5f1 52%,#f4eadc);color:var(--ink);font-family:Georgia,Cambria,serif}main{width:min(1480px,calc(100vw - 32px));margin:0 auto;padding:24px 0 42px}header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding:24px;border:1px solid var(--line);background:rgba(255,253,248,.92);border-radius:20px;box-shadow:0 22px 70px rgba(15,23,42,.1)}h1{margin:0;font-size:34px;letter-spacing:-.04em}.sub{margin:8px 0 0;color:var(--muted);line-height:1.45;max-width:860px;font-family:Segoe UI,ui-sans-serif,sans-serif}.actions,.review-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:999px;padding:12px 17px;font-weight:800;font-size:14px;cursor:pointer;font-family:Segoe UI,ui-sans-serif,sans-serif}button.secondary{background:#fff;color:var(--ink);border-color:var(--line)}button:disabled{opacity:.48;cursor:not-allowed}.banner{margin-top:14px;border-radius:14px;padding:13px 16px;border:1px solid var(--line);background:rgba(255,253,248,.9);color:var(--muted);font-family:Segoe UI,ui-sans-serif,sans-serif}.banner.error{border-color:#f1b8b2;color:var(--bad);background:#fff4f2}.banner.ok{border-color:#9fd8cf;color:var(--good);background:#eefbf8}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}.metric{border:1px solid var(--line);background:rgba(255,253,248,.9);border-radius:16px;padding:15px}.metric p{margin:0;color:#60718b;font-size:10px;text-transform:uppercase;letter-spacing:.16em;font-weight:900;font-family:Segoe UI,ui-sans-serif,sans-serif}.metric strong{display:block;margin-top:8px;font-size:27px;letter-spacing:-.04em}.metric span{display:block;margin-top:7px;color:var(--muted);font-size:13px;line-height:1.4;font-family:Segoe UI,ui-sans-serif,sans-serif}.summary{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.panel{border:1px solid var(--line);background:rgba(255,253,248,.9);border-radius:16px;padding:18px}.panel h2,.posts h2{margin:0 0 10px;font-size:17px;letter-spacing:-.03em}.panel p{margin:0;color:#334155;line-height:1.55;font-family:Segoe UI,ui-sans-serif,sans-serif}.posts{margin-top:16px;border:1px solid var(--line);background:rgba(255,253,248,.65);border-radius:20px;overflow:hidden}.posts-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:18px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);background:rgba(255,253,248,.96);backdrop-filter:blur(8px)}.review-actions{align-items:center}.count{color:var(--muted);font-size:13px;font-family:Segoe UI,ui-sans-serif,sans-serif}.post{display:grid;grid-template-columns:42px 108px minmax(0,1fr) 380px;gap:16px;padding:18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.5)}.post:last-child{border-bottom:0}.post.selected{background:linear-gradient(90deg,rgba(184,117,3,.1),rgba(255,255,255,.72))}.pick{display:flex;align-items:flex-start;justify-content:center;padding-top:6px}.pick input{width:20px;height:20px;accent-color:var(--accent)}.slot{font-weight:900;font-size:22px;letter-spacing:-.04em}.bet{color:#48648a;font-size:12px;margin-top:5px;font-family:Segoe UI,ui-sans-serif,sans-serif}.text{font-size:21px;line-height:1.42;margin:0;letter-spacing:-.025em}.details{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;color:#40536e;font-size:12px;line-height:1.42;font-family:Segoe UI,ui-sans-serif,sans-serif}.details b{color:#0f294c}textarea{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:12px;font:14px/1.45 Segoe UI,ui-sans-serif,sans-serif;background:#fff}.feedback-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#526985;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;font-family:Segoe UI,ui-sans-serif,sans-serif}.empty{padding:38px 18px;color:var(--muted);font-family:Segoe UI,ui-sans-serif,sans-serif}@media(max-width:1100px){header,.summary{display:block}.actions{justify-content:flex-start;margin-top:16px}.metrics{grid-template-columns:1fr 1fr}.post{grid-template-columns:38px 86px 1fr}.review{grid-column:1/-1}.posts-head{display:block}.review-actions{justify-content:flex-start;margin-top:10px}}@media(max-width:720px){main{width:min(100vw - 18px,720px)}.metrics{grid-template-columns:1fr}.post{grid-template-columns:34px 1fr}.slotbox{grid-column:2}.copy{grid-column:2}.review{grid-column:2}}
 </style></head><body><main><header><div><h1>Manifest Mental Agent</h1><p class="sub">Standalone local Hermes growth agent. Generate pulls fresh Lensically data once. Regenerate uses cached context and writes rejection memory. Schedule only schedules; it never publishes.</p></div><div class="actions"><button id="generate">Generate 17 Posts</button><button id="schedule" class="secondary">Schedule 17</button><button id="refresh" class="secondary">Refresh</button></div></header><div id="message" class="banner">Starting local agent surface...</div><section id="metrics" class="metrics"></section><section class="summary"><div class="panel"><h2>Strategy</h2><p id="strategy">No run yet.</p></div><div class="panel"><h2>Audience Fatigue</h2><p id="fatigue">No run yet.</p></div></section><section class="posts"><div class="posts-head"><h2>Generated Posts</h2><span id="slate-status">0/17</span></div><div id="posts"><div class="empty">Press Generate to run the agent.</div></div></section></main>
 <script>
-const state={run:null,active:null,reasons:{}};const fmt=n=>new Intl.NumberFormat('en-US').format(Math.round(Number(n||0)));const pct=n=>(Number(n||0)).toFixed(4)+'%';
+const state={run:null,active:null,reasons:{},selected:{}};const fmt=n=>new Intl.NumberFormat('en-US').format(Math.round(Number(n||0)));const pct=n=>(Number(n||0)).toFixed(4)+'%';
 function msg(t,type=''){const e=document.getElementById('message');e.textContent=t;e.className='banner '+type}
 async function api(p,o={}){const r=await fetch(p,{...o,headers:{'content-type':'application/json',...(o.headers||{})}});const d=await r.json().catch(()=>null);if(!r.ok)throw new Error(d?.error||'Request failed');return d}
 function metric(l,v,h=''){return '<div class="metric"><p>'+l+'</p><strong>'+v+'</strong><span>'+h+'</span></div>'}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
-function render(){const run=state.run||{},m=run.metrics||{};document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Generate'),metric('Slate',(run.posts||[]).length+'/17',run.target_date?'Target '+run.target_date:'No target')].join('');document.getElementById('strategy').textContent=run.strategy_summary||'No run yet.';document.getElementById('fatigue').textContent=run.fatigue_summary||'No run yet.';document.getElementById('slate-status').textContent=(run.posts||[]).length+'/17';document.getElementById('schedule').disabled=(run.posts||[]).length!==17||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);const posts=run.posts||[];document.getElementById('posts').innerHTML=posts.length?posts.map(post=>'<article class="post"><div><div class="slot">'+post.slot+'</div><div class="bet">'+esc(post.bet_type||'')+'</div></div><div><p class="text">'+esc(post.text)+'</p><div class="details"><div><b>Objective</b><br>'+esc(post.objective||'')+'</div><div><b>Fatigue</b><br>'+esc(post.fatigue_check||'')+'</div><div><b>Win</b><br>'+esc(post.expected_win_condition||'')+'</div></div></div><div><textarea data-reason="'+post.slot+'" placeholder="Why regenerate this post?">'+esc(state.reasons[post.slot]||'')+'</textarea><button class="secondary regen" data-slot="'+post.slot+'">Regenerate</button></div></article>').join(''):'<div class="empty">Press Generate to run the agent.</div>';document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)))}
+function selectedSlots(){return Object.keys(state.selected).filter(slot=>state.selected[slot])}
+function render(){const run=state.run||{},m=run.metrics||{},posts=run.posts||[],selected=selectedSlots();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Generate'),metric('Slate',posts.length+'/17',run.target_date?'Target '+run.target_date:'No target')].join('');document.getElementById('strategy').textContent=run.strategy_summary||'No run yet.';document.getElementById('fatigue').textContent=run.fatigue_summary||'No run yet.';document.getElementById('schedule').disabled=posts.length!==17||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected</span><div class="review-actions"><button id="regen-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Regenerate Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/17</span></div>':'0/17';document.getElementById('posts').innerHTML=posts.length?posts.map(post=>'<article class="post '+(state.selected[post.slot]?'selected':'')+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="slot">'+post.slot+'</div><div class="bet">'+esc(post.bet_type||'')+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p><div class="details"><div><b>Objective</b><br>'+esc(post.objective||'')+'</div><div><b>Fatigue</b><br>'+esc(post.fatigue_check||'')+'</div><div><b>Win</b><br>'+esc(post.expected_win_condition||'')+'</div></div></div><div class="review"><div class="feedback-label"><span>Regen feedback</span><button class="secondary regen" data-slot="'+post.slot+'" '+(state.active?'disabled':'')+'>One Slot</button></div><textarea data-reason="'+post.slot+'" placeholder="What is wrong? The agent will avoid this exact premise, payoff, and sentence path.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Press Generate to run the agent.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)));const regenSelected=document.getElementById('regen-selected');if(regenSelected)regenSelected.onclick=regenSelectedPosts;const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
 async function refresh(){const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;render();if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.run?'Agent ready. Latest run loaded.':'Agent ready. No run yet.','ok')}
 async function generate(){msg('Generating. Hermes is working locally; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:'{}'});state.run=d.run;msg('Generated 17 posts.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.learned_response||'Regenerated and learned from rejection.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function regenSelectedPosts(){const slots=selectedSlots();const rejections=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const missing=rejections.filter(item=>!item.reason).map(item=>item.slot);if(missing.length){msg('Add feedback for selected slots: '+missing.join(', '),'error');return}msg('Regenerating '+slots.length+' selected slot'+(slots.length===1?'':'s')+'. Only checked posts spend usage.');state.active={phase:'regenerating_selected'};render();try{const d=await api('/regen-selected',{method:'POST',body:JSON.stringify({rejections})});state.run=d.run;slots.forEach(slot=>{state.reasons[slot]='';state.selected[slot]=false});msg('Regenerated '+slots.length+' selected slot'+(slots.length===1?'':'s')+' and wrote memory.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function schedule(){msg('Scheduling latest 17-post slate through Lensically.');try{const d=await api('/schedule',{method:'POST',body:'{}'});state.run=d.run;msg('Scheduled latest slate. It did not publish.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 document.getElementById('generate').onclick=generate;document.getElementById('schedule').onclick=schedule;document.getElementById('refresh').onclick=refresh;refresh();
 </script></body></html>`;
@@ -500,6 +573,10 @@ async function handle(request, response) {
     if (url.pathname === "/regen" && request.method === "POST") {
       const body = await readBody(request);
       return send(response, 200, { ok: true, ...(await regenSlot({ slot: String(body.slot ?? ""), reason: String(body.reason ?? "") })) });
+    }
+    if (url.pathname === "/regen-selected" && request.method === "POST") {
+      const body = await readBody(request);
+      return send(response, 200, { ok: true, ...(await regenSlots(body.rejections)) });
     }
     if (url.pathname === "/schedule" && request.method === "POST") return send(response, 200, { ok: true, run: await scheduleLatestRun() });
     return send(response, 404, { error: "Not found" });
