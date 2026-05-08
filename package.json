@@ -5,6 +5,7 @@
   "description": "Private Threads workspace tooling",
   "scripts": {
     "agent:configure-lensically-api": "powershell -ExecutionPolicy Bypass -File ./scripts/configure-lensically-agent-api.ps1",
+    "agent:desktop": "powershell -ExecutionPolicy Bypass -File ./scripts/launch-manifest-agent-desktop.ps1",
     "hermes:configure-openrouter": "powershell -ExecutionPolicy Bypass -File ./scripts/configure-hermes-openrouter.ps1",
     "hermes:install": "powershell -ExecutionPolicy Bypass -File ./scripts/install-hermes-wsl.ps1",
     "agent:manifestmental": "powershell -ExecutionPolicy Bypass -File ./scripts/run-manifest-mental-hermes.ps1",

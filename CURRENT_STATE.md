@@ -21,6 +21,13 @@
   - preview before scheduling
   - scheduling through the existing scheduler
 
+## Standalone Agent State
+
+- The Manifest Mental agent is a local standalone desktop web app, not a Lensically route.
+- Launch it from the Windows desktop shortcut `Manifest Mental Agent.lnk`, which opens `http://127.0.0.1:4317`.
+- The local app runs Hermes through OpenAI Codex OAuth, stores memory in `manifest-mental-vault/**`, calls Lensically worker APIs for data and scheduling, and must never publish directly.
+- Generate pulls fresh context. Regenerate uses cached context plus rejection feedback. Schedule only schedules the generated slate into Lensically.
+
 ## Scheduled Posts State
 
 - `/scheduled-posts` is the management surface for upcoming scheduled posts.
