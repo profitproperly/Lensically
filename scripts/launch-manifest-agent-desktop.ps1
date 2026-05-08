@@ -10,6 +10,11 @@ $url = "http://127.0.0.1:$Port"
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
 
+$repoSkillRoot = Join-Path $repoRoot "hermes-skills"
+if (Test-Path $repoSkillRoot) {
+  wsl.exe bash -lc "mkdir -p ~/.hermes/skills/social-media && cp -R /mnt/c/Auto-Threads/lensically/hermes-skills/* ~/.hermes/skills/social-media/"
+}
+
 $existing = Get-CimInstance Win32_Process | Where-Object {
   $_.Name -match "^node(\.exe)?$" -and $_.CommandLine -like "*manifest-agent-desktop.mjs*"
 }

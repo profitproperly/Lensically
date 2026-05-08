@@ -358,6 +358,7 @@ function compactRegenContext(context) {
 function buildGeneratePrompt(context, lessons, guidance) {
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
+    "Use these Hermes skills before answering: /manifest-mental-winner-analysis, /manifest-mental-slate-builder, /manifest-mental-post-craft, /manifest-mental-fatigue.",
     "Output valid JSON only. No markdown.",
     "Generate exactly 17 post candidates from 07:00 through 23:00 ET.",
     "Never publish. Never call a publish endpoint. Only create candidates; scheduling is a later explicit user action.",
@@ -381,6 +382,7 @@ function buildGeneratePrompt(context, lessons, guidance) {
 function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, lessons, guidance }) {
   return [
     "You are the standalone Manifest Mental recursive learning agent regenerating one rejected post.",
+    "Use these Hermes skills before answering: /manifest-mental-regen, /manifest-mental-post-craft, /manifest-mental-fatigue, /manifest-mental-winner-analysis.",
     "Output valid JSON only. No markdown.",
     "Use cached context only. Do not fetch fresh insights, follower, or archive data.",
     "The user gave a rejection reason. Explain what you understood, write a memory note, and regenerate only that slot.",
