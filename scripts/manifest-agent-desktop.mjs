@@ -9,6 +9,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VAULT = path.join(ROOT, "manifest-mental-vault");
 const SKILLS_ROOT = path.join(ROOT, "hermes-skills");
 const LOCAL_ENV_PATH = path.join(ROOT, ".lensically-agent.env");
+const TASTE_MEMORY_PATH = path.join(VAULT, "Lessons", "manifest_mental_taste_memory.json");
 const PORT = Number(process.env.MANIFEST_AGENT_DESKTOP_PORT || 4317);
 const API_BASE_URL = process.env.LENSICALLY_API_BASE_URL || "https://api.lensically.com";
 const ACCOUNT_ID = "manifest-mental";
@@ -18,6 +19,11 @@ const HERMES_BIN = "/home/brian/.local/bin/hermes";
 const HERMES_MODEL = "gpt-5.5";
 const HERMES_PROVIDER = "openai-codex";
 const MAX_SELECTED_REGEN = 3;
+const RECENT_TASTE_WINDOW_SIZE = 100;
+const RECENT_A_TIER_RATIO = 0.10;
+const RECENT_B_TIER_RATIO = 0.15;
+const ALL_TIME_CHAMPION_COUNT = 25;
+const TASTE_MEMORY_MIN_AGE_HOURS = 24;
 
 let activeRun = null;
 let activeHermesChild = null;
@@ -93,6 +99,163 @@ function numberValue(value) {
 function average(values) {
   const finite = values.filter((value) => Number.isFinite(value));
   return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : 0;
+}
+
+function parseTimestamp(value) {
+  const parsed = new Date(String(value ?? ""));
+  return Number.isNaN(parsed.valueOf()) ? null : parsed;
+}
+
+function normalizeTastePost(post) {
+  return {
+    post_id: String(post?.id ?? post?.post_id ?? "").trim(),
+    posted_at: String(post?.timestamp ?? post?.posted_at ?? "").trim(),
+    text: String(post?.text ?? "").trim(),
+    likes: numberValue(post?.likes),
+  };
+}
+
+function tasteSignals(text) {
+  const normalized = String(text ?? "").toLowerCase().replace(/[’]/g, "'");
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return {
+    direct_address: /\byou\b|\byour\b|you're|the person reading this/.test(normalized),
+    imminent: /about to|going to|soon|this year/.test(normalized),
+    money: /money|cash|income|paid|pay|deposit|bank|bill|debt|interest|salary|wealth|rich|overpay/.test(normalized),
+    status: /chosen|optional|privilege|appointment|main event|standard|match|access|name|brought up|treated better|treated like|noticed|claim you|priority/.test(normalized),
+    concrete_trigger: /message|text|call|email|application|account|bill|charge|deposit|bank|name|room|door|location|phone/.test(normalized),
+    short_line: words.length > 0 && words.length <= 12,
+  };
+}
+
+function whyItSold(text) {
+  const signals = tasteSignals(text);
+  if (signals.money && signals.status) {
+    return "It sells because it blends money relief with status elevation and lands the payoff immediately.";
+  }
+  if (signals.money && signals.concrete_trigger) {
+    return "It sells because it turns money relief into a concrete scene the reader can feel happening.";
+  }
+  if (signals.money) {
+    return "It sells because it promises fast money relief in direct language with almost no friction.";
+  }
+  if (signals.status) {
+    return "It sells because it makes the reader feel chosen, upgraded, or impossible to overlook.";
+  }
+  if (signals.concrete_trigger) {
+    return "It sells because it gives the reader a specific scene instead of vague hope.";
+  }
+  if (signals.direct_address && signals.imminent) {
+    return "It sells because it speaks straight to the reader and makes the payoff feel immediate.";
+  }
+  return "It sells because it delivers a fast personal payoff in a clean low-friction sentence.";
+}
+
+function uniqueEligibleTastePosts(context, referenceNow = new Date()) {
+  const sources = [
+    ...(Array.isArray(context?.archive_recent) ? context.archive_recent : []),
+    ...(Array.isArray(context?.archive_top) ? context.archive_top : []),
+  ];
+  const seen = new Set();
+  const cutoffMs = referenceNow.valueOf() - (TASTE_MEMORY_MIN_AGE_HOURS * 60 * 60 * 1000);
+  const eligible = [];
+
+  for (const sourcePost of sources) {
+    const post = normalizeTastePost(sourcePost);
+    if (!post.posted_at || !post.text) continue;
+    const stamp = parseTimestamp(post.posted_at);
+    if (!stamp || stamp.valueOf() > cutoffMs) continue;
+    const dedupeKey = post.post_id || `${post.posted_at}::${post.text}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    eligible.push(post);
+  }
+
+  return eligible;
+}
+
+function recentWinnerCounts(size) {
+  if (!size) return { aCount: 0, bCount: 0 };
+  const aCount = Math.max(1, Math.ceil(size * RECENT_A_TIER_RATIO));
+  const bCount = Math.max(1, Math.ceil(size * RECENT_B_TIER_RATIO));
+  return {
+    aCount,
+    bCount: Math.min(size - aCount, bCount),
+  };
+}
+
+function bestSellerSynthesis(posts) {
+  if (!posts.length) return "No eligible winners yet.";
+  const tallies = posts.reduce((accumulator, post) => {
+    const signals = tasteSignals(post.text);
+    for (const [key, value] of Object.entries(signals)) {
+      if (value) accumulator[key] += 1;
+    }
+    return accumulator;
+  }, {
+    direct_address: 0,
+    imminent: 0,
+    money: 0,
+    status: 0,
+    concrete_trigger: 0,
+    short_line: 0,
+  });
+
+  const parts = [];
+  if (tallies.direct_address >= posts.length * 0.6) parts.push("speak straight to the reader");
+  if (tallies.imminent >= posts.length * 0.6) parts.push("make the payoff feel immediate");
+  if (tallies.money >= posts.length * 0.45 && tallies.status >= posts.length * 0.35) {
+    parts.push("blend money relief with status elevation");
+  } else if (tallies.money >= posts.length * 0.45) {
+    parts.push("center money relief");
+  } else if (tallies.status >= posts.length * 0.35) {
+    parts.push("center status elevation");
+  }
+  if (tallies.short_line >= posts.length * 0.5) parts.push("land the reward in very few words");
+  if (!parts.length && tallies.concrete_trigger >= posts.length * 0.25) {
+    parts.push("use concrete scenes instead of vague abstraction");
+  }
+  if (!parts.length) {
+    parts.push("deliver a clean immediate emotional reward");
+  }
+
+  return `Best sellers here ${parts.slice(0, 4).join(", ")}; the constant is instant payoff, not repeating the same exact sentence resolution.`;
+}
+
+function buildTasteMemory(context, referenceNow = new Date()) {
+  const eligible = uniqueEligibleTastePosts(context, referenceNow);
+  const recentWindow = [...eligible]
+    .sort((left, right) => parseTimestamp(right.posted_at).valueOf() - parseTimestamp(left.posted_at).valueOf())
+    .slice(0, RECENT_TASTE_WINDOW_SIZE);
+  const recentRanked = [...recentWindow]
+    .sort((left, right) => right.likes - left.likes || parseTimestamp(right.posted_at).valueOf() - parseTimestamp(left.posted_at).valueOf());
+  const { aCount, bCount } = recentWinnerCounts(recentRanked.length);
+  const recentWinners = recentRanked.slice(0, aCount + bCount).map((post, index) => ({
+    ...post,
+    rank: index + 1,
+    tier: index < aCount ? "A" : "B",
+    why_it_sold: whyItSold(post.text),
+  }));
+  const allTimeChampions = [...eligible]
+    .sort((left, right) => right.likes - left.likes || parseTimestamp(right.posted_at).valueOf() - parseTimestamp(left.posted_at).valueOf())
+    .slice(0, ALL_TIME_CHAMPION_COUNT)
+    .map((post, index) => ({
+      ...post,
+      rank: index + 1,
+      why_it_sold: whyItSold(post.text),
+    }));
+  const synthesisPosts = [...recentWinners, ...allTimeChampions].reduce((accumulator, post) => {
+    if (!accumulator.some((item) => item.post_id === post.post_id)) accumulator.push(post);
+    return accumulator;
+  }, []);
+
+  return {
+    core_law: "Likes are sales. Taste is learned from likes only.",
+    recent_window_size: RECENT_TASTE_WINDOW_SIZE,
+    recent_winners: recentWinners,
+    all_time_champions: allTimeChampions,
+    best_seller_synthesis: bestSellerSynthesis(synthesisPosts),
+  };
 }
 
 function computeMetrics({ dashboard, followers, archiveRecent, archiveTop }) {
@@ -179,6 +342,12 @@ async function writeJson(filePath, data) {
 
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf8"));
+}
+
+async function writeTasteMemory(context, referenceNow = new Date()) {
+  const memory = buildTasteMemory(context, referenceNow);
+  await writeJson(TASTE_MEMORY_PATH, memory);
+  return memory;
 }
 
 async function loadLatestRun() {
@@ -274,6 +443,7 @@ async function saveGuidanceWithModel(text) {
 const CONTROL_FILES = {
   "memory/guidance": { title: "Guidance Memory", file: path.join(VAULT, "Lessons", "agent-guidance.json"), editable: true, type: "json" },
   "memory/rejection-lessons": { title: "Rejection Lessons", file: path.join(VAULT, "Lessons", "rejection-lessons.json"), editable: true, type: "json" },
+  "memory/taste-memory": { title: "Taste Memory", file: TASTE_MEMORY_PATH, editable: false, type: "json" },
   "runs/latest-run": { title: "Latest Run", file: path.join(VAULT, "Runs", "latest-run.json"), editable: false, type: "json" },
   "context/latest-generate-context": { title: "Latest Generate Context", file: path.join(VAULT, "Context", "latest-generate-context.json"), editable: false, type: "json" },
   "context/latest-hermes-prompt": { title: "Latest Hermes Prompt", file: path.join(VAULT, "Context", "latest-hermes-prompt.txt"), editable: false, type: "text" },
@@ -424,7 +594,7 @@ function compactRegenContext(context) {
   };
 }
 
-function buildGeneratePrompt(context, lessons, guidance) {
+function buildGeneratePrompt(context, lessons, guidance, tasteMemory) {
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
     "Use these Hermes skills before answering: /manifest-mental-winner-analysis, /manifest-mental-slate-builder, /manifest-mental-post-craft, /manifest-mental-fatigue.",
@@ -437,8 +607,12 @@ function buildGeneratePrompt(context, lessons, guidance) {
     "Do not optimize for variety theater. Generate the 17 strongest posts for this account, even if several winners share a broad lane. Variety only matters when it prevents audience fatigue.",
     "Do not label posts with genres, objectives, bet types, or win conditions. Those labels can bias the writing.",
     "Audience fatigue rule: openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close to recent/generated posts.",
+    "Before generating posts, read the taste memory and generate from recent winners, all-time champions, and best_seller_synthesis.",
+    "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Use the full archive, follower archive, metrics, goals, rejection lessons, and top posts. Do the math and strategy in the backend.",
     "Return JSON: {\"metrics\": object, \"strategy_summary\": string, \"fatigue_summary\": string, \"posts\": [{\"slot\":\"07:00\",\"text\":\"...\"}], \"memory_notes\": [string]}",
+    "Taste memory:",
+    JSON.stringify(tasteMemory ?? {}),
     "Prior rejection lessons:",
     JSON.stringify(lessons.slice(-40)),
     "Persistent user steering guidance:",
@@ -448,7 +622,7 @@ function buildGeneratePrompt(context, lessons, guidance) {
   ].join("\n\n");
 }
 
-function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, lessons, guidance }) {
+function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, lessons, guidance, tasteMemory }) {
   return [
     "You are the standalone Manifest Mental recursive learning agent regenerating one rejected post.",
     "Use these Hermes skills before answering: /manifest-mental-regen, /manifest-mental-post-craft, /manifest-mental-fatigue, /manifest-mental-winner-analysis.",
@@ -459,9 +633,12 @@ function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, less
     "Do not reuse the rejected post's main nouns, core metaphor, ending logic, or sentence resolution unless the user explicitly asked to keep them.",
     "Do not label the replacement with a genre, objective, bet type, or win condition. Just return the replacement post and learning fields.",
     "Audience fatigue rule: openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close.",
+    "Use the taste memory as the winning baseline, but the replacement must still resolve differently from the stored winners.",
     "Return JSON: {\"slot\":\"09:00\",\"text\":\"...\",\"learned_response\":\"...\", \"memory_note\":\"...\"}",
     "Rejection:",
     JSON.stringify({ slot, reason, previousPost }),
+    "Taste memory:",
+    JSON.stringify(tasteMemory ?? {}),
     "Prior rejection lessons:",
     JSON.stringify(lessons.slice(-20).map((lesson) => ({
       slot: lesson.slot,
@@ -640,10 +817,11 @@ async function generateRun() {
   const runId = nowStamp();
   activeRun = { id: runId, phase: "starting", started_at: new Date().toISOString() };
   const context = await buildFreshContext();
+  const tasteMemory = await writeTasteMemory(context, new Date(context.generated_at ?? Date.now()));
   const lessons = await loadLessons();
   const guidance = await loadGuidance();
   activeRun = { ...activeRun, phase: "hermes_generating_17_posts" };
-  const hermes = await runHermesJson(buildGeneratePrompt(context, lessons, guidance));
+  const hermes = await runHermesJson(buildGeneratePrompt(context, lessons, guidance, tasteMemory));
   const posts = normalizePosts(hermes.posts, context.desired_slots);
   const run = {
     id: runId,
@@ -666,6 +844,7 @@ async function regenSlot({ slot, reason }) {
   if (!slot || !reason?.trim()) throw new Error("slot and reason are required.");
   if (activeRun) throw new Error(`Agent is already running: ${activeRun.phase}`);
   const context = await readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
+  const tasteMemory = await writeTasteMemory(context);
   const latestRun = await loadLatestRun();
   if (!latestRun?.posts?.length) throw new Error("No generated run is available. Press Generate first.");
   const previousPost = latestRun.posts.find((post) => post.slot === slot);
@@ -674,7 +853,7 @@ async function regenSlot({ slot, reason }) {
   const guidance = await loadGuidance();
   activeRun = { id: nowStamp(), phase: `regenerating_${slot}`, started_at: new Date().toISOString() };
   log("regen_slot_start", { slot });
-  const hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason: reason.trim(), previousPost, lessons, guidance }));
+  const hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason: reason.trim(), previousPost, lessons, guidance, tasteMemory }));
   const nextPost = {
     slot,
     text: String(hermes.text ?? "").trim(),
@@ -833,8 +1012,19 @@ async function handle(request, response) {
   }
 }
 
+async function rebuildTasteMemoryFromLatestContext() {
+  const contextPath = path.join(VAULT, "Context", "latest-generate-context.json");
+  const context = await readJson(contextPath);
+  return writeTasteMemory(context);
+}
+
 await loadLocalEnv();
 await ensureDirs();
+if (process.argv.includes("--rebuild-taste-memory")) {
+  const memory = await rebuildTasteMemoryFromLatestContext();
+  console.log(`Taste memory rebuilt with ${memory.recent_winners.length} recent winners and ${memory.all_time_champions.length} all-time champions.`);
+  process.exit(0);
+}
 createServer((request, response) => void handle(request, response)).listen(PORT, "127.0.0.1", () => {
   console.log(`Manifest Mental Agent desktop app running at http://127.0.0.1:${PORT}`);
 });
