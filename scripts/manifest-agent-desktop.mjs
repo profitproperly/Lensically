@@ -388,14 +388,15 @@ async function loadGuidance() {
   }
 }
 
-async function saveGuidanceEntry(text, reply = "") {
-  const trimmed = String(text ?? "").trim();
-  if (!trimmed) throw new Error("Guidance text is required.");
+async function saveGuidanceEntry(userInput, understanding) {
+  const trimmedInput = String(userInput ?? "").trim();
+  const trimmedUnderstanding = String(understanding ?? "").trim();
+  if (!trimmedInput) throw new Error("Guidance text is required.");
   const guidance = await loadGuidance();
   const entry = {
     saved_at: new Date().toISOString(),
-    text: trimmed,
-    reply: String(reply ?? "").trim(),
+    user_input: trimmedInput,
+    understanding: trimmedUnderstanding || trimmedInput,
   };
   await writeJson(path.join(VAULT, "Lessons", "agent-guidance.json"), {
     updated_at: new Date().toISOString(),
@@ -408,18 +409,21 @@ function buildGuidancePrompt(text, guidance, lessons) {
   return [
     "You are the local Manifest Mental growth agent.",
     "Output valid JSON only. No markdown.",
-    "The user is giving durable taste/strategy guidance that should shape future post generation and regeneration.",
-    "Reason about what the user means. Be direct. Do not generate posts.",
-    "Return JSON: {\"reply\":\"short direct response to the user explaining what you understood and how you will apply it\", \"memory_note\":\"durable instruction to store for future prompts\"}",
+    "The user is giving durable taste or strategy guidance that should shape future post generation and regeneration.",
+    "Understand why the user is telling you this. Be direct. Do not generate posts.",
+    "Return JSON: {\"reply\":\"short direct response to the user explaining what you understood\", \"understanding\":\"one short plain-English explanation of why the user is giving this guidance and what signal it contains\"}",
     "New user guidance:",
     String(text ?? "").trim(),
     "Existing steering guidance:",
-    JSON.stringify(guidance.slice(-40)),
+    JSON.stringify(guidance.slice(-40).map((entry) => ({
+      user_input: entry.user_input,
+      understanding: entry.understanding,
+    }))),
     "Recent rejection lessons:",
     JSON.stringify(lessons.slice(-20).map((lesson) => ({
       slot: lesson.slot,
-      reason: lesson.reason,
-      memory_note: lesson.memory_note,
+      user_feedback: lesson.user_feedback,
+      understanding: lesson.understanding,
     }))),
   ].join("\n\n");
 }
@@ -433,8 +437,8 @@ async function saveGuidanceWithModel(text) {
   activeRun = { id: nowStamp(), phase: "reasoning_about_guidance", started_at: new Date().toISOString() };
   const hermes = await runHermesJson(buildGuidancePrompt(trimmed, guidance, lessons));
   const reply = String(hermes.reply ?? "").trim();
-  const memoryNote = String(hermes.memory_note ?? trimmed).trim();
-  const entry = await saveGuidanceEntry(memoryNote, reply);
+  const understanding = String(hermes.understanding ?? trimmed).trim();
+  const entry = await saveGuidanceEntry(trimmed, understanding);
   activeRun = null;
   return { entry, reply: reply || "I saved this as steering memory and will apply it to future Generate and Regen prompts.", guidance: await loadGuidance() };
 }
@@ -585,9 +589,18 @@ function buildGeneratePrompt(context, lessons, guidance, tasteMemory) {
     "Taste memory:",
     JSON.stringify(tasteMemory ?? {}),
     "Prior rejection lessons:",
-    JSON.stringify(lessons.slice(-40)),
+    JSON.stringify(lessons.slice(-40).map((lesson) => ({
+      slot: lesson.slot,
+      source_text: lesson.source_text,
+      user_feedback: lesson.user_feedback,
+      understanding: lesson.understanding,
+      replacement_text: lesson.replacement_text,
+    }))),
     "Persistent user steering guidance:",
-    JSON.stringify(guidance.slice(-40)),
+    JSON.stringify(guidance.slice(-40).map((entry) => ({
+      user_input: entry.user_input,
+      understanding: entry.understanding,
+    }))),
     "Context:",
     JSON.stringify(compactContext(context)),
   ].join("\n\n");
@@ -598,13 +611,13 @@ function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, less
     "You are the standalone Manifest Mental recursive learning agent regenerating one rejected post.",
     "Output valid JSON only. No markdown.",
     "Use cached context only. Do not fetch fresh insights, follower, or archive data.",
-    "The user gave a rejection reason. Explain what you understood, write a memory note, and regenerate only that slot.",
+    "The user gave a rejection reason. Understand why they rejected it and regenerate only that slot.",
     "You are not allowed to lightly revise the rejected post. Create a whole brand new post with a different premise, image, payoff, sentence path, and emotional turn.",
     "Do not reuse the rejected post's main nouns, core metaphor, ending logic, or sentence resolution unless the user explicitly asked to keep them.",
-    "Do not label the replacement with a genre, objective, bet type, or win condition. Just return the replacement post and learning fields.",
+    "Do not label the replacement with a genre, objective, bet type, or win condition. Just return the replacement post and understanding field.",
     "Audience fatigue rule: openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close.",
     "Use the taste memory as the winning baseline, but the replacement must still resolve differently from the stored winners.",
-    "Return JSON: {\"slot\":\"09:00\",\"text\":\"...\",\"learned_response\":\"...\", \"memory_note\":\"...\"}",
+    "Return JSON: {\"slot\":\"09:00\",\"text\":\"...\",\"understanding\":\"one short plain-English explanation of why the user rejected the original post\"}",
     "Rejection:",
     JSON.stringify({ slot, reason, previousPost }),
     "Taste memory:",
@@ -612,12 +625,16 @@ function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, less
     "Prior rejection lessons:",
     JSON.stringify(lessons.slice(-20).map((lesson) => ({
       slot: lesson.slot,
-      reason: lesson.reason,
-      replacement_post: lesson.replacement_post,
-      memory_note: lesson.memory_note,
+      source_text: lesson.source_text,
+      user_feedback: lesson.user_feedback,
+      understanding: lesson.understanding,
+      replacement_text: lesson.replacement_text,
     }))),
     "Persistent user steering guidance:",
-    JSON.stringify(guidance.slice(-40)),
+    JSON.stringify(guidance.slice(-40).map((entry) => ({
+      user_input: entry.user_input,
+      understanding: entry.understanding,
+    }))),
     "Cached context:",
     JSON.stringify(compactRegenContext(context)),
     "Current slate:",
@@ -829,23 +846,29 @@ async function regenSlot({ slot, reason }) {
     text: String(hermes.text ?? "").trim(),
   };
   assertFreshReplacement(previousPost.text, nextPost.text);
-  const rejection = {
-    rejected_at: new Date().toISOString(),
+  const savedAt = new Date().toISOString();
+  const understanding = String(hermes.understanding ?? reason).trim();
+  const rejectionLesson = {
+    saved_at: savedAt,
     slot,
-    reason: reason.trim(),
+    source_text: String(previousPost.text ?? "").trim(),
+    user_feedback: reason.trim(),
+    understanding,
+    replacement_text: nextPost.text,
+  };
+  const rejection = {
+    ...rejectionLesson,
     previous_post: previousPost,
     replacement_post: nextPost,
-    learned_response: String(hermes.learned_response ?? "").trim(),
-    memory_note: String(hermes.memory_note ?? reason).trim(),
   };
   latestRun.posts = latestRun.posts.map((post) => post.slot === slot ? nextPost : post);
   latestRun.last_regen = rejection;
   await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
   await writeJson(path.join(VAULT, "Rejections", `rejection-${nowStamp()}-${slot.replace(":", "-")}.json`), rejection);
-  await saveLessons([...lessons, rejection].slice(-300));
+  await saveLessons([...lessons, rejectionLesson].slice(-300));
   activeRun = null;
   log("regen_slot_complete", { slot });
-  return { run: latestRun, post: nextPost, learned_response: rejection.learned_response };
+  return { run: latestRun, post: nextPost, understanding };
 }
 
 async function regenSlots(rejections) {
@@ -859,7 +882,7 @@ async function regenSlots(rejections) {
     if (!slot || !reason) throw new Error("Every selected post needs a feedback reason.");
     const result = await regenSlot({ slot, reason });
     run = result.run;
-    results.push({ slot, learned_response: result.learned_response });
+    results.push({ slot, understanding: result.understanding });
   }
   return { run, results };
 }
@@ -916,12 +939,12 @@ function msg(t,type=''){const e=document.getElementById('message');e.textContent
 async function api(p,o={}){const r=await fetch(p,{...o,headers:{'content-type':'application/json',...(o.headers||{})}});const d=await r.json().catch(()=>null);if(!r.ok)throw new Error(d?.error||'Request failed');return d}
 function metric(l,v,h=''){return '<div class="metric"><p>'+l+'</p><strong>'+v+'</strong><span>'+h+'</span></div>'}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
-function renderGuidance(){const list=document.getElementById('guidance-list');list.innerHTML=state.guidance.length?state.guidance.slice(-12).reverse().map(item=>'<div class="guidance-item"><b>'+esc(new Date(item.saved_at).toLocaleString())+'</b><br>'+esc(item.text)+(item.reply?'<br><br><b>Agent:</b> '+esc(item.reply):'')+'</div>').join(''):'No steering guidance saved yet.'}
+function renderGuidance(){const list=document.getElementById('guidance-list');list.innerHTML=state.guidance.length?state.guidance.slice(-12).reverse().map(item=>'<div class="guidance-item"><b>'+esc(new Date(item.saved_at).toLocaleString())+'</b><br><b>You said:</b> '+esc(item.user_input||'')+(item.understanding?'<br><br><b>Understanding:</b> '+esc(item.understanding):'')+'</div>').join(''):'No steering guidance saved yet.'}
 function selectedSlots(){return Object.keys(state.selected).filter(slot=>state.selected[slot])}
 function render(){const run=state.run||{},m=run.metrics||{},posts=run.posts||[],selected=selectedSlots();renderGuidance();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Generate'),metric('Slate',posts.length+'/17',run.target_date?'Target '+run.target_date:'No target')].join('');document.getElementById('strategy').textContent=run.strategy_summary||'No run yet.';document.getElementById('fatigue').textContent=run.fatigue_summary||'No run yet.';document.getElementById('schedule').disabled=posts.length!==17||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="regen-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Regenerate Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/17</span></div>':'0/17';document.getElementById('posts').innerHTML=posts.length?posts.map(post=>'<article class="post '+(state.selected[post.slot]?'selected':'')+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="slot">'+post.slot+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p></div><div class="review"><div class="feedback-label"><span>Regen feedback</span><button class="secondary regen" data-slot="'+post.slot+'" '+(state.active?'disabled':'')+'>One Slot</button></div><textarea data-reason="'+post.slot+'" placeholder="What is wrong? The agent will avoid this exact premise, payoff, and sentence path.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Press Generate to run the agent.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)));const regenSelected=document.getElementById('regen-selected');if(regenSelected)regenSelected.onclick=regenSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
 async function refresh(){const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;state.guidance=d.guidance||[];render();if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.run?'Agent ready. Latest run loaded.':'Agent ready. No run yet.','ok')}
 async function generate(){msg('Generating. Hermes is working locally; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:'{}'});state.run=d.run;msg('Generated 17 posts.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
-async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.learned_response||'Regenerated and learned from rejection.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.understanding||'Regenerated and saved the rejection understanding.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function regenSelectedPosts(){const slots=selectedSlots();if(slots.length>${MAX_SELECTED_REGEN}){msg('Select at most ${MAX_SELECTED_REGEN} posts per regen. This protects your usage.','error');return}const rejections=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const missing=rejections.filter(item=>!item.reason).map(item=>item.slot);if(missing.length){msg('Add feedback for selected slots: '+missing.join(', '),'error');return}state.active={phase:'regenerating_selected'};render();try{let done=0;for(const item of rejections){msg('Regenerating '+item.slot+' ('+(done+1)+'/'+rejections.length+').');const d=await api('/regen',{method:'POST',body:JSON.stringify(item)});state.run=d.run;state.reasons[item.slot]='';state.selected[item.slot]=false;done+=1;render()}msg('Regenerated '+done+' selected slot'+(done===1?'':'s')+' and wrote memory.','ok')}catch(e){msg(e.message+' Latest successful slots were saved; press Refresh to reload them.','error');await refresh()}finally{state.active=null;render()}}
 async function schedule(){msg('Scheduling latest 17-post slate through Lensically.');try{const d=await api('/schedule',{method:'POST',body:'{}'});state.run=d.run;msg('Scheduled latest slate. It did not publish.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function stopAgent(){msg('Stopping active Hermes run.');try{const d=await api('/kill',{method:'POST',body:'{}'});state.active=null;msg(d.killed?'Stopped active Hermes run.':'No active Hermes process found.','ok');await refresh()}catch(e){msg(e.message,'error')}finally{render()}}
