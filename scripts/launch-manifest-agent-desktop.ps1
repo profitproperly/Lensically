@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $logPath = Join-Path $repoRoot "logs\manifest-agent-desktop.log"
 $url = "http://127.0.0.1:$Port"
+$nodePath = (Get-Command node.exe -ErrorAction Stop).Source
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
 
@@ -20,13 +21,20 @@ $existing = Get-CimInstance Win32_Process | Where-Object {
 }
 
 if (-not $existing) {
+  $previousPort = $env:MANIFEST_AGENT_DESKTOP_PORT
+  $env:MANIFEST_AGENT_DESKTOP_PORT = "$Port"
+  $scriptPath = Join-Path $repoRoot "scripts\manifest-agent-desktop.mjs"
+  $command = "& { Set-Location '$repoRoot'; `$env:MANIFEST_AGENT_DESKTOP_PORT = '$Port'; & '$nodePath' '$scriptPath' *>> '$logPath' }"
   Start-Process -FilePath "powershell.exe" -ArgumentList @(
-    "-ExecutionPolicy",
-    "Bypass",
     "-NoProfile",
-    "-Command",
-    "cd '$repoRoot'; `$env:MANIFEST_AGENT_DESKTOP_PORT='$Port'; node .\scripts\manifest-agent-desktop.mjs *> '$logPath'"
-  ) -WindowStyle Minimized
+    "-WindowStyle", "Hidden",
+    "-Command", $command
+  ) -WorkingDirectory $repoRoot -WindowStyle Hidden
+  if ($null -eq $previousPort) {
+    Remove-Item Env:MANIFEST_AGENT_DESKTOP_PORT -ErrorAction SilentlyContinue
+  } else {
+    $env:MANIFEST_AGENT_DESKTOP_PORT = $previousPort
+  }
 }
 
 $ready = $false
