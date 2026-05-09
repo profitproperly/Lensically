@@ -146,4 +146,57 @@ describe("patterns import routes", () => {
       patterns: [],
     });
   });
+
+  it("lists saved patterns ranked by likes when requested", async () => {
+    const origin = "chrome-extension://exampleextensionid";
+
+    await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: origin,
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@example/post/low",
+        post_text: "Lower like post",
+        likes: 12,
+        views: 900,
+      }),
+    });
+
+    await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: origin,
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@example/post/high",
+        post_text: "Higher like post",
+        likes: 400,
+        views: 100,
+      }),
+    });
+
+    const listResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&limit=10&order=likes");
+    expect(listResponse.status).toBe(200);
+    const payload = (await listResponse.json()) as {
+      order?: string;
+      patterns?: Array<{ source_url?: string; likes?: number }>;
+    };
+
+    expect(payload.order).toBe("likes");
+    expect(payload.patterns?.[0]).toMatchObject({
+      source_url: "https://www.threads.com/@example/post/high",
+      likes: 400,
+    });
+    expect(payload.patterns?.[1]).toMatchObject({
+      source_url: "https://www.threads.com/@example/post/low",
+      likes: 12,
+    });
+  });
 });

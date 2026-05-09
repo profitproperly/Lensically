@@ -3232,7 +3232,12 @@ async function buildThreadsDashboardPayload(
     ? recentFollowerGains.reduce((sum, value) => sum + value, 0) / recentFollowerGains.length
     : 0;
   const bestFollowerDay = followerTrend.length > 0
-    ? followerTrend.reduce((best, entry) => (entry.gain > best.gain ? entry : best), followerTrend[0])
+    ? followerTrend.reduce((best, entry) => (
+      entry.gain > best.gain
+      || (entry.gain === best.gain && String(entry.date ?? "") > String(best.date ?? ""))
+        ? entry
+        : best
+    ), followerTrend[0])
     : null;
 
   return {
@@ -3420,6 +3425,16 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(app_user_id, source_url)
     )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_updated
+     ON external_patterns (app_user_id, updated_at DESC, id DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_likes
+     ON external_patterns (app_user_id, likes DESC, views DESC, updated_at DESC, id DESC)`,
   ).run();
 }
 
@@ -5620,17 +5635,26 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const limit = Number.isFinite(rawLimit) && rawLimit > 0
         ? Math.min(Math.floor(rawLimit), 200)
         : 50;
+      const requestedOrder = String(url.searchParams.get("order") ?? "newest").trim().toLowerCase();
+      const order = requestedOrder === "likes" ? "likes" : "newest";
 
       await ensureExternalPatternsTable(env);
-      const rows = await env.DB.prepare(
-        `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
-                post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
-                raw_payload, saved_at, updated_at
-         FROM external_patterns
-         WHERE app_user_id = ?
-         ORDER BY datetime(updated_at) DESC, id DESC
-         LIMIT ?`,
-      )
+      const listSql = order === "likes"
+        ? `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+                  post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+                  raw_payload, saved_at, updated_at
+           FROM external_patterns
+           WHERE app_user_id = ?
+           ORDER BY likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC
+           LIMIT ?`
+        : `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+                  post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+                  raw_payload, saved_at, updated_at
+           FROM external_patterns
+           WHERE app_user_id = ?
+           ORDER BY datetime(updated_at) DESC, id DESC
+           LIMIT ?`;
+      const rows = await env.DB.prepare(listSql)
         .bind(appUserId, limit)
         .all<ExternalPatternRow>();
 
@@ -5645,6 +5669,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return new Response(JSON.stringify({
         success: true,
         app_user_id: appUserId,
+        order,
         total: Number(totalRow?.total ?? 0),
         patterns: rows.results ?? [],
       }), {

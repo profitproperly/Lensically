@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
 
 type SavedPatternRow = {
@@ -19,6 +19,7 @@ type SavedPatternRow = {
 };
 
 type SavedPatternsResponse = {
+  order?: "newest" | "likes";
   patterns?: SavedPatternRow[];
   total?: number;
   error?: string;
@@ -61,18 +62,19 @@ function truncateText(value: string, maxLength = 160): string {
 export default function SavedPatternsPage() {
   const [patterns, setPatterns] = useState<SavedPatternRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [order, setOrder] = useState<"newest" | "likes">("newest");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
 
-  async function loadPatterns() {
+  const loadPatterns = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
       const response = await fetch(
-        `${SAVED_PATTERNS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}&limit=${DEFAULT_LIMIT}`,
+        `${SAVED_PATTERNS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}&limit=${DEFAULT_LIMIT}&order=${encodeURIComponent(order)}`,
         {
           cache: "no-store",
           credentials: "include",
@@ -96,11 +98,11 @@ export default function SavedPatternsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [order]);
 
   useEffect(() => {
     void loadPatterns();
-  }, []);
+  }, [loadPatterns]);
 
   const allVisibleSelected = useMemo(
     () => patterns.length > 0 && patterns.every((pattern) => selectedIds.includes(pattern.id)),
@@ -162,6 +164,30 @@ export default function SavedPatternsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-md border border-slate-300 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setOrder("newest")}
+              disabled={loading || deleting}
+              className={[
+                "rounded-md px-3 py-2 text-sm font-medium",
+                order === "newest" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50",
+              ].join(" ")}
+            >
+              Newest
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrder("likes")}
+              disabled={loading || deleting}
+              className={[
+                "rounded-md px-3 py-2 text-sm font-medium",
+                order === "likes" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50",
+              ].join(" ")}
+            >
+              Likes
+            </button>
+          </div>
           <button
             type="button"
             onClick={toggleSelectAll}
@@ -186,7 +212,9 @@ export default function SavedPatternsPage() {
           <p className="font-medium text-slate-700">
             {loading ? "Loading saved patterns..." : `${formatMetric(patterns.length)} of ${formatMetric(total)} saved patterns`}
           </p>
-          <span className="text-slate-500">{selectedIds.length ? `${formatMetric(selectedIds.length)} selected` : "Newest first"}</span>
+          <span className="text-slate-500">
+            {selectedIds.length ? `${formatMetric(selectedIds.length)} selected` : order === "likes" ? "Ranked by likes" : "Newest first"}
+          </span>
         </div>
       </section>
 
