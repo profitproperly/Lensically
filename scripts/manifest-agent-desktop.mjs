@@ -190,7 +190,7 @@ function recentWinnerCounts(size) {
   };
 }
 
-function bestSellerSynthesis(posts) {
+function winnerSynthesis(posts) {
   if (!posts.length) return "No eligible winners yet.";
   const tallies = posts.reduce((accumulator, post) => {
     const signals = tasteSignals(post.text);
@@ -225,7 +225,7 @@ function bestSellerSynthesis(posts) {
     parts.push("deliver a clean immediate emotional reward");
   }
 
-  return `Best sellers here ${parts.slice(0, 4).join(", ")}; the constant is instant payoff, not repeating the same exact sentence resolution.`;
+  return `Winning posts here ${parts.slice(0, 4).join(", ")}; the constant is instant payoff, not repeating the same exact sentence resolution.`;
 }
 
 function buildTasteMemory(context) {
@@ -258,7 +258,7 @@ function buildTasteMemory(context) {
     recent_window_size: RECENT_TASTE_WINDOW_SIZE,
     recent_winners: recentWinners,
     all_time_champions: allTimeChampions,
-    best_seller_synthesis: bestSellerSynthesis(synthesisPosts),
+    winner_synthesis: winnerSynthesis(synthesisPosts),
   };
 }
 
@@ -648,7 +648,7 @@ function buildGeneratePrompt(context, lessons, guidance, tasteMemory, generation
     "Do not optimize for variety theater. Generate the 17 strongest posts for this account, even if several winners share a broad lane.",
     "Do not label posts with genres, objectives, bet types, or win conditions. Those labels can bias the writing.",
     "Openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close to recent/generated posts.",
-    "Before generating posts, read the taste memory and generate from recent winners, all-time champions, and best_seller_synthesis.",
+    "Before generating posts, read the taste memory and generate from recent winners, all-time champions, and winner_synthesis.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Use the full archive, follower archive, metrics, goals, rejection lessons, and top posts. Do the math and strategy in the backend.",
     "Return JSON: {\"metrics\": object, \"posts\": [{\"slot\":\"07:00\",\"text\":\"...\"}], \"memory_notes\": [string]}",
