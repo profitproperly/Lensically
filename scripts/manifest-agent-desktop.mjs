@@ -24,6 +24,7 @@ const RECENT_A_TIER_RATIO = 0.10;
 const RECENT_B_TIER_RATIO = 0.15;
 const ALL_TIME_CHAMPION_COUNT = 25;
 const TASTE_MEMORY_MIN_AGE_HOURS = 24;
+const HERMES_CONTEXT_MAX_AGE_HOURS = 24;
 
 let activeRun = null;
 let activeHermesChild = null;
@@ -89,6 +90,36 @@ async function fetchAllArchive(order) {
     if (!pagePosts.length || (total && posts.length >= total)) break;
   }
   return posts;
+}
+
+async function syncLensicallyPostArchive() {
+  let cursor = null;
+  let hasMore = true;
+  let pages = 0;
+  let syncedPosts = 0;
+
+  while (hasMore && pages < 250) {
+    const route = cursor
+      ? `/api/threads/posts?cursor=${encodeURIComponent(cursor)}&cursor_depth=${pages + 1}`
+      : "/api/threads/posts";
+    const data = await fetchJson(route);
+    const posts = Array.isArray(data.posts) ? data.posts : [];
+    syncedPosts += posts.length;
+    cursor = typeof data.next_cursor === "string" && data.next_cursor.trim() ? data.next_cursor.trim() : null;
+    hasMore = Boolean(data.has_more && cursor);
+    pages += 1;
+  }
+
+  return { pages, synced_posts: syncedPosts };
+}
+
+async function syncLensicallyFollowers() {
+  const data = await fetchJson("/api/threads/followers?limit=100&page=1");
+  return {
+    rows: Array.isArray(data.rows) ? data.rows.length : 0,
+    total_count: numberValue(data.total_count),
+    page_size: numberValue(data.page_size),
+  };
 }
 
 function numberValue(value) {
@@ -383,6 +414,33 @@ async function loadLatestContextSummary() {
   } catch {
     return null;
   }
+}
+
+function hoursSince(isoTimestamp) {
+  const parsed = parseTimestamp(isoTimestamp);
+  if (!parsed) return Number.POSITIVE_INFINITY;
+  return (Date.now() - parsed.valueOf()) / (60 * 60 * 1000);
+}
+
+function isContextFresh(context) {
+  return hoursSince(context?.generated_at) <= HERMES_CONTEXT_MAX_AGE_HOURS;
+}
+
+async function readLatestPulledContext() {
+  return readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
+}
+
+async function requireFreshPulledContext() {
+  let context;
+  try {
+    context = await readLatestPulledContext();
+  } catch {
+    throw new Error("No pulled Lensically data is available. Press Pull Data first.");
+  }
+  if (!isContextFresh(context)) {
+    throw new Error("Pulled Lensically data is older than 24 hours. Press Pull Data before generating.");
+  }
+  return context;
 }
 
 async function loadLessons() {
@@ -838,7 +896,7 @@ function normalizePosts(posts, desiredSlots) {
 async function generateRun(postCount = DEFAULT_POST_COUNT) {
   const runId = nowStamp();
   activeRun = { id: runId, phase: "starting", started_at: new Date().toISOString() };
-  const context = await buildFreshContext();
+  const context = await requireFreshPulledContext();
   const generationSlots = pickGenerationSlots(context, postCount);
   if (!generationSlots.length) throw new Error("No schedule slots are available for generation.");
   const tasteMemory = await writeTasteMemory(context, new Date(context.generated_at ?? Date.now()));
@@ -953,10 +1011,20 @@ async function scheduleLatestRun() {
 
 async function pullFreshContext() {
   if (activeRun) throw new Error(`Agent is already running: ${activeRun.phase}`);
-  activeRun = { id: nowStamp(), phase: "pulling_lensically_context", started_at: new Date().toISOString() };
+  activeRun = { id: nowStamp(), phase: "syncing_lensically_insights", started_at: new Date().toISOString() };
+  const postSync = await syncLensicallyPostArchive();
+  activeRun = { ...activeRun, phase: "syncing_lensically_followers" };
+  const followerSync = await syncLensicallyFollowers();
+  activeRun = { ...activeRun, phase: "building_hermes_context_from_lensically" };
   const context = await buildFreshContext();
   activeRun = null;
-  return summarizeContext(context);
+  return {
+    summary: summarizeContext(context),
+    sync: {
+      post_archive: postSync,
+      followers: followerSync,
+    },
+  };
 }
 
 function escapeHtml(value) {
@@ -975,7 +1043,7 @@ function html() {
 <title>Manifest Mental Agent</title>
 <style>
 :root{--ink:#08111f;--muted:#5d6f89;--line:#d9e1ec;--paper:#f6f3ea;--card:#fffdf8;--accent:#0b1220;--soft:#eef3ef;--good:#0f766e;--bad:#b42318;--gold:#b87503}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 8%,#fff7df 0 18%,transparent 34%),linear-gradient(135deg,#f9f6ed,#edf5f1 52%,#f4eadc);color:var(--ink);font-family:Georgia,Cambria,serif}main{width:min(1480px,calc(100vw - 32px));margin:0 auto;padding:24px 0 42px}header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding:24px;border:1px solid var(--line);background:rgba(255,253,248,.92);border-radius:20px;box-shadow:0 22px 70px rgba(15,23,42,.1)}h1{margin:0;font-size:34px;letter-spacing:-.04em}.sub{margin:8px 0 0;color:var(--muted);line-height:1.45;max-width:860px;font-family:Segoe UI,ui-sans-serif,sans-serif}.actions,.review-actions,.guidance-actions,.control-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:999px;padding:12px 17px;font-weight:800;font-size:14px;cursor:pointer;font-family:Segoe UI,ui-sans-serif,sans-serif}button.secondary{background:#fff;color:var(--ink);border-color:var(--line)}button.danger{background:#fff4f2;color:var(--bad);border-color:#f1b8b2}button.danger:not(:disabled){box-shadow:0 0 0 3px rgba(180,35,24,.08)}button:disabled{opacity:.48;cursor:not-allowed}.banner{margin-top:14px;border-radius:14px;padding:13px 16px;border:1px solid var(--line);background:rgba(255,253,248,.9);color:var(--muted);font-family:Segoe UI,ui-sans-serif,sans-serif}.banner.error{border-color:#f1b8b2;color:var(--bad);background:#fff4f2}.banner.ok{border-color:#9fd8cf;color:var(--good);background:#eefbf8}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}.metric{border:1px solid var(--line);background:rgba(255,253,248,.9);border-radius:16px;padding:15px}.metric p{margin:0;color:#60718b;font-size:10px;text-transform:uppercase;letter-spacing:.16em;font-weight:900;font-family:Segoe UI,ui-sans-serif,sans-serif}.metric strong{display:block;margin-top:8px;font-size:27px;letter-spacing:-.04em}.metric span{display:block;margin-top:7px;color:var(--muted);font-size:13px;line-height:1.4;font-family:Segoe UI,ui-sans-serif,sans-serif}.guidance,.control{margin-top:16px;border:1px solid var(--line);background:rgba(255,253,248,.9);border-radius:16px;padding:18px}.guidance h2,.control h2,.posts h2{margin:0 0 10px;font-size:17px;letter-spacing:-.03em}.guidance-grid{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:14px}.guidance-list{max-height:155px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(255,255,255,.55);font:13px/1.45 Segoe UI,ui-sans-serif,sans-serif;color:#334155}.guidance-item{padding:8px 0;border-bottom:1px solid #e8edf4}.guidance-item:last-child{border-bottom:0}.control-grid{display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;margin-top:12px}.control-list{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(255,255,255,.55);font:13px/1.4 Segoe UI,ui-sans-serif,sans-serif}.control-group{margin:8px 0 10px;color:#526985;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.control-item{display:block;width:100%;text-align:left;margin:5px 0;border-color:#dfe6ef;background:#fff;color:#0b2445;border-radius:12px;padding:9px 11px}.control-item.active{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,117,3,.12)}#control-editor{min-height:420px;font-family:Consolas,ui-monospace,monospace;font-size:12px;white-space:pre}.control-meta{font:13px/1.4 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted);margin:0 0 8px}.posts{margin-top:16px;border:1px solid var(--line);background:rgba(255,253,248,.65);border-radius:20px;overflow:hidden}.posts-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:18px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);background:rgba(255,253,248,.96);backdrop-filter:blur(8px)}.review-actions,.guidance-actions,.control-actions{align-items:center}.count{color:var(--muted);font-size:13px;font-family:Segoe UI,ui-sans-serif,sans-serif}.post{display:grid;grid-template-columns:42px 88px minmax(0,1fr) 380px;gap:18px;padding:20px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.5)}.post:last-child{border-bottom:0}.post.selected{background:linear-gradient(90deg,rgba(184,117,3,.1),rgba(255,255,255,.72))}.pick{display:flex;align-items:flex-start;justify-content:center;padding-top:6px}.pick input{width:20px;height:20px;accent-color:var(--accent)}.slot{font-weight:900;font-size:22px;letter-spacing:-.04em}.text{font-size:23px;line-height:1.38;margin:0;letter-spacing:-.03em}textarea{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:12px;font:14px/1.45 Segoe UI,ui-sans-serif,sans-serif;background:#fff}.feedback-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#526985;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;font-family:Segoe UI,ui-sans-serif,sans-serif}.empty{padding:38px 18px;color:var(--muted);font-family:Segoe UI,ui-sans-serif,sans-serif}@media(max-width:1100px){header,.guidance-grid,.control-grid{display:block}.actions{justify-content:flex-start;margin-top:16px}.metrics{grid-template-columns:1fr 1fr}.post{grid-template-columns:38px 76px 1fr}.review{grid-column:1/-1}.posts-head{display:block}.review-actions{justify-content:flex-start;margin-top:10px}.guidance-list,.control-list{margin-top:12px}}@media(max-width:720px){main{width:min(100vw - 18px,720px)}.metrics{grid-template-columns:1fr}.post{grid-template-columns:34px 1fr}.slotbox{grid-column:2}.copy{grid-column:2}.review{grid-column:2}}
-</style></head><body><main><header><div><h1>Manifest Mental Agent</h1><p class="sub">Pull Data and Schedule use Lensically only. Generate uses Hermes after data is already cached locally.</p></div><div class="actions"><label style="display:flex;align-items:center;gap:8px;font:13px/1.2 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted)">Posts <select id="post-count" style="border:1px solid var(--line);border-radius:999px;padding:9px 12px;background:#fff;color:var(--ink);font:14px/1 Segoe UI,ui-sans-serif,sans-serif"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option selected>17</option></select></label><button id="pull-data" class="secondary">Pull Data</button><button id="generate">Generate Posts</button><button id="stop" class="danger" disabled>Stop Agent</button><button id="schedule" class="secondary">Schedule Latest</button><button id="refresh" class="secondary">Refresh View</button></div></header><div id="message" class="banner">Starting local agent surface...</div><section id="metrics" class="metrics"></section><section class="guidance"><h2>Steer The Agent</h2><div class="guidance-grid"><div><textarea id="guidance-input" placeholder="Tell the agent what to learn. Example: stop using cleanly/clearly, avoid vague emotional abstractions, prefer concrete scenes with a sharper payoff."></textarea><div class="guidance-actions"><button id="save-guidance" class="secondary">Ask Agent + Save</button></div><p id="agent-reply" class="banner">Agent reply will appear here. This uses one Hermes model call when clicked.</p></div><div class="guidance-list" id="guidance-list">No steering guidance saved yet.</div></div></section><section class="control"><h2>Agent Control</h2><button id="toggle-control" class="secondary">Open Control Panel</button><div id="control-panel" style="display:none"><p class="control-meta">Inspect and edit memory, prompts, context, and runs. Latest prompts, context, and runs are read-only evidence.</p><div class="control-grid"><div id="control-list" class="control-list">Loading controls...</div><div><p id="control-meta" class="control-meta">Select an artifact.</p><textarea id="control-editor" spellcheck="false"></textarea><div class="control-actions"><button id="save-control" class="secondary" disabled>Save Artifact</button><button id="reload-control" class="secondary" disabled>Reload</button></div></div></div></div></section><section class="posts"><div class="posts-head"><h2>Generated Posts</h2><span id="slate-status">0</span></div><div id="posts"><div class="empty">Pull data, choose a post count, then generate.</div></div></section></main>
+</style></head><body><main><header><div><h1>Manifest Mental Agent</h1><p class="sub">Pull Data manually syncs Lensically insights and followers, then Hermes generates from that fresh Lensically state for up to 24 hours.</p></div><div class="actions"><label style="display:flex;align-items:center;gap:8px;font:13px/1.2 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted)">Posts <select id="post-count" style="border:1px solid var(--line);border-radius:999px;padding:9px 12px;background:#fff;color:var(--ink);font:14px/1 Segoe UI,ui-sans-serif,sans-serif"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option selected>17</option></select></label><button id="pull-data" class="secondary">Pull Data</button><button id="generate">Generate Posts</button><button id="stop" class="danger" disabled>Stop Agent</button><button id="schedule" class="secondary">Schedule Latest</button><button id="refresh" class="secondary">Refresh View</button></div></header><div id="message" class="banner">Starting local agent surface...</div><section id="metrics" class="metrics"></section><section class="guidance"><h2>Steer The Agent</h2><div class="guidance-grid"><div><textarea id="guidance-input" placeholder="Tell the agent what to learn. Example: stop using cleanly/clearly, avoid vague emotional abstractions, prefer concrete scenes with a sharper payoff."></textarea><div class="guidance-actions"><button id="save-guidance" class="secondary">Ask Agent + Save</button></div><p id="agent-reply" class="banner">Agent reply will appear here. This uses one Hermes model call when clicked.</p></div><div class="guidance-list" id="guidance-list">No steering guidance saved yet.</div></div></section><section class="control"><h2>Agent Control</h2><button id="toggle-control" class="secondary">Open Control Panel</button><div id="control-panel" style="display:none"><p class="control-meta">Inspect and edit memory, prompts, context, and runs. Latest prompts, context, and runs are read-only evidence.</p><div class="control-grid"><div id="control-list" class="control-list">Loading controls...</div><div><p id="control-meta" class="control-meta">Select an artifact.</p><textarea id="control-editor" spellcheck="false"></textarea><div class="control-actions"><button id="save-control" class="secondary" disabled>Save Artifact</button><button id="reload-control" class="secondary" disabled>Reload</button></div></div></div></div></section><section class="posts"><div class="posts-head"><h2>Generated Posts</h2><span id="slate-status">0</span></div><div id="posts"><div class="empty">Pull data, choose a post count, then generate.</div></div></section></main>
 <script>
 const state={run:null,active:null,reasons:{},selected:{},guidance:[],context:null};const fmt=n=>new Intl.NumberFormat('en-US').format(Math.round(Number(n||0)));const pct=n=>(Number(n||0)).toFixed(4)+'%';
 let controlState={registry:[],current:null};
@@ -987,7 +1055,7 @@ function renderGuidance(){const list=document.getElementById('guidance-list');li
 function selectedSlots(){return Object.keys(state.selected).filter(slot=>state.selected[slot])}
 function render(){const run=state.run||{},context=state.context||{},m=run.metrics||context.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||17);renderGuidance();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date):'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="regen-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Regenerate Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map(post=>'<article class="post '+(state.selected[post.slot]?'selected':'')+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="slot">'+post.slot+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p></div><div class="review"><div class="feedback-label"><span>Regen feedback</span><button class="secondary regen" data-slot="'+post.slot+'" '+(state.active?'disabled':'')+'>One Slot</button></div><textarea data-reason="'+post.slot+'" placeholder="What is wrong? The agent will avoid this exact premise, payoff, and sentence path.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Pull data, choose a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)));const regenSelected=document.getElementById('regen-selected');if(regenSelected)regenSelected.onclick=regenSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
 async function refresh(){const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;state.guidance=d.guidance||[];state.context=d.latest_context||state.context;render();if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.run?'View refreshed. Latest run loaded.':state.context?'View refreshed. Latest pulled data loaded.':'Agent ready. No run yet.','ok')}
-async function pullData(){msg('Pulling fresh Lensically data without Hermes.');state.active={phase:'pulling_lensically_context'};render();try{const d=await api('/pull-data',{method:'POST',body:'{}'});state.context=d.context;msg('Pulled fresh Lensically data. No AI used.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
+async function pullData(){msg('Pulling fresh Lensically insights and followers without Hermes.');state.active={phase:'syncing_lensically_insights'};render();try{const d=await api('/pull-data',{method:'POST',body:'{}'});state.context=d.context?.summary||state.context;const sync=d.context?.sync||{};msg('Pulled fresh Lensically data. Synced '+(sync.post_archive?.synced_posts||0)+' posts across '+(sync.post_archive?.pages||0)+' pages and refreshed '+(sync.followers?.total_count||0)+' follower snapshots.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function generate(){const postCount=Number(document.getElementById('post-count').value||17);msg('Generating '+postCount+' posts. Hermes is working locally; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:JSON.stringify({post_count:postCount})});state.run=d.run;state.context=d.context||state.context;msg('Generated '+(d.run?.posts?.length||postCount)+' posts.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.understanding||'Regenerated and saved the rejection understanding.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function regenSelectedPosts(){const slots=selectedSlots();if(slots.length>${MAX_SELECTED_REGEN}){msg('Select at most ${MAX_SELECTED_REGEN} posts per regen. This protects your usage.','error');return}const rejections=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const missing=rejections.filter(item=>!item.reason).map(item=>item.slot);if(missing.length){msg('Add feedback for selected slots: '+missing.join(', '),'error');return}state.active={phase:'regenerating_selected'};render();try{let done=0;for(const item of rejections){msg('Regenerating '+item.slot+' ('+(done+1)+'/'+rejections.length+').');const d=await api('/regen',{method:'POST',body:JSON.stringify(item)});state.run=d.run;state.reasons[item.slot]='';state.selected[item.slot]=false;done+=1;render()}msg('Regenerated '+done+' selected slot'+(done===1?'':'s')+' and wrote memory.','ok')}catch(e){msg(e.message+' Latest successful slots were saved; press Refresh to reload them.','error');await refresh()}finally{state.active=null;render()}}
