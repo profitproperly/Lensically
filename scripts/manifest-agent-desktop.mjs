@@ -413,6 +413,9 @@ function hoursSince(isoTimestamp) {
 async function loadSelectedBatchPresetId() {
   try {
     const data = await readJson(BATCH_PRESET_SELECTION_PATH);
+    if (data?.explicit_selection !== true) {
+      return null;
+    }
     const presetId = String(data?.preset_id ?? "").trim();
     return presetId || null;
   } catch {
@@ -425,31 +428,33 @@ async function saveSelectedBatchPresetId(presetId) {
   if (!trimmed) throw new Error("preset_id is required.");
   await writeJson(BATCH_PRESET_SELECTION_PATH, {
     preset_id: trimmed,
+    explicit_selection: true,
     updated_at: new Date().toISOString(),
   });
   return trimmed;
 }
 
-function resolveSelectedBatchPreset(presets, selectedPresetId, fallbackPreset = null) {
-  if (!Array.isArray(presets) || !presets.length) return fallbackPreset;
-  const bySelectedId = selectedPresetId
-    ? presets.find((preset) => String(preset?.id ?? "") === String(selectedPresetId))
-    : null;
-  if (bySelectedId) return bySelectedId;
-  if (fallbackPreset?.id) {
-    const matchingFallback = presets.find((preset) => String(preset?.id ?? "") === String(fallbackPreset.id));
-    if (matchingFallback) return matchingFallback;
+async function clearSelectedBatchPresetId() {
+  try {
+    await fs.unlink(BATCH_PRESET_SELECTION_PATH);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
   }
-  return presets.find((preset) => preset?.is_favorite) ?? presets[0] ?? fallbackPreset;
+}
+
+function resolveSelectedBatchPreset(presets, selectedPresetId) {
+  if (!Array.isArray(presets) || !presets.length) return null;
+  if (!selectedPresetId) return null;
+  return presets.find((preset) => String(preset?.id ?? "") === String(selectedPresetId)) ?? null;
 }
 
 async function loadBatchPresetState(context = null) {
   const presets = await fetchLensicallyBatchPresets();
   const selectedPresetId = await loadSelectedBatchPresetId();
-  const activePreset = resolveSelectedBatchPreset(presets, selectedPresetId, context?.batch_preset ?? null);
+  const activePreset = resolveSelectedBatchPreset(presets, selectedPresetId);
   return {
     presets,
-    selected_preset_id: activePreset?.id ?? selectedPresetId ?? null,
+    selected_preset_id: activePreset?.id ?? null,
     active_preset: activePreset ?? null,
   };
 }
@@ -932,9 +937,10 @@ async function generateRun(postCount = DEFAULT_POST_COUNT) {
   activeRun = { id: runId, phase: "starting", started_at: new Date().toISOString() };
   const context = await requireFreshPulledContext();
   const batchPresetState = await loadBatchPresetState(context);
-  const desiredSlots = Array.isArray(batchPresetState.active_preset?.times) && batchPresetState.active_preset.times.length
-    ? batchPresetState.active_preset.times
-    : context.desired_slots;
+  if (!Array.isArray(batchPresetState.active_preset?.times) || !batchPresetState.active_preset.times.length) {
+    throw new Error("Choose a Lensically batch first.");
+  }
+  const desiredSlots = batchPresetState.active_preset.times;
   const generationSlots = pickGenerationSlots(desiredSlots, postCount);
   if (!generationSlots.length) throw new Error("No schedule slots are available for generation.");
   const tasteMemory = await writeTasteMemory(context);
@@ -1102,11 +1108,12 @@ function metric(l,v,h=''){return '<div class="metric"><p>'+l+'</p><strong>'+v+'<
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 function isCurrentRunUsable(run, context){if(!run||typeof run!=='object')return false;if(!Array.isArray(run.posts)||!run.posts.length)return false;if(!context||typeof context!=='object')return true;return String(run.target_date||'')===String(context.target_date||'')}
 function renderGuidance(){const list=document.getElementById('guidance-list');list.innerHTML=state.guidance.length?state.guidance.slice(-12).reverse().map(item=>'<div class="guidance-item"><b>'+esc(new Date(item.saved_at).toLocaleString())+'</b><br><b>You said:</b> '+esc(item.user_input||'')+(item.understanding?'<br><br><b>Understanding:</b> '+esc(item.understanding):'')+'</div>').join(''):'No steering guidance saved yet.'}
-function renderBatchPresets(){const activeId=state.selectedBatchPresetId||state.context?.batch_preset?.id||null;const target=document.getElementById('batch-presets');target.innerHTML=state.batchPresets.length?state.batchPresets.map(preset=>{const active=activeId===preset.id;return '<button class="control-item use-batch'+(active?' active':'')+'" data-preset="'+esc(preset.id)+'" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div style="text-align:left"><div style="font-weight:800">'+esc(preset.name)+(preset.is_favorite?' <span style=\"color:var(--gold)\">Favorite</span>':'')+'</div><div style="margin-top:6px;color:var(--muted);font-size:12px;line-height:1.45">'+esc((preset.times||[]).join(', '))+'</div></div><div style="white-space:nowrap;font-weight:800;color:'+(active?'var(--gold)':'#0b2445')+'">'+(active?'Selected':'Use This Batch')+'</div></div></button>'}).join(''):'No saved Lensically batches yet.';document.querySelectorAll('.use-batch').forEach(btn=>btn.onclick=()=>useBatchPreset(btn.dataset.preset))}
+function renderBatchPresets(){const activeId=state.selectedBatchPresetId||null;const target=document.getElementById('batch-presets');const header=activeId?'<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button id="clear-batch-selection" class="secondary">Clear Selection</button></div>':'<div style="margin-bottom:10px;color:var(--muted)">No batch selected.</div>';target.innerHTML=state.batchPresets.length?header+state.batchPresets.map(preset=>{const active=activeId===preset.id;return '<button class="control-item use-batch'+(active?' active':'')+'" data-preset="'+esc(preset.id)+'" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div style="text-align:left"><div style="font-weight:800">'+esc(preset.name)+(preset.is_favorite?' <span style=\"color:var(--gold)\">Favorite</span>':'')+'</div><div style="margin-top:6px;color:var(--muted);font-size:12px;line-height:1.45">'+esc((preset.times||[]).join(', '))+'</div></div><div style="white-space:nowrap;font-weight:800;color:'+(active?'var(--gold)':'#0b2445')+'">'+(active?'Selected':'Use This Batch')+'</div></div></button>'}).join(''):'No saved Lensically batches yet.';document.querySelectorAll('.use-batch').forEach(btn=>btn.onclick=()=>useBatchPreset(btn.dataset.preset));const clear=document.getElementById('clear-batch-selection');if(clear)clear.onclick=clearBatchPreset}
 function selectedSlots(){return Object.keys(state.selected).filter(slot=>state.selected[slot])}
-function render(){const rawRun=state.run||null,context=state.context||{},run=isCurrentRunUsable(rawRun,context)?rawRun:{},m=context.metrics||run.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||17),batchPreset=(state.batchPresets.find(preset=>preset.id===state.selectedBatchPresetId)||context.batch_preset||null),batchLabel=batchPreset?.name||'No Lensically batch',batchMeta=batchPreset?'Used for generation and scheduling':'Select a saved Lensically batch';renderGuidance();renderBatchPresets();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Batch Preset',batchPreset?.times?.length?fmt(batchPreset.times.length)+' slots':fmt((context.desired_slots||[]).length),batchLabel+' · '+batchMeta),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date):'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="regen-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Regenerate Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map(post=>'<article class="post '+(state.selected[post.slot]?'selected':'')+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="slot">'+post.slot+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p></div><div class="review"><div class="feedback-label"><span>Regen feedback</span><button class="secondary regen" data-slot="'+post.slot+'" '+(state.active?'disabled':'')+'>One Slot</button></div><textarea data-reason="'+post.slot+'" placeholder="What is wrong? The agent will avoid this exact premise, payoff, and sentence path.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Pull data, choose a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)));const regenSelected=document.getElementById('regen-selected');if(regenSelected)regenSelected.onclick=regenSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
+function render(){const rawRun=state.run||null,context=state.context||{},run=isCurrentRunUsable(rawRun,context)?rawRun:{},m=context.metrics||run.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||17),batchPreset=(state.batchPresets.find(preset=>preset.id===state.selectedBatchPresetId)||null),batchLabel=batchPreset?.name||'No batch selected',batchMeta=batchPreset?'Used for generation and scheduling':'Choose a saved Lensically batch before generating';renderGuidance();renderBatchPresets();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Batch Preset',batchPreset?.times?.length?fmt(batchPreset.times.length)+' slots':'0 slots',batchLabel+' · '+batchMeta),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date):'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="regen-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Regenerate Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map(post=>'<article class="post '+(state.selected[post.slot]?'selected':'')+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="slot">'+post.slot+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p></div><div class="review"><div class="feedback-label"><span>Regen feedback</span><button class="secondary regen" data-slot="'+post.slot+'" '+(state.active?'disabled':'')+'>One Slot</button></div><textarea data-reason="'+post.slot+'" placeholder="What is wrong? The agent will avoid this exact premise, payoff, and sentence path.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Pull data, choose a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)));const regenSelected=document.getElementById('regen-selected');if(regenSelected)regenSelected.onclick=regenSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
 async function refresh(){const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;state.guidance=d.guidance||[];state.context=d.latest_context||state.context;state.batchPresets=Array.isArray(d.batch_presets)?d.batch_presets:state.batchPresets;state.selectedBatchPresetId=d.selected_batch_preset_id||state.selectedBatchPresetId;render();if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.context?'View refreshed. Latest pulled data loaded.':state.run?'View refreshed. Latest run loaded.':'Agent ready. No run yet.','ok')}
 async function useBatchPreset(presetId){msg('Using selected Lensically batch in Hermes.');try{const d=await api('/batch-presets/use',{method:'POST',body:JSON.stringify({preset_id:presetId})});state.batchPresets=Array.isArray(d.presets)?d.presets:state.batchPresets;state.selectedBatchPresetId=d.selected_preset_id||presetId;msg('Using '+(d.active_preset?.name||'selected batch')+' for Hermes generation and scheduling.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function clearBatchPreset(){msg('Clearing Hermes batch selection.');try{const d=await api('/batch-presets/clear',{method:'POST',body:'{}'});state.batchPresets=Array.isArray(d.presets)?d.presets:state.batchPresets;state.selectedBatchPresetId=null;msg('Batch selection cleared. Choose a batch before generating.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function pullData(){msg('Pulling fresh Lensically insights and followers without Hermes.');state.active={phase:'syncing_lensically_insights'};render();try{const d=await api('/pull-data',{method:'POST',body:'{}'});state.context=d.context?.summary||state.context;state.run=null;const sync=d.context?.sync||{};msg('Pulled fresh Lensically data. Synced '+(sync.post_archive?.synced_posts||0)+' posts across '+(sync.post_archive?.pages||0)+' pages and refreshed '+(sync.followers?.total_count||0)+' follower snapshots.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function generate(){const postCount=Number(document.getElementById('post-count').value||17);msg('Generating '+postCount+' posts. Hermes is working locally; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:JSON.stringify({post_count:postCount})});state.run=d.run;state.context=d.context||state.context;msg('Generated '+(d.run?.posts?.length||postCount)+' posts.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.understanding||'Regenerated and saved the rejection understanding.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
@@ -1173,11 +1180,22 @@ async function handle(request, response) {
       const presetId = await saveSelectedBatchPresetId(String(body.preset_id ?? ""));
       const latestContext = await loadLatestContextSummary();
       const batchPresetState = await loadBatchPresetState(latestContext);
-      const activePreset = resolveSelectedBatchPreset(batchPresetState.presets, presetId, latestContext?.batch_preset ?? null);
+      const activePreset = resolveSelectedBatchPreset(batchPresetState.presets, presetId);
       return send(response, 200, {
         ok: true,
         selected_preset_id: activePreset?.id ?? presetId,
         active_preset: activePreset ?? null,
+        presets: batchPresetState.presets,
+      });
+    }
+    if (url.pathname === "/batch-presets/clear" && request.method === "POST") {
+      await clearSelectedBatchPresetId();
+      const latestContext = await loadLatestContextSummary();
+      const batchPresetState = await loadBatchPresetState(latestContext);
+      return send(response, 200, {
+        ok: true,
+        selected_preset_id: null,
+        active_preset: null,
         presets: batchPresetState.presets,
       });
     }
