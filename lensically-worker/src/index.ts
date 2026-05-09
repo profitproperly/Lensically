@@ -5706,6 +5706,24 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }));
     }
 
+    if ((normalizedPath === "/internal/batch-schedule/presets" || normalizedPath === "/api/internal/batch-schedule/presets") && request.method === "GET") {
+      if (!isInternalRequestAuthorized(request, env)) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      const presets = await listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID);
+      return new Response(JSON.stringify({
+        success: true,
+        presets,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     if (normalizedPath === "/api/batch-schedule/presets" && request.method === "POST") {
       const authUser = await requireAuth(request, env);
       if (authUser instanceof Response) {
