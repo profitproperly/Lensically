@@ -23,7 +23,6 @@ const RECENT_TASTE_WINDOW_SIZE = 100;
 const RECENT_A_TIER_RATIO = 0.10;
 const RECENT_B_TIER_RATIO = 0.15;
 const ALL_TIME_CHAMPION_COUNT = 25;
-const TASTE_MEMORY_MIN_AGE_HOURS = 24;
 const HERMES_CONTEXT_MAX_AGE_HOURS = 24;
 
 let activeRun = null;
@@ -159,43 +158,19 @@ function tasteSignals(text) {
   };
 }
 
-function whyItSold(text) {
-  const signals = tasteSignals(text);
-  if (signals.money && signals.status) {
-    return "It sells because it blends money relief with status elevation and lands the payoff immediately.";
-  }
-  if (signals.money && signals.concrete_trigger) {
-    return "It sells because it turns money relief into a concrete scene the reader can feel happening.";
-  }
-  if (signals.money) {
-    return "It sells because it promises fast money relief in direct language with almost no friction.";
-  }
-  if (signals.status) {
-    return "It sells because it makes the reader feel chosen, upgraded, or impossible to overlook.";
-  }
-  if (signals.concrete_trigger) {
-    return "It sells because it gives the reader a specific scene instead of vague hope.";
-  }
-  if (signals.direct_address && signals.imminent) {
-    return "It sells because it speaks straight to the reader and makes the payoff feel immediate.";
-  }
-  return "It sells because it delivers a fast personal payoff in a clean low-friction sentence.";
-}
-
-function uniqueEligibleTastePosts(context, referenceNow = new Date()) {
+function uniqueEligibleTastePosts(context) {
   const sources = [
     ...(Array.isArray(context?.archive_recent) ? context.archive_recent : []),
     ...(Array.isArray(context?.archive_top) ? context.archive_top : []),
   ];
   const seen = new Set();
-  const cutoffMs = referenceNow.valueOf() - (TASTE_MEMORY_MIN_AGE_HOURS * 60 * 60 * 1000);
   const eligible = [];
 
   for (const sourcePost of sources) {
     const post = normalizeTastePost(sourcePost);
     if (!post.posted_at || !post.text) continue;
     const stamp = parseTimestamp(post.posted_at);
-    if (!stamp || stamp.valueOf() > cutoffMs) continue;
+    if (!stamp) continue;
     const dedupeKey = post.post_id || `${post.posted_at}::${post.text}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
@@ -253,8 +228,8 @@ function bestSellerSynthesis(posts) {
   return `Best sellers here ${parts.slice(0, 4).join(", ")}; the constant is instant payoff, not repeating the same exact sentence resolution.`;
 }
 
-function buildTasteMemory(context, referenceNow = new Date()) {
-  const eligible = uniqueEligibleTastePosts(context, referenceNow);
+function buildTasteMemory(context) {
+  const eligible = uniqueEligibleTastePosts(context);
   const recentWindow = [...eligible]
     .sort((left, right) => parseTimestamp(right.posted_at).valueOf() - parseTimestamp(left.posted_at).valueOf())
     .slice(0, RECENT_TASTE_WINDOW_SIZE);
@@ -265,7 +240,6 @@ function buildTasteMemory(context, referenceNow = new Date()) {
     ...post,
     rank: index + 1,
     tier: index < aCount ? "A" : "B",
-    why_it_sold: whyItSold(post.text),
   }));
   const allTimeChampions = [...eligible]
     .sort((left, right) => right.likes - left.likes || parseTimestamp(right.posted_at).valueOf() - parseTimestamp(left.posted_at).valueOf())
@@ -273,7 +247,6 @@ function buildTasteMemory(context, referenceNow = new Date()) {
     .map((post, index) => ({
       ...post,
       rank: index + 1,
-      why_it_sold: whyItSold(post.text),
     }));
   const synthesisPosts = [...recentWinners, ...allTimeChampions].reduce((accumulator, post) => {
     if (!accumulator.some((item) => item.post_id === post.post_id)) accumulator.push(post);
@@ -375,8 +348,8 @@ async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf8"));
 }
 
-async function writeTasteMemory(context, referenceNow = new Date()) {
-  const memory = buildTasteMemory(context, referenceNow);
+async function writeTasteMemory(context) {
+  const memory = buildTasteMemory(context);
   await writeJson(TASTE_MEMORY_PATH, memory);
   return memory;
 }
@@ -899,7 +872,7 @@ async function generateRun(postCount = DEFAULT_POST_COUNT) {
   const context = await requireFreshPulledContext();
   const generationSlots = pickGenerationSlots(context, postCount);
   if (!generationSlots.length) throw new Error("No schedule slots are available for generation.");
-  const tasteMemory = await writeTasteMemory(context, new Date(context.generated_at ?? Date.now()));
+  const tasteMemory = await writeTasteMemory(context);
   const lessons = await loadLessons();
   const guidance = await loadGuidance();
   activeRun = { ...activeRun, phase: `hermes_generating_${generationSlots.length}_posts` };
@@ -1017,6 +990,8 @@ async function pullFreshContext() {
   const followerSync = await syncLensicallyFollowers();
   activeRun = { ...activeRun, phase: "building_hermes_context_from_lensically" };
   const context = await buildFreshContext();
+  activeRun = { ...activeRun, phase: "updating_taste_memory" };
+  await writeTasteMemory(context);
   activeRun = null;
   return {
     summary: summarizeContext(context),
