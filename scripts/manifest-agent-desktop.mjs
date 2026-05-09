@@ -254,7 +254,7 @@ function buildTasteMemory(context) {
   }, []);
 
   return {
-    core_law: "Likes are sales. Taste is learned from likes only.",
+    core_law: "Taste is learned from likes only.",
     recent_window_size: RECENT_TASTE_WINDOW_SIZE,
     recent_winners: recentWinners,
     all_time_champions: allTimeChampions,
