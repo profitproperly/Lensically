@@ -18,7 +18,6 @@ const GOAL_FOLLOWERS = 1_000_000;
 const HERMES_BIN = "/home/brian/.local/bin/hermes";
 const HERMES_MODEL = "gpt-5.5";
 const HERMES_PROVIDER = "openai-codex";
-const MAX_SELECTED_REGEN = 3;
 const DEFAULT_POST_COUNT = 17;
 const MAX_POST_COUNT = 200;
 const RECENT_TASTE_WINDOW_SIZE = 100;
@@ -527,7 +526,7 @@ function buildGuidancePrompt(text, guidance, lessons) {
   return [
     "You are the local Manifest Mental growth agent.",
     "Output valid JSON only. No markdown.",
-    "The user is giving durable taste or strategy guidance that should shape future post generation and regeneration.",
+    "The user is giving durable taste or strategy guidance that should shape future post generation and deletion decisions.",
     "Understand why the user is telling you this. Be direct. Do not generate posts.",
     "Return JSON: {\"reply\":\"short direct response to the user explaining what you understood\", \"understanding\":\"one short plain-English explanation of why the user is giving this guidance and what signal it contains\"}",
     "New user guidance:",
@@ -633,7 +632,7 @@ async function buildFreshContext() {
       never_publish: true,
       only_schedule_after_user_clicks_schedule: true,
       full_context_pull_only_on_generate: true,
-      regen_uses_cached_context: true,
+      delete_feedback_writes_rejection_memory: true,
       fatigue_rule: "Reusing openers is permitted. Reusing the latter half, payoff, or sentence resolution too closely is audience fatigue.",
     },
   };
@@ -693,25 +692,6 @@ function relabelPosts(posts) {
   }));
 }
 
-function compactRegenContext(context) {
-  return {
-    target_date: context.target_date,
-    desired_slots: context.desired_slots,
-    metrics: context.metrics,
-    archive_recent: context.archive_recent.slice(0, 40).map((post) => ({
-      text: post.text,
-      likes: post.likes,
-      views: post.views,
-    })),
-    archive_top: context.archive_top.slice(0, 40).map((post) => ({
-      text: post.text,
-      likes: post.likes,
-      views: post.views,
-    })),
-    rules: context.agent_rules,
-  };
-}
-
 function buildGeneratePrompt(context, lessons, guidance, tasteMemory, generationSlots, existingPosts = []) {
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
@@ -749,77 +729,6 @@ function buildGeneratePrompt(context, lessons, guidance, tasteMemory, generation
     "Context:",
     JSON.stringify(compactContext(context)),
   ].join("\n\n");
-}
-
-function buildRegenPrompt({ context, latestRun, slot, reason, previousPost, lessons, guidance, tasteMemory }) {
-  return [
-    "You are the standalone Manifest Mental recursive learning agent regenerating one rejected post.",
-    "Output valid JSON only. No markdown.",
-    "Use cached context only. Do not fetch fresh insights, follower, or archive data.",
-    "The user gave a rejection reason. Understand why they rejected it and regenerate only that slot.",
-    "You are not allowed to lightly revise the rejected post. Create a whole brand new post with a different premise, image, payoff, sentence path, and emotional turn.",
-    "Do not reuse the rejected post's main nouns, core metaphor, ending logic, or sentence resolution unless the user explicitly asked to keep them.",
-    "Do not label the replacement with a genre, objective, bet type, or win condition. Just return the replacement post and understanding field.",
-    "Openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close.",
-    "Use the taste memory as the winning baseline, but the replacement must still resolve differently from the stored winners.",
-    "Return JSON: {\"slot\":\"09:00\",\"text\":\"...\",\"understanding\":\"one short plain-English explanation of why the user rejected the original post\"}",
-    "Rejection:",
-    JSON.stringify({ slot, reason, previousPost }),
-    "Taste memory:",
-    JSON.stringify(tasteMemory ?? {}),
-    "Prior rejection lessons:",
-    JSON.stringify(lessons.slice(-20).map((lesson) => ({
-      slot: lesson.slot,
-      source_text: lesson.source_text,
-      user_feedback: lesson.user_feedback,
-      understanding: lesson.understanding,
-      replacement_text: lesson.replacement_text,
-    }))),
-    "Persistent user steering guidance:",
-    JSON.stringify(guidance.slice(-40).map((entry) => ({
-      user_input: entry.user_input,
-      understanding: entry.understanding,
-    }))),
-    "Cached context:",
-    JSON.stringify(compactRegenContext(context)),
-    "Current slate:",
-    JSON.stringify(latestRun?.posts ?? []),
-  ].join("\n\n");
-}
-
-function words(value) {
-  return String(value ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s']/g, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function sharedWordRatio(a, b) {
-  const aWords = new Set(words(a).filter((word) => word.length > 3));
-  const bWords = new Set(words(b).filter((word) => word.length > 3));
-  if (!aWords.size || !bWords.size) return 0;
-  let shared = 0;
-  for (const word of aWords) if (bWords.has(word)) shared += 1;
-  return shared / Math.min(aWords.size, bWords.size);
-}
-
-function phrase(value, start, count) {
-  const allWords = words(value);
-  return allWords.slice(start < 0 ? Math.max(0, allWords.length + start) : start, start < 0 ? allWords.length : start + count).join(" ");
-}
-
-function assertFreshReplacement(previousText, nextText) {
-  const previous = String(previousText ?? "").trim();
-  const next = String(nextText ?? "").trim();
-  if (!next) throw new Error("Hermes returned an empty regenerated post.");
-  if (previous.toLowerCase() === next.toLowerCase()) throw new Error("Hermes repeated the rejected post exactly.");
-  const sameOpening = phrase(previous, 0, 6) && phrase(previous, 0, 6) === phrase(next, 0, 6);
-  const sameEnding = phrase(previous, -7, 7) && phrase(previous, -7, 7) === phrase(next, -7, 7);
-  const overlap = sharedWordRatio(previous, next);
-  if (sameOpening || sameEnding || overlap > 0.55) {
-    throw new Error(`Replacement is too close to rejected post. overlap=${overlap.toFixed(2)}`);
-  }
 }
 
 function extractJson(text) {
@@ -989,69 +898,35 @@ async function generateRun(postCount = DEFAULT_POST_COUNT) {
   return run;
 }
 
-async function regenSlot({ slot, reason }) {
-  if (!slot || !reason?.trim()) throw new Error("slot and reason are required.");
-  if (activeRun) throw new Error(`Agent is already running: ${activeRun.phase}`);
-  const context = await readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
-  const tasteMemory = await writeTasteMemory(context);
-  const latestRun = await loadLatestRun();
-  if (!latestRun?.posts?.length) throw new Error("No generated run is available. Press Generate first.");
-  latestRun.posts = relabelPosts(latestRun.posts);
-  const previousPost = latestRun.posts.find((post) => post.slot === slot);
-  if (!previousPost) throw new Error(`Slot ${slot} was not found.`);
+async function saveRejectedPosts(entries) {
+  const normalizedEntries = (Array.isArray(entries) ? entries : []).map((entry) => ({
+    slot: String(entry?.slot ?? "").trim(),
+    source_text: String(entry?.source_text ?? "").trim(),
+    user_feedback: String(entry?.user_feedback ?? "").trim(),
+  })).filter((entry) => entry.slot && entry.source_text && entry.user_feedback);
+  if (!normalizedEntries.length) return [];
   const lessons = await loadLessons();
-  const guidance = await loadGuidance();
-  activeRun = { id: nowStamp(), phase: `regenerating_${slot}`, started_at: new Date().toISOString() };
-  log("regen_slot_start", { slot });
-  const hermes = await runHermesJson(buildRegenPrompt({ context, latestRun, slot, reason: reason.trim(), previousPost, lessons, guidance, tasteMemory }));
-  const nextPost = {
-    slot,
-    text: String(hermes.text ?? "").trim(),
-    approved: false,
-  };
-  assertFreshReplacement(previousPost.text, nextPost.text);
   const savedAt = new Date().toISOString();
-  const understanding = String(hermes.understanding ?? reason).trim();
-  const rejectionLesson = {
+  const lessonEntries = normalizedEntries.map((entry) => ({
     saved_at: savedAt,
-    slot,
-    source_text: String(previousPost.text ?? "").trim(),
-    user_feedback: reason.trim(),
-    understanding,
-    replacement_text: nextPost.text,
-  };
-  const rejection = {
-    ...rejectionLesson,
-    previous_post: previousPost,
-    replacement_post: nextPost,
-  };
-  latestRun.posts = relabelPosts(latestRun.posts.map((post) => post.slot === slot ? nextPost : post));
-  latestRun.last_regen = rejection;
-  await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
-  await writeJson(path.join(VAULT, "Rejections", `rejection-${nowStamp()}-${slot.replace(":", "-")}.json`), rejection);
-  await saveLessons([...lessons, rejectionLesson].slice(-300));
-  activeRun = null;
-  log("regen_slot_complete", { slot });
-  return { run: latestRun, post: nextPost, understanding };
-}
-
-async function regenSlots(rejections) {
-  if (!Array.isArray(rejections) || !rejections.length) throw new Error("Select at least one post to regenerate.");
-  if (rejections.length > MAX_SELECTED_REGEN) throw new Error(`Regenerate at most ${MAX_SELECTED_REGEN} selected posts at a time. This protects your model usage.`);
-  const results = [];
-  let run = null;
-  for (const rejection of rejections) {
-    const slot = String(rejection?.slot ?? "");
-    const reason = String(rejection?.reason ?? "").trim();
-    if (!slot || !reason) throw new Error("Every selected post needs a feedback reason.");
-    const result = await regenSlot({ slot, reason });
-    run = result.run;
-    results.push({ slot, understanding: result.understanding });
+    slot: entry.slot,
+    source_text: entry.source_text,
+    user_feedback: entry.user_feedback,
+    understanding: entry.user_feedback,
+    replacement_text: "",
+  }));
+  const existing = Array.isArray(lessons) ? lessons : [];
+  await saveLessons([...existing, ...lessonEntries].slice(-300));
+  for (const lesson of lessonEntries) {
+    await writeJson(path.join(VAULT, "Rejections", `rejection-${nowStamp()}-${lesson.slot.replace(/[^a-z0-9]+/gi, "-")}.json`), {
+      ...lesson,
+      deleted: true,
+    });
   }
-  return { run, results };
+  return lessonEntries;
 }
 
-async function deleteRunPost(index) {
+async function deleteRunPost(index, reason = "") {
   const latestRun = await loadLatestRun();
   if (!latestRun?.posts?.length) throw new Error("No generated run is available.");
   latestRun.posts = relabelPosts(latestRun.posts);
@@ -1059,6 +934,12 @@ async function deleteRunPost(index) {
   if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= latestRun.posts.length) {
     throw new Error("Post index is out of range.");
   }
+  const deletedPost = latestRun.posts[numericIndex];
+  await saveRejectedPosts([{
+    slot: deletedPost.slot,
+    source_text: deletedPost.text,
+    user_feedback: reason,
+  }]);
   latestRun.posts.splice(numericIndex, 1);
   latestRun.posts = relabelPosts(latestRun.posts);
   await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
@@ -1095,12 +976,23 @@ async function setApprovedRunPosts(slots, approved = true) {
   return latestRun;
 }
 
-async function deleteRunPostsBySlots(slots) {
+async function deleteRunPostsBySlots(entries) {
   const latestRun = await loadLatestRun();
   if (!latestRun?.posts?.length) throw new Error("No generated run is available.");
-  const slotSet = new Set((Array.isArray(slots) ? slots : []).map((slot) => String(slot ?? "")).filter(Boolean));
+  const normalizedEntries = (Array.isArray(entries) ? entries : []).map((entry) => ({
+    slot: typeof entry === "string" ? entry : String(entry?.slot ?? ""),
+    user_feedback: typeof entry === "string" ? "" : String(entry?.reason ?? ""),
+  })).filter((entry) => entry.slot);
+  const slotSet = new Set(normalizedEntries.map((entry) => entry.slot));
   if (!slotSet.size) throw new Error("Select at least one post first.");
-  latestRun.posts = relabelPosts(latestRun.posts).filter((post) => !slotSet.has(post.slot));
+  latestRun.posts = relabelPosts(latestRun.posts);
+  const deletedPosts = latestRun.posts.filter((post) => slotSet.has(post.slot));
+  await saveRejectedPosts(deletedPosts.map((post) => ({
+    slot: post.slot,
+    source_text: post.text,
+    user_feedback: normalizedEntries.find((entry) => entry.slot === post.slot)?.user_feedback ?? "",
+  })));
+  latestRun.posts = latestRun.posts.filter((post) => !slotSet.has(post.slot));
   latestRun.posts = relabelPosts(latestRun.posts);
   await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
   return latestRun;
@@ -1197,18 +1089,16 @@ function isCurrentRunUsable(run, context){if(!run||typeof run!=='object')return 
 function renderGuidance(){const list=document.getElementById('guidance-list');list.innerHTML=state.guidance.length?state.guidance.slice(-12).reverse().map(item=>'<div class="guidance-item"><b>'+esc(new Date(item.saved_at).toLocaleString())+'</b><br><b>You said:</b> '+esc(item.user_input||'')+(item.understanding?'<br><br><b>Understanding:</b> '+esc(item.understanding):'')+'</div>').join(''):'No steering guidance saved yet.'}
 function renderBatchPresets(){const activeId=state.selectedBatchPresetId||null;const target=document.getElementById('batch-presets');const header=activeId?'<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button id="clear-batch-selection" class="secondary">Clear Selection</button></div>':'<div style="margin-bottom:10px;color:var(--muted)">No batch selected.</div>';target.innerHTML=state.batchPresets.length?header+state.batchPresets.map(preset=>{const active=activeId===preset.id;return '<button class="control-item use-batch'+(active?' active':'')+'" data-preset="'+esc(preset.id)+'" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div style="text-align:left"><div style="font-weight:800">'+esc(preset.name)+(preset.is_favorite?' <span style=\"color:var(--gold)\">Favorite</span>':'')+'</div><div style="margin-top:6px;color:var(--muted);font-size:12px;line-height:1.45">'+esc((preset.times||[]).join(', '))+'</div></div><div style="white-space:nowrap;font-weight:800;color:'+(active?'var(--gold)':'#0b2445')+'">'+(active?'Selected':'Use This Batch')+'</div></div></button>'}).join(''):'No saved Lensically batches yet.';document.querySelectorAll('.use-batch').forEach(btn=>btn.onclick=()=>useBatchPreset(btn.dataset.preset));const clear=document.getElementById('clear-batch-selection');if(clear)clear.onclick=clearBatchPreset}
 function selectedSlots(){return Object.keys(state.selected).filter(slot=>state.selected[slot])}
-function render(){const rawRun=state.run||null,context=state.context||{},run=isCurrentRunUsable(rawRun,context)?rawRun:{},m=context.metrics||run.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||${DEFAULT_POST_COUNT}),approvedCount=posts.filter(post=>post.approved).length,batchPreset=(state.batchPresets.find(preset=>preset.id===state.selectedBatchPresetId)||null),batchLabel=batchPreset?.name||'No batch selected',batchMeta=batchPreset?'Used only when scheduling the current slate':'Choose a saved Lensically batch before scheduling';renderGuidance();renderBatchPresets();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Batch Preset',batchPreset?.times?.length?fmt(batchPreset.times.length)+' slots':'0 slots',batchLabel+' · '+batchMeta),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date)+' · '+approvedCount+' approved':'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected · '+approvedCount+' approved</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="approve-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Approve Selected</button><button id="regen-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Regenerate Selected</button><button id="delete-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Delete Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map((post,index)=>'<article class="post '+(state.selected[post.slot]?'selected ':'')+(post.approved?'approved':'')+'" data-index="'+index+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="drag-handle" draggable="'+(!state.active)+'" data-drag-index="'+index+'" title="Drag to reorder">Drag</div><div class="slot-meta"><div class="slot">#'+(index+1)+'</div><div class="count">'+esc(post.slot)+'</div>'+(post.approved?'<div class="count" style="color:var(--gold);font-weight:800">Approved</div>':'')+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p></div><div class="review"><div class="feedback-label"><span>Regen feedback</span><div class="feedback-actions"><button class="secondary regen" data-slot="'+post.slot+'" '+(state.active?'disabled':'')+'>One Slot</button><button class="secondary delete-post" data-index="'+index+'" '+(state.active?'disabled':'')+'>Delete</button></div></div><textarea data-reason="'+post.slot+'" placeholder="What is wrong? The agent will avoid this exact premise, payoff, and sentence path.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Pull data, enter a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.regen').forEach(btn=>btn.addEventListener('click',()=>regen(btn.dataset.slot)));document.querySelectorAll('.delete-post').forEach(btn=>btn.addEventListener('click',()=>deletePost(Number(btn.dataset.index))));document.querySelectorAll('.drag-handle').forEach(handle=>{handle.addEventListener('dragstart',event=>{const index=handle.dataset.dragIndex;if(!index)return;event.dataTransfer?.setData('text/plain',index);event.dataTransfer&&(event.dataTransfer.effectAllowed='move');handle.closest('.post')?.classList.add('dragging')});handle.addEventListener('dragend',()=>{document.querySelectorAll('.post').forEach(card=>card.classList.remove('dragging','drop-target'))})});document.querySelectorAll('.post').forEach(card=>{card.addEventListener('dragover',event=>{event.preventDefault();if(state.active)return;event.dataTransfer&&(event.dataTransfer.dropEffect='move');document.querySelectorAll('.post.drop-target').forEach(node=>node.classList.remove('drop-target'));card.classList.add('drop-target')});card.addEventListener('dragleave',event=>{if(!card.contains(event.relatedTarget))card.classList.remove('drop-target')});card.addEventListener('drop',event=>{event.preventDefault();card.classList.remove('drop-target');const fromIndex=Number(event.dataTransfer?.getData('text/plain'));const toIndex=Number(card.dataset.index);if(Number.isInteger(fromIndex)&&Number.isInteger(toIndex)&&fromIndex!==toIndex)reorderPosts(fromIndex,toIndex)})});const approveSelected=document.getElementById('approve-selected');if(approveSelected)approveSelected.onclick=approveSelectedPosts;const regenSelected=document.getElementById('regen-selected');if(regenSelected)regenSelected.onclick=regenSelectedPosts;const deleteSelected=document.getElementById('delete-selected');if(deleteSelected)deleteSelected.onclick=deleteSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
+function render(){const rawRun=state.run||null,context=state.context||{},run=isCurrentRunUsable(rawRun,context)?rawRun:{},m=context.metrics||run.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||${DEFAULT_POST_COUNT}),approvedCount=posts.filter(post=>post.approved).length,batchPreset=(state.batchPresets.find(preset=>preset.id===state.selectedBatchPresetId)||null),batchLabel=batchPreset?.name||'No batch selected',batchMeta=batchPreset?'Used only when scheduling the current slate':'Choose a saved Lensically batch before scheduling';renderGuidance();renderBatchPresets();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Batch Preset',batchPreset?.times?.length?fmt(batchPreset.times.length)+' slots':'0 slots',batchLabel+' · '+batchMeta),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date)+' · '+approvedCount+' approved':'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected · '+approvedCount+' approved</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="approve-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Approve Selected</button><button id="delete-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Delete Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map((post,index)=>'<article class="post '+(state.selected[post.slot]?'selected ':'')+(post.approved?'approved':'')+'" data-index="'+index+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="drag-handle" draggable="'+(!state.active)+'" data-drag-index="'+index+'" title="Drag to reorder">Drag</div><div class="slot-meta"><div class="slot">#'+(index+1)+'</div><div class="count">'+esc(post.slot)+'</div>'+(post.approved?'<div class="count" style="color:var(--gold);font-weight:800">Approved</div>':'')+'</div></div><div class="copy"><p class="text">'+esc(post.text)+'</p></div><div class="review"><div class="feedback-label"><span>Delete feedback</span><div class="feedback-actions"><button class="secondary delete-post" data-index="'+index+'" '+(state.active?'disabled':'')+'>Delete</button></div></div><textarea data-reason="'+post.slot+'" placeholder="Why is this post bad? This will be saved into rejection memory when you delete it.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>').join(''):'<div class="empty">Pull data, enter a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('.delete-post').forEach(btn=>btn.addEventListener('click',()=>deletePost(Number(btn.dataset.index))));document.querySelectorAll('.drag-handle').forEach(handle=>{handle.addEventListener('dragstart',event=>{const index=handle.dataset.dragIndex;if(!index)return;event.dataTransfer?.setData('text/plain',index);event.dataTransfer&&(event.dataTransfer.effectAllowed='move');handle.closest('.post')?.classList.add('dragging')});handle.addEventListener('dragend',()=>{document.querySelectorAll('.post').forEach(card=>card.classList.remove('dragging','drop-target'))})});document.querySelectorAll('.post').forEach(card=>{card.addEventListener('dragover',event=>{event.preventDefault();if(state.active)return;event.dataTransfer&&(event.dataTransfer.dropEffect='move');document.querySelectorAll('.post.drop-target').forEach(node=>node.classList.remove('drop-target'));card.classList.add('drop-target')});card.addEventListener('dragleave',event=>{if(!card.contains(event.relatedTarget))card.classList.remove('drop-target')});card.addEventListener('drop',event=>{event.preventDefault();card.classList.remove('drop-target');const fromIndex=Number(event.dataTransfer?.getData('text/plain'));const toIndex=Number(card.dataset.index);if(Number.isInteger(fromIndex)&&Number.isInteger(toIndex)&&fromIndex!==toIndex)reorderPosts(fromIndex,toIndex)})});const approveSelected=document.getElementById('approve-selected');if(approveSelected)approveSelected.onclick=approveSelectedPosts;const deleteSelected=document.getElementById('delete-selected');if(deleteSelected)deleteSelected.onclick=deleteSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
 async function refresh(){const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;state.guidance=d.guidance||[];state.context=d.latest_context||state.context;state.batchPresets=Array.isArray(d.batch_presets)?d.batch_presets:state.batchPresets;state.selectedBatchPresetId=d.selected_batch_preset_id||state.selectedBatchPresetId;render();if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.context?'View refreshed. Latest pulled data loaded.':state.run?'View refreshed. Latest run loaded.':'Agent ready. No run yet.','ok')}
 async function useBatchPreset(presetId){msg('Using selected Lensically batch in Hermes.');try{const d=await api('/batch-presets/use',{method:'POST',body:JSON.stringify({preset_id:presetId})});state.batchPresets=Array.isArray(d.presets)?d.presets:state.batchPresets;state.selectedBatchPresetId=d.selected_preset_id||presetId;msg('Using '+(d.active_preset?.name||'selected batch')+' for Hermes generation and scheduling.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function clearBatchPreset(){msg('Clearing Hermes batch selection.');try{const d=await api('/batch-presets/clear',{method:'POST',body:'{}'});state.batchPresets=Array.isArray(d.presets)?d.presets:state.batchPresets;state.selectedBatchPresetId=null;msg('Batch selection cleared. Choose a batch before generating.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function pullData(){msg('Pulling fresh Lensically insights and followers without Hermes.');state.active={phase:'syncing_lensically_insights'};render();try{const d=await api('/pull-data',{method:'POST',body:'{}'});state.context=d.context?.summary||state.context;state.run=null;const sync=d.context?.sync||{};msg('Pulled fresh Lensically data. Synced '+(sync.post_archive?.synced_posts||0)+' posts across '+(sync.post_archive?.pages||0)+' pages and refreshed '+(sync.followers?.total_count||0)+' follower snapshots.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function generate(){const postCount=Number(document.getElementById('post-count').value||17);msg('Generating '+postCount+' more posts. Hermes is appending to the current slate; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:JSON.stringify({post_count:postCount})});state.run=d.run;state.context=d.context||state.context;state.selected={};msg('Slate now has '+(d.run?.posts?.length||postCount)+' total posts.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
-async function regen(slot){const reason=(state.reasons[slot]||'').trim();if(!reason){msg('Give the agent a rejection reason first.','error');return}msg('Regenerating '+slot+' and writing rejection memory.');try{const d=await api('/regen',{method:'POST',body:JSON.stringify({slot,reason})});state.run=d.run;state.reasons[slot]='';msg(d.understanding||'Regenerated and saved the rejection understanding.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function regenSelectedPosts(){const slots=selectedSlots();if(slots.length>${MAX_SELECTED_REGEN}){msg('Select at most ${MAX_SELECTED_REGEN} posts per regen. This protects your usage.','error');return}const rejections=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const missing=rejections.filter(item=>!item.reason).map(item=>item.slot);if(missing.length){msg('Add feedback for selected slots: '+missing.join(', '),'error');return}state.active={phase:'regenerating_selected'};render();try{let done=0;for(const item of rejections){msg('Regenerating '+item.slot+' ('+(done+1)+'/'+rejections.length+').');const d=await api('/regen',{method:'POST',body:JSON.stringify(item)});state.run=d.run;state.reasons[item.slot]='';state.selected[item.slot]=false;done+=1;render()}msg('Regenerated '+done+' selected slot'+(done===1?'':'s')+' and wrote memory.','ok')}catch(e){msg(e.message+' Latest successful slots were saved and reloaded.','error');await refresh()}finally{state.active=null;render()}}
 async function reorderPosts(fromIndex,toIndex){msg('Reordering generated posts.');try{const d=await api('/run/posts/reorder',{method:'POST',body:JSON.stringify({from_index:fromIndex,to_index:toIndex})});state.run=d.run;msg('Post order updated.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function deletePost(index){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post){msg('Post not found.','error');return}if(!window.confirm('Delete generated post #'+(index+1)+'?'))return;msg('Deleting generated post #'+(index+1)+'.');try{const d=await api('/run/posts/delete',{method:'POST',body:JSON.stringify({index})});delete state.reasons[post.slot];delete state.selected[post.slot];state.run=d.run;msg('Post deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function deletePost(index){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post){msg('Post not found.','error');return}if(!window.confirm('Delete generated post #'+(index+1)+'?'))return;msg('Deleting generated post #'+(index+1)+'.');try{const d=await api('/run/posts/delete',{method:'POST',body:JSON.stringify({index,reason:(state.reasons[post.slot]||'').trim()})});delete state.reasons[post.slot];delete state.selected[post.slot];state.run=d.run;msg('Post deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function approveSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to approve.','error');return}msg('Approving selected posts.');try{const d=await api('/run/posts/approve',{method:'POST',body:JSON.stringify({slots})});state.run=d.run;state.selected={};msg('Selected posts approved. Future generate runs will keep them and append new posts after the current slate.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function deleteSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to delete.','error');return}if(!window.confirm('Delete '+slots.length+' selected post'+(slots.length===1?'':'s')+'?'))return;msg('Deleting selected posts.');try{const d=await api('/run/posts/delete-selected',{method:'POST',body:JSON.stringify({slots})});slots.forEach(slot=>{delete state.reasons[slot];delete state.selected[slot]});state.selected={};state.run=d.run;msg('Selected posts deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function deleteSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to delete.','error');return}if(!window.confirm('Delete '+slots.length+' selected post'+(slots.length===1?'':'s')+'?'))return;msg('Deleting selected posts.');try{const entries=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const d=await api('/run/posts/delete-selected',{method:'POST',body:JSON.stringify({entries})});slots.forEach(slot=>{delete state.reasons[slot];delete state.selected[slot]});state.selected={};state.run=d.run;msg('Selected posts deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function schedule(){msg('Scheduling the latest generated posts through Lensically.');try{const d=await api('/schedule',{method:'POST',body:'{}'});state.run=d.run;msg('Scheduled the latest generated posts. It did not publish.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function stopAgent(){msg('Stopping active Hermes run.');try{const d=await api('/kill',{method:'POST',body:'{}'});state.active=null;msg(d.killed?'Stopped active Hermes run.':'No active Hermes process found.','ok');await refresh()}catch(e){msg(e.message,'error')}finally{render()}}
 async function loadControlRegistry(){const d=await api('/control');controlState.registry=d.groups||[];const list=document.getElementById('control-list');list.innerHTML=controlState.registry.map(group=>'<div class="control-group">'+esc(group.group)+'</div>'+group.items.map(item=>'<button class="control-item '+(controlState.current?.id===item.id?'active':'')+'" data-control="'+esc(item.id)+'">'+esc(item.title)+(item.editable?'':' · read-only')+'</button>').join('')).join('');document.querySelectorAll('[data-control]').forEach(btn=>btn.onclick=()=>loadControl(btn.dataset.control))}
@@ -1303,21 +1193,13 @@ async function handle(request, response) {
       return send(response, 200, { ok: true, run: await generateRun(body.post_count), context: await loadLatestContextSummary() });
     }
     if (url.pathname === "/pull-data" && request.method === "POST") return send(response, 200, { ok: true, context: await pullFreshContext() });
-    if (url.pathname === "/regen" && request.method === "POST") {
-      const body = await readBody(request);
-      return send(response, 200, { ok: true, ...(await regenSlot({ slot: String(body.slot ?? ""), reason: String(body.reason ?? "") })) });
-    }
-    if (url.pathname === "/regen-selected" && request.method === "POST") {
-      const body = await readBody(request);
-      return send(response, 200, { ok: true, ...(await regenSlots(body.rejections)) });
-    }
     if (url.pathname === "/run/posts/delete" && request.method === "POST") {
       const body = await readBody(request);
-      return send(response, 200, { ok: true, run: await deleteRunPost(body.index) });
+      return send(response, 200, { ok: true, run: await deleteRunPost(body.index, String(body.reason ?? "")) });
     }
     if (url.pathname === "/run/posts/delete-selected" && request.method === "POST") {
       const body = await readBody(request);
-      return send(response, 200, { ok: true, run: await deleteRunPostsBySlots(body.slots) });
+      return send(response, 200, { ok: true, run: await deleteRunPostsBySlots(body.entries) });
     }
     if (url.pathname === "/run/posts/approve" && request.method === "POST") {
       const body = await readBody(request);
