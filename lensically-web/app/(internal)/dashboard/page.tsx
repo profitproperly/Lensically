@@ -105,14 +105,17 @@ function formatShortDate(value: string | null | undefined): string {
     return "Unknown date";
   }
 
-  const parsed = Date.parse(`${value}T00:00:00Z`);
-  if (!Number.isFinite(parsed)) {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
     return value;
   }
+
+  const parsed = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   }).format(new Date(parsed));
 }
 
