@@ -2096,6 +2096,16 @@ async function listBatchSchedulePresetsForUser(
   });
 }
 
+function pickPreferredBatchSchedulePreset(
+  presets: Array<{ id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string }>,
+): { id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string } | null {
+  if (!Array.isArray(presets) || presets.length === 0) {
+    return null;
+  }
+
+  return presets.find((preset) => preset.is_favorite) ?? presets[0] ?? null;
+}
+
 async function listUserTableColumns(env: Env): Promise<string[]> {
   const result = await env.DB.prepare("PRAGMA table_info(users)").all<{ name?: string }>();
   return (result.results ?? [])
@@ -7910,8 +7920,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const desiredSlots = buildHourlySlotTimes(7, 23);
-      const [recentArchive, topArchive, scheduledPosts] = await Promise.all([
+      const [batchPresets, recentArchive, topArchive, scheduledPosts] = await Promise.all([
+        listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID),
         listArchivedThreadsPosts(env, configuredProfile.threads_user_id, "recent", 48, 0),
         listArchivedThreadsPosts(env, configuredProfile.threads_user_id, "top", 48, 0),
         listScheduledPostsForThreadsAccountOnLocalDate(
@@ -7921,6 +7931,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           timeZone,
         ),
       ]);
+      const selectedBatchPreset = pickPreferredBatchSchedulePreset(batchPresets);
+      const desiredSlots = selectedBatchPreset?.times?.length
+        ? selectedBatchPreset.times
+        : buildHourlySlotTimes(7, 23);
 
       const occupiedSlots = new Set(
         scheduledPosts
@@ -7941,6 +7955,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           date: targetDate,
           timezone: timeZone,
           desired_slots: desiredSlots,
+          batch_preset: selectedBatchPreset
+            ? {
+                id: selectedBatchPreset.id,
+                name: selectedBatchPreset.name,
+                times: selectedBatchPreset.times,
+                is_favorite: selectedBatchPreset.is_favorite,
+              }
+            : null,
+          slot_source: selectedBatchPreset ? "lensically_batch_preset" : "default_hourly_fallback",
           occupied_slots: Array.from(occupiedSlots),
           missing_slots: missingSlots,
           scheduled_posts: scheduledPosts,

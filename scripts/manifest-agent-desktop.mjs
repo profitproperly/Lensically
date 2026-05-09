@@ -376,6 +376,8 @@ function summarizeContext(context) {
     target_date: context.target_date ?? null,
     desired_slots: Array.isArray(context.desired_slots) ? context.desired_slots : [],
     missing_slots: Array.isArray(context.missing_slots) ? context.missing_slots : [],
+    batch_preset: context.batch_preset ?? null,
+    slot_source: context.slot_source ?? null,
     metrics: normalizeMetrics({}, context.metrics),
   };
 }
@@ -557,6 +559,8 @@ async function buildFreshContext() {
     target_date: automationContext.date,
     desired_slots: automationContext.desired_slots,
     missing_slots: automationContext.missing_slots,
+    batch_preset: automationContext.batch_preset ?? null,
+    slot_source: automationContext.slot_source ?? null,
     scheduled_posts: automationContext.scheduled_posts,
     metrics: computeMetrics({ dashboard, followers, archiveRecent, archiveTop }),
     follower_archive: followers,
