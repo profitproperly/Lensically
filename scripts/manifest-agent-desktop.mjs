@@ -425,11 +425,15 @@ async function loadLatestRun() {
   try {
     const run = await readJson(path.join(VAULT, "Runs", "latest-run.json"));
     const { strategy_summary, fatigue_summary, ...cleanRun } = run ?? {};
+    const normalizedRun = {
+      ...cleanRun,
+      posts: relabelPosts(cleanRun.posts),
+    };
     try {
       const context = await readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
-      return { ...cleanRun, metrics: normalizeMetrics(context.metrics, cleanRun.metrics) };
+      return { ...normalizedRun, metrics: normalizeMetrics(context.metrics, cleanRun.metrics) };
     } catch {
-      return { ...cleanRun, metrics: normalizeMetrics({}, cleanRun.metrics) };
+      return { ...normalizedRun, metrics: normalizeMetrics({}, cleanRun.metrics) };
     }
   } catch {
     return null;
@@ -560,6 +564,36 @@ async function saveLessons(lessons) {
   });
 }
 
+async function loadApprovalLessons() {
+  try {
+    const data = await readJson(path.join(VAULT, "Lessons", "approval-lessons.json"));
+    return (Array.isArray(data.lessons) ? data.lessons : []).map((lesson) => ({
+      saved_at: String(lesson?.saved_at ?? "").trim(),
+      scheduled_at: String(lesson?.scheduled_at ?? "").trim(),
+      target_date: String(lesson?.target_date ?? "").trim(),
+      slot: String(lesson?.slot ?? "").trim(),
+      source_text: String(lesson?.source_text ?? "").trim(),
+      user_feedback: String(lesson?.user_feedback ?? "").trim(),
+    })).filter((lesson) => lesson.slot && lesson.source_text && lesson.user_feedback);
+  } catch {
+    return [];
+  }
+}
+
+async function saveApprovalLessons(lessons) {
+  await writeJson(path.join(VAULT, "Lessons", "approval-lessons.json"), {
+    updated_at: new Date().toISOString(),
+    lessons: (Array.isArray(lessons) ? lessons : []).map((lesson) => ({
+      saved_at: String(lesson?.saved_at ?? "").trim(),
+      scheduled_at: String(lesson?.scheduled_at ?? "").trim(),
+      target_date: String(lesson?.target_date ?? "").trim(),
+      slot: String(lesson?.slot ?? "").trim(),
+      source_text: String(lesson?.source_text ?? "").trim(),
+      user_feedback: String(lesson?.user_feedback ?? "").trim(),
+    })).filter((lesson) => lesson.slot && lesson.source_text && lesson.user_feedback),
+  });
+}
+
 async function loadGuidance() {
   try {
     const data = await readJson(path.join(VAULT, "Lessons", "agent-guidance.json"));
@@ -638,6 +672,7 @@ async function saveGuidanceDirect(text) {
 const CONTROL_FILES = {
   "memory/guidance": { title: "Guidance Memory", file: path.join(VAULT, "Lessons", "agent-guidance.json"), editable: true, type: "json" },
   "memory/rejection-lessons": { title: "Rejection Lessons", file: path.join(VAULT, "Lessons", "rejection-lessons.json"), editable: true, type: "json" },
+  "memory/approval-lessons": { title: "Approval Lessons", file: path.join(VAULT, "Lessons", "approval-lessons.json"), editable: true, type: "json" },
   "memory/taste-memory": { title: "Taste Memory", file: TASTE_MEMORY_PATH, editable: false, type: "json" },
   "memory/saved-pattern-memory": { title: "Saved Pattern Memory", file: SAVED_PATTERN_MEMORY_PATH, editable: false, type: "json" },
   "runs/latest-run": { title: "Latest Run", file: path.join(VAULT, "Runs", "latest-run.json"), editable: false, type: "json" },
@@ -767,10 +802,11 @@ function relabelPosts(posts) {
     slot: `Post ${index + 1}`,
     text: String(post?.text ?? "").trim(),
     approved: Boolean(post?.approved),
+    approval_lesson: String(post?.approval_lesson ?? "").trim(),
   }));
 }
 
-function buildGeneratePrompt(context, lessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = []) {
+function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = []) {
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
     "Output valid JSON only. No markdown.",
@@ -787,7 +823,7 @@ function buildGeneratePrompt(context, lessons, guidance, tasteMemory, savedPatte
     "Use external saved patterns for idea expansion and structural inspiration only. Do not copy wording, exact opener plus resolution combinations, or exact payoff logic.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Some posts may already exist in the current slate. Do not rewrite them. Generate only the new slots and avoid duplicating or lightly paraphrasing the existing posts.",
-    "Use the full archive, follower archive, metrics, goals, rejection lessons, and top posts. Do the math and strategy in the backend.",
+    "Use the full archive, follower archive, metrics, goals, rejection lessons, approval lessons, and top posts. Do the math and strategy in the backend.",
     "Return JSON: {\"metrics\": object, \"posts\": [{\"slot\":\"Post 1\",\"text\":\"...\"}], \"memory_notes\": [string]}",
     "Existing posts already kept in the slate:",
     JSON.stringify((existingPosts ?? []).map((post) => ({ slot: post.slot, text: post.text, approved: Boolean(post.approved) }))),
@@ -796,10 +832,17 @@ function buildGeneratePrompt(context, lessons, guidance, tasteMemory, savedPatte
     "Saved pattern memory:",
     JSON.stringify(savedPatternMemory ?? {}),
     "Prior rejection lessons:",
-    JSON.stringify(lessons.slice(-40).map((lesson) => ({
+    JSON.stringify(rejectionLessons.slice(-40).map((lesson) => ({
       slot: lesson.slot,
       source_text: lesson.source_text,
       user_feedback: lesson.user_feedback,
+    }))),
+    "Prior approval lessons:",
+    JSON.stringify(approvalLessons.slice(-40).map((lesson) => ({
+      slot: lesson.slot,
+      source_text: lesson.source_text,
+      user_feedback: lesson.user_feedback,
+      target_date: lesson.target_date,
     }))),
     "Persistent user steering guidance:",
     JSON.stringify(guidance.slice(-40).map((entry) => ({
@@ -954,12 +997,13 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
   const generationSlots = buildGenerationSlots(postCount, existingPosts.length);
   const tasteMemory = await writeTasteMemory(context);
   const savedPatternMemory = await loadSavedPatternMemory();
-  const lessons = await loadLessons();
+  const rejectionLessons = await loadLessons();
+  const approvalLessons = await loadApprovalLessons();
   const guidance = await loadGuidance();
   let hermes = { posts: [], metrics: {}, memory_notes: [] };
   if (generationSlots.length) {
     activeRun = { ...activeRun, phase: `hermes_generating_${generationSlots.length}_posts` };
-    hermes = await runHermesJson(buildGeneratePrompt(context, lessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts));
+    hermes = await runHermesJson(buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts));
   } else {
     activeRun = { ...activeRun, phase: "no_new_posts_requested" };
   }
@@ -1005,6 +1049,36 @@ async function saveRejectedPosts(entries) {
     await writeJson(path.join(VAULT, "Rejections", `rejection-${nowStamp()}-${lesson.slot.replace(/[^a-z0-9]+/gi, "-")}.json`), {
       ...lesson,
       deleted: true,
+    });
+  }
+  return lessonEntries;
+}
+
+async function saveScheduledApprovalLessons(entries, metadata = {}) {
+  const normalizedEntries = (Array.isArray(entries) ? entries : []).map((entry) => ({
+    slot: String(entry?.slot ?? "").trim(),
+    source_text: String(entry?.source_text ?? "").trim(),
+    user_feedback: String(entry?.user_feedback ?? "").trim(),
+  })).filter((entry) => entry.slot && entry.source_text && entry.user_feedback);
+  if (!normalizedEntries.length) return [];
+  const lessons = await loadApprovalLessons();
+  const savedAt = new Date().toISOString();
+  const scheduledAt = String(metadata?.scheduled_at ?? savedAt).trim();
+  const targetDate = String(metadata?.target_date ?? "").trim();
+  const lessonEntries = normalizedEntries.map((entry) => ({
+    saved_at: savedAt,
+    scheduled_at: scheduledAt,
+    target_date: targetDate,
+    slot: entry.slot,
+    source_text: entry.source_text,
+    user_feedback: entry.user_feedback,
+  }));
+  const existing = Array.isArray(lessons) ? lessons : [];
+  await saveApprovalLessons([...existing, ...lessonEntries].slice(-300));
+  for (const lesson of lessonEntries) {
+    await writeJson(path.join(VAULT, "Approvals", `approval-${nowStamp()}-${lesson.slot.replace(/[^a-z0-9]+/gi, "-")}.json`), {
+      ...lesson,
+      scheduled: true,
     });
   }
   return lessonEntries;
@@ -1063,6 +1137,22 @@ async function updateRunPostText(index, text) {
   latestRun.posts[numericIndex] = {
     ...latestRun.posts[numericIndex],
     text: nextText,
+  };
+  await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
+  return latestRun;
+}
+
+async function updateRunPostApprovalLesson(index, approvalLesson) {
+  const latestRun = await loadLatestRun();
+  if (!latestRun?.posts?.length) throw new Error("No generated run is available.");
+  latestRun.posts = relabelPosts(latestRun.posts);
+  const numericIndex = Math.trunc(Number(index));
+  if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= latestRun.posts.length) {
+    throw new Error("Post index is out of range.");
+  }
+  latestRun.posts[numericIndex] = {
+    ...latestRun.posts[numericIndex],
+    approval_lesson: String(approvalLesson ?? "").trim(),
   };
   await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
   return latestRun;
@@ -1130,6 +1220,7 @@ async function scheduleLatestRun(targetDate = null) {
   const scheduleDate = String(targetDate ?? latestRun.target_date ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) throw new Error("Choose a valid target date before scheduling.");
   const payloadPath = path.join(VAULT, "Runs", "latest-schedule-plan.json");
+  const scheduledAt = new Date().toISOString();
   await writeJson(payloadPath, {
     account_id: ACCOUNT_ID,
     date: scheduleDate,
@@ -1148,11 +1239,19 @@ async function scheduleLatestRun(targetDate = null) {
       else resolve(extractJson(stdout));
     });
   });
+  await saveScheduledApprovalLessons(
+    latestRun.posts.map((post) => ({
+      slot: post.slot,
+      source_text: post.text,
+      user_feedback: post.approval_lesson,
+    })),
+    { scheduled_at: scheduledAt, target_date: scheduleDate },
+  );
   latestRun.schedule_result = output;
   latestRun.scheduled_batch_preset = batchPresetState.active_preset ?? null;
   latestRun.scheduled_target_date = scheduleDate;
   latestRun.status = "scheduled";
-  latestRun.scheduled_at = new Date().toISOString();
+  latestRun.scheduled_at = scheduledAt;
   await writeJson(path.join(VAULT, "Runs", `scheduled-${nowStamp()}.json`), latestRun);
   const clearedRun = {
     ...latestRun,
@@ -1186,6 +1285,15 @@ async function scheduleSingleRunPost(slot, date, time) {
       timezone: TIMEZONE,
     }),
   });
+  const scheduledAt = new Date().toISOString();
+  await saveScheduledApprovalLessons([{
+    slot: post.slot,
+    source_text: post.text,
+    user_feedback: post.approval_lesson,
+  }], {
+    scheduled_at: scheduledAt,
+    target_date: scheduleDate,
+  });
   latestRun.posts = relabelPosts(latestRun.posts.filter((entry) => String(entry?.slot ?? "") !== normalizedSlot));
   latestRun.requested_post_count = latestRun.posts.length;
   latestRun.last_custom_schedule = {
@@ -1193,7 +1301,7 @@ async function scheduleSingleRunPost(slot, date, time) {
     date: scheduleDate,
     time: scheduleTime,
     scheduled_post: result?.scheduled_post ?? null,
-    scheduled_at: new Date().toISOString(),
+    scheduled_at: scheduledAt,
   };
   await writeJson(path.join(VAULT, "Runs", "latest-run.json"), latestRun);
   return { run: latestRun, scheduled_post: result?.scheduled_post ?? null };
@@ -1259,7 +1367,7 @@ function html(initialState = {}) {
 :root{--ink:#08111f;--muted:#5d6f89;--line:#d9e1ec;--paper:#f6f3ea;--card:#fffdf8;--accent:#0b1220;--soft:#eef3ef;--good:#0f766e;--bad:#b42318;--gold:#b87503}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 8%,#fff7df 0 18%,transparent 34%),linear-gradient(135deg,#f9f6ed,#edf5f1 52%,#f4eadc);color:var(--ink);font-family:Georgia,Cambria,serif}main{width:min(1480px,calc(100vw - 32px));margin:0 auto;padding:24px 0 42px}header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding:24px;border:1px solid var(--line);background:rgba(255,253,248,.92);border-radius:20px;box-shadow:0 22px 70px rgba(15,23,42,.1)}h1{margin:0;font-size:34px;letter-spacing:-.04em}.sub{margin:8px 0 0;color:var(--muted);line-height:1.45;max-width:860px;font-family:Segoe UI,ui-sans-serif,sans-serif}.actions,.review-actions,.guidance-actions,.control-actions,.feedback-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:999px;padding:12px 17px;font-weight:800;font-size:14px;cursor:pointer;font-family:Segoe UI,ui-sans-serif,sans-serif}button.secondary{background:#fff;color:var(--ink);border-color:var(--line)}button.danger{background:#fff4f2;color:var(--bad);border-color:#f1b8b2}button.danger:not(:disabled){box-shadow:0 0 0 3px rgba(180,35,24,.08)}button:disabled{opacity:.48;cursor:not-allowed}.banner{margin-top:14px;border-radius:14px;padding:13px 16px;border:1px solid var(--line);background:rgba(255,253,248,.9);color:var(--muted);font-family:Segoe UI,ui-sans-serif,sans-serif}.banner.error{border-color:#f1b8b2;color:var(--bad);background:#fff4f2}.banner.ok{border-color:#9fd8cf;color:var(--good);background:#eefbf8}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}.metric{border:1px solid var(--line);background:rgba(255,253,248,.9);border-radius:16px;padding:15px}.metric p{margin:0;color:#60718b;font-size:10px;text-transform:uppercase;letter-spacing:.16em;font-weight:900;font-family:Segoe UI,ui-sans-serif,sans-serif}.metric strong{display:block;margin-top:8px;font-size:27px;letter-spacing:-.04em}.metric span{display:block;margin-top:7px;color:var(--muted);font-size:13px;line-height:1.4;font-family:Segoe UI,ui-sans-serif,sans-serif}.guidance,.control{margin-top:16px;border:1px solid var(--line);background:rgba(255,253,248,.9);border-radius:16px;padding:18px}.guidance h2,.control h2,.posts h2{margin:0 0 10px;font-size:17px;letter-spacing:-.03em}.guidance-grid{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:14px}.guidance-list{max-height:155px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(255,255,255,.55);font:13px/1.45 Segoe UI,ui-sans-serif,sans-serif;color:#334155}.guidance-item{padding:8px 0;border-bottom:1px solid #e8edf4}.guidance-item:last-child{border-bottom:0}.control-grid{display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;margin-top:12px}.control-list{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(255,255,255,.55);font:13px/1.4 Segoe UI,ui-sans-serif,sans-serif}.control-group{margin:8px 0 10px;color:#526985;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.control-item{display:block;width:100%;text-align:left;margin:5px 0;border-color:#dfe6ef;background:#fff;color:#0b2445;border-radius:12px;padding:9px 11px}.control-item.active{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,117,3,.12)}#control-editor{min-height:420px;font-family:Consolas,ui-monospace,monospace;font-size:12px;white-space:pre}.control-meta{font:13px/1.4 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted);margin:0 0 8px}.posts{margin-top:16px;border:1px solid var(--line);background:rgba(255,253,248,.65);border-radius:20px;overflow:hidden}.posts-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:18px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);background:rgba(255,253,248,.96);backdrop-filter:blur(8px)}.review-actions,.guidance-actions,.control-actions,.feedback-actions{align-items:center}.count{color:var(--muted);font-size:13px;font-family:Segoe UI,ui-sans-serif,sans-serif}.post{display:grid;grid-template-columns:42px 108px minmax(0,1fr) 380px;gap:18px;padding:20px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.5)}.post:last-child{border-bottom:0}.post.selected{background:linear-gradient(90deg,rgba(184,117,3,.1),rgba(255,255,255,.72))}.post.approved{box-shadow:inset 4px 0 0 var(--gold)}.post.drop-target{box-shadow:inset 0 0 0 2px rgba(184,117,3,.55);background:linear-gradient(90deg,rgba(184,117,3,.08),rgba(255,255,255,.8))}.post.dragging{opacity:.55}.pick{display:flex;align-items:flex-start;justify-content:center;padding-top:6px}.pick input{width:20px;height:20px;accent-color:var(--accent)}.slotbox{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.slot{font-weight:900;font-size:22px;letter-spacing:-.04em}.slot-meta{display:flex;flex-direction:column;gap:4px}.drag-handle{display:inline-flex;align-items:center;gap:8px;border:1px dashed #cbd5e1;border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.7);color:#40556f;font:12px/1 Segoe UI,ui-sans-serif,sans-serif;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:grab;user-select:none}.drag-handle:active{cursor:grabbing}.drag-handle::before{content:'⋮⋮';font-size:14px;letter-spacing:-1px}.text{font-size:23px;line-height:1.38;margin:0;letter-spacing:-.03em}.copy{padding-top:6px}textarea{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:12px;font:14px/1.45 Segoe UI,ui-sans-serif,sans-serif;background:#fff}.feedback-label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;color:#526985;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;font-family:Segoe UI,ui-sans-serif,sans-serif}.feedback-actions{justify-content:flex-start}.empty{padding:38px 18px;color:var(--muted);font-family:Segoe UI,ui-sans-serif,sans-serif}@media(max-width:1100px){header,.guidance-grid,.control-grid{display:block}.actions{justify-content:flex-start;margin-top:16px}.metrics{grid-template-columns:1fr 1fr}.post{grid-template-columns:38px 96px 1fr}.review{grid-column:1/-1}.posts-head{display:block}.review-actions{justify-content:flex-start;margin-top:10px}.guidance-list,.control-list{margin-top:12px}}@media(max-width:720px){main{width:min(100vw - 18px,720px)}.metrics{grid-template-columns:1fr}.post{grid-template-columns:34px 1fr}.slotbox{grid-column:2}.copy{grid-column:2}.review{grid-column:2}.feedback-label{align-items:flex-start;flex-direction:column}.feedback-actions{width:100%}}
 </style></head><body><main><header><div><h1>Manifest Mental Agent</h1><p class="sub">Pull Data manually syncs Lensically insights and followers, then Hermes generates from that fresh Lensically state for up to 24 hours.</p></div><div class="actions"><label style="display:flex;align-items:center;gap:8px;font:13px/1.2 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted)">Posts <input id="post-count" type="number" min="1" max="${MAX_POST_COUNT}" value="${DEFAULT_POST_COUNT}" style="width:96px;border:1px solid var(--line);border-radius:999px;padding:9px 12px;background:#fff;color:var(--ink);font:14px/1 Segoe UI,ui-sans-serif,sans-serif"></label><button id="pull-data" class="secondary">Pull Data</button><button id="generate">Generate Posts</button><button id="stop" class="danger" disabled>Stop Agent</button><button id="schedule" class="secondary">Schedule Latest</button></div></header><div id="message" class="banner">Starting local agent surface...</div><section id="metrics" class="metrics"></section><section class="control"><h2>Batch Schedule</h2><p class="control-meta">Pick the saved Lensically batch Hermes should use only when you schedule the current slate.</p><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px"><label style="display:flex;flex-direction:column;gap:6px;font:13px/1.2 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted)"><span>Target Date</span><input id="batch-target-date" type="date" value="${initialBatchDate}" min="${minCustomDate}" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:var(--ink);font:14px/1 Segoe UI,ui-sans-serif,sans-serif"></label><span class="count">Hermes context and batch scheduling both use this day.</span></div><div id="batch-presets" class="control-list">Loading saved batches...</div></section><section class="control"><h2>Custom Schedule</h2><p class="control-meta">Select exactly one generated post, then schedule it directly with a custom date and time.</p><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap"><label style="display:flex;flex-direction:column;gap:6px;font:13px/1.2 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted)"><span>Date</span><input id="custom-schedule-date" type="date" min="${minCustomDate}" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:var(--ink);font:14px/1 Segoe UI,ui-sans-serif,sans-serif"></label><label style="display:flex;flex-direction:column;gap:6px;font:13px/1.2 Segoe UI,ui-sans-serif,sans-serif;color:var(--muted)"><span>Time</span><input id="custom-schedule-time" type="time" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:var(--ink);font:14px/1 Segoe UI,ui-sans-serif,sans-serif"></label><button id="schedule-custom" class="secondary">Schedule Selected</button></div></section><section class="guidance"><h2>Steer The Agent</h2><div class="guidance-grid"><div><textarea id="guidance-input" placeholder="Tell the agent what to learn. Example: stop using cleanly/clearly, avoid vague emotional abstractions, prefer concrete scenes with a sharper payoff."></textarea><div class="guidance-actions"><button id="save-guidance" class="secondary">Talk To Agent + Save</button><button id="store-guidance" class="secondary">Store Only</button></div><p id="agent-reply" class="banner">Use Talk To Agent when you want Hermes to interpret the steering. Use Store Only when you just want the note saved as memory.</p></div><div class="guidance-list" id="guidance-list">No steering guidance saved yet.</div></div></section><section class="control"><h2>Agent Control</h2><button id="toggle-control" class="secondary">Open Control Panel</button><div id="control-panel" style="display:none"><p class="control-meta">Inspect and edit memory, prompts, context, and runs. Latest prompts, context, and runs are read-only evidence.</p><div class="control-grid"><div id="control-list" class="control-list">Loading controls...</div><div><p id="control-meta" class="control-meta">Select an artifact.</p><textarea id="control-editor" spellcheck="false"></textarea><div class="control-actions"><button id="save-control" class="secondary" disabled>Save Artifact</button><button id="reload-control" class="secondary" disabled>Reload</button></div></div></div></div></section><section class="posts"><div class="posts-head"><h2>Generated Posts</h2><span id="slate-status">0</span></div><div id="posts"><div class="empty">Pull data, enter a post count, then generate.</div></div></section></main>
 <script>
-const initialData=${boot};const state={run:initialData.latest_run||null,active:initialData.active_run||null,reasons:{},selected:{},edits:{},guidance:Array.isArray(initialData.guidance)?initialData.guidance:[],context:initialData.latest_context||null,batchPresets:Array.isArray(initialData.batch_presets)?initialData.batch_presets:[],selectedBatchPresetId:initialData.selected_batch_preset_id||null,guidanceBusy:false,loading:true};const fmt=n=>new Intl.NumberFormat('en-US').format(Math.round(Number(n||0)));const pct=n=>(Number(n||0)).toFixed(4)+'%';
+const initialData=${boot};const state={run:initialData.latest_run||null,active:initialData.active_run||null,reasons:{},approvalLessons:{},selected:{},edits:{},guidance:Array.isArray(initialData.guidance)?initialData.guidance:[],context:initialData.latest_context||null,batchPresets:Array.isArray(initialData.batch_presets)?initialData.batch_presets:[],selectedBatchPresetId:initialData.selected_batch_preset_id||null,guidanceBusy:false,loading:true};const fmt=n=>new Intl.NumberFormat('en-US').format(Math.round(Number(n||0)));const pct=n=>(Number(n||0)).toFixed(4)+'%';
 let controlState={registry:[],current:null};
 let guidanceVersion=0;
 function msg(t,type=''){const e=document.getElementById('message');e.textContent=t;e.className='banner '+type}
@@ -1274,8 +1382,9 @@ function selectedSlots(){return Object.keys(state.selected).filter(slot=>state.s
 function getBatchTargetDate(){return String(document.getElementById('batch-target-date')?.value||'').trim()}
 function getCustomScheduleDate(){return String(document.getElementById('custom-schedule-date')?.value||'').trim()}
 function getCustomScheduleTime(){return String(document.getElementById('custom-schedule-time')?.value||'').trim()}
-function render(){const rawRun=state.run||null,context=state.context||{},run=isCurrentRunUsable(rawRun,context)?rawRun:{},m=context.metrics||run.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||${DEFAULT_POST_COUNT}),approvedCount=posts.filter(post=>post.approved).length,batchPreset=(state.batchPresets.find(preset=>preset.id===state.selectedBatchPresetId)||null),batchLabel=batchPreset?.name||'No batch selected',batchMeta=batchPreset?'Used only when scheduling the current slate':'Choose a saved Lensically batch before scheduling';renderGuidance();renderBatchPresets();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Batch Preset',batchPreset?.times?.length?fmt(batchPreset.times.length)+' slots':'0 slots',batchLabel+' · '+batchMeta),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date)+' · '+approvedCount+' approved':'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected · '+approvedCount+' approved</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="approve-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Approve Selected</button><button id="unapprove-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Unapprove Selected</button><button id="delete-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Delete Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map((post,index)=>{const draft=Object.prototype.hasOwnProperty.call(state.edits,post.slot)?state.edits[post.slot]:post.text;return '<article class="post '+(state.selected[post.slot]?'selected ':'')+(post.approved?'approved':'')+'" data-index="'+index+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="drag-handle" draggable="'+(!state.active)+'" data-drag-index="'+index+'" title="Drag to reorder">Drag</div><div class="slot-meta"><div class="slot">#'+(index+1)+'</div><div class="count">'+esc(post.slot)+'</div>'+(post.approved?'<div class="count" style="color:var(--gold);font-weight:800">Approved</div>':'<div class="count">Not approved</div>')+'</div></div><div class="copy"><textarea data-edit="'+post.slot+'" data-index="'+index+'" placeholder="Edit post text here.">'+esc(draft)+'</textarea><div class="feedback-actions" style="margin-top:10px"><button class="secondary toggle-approval" data-slot="'+esc(post.slot)+'" data-approved="'+(post.approved?'1':'0')+'" '+(state.active?'disabled':'')+'>'+(post.approved?'Unapprove':'Approve')+'</button></div></div><div class="review"><div class="feedback-label"><span>Delete feedback</span><div class="feedback-actions"><button class="secondary delete-post" data-index="'+index+'" '+(state.active?'disabled':'')+'>Delete</button></div></div><textarea data-reason="'+post.slot+'" placeholder="Why is this post bad? This will be saved into rejection memory when you delete it.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>'}).join(''):'<div class="empty">Pull data, enter a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('textarea[data-edit]').forEach(el=>{el.addEventListener('input',e=>{state.edits[e.target.dataset.edit]=e.target.value});el.addEventListener('blur',e=>savePostEdit(Number(e.target.dataset.index),true))});document.querySelectorAll('.toggle-approval').forEach(btn=>btn.addEventListener('click',()=>toggleApproval(btn.dataset.slot,btn.dataset.approved==='1')));document.querySelectorAll('.delete-post').forEach(btn=>btn.addEventListener('click',()=>deletePost(Number(btn.dataset.index))));document.querySelectorAll('.drag-handle').forEach(handle=>{handle.addEventListener('dragstart',event=>{const index=handle.dataset.dragIndex;if(!index)return;event.dataTransfer?.setData('text/plain',index);event.dataTransfer&&(event.dataTransfer.effectAllowed='move');handle.closest('.post')?.classList.add('dragging')});handle.addEventListener('dragend',()=>{document.querySelectorAll('.post').forEach(card=>card.classList.remove('dragging','drop-target'))})});document.querySelectorAll('.post').forEach(card=>{card.addEventListener('dragover',event=>{event.preventDefault();if(state.active)return;event.dataTransfer&&(event.dataTransfer.dropEffect='move');document.querySelectorAll('.post.drop-target').forEach(node=>node.classList.remove('drop-target'));card.classList.add('drop-target')});card.addEventListener('dragleave',event=>{if(!card.contains(event.relatedTarget))card.classList.remove('drop-target')});card.addEventListener('drop',event=>{event.preventDefault();card.classList.remove('drop-target');const fromIndex=Number(event.dataTransfer?.getData('text/plain'));const toIndex=Number(card.dataset.index);if(Number.isInteger(fromIndex)&&Number.isInteger(toIndex)&&fromIndex!==toIndex)reorderPosts(fromIndex,toIndex)})});const approveSelected=document.getElementById('approve-selected');if(approveSelected)approveSelected.onclick=approveSelectedPosts;const unapproveSelected=document.getElementById('unapprove-selected');if(unapproveSelected)unapproveSelected.onclick=unapproveSelectedPosts;const deleteSelected=document.getElementById('delete-selected');if(deleteSelected)deleteSelected.onclick=deleteSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
+function render(){const rawRun=state.run||null,context=state.context||{},run=isCurrentRunUsable(rawRun,context)?rawRun:{},m=context.metrics||run.metrics||{},posts=run.posts||[],selected=selectedSlots(),requested=run.requested_post_count||posts.length||Number(document.getElementById('post-count')?.value||${DEFAULT_POST_COUNT}),approvedCount=posts.filter(post=>post.approved).length,batchPreset=(state.batchPresets.find(preset=>preset.id===state.selectedBatchPresetId)||null),batchLabel=batchPreset?.name||'No batch selected',batchMeta=batchPreset?'Used only when scheduling the current slate':'Choose a saved Lensically batch before scheduling';renderGuidance();renderBatchPresets();document.getElementById('metrics').innerHTML=[metric('Current Followers',fmt(m.current_followers),fmt(m.followers_to_1m)+' away from 1M'),metric('Progress To 1M',pct(m.progress_to_1m_percent),'North-star target'),metric('2x Top Likes',fmt(m.goals?.top_post_likes_2x),'Top likes: '+fmt(m.top_post?.likes)),metric('2x Avg Views',fmt(m.goals?.average_views_2x),'Avg views: '+fmt(m.baselines?.average_views)),metric('2x Avg Likes',fmt(m.goals?.average_likes_2x),'Avg likes: '+fmt(m.baselines?.average_likes)),metric('Archive Seen',fmt(m.baselines?.archive_total_seen),fmt(m.baselines?.recent_sample_size)+' recent sample'),metric('Follower Snapshots',fmt(m.baselines?.follower_snapshots_seen),'Fresh on Pull Data'),metric('Batch Preset',batchPreset?.times?.length?fmt(batchPreset.times.length)+' slots':'0 slots',batchLabel+' · '+batchMeta),metric('Slate',posts.length+'/'+requested,(run.target_date||context.target_date)?'Target '+(run.target_date||context.target_date)+' · '+approvedCount+' approved':'No target')].join('');document.getElementById('pull-data').disabled=Boolean(state.active);document.getElementById('schedule').disabled=!posts.length||Boolean(state.active);document.getElementById('generate').disabled=Boolean(state.active);document.getElementById('post-count').disabled=Boolean(state.active);document.getElementById('stop').disabled=!Boolean(state.active);document.getElementById('slate-status').innerHTML=posts.length?'<span class="count">'+selected.length+' selected · '+approvedCount+' approved</span><div class="review-actions"><button id="select-all" class="secondary">Select All</button><button id="approve-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Approve Selected</button><button id="unapprove-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Unapprove Selected</button><button id="delete-selected" class="secondary" '+(!selected.length||state.active?'disabled':'')+'>Delete Selected</button><button id="clear-selected" class="secondary" '+(!selected.length?'disabled':'')+'>Clear</button><span class="count">'+posts.length+'/'+requested+'</span></div>':'0';document.getElementById('posts').innerHTML=posts.length?posts.map((post,index)=>{const draft=Object.prototype.hasOwnProperty.call(state.edits,post.slot)?state.edits[post.slot]:post.text;const approvalLesson=Object.prototype.hasOwnProperty.call(state.approvalLessons,post.slot)?state.approvalLessons[post.slot]:String(post.approval_lesson||'');return '<article class="post '+(state.selected[post.slot]?'selected ':'')+(post.approved?'approved':'')+'" data-index="'+index+'"><label class="pick"><input type="checkbox" data-select="'+post.slot+'" '+(state.selected[post.slot]?'checked':'')+'></label><div class="slotbox"><div class="drag-handle" draggable="'+(!state.active)+'" data-drag-index="'+index+'" title="Drag to reorder">Drag</div><div class="slot-meta"><div class="slot">#'+(index+1)+'</div><div class="count">'+esc(post.slot)+'</div>'+(post.approved?'<div class="count" style="color:var(--gold);font-weight:800">Approved</div>':'<div class="count">Not approved</div>')+'</div></div><div class="copy"><textarea data-edit="'+post.slot+'" data-index="'+index+'" placeholder="Edit post text here.">'+esc(draft)+'</textarea><div class="feedback-actions" style="margin-top:10px"><button class="secondary toggle-approval" data-slot="'+esc(post.slot)+'" data-approved="'+(post.approved?'1':'0')+'" '+(state.active?'disabled':'')+'>'+(post.approved?'Unapprove':'Approve')+'</button></div></div><div class="review"><div class="feedback-label"><span>Approval lesson</span><div class="feedback-actions"><span class="count">Saved only when scheduled</span></div></div><textarea data-approval-lesson="'+post.slot+'" data-index="'+index+'" placeholder="Why is this post good? This will be saved into approval lessons only if this post gets scheduled.">'+esc(approvalLesson)+'</textarea><div class="feedback-label" style="margin-top:14px"><span>Delete feedback</span><div class="feedback-actions"><button class="secondary delete-post" data-index="'+index+'" '+(state.active?'disabled':'')+'>Delete</button></div></div><textarea data-reason="'+post.slot+'" placeholder="Why is this post bad? This will be saved into rejection memory when you delete it.">'+esc(state.reasons[post.slot]||'')+'</textarea></div></article>'}).join(''):'<div class="empty">Pull data, enter a post count, then generate.</div>';document.querySelectorAll('input[data-select]').forEach(el=>el.addEventListener('change',e=>{state.selected[e.target.dataset.select]=e.target.checked;render()}));document.querySelectorAll('textarea[data-reason]').forEach(el=>el.addEventListener('input',e=>{state.reasons[e.target.dataset.reason]=e.target.value}));document.querySelectorAll('textarea[data-edit]').forEach(el=>{el.addEventListener('input',e=>{state.edits[e.target.dataset.edit]=e.target.value});el.addEventListener('blur',e=>savePostEdit(Number(e.target.dataset.index),true))});document.querySelectorAll('textarea[data-approval-lesson]').forEach(el=>{el.addEventListener('input',e=>{state.approvalLessons[e.target.dataset.approvalLesson]=e.target.value});el.addEventListener('blur',e=>saveApprovalLesson(Number(e.target.dataset.index),true))});document.querySelectorAll('.toggle-approval').forEach(btn=>btn.addEventListener('click',()=>toggleApproval(btn.dataset.slot,btn.dataset.approved==='1')));document.querySelectorAll('.delete-post').forEach(btn=>btn.addEventListener('click',()=>deletePost(Number(btn.dataset.index))));document.querySelectorAll('.drag-handle').forEach(handle=>{handle.addEventListener('dragstart',event=>{const index=handle.dataset.dragIndex;if(!index)return;event.dataTransfer?.setData('text/plain',index);event.dataTransfer&&(event.dataTransfer.effectAllowed='move');handle.closest('.post')?.classList.add('dragging')});handle.addEventListener('dragend',()=>{document.querySelectorAll('.post').forEach(card=>card.classList.remove('dragging','drop-target'))})});document.querySelectorAll('.post').forEach(card=>{card.addEventListener('dragover',event=>{event.preventDefault();if(state.active)return;event.dataTransfer&&(event.dataTransfer.dropEffect='move');document.querySelectorAll('.post.drop-target').forEach(node=>node.classList.remove('drop-target'));card.classList.add('drop-target')});card.addEventListener('dragleave',event=>{if(!card.contains(event.relatedTarget))card.classList.remove('drop-target')});card.addEventListener('drop',event=>{event.preventDefault();card.classList.remove('drop-target');const fromIndex=Number(event.dataTransfer?.getData('text/plain'));const toIndex=Number(card.dataset.index);if(Number.isInteger(fromIndex)&&Number.isInteger(toIndex)&&fromIndex!==toIndex)reorderPosts(fromIndex,toIndex)})});const approveSelected=document.getElementById('approve-selected');if(approveSelected)approveSelected.onclick=approveSelectedPosts;const unapproveSelected=document.getElementById('unapprove-selected');if(unapproveSelected)unapproveSelected.onclick=unapproveSelectedPosts;const deleteSelected=document.getElementById('delete-selected');if(deleteSelected)deleteSelected.onclick=deleteSelectedPosts;const selectAll=document.getElementById('select-all');if(selectAll)selectAll.onclick=()=>{posts.forEach(post=>{state.selected[post.slot]=true});render()};const clear=document.getElementById('clear-selected');if(clear)clear.onclick=()=>{state.selected={};render()}}
 async function savePostEdit(index,silent=false){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post)return;const text=String(Object.prototype.hasOwnProperty.call(state.edits,post.slot)?state.edits[post.slot]:post.text).trim();if(!text||text===post.text)return;if(!silent)msg('Saving post text.');try{const d=await api('/run/posts/edit',{method:'POST',body:JSON.stringify({index,text})});delete state.edits[post.slot];state.run=d.run;if(!silent)msg('Post text updated.','ok')}catch(e){msg(e.message,'error')}finally{if(!silent)render()}}
+async function saveApprovalLesson(index,silent=false){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post)return;const approvalLesson=String(Object.prototype.hasOwnProperty.call(state.approvalLessons,post.slot)?state.approvalLessons[post.slot]:post.approval_lesson||'').trim();if(approvalLesson===String(post.approval_lesson||'').trim())return;if(!silent)msg('Saving approval lesson.');try{const d=await api('/run/posts/approval-lesson',{method:'POST',body:JSON.stringify({index,approval_lesson:approvalLesson})});delete state.approvalLessons[post.slot];state.run=d.run;if(!silent)msg('Approval lesson updated.','ok')}catch(e){msg(e.message,'error')}finally{if(!silent)render()}}
 async function unapproveSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to unapprove.','error');return}msg('Removing approval from selected posts.');try{const d=await api('/run/posts/unapprove',{method:'POST',body:JSON.stringify({slots})});state.run=d.run;state.selected={};msg('Selected posts unapproved.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function toggleApproval(slot,isApproved){msg((isApproved?'Removing approval from ':'Approving ')+slot+'.');try{const d=await api(isApproved?'/run/posts/unapprove':'/run/posts/approve',{method:'POST',body:JSON.stringify({slots:[slot]})});state.run=d.run;delete state.selected[slot];msg('Post approval updated.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function refresh(){const currentGuidanceVersion=guidanceVersion;try{const d=await api('/status');state.active=d.active_run;state.run=d.latest_run;if(currentGuidanceVersion===guidanceVersion)state.guidance=d.guidance||[];state.context=d.latest_context||state.context;state.batchPresets=Array.isArray(d.batch_presets)?d.batch_presets:state.batchPresets;state.selectedBatchPresetId=d.selected_batch_preset_id||state.selectedBatchPresetId;if(state.active)msg('Agent phase: '+state.active.phase);else msg(state.context?'View refreshed. Latest pulled data loaded.':state.run?'View refreshed. Latest run loaded.':'Agent ready. No run yet.','ok')}finally{state.loading=false;render()}}
@@ -1284,9 +1393,9 @@ async function clearBatchPreset(){msg('Clearing Hermes batch selection.');try{co
 async function pullData(){const targetDate=getBatchTargetDate();if(!targetDate){msg('Choose a target date before pulling data.','error');return}msg('Pulling fresh Lensically insights and followers without Hermes.');state.active={phase:'syncing_lensically_insights'};render();try{const d=await api('/pull-data',{method:'POST',body:JSON.stringify({target_date:targetDate})});state.context=d.context?.summary||state.context;state.guidance=Array.isArray(d.context?.guidance)?d.context.guidance:state.guidance;state.batchPresets=Array.isArray(d.context?.batch_presets)?d.context.batch_presets:state.batchPresets;state.selectedBatchPresetId=d.context?.selected_batch_preset_id??state.selectedBatchPresetId;const sync=d.context?.sync||{};msg('Pulled fresh Lensically data for '+targetDate+'. Synced '+(sync.post_archive?.synced_posts||0)+' posts across '+(sync.post_archive?.pages||0)+' pages and refreshed '+(sync.followers?.total_count||0)+' follower snapshots.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function generate(){const postCount=Number(document.getElementById('post-count').value||17);const targetDate=getBatchTargetDate();if(!targetDate){msg('Choose a target date before generating.','error');return}msg('Generating '+postCount+' more posts for '+targetDate+'. Hermes is appending to the current slate; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:JSON.stringify({post_count:postCount,target_date:targetDate})});state.run=d.run;state.context=d.context||state.context;state.selected={};msg('Slate now has '+(d.run?.posts?.length||postCount)+' total posts for '+targetDate+'.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function reorderPosts(fromIndex,toIndex){msg('Reordering generated posts.');try{const d=await api('/run/posts/reorder',{method:'POST',body:JSON.stringify({from_index:fromIndex,to_index:toIndex})});state.run=d.run;msg('Post order updated.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function deletePost(index){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post){msg('Post not found.','error');return}if(!window.confirm('Delete generated post #'+(index+1)+'?'))return;msg('Deleting generated post #'+(index+1)+'.');try{const d=await api('/run/posts/delete',{method:'POST',body:JSON.stringify({index,reason:(state.reasons[post.slot]||'').trim()})});delete state.reasons[post.slot];delete state.selected[post.slot];state.run=d.run;msg('Post deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function deletePost(index){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post){msg('Post not found.','error');return}if(!window.confirm('Delete generated post #'+(index+1)+'?'))return;msg('Deleting generated post #'+(index+1)+'.');try{const d=await api('/run/posts/delete',{method:'POST',body:JSON.stringify({index,reason:(state.reasons[post.slot]||'').trim()})});delete state.reasons[post.slot];delete state.approvalLessons[post.slot];delete state.selected[post.slot];state.run=d.run;msg('Post deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function approveSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to approve.','error');return}msg('Approving selected posts.');try{const d=await api('/run/posts/approve',{method:'POST',body:JSON.stringify({slots})});state.run=d.run;state.selected={};msg('Selected posts approved. Future generate runs will keep them and append new posts after the current slate.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function deleteSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to delete.','error');return}if(!window.confirm('Delete '+slots.length+' selected post'+(slots.length===1?'':'s')+'?'))return;msg('Deleting selected posts.');try{const entries=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const d=await api('/run/posts/delete-selected',{method:'POST',body:JSON.stringify({entries})});slots.forEach(slot=>{delete state.reasons[slot];delete state.selected[slot]});state.selected={};state.run=d.run;msg('Selected posts deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function deleteSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to delete.','error');return}if(!window.confirm('Delete '+slots.length+' selected post'+(slots.length===1?'':'s')+'?'))return;msg('Deleting selected posts.');try{const entries=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const d=await api('/run/posts/delete-selected',{method:'POST',body:JSON.stringify({entries})});slots.forEach(slot=>{delete state.reasons[slot];delete state.approvalLessons[slot];delete state.selected[slot]});state.selected={};state.run=d.run;msg('Selected posts deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function schedule(){const targetDate=getBatchTargetDate();if(!targetDate){msg('Choose a target date before scheduling.','error');return}msg('Scheduling the latest generated posts through Lensically for '+targetDate+'.');try{const d=await api('/schedule',{method:'POST',body:JSON.stringify({target_date:targetDate})});state.run=d.run;msg('Scheduled the latest generated posts for '+targetDate+'. It did not publish.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function scheduleCustom(){const slots=selectedSlots();if(slots.length!==1){msg('Select exactly one post for custom scheduling.','error');return}const date=getCustomScheduleDate();const time=getCustomScheduleTime();if(!date||!time){msg('Choose both a custom date and time first.','error');return}msg('Scheduling '+slots[0]+' for '+date+' at '+time+'.');try{const d=await api('/schedule/custom',{method:'POST',body:JSON.stringify({slot:slots[0],date,time})});state.run=d.run;delete state.selected[slots[0]];msg('Scheduled '+slots[0]+' for '+date+' at '+time+'.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function stopAgent(){msg('Stopping active Hermes run.');try{const d=await api('/kill',{method:'POST',body:'{}'});state.active=null;msg(d.killed?'Stopped active Hermes run.':'No active Hermes process found.','ok');await refresh()}catch(e){msg(e.message,'error')}finally{render()}}
@@ -1397,6 +1506,10 @@ async function handle(request, response) {
     if (url.pathname === "/run/posts/edit" && request.method === "POST") {
       const body = await readBody(request);
       return send(response, 200, { ok: true, run: await updateRunPostText(body.index, body.text) });
+    }
+    if (url.pathname === "/run/posts/approval-lesson" && request.method === "POST") {
+      const body = await readBody(request);
+      return send(response, 200, { ok: true, run: await updateRunPostApprovalLesson(body.index, body.approval_lesson) });
     }
     if (url.pathname === "/run/posts/approve" && request.method === "POST") {
       const body = await readBody(request);
