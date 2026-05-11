@@ -1239,27 +1239,45 @@ async function scheduleLatestRun(targetDate = null) {
       else resolve(extractJson(stdout));
     });
   });
-  await saveScheduledApprovalLessons(
-    latestRun.posts.map((post) => ({
-      slot: post.slot,
-      source_text: post.text,
-      user_feedback: post.approval_lesson,
-    })),
-    { scheduled_at: scheduledAt, target_date: scheduleDate },
-  );
-  latestRun.schedule_result = output;
-  latestRun.scheduled_batch_preset = batchPresetState.active_preset ?? null;
-  latestRun.scheduled_target_date = scheduleDate;
-  latestRun.status = "scheduled";
-  latestRun.scheduled_at = scheduledAt;
-  await writeJson(path.join(VAULT, "Runs", `scheduled-${nowStamp()}.json`), latestRun);
-  const clearedRun = {
+  const response = output?.response ?? {};
+  const createdSlots = new Set((Array.isArray(response.created) ? response.created : []).map((entry) => String(entry?.slot ?? "").trim()).filter(Boolean));
+  const plannedPosts = latestRun.posts.map((post, index) => ({
+    slot_time: String(batchTimes[index] ?? "").trim(),
+    ...post,
+  }));
+  const scheduledPosts = plannedPosts.filter((post) => createdSlots.has(post.slot_time));
+  const remainingPosts = relabelPosts(plannedPosts.filter((post) => !createdSlots.has(post.slot_time)).map(({ slot_time, ...post }) => post));
+  if (scheduledPosts.length) {
+    await saveScheduledApprovalLessons(
+      scheduledPosts.map((post) => ({
+        slot: post.slot,
+        source_text: post.text,
+        user_feedback: post.approval_lesson,
+      })),
+      { scheduled_at: scheduledAt, target_date: scheduleDate },
+    );
+  }
+  const scheduledSnapshot = {
     ...latestRun,
-    posts: [],
-    requested_post_count: 0,
+    schedule_result: output,
+    scheduled_batch_preset: batchPresetState.active_preset ?? null,
+    scheduled_target_date: scheduleDate,
+    scheduled_at: scheduledAt,
+    status: scheduledPosts.length ? "scheduled" : latestRun.status,
   };
-  await writeJson(path.join(VAULT, "Runs", "latest-run.json"), clearedRun);
-  return clearedRun;
+  await writeJson(path.join(VAULT, "Runs", `scheduled-${nowStamp()}.json`), scheduledSnapshot);
+  const nextRun = {
+    ...latestRun,
+    schedule_result: output,
+    scheduled_batch_preset: batchPresetState.active_preset ?? null,
+    scheduled_target_date: scheduleDate,
+    scheduled_at: scheduledAt,
+    status: remainingPosts.length ? "generated" : "scheduled",
+    posts: remainingPosts,
+    requested_post_count: remainingPosts.length,
+  };
+  await writeJson(path.join(VAULT, "Runs", "latest-run.json"), nextRun);
+  return nextRun;
 }
 
 async function scheduleSingleRunPost(slot, date, time) {
@@ -1396,8 +1414,8 @@ async function reorderPosts(fromIndex,toIndex){msg('Reordering generated posts.'
 async function deletePost(index){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post){msg('Post not found.','error');return}if(!window.confirm('Delete generated post #'+(index+1)+'?'))return;msg('Deleting generated post #'+(index+1)+'.');try{const d=await api('/run/posts/delete',{method:'POST',body:JSON.stringify({index,reason:(state.reasons[post.slot]||'').trim()})});delete state.reasons[post.slot];delete state.approvalLessons[post.slot];delete state.selected[post.slot];state.run=d.run;msg('Post deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function approveSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to approve.','error');return}msg('Approving selected posts.');try{const d=await api('/run/posts/approve',{method:'POST',body:JSON.stringify({slots})});state.run=d.run;state.selected={};msg('Selected posts approved. Future generate runs will keep them and append new posts after the current slate.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function deleteSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to delete.','error');return}if(!window.confirm('Delete '+slots.length+' selected post'+(slots.length===1?'':'s')+'?'))return;msg('Deleting selected posts.');try{const entries=slots.map(slot=>({slot,reason:(state.reasons[slot]||'').trim()}));const d=await api('/run/posts/delete-selected',{method:'POST',body:JSON.stringify({entries})});slots.forEach(slot=>{delete state.reasons[slot];delete state.approvalLessons[slot];delete state.selected[slot]});state.selected={};state.run=d.run;msg('Selected posts deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function schedule(){const targetDate=getBatchTargetDate();if(!targetDate){msg('Choose a target date before scheduling.','error');return}msg('Scheduling the latest generated posts through Lensically for '+targetDate+'.');try{const d=await api('/schedule',{method:'POST',body:JSON.stringify({target_date:targetDate})});state.run=d.run;msg('Scheduled the latest generated posts for '+targetDate+'. It did not publish.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
-async function scheduleCustom(){const slots=selectedSlots();if(slots.length!==1){msg('Select exactly one post for custom scheduling.','error');return}const date=getCustomScheduleDate();const time=getCustomScheduleTime();if(!date||!time){msg('Choose both a custom date and time first.','error');return}msg('Scheduling '+slots[0]+' for '+date+' at '+time+'.');try{const d=await api('/schedule/custom',{method:'POST',body:JSON.stringify({slot:slots[0],date,time})});state.run=d.run;delete state.selected[slots[0]];msg('Scheduled '+slots[0]+' for '+date+' at '+time+'.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function schedule(){const targetDate=getBatchTargetDate();if(!targetDate){msg('Choose a target date before scheduling.','error');return}const posts=state.run?.posts||[];if(!posts.length){msg('No generated run is available.','error');return}if(!window.confirm('Schedule '+posts.length+' post'+(posts.length===1?'':'s')+' for '+targetDate+'? Double-check the date before continuing.'))return;msg('Scheduling the latest generated posts through Lensically for '+targetDate+'.');try{const d=await api('/schedule',{method:'POST',body:JSON.stringify({target_date:targetDate})});state.run=d.run;const created=(d.run?.schedule_result?.response?.created||[]).length;const skipped=(d.run?.schedule_result?.response?.skipped||[]).length;if(created&&skipped)msg('Scheduled '+created+' post'+(created===1?'':'s')+' for '+targetDate+' and kept '+(d.run?.posts?.length||0)+' unscheduled post'+((d.run?.posts?.length||0)===1?'':'s')+' in the slate.','ok');else if(created)msg('Scheduled '+created+' post'+(created===1?'':'s')+' for '+targetDate+'. It did not publish.','ok');else msg('Nothing was scheduled for '+targetDate+'. The slate was kept intact.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
+async function scheduleCustom(){const slots=selectedSlots();if(slots.length!==1){msg('Select exactly one post for custom scheduling.','error');return}const date=getCustomScheduleDate();const time=getCustomScheduleTime();if(!date||!time){msg('Choose both a custom date and time first.','error');return}if(!window.confirm('Schedule '+slots[0]+' for '+date+' at '+time+'? Double-check the date and time before continuing.'))return;msg('Scheduling '+slots[0]+' for '+date+' at '+time+'.');try{const d=await api('/schedule/custom',{method:'POST',body:JSON.stringify({slot:slots[0],date,time})});state.run=d.run;delete state.selected[slots[0]];msg('Scheduled '+slots[0]+' for '+date+' at '+time+'.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function stopAgent(){msg('Stopping active Hermes run.');try{const d=await api('/kill',{method:'POST',body:'{}'});state.active=null;msg(d.killed?'Stopped active Hermes run.':'No active Hermes process found.','ok');await refresh()}catch(e){msg(e.message,'error')}finally{render()}}
 async function loadControlRegistry(){const d=await api('/control');controlState.registry=d.groups||[];const list=document.getElementById('control-list');list.innerHTML=controlState.registry.map(group=>'<div class="control-group">'+esc(group.group)+'</div>'+group.items.map(item=>'<button class="control-item '+(controlState.current?.id===item.id?'active':'')+'" data-control="'+esc(item.id)+'">'+esc(item.title)+(item.editable?'':' · read-only')+'</button>').join('')).join('');document.querySelectorAll('[data-control]').forEach(btn=>btn.onclick=()=>loadControl(btn.dataset.control))}
 async function loadControl(id){const d=await api('/control/file?id='+encodeURIComponent(id));controlState.current=d;document.getElementById('control-editor').value=d.content||'';document.getElementById('control-editor').readOnly=!d.editable;document.getElementById('save-control').disabled=!d.editable;document.getElementById('reload-control').disabled=false;document.getElementById('control-meta').textContent=d.title+' · '+d.type+(d.editable?' · editable':' · read-only');await loadControlRegistry()}
