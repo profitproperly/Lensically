@@ -51,6 +51,7 @@ Unless the user says `talk only` or explicitly opts out, implementation tasks de
 
 - If `lensically-web/**` changed, run frontend checks and deploy the frontend if runtime code changed.
 - If `lensically-worker/**` changed, run backend checks and deploy the worker if runtime code changed.
+- If `scripts/manifest-agent-desktop.mjs`, `scripts/launch-manifest-agent-desktop.ps1`, or Hermes local app assets change, restart the local Manifest Mental desktop app so the running Hermes surface picks up the new code before handoff.
 - If `lensically-worker/src/index.ts` changed, include the backend auth/API smoke coverage used by this repo.
 - Do not tell the user to run checks, push, or deploy. The agent does that work.
 - In the final handoff, state what you ran and what you deployed.
