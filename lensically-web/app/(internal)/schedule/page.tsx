@@ -139,6 +139,14 @@ function addDaysToIsoDate(date: string, days: number): string | null {
   return `${shifted.getUTCFullYear()}-${padTwoDigits(shifted.getUTCMonth() + 1)}-${padTwoDigits(shifted.getUTCDate())}`;
 }
 
+function parseSpoilerPhraseLines(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
 function formatPublishErrorMessage(raw: string | null | undefined): string {
   const normalizedRaw = typeof raw === "string" ? raw.trim() : "";
   if (!normalizedRaw) {
@@ -213,6 +221,8 @@ export default function SchedulePage() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [isScheduleComposerOpen, setIsScheduleComposerOpen] = useState(false);
   const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
+  const [spoilerAllText, setSpoilerAllText] = useState(false);
+  const [spoilerPhrasesInput, setSpoilerPhrasesInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
@@ -368,6 +378,7 @@ export default function SchedulePage() {
 
   async function handlePostNow() {
     const trimmedText = postText.trim();
+    const spoilerPhrases = parseSpoilerPhraseLines(spoilerPhrasesInput);
     if (!trimmedText) {
       setErrorMessage("Enter post text before publishing.");
       return;
@@ -391,6 +402,8 @@ export default function SchedulePage() {
         body: JSON.stringify({
           threads_user_id: threadsUserId,
           text: trimmedText,
+          spoiler_all_text: spoilerAllText,
+          spoiler_phrases: spoilerPhrases,
         }),
       });
 
@@ -406,6 +419,8 @@ export default function SchedulePage() {
           : "Post published successfully.",
       );
       setPostText("");
+      setSpoilerAllText(false);
+      setSpoilerPhrasesInput("");
     } catch {
       setErrorMessage("Could not publish post.");
     } finally {
@@ -433,6 +448,7 @@ export default function SchedulePage() {
     const trimmedText = postText.trim();
     const machineTimezone = resolveTimezonePreference(timezone);
     const machineTime = normalizeTimePayload(scheduleTime);
+    const spoilerPhrases = parseSpoilerPhraseLines(spoilerPhrasesInput);
     if (!trimmedText) {
       setErrorMessage("Enter post text before scheduling.");
       return;
@@ -471,6 +487,8 @@ export default function SchedulePage() {
           date: scheduleDate,
           time: machineTime,
           timezone: machineTimezone,
+          spoiler_all_text: spoilerAllText,
+          spoiler_phrases: spoilerPhrases,
         }),
       });
 
@@ -495,6 +513,8 @@ export default function SchedulePage() {
           : "Post scheduled successfully.",
       );
       setPostText("");
+      setSpoilerAllText(false);
+      setSpoilerPhrasesInput("");
       setScheduleDate("");
       setScheduleTime("");
       setIsScheduleComposerOpen(false);
@@ -584,6 +604,52 @@ export default function SchedulePage() {
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
             />
             <p className="mt-1 text-xs text-slate-500">{postText.length}/500</p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-start gap-3">
+              <input
+                id="spoiler-all-text"
+                type="checkbox"
+                checked={spoilerAllText}
+                onChange={(event) => {
+                  setSpoilerAllText(event.target.checked);
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }}
+                disabled={isSubmitting}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+              />
+              <div className="min-w-0">
+                <label htmlFor="spoiler-all-text" className="block text-sm font-medium text-slate-900">
+                  Mark the full post as a spoiler
+                </label>
+                <p className="mt-1 text-xs text-slate-500">
+                  Threads will blur the entire text until someone taps to reveal it.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <label htmlFor="spoiler-phrases" className="block text-sm font-medium text-slate-900">
+                Spoiler phrases
+              </label>
+              <textarea
+                id="spoiler-phrases"
+                value={spoilerPhrasesInput}
+                onChange={(event) => {
+                  setSpoilerPhrasesInput(event.target.value);
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }}
+                rows={3}
+                disabled={isSubmitting || spoilerAllText}
+                placeholder={"One exact phrase per line\nExample ending\nWinner reveal"}
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Optional. We will hide the first matching occurrence of each phrase in the post text, up to 10 phrases.
+              </p>
+            </div>
           </div>
 
           {isScheduleComposerOpen ? (

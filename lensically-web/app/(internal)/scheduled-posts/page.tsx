@@ -30,6 +30,8 @@ type ScheduledPost = {
   text: string;
   status: "approved" | "posting" | "posted";
   scheduled_time_utc: string;
+  spoiler_all_text?: boolean;
+  spoiler_phrases?: string[];
   publish_error_message?: string | null;
   last_attempted_at?: string | null;
   processing_started_at?: string | null;
@@ -139,6 +141,14 @@ function normalizeTimePayload(value: string): string | null {
     return null;
   }
   return `${padTwoDigits(hour)}:${padTwoDigits(minute)}`;
+}
+
+function parseSpoilerPhraseLines(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 10);
 }
 
 function formatPublishErrorMessage(raw: string | null | undefined): string {
@@ -266,6 +276,8 @@ export default function ScheduledPostsPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [editingScheduledPostId, setEditingScheduledPostId] = useState<number | null>(null);
   const [editPostText, setEditPostText] = useState("");
+  const [editSpoilerAllText, setEditSpoilerAllText] = useState(false);
+  const [editSpoilerPhrasesInput, setEditSpoilerPhrasesInput] = useState("");
   const [editScheduleDate, setEditScheduleDate] = useState("");
   const [editScheduleTime, setEditScheduleTime] = useState("");
   const [savingScheduledPostId, setSavingScheduledPostId] = useState<number | null>(null);
@@ -637,6 +649,8 @@ export default function ScheduledPostsPage() {
 
     setEditingScheduledPostId(post.id);
     setEditPostText(post.text);
+    setEditSpoilerAllText(post.spoiler_all_text === true);
+    setEditSpoilerPhrasesInput(Array.isArray(post.spoiler_phrases) ? post.spoiler_phrases.join("\n") : "");
     setEditScheduleDate(localInput.date);
     setEditScheduleTime(localInput.time);
     setEditScheduledPostError("");
@@ -650,6 +664,8 @@ export default function ScheduledPostsPage() {
   function cancelEditingScheduledPost() {
     setEditingScheduledPostId(null);
     setEditPostText("");
+    setEditSpoilerAllText(false);
+    setEditSpoilerPhrasesInput("");
     setEditScheduleDate("");
     setEditScheduleTime("");
     setEditScheduledPostError("");
@@ -720,6 +736,7 @@ export default function ScheduledPostsPage() {
   async function saveEditedScheduledPost(scheduledPostId: number) {
     const trimmedText = editPostText.trim();
     const normalizedTime = normalizeTimePayload(editScheduleTime);
+    const spoilerPhrases = parseSpoilerPhraseLines(editSpoilerPhrasesInput);
     if (!trimmedText) {
       setEditScheduledPostError("Enter post text before saving.");
       setEditScheduledPostSuccess("");
@@ -753,6 +770,8 @@ export default function ScheduledPostsPage() {
           date: editScheduleDate,
           time: normalizedTime,
           timezone,
+          spoiler_all_text: editSpoilerAllText,
+          spoiler_phrases: spoilerPhrases,
         }),
       });
 
@@ -760,7 +779,14 @@ export default function ScheduledPostsPage() {
         | {
           success?: boolean;
           error?: string;
-          scheduled_post?: { id?: number; text?: string; status?: "approved" | "posting" | "posted"; scheduled_time_utc?: string };
+          scheduled_post?: {
+            id?: number;
+            text?: string;
+            status?: "approved" | "posting" | "posted";
+            scheduled_time_utc?: string;
+            spoiler_all_text?: boolean;
+            spoiler_phrases?: string[];
+          };
         }
         | null;
 
@@ -785,11 +811,15 @@ export default function ScheduledPostsPage() {
             text: updatedText,
             status: updatedStatus,
             scheduled_time_utc: updatedPost.scheduled_time_utc ?? post.scheduled_time_utc,
+            spoiler_all_text: updatedPost.spoiler_all_text === true,
+            spoiler_phrases: Array.isArray(updatedPost.spoiler_phrases) ? updatedPost.spoiler_phrases : [],
           };
         }),
       );
       setEditingScheduledPostId(null);
       setEditPostText("");
+      setEditSpoilerAllText(false);
+      setEditSpoilerPhrasesInput("");
       setEditScheduleDate("");
       setEditScheduleTime("");
       setEditScheduledPostError("");
@@ -970,6 +1000,20 @@ export default function ScheduledPostsPage() {
                     </label>
                   ) : null}
                   <p className="line-clamp-3 text-sm text-slate-900">{post.text}</p>
+                  {post.spoiler_all_text || (post.spoiler_phrases?.length ?? 0) > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {post.spoiler_all_text ? (
+                        <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-700">
+                          Full-text spoiler
+                        </span>
+                      ) : null}
+                      {(post.spoiler_phrases?.length ?? 0) > 0 ? (
+                        <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-700">
+                          {post.spoiler_phrases?.length} spoiler phrase{post.spoiler_phrases?.length === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
@@ -1085,6 +1129,32 @@ export default function ScheduledPostsPage() {
                         maxLength={500}
                         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                       />
+                      <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label className="flex items-start gap-2 text-xs font-medium text-slate-700" htmlFor={`edit-spoiler-all-${post.id}`}>
+                          <input
+                            id={`edit-spoiler-all-${post.id}`}
+                            type="checkbox"
+                            checked={editSpoilerAllText}
+                            onChange={(event) => setEditSpoilerAllText(event.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                          />
+                          <span>Mark the full post as a spoiler</span>
+                        </label>
+                        <div className="mt-3">
+                          <label className="block text-xs font-medium text-slate-700" htmlFor={`edit-spoiler-phrases-${post.id}`}>
+                            Spoiler phrases
+                          </label>
+                          <textarea
+                            id={`edit-spoiler-phrases-${post.id}`}
+                            value={editSpoilerPhrasesInput}
+                            onChange={(event) => setEditSpoilerPhrasesInput(event.target.value)}
+                            rows={3}
+                            disabled={editSpoilerAllText}
+                            placeholder={"One exact phrase per line\nExample ending\nWinner reveal"}
+                            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                          />
+                        </div>
+                      </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="block text-xs font-medium text-slate-700" htmlFor={`edit-post-date-${post.id}`}>

@@ -37,9 +37,17 @@ type ThreadsPublishOptions = {
   accessToken: string;
   threadsUserId: string;
   text: string;
+  spoilerAllText?: boolean;
+  spoilerPhrases?: string[];
   readinessMaxChecks?: number;
   readinessDelayMs?: number;
   publishMaxAttempts?: number;
+};
+
+export type ThreadsTextSpoilerEntity = {
+  entity_type: "SPOILER";
+  offset: number;
+  length: number;
 };
 
 const DEFAULT_READINESS_MAX_CHECKS = 10;
@@ -49,6 +57,7 @@ const THREADS_READY_STATUSES = new Set(["FINISHED", "PUBLISHED"]);
 const THREADS_PENDING_STATUSES = new Set(["IN_PROGRESS", "PROCESSING"]);
 const MAX_PROVIDER_ERROR_BODY_LENGTH = 400;
 const MAX_PROVIDER_ERROR_MESSAGE_LENGTH = 220;
+const MAX_TEXT_SPOILER_ENTITIES = 10;
 
 function getIdFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -151,6 +160,111 @@ async function readProviderFailureDetails(response: Response): Promise<{ errorMe
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function normalizeSpoilerPhrases(phrases: string[] | null | undefined): string[] {
+  if (!Array.isArray(phrases)) {
+    return [];
+  }
+
+  const normalized: string[] = [];
+  for (const phrase of phrases) {
+    if (typeof phrase !== "string") {
+      continue;
+    }
+    const trimmed = phrase.trim();
+    if (!trimmed) {
+      continue;
+    }
+    normalized.push(trimmed);
+  }
+  return normalized.slice(0, MAX_TEXT_SPOILER_ENTITIES);
+}
+
+function rangesOverlap(
+  leftStart: number,
+  leftEndExclusive: number,
+  rightStart: number,
+  rightEndExclusive: number,
+): boolean {
+  return leftStart < rightEndExclusive && rightStart < leftEndExclusive;
+}
+
+export function buildTextSpoilerEntities(
+  text: string,
+  options: {
+    spoilerAllText?: boolean;
+    spoilerPhrases?: string[] | null;
+  },
+): {
+  entities: ThreadsTextSpoilerEntity[];
+  error?: string;
+} {
+  const normalizedPhrases = normalizeSpoilerPhrases(options.spoilerPhrases);
+
+  if (options.spoilerAllText) {
+    if (!text.length) {
+      return { entities: [] };
+    }
+    return {
+      entities: [{
+        entity_type: "SPOILER",
+        offset: 0,
+        length: text.length,
+      }],
+    };
+  }
+
+  if (!normalizedPhrases.length) {
+    return { entities: [] };
+  }
+
+  const entities: ThreadsTextSpoilerEntity[] = [];
+  for (const phrase of normalizedPhrases) {
+    let searchStart = 0;
+    let matchedOffset = -1;
+
+    while (searchStart <= text.length) {
+      const offset = text.indexOf(phrase, searchStart);
+      if (offset < 0) {
+        break;
+      }
+
+      const endExclusive = offset + phrase.length;
+      const overlapsExisting = entities.some((entity) =>
+        rangesOverlap(offset, endExclusive, entity.offset, entity.offset + entity.length)
+      );
+      if (!overlapsExisting) {
+        matchedOffset = offset;
+        break;
+      }
+
+      searchStart = offset + 1;
+    }
+
+    if (matchedOffset < 0) {
+      return {
+        entities: [],
+        error: `Spoiler phrase not found in post text: ${phrase}`,
+      };
+    }
+
+    entities.push({
+      entity_type: "SPOILER",
+      offset: matchedOffset,
+      length: phrase.length,
+    });
+  }
+
+  if (entities.length > MAX_TEXT_SPOILER_ENTITIES) {
+    return {
+      entities: [],
+      error: `Threads only allows up to ${MAX_TEXT_SPOILER_ENTITIES} text spoiler entities per post.`,
+    };
+  }
+
+  entities.sort((left, right) => left.offset - right.offset);
+  return { entities };
 }
 
 async function waitForContainerReadiness(
@@ -299,6 +413,8 @@ export async function publishTextToThreads({
   accessToken,
   threadsUserId,
   text,
+  spoilerAllText = false,
+  spoilerPhrases = [],
   readinessMaxChecks = DEFAULT_READINESS_MAX_CHECKS,
   readinessDelayMs = DEFAULT_READINESS_DELAY_MS,
   publishMaxAttempts = DEFAULT_PUBLISH_MAX_ATTEMPTS,
@@ -307,6 +423,20 @@ export async function publishTextToThreads({
     text,
     media_type: "TEXT",
   });
+  const spoilerEntities = buildTextSpoilerEntities(text, {
+    spoilerAllText,
+    spoilerPhrases,
+  });
+  if (spoilerEntities.error) {
+    return {
+      success: false,
+      errorCode: "threads_publish_create_invalid_response",
+      errorMessage: spoilerEntities.error,
+    };
+  }
+  if (spoilerEntities.entities.length > 0) {
+    publishCreateBody.set("text_entities", JSON.stringify(spoilerEntities.entities));
+  }
   let createResponse: Response;
   try {
     createResponse = await fetch(

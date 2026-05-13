@@ -1,5 +1,9 @@
 import { enforceLimit, type EnforceLimitResult, type UsageFeature } from "./utils/enforceLimit";
-import { publishTextToThreads } from "./utils/threadsPublishService";
+import {
+  buildTextSpoilerEntities,
+  normalizeSpoilerPhrases,
+  publishTextToThreads,
+} from "./utils/threadsPublishService";
 import {
   executeThreadsProfileLookup,
 } from "./utils/threadsProfileLookupService";
@@ -574,6 +578,8 @@ type DueScheduledPost = {
   user_id: string;
   threads_user_id: string;
   post_text: string;
+  spoiler_all_text: number | null;
+  spoiler_phrases_json: string | null;
 };
 
 type ImmediatePublishIdempotencyRecord = {
@@ -749,16 +755,65 @@ async function buildScheduledPostIdempotencyKey(
   threadsUserId: string,
   scheduledUtc: string,
   text: string,
+  spoilerFingerprint: string = "none",
 ): Promise<string> {
-  return sha256Hex(`schedule|${appUserId}|${threadsUserId}|${scheduledUtc}|${text}`);
+  return sha256Hex(`schedule|${appUserId}|${threadsUserId}|${scheduledUtc}|${text}|${spoilerFingerprint}`);
 }
 
 async function buildImmediatePublishRequestHash(
   appUserId: string,
   threadsUserId: string,
   text: string,
+  spoilerFingerprint: string = "none",
 ): Promise<string> {
-  return sha256Hex(`post-now|${appUserId}|${threadsUserId}|${text}`);
+  return sha256Hex(`post-now|${appUserId}|${threadsUserId}|${text}|${spoilerFingerprint}`);
+}
+
+function normalizeSpoilerFlag(value: unknown): boolean {
+  return value === true;
+}
+
+function normalizeSpoilerPhrasesInput(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return normalizeSpoilerPhrases(value.filter((item): item is string => typeof item === "string"));
+}
+
+function parseSpoilerPhrasesJson(value: string | null | undefined): string[] {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    return [];
+  }
+
+  try {
+    return normalizeSpoilerPhrasesInput(JSON.parse(trimmed));
+  } catch {
+    return [];
+  }
+}
+
+function serializeSpoilerPhrases(phrases: string[]): string | null {
+  return phrases.length ? JSON.stringify(phrases) : null;
+}
+
+function buildSpoilerFingerprint(spoilerAllText: boolean, spoilerPhrases: string[]): string {
+  return JSON.stringify({
+    spoiler_all_text: spoilerAllText,
+    spoiler_phrases: spoilerPhrases,
+  });
+}
+
+function validateTextSpoilerConfig(
+  text: string,
+  spoilerAllText: boolean,
+  spoilerPhrases: string[],
+): string | null {
+  const result = buildTextSpoilerEntities(text, {
+    spoilerAllText,
+    spoilerPhrases,
+  });
+  return result.error ?? null;
 }
 
 function getImmediatePublishRequestBucket(nowMs: number = Date.now()): string {
@@ -780,7 +835,7 @@ async function getDueApprovedScheduledPosts(
   batchSize: number,
 ): Promise<DueScheduledPost[]> {
   const rows = await env.DB.prepare(
-    `SELECT id, user_id, threads_user_id, post_text
+    `SELECT id, user_id, threads_user_id, post_text, spoiler_all_text, spoiler_phrases_json
      FROM scheduled_posts
      WHERE status = ?
        AND scheduled_time <= ?
@@ -799,6 +854,8 @@ async function publishThreadsTextForAppUser(
   appUserId: string,
   threadsUserId: string,
   text: string,
+  spoilerAllText: boolean = false,
+  spoilerPhrases: string[] = [],
 ): Promise<AppUserThreadsPublishResult> {
   const account = await getThreadsAccountForAppUser(env, appUserId);
   if (!account?.access_token || account.threads_user_id !== threadsUserId) {
@@ -814,6 +871,8 @@ async function publishThreadsTextForAppUser(
       accessToken: account.access_token,
       threadsUserId: account.threads_user_id,
       text,
+      spoilerAllText,
+      spoilerPhrases,
     });
     if (!publishResult.success) {
       return {
@@ -949,6 +1008,8 @@ async function processScheduledPost(
     post.user_id,
     post.threads_user_id,
     post.post_text,
+    post.spoiler_all_text === 1,
+    parseSpoilerPhrasesJson(post.spoiler_phrases_json),
   );
   if (!publishOutcome.success) {
     logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
@@ -1868,6 +1929,8 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
       user_id TEXT NOT NULL,
       threads_user_id TEXT NOT NULL CHECK (length(trim(threads_user_id)) > 0),
       post_text TEXT NOT NULL,
+      spoiler_all_text INTEGER NOT NULL DEFAULT 0,
+      spoiler_phrases_json TEXT,
       status TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('approved', 'posting', 'posted')),
       scheduled_time TEXT NOT NULL,
       publish_request_id TEXT,
@@ -1901,6 +1964,8 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
   ).run();
 
   const schemaAlignmentColumns: Array<{ name: string; definition: string }> = [
+    { name: "spoiler_all_text", definition: "INTEGER NOT NULL DEFAULT 0" },
+    { name: "spoiler_phrases_json", definition: "TEXT" },
     { name: "publish_request_id", definition: "TEXT" },
     { name: "idempotency_key", definition: "TEXT" },
     { name: "published_at", definition: "TEXT" },
@@ -4383,6 +4448,8 @@ async function createScheduledPostForAppUser(
   date: string,
   time: string,
   timeZone: string,
+  spoilerAllText: boolean = false,
+  spoilerPhrases: string[] = [],
 ): Promise<{
   success: boolean;
   scheduledPostId?: number;
@@ -4393,6 +4460,10 @@ async function createScheduledPostForAppUser(
   const trimmedText = text.trim();
   if (!trimmedText || !threadsUserId || !date || !time) {
     return { success: false, error: "missing_required_fields" };
+  }
+  const spoilerValidationError = validateTextSpoilerConfig(trimmedText, spoilerAllText, spoilerPhrases);
+  if (spoilerValidationError) {
+    return { success: false, error: spoilerValidationError };
   }
 
   const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timeZone);
@@ -4411,11 +4482,13 @@ async function createScheduledPostForAppUser(
   });
 
   await ensureScheduledPostsTable(env);
+  const spoilerFingerprint = buildSpoilerFingerprint(spoilerAllText, spoilerPhrases);
   const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
     appUserId,
     threadsUserId,
     scheduledUtc,
     trimmedText,
+    spoilerFingerprint,
   );
 
   const existingScheduledPost = await env.DB.prepare(
@@ -4442,16 +4515,20 @@ async function createScheduledPostForAppUser(
         user_id,
         threads_user_id,
         post_text,
+        spoiler_all_text,
+        spoiler_phrases_json,
         status,
         scheduled_time,
         idempotency_key
       )
-      VALUES (?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         appUserId,
         threadsUserId,
         trimmedText,
+        spoilerAllText ? 1 : 0,
+        serializeSpoilerPhrases(spoilerPhrases),
         SCHEDULED_POST_STATUS_APPROVED,
         scheduledUtc,
         scheduleIdempotencyKey,
@@ -6913,7 +6990,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       (url.pathname === "/api/threads/publish" || url.pathname === "/api/threads/post-now")
       && request.method === "POST"
     ) {
-      let payload: { app_user_id?: string; threads_user_id?: string; text?: string };
+      let payload: {
+        app_user_id?: string;
+        threads_user_id?: string;
+        text?: string;
+        spoiler_all_text?: boolean;
+        spoiler_phrases?: string[];
+      };
       try {
         payload = await request.json();
       } catch {
@@ -6928,10 +7011,22 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       const threadsUserId = payload.threads_user_id?.trim();
       const text = payload.text?.trim();
+      const spoilerAllText = normalizeSpoilerFlag(payload.spoiler_all_text);
+      const spoilerPhrases = normalizeSpoilerPhrasesInput(payload.spoiler_phrases);
 
       if (!threadsUserId || !text) {
         return new Response(
           JSON.stringify({ error: "threads_user_id and text are required" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      const spoilerValidationError = validateTextSpoilerConfig(text, spoilerAllText, spoilerPhrases);
+      if (spoilerValidationError) {
+        return new Response(
+          JSON.stringify({ error: spoilerValidationError }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -6965,10 +7060,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       await ensureImmediatePublishIdempotencyTable(env);
       const publishScope = url.pathname === "/api/threads/publish" ? "publish" : "post-now";
+      const spoilerFingerprint = buildSpoilerFingerprint(spoilerAllText, spoilerPhrases);
       const requestHash = await buildImmediatePublishRequestHash(
         ownedAppUserId,
         account.threads_user_id,
         text,
+        spoilerFingerprint,
       );
       const requestBucket = getImmediatePublishRequestBucket();
       const existingResponse = await getImmediatePublishIdempotentResponse(
@@ -6994,6 +7091,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         ownedAppUserId,
         account.threads_user_id,
         text,
+        spoilerAllText,
+        spoilerPhrases,
       );
       if (!publishOutcome.success) {
         const publishErrorMessage = buildPublishErrorStorageValue(
@@ -7087,6 +7186,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           text?: string;
           time?: string;
           date?: string;
+          spoiler_all_text?: boolean;
+          spoiler_phrases?: string[];
         }>;
       };
       try {
@@ -7155,6 +7256,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const date = typeof entry?.date === "string" && entry.date.trim()
           ? entry.date.trim()
           : sharedDate;
+        const spoilerAllText = normalizeSpoilerFlag(entry?.spoiler_all_text);
+        const spoilerPhrases = normalizeSpoilerPhrasesInput(entry?.spoiler_phrases);
 
         if (!date || !time || typeof text !== "string") {
           results.push({
@@ -7176,6 +7279,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           date,
           time,
           timezone,
+          spoilerAllText,
+          spoilerPhrases,
         );
 
         results.push({
@@ -7208,6 +7313,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         date?: string;
         time?: string;
         timezone?: string;
+        spoiler_all_text?: boolean;
+        spoiler_phrases?: string[];
       };
       try {
         payload = await request.json();
@@ -7226,6 +7333,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const date = payload.date?.trim();
       const time = payload.time?.trim();
       const timezone = payload.timezone?.trim() || null;
+      const spoilerAllText = normalizeSpoilerFlag(payload.spoiler_all_text);
+      const spoilerPhrases = normalizeSpoilerPhrasesInput(payload.spoiler_phrases);
 
       if (!threadsUserId || !text || !date || !time) {
         return new Response(
@@ -7279,6 +7388,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         threadsUserId,
         scheduledUtc,
         text,
+        buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
       );
 
       const existingScheduledPost = await env.DB.prepare(
@@ -7305,6 +7415,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
               id: Number(existingScheduledPost.id),
               status: existingScheduledPost.status,
               scheduled_time_utc: existingScheduledPost.scheduled_time,
+              spoiler_all_text: spoilerAllText,
+              spoiler_phrases: spoilerPhrases,
             },
           }),
           {
@@ -7321,16 +7433,20 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             user_id,
             threads_user_id,
             post_text,
+            spoiler_all_text,
+            spoiler_phrases_json,
             status,
             scheduled_time,
             idempotency_key
           )
-          VALUES (?, ?, ?, ?, ?, ?)`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
           .bind(
             ownedAppUserId,
             threadsUserId,
             text,
+            spoilerAllText ? 1 : 0,
+            serializeSpoilerPhrases(spoilerPhrases),
             SCHEDULED_POST_STATUS_APPROVED,
             scheduledUtc,
             scheduleIdempotencyKey,
@@ -7370,6 +7486,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
               id: Number(racedScheduledPost.id),
               status: racedScheduledPost.status,
               scheduled_time_utc: racedScheduledPost.scheduled_time,
+              spoiler_all_text: spoilerAllText,
+              spoiler_phrases: spoilerPhrases,
             },
           }),
           {
@@ -7394,6 +7512,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             id: insertedScheduledPostId,
             status: SCHEDULED_POST_STATUS_APPROVED,
             scheduled_time_utc: scheduledUtc,
+            spoiler_all_text: spoilerAllText,
+            spoiler_phrases: spoilerPhrases,
           },
         }),
         {
@@ -7411,6 +7531,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         date?: string;
         time?: string;
         timezone?: string;
+        spoiler_all_text?: boolean;
+        spoiler_phrases?: string[];
       };
       try {
         payload = await request.json();
@@ -7429,12 +7551,24 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const date = payload.date?.trim();
       const time = payload.time?.trim();
       const timezone = payload.timezone?.trim() || null;
+      const spoilerAllText = normalizeSpoilerFlag(payload.spoiler_all_text);
+      const spoilerPhrases = normalizeSpoilerPhrasesInput(payload.spoiler_phrases);
 
       if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !text || !date || !time) {
         return new Response(
           JSON.stringify({
             error: "scheduled_post_id, text, date, and time are required",
           }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      const spoilerValidationError = validateTextSpoilerConfig(text, spoilerAllText, spoilerPhrases);
+      if (spoilerValidationError) {
+        return new Response(
+          JSON.stringify({ error: spoilerValidationError }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -7499,12 +7633,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         existingScheduledPost.threads_user_id,
         scheduledUtc,
         text,
+        buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
       );
 
       try {
         const result = await env.DB.prepare(
           `UPDATE scheduled_posts
            SET post_text = ?,
+               spoiler_all_text = ?,
+               spoiler_phrases_json = ?,
                scheduled_time = ?,
                idempotency_key = ?
            WHERE id = ?
@@ -7513,6 +7650,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         )
           .bind(
             text,
+            spoilerAllText ? 1 : 0,
+            serializeSpoilerPhrases(spoilerPhrases),
             scheduledUtc,
             scheduleIdempotencyKey,
             scheduledPostId,
@@ -7551,6 +7690,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             text,
             status: SCHEDULED_POST_STATUS_APPROVED,
             scheduled_time_utc: scheduledUtc,
+            spoiler_all_text: spoilerAllText,
+            spoiler_phrases: spoilerPhrases,
           },
         }),
         {
@@ -7656,7 +7797,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       await ensureScheduledPostsTable(env);
       const scheduledPost = await env.DB.prepare(
-        `SELECT id, user_id, threads_user_id, post_text, status
+        `SELECT id, user_id, threads_user_id, post_text, status, spoiler_all_text, spoiler_phrases_json
          FROM scheduled_posts
          WHERE id = ?
            AND user_id = ?
@@ -7669,6 +7810,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           threads_user_id: string;
           post_text: string;
           status: string;
+          spoiler_all_text: number | null;
+          spoiler_phrases_json: string | null;
         }>();
 
       if (!scheduledPost) {
@@ -7714,6 +7857,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         user_id: scheduledPost.user_id,
         threads_user_id: scheduledPost.threads_user_id,
         post_text: scheduledPost.post_text,
+        spoiler_all_text: scheduledPost.spoiler_all_text,
+        spoiler_phrases_json: scheduledPost.spoiler_phrases_json,
       });
 
       const refreshed = await env.DB.prepare(
@@ -7777,7 +7922,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const rows = await env.DB.prepare(
-        `SELECT id, post_text, status, scheduled_time, publish_error_message, last_attempted_at, processing_started_at
+        `SELECT id, post_text, status, scheduled_time, spoiler_all_text, spoiler_phrases_json, publish_error_message, last_attempted_at, processing_started_at
          FROM scheduled_posts
          WHERE user_id = ?
            AND status IN (?, ?)
@@ -7794,6 +7939,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           post_text: string;
           status: string;
           scheduled_time: string;
+          spoiler_all_text: number | null;
+          spoiler_phrases_json: string | null;
           publish_error_message: string | null;
           last_attempted_at: string | null;
           processing_started_at: string | null;
@@ -7807,6 +7954,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             text: row.post_text,
             status: row.status,
             scheduled_time_utc: row.scheduled_time,
+            spoiler_all_text: row.spoiler_all_text === 1,
+            spoiler_phrases: parseSpoilerPhrasesJson(row.spoiler_phrases_json),
             publish_error_message: row.publish_error_message ?? null,
             last_attempted_at: row.last_attempted_at ?? null,
             processing_started_at: row.processing_started_at ?? null,
