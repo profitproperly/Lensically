@@ -103,6 +103,23 @@ async function fetchSavedPatterns(order = "newest", limit = 200) {
   return Array.isArray(data?.patterns) ? data.patterns : [];
 }
 
+function mergeSavedPatterns(...patternSets) {
+  const merged = [];
+  const seen = new Set();
+  for (const set of patternSets) {
+    for (const pattern of Array.isArray(set) ? set : []) {
+      const id = String(pattern?.id ?? "").trim();
+      const sourceUrl = String(pattern?.source_url ?? "").trim();
+      const text = String(pattern?.post_text ?? "").trim();
+      const key = id || sourceUrl || text;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(pattern);
+    }
+  }
+  return merged;
+}
+
 async function fetchAllArchive(order) {
   const posts = [];
   for (let page = 1; page <= 20; page += 1) {
@@ -363,6 +380,21 @@ function buildPatternStrategyNotes(patternSummary, archiveSummary, ratioSummary)
   return notes.slice(0, 8);
 }
 
+function summarizeSavedPatternBand(patterns) {
+  const sample = patterns.slice(0, 8).map((pattern, index) => ({
+    rank: index + 1,
+    text: pattern.post_text,
+    likes: pattern.likes,
+    views: pattern.views,
+  }));
+  return {
+    count: patterns.length,
+    performance: summarizeSavedPatternPerformance(patterns, null),
+    shape: summarizePostAnalyses(patterns.map((pattern) => analyzePostText(pattern.post_text))),
+    sample,
+  };
+}
+
 function uniqueEligibleTastePosts(context) {
   const sources = [
     ...(Array.isArray(context?.archive_recent) ? context.archive_recent : []),
@@ -471,35 +503,67 @@ function buildSavedPatternMemory(patterns, context = null) {
   const normalized = (Array.isArray(patterns) ? patterns : [])
     .map(normalizeSavedPattern)
     .filter((pattern) => pattern.source_url && pattern.post_text);
-  const top_patterns = [...normalized]
+  const rankedPatterns = [...normalized]
     .sort((left, right) => (
       right.likes - left.likes
       || right.views - left.views
       || (parseTimestamp(right.posted_at)?.valueOf() ?? 0) - (parseTimestamp(left.posted_at)?.valueOf() ?? 0)
-    ))
+    ));
+  const top_patterns = rankedPatterns
     .slice(0, SAVED_PATTERN_TOP_COUNT)
     .map((pattern, index) => ({
       ...pattern,
       rank: index + 1,
     }));
+  const recent_patterns = [...normalized]
+    .sort((left, right) => (
+      (parseTimestamp(right.posted_at)?.valueOf() ?? 0) - (parseTimestamp(left.posted_at)?.valueOf() ?? 0)
+      || right.likes - left.likes
+      || right.views - left.views
+    ))
+    .slice(0, 15)
+    .map((pattern, index) => ({
+      ...pattern,
+      recent_rank: index + 1,
+    }));
+  const upperBound = Math.max(SAVED_PATTERN_TOP_COUNT, Math.floor(rankedPatterns.length * 0.33));
+  const lowerStart = Math.max(upperBound, Math.floor(rankedPatterns.length * 0.66));
+  const midBand = rankedPatterns.slice(upperBound, lowerStart);
+  const lowerBand = rankedPatterns.slice(lowerStart);
   const patternSummary = summarizePostAnalyses(top_patterns.map((pattern) => analyzePostText(pattern.post_text)));
+  const allPatternSummary = summarizePostAnalyses(rankedPatterns.map((pattern) => analyzePostText(pattern.post_text)));
   const archiveSummary = summarizePostAnalyses(uniqueEligibleTastePosts(context).map((post) => analyzePostText(post.text)));
-  const performanceSummary = summarizeSavedPatternPerformance(top_patterns, context);
-  const strategyNotes = buildPatternStrategyNotes(patternSummary, archiveSummary, performanceSummary);
+  const performanceSummary = summarizeSavedPatternPerformance(rankedPatterns, context);
+  const topPerformanceSummary = summarizeSavedPatternPerformance(top_patterns, context);
+  const strategyNotes = buildPatternStrategyNotes(allPatternSummary, archiveSummary, performanceSummary);
 
   return {
-    core_law: "Saved patterns are external winning posts for inspiration, not copying.",
+    core_law: "Saved patterns are curated market research and the primary external growth signal. Use them to evolve the account without copying.",
     ranked_by: "likes",
     total_count: normalized.length,
     top_count: SAVED_PATTERN_TOP_COUNT,
+    market_position: {
+      saved_patterns_lead: true,
+      archive_role: "Use archive context mainly for anti-fatigue, anti-duplication, and identity guardrails.",
+      lesson_role: "Use rejection lessons as hard constraints and approval lessons as strong positive steering.",
+    },
     performance_summary: performanceSummary,
+    top_performance_summary: topPerformanceSummary,
+    all_pattern_shape: allPatternSummary,
     top_pattern_shape: patternSummary,
     archive_shape_comparison: {
       archive_shape: archiveSummary,
-      signal_gaps_vs_archive: summarizeSignalGaps(patternSummary, archiveSummary).slice(0, 12),
+      signal_gaps_vs_archive: summarizeSignalGaps(allPatternSummary, archiveSummary).slice(0, 12),
+    },
+    coverage_bands: {
+      top_band: summarizeSavedPatternBand(rankedPatterns.slice(0, upperBound)),
+      mid_band: summarizeSavedPatternBand(midBand),
+      lower_band: summarizeSavedPatternBand(lowerBand),
+      recent_band: summarizeSavedPatternBand(recent_patterns),
     },
     strategy_notes: strategyNotes,
     top_patterns,
+    recent_patterns,
   };
 }
 
@@ -1011,13 +1075,15 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Do not label posts with genres, objectives, bet types, or win conditions. Those labels can bias the writing.",
     "Openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close to recent/generated posts.",
     "Before generating posts, read the taste memory and the saved pattern memory.",
-    "Internal taste memory outranks external saved patterns when they conflict.",
-    "Use external saved patterns for idea expansion and structural inspiration only. Do not copy wording, exact opener plus resolution combinations, or exact payoff logic.",
-    "Read the saved-pattern performance summary and shape summary. If saved patterns are materially outperforming the archive, borrow their mechanics and post shape without copying their wording.",
+    "Saved patterns are curated market research and should usually lead strategy when they materially outperform the account archive.",
+    "Use the full saved-pattern memory: top winners for breakthrough mechanics, mid/lower bands for anti-staleness and range awareness, and recent saved patterns for what the market is rewarding now.",
+    "Use the account archive mainly for anti-fatigue, anti-duplication, and identity guardrails. Do not let the archive trap you inside stale account habits if stronger saved-pattern evidence points elsewhere.",
+    "Read the saved-pattern performance summary, coverage bands, and shape summaries. Borrow mechanics, pacing, and post shape from the market without copying wording, exact opener plus resolution combinations, or exact payoff logic.",
     "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, and stale sentence resolutions that the recent archive is already leaning on too hard.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
     "Keep the growth strategy, emotional mechanic, pacing, and post style from strong saved patterns, but rewrite them into gender-neutral language for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
+    "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns are the main growth engine. The archive is context, not the ceiling.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Some posts may already exist in the current slate. Do not rewrite them. Generate only the new slots and avoid duplicating or lightly paraphrasing the existing posts.",
     "Use the full archive, follower archive, metrics, goals, rejection lessons, approval lessons, and top posts. Do the math and strategy in the backend.",
@@ -1529,7 +1595,11 @@ async function pullFreshContext(targetDate = null) {
   activeRun = { ...activeRun, phase: "syncing_lensically_followers" };
   const followerSync = await syncLensicallyFollowers();
   activeRun = { ...activeRun, phase: "syncing_saved_patterns" };
-  const savedPatterns = await fetchSavedPatterns("likes", 200);
+  const [savedPatternsByLikes, savedPatternsByNewest] = await Promise.all([
+    fetchSavedPatterns("likes", 200),
+    fetchSavedPatterns("newest", 200),
+  ]);
+  const savedPatterns = mergeSavedPatterns(savedPatternsByLikes, savedPatternsByNewest);
   activeRun = { ...activeRun, phase: "building_hermes_context_from_lensically" };
   const context = await buildFreshContext(targetDate);
   activeRun = { ...activeRun, phase: "updating_taste_memory" };
@@ -1545,7 +1615,12 @@ async function pullFreshContext(targetDate = null) {
     sync: {
       post_archive: postSync,
       followers: followerSync,
-      saved_patterns: { total_count: savedPatterns.length, top_count: Array.isArray(savedPatternMemory?.top_patterns) ? savedPatternMemory.top_patterns.length : 0 },
+      saved_patterns: {
+        total_count: savedPatterns.length,
+        likes_feed_count: savedPatternsByLikes.length,
+        newest_feed_count: savedPatternsByNewest.length,
+        top_count: Array.isArray(savedPatternMemory?.top_patterns) ? savedPatternMemory.top_patterns.length : 0,
+      },
     },
     guidance,
     lessons,
