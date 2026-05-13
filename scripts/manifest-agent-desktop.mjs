@@ -1126,6 +1126,14 @@ function relabelPosts(posts) {
 }
 
 function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = []) {
+  const compact = compactContext(context);
+  const metrics = compact.metrics ?? {};
+  const contextPath = "manifest-mental-vault/Context/latest-generate-context.json";
+  const tasteMemoryPath = "manifest-mental-vault/Lessons/manifest_mental_taste_memory.json";
+  const savedPatternMemoryPath = "manifest-mental-vault/Lessons/manifest_mental_saved_pattern_memory.json";
+  const rejectionLessonsPath = "manifest-mental-vault/Lessons/rejection-lessons.json";
+  const approvalLessonsPath = "manifest-mental-vault/Lessons/approval-lessons.json";
+  const guidancePath = "manifest-mental-vault/Lessons/agent-guidance.json";
   return [
     "You are the standalone Manifest Mental recursive learning agent.",
     "Output valid JSON only. No markdown.",
@@ -1149,34 +1157,50 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns are the main growth engine. The archive is context, not the ceiling.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Some posts may already exist in the current slate. Do not rewrite them. Generate only the new slots and avoid duplicating or lightly paraphrasing the existing posts.",
-    "Use the full archive, follower archive, metrics, goals, rejection lessons, approval lessons, and top posts. Do the math and strategy in the backend.",
+    "Read the freshest vault files directly from disk before generating. Do not rely only on this prompt summary.",
+    "Primary files to read:",
+    `- ${contextPath}`,
+    `- ${tasteMemoryPath}`,
+    `- ${savedPatternMemoryPath}`,
+    `- ${rejectionLessonsPath}`,
+    `- ${approvalLessonsPath}`,
+    `- ${guidancePath}`,
+    "Use the full archive, follower archive, metrics, goals, rejection lessons, approval lessons, and top posts from those files. Do the math and strategy in the backend.",
     "Return JSON: {\"metrics\": object, \"posts\": [{\"slot\":\"Post 1\",\"text\":\"...\"}], \"memory_notes\": [string]}",
+    "Prompt summary:",
+    JSON.stringify({
+      target_date: compact.target_date,
+      desired_slots: compact.desired_slots,
+      missing_slots: compact.missing_slots,
+      metrics: {
+        current_followers: metrics.current_followers,
+        top_post: metrics.top_post,
+        goals: metrics.goals,
+        baselines: metrics.baselines,
+      },
+      archive_counts: {
+        archive_recent: Array.isArray(compact.archive_recent) ? compact.archive_recent.length : 0,
+        archive_top: Array.isArray(compact.archive_top) ? compact.archive_top.length : 0,
+        archive_all: Array.isArray(compact.archive_all) ? compact.archive_all.length : 0,
+      },
+      taste_counts: {
+        recent_winners: Array.isArray(tasteMemory?.recent_winners) ? tasteMemory.recent_winners.length : 0,
+        all_time_champions: Array.isArray(tasteMemory?.all_time_champions) ? tasteMemory.all_time_champions.length : 0,
+      },
+      saved_pattern_counts: {
+        total_count: savedPatternMemory?.total_count ?? 0,
+        top_count: Array.isArray(savedPatternMemory?.top_patterns) ? savedPatternMemory.top_patterns.length : 0,
+        recent_count: Array.isArray(savedPatternMemory?.recent_patterns) ? savedPatternMemory.recent_patterns.length : 0,
+        all_count: Array.isArray(savedPatternMemory?.all_patterns) ? savedPatternMemory.all_patterns.length : 0,
+      },
+      lesson_counts: {
+        rejection: Array.isArray(rejectionLessons) ? rejectionLessons.length : 0,
+        approval: Array.isArray(approvalLessons) ? approvalLessons.length : 0,
+        guidance: Array.isArray(guidance) ? guidance.length : 0,
+      },
+    }),
     "Existing posts already kept in the slate:",
     JSON.stringify((existingPosts ?? []).map((post) => ({ slot: post.slot, text: post.text, approved: Boolean(post.approved) }))),
-    "Taste memory:",
-    JSON.stringify(tasteMemory ?? {}),
-    "Saved pattern memory:",
-    JSON.stringify(savedPatternMemory ?? {}),
-    "Prior rejection lessons:",
-    JSON.stringify(rejectionLessons.slice(-40).map((lesson) => ({
-      slot: lesson.slot,
-      source_text: lesson.source_text,
-      user_feedback: lesson.user_feedback,
-    }))),
-    "Prior approval lessons:",
-    JSON.stringify(approvalLessons.slice(-40).map((lesson) => ({
-      slot: lesson.slot,
-      source_text: lesson.source_text,
-      user_feedback: lesson.user_feedback,
-      target_date: lesson.target_date,
-    }))),
-    "Persistent user steering guidance:",
-    JSON.stringify(guidance.slice(-40).map((entry) => ({
-      user_input: entry.user_input,
-      understanding: entry.understanding,
-    }))),
-    "Context:",
-    JSON.stringify(compactContext(context)),
   ].join("\n\n");
 }
 
