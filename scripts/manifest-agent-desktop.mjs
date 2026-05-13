@@ -404,12 +404,12 @@ function buildPatternStrategyNotes(patternSummary, archiveSummary, ratioSummary)
   const averageLikesRatio = numberValue(ratioSummary?.average_likes_ratio_vs_archive);
   const averageViewsRatio = numberValue(ratioSummary?.average_views_ratio_vs_archive);
 
-  if (averageLikesRatio > 1.2) notes.push(`Saved patterns are outperforming the archive on likes by ${averageLikesRatio}x on average.`);
-  if (averageViewsRatio > 1.2) notes.push(`Saved patterns are outperforming the archive on views by ${averageViewsRatio}x on average.`);
+  if (averageLikesRatio > 1.2) notes.push(`Saved patterns are outperforming the archive on likes by ${averageLikesRatio}x on average, so their mechanics deserve study but not direct imitation.`);
+  if (averageViewsRatio > 1.2) notes.push(`Saved patterns are outperforming the archive on views by ${averageViewsRatio}x on average, so their mechanics deserve study but not direct imitation.`);
 
   for (const gap of summarizeSignalGaps(patternSummary, archiveSummary).slice(0, 6)) {
-    if (gap.gap >= 0.18) notes.push(`Saved patterns lean harder into ${gap.signal.replace(/_/g, " ")} than the current archive.`);
-    else if (gap.gap <= -0.18) notes.push(`The current archive leans harder into ${gap.signal.replace(/_/g, " ")} than the saved-pattern winners.`);
+    if (gap.gap >= 0.18) notes.push(`Saved patterns lean harder into ${gap.signal.replace(/_/g, " ")} than the current archive. Treat that as a mechanic gap to explore, not a script to mimic.`);
+    else if (gap.gap <= -0.18) notes.push(`The current archive leans harder into ${gap.signal.replace(/_/g, " ")} than the saved-pattern winners. Treat that as identity evidence, not a cage.`);
   }
 
   return notes.slice(0, 8);
@@ -587,13 +587,13 @@ function buildSavedPatternMemory(patterns, context = null) {
   const strategyNotes = buildPatternStrategyNotes(allPatternSummary, archiveSummary, performanceSummary);
 
   return {
-    core_law: "Saved patterns are curated market research and the primary external growth signal. Use them to evolve the account without copying.",
+    core_law: "Saved patterns and internal winners are both evidence pools. Extract mechanics from both, then write fresh posts that belong to neither source verbatim.",
     ranked_by: "likes",
     total_count: normalized.length,
     top_count: SAVED_PATTERN_TOP_COUNT,
     market_position: {
-      saved_patterns_lead: true,
-      archive_role: "Use archive context mainly for anti-fatigue, anti-duplication, and identity guardrails.",
+      source_priority: "No source wins by default. Use saved patterns for expansion pressure, archive winners for account truth, and lessons for hard supervision.",
+      archive_role: "Use archive context for identity evidence, anti-fatigue, and anti-duplication.",
       lesson_role: "Use rejection lessons as hard constraints and approval lessons as strong positive steering.",
     },
     performance_summary: performanceSummary,
@@ -1146,16 +1146,26 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Do not label posts with genres, objectives, bet types, or win conditions. Those labels can bias the writing.",
     "Openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close to recent/generated posts.",
     "Before generating posts, read the taste memory and the saved pattern memory.",
-    "Saved patterns are curated market research and should usually lead strategy when they materially outperform the account archive.",
+    "Do not treat saved patterns as the boss. Do not treat internal winners as the boss. Treat both as evidence pools that you study, abstract, and then write beyond.",
     "Use the full saved-pattern memory: the complete ranked catalog, top winners for breakthrough mechanics, mid/lower bands for anti-staleness and range awareness, and recent saved patterns for what the market is rewarding now.",
-    "Use the full account archive, especially the deduped archive_all view, mainly for anti-fatigue, anti-duplication, and identity guardrails. Do not let the archive trap you inside stale account habits if stronger saved-pattern evidence points elsewhere.",
-    "Read the saved-pattern performance summary, coverage bands, and shape summaries. Borrow mechanics, pacing, and post shape from the market without copying wording, exact opener plus resolution combinations, or exact payoff logic.",
-    "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, and stale sentence resolutions that the recent archive is already leaning on too hard.",
+    "Use the full account archive, especially the deduped archive_all view, for identity evidence, anti-fatigue, anti-duplication, and proof of what actually converts on this account.",
+    "Read the saved-pattern performance summary, coverage bands, and shape summaries. Read the archive winners and fatigue summary with equal seriousness.",
+    "Extract psychological mechanics, tension patterns, pacing, and emotional turns. Do not preserve source wording, source cadence, source sentence map, or source payoff sequence.",
+    "If a draft feels like a nearby paraphrase of a saved pattern or an internal winner, reject it and write a new one from scratch.",
+    "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, stale sentence resolutions, and obvious re-skins of posts already seen in the archive or current slate.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
-    "Keep the growth strategy, emotional mechanic, pacing, and post style from strong saved patterns, but rewrite them into gender-neutral language for this account.",
+    "Keep useful growth mechanics, but rewrite them into gender-neutral language and fresh account-native copy for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
-    "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns are the main growth engine. The archive is context, not the ceiling.",
+    "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns and internal winners are both research inputs, not masters.",
+    "Write with force, intent, and a point of view. Do not sound like a mimic bot. Do not sound like a stitched summary of reference posts.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
+    "Use this internal process for every slot:",
+    "1. Silently identify 2-3 useful mechanics from the evidence files.",
+    "2. Silently state what emotional shift the post should create.",
+    "3. Write a new post from scratch in Manifest Mental voice.",
+    "4. Silently reject the draft if it is too close in opener shape, rhythm, logic, or payoff to any source post or any current-slate post.",
+    "5. Only keep drafts that feel alive, decisive, and newly written.",
+    "Across the batch, avoid clumping into one move repeated 17 times. Spread across distinct emotional angles, tension types, and payoff styles when that improves strength.",
     "Some posts may already exist in the current slate. Do not rewrite them. Generate only the new slots and avoid duplicating or lightly paraphrasing the existing posts.",
     "Read the freshest vault files directly from disk before generating. Do not rely only on this prompt summary.",
     "Primary files to read:",
