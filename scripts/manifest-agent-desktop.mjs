@@ -23,6 +23,7 @@ const HERMES_PROVIDER = "openai-codex";
 const DEFAULT_POST_COUNT = 17;
 const MAX_POST_COUNT = 200;
 const RECENT_TASTE_WINDOW_SIZE = 100;
+const RECENT_FATIGUE_WINDOW_SIZE = 40;
 const RECENT_A_TIER_RATIO = 0.10;
 const RECENT_B_TIER_RATIO = 0.15;
 const ALL_TIME_CHAMPION_COUNT = 25;
@@ -200,7 +201,15 @@ function normalizeTastePost(post) {
   };
 }
 
-function tasteSignals(text) {
+function normalizeAnalysisText(text) {
+  return String(text ?? "")
+    .toLowerCase()
+    .replace(/[â€™’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function legacyTasteSignals(text) {
   const normalized = String(text ?? "").toLowerCase().replace(/[’]/g, "'");
   const words = normalized.split(/\s+/).filter(Boolean);
   return {
@@ -211,6 +220,147 @@ function tasteSignals(text) {
     concrete_trigger: /message|text|call|email|application|account|bill|charge|deposit|bank|name|room|door|location|phone/.test(normalized),
     short_line: words.length > 0 && words.length <= 12,
   };
+}
+
+function tasteSignals(text) {
+  const normalized = normalizeAnalysisText(text);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return {
+    direct_address: /\byou\b|\byour\b|you're|the person reading this/.test(normalized),
+    imminent: /about to|going to|soon|this year/.test(normalized),
+    money: /money|cash|income|paid|pay|deposit|bank|bill|debt|interest|salary|wealth|rich|overpay/.test(normalized),
+    status: /chosen|optional|privilege|appointment|main event|standard|match|access|name|brought up|treated better|treated like|noticed|claim you|priority/.test(normalized),
+    concrete_trigger: /message|text|call|email|application|account|bill|charge|deposit|bank|name|room|door|location|phone/.test(normalized),
+    short_line: words.length > 0 && words.length <= 12,
+  };
+}
+
+function analyzePostText(text) {
+  const raw = String(text ?? "").trim();
+  const normalized = normalizeAnalysisText(raw);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const signals = tasteSignals(raw);
+  return {
+    text: raw,
+    opener: words.slice(0, 4).join(" "),
+    word_count: words.length,
+    line_count: raw ? raw.split(/\n+/).filter((line) => line.trim()).length || 1 : 0,
+    direct_address: signals.direct_address,
+    imminent: signals.imminent,
+    money: signals.money,
+    status: signals.status,
+    concrete_trigger: signals.concrete_trigger,
+    short_line: signals.short_line,
+    social_reversal: /ignored|underestimating|underestimated|dismissing|dismissed|regret|expensive mistake|saw it coming|can't undo|cannot undo/.test(normalized),
+    authority: /standards|value|respect|chosen|priority|worth protecting|worth waiting|risk losing|optional|privilege/.test(normalized),
+    certainty: /about to|will|already|always|never|impossible|refuse|not suggestions|can't undo|cannot undo/.test(normalized),
+    contrast: /\bbut\b|\binstead\b|\brather than\b|\bnot\b/.test(normalized),
+    caps_emphasis: /\b[A-Z]{3,}\b/.test(raw),
+  };
+}
+
+function summarizePostAnalyses(analyses) {
+  const rows = Array.isArray(analyses) ? analyses.filter((entry) => entry && entry.text) : [];
+  const total = rows.length;
+  const rate = (predicate) => total ? Number((rows.filter(predicate).length / total).toFixed(3)) : 0;
+  const openerCounts = new Map();
+
+  for (const entry of rows) {
+    if (!entry.opener) continue;
+    openerCounts.set(entry.opener, (openerCounts.get(entry.opener) ?? 0) + 1);
+  }
+
+  return {
+    total_posts: total,
+    average_words: Number(average(rows.map((entry) => entry.word_count)).toFixed(1)),
+    average_lines: Number(average(rows.map((entry) => entry.line_count)).toFixed(1)),
+    length_buckets: {
+      short: rows.filter((entry) => entry.word_count > 0 && entry.word_count <= 12).length,
+      medium: rows.filter((entry) => entry.word_count >= 13 && entry.word_count <= 20).length,
+      long: rows.filter((entry) => entry.word_count >= 21).length,
+    },
+    signal_rates: {
+      direct_address: rate((entry) => entry.direct_address),
+      imminent: rate((entry) => entry.imminent),
+      money: rate((entry) => entry.money),
+      status: rate((entry) => entry.status),
+      concrete_trigger: rate((entry) => entry.concrete_trigger),
+      short_line: rate((entry) => entry.short_line),
+      social_reversal: rate((entry) => entry.social_reversal),
+      authority: rate((entry) => entry.authority),
+      certainty: rate((entry) => entry.certainty),
+      contrast: rate((entry) => entry.contrast),
+      caps_emphasis: rate((entry) => entry.caps_emphasis),
+    },
+    top_openers: [...openerCounts.entries()]
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, 12)
+      .map(([opener, count]) => ({ opener, count })),
+  };
+}
+
+function summarizeSavedPatternPerformance(patterns, context) {
+  const likes = patterns.map((pattern) => numberValue(pattern.likes));
+  const views = patterns.map((pattern) => numberValue(pattern.views));
+  const replies = patterns.map((pattern) => numberValue(pattern.replies));
+  const reposts = patterns.map((pattern) => numberValue(pattern.reposts));
+  const archiveAverageLikes = numberValue(context?.metrics?.baselines?.average_likes);
+  const archiveAverageViews = numberValue(context?.metrics?.baselines?.average_views);
+  const archiveTopLikes = numberValue(context?.metrics?.top_post?.likes);
+  const archiveTopViews = numberValue(context?.metrics?.top_post?.views);
+  const avgLikes = Math.round(average(likes));
+  const avgViews = Math.round(average(views));
+  const topLikes = likes.length ? Math.max(...likes) : 0;
+  const topViews = views.length ? Math.max(...views) : 0;
+
+  return {
+    average_likes: avgLikes,
+    average_views: avgViews,
+    average_replies: Math.round(average(replies)),
+    average_reposts: Math.round(average(reposts)),
+    top_likes: topLikes,
+    top_views: topViews,
+    archive_average_likes: archiveAverageLikes,
+    archive_average_views: archiveAverageViews,
+    archive_top_likes: archiveTopLikes,
+    archive_top_views: archiveTopViews,
+    average_likes_ratio_vs_archive: archiveAverageLikes ? Number((avgLikes / archiveAverageLikes).toFixed(2)) : null,
+    average_views_ratio_vs_archive: archiveAverageViews ? Number((avgViews / archiveAverageViews).toFixed(2)) : null,
+    top_likes_ratio_vs_archive_top: archiveTopLikes ? Number((topLikes / archiveTopLikes).toFixed(2)) : null,
+    top_views_ratio_vs_archive_top: archiveTopViews ? Number((topViews / archiveTopViews).toFixed(2)) : null,
+  };
+}
+
+function summarizeSignalGaps(sourceSummary, targetSummary) {
+  const sourceRates = sourceSummary?.signal_rates ?? {};
+  const targetRates = targetSummary?.signal_rates ?? {};
+  const keys = [...new Set([...Object.keys(sourceRates), ...Object.keys(targetRates)])];
+  return keys.map((key) => {
+    const source = numberValue(sourceRates[key]);
+    const target = numberValue(targetRates[key]);
+    return {
+      signal: key,
+      source_rate: source,
+      target_rate: target,
+      gap: Number((source - target).toFixed(3)),
+    };
+  }).sort((left, right) => Math.abs(right.gap) - Math.abs(left.gap));
+}
+
+function buildPatternStrategyNotes(patternSummary, archiveSummary, ratioSummary) {
+  const notes = [];
+  const averageLikesRatio = numberValue(ratioSummary?.average_likes_ratio_vs_archive);
+  const averageViewsRatio = numberValue(ratioSummary?.average_views_ratio_vs_archive);
+
+  if (averageLikesRatio > 1.2) notes.push(`Saved patterns are outperforming the archive on likes by ${averageLikesRatio}x on average.`);
+  if (averageViewsRatio > 1.2) notes.push(`Saved patterns are outperforming the archive on views by ${averageViewsRatio}x on average.`);
+
+  for (const gap of summarizeSignalGaps(patternSummary, archiveSummary).slice(0, 6)) {
+    if (gap.gap >= 0.18) notes.push(`Saved patterns lean harder into ${gap.signal.replace(/_/g, " ")} than the current archive.`);
+    else if (gap.gap <= -0.18) notes.push(`The current archive leans harder into ${gap.signal.replace(/_/g, " ")} than the saved-pattern winners.`);
+  }
+
+  return notes.slice(0, 8);
 }
 
 function uniqueEligibleTastePosts(context) {
@@ -265,12 +415,38 @@ function buildTasteMemory(context) {
       ...post,
       rank: index + 1,
     }));
+  const recentArchive = [...eligible]
+    .sort((left, right) => parseTimestamp(right.posted_at).valueOf() - parseTimestamp(left.posted_at).valueOf())
+    .slice(0, RECENT_FATIGUE_WINDOW_SIZE);
+  const winnerAnalysis = summarizePostAnalyses(recentWinners.map((post) => analyzePostText(post.text)));
+  const recentArchiveAnalysis = summarizePostAnalyses(recentArchive.map((post) => analyzePostText(post.text)));
+  const repeatedOpeners = recentArchiveAnalysis.top_openers.filter((entry) => entry.count >= 2).slice(0, 8);
+  const overusedSignals = Object.entries(recentArchiveAnalysis.signal_rates)
+    .map(([signal, rate]) => ({ signal, rate, winner_rate: numberValue(winnerAnalysis.signal_rates?.[signal]) }))
+    .filter((entry) => entry.rate >= 0.6)
+    .sort((left, right) => right.rate - left.rate)
+    .slice(0, 8);
+  const freshnessNotes = summarizeSignalGaps(recentArchiveAnalysis, winnerAnalysis)
+    .filter((entry) => Math.abs(entry.gap) >= 0.2)
+    .slice(0, 6)
+    .map((entry) => entry.gap > 0
+      ? `Recent archive is over-leaning on ${entry.signal.replace(/_/g, " ")} relative to internal winners.`
+      : `Recent archive is under-leaning on ${entry.signal.replace(/_/g, " ")} relative to internal winners.`);
 
   return {
     core_law: "Taste is learned from likes only.",
     recent_window_size: RECENT_TASTE_WINDOW_SIZE,
+    archive_total_seen: eligible.length,
     recent_winners: recentWinners,
     all_time_champions: allTimeChampions,
+    fatigue_summary: {
+      recent_archive_window_size: RECENT_FATIGUE_WINDOW_SIZE,
+      recent_archive_analysis: recentArchiveAnalysis,
+      winner_analysis: winnerAnalysis,
+      repeated_openers: repeatedOpeners,
+      overused_signals: overusedSignals,
+      freshness_notes: freshnessNotes,
+    },
   };
 }
 
@@ -291,7 +467,7 @@ function normalizeSavedPattern(pattern) {
   };
 }
 
-function buildSavedPatternMemory(patterns) {
+function buildSavedPatternMemory(patterns, context = null) {
   const normalized = (Array.isArray(patterns) ? patterns : [])
     .map(normalizeSavedPattern)
     .filter((pattern) => pattern.source_url && pattern.post_text);
@@ -306,11 +482,23 @@ function buildSavedPatternMemory(patterns) {
       ...pattern,
       rank: index + 1,
     }));
+  const patternSummary = summarizePostAnalyses(top_patterns.map((pattern) => analyzePostText(pattern.post_text)));
+  const archiveSummary = summarizePostAnalyses(uniqueEligibleTastePosts(context).map((post) => analyzePostText(post.text)));
+  const performanceSummary = summarizeSavedPatternPerformance(top_patterns, context);
+  const strategyNotes = buildPatternStrategyNotes(patternSummary, archiveSummary, performanceSummary);
 
   return {
     core_law: "Saved patterns are external winning posts for inspiration, not copying.",
     ranked_by: "likes",
+    total_count: normalized.length,
     top_count: SAVED_PATTERN_TOP_COUNT,
+    performance_summary: performanceSummary,
+    top_pattern_shape: patternSummary,
+    archive_shape_comparison: {
+      archive_shape: archiveSummary,
+      signal_gaps_vs_archive: summarizeSignalGaps(patternSummary, archiveSummary).slice(0, 12),
+    },
+    strategy_notes: strategyNotes,
     top_patterns,
   };
 }
@@ -408,7 +596,11 @@ async function writeTasteMemory(context) {
 }
 
 async function writeSavedPatternMemory(patterns) {
-  const memory = buildSavedPatternMemory(patterns);
+  let context = null;
+  try {
+    context = await readLatestPulledContext();
+  } catch {}
+  const memory = buildSavedPatternMemory(patterns, context);
   await writeJson(SAVED_PATTERN_MEMORY_PATH, memory);
   return memory;
 }
@@ -821,6 +1013,8 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Before generating posts, read the taste memory and the saved pattern memory.",
     "Internal taste memory outranks external saved patterns when they conflict.",
     "Use external saved patterns for idea expansion and structural inspiration only. Do not copy wording, exact opener plus resolution combinations, or exact payoff logic.",
+    "Read the saved-pattern performance summary and shape summary. If saved patterns are materially outperforming the archive, borrow their mechanics and post shape without copying their wording.",
+    "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, and stale sentence resolutions that the recent archive is already leaning on too hard.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
     "Keep the growth strategy, emotional mechanic, pacing, and post style from strong saved patterns, but rewrite them into gender-neutral language for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
