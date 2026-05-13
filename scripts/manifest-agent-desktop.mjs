@@ -1211,9 +1211,56 @@ function extractJson(text) {
   } catch {
     const first = trimmed.indexOf("{");
     const last = trimmed.lastIndexOf("}");
-    if (first >= 0 && last > first) return JSON.parse(trimmed.slice(first, last + 1));
+    if (first >= 0 && last > first) {
+      const candidate = trimmed.slice(first, last + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        return JSON.parse(repairJsonLike(candidate));
+      }
+    }
     throw new Error(`Hermes did not return parseable JSON: ${trimmed.slice(0, 500)}`);
   }
+}
+
+function repairJsonLike(text) {
+  const source = String(text ?? "");
+  let result = "";
+  let inString = false;
+  let escaping = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (escaping) {
+      result += char;
+      escaping = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      escaping = true;
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = !inString;
+      result += char;
+      continue;
+    }
+
+    if (inString && (char === "\n" || char === "\r" || char === "\t")) {
+      result += char === "\t" ? "\\t" : "\\n";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result
+    .replace(/,\s*([}\]])/g, "$1")
+    .replace(/\u0000/g, "");
 }
 
 function toWslPath(windowsPath) {
@@ -1225,6 +1272,8 @@ function toWslPath(windowsPath) {
 async function runHermesJson(prompt) {
   const promptPath = path.join(VAULT, "Context", "latest-hermes-prompt.txt");
   const runnerPath = path.join(VAULT, "Context", "hermes-runner.py");
+  const stdoutPath = path.join(VAULT, "Context", "latest-hermes-stdout.txt");
+  const stderrPath = path.join(VAULT, "Context", "latest-hermes-stderr.txt");
   await fs.writeFile(promptPath, prompt, "utf8");
   await fs.writeFile(runnerPath, [
     "import subprocess",
@@ -1283,16 +1332,26 @@ async function runHermesJson(prompt) {
     child.on("close", (code) => {
       clearTimeout(timeout);
       if (activeHermesChild === child) activeHermesChild = null;
-      if (activeHermesKilled) {
-        log("hermes_stopped", { code });
-        reject(new Error("Hermes was stopped by kill switch."));
-      } else if (code !== 0) {
-        log("hermes_failed", { code, stderr: stderr.slice(0, 500) });
-        reject(new Error(`Hermes exited ${code}: ${stderr || stdout}`));
-      } else {
-        log("hermes_complete", { stdout_bytes: Buffer.byteLength(stdout, "utf8") });
-        resolve(extractJson(stdout));
-      }
+      Promise.allSettled([
+        fs.writeFile(stdoutPath, stdout, "utf8"),
+        fs.writeFile(stderrPath, stderr, "utf8"),
+      ]).finally(() => {
+        if (activeHermesKilled) {
+          log("hermes_stopped", { code });
+          reject(new Error("Hermes was stopped by kill switch."));
+        } else if (code !== 0) {
+          log("hermes_failed", { code, stderr: stderr.slice(0, 500) });
+          reject(new Error(`Hermes exited ${code}: ${stderr || stdout}`));
+        } else {
+          log("hermes_complete", { stdout_bytes: Buffer.byteLength(stdout, "utf8") });
+          try {
+            resolve(extractJson(stdout));
+          } catch (error) {
+            log("hermes_parse_failed", { error: error instanceof Error ? error.message : String(error), stdout: stdout.slice(0, 500) });
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        }
+      });
     });
   });
 }
