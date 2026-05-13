@@ -96,11 +96,29 @@ async function fetchLensicallyBatchPresets() {
   return Array.isArray(data?.presets) ? data.presets : [];
 }
 
-async function fetchSavedPatterns(order = "newest", limit = 200) {
+async function fetchSavedPatternsPage(order = "newest", limit = 200, page = 1) {
   const safeOrder = String(order ?? "").trim().toLowerCase() === "likes" ? "likes" : "newest";
   const safeLimit = Math.max(1, Math.min(Math.floor(Number(limit ?? 200)) || 200, 200));
-  const data = await fetchJson(`/api/patterns/list?app_user_id=${encodeURIComponent(SAVED_PATTERNS_APP_USER_ID)}&limit=${safeLimit}&order=${encodeURIComponent(safeOrder)}`);
-  return Array.isArray(data?.patterns) ? data.patterns : [];
+  const safePage = Math.max(1, Math.floor(Number(page ?? 1)) || 1);
+  return fetchJson(`/api/patterns/list?app_user_id=${encodeURIComponent(SAVED_PATTERNS_APP_USER_ID)}&limit=${safeLimit}&page=${safePage}&order=${encodeURIComponent(safeOrder)}`);
+}
+
+async function fetchAllSavedPatterns(order = "newest") {
+  const limit = 200;
+  const patterns = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const data = await fetchSavedPatternsPage(order, limit, page);
+    const pagePatterns = Array.isArray(data?.patterns) ? data.patterns : [];
+    patterns.push(...pagePatterns);
+    totalPages = Math.max(1, numberValue(data?.total_pages) || Math.ceil(numberValue(data?.total) / limit) || 1);
+    page += 1;
+    if (!pagePatterns.length) break;
+  } while (page <= totalPages);
+
+  return patterns;
 }
 
 function mergeSavedPatterns(...patternSets) {
@@ -120,14 +138,31 @@ function mergeSavedPatterns(...patternSets) {
   return merged;
 }
 
+function dedupeArchivePosts(posts) {
+  const deduped = [];
+  const seen = new Set();
+  for (const post of Array.isArray(posts) ? posts : []) {
+    const id = String(post?.id ?? post?.post_id ?? "").trim();
+    const permalink = String(post?.permalink ?? "").trim();
+    const text = String(post?.text ?? "").trim();
+    const timestamp = String(post?.timestamp ?? post?.posted_at ?? "").trim();
+    const key = id || permalink || `${timestamp}::${text}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(post);
+  }
+  return deduped;
+}
+
 async function fetchAllArchive(order) {
   const posts = [];
-  for (let page = 1; page <= 20; page += 1) {
+  let totalPages = 1;
+  for (let page = 1; page <= totalPages; page += 1) {
     const data = await fetchJson(`/api/threads/posts/archive?order=${encodeURIComponent(order)}&limit=100&page=${page}`);
     const pagePosts = Array.isArray(data.posts) ? data.posts : [];
     posts.push(...pagePosts);
-    const total = Number(data.total ?? data.total_posts ?? data.totalCount ?? 0);
-    if (!pagePosts.length || (total && posts.length >= total)) break;
+    totalPages = Math.max(1, Number(data.total_pages ?? 0) || Math.ceil(Number(data.total_count ?? data.total ?? data.total_posts ?? data.totalCount ?? 0) / 100) || 1);
+    if (!pagePosts.length) break;
   }
   return posts;
 }
@@ -515,6 +550,20 @@ function buildSavedPatternMemory(patterns, context = null) {
       ...pattern,
       rank: index + 1,
     }));
+  const all_patterns = rankedPatterns.map((pattern, index) => ({
+    rank: index + 1,
+    id: pattern.id,
+    source_url: pattern.source_url,
+    author_handle: pattern.author_handle,
+    post_text: pattern.post_text,
+    likes: pattern.likes,
+    views: pattern.views,
+    replies: pattern.replies,
+    reposts: pattern.reposts,
+    shares: pattern.shares,
+    posted_at: pattern.posted_at,
+    updated_at: pattern.updated_at,
+  }));
   const recent_patterns = [...normalized]
     .sort((left, right) => (
       (parseTimestamp(right.posted_at)?.valueOf() ?? 0) - (parseTimestamp(left.posted_at)?.valueOf() ?? 0)
@@ -562,6 +611,7 @@ function buildSavedPatternMemory(patterns, context = null) {
       recent_band: summarizeSavedPatternBand(recent_patterns),
     },
     strategy_notes: strategyNotes,
+    all_patterns,
     top_patterns,
     recent_patterns,
   };
@@ -1011,13 +1061,17 @@ async function buildFreshContext(targetDate = null) {
 }
 
 function compactContext(context) {
+  const archiveAll = dedupeArchivePosts([
+    ...(Array.isArray(context.archive_recent) ? context.archive_recent : []),
+    ...(Array.isArray(context.archive_top) ? context.archive_top : []),
+  ]);
   return {
     target_date: context.target_date,
     desired_slots: context.desired_slots,
     missing_slots: context.missing_slots,
     metrics: context.metrics,
     follower_archive: { rows: Array.isArray(context.follower_archive?.rows) ? context.follower_archive.rows.slice(0, 120) : [] },
-    archive_recent: context.archive_recent.slice(0, 180).map((post) => ({
+    archive_recent: (Array.isArray(context.archive_recent) ? context.archive_recent : []).map((post) => ({
       id: post.id,
       text: post.text,
       timestamp: post.timestamp,
@@ -1026,10 +1080,19 @@ function compactContext(context) {
       replies: post.replies,
       reposts: post.reposts,
     })),
-    archive_top: context.archive_top.slice(0, 100).map((post) => ({
+    archive_top: (Array.isArray(context.archive_top) ? context.archive_top : []).map((post) => ({
       id: post.id,
       text: post.text,
       timestamp: post.timestamp,
+      likes: post.likes,
+      views: post.views,
+      replies: post.replies,
+      reposts: post.reposts,
+    })),
+    archive_all: archiveAll.map((post) => ({
+      id: post.id,
+      text: post.text,
+      timestamp: post.timestamp ?? post.posted_at,
       likes: post.likes,
       views: post.views,
       replies: post.replies,
@@ -1076,8 +1139,8 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close to recent/generated posts.",
     "Before generating posts, read the taste memory and the saved pattern memory.",
     "Saved patterns are curated market research and should usually lead strategy when they materially outperform the account archive.",
-    "Use the full saved-pattern memory: top winners for breakthrough mechanics, mid/lower bands for anti-staleness and range awareness, and recent saved patterns for what the market is rewarding now.",
-    "Use the account archive mainly for anti-fatigue, anti-duplication, and identity guardrails. Do not let the archive trap you inside stale account habits if stronger saved-pattern evidence points elsewhere.",
+    "Use the full saved-pattern memory: the complete ranked catalog, top winners for breakthrough mechanics, mid/lower bands for anti-staleness and range awareness, and recent saved patterns for what the market is rewarding now.",
+    "Use the full account archive, especially the deduped archive_all view, mainly for anti-fatigue, anti-duplication, and identity guardrails. Do not let the archive trap you inside stale account habits if stronger saved-pattern evidence points elsewhere.",
     "Read the saved-pattern performance summary, coverage bands, and shape summaries. Borrow mechanics, pacing, and post shape from the market without copying wording, exact opener plus resolution combinations, or exact payoff logic.",
     "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, and stale sentence resolutions that the recent archive is already leaning on too hard.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
@@ -1596,8 +1659,8 @@ async function pullFreshContext(targetDate = null) {
   const followerSync = await syncLensicallyFollowers();
   activeRun = { ...activeRun, phase: "syncing_saved_patterns" };
   const [savedPatternsByLikes, savedPatternsByNewest] = await Promise.all([
-    fetchSavedPatterns("likes", 200),
-    fetchSavedPatterns("newest", 200),
+    fetchAllSavedPatterns("likes"),
+    fetchAllSavedPatterns("newest"),
   ]);
   const savedPatterns = mergeSavedPatterns(savedPatternsByLikes, savedPatternsByNewest);
   activeRun = { ...activeRun, phase: "building_hermes_context_from_lensically" };

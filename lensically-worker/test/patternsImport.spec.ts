@@ -199,4 +199,43 @@ describe("patterns import routes", () => {
       likes: 12,
     });
   });
+
+  it("paginates saved patterns", async () => {
+    const origin = "chrome-extension://exampleextensionid";
+
+    for (let index = 1; index <= 3; index += 1) {
+      await fetchFromWorker("/api/patterns/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: origin,
+        },
+        body: JSON.stringify({
+          app_user_id: "lensically_test",
+          platform: "threads",
+          source_url: `https://www.threads.com/@example/post/page-${index}`,
+          post_text: `Paged post ${index}`,
+          likes: index,
+          posted_at: `2026-05-0${index}T00:00:00.000Z`,
+        }),
+      });
+    }
+
+    const listResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&limit=2&page=2&order=newest");
+    expect(listResponse.status).toBe(200);
+    const payload = (await listResponse.json()) as {
+      total?: number;
+      page?: number;
+      page_size?: number;
+      total_pages?: number;
+      patterns?: Array<{ source_url?: string }>;
+    };
+
+    expect(payload.total).toBe(3);
+    expect(payload.page).toBe(2);
+    expect(payload.page_size).toBe(2);
+    expect(payload.total_pages).toBe(2);
+    expect(payload.patterns).toHaveLength(1);
+    expect(payload.patterns?.[0]?.source_url).toBe("https://www.threads.com/@example/post/page-1");
+  });
 });

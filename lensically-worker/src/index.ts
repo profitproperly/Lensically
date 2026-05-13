@@ -5635,6 +5635,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const limit = Number.isFinite(rawLimit) && rawLimit > 0
         ? Math.min(Math.floor(rawLimit), 200)
         : 50;
+      const rawPage = Number(url.searchParams.get("page") ?? "1");
+      const page = Number.isFinite(rawPage) && rawPage > 0
+        ? Math.max(1, Math.floor(rawPage))
+        : 1;
+      const offset = (page - 1) * limit;
       const requestedOrder = String(url.searchParams.get("order") ?? "newest").trim().toLowerCase();
       const order = requestedOrder === "likes" ? "likes" : "newest";
 
@@ -5646,16 +5651,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
            FROM external_patterns
            WHERE app_user_id = ?
            ORDER BY likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC
-           LIMIT ?`
+           LIMIT ? OFFSET ?`
         : `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
                   post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
                   raw_payload, saved_at, updated_at
            FROM external_patterns
            WHERE app_user_id = ?
            ORDER BY datetime(updated_at) DESC, id DESC
-           LIMIT ?`;
+           LIMIT ? OFFSET ?`;
       const rows = await env.DB.prepare(listSql)
-        .bind(appUserId, limit)
+        .bind(appUserId, limit, offset)
         .all<ExternalPatternRow>();
 
       const totalRow = await env.DB.prepare(
@@ -5666,11 +5671,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         .bind(appUserId)
         .first<{ total: number | string }>();
 
+      const total = Number(totalRow?.total ?? 0);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
       return new Response(JSON.stringify({
         success: true,
         app_user_id: appUserId,
         order,
-        total: Number(totalRow?.total ?? 0),
+        total,
+        page,
+        page_size: limit,
+        total_pages: totalPages,
         patterns: rows.results ?? [],
       }), {
         status: 200,
