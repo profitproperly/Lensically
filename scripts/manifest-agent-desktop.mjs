@@ -292,9 +292,11 @@ function analyzePostText(text) {
   const normalized = normalizeAnalysisText(raw);
   const words = normalized.split(/\s+/).filter(Boolean);
   const signals = tasteSignals(raw);
+  const midpoint = words.length > 1 ? Math.floor(words.length / 2) : words.length;
   return {
     text: raw,
     opener: words.slice(0, 4).join(" "),
+    payoff: words.slice(midpoint).join(" "),
     word_count: words.length,
     line_count: raw ? raw.split(/\n+/).filter((line) => line.trim()).length || 1 : 0,
     direct_address: signals.direct_address,
@@ -308,6 +310,53 @@ function analyzePostText(text) {
     certainty: /about to|will|already|always|never|impossible|refuse|not suggestions|can't undo|cannot undo/.test(normalized),
     contrast: /\bbut\b|\binstead\b|\brather than\b|\bnot\b/.test(normalized),
     caps_emphasis: /\b[A-Z]{3,}\b/.test(raw),
+  };
+}
+
+function extractPayoffText(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return "";
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length <= 6) return raw;
+  return words.slice(Math.floor(words.length / 2)).join(" ").trim();
+}
+
+function buildWeakPayoffLedger(rejectionLessons) {
+  return (Array.isArray(rejectionLessons) ? rejectionLessons : [])
+    .slice(-20)
+    .map((lesson) => ({
+      bad_draft: String(lesson?.source_text ?? "").trim(),
+      weak_payoff: extractPayoffText(lesson?.source_text),
+      why_bad: String(lesson?.user_feedback ?? "").trim(),
+    }))
+    .filter((entry) => entry.bad_draft && entry.weak_payoff && entry.why_bad)
+    .slice(-10);
+}
+
+function buildStrongPayoffLedger(approvalLessons, tasteMemory) {
+  const approvalExamples = (Array.isArray(approvalLessons) ? approvalLessons : [])
+    .slice(-10)
+    .map((lesson) => ({
+      source_text: String(lesson?.source_text ?? "").trim(),
+      strong_payoff: extractPayoffText(lesson?.source_text),
+      why_good: String(lesson?.user_feedback ?? "").trim(),
+      source: "approval_lesson",
+    }))
+    .filter((entry) => entry.source_text && entry.strong_payoff && entry.why_good);
+
+  const winnerExamples = (Array.isArray(tasteMemory?.recent_winners) ? tasteMemory.recent_winners : [])
+    .slice(0, 10)
+    .map((post) => ({
+      source_text: String(post?.text ?? "").trim(),
+      strong_payoff: extractPayoffText(post?.text),
+      likes: numberValue(post?.likes),
+      source: "winner",
+    }))
+    .filter((entry) => entry.source_text && entry.strong_payoff);
+
+  return {
+    approvals: approvalExamples,
+    winners: winnerExamples,
   };
 }
 
@@ -1132,6 +1181,8 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
   const repeatedOpeners = Array.isArray(fatigueSummary?.repeated_openers)
     ? fatigueSummary.repeated_openers.map((entry) => String(entry?.opener ?? "").trim()).filter(Boolean).slice(0, 6)
     : [];
+  const weakPayoffLedger = buildWeakPayoffLedger(rejectionLessons);
+  const strongPayoffLedger = buildStrongPayoffLedger(approvalLessons, tasteMemory);
   const recentRejectionFeedback = Array.isArray(rejectionLessons)
     ? rejectionLessons.slice(-25).map((lesson) => String(lesson?.user_feedback ?? "").trim()).filter(Boolean)
     : [];
@@ -1158,6 +1209,7 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     `Do not optimize for variety theater. Generate the ${generationSlots.length} strongest posts for this account, even if several winners share a broad lane.`,
     "Do not label posts with genres, objectives, bet types, or win conditions. Those labels can bias the writing.",
     "Openers may repeat when useful. The latter half, payoff, promise, and sentence resolution must not be too close to recent/generated posts.",
+    "Judge the back half harder than the opener. A post with a usable opener but a weak payoff is a failed post.",
     "Before generating posts, read the taste memory and the saved pattern memory.",
     "Do not treat saved patterns as the boss. Do not treat internal winners as the boss. Treat both as evidence pools that you study, abstract, and then write beyond.",
     "Use the full saved-pattern memory: the complete ranked catalog, top winners for breakthrough mechanics, mid/lower bands for anti-staleness and range awareness, and recent saved patterns for what the market is rewarding now.",
@@ -1174,14 +1226,16 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
     "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns and internal winners are both research inputs, not masters.",
     "Do not water down rejection lessons into generic caution. Treat them as literal vetoes against weak logic, vague objects, empty metaphors, jumbled clauses, and repetitive half-reskins.",
+    "Do not let the ending drift into soft abstraction. The payoff must land with clean logic, desire, tension, or consequence.",
     "Write with force, intent, and a point of view. Do not sound like a mimic bot. Do not sound like a stitched summary of reference posts.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Use this internal process for every slot:",
     "1. Silently identify 2-3 useful mechanics from the evidence files.",
     "2. Silently state what emotional shift the post should create.",
     "3. Write a new post from scratch in Manifest Mental voice.",
-    "4. Silently reject the draft if it is too close in opener shape, rhythm, logic, or payoff to any source post or any current-slate post.",
-    "5. Only keep drafts that feel alive, decisive, and newly written.",
+    "4. Silently inspect the second half first. Reject the draft if the payoff is vague, over-explained, emotionally flat, logically loose, metaphor-heavy, or too similar to known weak endings.",
+    "5. Silently reject the draft if it is too close in opener shape, rhythm, logic, or payoff to any source post or any current-slate post.",
+    "6. Only keep drafts whose back half feels sharper than the opener and newly written.",
     "Across the batch, avoid clumping into one move repeated 17 times. Spread across distinct emotional angles, tension types, and payoff styles when that improves strength.",
     "Some posts may already exist in the current slate. Do not rewrite them. Generate only the new slots and avoid duplicating or lightly paraphrasing the existing posts.",
     "Read the freshest vault files directly from disk before generating. Do not rely only on this prompt summary.",
@@ -1199,6 +1253,16 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     rejectionExamples.length
       ? "Recent rejected source examples:\n" + rejectionExamples.map((entry) => `- Bad draft: "${entry.source_text}" | Why it failed: ${entry.user_feedback}`).join("\n")
       : "Recent rejected source examples: none available.",
+    weakPayoffLedger.length
+      ? "Weak payoff ledger to avoid:\n" + weakPayoffLedger.map((entry) => `- Draft: "${entry.bad_draft}" | Weak back half: "${entry.weak_payoff}" | Why it failed: ${entry.why_bad}`).join("\n")
+      : "Weak payoff ledger to avoid: none available.",
+    strongPayoffLedger.approvals.length || strongPayoffLedger.winners.length
+      ? "Strong payoff ledger to study:\n"
+        + [
+          ...strongPayoffLedger.approvals.map((entry) => `- Approved post: "${entry.source_text}" | Strong back half: "${entry.strong_payoff}" | Why it worked: ${entry.why_good}`),
+          ...strongPayoffLedger.winners.map((entry) => `- Winning post: "${entry.source_text}" | Strong back half: "${entry.strong_payoff}" | Likes: ${entry.likes}`),
+        ].join("\n")
+      : "Strong payoff ledger to study: none available.",
     "Return JSON: {\"metrics\": object, \"posts\": [{\"slot\":\"Post 1\",\"text\":\"...\"}], \"memory_notes\": [string]}",
     "Prompt summary:",
     JSON.stringify({
