@@ -1128,6 +1128,19 @@ function relabelPosts(posts) {
 function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = []) {
   const compact = compactContext(context);
   const metrics = compact.metrics ?? {};
+  const fatigueSummary = tasteMemory?.fatigue_summary ?? {};
+  const repeatedOpeners = Array.isArray(fatigueSummary?.repeated_openers)
+    ? fatigueSummary.repeated_openers.map((entry) => String(entry?.opener ?? "").trim()).filter(Boolean).slice(0, 6)
+    : [];
+  const recentRejectionFeedback = Array.isArray(rejectionLessons)
+    ? rejectionLessons.slice(-25).map((lesson) => String(lesson?.user_feedback ?? "").trim()).filter(Boolean)
+    : [];
+  const rejectionExamples = Array.isArray(rejectionLessons)
+    ? rejectionLessons.slice(-12).map((lesson) => ({
+      source_text: String(lesson?.source_text ?? "").trim(),
+      user_feedback: String(lesson?.user_feedback ?? "").trim(),
+    })).filter((lesson) => lesson.source_text && lesson.user_feedback)
+    : [];
   const contextPath = "manifest-mental-vault/Context/latest-generate-context.json";
   const tasteMemoryPath = "manifest-mental-vault/Lessons/manifest_mental_taste_memory.json";
   const savedPatternMemoryPath = "manifest-mental-vault/Lessons/manifest_mental_saved_pattern_memory.json";
@@ -1153,10 +1166,14 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "Extract psychological mechanics, tension patterns, pacing, and emotional turns. Do not preserve source wording, source cadence, source sentence map, or source payoff sequence.",
     "If a draft feels like a nearby paraphrase of a saved pattern or an internal winner, reject it and write a new one from scratch.",
     "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, stale sentence resolutions, and obvious re-skins of posts already seen in the archive or current slate.",
+    repeatedOpeners.length
+      ? `For this run, treat these opener families as overused and avoid using them unless there is a truly exceptional reason: ${repeatedOpeners.join("; ")}.`
+      : "For this run, actively avoid obvious repeated opener families from the recent archive.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
     "Keep useful growth mechanics, but rewrite them into gender-neutral language and fresh account-native copy for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
     "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns and internal winners are both research inputs, not masters.",
+    "Do not water down rejection lessons into generic caution. Treat them as literal vetoes against weak logic, vague objects, empty metaphors, jumbled clauses, and repetitive half-reskins.",
     "Write with force, intent, and a point of view. Do not sound like a mimic bot. Do not sound like a stitched summary of reference posts.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
     "Use this internal process for every slot:",
@@ -1176,6 +1193,12 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     `- ${approvalLessonsPath}`,
     `- ${guidancePath}`,
     "Use the full archive, follower archive, metrics, goals, rejection lessons, approval lessons, and top posts from those files. Do the math and strategy in the backend.",
+    recentRejectionFeedback.length
+      ? "Recent rejection feedback to obey literally:\n" + recentRejectionFeedback.map((line) => `- ${line}`).join("\n")
+      : "Recent rejection feedback to obey literally: none available.",
+    rejectionExamples.length
+      ? "Recent rejected source examples:\n" + rejectionExamples.map((entry) => `- Bad draft: "${entry.source_text}" | Why it failed: ${entry.user_feedback}`).join("\n")
+      : "Recent rejected source examples: none available.",
     "Return JSON: {\"metrics\": object, \"posts\": [{\"slot\":\"Post 1\",\"text\":\"...\"}], \"memory_notes\": [string]}",
     "Prompt summary:",
     JSON.stringify({
