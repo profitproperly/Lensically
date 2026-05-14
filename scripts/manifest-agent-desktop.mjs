@@ -10,6 +10,7 @@ const VAULT = path.join(ROOT, "manifest-mental-vault");
 const LOCAL_ENV_PATH = path.join(ROOT, ".lensically-agent.env");
 const TASTE_MEMORY_PATH = path.join(VAULT, "Lessons", "manifest_mental_taste_memory.json");
 const SAVED_PATTERN_MEMORY_PATH = path.join(VAULT, "Lessons", "manifest_mental_saved_pattern_memory.json");
+const REJECTION_POLICY_PATH = path.join(VAULT, "Lessons", "manifest_mental_rejection_policy.json");
 const BATCH_PRESET_SELECTION_PATH = path.join(VAULT, "Context", "selected-batch-preset.json");
 const PORT = Number(process.env.MANIFEST_AGENT_DESKTOP_PORT || 4317);
 const API_BASE_URL = process.env.LENSICALLY_API_BASE_URL || "https://api.lensically.com";
@@ -977,15 +978,79 @@ async function loadLessons() {
 }
 
 async function saveLessons(lessons) {
+  const normalizedLessons = (Array.isArray(lessons) ? lessons : []).map((lesson) => ({
+    saved_at: String(lesson?.saved_at ?? "").trim(),
+    slot: String(lesson?.slot ?? "").trim(),
+    source_text: String(lesson?.source_text ?? "").trim(),
+    user_feedback: String(lesson?.user_feedback ?? "").trim(),
+  })).filter((lesson) => lesson.slot && lesson.source_text && lesson.user_feedback);
   await writeJson(path.join(VAULT, "Lessons", "rejection-lessons.json"), {
     updated_at: new Date().toISOString(),
-    lessons: (Array.isArray(lessons) ? lessons : []).map((lesson) => ({
-      saved_at: String(lesson?.saved_at ?? "").trim(),
-      slot: String(lesson?.slot ?? "").trim(),
+    lessons: normalizedLessons,
+  });
+  await writeRejectionPolicy(normalizedLessons);
+}
+
+function summarizeRejectionRules(rejectionLessons) {
+  const lessons = Array.isArray(rejectionLessons) ? rejectionLessons : [];
+  const bannedPhrases = new Set();
+  const bannedOpeners = new Set();
+  const bannedPayoffs = new Set();
+  const failureReasons = new Map();
+
+  for (const lesson of lessons.slice(-150)) {
+    const feedback = String(lesson?.user_feedback ?? "").trim();
+    const sourceText = String(lesson?.source_text ?? "").trim();
+    if (!feedback || !sourceText) continue;
+
+    for (const phrase of extractBannedPhrasesFromFeedback(feedback)) {
+      bannedPhrases.add(phrase);
+    }
+
+    const analysis = analyzePostText(sourceText);
+    if (analysis.opener) bannedOpeners.add(analysis.opener);
+    if (analysis.payoff) bannedPayoffs.add(analysis.payoff);
+
+    for (const sentence of feedback.split(/[.!?]\s+/)) {
+      const trimmed = sentence.trim();
+      if (!trimmed) continue;
+      const key = normalizeAnalysisText(trimmed);
+      failureReasons.set(key, (failureReasons.get(key) ?? 0) + 1);
+    }
+  }
+
+  return {
+    updated_at: new Date().toISOString(),
+    policy_goal: "Hermes must not generate drafts that repeat known weak logic, banned wording, vague payoffs, or explicitly rejected structures.",
+    banned_phrases: [...bannedPhrases].sort((left, right) => right.length - left.length).slice(0, 80),
+    banned_openers: [...bannedOpeners].sort((left, right) => right.length - left.length).slice(0, 40),
+    banned_payoffs: [...bannedPayoffs].sort((left, right) => right.length - left.length).slice(0, 60),
+    failure_reasons: [...failureReasons.entries()]
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, 40)
+      .map(([reason, count]) => ({ reason, count })),
+    recent_examples: lessons.slice(-20).map((lesson) => ({
       source_text: String(lesson?.source_text ?? "").trim(),
       user_feedback: String(lesson?.user_feedback ?? "").trim(),
-    })).filter((lesson) => lesson.slot && lesson.source_text && lesson.user_feedback),
-  });
+      opener: analyzePostText(lesson?.source_text).opener,
+      payoff: extractPayoffText(lesson?.source_text),
+    })).filter((entry) => entry.source_text && entry.user_feedback),
+  };
+}
+
+async function writeRejectionPolicy(rejectionLessons) {
+  const policy = summarizeRejectionRules(rejectionLessons);
+  await writeJson(REJECTION_POLICY_PATH, policy);
+  return policy;
+}
+
+async function loadRejectionPolicy() {
+  try {
+    return await readJson(REJECTION_POLICY_PATH);
+  } catch {
+    const lessons = await loadLessons();
+    return writeRejectionPolicy(lessons);
+  }
 }
 
 async function loadApprovalLessons() {
@@ -1096,6 +1161,7 @@ async function saveGuidanceDirect(text) {
 const CONTROL_FILES = {
   "memory/guidance": { title: "Guidance Memory", file: path.join(VAULT, "Lessons", "agent-guidance.json"), editable: true, type: "json" },
   "memory/rejection-lessons": { title: "Rejection Lessons", file: path.join(VAULT, "Lessons", "rejection-lessons.json"), editable: true, type: "json" },
+  "memory/rejection-policy": { title: "Rejection Policy", file: REJECTION_POLICY_PATH, editable: false, type: "json" },
   "memory/approval-lessons": { title: "Approval Lessons", file: path.join(VAULT, "Lessons", "approval-lessons.json"), editable: true, type: "json" },
   "memory/taste-memory": { title: "Taste Memory", file: TASTE_MEMORY_PATH, editable: false, type: "json" },
   "memory/saved-pattern-memory": { title: "Saved Pattern Memory", file: SAVED_PATTERN_MEMORY_PATH, editable: false, type: "json" },
@@ -1243,7 +1309,7 @@ function relabelPosts(posts) {
   }));
 }
 
-function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = [], extraConstraints = []) {
+function buildGeneratePrompt(context, rejectionLessons, rejectionPolicy, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = [], extraConstraints = []) {
   const compact = compactContext(context);
   const metrics = compact.metrics ?? {};
   const fatigueSummary = tasteMemory?.fatigue_summary ?? {};
@@ -1265,6 +1331,7 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
   const tasteMemoryPath = "manifest-mental-vault/Lessons/manifest_mental_taste_memory.json";
   const savedPatternMemoryPath = "manifest-mental-vault/Lessons/manifest_mental_saved_pattern_memory.json";
   const rejectionLessonsPath = "manifest-mental-vault/Lessons/rejection-lessons.json";
+  const rejectionPolicyPath = "manifest-mental-vault/Lessons/manifest_mental_rejection_policy.json";
   const approvalLessonsPath = "manifest-mental-vault/Lessons/approval-lessons.json";
   const guidancePath = "manifest-mental-vault/Lessons/agent-guidance.json";
   return [
@@ -1293,8 +1360,8 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
     "Keep useful growth mechanics, but rewrite them into gender-neutral language and fresh account-native copy for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
-    "Rejection lessons are the hardest constraints. Approval lessons are strong positive steering. Saved patterns and internal winners are both research inputs, not masters.",
-    "Do not water down rejection lessons into generic caution. Treat them as literal vetoes against weak logic, vague objects, empty metaphors, jumbled clauses, and repetitive half-reskins.",
+    "Rejection policy is the hardest law. Approval lessons are strong positive steering. Saved patterns and internal winners are both research inputs, not masters.",
+    "Do not water down rejection rules into generic caution. Treat them as literal vetoes against weak logic, vague objects, empty metaphors, jumbled clauses, repetitive half-reskins, and banned wording.",
     "Do not let the ending drift into soft abstraction. The payoff must land with clean logic, desire, tension, or consequence.",
     "Write with force, intent, and a point of view. Do not sound like a mimic bot. Do not sound like a stitched summary of reference posts.",
     "Preserve proven constants, but create fresh sentence resolutions that do not copy the winners' payoff logic.",
@@ -1313,9 +1380,11 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
     `- ${tasteMemoryPath}`,
     `- ${savedPatternMemoryPath}`,
     `- ${rejectionLessonsPath}`,
+    `- ${rejectionPolicyPath}`,
     `- ${approvalLessonsPath}`,
     `- ${guidancePath}`,
-    "Use the full archive, follower archive, metrics, goals, rejection lessons, approval lessons, and top posts from those files. Do the math and strategy in the backend.",
+    "Read the rejection policy file before writing any draft. Use it as pre-generation thought control, not just post-generation cleanup.",
+    "Use the full archive, follower archive, metrics, goals, rejection lessons, rejection policy, approval lessons, and top posts from those files. Do the math and strategy in the backend.",
     recentRejectionFeedback.length
       ? "Recent rejection feedback to obey literally:\n" + recentRejectionFeedback.map((line) => `- ${line}`).join("\n")
       : "Recent rejection feedback to obey literally: none available.",
@@ -1366,6 +1435,12 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
         rejection: Array.isArray(rejectionLessons) ? rejectionLessons.length : 0,
         approval: Array.isArray(approvalLessons) ? approvalLessons.length : 0,
         guidance: Array.isArray(guidance) ? guidance.length : 0,
+      },
+      rejection_policy_counts: {
+        banned_phrases: Array.isArray(rejectionPolicy?.banned_phrases) ? rejectionPolicy.banned_phrases.length : 0,
+        banned_openers: Array.isArray(rejectionPolicy?.banned_openers) ? rejectionPolicy.banned_openers.length : 0,
+        banned_payoffs: Array.isArray(rejectionPolicy?.banned_payoffs) ? rejectionPolicy.banned_payoffs.length : 0,
+        failure_reasons: Array.isArray(rejectionPolicy?.failure_reasons) ? rejectionPolicy.failure_reasons.length : 0,
       },
     }),
     "Existing posts already kept in the slate:",
@@ -1576,6 +1651,7 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
   const tasteMemory = await writeTasteMemory(context);
   const savedPatternMemory = await loadSavedPatternMemory();
   const rejectionLessons = await loadLessons();
+  const rejectionPolicy = await writeRejectionPolicy(rejectionLessons);
   const approvalLessons = await loadApprovalLessons();
   const guidance = await loadGuidance();
   const autoRejectRules = buildAutoRejectRules(rejectionLessons);
@@ -1592,6 +1668,7 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
       hermes = await runHermesJson(buildGeneratePrompt(
         context,
         rejectionLessons,
+        rejectionPolicy,
         approvalLessons,
         guidance,
         tasteMemory,
