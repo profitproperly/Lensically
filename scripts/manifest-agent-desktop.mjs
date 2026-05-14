@@ -321,6 +321,75 @@ function extractPayoffText(text) {
   return words.slice(Math.floor(words.length / 2)).join(" ").trim();
 }
 
+function escapeRegex(value) {
+  return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractBannedPhrasesFromFeedback(feedback) {
+  const text = String(feedback ?? "").trim();
+  if (!text) return [];
+  const matches = [];
+  const patterns = [
+    /stop saying ([^.,;\n]+)/gi,
+    /never use (?:the word )?([^.,;\n]+)/gi,
+    /([^.,;\n]{3,80}?) is (?:bad|weak|horrible|corny|vague|repetitive)/gi,
+    /([^.,;\n]{3,80}?) just doesn't do it/gi,
+    /([^.,;\n]{3,80}?) just doesnt do it/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const phrase = normalizeAnalysisText(match[1]);
+      if (!phrase) continue;
+      const wordCount = phrase.split(/\s+/).filter(Boolean).length;
+      if (wordCount > 10) continue;
+      matches.push(phrase);
+    }
+  }
+
+  return [...new Set(matches)];
+}
+
+function buildAutoRejectRules(rejectionLessons) {
+  const bannedPhrases = new Set();
+  const weakPayoffs = [];
+
+  for (const lesson of Array.isArray(rejectionLessons) ? rejectionLessons.slice(-120) : []) {
+    for (const phrase of extractBannedPhrasesFromFeedback(lesson?.user_feedback)) {
+      bannedPhrases.add(phrase);
+    }
+    const payoff = normalizeAnalysisText(extractPayoffText(lesson?.source_text));
+    if (payoff) weakPayoffs.push(payoff);
+  }
+
+  return {
+    banned_phrases: [...bannedPhrases].sort((left, right) => right.length - left.length),
+    weak_payoffs: [...new Set(weakPayoffs)].sort((left, right) => right.length - left.length),
+  };
+}
+
+function detectAutoRejectViolations(text, rules) {
+  const normalized = normalizeAnalysisText(text);
+  const violations = [];
+  const payoff = normalizeAnalysisText(extractPayoffText(text));
+
+  for (const phrase of Array.isArray(rules?.banned_phrases) ? rules.banned_phrases : []) {
+    if (phrase && normalized.includes(phrase)) {
+      violations.push(`contains banned rejection phrase: "${phrase}"`);
+      break;
+    }
+  }
+
+  for (const weakPayoff of Array.isArray(rules?.weak_payoffs) ? rules.weak_payoffs : []) {
+    if (weakPayoff && payoff && payoff.includes(weakPayoff)) {
+      violations.push(`reuses known weak payoff pattern: "${weakPayoff}"`);
+      break;
+    }
+  }
+
+  return violations;
+}
+
 function buildWeakPayoffLedger(rejectionLessons) {
   return (Array.isArray(rejectionLessons) ? rejectionLessons : [])
     .slice(-20)
@@ -1174,7 +1243,7 @@ function relabelPosts(posts) {
   }));
 }
 
-function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = []) {
+function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts = [], extraConstraints = []) {
   const compact = compactContext(context);
   const metrics = compact.metrics ?? {};
   const fatigueSummary = tasteMemory?.fatigue_summary ?? {};
@@ -1263,6 +1332,9 @@ function buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidanc
           ...strongPayoffLedger.winners.map((entry) => `- Winning post: "${entry.source_text}" | Strong back half: "${entry.strong_payoff}" | Likes: ${entry.likes}`),
         ].join("\n")
       : "Strong payoff ledger to study: none available.",
+    extraConstraints.length
+      ? "Auto-rejected draft constraints from the previous pass:\n" + extraConstraints.map((line) => `- ${line}`).join("\n")
+      : "Auto-rejected draft constraints from the previous pass: none.",
     "Return JSON: {\"metrics\": object, \"posts\": [{\"slot\":\"Post 1\",\"text\":\"...\"}], \"memory_notes\": [string]}",
     "Prompt summary:",
     JSON.stringify({
@@ -1506,14 +1578,51 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
   const rejectionLessons = await loadLessons();
   const approvalLessons = await loadApprovalLessons();
   const guidance = await loadGuidance();
+  const autoRejectRules = buildAutoRejectRules(rejectionLessons);
   let hermes = { posts: [], metrics: {}, memory_notes: [] };
-  if (generationSlots.length) {
-    activeRun = { ...activeRun, phase: `hermes_generating_${generationSlots.length}_posts` };
-    hermes = await runHermesJson(buildGeneratePrompt(context, rejectionLessons, approvalLessons, guidance, tasteMemory, savedPatternMemory, generationSlots, existingPosts));
+  let generatedPosts = [];
+  let autoRejectedCount = 0;
+  let remainingSlots = [...generationSlots];
+  let acceptedGeneratedPosts = [];
+  let extraConstraints = [];
+
+  if (remainingSlots.length) {
+    for (let pass = 1; pass <= 2 && remainingSlots.length; pass += 1) {
+      activeRun = { ...activeRun, phase: `hermes_generating_${remainingSlots.length}_posts_pass_${pass}` };
+      hermes = await runHermesJson(buildGeneratePrompt(
+        context,
+        rejectionLessons,
+        approvalLessons,
+        guidance,
+        tasteMemory,
+        savedPatternMemory,
+        remainingSlots,
+        [...existingPosts, ...acceptedGeneratedPosts],
+        extraConstraints,
+      ));
+      const candidatePosts = normalizePosts(hermes.posts ?? [], remainingSlots).map((post) => ({ ...post, approved: false }));
+      const nextRemainingSlots = [];
+      const nextConstraints = [];
+
+      for (const post of candidatePosts) {
+        const violations = detectAutoRejectViolations(post.text, autoRejectRules);
+        if (violations.length) {
+          autoRejectedCount += 1;
+          nextRemainingSlots.push(post.slot);
+          nextConstraints.push(`Reject "${post.text}" because it ${violations.join(" and ")}.`);
+          continue;
+        }
+        acceptedGeneratedPosts.push(post);
+      }
+
+      remainingSlots = nextRemainingSlots;
+      extraConstraints = nextConstraints.slice(0, 20);
+    }
   } else {
     activeRun = { ...activeRun, phase: "no_new_posts_requested" };
   }
-  const generatedPosts = normalizePosts(hermes.posts ?? [], generationSlots).map((post) => ({ ...post, approved: false }));
+
+  generatedPosts = acceptedGeneratedPosts;
   const posts = relabelPosts([...existingPosts, ...generatedPosts]);
   const run = {
     id: runId,
@@ -1524,6 +1633,8 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
     metrics: normalizeMetrics(context.metrics, hermes.metrics),
     memory_notes: [
       ...(existingPosts.length ? [`Appended ${generatedPosts.length} new post${generatedPosts.length === 1 ? "" : "s"} after keeping ${existingPosts.length} existing slate post${existingPosts.length === 1 ? "" : "s"} in place.`] : []),
+      ...(autoRejectedCount ? [`Auto-rejected ${autoRejectedCount} draft${autoRejectedCount === 1 ? "" : "s"} that violated hard rejection rules before they reached the slate.`] : []),
+      ...(remainingSlots.length ? [`${remainingSlots.length} slot${remainingSlots.length === 1 ? "" : "s"} were left empty because Hermes kept returning drafts that violated hard rejection rules.`] : []),
       ...(Array.isArray(hermes.memory_notes) ? hermes.memory_notes.map(String) : []),
     ],
     posts,
