@@ -24,6 +24,7 @@ const HERMES_PROVIDER = "openai-codex";
 const WINDOWS_CODEX_AUTH_PATH = path.join(process.env.USERPROFILE || "C:\\Users\\brian", ".codex", "auth.json");
 const DEFAULT_POST_COUNT = 17;
 const MAX_POST_COUNT = 200;
+const HERMES_GENERATION_MAX_PASSES = 5;
 const RECENT_TASTE_WINDOW_SIZE = 100;
 const RECENT_FATIGUE_WINDOW_SIZE = 40;
 const RECENT_A_TIER_RATIO = 0.10;
@@ -898,9 +899,21 @@ async function loadLatestRun() {
   try {
     const run = await readJson(path.join(VAULT, "Runs", "latest-run.json"));
     const { strategy_summary, fatigue_summary, ...cleanRun } = run ?? {};
+    const posts = relabelPosts(cleanRun.posts);
+    const memoryNotes = Array.isArray(cleanRun.memory_notes) ? cleanRun.memory_notes.map(String) : [];
+    const inferredMissingCount = Number(cleanRun.missing_post_count)
+      || memoryNotes.reduce((count, note) => {
+        const match = String(note).match(/(\d+)\s+slot(?:s)?\s+were left empty/i);
+        return match ? Math.max(count, Number(match[1])) : count;
+      }, 0);
     const normalizedRun = {
       ...cleanRun,
-      posts: relabelPosts(cleanRun.posts),
+      posts,
+      missing_post_count: inferredMissingCount,
+      requested_post_count: Math.max(
+        Number(cleanRun.requested_post_count) || 0,
+        posts.length + inferredMissingCount,
+      ),
     };
     try {
       const context = await readJson(path.join(VAULT, "Context", "latest-generate-context.json"));
@@ -1805,9 +1818,10 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
   let remainingSlots = [...generationSlots];
   let acceptedGeneratedPosts = [];
   let extraConstraints = [];
+  const requestedTotalPostCount = existingPosts.length + generationSlots.length;
 
   if (remainingSlots.length) {
-    for (let pass = 1; pass <= 2 && remainingSlots.length; pass += 1) {
+    for (let pass = 1; pass <= HERMES_GENERATION_MAX_PASSES && remainingSlots.length; pass += 1) {
       activeRun = { ...activeRun, phase: `hermes_generating_${remainingSlots.length}_posts_pass_${pass}` };
       hermes = await runHermesJson(buildGeneratePrompt(
         context,
@@ -1847,10 +1861,12 @@ async function generateRun(postCount = DEFAULT_POST_COUNT, requestedTargetDate =
   const posts = relabelPosts([...existingPosts, ...generatedPosts]);
   const run = {
     id: runId,
-    status: "generated",
+    status: remainingSlots.length ? "partial_generated" : "generated",
     generated_at: new Date().toISOString(),
     target_date: context.target_date,
-    requested_post_count: posts.length,
+    requested_post_count: requestedTotalPostCount,
+    missing_post_count: remainingSlots.length,
+    generation_passes: HERMES_GENERATION_MAX_PASSES,
     metrics: normalizeMetrics(context.metrics, hermes.metrics),
     memory_notes: [
       ...(existingPosts.length ? [`Appended ${generatedPosts.length} new post${generatedPosts.length === 1 ? "" : "s"} after keeping ${existingPosts.length} existing slate post${existingPosts.length === 1 ? "" : "s"} in place.`] : []),
@@ -2258,7 +2274,7 @@ async function refresh(){const currentGuidanceVersion=guidanceVersion;try{const 
 async function useBatchPreset(presetId){msg('Using selected Lensically batch in Hermes.');try{const d=await api('/batch-presets/use',{method:'POST',body:JSON.stringify({preset_id:presetId})});state.batchPresets=Array.isArray(d.presets)?d.presets:state.batchPresets;state.selectedBatchPresetId=d.selected_preset_id||presetId;msg('Using '+(d.active_preset?.name||'selected batch')+' for Hermes generation and scheduling.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function clearBatchPreset(){msg('Clearing Hermes batch selection.');try{const d=await api('/batch-presets/clear',{method:'POST',body:'{}'});state.batchPresets=Array.isArray(d.presets)?d.presets:state.batchPresets;state.selectedBatchPresetId=null;msg('Batch selection cleared. Choose a batch before generating.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function pullData(){const targetDate=getContextTargetDate();if(!targetDate){msg('Choose a context date before pulling data.','error');return}msg('Pulling fresh Lensically insights and followers without Hermes.');state.active={phase:'syncing_lensically_insights'};render();try{const d=await api('/pull-data',{method:'POST',body:JSON.stringify({target_date:targetDate})});state.context=d.context?.summary||state.context;state.guidance=Array.isArray(d.context?.guidance)?d.context.guidance:state.guidance;state.batchPresets=Array.isArray(d.context?.batch_presets)?d.context.batch_presets:state.batchPresets;state.selectedBatchPresetId=d.context?.selected_batch_preset_id??state.selectedBatchPresetId;const sync=d.context?.sync||{};msg('Pulled fresh Lensically data for '+targetDate+'. Synced '+(sync.post_archive?.synced_posts||0)+' posts across '+(sync.post_archive?.pages||0)+' pages and refreshed '+(sync.followers?.total_count||0)+' follower snapshots.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
-async function generate(){const postCount=Number(document.getElementById('post-count').value||17);const targetDate=getContextTargetDate();if(!targetDate){msg('Choose a context date before generating.','error');return}msg('Generating '+postCount+' more posts for '+targetDate+'. Hermes is appending to the current slate; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:JSON.stringify({post_count:postCount,target_date:targetDate})});state.run=d.run;state.context=d.context||state.context;state.selected={};msg('Slate now has '+(d.run?.posts?.length||postCount)+' total posts for '+targetDate+'.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
+async function generate(){const postCount=Number(document.getElementById('post-count').value||17);const targetDate=getContextTargetDate();if(!targetDate){msg('Choose a context date before generating.','error');return}msg('Generating '+postCount+' more posts for '+targetDate+'. Hermes is appending to the current slate; this can take several minutes.');state.active={phase:'starting'};render();try{const d=await api('/generate',{method:'POST',body:JSON.stringify({post_count:postCount,target_date:targetDate})});state.run=d.run;state.context=d.context||state.context;state.selected={};const actualCount=d.run?.posts?.length||0;const requestedCount=d.run?.requested_post_count||postCount;const missingCount=d.run?.missing_post_count||0;if(missingCount>0)msg('Requested '+requestedCount+' total posts for '+targetDate+' but Hermes only returned '+actualCount+'. '+missingCount+' slot'+(missingCount===1?' was':'s were')+' left empty after hard rejections.','error');else msg('Slate now has '+actualCount+' total posts for '+targetDate+'.','ok')}catch(e){msg(e.message,'error')}finally{state.active=null;render()}}
 async function reorderPosts(fromIndex,toIndex){msg('Reordering generated posts.');try{const d=await api('/run/posts/reorder',{method:'POST',body:JSON.stringify({from_index:fromIndex,to_index:toIndex})});state.run=d.run;msg('Post order updated.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function deletePost(index){const posts=state.run?.posts||[];const post=posts[index]||null;if(!post){msg('Post not found.','error');return}if(!window.confirm('Delete generated post #'+(index+1)+'?'))return;msg('Deleting generated post #'+(index+1)+'.');try{const d=await api('/run/posts/delete',{method:'POST',body:JSON.stringify({index,reason:(state.reasons[post.slot]||'').trim()})});delete state.reasons[post.slot];delete state.approvalLessons[post.slot];delete state.selected[post.slot];state.run=d.run;msg('Post deleted.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
 async function approveSelectedPosts(){const slots=selectedSlots();if(!slots.length){msg('Select at least one post to approve.','error');return}msg('Approving selected posts.');try{const d=await api('/run/posts/approve',{method:'POST',body:JSON.stringify({slots})});state.run=d.run;state.selected={};msg('Selected posts approved. Future generate runs will keep them and append new posts after the current slate.','ok')}catch(e){msg(e.message,'error')}finally{render()}}
