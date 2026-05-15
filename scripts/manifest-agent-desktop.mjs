@@ -21,6 +21,7 @@ const GOAL_FOLLOWERS = 1_000_000;
 const HERMES_BIN = "/home/brian/.local/bin/hermes";
 const HERMES_MODEL = "gpt-5.5";
 const HERMES_PROVIDER = "openai-codex";
+const WINDOWS_CODEX_AUTH_PATH = path.join(process.env.USERPROFILE || "C:\\Users\\brian", ".codex", "auth.json");
 const DEFAULT_POST_COUNT = 17;
 const MAX_POST_COUNT = 200;
 const RECENT_TASTE_WINDOW_SIZE = 100;
@@ -1581,7 +1582,77 @@ function toWslPath(windowsPath) {
   return match ? `/mnt/${match[1].toLowerCase()}/${match[2]}` : normalized;
 }
 
+function ensureHermesCodexAuth() {
+  if (HERMES_PROVIDER !== "openai-codex") return;
+  const sourcePath = path.resolve(WINDOWS_CODEX_AUTH_PATH);
+  const check = spawnSync("wsl.exe", [
+    "python3",
+    "-c",
+    [
+      "import json, pathlib, sys",
+      `source = pathlib.Path(${JSON.stringify(toWslPath(sourcePath))})`,
+      "target = pathlib.Path.home() / '.hermes' / 'auth.json'",
+      "providers = {}",
+      "if target.exists():",
+      "    try:",
+      "        payload = json.loads(target.read_text(encoding='utf-8'))",
+      "        if isinstance(payload, dict):",
+      "            providers = payload.get('providers') if isinstance(payload.get('providers'), dict) else {}",
+      "    except Exception:",
+      "        providers = {}",
+      "state = providers.get('openai-codex') if isinstance(providers, dict) else None",
+      "tokens = state.get('tokens') if isinstance(state, dict) else None",
+      "ok = isinstance(tokens, dict) and bool(tokens.get('access_token')) and bool(tokens.get('refresh_token'))",
+      "print('ready' if ok else 'missing')",
+      "sys.exit(0)",
+    ].join("\n"),
+  ], { encoding: "utf8", windowsHide: true });
+  if ((check.stdout || "").trim() === "ready") return;
+
+  const repair = spawnSync("wsl.exe", [
+    "python3",
+    "-c",
+    [
+      "import json, pathlib, sys",
+      `source = pathlib.Path(${JSON.stringify(toWslPath(sourcePath))})`,
+      "target = pathlib.Path.home() / '.hermes' / 'auth.json'",
+      "if not source.exists():",
+      "    print('missing-source')",
+      "    sys.exit(0)",
+      "src = json.loads(source.read_text(encoding='utf-8'))",
+      "tokens = src.get('tokens') if isinstance(src, dict) else None",
+      "if not isinstance(tokens, dict) or not tokens.get('access_token') or not tokens.get('refresh_token'):",
+      "    print('missing-tokens')",
+      "    sys.exit(0)",
+      "payload = {}",
+      "if target.exists():",
+      "    try:",
+      "        payload = json.loads(target.read_text(encoding='utf-8'))",
+      "    except Exception:",
+      "        payload = {}",
+      "if not isinstance(payload, dict):",
+      "    payload = {}",
+      "providers = payload.get('providers') if isinstance(payload.get('providers'), dict) else {}",
+      "providers['openai-codex'] = {",
+      "    'tokens': tokens,",
+      "    'last_refresh': src.get('last_refresh'),",
+      "    'auth_mode': src.get('auth_mode') or 'chatgpt',",
+      "}",
+      "payload['version'] = payload.get('version') or 1",
+      "payload['providers'] = providers",
+      "payload['credential_pool'] = payload.get('credential_pool') if isinstance(payload.get('credential_pool'), dict) else {}",
+      "target.parent.mkdir(parents=True, exist_ok=True)",
+      "target.write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')",
+      "print('repaired')",
+    ].join("\n"),
+  ], { encoding: "utf8", windowsHide: true });
+  if (repair.status !== 0) {
+    throw new Error(`Failed to repair Hermes Codex auth bridge: ${(repair.stderr || repair.stdout || "").trim()}`);
+  }
+}
+
 async function runHermesJson(prompt) {
+  ensureHermesCodexAuth();
   const promptPath = path.join(VAULT, "Context", "latest-hermes-prompt.txt");
   const runnerPath = path.join(VAULT, "Context", "hermes-runner.py");
   const stdoutPath = path.join(VAULT, "Context", "latest-hermes-stdout.txt");
