@@ -369,10 +369,19 @@ function buildAutoRejectRules(rejectionLessons) {
   };
 }
 
+function isGenericSoftPayoff(payoff, signals) {
+  const normalizedPayoff = normalizeAnalysisText(payoff);
+  if (!normalizedPayoff) return false;
+  const genericSoftObjects = /\b(relief|appreciation|attention|chapter|future|version of your life|better treatment|better money|right appreciation|right people)\b/;
+  if (!genericSoftObjects.test(normalizedPayoff)) return false;
+  return !signals.concrete_trigger && !signals.status && !signals.social_reversal;
+}
+
 function detectAutoRejectViolations(text, rules) {
   const normalized = normalizeAnalysisText(text);
   const violations = [];
   const payoff = normalizeAnalysisText(extractPayoffText(text));
+  const signals = analyzePostText(text);
 
   for (const phrase of Array.isArray(rules?.banned_phrases) ? rules.banned_phrases : []) {
     if (phrase && normalized.includes(phrase)) {
@@ -388,7 +397,45 @@ function detectAutoRejectViolations(text, rules) {
     }
   }
 
+  if (signals.money && !signals.concrete_trigger && !signals.status && !signals.social_reversal) {
+    violations.push("uses a money promise without a concrete pressure change, status turn, or social consequence");
+  }
+
+  if (isGenericSoftPayoff(payoff, signals)) {
+    violations.push("lands in a soft generic payoff instead of a sharp consequence");
+  }
+
   return violations;
+}
+
+function summarizeRecentPerformance(context) {
+  const recent = (Array.isArray(context?.archive_recent) ? context.archive_recent : [])
+    .filter((post) => numberValue(post?.views) > 0)
+    .slice(0, 17);
+  const baselineLikes = numberValue(context?.metrics?.baselines?.average_likes);
+  const baselineViews = numberValue(context?.metrics?.baselines?.average_views);
+  const averageLikes = Number(average(recent.map((post) => numberValue(post?.likes))).toFixed(2));
+  const averageViews = Number(average(recent.map((post) => numberValue(post?.views))).toFixed(2));
+  const lowPerformers = [...recent]
+    .sort((left, right) => numberValue(left?.likes) - numberValue(right?.likes) || numberValue(right?.views) - numberValue(left?.views))
+    .slice(0, 5)
+    .map((post) => ({
+      text: String(post?.text ?? "").trim(),
+      likes: numberValue(post?.likes),
+      views: numberValue(post?.views),
+    }))
+    .filter((post) => post.text);
+
+  return {
+    recent_posts: recent.length,
+    average_likes: averageLikes,
+    average_views: averageViews,
+    baseline_likes: baselineLikes,
+    baseline_views: baselineViews,
+    average_likes_ratio_vs_baseline: baselineLikes ? Number((averageLikes / baselineLikes).toFixed(2)) : null,
+    average_views_ratio_vs_baseline: baselineViews ? Number((averageViews / baselineViews).toFixed(2)) : null,
+    low_performers: lowPerformers,
+  };
 }
 
 function buildWeakPayoffLedger(rejectionLessons) {
@@ -1313,6 +1360,7 @@ function buildGeneratePrompt(context, rejectionLessons, rejectionPolicy, approva
   const compact = compactContext(context);
   const metrics = compact.metrics ?? {};
   const fatigueSummary = tasteMemory?.fatigue_summary ?? {};
+  const recentPerformance = summarizeRecentPerformance(compact);
   const repeatedOpeners = Array.isArray(fatigueSummary?.repeated_openers)
     ? fatigueSummary.repeated_openers.map((entry) => String(entry?.opener ?? "").trim()).filter(Boolean).slice(0, 6)
     : [];
@@ -1357,6 +1405,13 @@ function buildGeneratePrompt(context, rejectionLessons, rejectionPolicy, approva
     repeatedOpeners.length
       ? `For this run, treat these opener families as overused and avoid using them unless there is a truly exceptional reason: ${repeatedOpeners.join("; ")}.`
       : "For this run, actively avoid obvious repeated opener families from the recent archive.",
+    recentPerformance.average_likes_ratio_vs_baseline !== null && recentPerformance.average_views_ratio_vs_baseline !== null
+      ? `Current problem diagnosis: recent posts are converting weakly. The last ${recentPerformance.recent_posts} view-bearing posts are averaging ${recentPerformance.average_likes} likes vs ${recentPerformance.baseline_likes} baseline (${recentPerformance.average_likes_ratio_vs_baseline}x), while views are ${recentPerformance.average_views} vs ${recentPerformance.baseline_views} baseline (${recentPerformance.average_views_ratio_vs_baseline}x). Solve for sharper like-conversion, not just more impressions.`
+      : "Current problem diagnosis: optimize for sharper like-conversion, not generic reach.",
+    "Recent underperformance pattern: generic blessing language and vague money promises are losing. Do not write soft payoff objects like relief, appreciation, attention, future, chapter, or better treatment unless the sentence also creates a concrete pressure change, status turn, or social consequence.",
+    "Money copy must earn its place. A money post is weak if it only says money is coming. A money post is stronger when it changes a bill, account, pressure point, walking-away power, price, or treatment dynamic.",
+    "Status copy must feel expensive. Prefer being chosen, respected, mentioned, prioritized, handled carefully, or becoming costly to fumble over generic positivity.",
+    "If the setup is broad, the payoff must become narrower and more consequential by the end of the sentence.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
     "Keep useful growth mechanics, but rewrite them into gender-neutral language and fresh account-native copy for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
@@ -1401,6 +1456,9 @@ function buildGeneratePrompt(context, rejectionLessons, rejectionPolicy, approva
           ...strongPayoffLedger.winners.map((entry) => `- Winning post: "${entry.source_text}" | Strong back half: "${entry.strong_payoff}" | Likes: ${entry.likes}`),
         ].join("\n")
       : "Strong payoff ledger to study: none available.",
+    recentPerformance.low_performers.length
+      ? "Recent low-performing posts to learn away from:\n" + recentPerformance.low_performers.map((entry) => `- Weak recent post: "${entry.text}" | Likes: ${entry.likes} | Views: ${entry.views}`).join("\n")
+      : "Recent low-performing posts to learn away from: none available.",
     extraConstraints.length
       ? "Auto-rejected draft constraints from the previous pass:\n" + extraConstraints.map((line) => `- ${line}`).join("\n")
       : "Auto-rejected draft constraints from the previous pass: none.",
