@@ -1509,8 +1509,15 @@ function buildGeneratePrompt(context, rejectionLessons, rejectionPolicy, approva
   ].join("\n\n");
 }
 
-function extractJson(text) {
+function extractJson(text, stderr = "") {
   const trimmed = String(text ?? "").trim();
+  const stderrText = String(stderr ?? "").trim();
+  if (!trimmed) {
+    if (/No Codex credentials stored/i.test(stderrText)) {
+      throw new Error("Hermes is not authenticated with Codex in WSL. Run `hermes auth` in the Hermes environment, then try Generate again.");
+    }
+    throw new Error(`Hermes returned empty output. Check latest-hermes-stderr.txt for the underlying runner/auth error.${stderrText ? ` stderr: ${stderrText.slice(0, 500)}` : ""}`);
+  }
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -1524,7 +1531,7 @@ function extractJson(text) {
         return JSON.parse(repairJsonLike(candidate));
       }
     }
-    throw new Error(`Hermes did not return parseable JSON: ${trimmed.slice(0, 500)}`);
+    throw new Error(`Hermes did not return parseable JSON. stdout: ${trimmed.slice(0, 500)}${stderrText ? ` | stderr: ${stderrText.slice(0, 500)}` : ""}`);
   }
 }
 
@@ -1646,11 +1653,15 @@ async function runHermesJson(prompt) {
           reject(new Error("Hermes was stopped by kill switch."));
         } else if (code !== 0) {
           log("hermes_failed", { code, stderr: stderr.slice(0, 500) });
-          reject(new Error(`Hermes exited ${code}: ${stderr || stdout}`));
+          if (/No Codex credentials stored/i.test(stderr)) {
+            reject(new Error("Hermes is not authenticated with Codex in WSL. Run `hermes auth` in the Hermes environment, then try Generate again."));
+          } else {
+            reject(new Error(`Hermes exited ${code}: ${stderr || stdout}`));
+          }
         } else {
           log("hermes_complete", { stdout_bytes: Buffer.byteLength(stdout, "utf8") });
           try {
-            resolve(extractJson(stdout));
+            resolve(extractJson(stdout, stderr));
           } catch (error) {
             log("hermes_parse_failed", { error: error instanceof Error ? error.message : String(error), stdout: stdout.slice(0, 500) });
             reject(error instanceof Error ? error : new Error(String(error)));
