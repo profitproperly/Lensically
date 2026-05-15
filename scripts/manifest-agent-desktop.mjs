@@ -1402,16 +1402,19 @@ function buildGeneratePrompt(context, rejectionLessons, rejectionPolicy, approva
     "Extract psychological mechanics, tension patterns, pacing, and emotional turns. Do not preserve source wording, source cadence, source sentence map, or source payoff sequence.",
     "If a draft feels like a nearby paraphrase of a saved pattern or an internal winner, reject it and write a new one from scratch.",
     "Read the taste-memory fatigue summary. Avoid repeated opener families, overused mechanics, stale sentence resolutions, and obvious re-skins of posts already seen in the archive or current slate.",
+    "Get back to the basics that have already won on this account.",
+    "Default to the proven opener families first: 'You're about to ...', 'The person reading this ...', and 'To the person reading this ...'.",
+    "Treat 'The person reading this is about to ...' as a primary winning opener, not a backup variation.",
+    "Treat 'To the person reading this ...' as another primary winning opener family when it fits the sentence naturally.",
+    "Do not avoid those opener families just because they have appeared recently. Reuse them when they are still the strongest move.",
     repeatedOpeners.length
-      ? `For this run, treat these opener families as overused and avoid using them unless there is a truly exceptional reason: ${repeatedOpeners.join("; ")}.`
-      : "For this run, actively avoid obvious repeated opener families from the recent archive.",
+      ? `Recent repeated opener families are evidence of what this account keeps reaching for: ${repeatedOpeners.join("; ")}. Treat repetition as acceptable when the payoff still feels like a true winner.`
+      : "If the evidence says a proven opener family still works, reuse it confidently.",
     recentPerformance.average_likes_ratio_vs_baseline !== null && recentPerformance.average_views_ratio_vs_baseline !== null
-      ? `Current problem diagnosis: recent posts are converting weakly. The last ${recentPerformance.recent_posts} view-bearing posts are averaging ${recentPerformance.average_likes} likes vs ${recentPerformance.baseline_likes} baseline (${recentPerformance.average_likes_ratio_vs_baseline}x), while views are ${recentPerformance.average_views} vs ${recentPerformance.baseline_views} baseline (${recentPerformance.average_views_ratio_vs_baseline}x). Solve for sharper like-conversion, not just more impressions.`
-      : "Current problem diagnosis: optimize for sharper like-conversion, not generic reach.",
-    "Recent underperformance pattern: generic blessing language and vague money promises are losing. Do not write soft payoff objects like relief, appreciation, attention, future, chapter, or better treatment unless the sentence also creates a concrete pressure change, status turn, or social consequence.",
-    "Money copy must earn its place. A money post is weak if it only says money is coming. A money post is stronger when it changes a bill, account, pressure point, walking-away power, price, or treatment dynamic.",
-    "Status copy must feel expensive. Prefer being chosen, respected, mentioned, prioritized, handled carefully, or becoming costly to fumble over generic positivity.",
-    "If the setup is broad, the payoff must become narrower and more consequential by the end of the sentence.",
+      ? `Current problem diagnosis: recent posts are averaging ${recentPerformance.average_likes} likes vs ${recentPerformance.baseline_likes} baseline (${recentPerformance.average_likes_ratio_vs_baseline}x) and ${recentPerformance.average_views} views vs ${recentPerformance.baseline_views} baseline (${recentPerformance.average_views_ratio_vs_baseline}x). Recover by leaning back into the opener families and sentence shapes that already proved they can win here.`
+      : "Current problem diagnosis: recover by leaning back into the opener families and sentence shapes that already proved they can win here.",
+    "Do not chase novelty for its own sake. Use the old winning rhythm again, but keep each post fresh enough that it does not read like a copy-paste reskin.",
+    "Simple direct promises are allowed again if they belong to the account's proven winning voice.",
     "If a saved pattern uses gendered audience language, treat that as source-specific wrapping rather than wording to copy.",
     "Keep useful growth mechanics, but rewrite them into gender-neutral language and fresh account-native copy for this account.",
     "Prefer direct second-person language or neutral terms such as person, people, or the person reading this. Do not use girl, guy, man, woman, boyfriend, girlfriend, wife, husband, or other gendered audience labels unless the user explicitly asks for that.",
