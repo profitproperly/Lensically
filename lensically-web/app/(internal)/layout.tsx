@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
+import { ThreadsAccountSwitcher } from "@/components/ThreadsAccountSwitcher";
 
 export default function InternalLayout({
   children,
@@ -60,9 +61,8 @@ export default function InternalLayout({
           </Link>
         </div>
 
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-medium text-slate-900">Manifest Mental</p>
-          <p className="text-xs text-slate-500">@manifestmental</p>
+        <div className="hidden sm:block">
+          <ThreadsAccountSwitcher />
         </div>
       </header>
 

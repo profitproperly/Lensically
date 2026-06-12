@@ -6,11 +6,14 @@ import { useEffect, useState } from "react";
 import { buildWorkerUrl } from "../lib/apiClient";
 import { preloadRouteDataForNavigation } from "../lib/routeDataPrefetch";
 import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "../lib/selectedThreadsAccount";
+import {
   readThreadsProfileCache,
   writeThreadsProfileCache,
 } from "../lib/threadsProfileCache";
-
-const DEFAULT_THREADS_USERNAME = "manifestmental";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -25,6 +28,10 @@ const links = [
 type ThreadsMeResponse = {
   username?: string;
   threads_profile_picture_url?: string;
+  account?: {
+    username?: string | null;
+    threads_profile_picture_url?: string | null;
+  } | null;
 };
 
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
@@ -40,7 +47,8 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const currentPath = String(pathname ?? "");
   const isActivePath = (href: string) => currentPath === String(href);
   const cachedProfile = readThreadsProfileCache("workspace-owner");
-  const [username, setUsername] = useState<string | null>(DEFAULT_THREADS_USERNAME);
+  const [selectedThreadsUserId, setSelectedThreadsUserId] = useState("");
+  const [username, setUsername] = useState<string | null>(null);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const displayUsername = username || cachedProfile?.account?.username || null;
@@ -49,19 +57,23 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        const selected = readSelectedThreadsUserId();
+        setSelectedThreadsUserId(selected);
         const res = await fetch(
-          THREADS_ME_URL,
+          appendThreadsUserId(THREADS_ME_URL, selected),
           { cache: "no-store", credentials: "include" },
         );
         if (!res.ok) {
           return;
         }
         const data = (await res.json()) as ThreadsMeResponse;
-        setUsername(data.username?.trim() || null);
-        setProfilePictureUrl(data.threads_profile_picture_url ?? null);
+        const nextUsername = data.account?.username?.trim() || data.username?.trim() || null;
+        const nextProfilePictureUrl = data.account?.threads_profile_picture_url ?? data.threads_profile_picture_url ?? null;
+        setUsername(nextUsername);
+        setProfilePictureUrl(nextProfilePictureUrl);
         writeThreadsProfileCache("workspace-owner", {
-          username: data.username ?? null,
-          threads_profile_picture_url: data.threads_profile_picture_url ?? null,
+          username: nextUsername,
+          threads_profile_picture_url: nextProfilePictureUrl,
         });
       } catch {
         // Ignore profile load errors to keep sidebar usable.
@@ -69,6 +81,19 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     };
 
     void loadProfile();
+
+    const handleSelectedAccount = (event: Event) => {
+      const nextThreadsUserId = (event as CustomEvent<{ threadsUserId?: string }>).detail?.threadsUserId?.trim() ?? "";
+      setSelectedThreadsUserId(nextThreadsUserId);
+      setUsername(null);
+      setProfilePictureUrl(null);
+      void loadProfile();
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+
+    return () => {
+      window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+    };
   }, []);
 
   useEffect(() => {
@@ -76,7 +101,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
       return;
     }
     setUsername(displayUsername);
-  }, [displayUsername]);
+  }, [displayUsername, selectedThreadsUserId]);
 
   async function handleSidebarNavigation(href: string) {
     if (!href || isActivePath(href) || pendingNavigationHref) {

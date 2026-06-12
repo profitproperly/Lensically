@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "@/lib/selectedThreadsAccount";
 
 type FollowerRow = {
   date: string;
@@ -154,7 +159,7 @@ export default function FollowersPage() {
 
       try {
         const response = await fetch(
-          `${THREADS_FOLLOWERS_URL}?limit=${FOLLOWERS_PAGE_SIZE}&page=${page}`,
+          appendThreadsUserId(`${THREADS_FOLLOWERS_URL}?limit=${FOLLOWERS_PAGE_SIZE}&page=${page}`, readSelectedThreadsUserId()),
           {
             cache: "no-store",
             credentials: "include",
@@ -195,9 +200,16 @@ export default function FollowersPage() {
 
     void loadFollowers();
 
+    const handleSelectedAccount = () => {
+      setPage(1);
+      void loadFollowers();
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+
     return () => {
       isMounted = false;
       controller.abort();
+      window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
     };
   }, [page]);
 

@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { buildWorkerUrl } from "../../../lib/apiClient";
+import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "../../../lib/selectedThreadsAccount";
 
 type ThreadsPost = {
   id?: string;
@@ -49,7 +54,7 @@ export default function PostsList() {
       setHasError(false);
 
       const res = await fetch(
-        THREADS_POSTS_URL,
+        appendThreadsUserId(THREADS_POSTS_URL, readSelectedThreadsUserId()),
         { cache: "no-store", credentials: "include" },
       );
       const data = (await res.json()) as PostsResponse;
@@ -85,7 +90,10 @@ export default function PostsList() {
 
     try {
       const res = await fetch(
-        `${THREADS_POSTS_URL}?cursor=${encodeURIComponent(cursor)}&cursor_depth=${nextDepth}`,
+        appendThreadsUserId(
+          `${THREADS_POSTS_URL}?cursor=${encodeURIComponent(cursor)}&cursor_depth=${nextDepth}`,
+          readSelectedThreadsUserId(),
+        ),
         { credentials: "include" },
       );
 
@@ -122,7 +130,7 @@ export default function PostsList() {
 
     try {
       const res = await fetch(
-        THREADS_POSTS_URL,
+        appendThreadsUserId(THREADS_POSTS_URL, readSelectedThreadsUserId()),
         { cache: "no-store", credentials: "include" },
       );
 
@@ -154,6 +162,14 @@ export default function PostsList() {
 
   useEffect(() => {
     void loadPosts();
+    const handleSelectedAccount = () => {
+      void loadPosts();
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+
+    return () => {
+      window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+    };
   }, [loadPosts]);
 
   const sortedPosts = [...posts].sort((a, b) => {

@@ -864,7 +864,7 @@ async function publishThreadsTextForAppUser(
   spoilerAllText: boolean = false,
   spoilerPhrases: string[] = [],
 ): Promise<AppUserThreadsPublishResult> {
-  const account = await getThreadsAccountForAppUser(env, appUserId);
+  const account = await getThreadsAccountForAppUser(env, appUserId, threadsUserId);
   if (!account?.access_token || account.threads_user_id !== threadsUserId) {
     return {
       success: false,
@@ -2527,17 +2527,35 @@ type MetaDeletionRequestRecord = {
   completed_at: string | null;
 };
 
-async function getThreadsAccountForAppUser(env: Env, appUserId: string): Promise<ThreadsAccount | null> {
+async function getThreadsAccountForAppUser(
+  env: Env,
+  appUserId: string,
+  requestedThreadsUserId: string | null = null,
+): Promise<ThreadsAccount | null> {
   logWorkerEvent("THREADS_ACCOUNT_LOOKUP", {
     appUserId,
+    requestedThreadsUserId,
   });
-  const configuredAccount = await getConfiguredThreadsAccountById(env, null);
-  if (configuredAccount) {
-    const profile = await fetchConfiguredThreadsProfile(env, configuredAccount, 0);
-    return {
-      threads_user_id: profile.threads_user_id,
-      access_token: configuredAccount.accessToken,
-    };
+  const configuredAccounts = await Promise.all(
+    getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
+  );
+  const resolvedConfiguredAccounts = configuredAccounts.filter(
+    (account): account is ResolvedConfiguredThreadsAccount => account !== null,
+  );
+
+  if (resolvedConfiguredAccounts.length > 0) {
+    for (let index = 0; index < resolvedConfiguredAccounts.length; index += 1) {
+      const configuredAccount = resolvedConfiguredAccounts[index];
+      const profile = await fetchConfiguredThreadsProfile(env, configuredAccount, index);
+      if (!requestedThreadsUserId || profile.threads_user_id === requestedThreadsUserId) {
+        return {
+          threads_user_id: profile.threads_user_id,
+          access_token: configuredAccount.accessToken,
+        };
+      }
+    }
+
+    return null;
   }
 
   return null;
@@ -5418,11 +5436,12 @@ async function processThreadsUninstallRequest(env: Env, platformUserId: string):
 async function getThreadsAccountForAppUserWithRetry(
   env: Env,
   appUserId: string,
+  requestedThreadsUserId: string | null = null,
   attempts = 6,
   delayMs = 500,
 ): Promise<ThreadsAccount | null> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const account = await getThreadsAccountForAppUser(env, appUserId);
+    const account = await getThreadsAccountForAppUser(env, appUserId, requestedThreadsUserId);
     if (account) {
       return account;
     }
@@ -6148,9 +6167,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/me" && request.method === "GET") {
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
       const configuredAccounts = await getConfiguredThreadsProfiles(env);
       if (configuredAccounts.length > 0) {
-        const activeAccount = configuredAccounts.find((account) => account.is_active) ?? configuredAccounts[0];
+        const activeAccount = configuredAccounts.find((account) => selectedThreadsUserId && account.threads_user_id === selectedThreadsUserId)
+          ?? configuredAccounts.find((account) => account.is_active)
+          ?? configuredAccounts[0];
 
         return new Response(
           JSON.stringify({
@@ -6218,7 +6240,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         ?? linkedAccounts[0]?.threads_user_id
         ?? null;
 
-      const account = await getThreadsAccountForAppUserWithRetry(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUserWithRetry(env, ownedAppUserId, selectedThreadsUserId);
       logWorkerEvent("THREADS_ME_LOOKUP_RESULT", {
         appUserId: ownedAppUserId,
         found: Boolean(account),
@@ -6444,7 +6466,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (url.pathname === "/api/threads/dashboard" && request.method === "GET") {
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, selectedThreadsUserId);
 
       if (!account?.access_token || !account.threads_user_id) {
         return new Response(
@@ -6475,7 +6498,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (url.pathname === "/api/threads/followers" && request.method === "GET") {
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, selectedThreadsUserId);
 
       if (!account?.threads_user_id) {
         return new Response(
@@ -6554,9 +6578,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/threads/accounts" && request.method === "GET") {
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
       const configuredAccounts = await getConfiguredThreadsProfiles(env);
       if (configuredAccounts.length > 0) {
-        const activeAccount = configuredAccounts.find((account) => account.is_active) ?? configuredAccounts[0];
+        const activeAccount = configuredAccounts.find((account) => selectedThreadsUserId && account.threads_user_id === selectedThreadsUserId)
+          ?? configuredAccounts.find((account) => account.is_active)
+          ?? configuredAccounts[0];
 
         return new Response(
           JSON.stringify({
@@ -6663,8 +6690,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, selectedThreadsUserId);
       logWorkerEvent("THREADS_ACCOUNT_LOOKUP_RESULT", {
         found: Boolean(account),
         threads_user_id: account?.threads_user_id ?? null,
@@ -6769,8 +6797,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (url.pathname === "/api/threads/posts/archive" && request.method === "GET") {
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, selectedThreadsUserId);
       if (!account || !account.threads_user_id) {
         return new Response(
           JSON.stringify({ error: "Threads access token missing" }),
@@ -6821,7 +6850,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const threadsUserId = url.searchParams.get("threads_user_id");
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, threadsUserId?.trim() || null);
 
       if (!account?.access_token || (threadsUserId && threadsUserId !== account.threads_user_id)) {
         return new Response(
@@ -6874,8 +6903,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, selectedThreadsUserId);
 
       if (!account?.access_token) {
         return new Response(
@@ -6939,7 +6969,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return forbiddenJsonResponse(requestCorsHeaders);
       }
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, url.searchParams.get("threads_user_id")?.trim() || null);
 
       if (!account) {
         return new Response(
@@ -7043,7 +7073,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, threadsUserId);
 
       if (!account?.access_token || account.threads_user_id !== threadsUserId) {
         return new Response(
@@ -7225,7 +7255,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, threadsUserId);
       const directThreadsAccount = account?.threads_user_id === threadsUserId
         ? account
         : await env.DB.prepare(
@@ -7358,7 +7388,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
       const resolvedTimezone = timezone ?? WORKSPACE_DEFAULT_TIMEZONE;
 
-      const account = await getThreadsAccountForAppUser(env, ownedAppUserId);
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, threadsUserId);
       if (!account?.threads_user_id || account.threads_user_id !== threadsUserId) {
         return new Response(
           JSON.stringify({ error: "Threads account not connected" }),
@@ -7913,6 +7943,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
     if (url.pathname === "/api/threads/schedule" && request.method === "GET") {
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
 
       const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
       if (!scheduledPostsTableExists) {
@@ -7932,12 +7963,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         `SELECT id, post_text, status, scheduled_time, spoiler_all_text, spoiler_phrases_json, publish_error_message, last_attempted_at, processing_started_at
          FROM scheduled_posts
          WHERE user_id = ?
+           AND (? IS NULL OR threads_user_id = ?)
            AND status IN (?, ?)
          ORDER BY scheduled_time ASC, id ASC
          LIMIT 100`,
       )
         .bind(
           ownedAppUserId,
+          selectedThreadsUserId,
+          selectedThreadsUserId,
           SCHEDULED_POST_STATUS_APPROVED,
           SCHEDULED_POST_STATUS_POSTING,
         )

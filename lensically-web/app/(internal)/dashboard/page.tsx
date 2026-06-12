@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "@/lib/selectedThreadsAccount";
 
 type RankedPost = {
   id: string;
@@ -199,7 +204,7 @@ export default function DashboardPage() {
       setError("");
 
       try {
-        const response = await fetch(THREADS_DASHBOARD_URL, {
+        const response = await fetch(appendThreadsUserId(THREADS_DASHBOARD_URL, readSelectedThreadsUserId()), {
           cache: "no-store",
           credentials: "include",
           signal: controller.signal,
@@ -224,7 +229,15 @@ export default function DashboardPage() {
 
     void loadDashboard();
 
-    return () => controller.abort();
+    const handleSelectedAccount = () => {
+      void loadDashboard();
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+
+    return () => {
+      controller.abort();
+      window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+    };
   }, []);
 
   if (loading) {

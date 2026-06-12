@@ -6,6 +6,12 @@ import BatchSchedulePanel from "@/components/BatchSchedulePanel";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import { useAuth } from "@/lib/AuthProvider";
 import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+  writeSelectedThreadsUserId,
+} from "@/lib/selectedThreadsAccount";
+import {
   formatTimezoneLabel,
   formatScheduledLocalTime,
   resolveClockFormatPreference,
@@ -262,8 +268,9 @@ export default function SchedulePage() {
 
       try {
         const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
+          const selectedThreadsUserId = readSelectedThreadsUserId();
           const accountsResponse = await fetch(
-            THREADS_ACCOUNTS_URL,
+            appendThreadsUserId(THREADS_ACCOUNTS_URL, selectedThreadsUserId),
             {
               cache: "no-store",
               credentials: "include",
@@ -275,7 +282,7 @@ export default function SchedulePage() {
           }
 
           const meResponse = await fetch(
-            THREADS_ME_URL,
+            appendThreadsUserId(THREADS_ME_URL, selectedThreadsUserId),
             {
               cache: "no-store",
               credentials: "include",
@@ -298,6 +305,10 @@ export default function SchedulePage() {
           setErrorMessage("Could not load Threads connection.");
           return;
         }
+        const savedThreadsUserId = readSelectedThreadsUserId();
+        const savedFromList = Array.isArray(data.accounts)
+          ? data.accounts.find((account) => account?.threads_user_id?.trim() === savedThreadsUserId)?.threads_user_id?.trim()
+          : "";
         const activeFromList = Array.isArray(data.accounts)
           ? data.accounts.find((account) => account?.is_active)?.threads_user_id?.trim()
           : "";
@@ -305,7 +316,8 @@ export default function SchedulePage() {
           ? data.accounts.find((account) => account?.threads_user_id)?.threads_user_id?.trim()
           : "";
         const resolvedThreadsUserId =
-          data.active_threads_user_id?.trim()
+          savedFromList
+          || data.active_threads_user_id?.trim()
           || activeFromList
           || firstFromList
           || data.account?.threads_user_id?.trim()
@@ -319,6 +331,7 @@ export default function SchedulePage() {
         }
 
         setThreadsUserId(resolvedThreadsUserId);
+        writeSelectedThreadsUserId(resolvedThreadsUserId);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -336,9 +349,15 @@ export default function SchedulePage() {
 
     void loadThreadsConnection();
 
+    const handleSelectedAccount = () => {
+      void loadThreadsConnection();
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+
     return () => {
       isMounted = false;
       controller.abort();
+      window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
     };
   }, []);
 

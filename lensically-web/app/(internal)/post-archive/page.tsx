@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "@/lib/selectedThreadsAccount";
 
 type ArchiveOrder = "recent" | "top";
 
@@ -150,7 +155,10 @@ export default function PostArchivePage() {
 
       try {
         const response = await fetch(
-          `${THREADS_POSTS_ARCHIVE_URL}?order=${encodeURIComponent(order)}&limit=${ARCHIVE_PAGE_SIZE}&page=${page}`,
+          appendThreadsUserId(
+            `${THREADS_POSTS_ARCHIVE_URL}?order=${encodeURIComponent(order)}&limit=${ARCHIVE_PAGE_SIZE}&page=${page}`,
+            readSelectedThreadsUserId(),
+          ),
           {
             cache: "no-store",
             credentials: "include",
@@ -190,9 +198,16 @@ export default function PostArchivePage() {
 
     void loadArchive();
 
+    const handleSelectedAccount = () => {
+      setPage(1);
+      void loadArchive();
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+
     return () => {
       isMounted = false;
       controller.abort();
+      window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
     };
   }, [order, page]);
 

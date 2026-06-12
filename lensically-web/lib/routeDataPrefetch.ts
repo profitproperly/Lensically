@@ -2,6 +2,10 @@
 
 import { buildWorkerUrl } from "./apiClient";
 import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+} from "./selectedThreadsAccount";
+import {
   writeThreadsConnectionCache,
 } from "./threadsConnectionCache";
 import {
@@ -56,8 +60,9 @@ async function preloadThreadsStatus(appUserId: string) {
     return true;
   }
 
+  const selectedThreadsUserId = readSelectedThreadsUserId();
   const response = await fetch(
-    THREADS_ME_URL,
+    appendThreadsUserId(THREADS_ME_URL, selectedThreadsUserId),
     { cache: "no-store", credentials: "include" },
   );
 
@@ -93,8 +98,9 @@ async function preloadInsights(appUserId: string) {
     // Ignore cache read errors and continue with preload fetch.
   }
 
+  const selectedThreadsUserId = readSelectedThreadsUserId();
   const response = await fetch(
-    THREADS_POSTS_URL,
+    appendThreadsUserId(THREADS_POSTS_URL, selectedThreadsUserId),
     { cache: "no-store", credentials: "include" },
   );
 
