@@ -14,6 +14,32 @@ const TIMEZONE = "America/New_York";
 const API_BASE_URL = process.env.LENSICALLY_API_BASE_URL || "https://api.lensically.com";
 const LLAMA_BASE_URL = process.env.VECTRIX_LLAMA_BASE_URL || "http://127.0.0.1:8080/v1";
 const MODEL = process.env.VECTRIX_QWEN_MODEL || "qwen3-4b-instruct";
+const VECTRIX_POST_FORMATS = [
+  "specific online income play with a concrete first step",
+  "wealth building mistake most beginners make and the better move",
+  "simple digital skill people can learn and sell",
+  "cash flow system breakdown with clear inputs and outputs",
+  "one person scenario that shows a money lesson",
+  "contrarian financial freedom take with practical reasoning",
+  "small operator checklist with three short items written as sentences",
+  "business idea validation test someone can run today",
+  "audience building lesson tied to monetization",
+  "habit that compounds into income over months",
+];
+const VECTRIX_BANNED_WEAK_PHRASES = [
+  "what's your strategy",
+  "what is your strategy",
+  "review your progress",
+  "reflect on your progress",
+  "build a habit of daily reflection",
+  "focus on what you can control",
+  "small changes compound",
+  "financial goals",
+  "stay motivated",
+  "on track",
+  "what worked today",
+  "what can you improve",
+];
 
 async function loadEnv() {
   try {
@@ -117,6 +143,11 @@ function containsDash(text) {
   return /[-\u2010-\u2015]/.test(String(text ?? ""));
 }
 
+function containsWeakPhrase(text) {
+  const normalized = normalizePostText(text).toLowerCase();
+  return VECTRIX_BANNED_WEAK_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
 function postKey(text) {
   return normalizePostText(text)
     .toLowerCase()
@@ -208,6 +239,7 @@ function normalizeStringArray(value, limit, maxLength = 160) {
     .map((entry) => String(entry ?? "").replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .filter((entry) => !containsDash(entry))
+    .filter((entry) => !containsWeakPhrase(entry))
     .slice(0, limit)
     .map((entry) => entry.slice(0, maxLength));
 }
@@ -316,16 +348,22 @@ async function generatePosts(context, memory) {
 
   const prompt = [
     "You are the Vectrix Threads growth worker.",
-    "Generate original Threads posts for the missing hourly slots.",
+    "Generate original Threads posts for the missing hourly slots that can attract followers, not generic motivation.",
     "Niche: making money online, building wealth, financial freedom, online business systems, monetizable skills, disciplined investing, cash-flow thinking.",
     "Rules: no scams, no guaranteed income claims, no fake results, no direct investment picks, no repeated wording, no hashtags, no emojis.",
     "Never use dashes of any kind in post text. Do not use hyphens, en dashes, em dashes, minus signs, or dash separators.",
+    "Avoid vague coaching questions. Do not write generic lines like review your progress, reflect on your progress, stay motivated, or what is your strategy.",
+    "Each post needs a concrete idea, a useful distinction, a specific action, or a memorable point of view.",
+    "Use direct statements more than questions. If you use a question, make it sharp and specific.",
+    "Write like an operator building online cash flow in public. Short, practical, specific, and follow worthy.",
     "Use archive samples to avoid repeating posts and to infer what should improve over time.",
     "Use strategy memory to repeat proven patterns and avoid weak patterns without copying old posts.",
     "Return only JSON in this exact shape: {\"posts\":[{\"slot\":\"HH:MM\",\"text\":\"post text\"}]}",
     `Date: ${context.date}`,
     `Missing slots: ${JSON.stringify(missingSlots)}`,
     `Content brief: ${context.agent?.content_brief || ""}`,
+    `Strong post formats to rotate: ${JSON.stringify(VECTRIX_POST_FORMATS)}`,
+    `Banned weak phrases: ${JSON.stringify(VECTRIX_BANNED_WEAK_PHRASES)}`,
     `Strategy memory: ${JSON.stringify(memory)}`,
     `Archive samples: ${JSON.stringify(archiveSamples)}`,
   ].join("\n\n");
@@ -357,6 +395,7 @@ async function generatePosts(context, memory) {
     const key = postKey(text);
     if (!requestedSlots.has(slot) || !text || !key) continue;
     if (containsDash(text)) continue;
+    if (containsWeakPhrase(text)) continue;
     if (duplicateKeys.has(key) || seen.has(key)) continue;
     seen.add(key);
     posts.push({ slot, text });
