@@ -15,6 +15,7 @@ logs
 lensically-web/.next
 lensically-web/.open-next
 lensically-worker/.cloudflare.deploy.ps1
+.github.deploy.ps1
 manifest-mental-vault/Daily/*.md
 manifest-mental-vault/Reports/*.md
 manifest-mental-vault/Candidates/*.md
