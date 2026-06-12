@@ -69,6 +69,7 @@ interface Env {
   WEB_APP_URL?: string;
   SCHEDULED_POST_BATCH_SIZE?: string;
   THREADS_TOKEN_MANIFEST_MENTAL?: string;
+  THREADS_TOKEN_VECTRIX?: string;
   DB: D1Database;
 }
 
@@ -125,6 +126,12 @@ const CONFIGURED_THREADS_ACCOUNTS: ConfiguredThreadsAccount[] = [
     label: "Manifest Mental",
     username: "manifestmental",
     tokenEnv: "THREADS_TOKEN_MANIFEST_MENTAL",
+  },
+  {
+    id: "vectrix",
+    label: "Vectrix",
+    username: "vectrixvoltmore",
+    tokenEnv: "THREADS_TOKEN_VECTRIX",
   },
 ];
 

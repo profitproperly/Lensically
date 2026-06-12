@@ -9,6 +9,7 @@
 		"start": "wrangler dev",
 		"cf:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/set-cloudflare-deploy-credentials.ps1",
 		"threads:token": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1",
+		"threads:token:vectrix": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1 -AccountSecretName THREADS_TOKEN_VECTRIX",
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},
