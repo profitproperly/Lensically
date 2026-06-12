@@ -9,6 +9,7 @@ dist
 build
 coverage
 logs
+agent-vaults
 *.log
 .next
 .open-next
