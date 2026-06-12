@@ -17,13 +17,13 @@ import {
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/agent", label: "Agent Control" },
   { href: "/insights", label: "Insights" },
   { href: "/saved-patterns", label: "Saved Patterns" },
   { href: "/followers", label: "Followers" },
   { href: "/post-archive", label: "Post Archive" },
   { href: "/schedule", label: "Create Post" },
   { href: "/scheduled-posts", label: "Scheduled Posts" },
-  { href: "/agent", label: "Agent Control" },
 ];
 
 type ThreadsMeResponse = {
@@ -123,7 +123,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
   const asideClassName = mobile
     ? "flex h-full w-full flex-col bg-white"
-    : "hidden shrink-0 bg-white xl:sticky xl:top-16 xl:flex xl:h-[calc(100vh-4rem)] xl:w-72 xl:flex-col xl:items-start xl:border-r xl:border-slate-200 xl:pt-6";
+    : "hidden shrink-0 overflow-y-auto bg-white xl:sticky xl:top-16 xl:flex xl:h-[calc(100vh-4rem)] xl:w-72 xl:flex-col xl:items-start xl:border-r xl:border-slate-200 xl:pt-6";
 
   return (
     <aside className={asideClassName}>
