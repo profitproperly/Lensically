@@ -99,6 +99,11 @@ type ConfiguredThreadsAccountProfile = {
   threads_profile_picture_url: string | null;
 };
 
+type AgentAccountControl = ConfiguredThreadsAccountProfile & {
+  agent_enabled: boolean;
+  agent_updated_at: string | null;
+};
+
 type ExternalPatternRow = {
   id: number;
   app_user_id: string;
@@ -351,6 +356,72 @@ async function getConfiguredThreadsProfiles(env: Env): Promise<ConfiguredThreads
   );
   const accounts = configuredAccounts.filter((account): account is ResolvedConfiguredThreadsAccount => account !== null);
   return Promise.all(accounts.map((account, index) => fetchConfiguredThreadsProfile(env, account, index)));
+}
+
+async function ensureAgentAccountControlsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS agent_account_controls (
+      account_id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  ).run();
+}
+
+async function listAgentAccountControls(env: Env): Promise<AgentAccountControl[]> {
+  await ensureAgentAccountControlsTable(env);
+  const [profiles, settings] = await Promise.all([
+    getConfiguredThreadsProfiles(env),
+    env.DB.prepare(
+      `SELECT account_id, enabled, updated_at
+       FROM agent_account_controls`,
+    ).all<{
+      account_id: string;
+      enabled: number | string | null;
+      updated_at: string | null;
+    }>(),
+  ]);
+
+  const settingsByAccountId = new Map(
+    (settings.results ?? []).map((setting) => [setting.account_id, setting]),
+  );
+
+  return profiles.map((profile) => {
+    const setting = settingsByAccountId.get(profile.account_id);
+    return {
+      ...profile,
+      agent_enabled: Number(setting?.enabled ?? 0) === 1,
+      agent_updated_at: setting?.updated_at ?? null,
+    };
+  });
+}
+
+async function setAgentAccountEnabled(
+  env: Env,
+  accountId: string,
+  enabled: boolean,
+): Promise<AgentAccountControl | null> {
+  const normalizedAccountId = accountId.trim().toLowerCase();
+  if (!normalizedAccountId) {
+    return null;
+  }
+
+  const configuredAccount = await getConfiguredThreadsAccountById(env, normalizedAccountId);
+  if (!configuredAccount) {
+    return null;
+  }
+
+  await ensureAgentAccountControlsTable(env);
+  await env.DB.prepare(
+    `INSERT INTO agent_account_controls (account_id, enabled, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(account_id) DO UPDATE SET
+       enabled = excluded.enabled,
+       updated_at = excluded.updated_at`,
+  ).bind(normalizedAccountId, enabled ? 1 : 0).run();
+
+  const controls = await listAgentAccountControls(env);
+  return controls.find((control) => control.account_id === normalizedAccountId) ?? null;
 }
 
 async function bootstrapConfiguredThreadsAccounts(env: Env): Promise<void> {
@@ -6656,6 +6727,80 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           status: 200,
           headers: {
             "Content-Type": "application/json",
+            ...requestCorsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/agent/accounts" && request.method === "GET") {
+      const accounts = await listAgentAccountControls(env);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          accounts,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            ...requestCorsHeaders,
+          },
+        },
+      );
+    }
+
+    if (url.pathname === "/api/agent/accounts/toggle" && request.method === "POST") {
+      let payload: {
+        account_id?: string;
+        enabled?: boolean;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const account = await setAgentAccountEnabled(
+        env,
+        String(payload.account_id ?? ""),
+        payload.enabled === true,
+      );
+      if (!account) {
+        return new Response(
+          JSON.stringify({ error: "Configured Threads account not found" }),
+          {
+            status: 404,
+            headers: {
+              "Content-Type": "application/json",
+              ...requestCorsHeaders,
+            },
+          },
+        );
+      }
+
+      const accounts = await listAgentAccountControls(env);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          account,
+          accounts,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
             ...requestCorsHeaders,
           },
         },

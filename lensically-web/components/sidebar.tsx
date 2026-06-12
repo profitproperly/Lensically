@@ -23,6 +23,7 @@ const links = [
   { href: "/post-archive", label: "Post Archive" },
   { href: "/schedule", label: "Create Post" },
   { href: "/scheduled-posts", label: "Scheduled Posts" },
+  { href: "/agent", label: "Agent Control" },
 ];
 
 type ThreadsMeResponse = {

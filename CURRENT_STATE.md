@@ -23,10 +23,11 @@
 
 ## Standalone Agent State
 
-- The Manifest Mental agent is a local standalone desktop web app, not a Lensically route.
-- Launch it from the Windows desktop shortcut `Manifest Mental Agent.lnk`, which opens `http://127.0.0.1:4317`.
-- The local app runs Hermes through OpenAI Codex OAuth, stores memory in `manifest-mental-vault/**`, calls Lensically worker APIs for data and scheduling, and must never publish directly.
-- Generate pulls fresh context. Regenerate uses cached context plus rejection feedback. Schedule only schedules the generated slate into Lensically.
+- The old Manifest Mental-specific Hermes desktop agent has been removed.
+- Local agent work should be account-agnostic and use configured Threads account IDs.
+- `/agent` is the account-level control surface for enabling or disabling the local worker agent per Threads account.
+- The remaining agent API helper stores per-account context snapshots under `agent-vaults/<account-id>/Context/**` and calls Lensically worker APIs for data and scheduling.
+- Local agents must schedule through Lensically worker APIs and must not publish directly.
 
 ## Scheduled Posts State
 

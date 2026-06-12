@@ -5,9 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOCAL_ENV_PATH = path.join(ROOT, ".lensically-agent.env");
-const VAULT_CONTEXT_DIR = path.join(ROOT, "manifest-mental-vault", "Context");
 const DEFAULT_BASE_URL = "https://api.lensically.com";
-const DEFAULT_ACCOUNT_ID = "manifest-mental";
 const DEFAULT_TIMEZONE = "America/New_York";
 
 function parseArgs(argv) {
@@ -94,7 +92,10 @@ async function writeJson(filePath, data) {
 
 async function commandContext(args) {
   const internalKey = requireInternalKey();
-  const accountId = args.account || DEFAULT_ACCOUNT_ID;
+  const accountId = String(args.account || process.env.LENSICALLY_AGENT_ACCOUNT_ID || "").trim().toLowerCase();
+  if (!accountId) {
+    throw new Error("context requires --account <configured-account-id> or LENSICALLY_AGENT_ACCOUNT_ID.");
+  }
   const timezone = args.timezone || DEFAULT_TIMEZONE;
   const url = buildUrl("/api/automation/context", {
     account_id: accountId,
@@ -106,8 +107,9 @@ async function commandContext(args) {
     headers: { "x-internal-key": internalKey },
   });
 
-  const latestPath = path.join(VAULT_CONTEXT_DIR, "latest-context.json");
-  const snapshotPath = path.join(VAULT_CONTEXT_DIR, `context-${todayStamp()}.json`);
+  const vaultContextDir = path.join(ROOT, "agent-vaults", accountId, "Context");
+  const latestPath = path.join(vaultContextDir, "latest-context.json");
+  const snapshotPath = path.join(vaultContextDir, `context-${todayStamp()}.json`);
   await writeJson(latestPath, data);
   await writeJson(snapshotPath, data);
 
@@ -164,7 +166,7 @@ async function main() {
     return;
   }
 
-  throw new Error("Usage: node scripts/lensically-agent-api.mjs <context|schedule-plan> [--file plan.json]");
+  throw new Error("Usage: node scripts/lensically-agent-api.mjs <context|schedule-plan> [--account account-id] [--file plan.json]");
 }
 
 main().catch((error) => {
