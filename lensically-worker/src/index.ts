@@ -102,6 +102,28 @@ type ConfiguredThreadsAccountProfile = {
 type AgentAccountControl = ConfiguredThreadsAccountProfile & {
   agent_enabled: boolean;
   agent_updated_at: string | null;
+  agent_schedule_slots: string[];
+  agent_content_brief: string | null;
+};
+
+const VECTRIX_AGENT_SCHEDULE_SLOTS = Array.from(
+  { length: 24 },
+  (_, hour) => `${hour.toString().padStart(2, "0")}:00`,
+);
+
+const VECTRIX_AGENT_CONTENT_BRIEF = [
+  "Create posts for Vectrix about making money online, building wealth, becoming financially free,",
+  "digital leverage, online business systems, monetizable skills, disciplined investing, and long-term cash-flow thinking.",
+  "Keep the angle practical, specific, and operator-minded. Avoid fake income claims, guaranteed results, scams,",
+  "or financial advice that tells readers exactly what asset to buy.",
+].join(" ");
+
+const DEFAULT_AGENT_ACCOUNT_CONFIGS: Record<string, { enabled: boolean; scheduleSlots: string[]; contentBrief: string }> = {
+  vectrix: {
+    enabled: true,
+    scheduleSlots: VECTRIX_AGENT_SCHEDULE_SLOTS,
+    contentBrief: VECTRIX_AGENT_CONTENT_BRIEF,
+  },
 };
 
 type ExternalPatternRow = {
@@ -363,21 +385,75 @@ async function ensureAgentAccountControlsTable(env: Env): Promise<void> {
     `CREATE TABLE IF NOT EXISTS agent_account_controls (
       account_id TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL DEFAULT 0,
+      schedule_slots_json TEXT,
+      content_brief TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
   ).run();
+
+  const tableInfo = await env.DB.prepare("PRAGMA table_info(agent_account_controls)").all<{
+    name: string;
+  }>();
+  const columnNames = new Set((tableInfo.results ?? []).map((column) => column.name));
+  const missingColumns: Array<{ name: string; definition: string }> = [
+    { name: "schedule_slots_json", definition: "TEXT" },
+    { name: "content_brief", definition: "TEXT" },
+  ].filter((column) => !columnNames.has(column.name));
+
+  for (const column of missingColumns) {
+    await env.DB.prepare(`ALTER TABLE agent_account_controls ADD COLUMN ${column.name} ${column.definition}`).run();
+  }
+}
+
+function parseAgentScheduleSlots(value: string | null | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return normalizeBatchSchedulePresetTimes(parsed) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function getDefaultAgentAccountConfig(accountId: string): { scheduleSlots: string[]; contentBrief: string | null } {
+  const config = DEFAULT_AGENT_ACCOUNT_CONFIGS[accountId];
+  return {
+    scheduleSlots: config?.scheduleSlots ?? [],
+    contentBrief: config?.contentBrief ?? null,
+  };
+}
+
+async function seedDefaultAgentAccountConfigs(env: Env): Promise<void> {
+  await ensureAgentAccountControlsTable(env);
+  for (const [accountId, config] of Object.entries(DEFAULT_AGENT_ACCOUNT_CONFIGS)) {
+    await env.DB.prepare(
+      `INSERT INTO agent_account_controls (account_id, enabled, schedule_slots_json, content_brief, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(account_id) DO UPDATE SET
+         enabled = CASE
+           WHEN agent_account_controls.updated_at IS NULL THEN excluded.enabled
+           ELSE agent_account_controls.enabled
+         END,
+         schedule_slots_json = COALESCE(agent_account_controls.schedule_slots_json, excluded.schedule_slots_json),
+         content_brief = COALESCE(agent_account_controls.content_brief, excluded.content_brief)`,
+    ).bind(accountId, config.enabled ? 1 : 0, JSON.stringify(config.scheduleSlots), config.contentBrief).run();
+  }
 }
 
 async function listAgentAccountControls(env: Env): Promise<AgentAccountControl[]> {
-  await ensureAgentAccountControlsTable(env);
+  await seedDefaultAgentAccountConfigs(env);
   const [profiles, settings] = await Promise.all([
     getConfiguredThreadsProfiles(env),
     env.DB.prepare(
-      `SELECT account_id, enabled, updated_at
+      `SELECT account_id, enabled, schedule_slots_json, content_brief, updated_at
        FROM agent_account_controls`,
     ).all<{
       account_id: string;
       enabled: number | string | null;
+      schedule_slots_json: string | null;
+      content_brief: string | null;
       updated_at: string | null;
     }>(),
   ]);
@@ -388,10 +464,14 @@ async function listAgentAccountControls(env: Env): Promise<AgentAccountControl[]
 
   return profiles.map((profile) => {
     const setting = settingsByAccountId.get(profile.account_id);
+    const defaultConfig = getDefaultAgentAccountConfig(profile.account_id);
+    const scheduleSlots = parseAgentScheduleSlots(setting?.schedule_slots_json) ?? [];
     return {
       ...profile,
       agent_enabled: Number(setting?.enabled ?? 0) === 1,
       agent_updated_at: setting?.updated_at ?? null,
+      agent_schedule_slots: scheduleSlots.length ? scheduleSlots : defaultConfig.scheduleSlots,
+      agent_content_brief: setting?.content_brief ?? defaultConfig.contentBrief,
     };
   });
 }
@@ -8321,9 +8401,19 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         ),
       ]);
       const selectedBatchPreset = pickPreferredBatchSchedulePreset(batchPresets);
-      const desiredSlots = selectedBatchPreset?.times?.length
+      const agentControls = await listAgentAccountControls(env);
+      const agentControl = agentControls.find((control) => control.account_id === configuredAccount.id) ?? null;
+      const agentScheduleSlots = agentControl?.agent_schedule_slots ?? [];
+      const desiredSlots = agentScheduleSlots.length
+        ? agentScheduleSlots
+        : selectedBatchPreset?.times?.length
         ? selectedBatchPreset.times
         : buildHourlySlotTimes(7, 23);
+      const slotSource = agentScheduleSlots.length
+        ? "agent_account_config"
+        : selectedBatchPreset
+          ? "lensically_batch_preset"
+          : "default_hourly_fallback";
 
       const occupiedSlots = new Set(
         scheduledPosts
@@ -8344,6 +8434,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           date: targetDate,
           timezone: timeZone,
           desired_slots: desiredSlots,
+          agent: {
+            enabled: agentControl?.agent_enabled ?? false,
+            content_brief: agentControl?.agent_content_brief ?? null,
+            schedule_slots: agentScheduleSlots,
+          },
           batch_preset: selectedBatchPreset
             ? {
                 id: selectedBatchPreset.id,
@@ -8352,7 +8447,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                 is_favorite: selectedBatchPreset.is_favorite,
               }
             : null,
-          slot_source: selectedBatchPreset ? "lensically_batch_preset" : "default_hourly_fallback",
+          slot_source: slotSource,
           occupied_slots: Array.from(occupiedSlots),
           missing_slots: missingSlots,
           scheduled_posts: scheduledPosts,

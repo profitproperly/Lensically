@@ -11,6 +11,8 @@ type AgentAccount = {
   threads_profile_picture_url: string | null;
   agent_enabled: boolean;
   agent_updated_at: string | null;
+  agent_schedule_slots: string[];
+  agent_content_brief: string | null;
 };
 
 type AgentAccountsResponse = {
@@ -129,6 +131,20 @@ export default function AgentControlPage() {
                         @{account.username || account.account_id}
                       </p>
                       <p className="truncate text-xs text-slate-400">{account.threads_user_id}</p>
+                      {account.agent_schedule_slots.length || account.agent_content_brief ? (
+                        <div className="mt-2 flex flex-col gap-1">
+                          {account.agent_schedule_slots.length ? (
+                            <p className="text-xs font-medium text-slate-600">
+                              {account.agent_schedule_slots.length} slots: {account.agent_schedule_slots[0]}-{account.agent_schedule_slots[account.agent_schedule_slots.length - 1]}
+                            </p>
+                          ) : null}
+                          {account.agent_content_brief ? (
+                            <p className="max-w-2xl text-xs leading-5 text-slate-500">
+                              {account.agent_content_brief}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
