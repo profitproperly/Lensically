@@ -97,6 +97,10 @@ function normalizePostText(value) {
     .slice(0, 480);
 }
 
+function containsDash(text) {
+  return /[-\u2010-\u2015]/.test(String(text ?? ""));
+}
+
 function postKey(text) {
   return normalizePostText(text)
     .toLowerCase()
@@ -141,6 +145,7 @@ async function generatePosts(context) {
     "Generate original Threads posts for the missing hourly slots.",
     "Niche: making money online, building wealth, financial freedom, online business systems, monetizable skills, disciplined investing, cash-flow thinking.",
     "Rules: no scams, no guaranteed income claims, no fake results, no direct investment picks, no repeated wording, no hashtags, no emojis.",
+    "Never use dashes of any kind in post text. Do not use hyphens, en dashes, em dashes, minus signs, or dash separators.",
     "Use archive samples to avoid repeating posts and to infer what should improve over time.",
     "Return only JSON in this exact shape: {\"posts\":[{\"slot\":\"HH:MM\",\"text\":\"post text\"}]}",
     `Date: ${context.date}`,
@@ -175,6 +180,7 @@ async function generatePosts(context) {
     const text = normalizePostText(entry.text);
     const key = postKey(text);
     if (!requestedSlots.has(slot) || !text || !key) continue;
+    if (containsDash(text)) continue;
     if (duplicateKeys.has(key) || seen.has(key)) continue;
     seen.add(key);
     posts.push({ slot, text });
