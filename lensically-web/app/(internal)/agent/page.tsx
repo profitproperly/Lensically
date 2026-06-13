@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "@/lib/selectedThreadsAccount";
 
 type AgentAccount = {
   account_id: string;
@@ -29,11 +34,12 @@ export default function AgentControlPage() {
   const [loading, setLoading] = useState(true);
   const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [threadsUserId, setThreadsUserId] = useState("");
 
-  async function loadAccounts() {
+  const loadAccounts = useCallback(async (selectedThreadsUserId = threadsUserId) => {
     setError(null);
     try {
-      const response = await fetch(AGENT_ACCOUNTS_URL, {
+      const response = await fetch(appendThreadsUserId(AGENT_ACCOUNTS_URL, selectedThreadsUserId), {
         cache: "no-store",
         credentials: "include",
       });
@@ -47,7 +53,7 @@ export default function AgentControlPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [threadsUserId]);
 
   async function toggleAccount(account: AgentAccount) {
     setSavingAccountId(account.account_id);
@@ -61,6 +67,7 @@ export default function AgentControlPage() {
         credentials: "include",
         body: JSON.stringify({
           account_id: account.account_id,
+          threads_user_id: threadsUserId,
           enabled: !account.agent_enabled,
         }),
       });
@@ -77,8 +84,19 @@ export default function AgentControlPage() {
   }
 
   useEffect(() => {
-    void loadAccounts();
-  }, []);
+    const initialThreadsUserId = readSelectedThreadsUserId();
+    setThreadsUserId(initialThreadsUserId);
+    void loadAccounts(initialThreadsUserId);
+
+    const handleSelectedAccount = (event: Event) => {
+      const nextThreadsUserId = (event as CustomEvent<{ threadsUserId?: string }>).detail?.threadsUserId?.trim() ?? "";
+      setThreadsUserId(nextThreadsUserId);
+      setLoading(true);
+      void loadAccounts(nextThreadsUserId);
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+    return () => window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+  }, [loadAccounts]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">

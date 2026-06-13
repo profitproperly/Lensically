@@ -129,6 +129,7 @@ const DEFAULT_AGENT_ACCOUNT_CONFIGS: Record<string, { enabled: boolean; schedule
 type ExternalPatternRow = {
   id: number;
   app_user_id: string;
+  account_id: string;
   platform: string;
   source_url: string;
   post_id: string | null;
@@ -161,6 +162,8 @@ const CONFIGURED_THREADS_ACCOUNTS: ConfiguredThreadsAccount[] = [
     tokenEnv: "THREADS_TOKEN_VECTRIX",
   },
 ];
+
+const DEFAULT_PATTERNS_ACCOUNT_ID = "manifest-mental";
 
 function limitDeniedResponse(
   result: Exclude<EnforceLimitResult, { allowed: true }>,
@@ -3648,6 +3651,7 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
     `CREATE TABLE IF NOT EXISTS external_patterns (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       app_user_id TEXT NOT NULL,
+      account_id TEXT NOT NULL DEFAULT 'manifest-mental',
       platform TEXT NOT NULL DEFAULT 'threads',
       source_url TEXT NOT NULL,
       post_id TEXT,
@@ -3664,18 +3668,32 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
       raw_payload TEXT,
       saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(app_user_id, source_url)
+      UNIQUE(app_user_id, account_id, source_url)
     )`,
   ).run();
 
+  const tableInfo = await env.DB.prepare("PRAGMA table_info(external_patterns)").all<{ name: string }>();
+  const hasAccountId = (tableInfo.results ?? []).some((column) => column.name === "account_id");
+  if (!hasAccountId) {
+    await env.DB.prepare(
+      `ALTER TABLE external_patterns
+       ADD COLUMN account_id TEXT NOT NULL DEFAULT 'manifest-mental'`,
+    ).run();
+  }
+
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_updated
-     ON external_patterns (app_user_id, updated_at DESC, id DESC)`,
+     ON external_patterns (app_user_id, account_id, updated_at DESC, id DESC)`,
   ).run();
 
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_likes
-     ON external_patterns (app_user_id, likes DESC, views DESC, updated_at DESC, id DESC)`,
+     ON external_patterns (app_user_id, account_id, likes DESC, views DESC, updated_at DESC, id DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_external_patterns_user_account_source
+     ON external_patterns (app_user_id, account_id, source_url)`,
   ).run();
 }
 
@@ -3754,6 +3772,8 @@ async function importExternalPattern(
 ): Promise<ExternalPatternRow> {
   await ensureExternalPatternsTable(env);
 
+  const accountId = normalizePatternString(payload.account_id, { maxLength: 80 })?.toLowerCase()
+    || DEFAULT_PATTERNS_ACCOUNT_ID;
   const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
   const sourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
   const postText = normalizePatternString(payload.post_text, { maxLength: 20000 });
@@ -3776,11 +3796,11 @@ async function importExternalPattern(
   const nowIso = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO external_patterns (
-      app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+      app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
       post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
       raw_payload, saved_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(app_user_id, source_url) DO UPDATE SET
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(app_user_id, account_id, source_url) DO UPDATE SET
       platform = excluded.platform,
       post_id = excluded.post_id,
       author_handle = excluded.author_handle,
@@ -3798,6 +3818,7 @@ async function importExternalPattern(
   )
     .bind(
       appUserId,
+      accountId,
       platform,
       sourceUrl,
       postId,
@@ -3819,13 +3840,13 @@ async function importExternalPattern(
 
   const row = await env.DB.prepare(
     `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
-            post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+            account_id, post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
             raw_payload, saved_at, updated_at
      FROM external_patterns
-     WHERE app_user_id = ? AND source_url = ?
+     WHERE app_user_id = ? AND account_id = ? AND source_url = ?
      LIMIT 1`,
   )
-    .bind(appUserId, sourceUrl)
+    .bind(appUserId, accountId, sourceUrl)
     .first<ExternalPatternRow>();
 
   if (!row) {
@@ -3838,6 +3859,7 @@ async function importExternalPattern(
 async function deleteExternalPatterns(
   env: Env,
   appUserId: string,
+  accountId: string,
   ids: number[],
 ): Promise<number> {
   await ensureExternalPatternsTable(env);
@@ -3858,12 +3880,33 @@ async function deleteExternalPatterns(
   const result = await env.DB.prepare(
     `DELETE FROM external_patterns
      WHERE app_user_id = ?
+       AND account_id = ?
        AND id IN (${placeholders})`,
   )
-    .bind(appUserId, ...normalizedIds)
+    .bind(appUserId, accountId, ...normalizedIds)
     .run();
 
   return Number(result.meta.changes ?? 0);
+}
+
+async function resolvePatternAccountId(
+  env: Env,
+  threadsUserId: string | null,
+  requestedAccountId?: string | null,
+): Promise<string> {
+  const normalizedAccountId = requestedAccountId?.trim().toLowerCase() ?? "";
+  if (normalizedAccountId && CONFIGURED_THREADS_ACCOUNTS.some((account) => account.id === normalizedAccountId)) {
+    return normalizedAccountId;
+  }
+
+  const normalizedThreadsUserId = threadsUserId?.trim() ?? "";
+  if (!normalizedThreadsUserId) {
+    return DEFAULT_PATTERNS_ACCOUNT_ID;
+  }
+
+  const profiles = await getConfiguredThreadsProfiles(env);
+  return profiles.find((profile) => profile.threads_user_id === normalizedThreadsUserId)?.account_id
+    ?? DEFAULT_PATTERNS_ACCOUNT_ID;
 }
 
 async function ensureAutomationDailyRunLocksTable(env: Env): Promise<void> {
@@ -5896,33 +5939,38 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const offset = (page - 1) * limit;
       const requestedOrder = String(url.searchParams.get("order") ?? "newest").trim().toLowerCase();
       const order = requestedOrder === "likes" ? "likes" : "newest";
+      const accountId = await resolvePatternAccountId(
+        env,
+        url.searchParams.get("threads_user_id"),
+        url.searchParams.get("account_id"),
+      );
 
       await ensureExternalPatternsTable(env);
       const listSql = order === "likes"
-        ? `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+        ? `SELECT id, app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
                   post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
                   raw_payload, saved_at, updated_at
            FROM external_patterns
-           WHERE app_user_id = ?
+           WHERE app_user_id = ? AND account_id = ?
            ORDER BY likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC
            LIMIT ? OFFSET ?`
-        : `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+        : `SELECT id, app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
                   post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
                   raw_payload, saved_at, updated_at
            FROM external_patterns
-           WHERE app_user_id = ?
+           WHERE app_user_id = ? AND account_id = ?
            ORDER BY datetime(updated_at) DESC, id DESC
            LIMIT ? OFFSET ?`;
       const rows = await env.DB.prepare(listSql)
-        .bind(appUserId, limit, offset)
+        .bind(appUserId, accountId, limit, offset)
         .all<ExternalPatternRow>();
 
       const totalRow = await env.DB.prepare(
         `SELECT COUNT(*) AS total
          FROM external_patterns
-         WHERE app_user_id = ?`,
+         WHERE app_user_id = ? AND account_id = ?`,
       )
-        .bind(appUserId)
+        .bind(appUserId, accountId)
         .first<{ total: number | string }>();
 
       const total = Number(totalRow?.total ?? 0);
@@ -5931,6 +5979,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return new Response(JSON.stringify({
         success: true,
         app_user_id: appUserId,
+        account_id: accountId,
         order,
         total,
         page,
@@ -5946,6 +5995,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     if (normalizedPath === "/api/patterns/delete" && request.method === "POST") {
       let payload: {
         app_user_id?: unknown;
+        account_id?: unknown;
+        threads_user_id?: unknown;
         ids?: unknown;
       };
       try {
@@ -5968,11 +6019,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const ids = Array.isArray(payload.ids) ? payload.ids.map((value) => Number(value)) : [];
-      const deleted = await deleteExternalPatterns(env, appUserId, ids);
+      const accountId = await resolvePatternAccountId(
+        env,
+        typeof payload.threads_user_id === "string" ? payload.threads_user_id : null,
+        typeof payload.account_id === "string" ? payload.account_id : null,
+      );
+      const deleted = await deleteExternalPatterns(env, appUserId, accountId, ids);
 
       return new Response(JSON.stringify({
         success: true,
         app_user_id: appUserId,
+        account_id: accountId,
         deleted,
       }), {
         status: 200,
@@ -6814,11 +6871,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (url.pathname === "/api/agent/accounts" && request.method === "GET") {
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
       const accounts = await listAgentAccountControls(env);
+      const filteredAccounts = selectedThreadsUserId
+        ? accounts.filter((account) => account.threads_user_id === selectedThreadsUserId)
+        : accounts;
       return new Response(
         JSON.stringify({
           success: true,
-          accounts,
+          accounts: filteredAccounts,
         }),
         {
           status: 200,
@@ -6834,6 +6895,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     if (url.pathname === "/api/agent/accounts/toggle" && request.method === "POST") {
       let payload: {
         account_id?: string;
+        threads_user_id?: string;
         enabled?: boolean;
       };
       try {
@@ -6869,12 +6931,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
+      const selectedThreadsUserId = typeof payload.threads_user_id === "string" ? payload.threads_user_id.trim() : "";
       const accounts = await listAgentAccountControls(env);
+      const filteredAccounts = selectedThreadsUserId
+        ? accounts.filter((control) => control.threads_user_id === selectedThreadsUserId)
+        : accounts;
       return new Response(
         JSON.stringify({
           success: true,
           account,
-          accounts,
+          accounts: filteredAccounts,
         }),
         {
           status: 200,

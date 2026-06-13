@@ -200,6 +200,38 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("scopes saved patterns to Manifest Mental by default", async () => {
+    const origin = "chrome-extension://exampleextensionid";
+
+    await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: origin,
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        source_url: "https://www.threads.com/@example/post/manifest-only",
+        post_text: "Manifest pattern",
+      }),
+    });
+
+    const manifestResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&limit=10");
+    await expect(manifestResponse.json()).resolves.toMatchObject({
+      success: true,
+      account_id: "manifest-mental",
+      total: 1,
+    });
+
+    const vectrixResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&account_id=vectrix&limit=10");
+    await expect(vectrixResponse.json()).resolves.toMatchObject({
+      success: true,
+      account_id: "vectrix",
+      total: 0,
+      patterns: [],
+    });
+  });
+
   it("paginates saved patterns", async () => {
     const origin = "chrome-extension://exampleextensionid";
 

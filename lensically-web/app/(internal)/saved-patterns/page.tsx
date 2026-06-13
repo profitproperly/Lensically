@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
+import {
+  appendThreadsUserId,
+  readSelectedThreadsUserId,
+  SELECTED_THREADS_ACCOUNT_EVENT,
+} from "@/lib/selectedThreadsAccount";
 
 type SavedPatternRow = {
   id: number;
@@ -67,19 +72,18 @@ export default function SavedPatternsPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
+  const [threadsUserId, setThreadsUserId] = useState("");
 
   const loadPatterns = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(
-        `${SAVED_PATTERNS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}&limit=${DEFAULT_LIMIT}&order=${encodeURIComponent(order)}`,
-        {
-          cache: "no-store",
-          credentials: "include",
-        },
-      );
+      const baseUrl = `${SAVED_PATTERNS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}&limit=${DEFAULT_LIMIT}&order=${encodeURIComponent(order)}`;
+      const response = await fetch(appendThreadsUserId(baseUrl, threadsUserId), {
+        cache: "no-store",
+        credentials: "include",
+      });
 
       const data = (await response.json().catch(() => null)) as SavedPatternsResponse | null;
       if (!response.ok) {
@@ -98,7 +102,17 @@ export default function SavedPatternsPage() {
     } finally {
       setLoading(false);
     }
-  }, [order]);
+  }, [order, threadsUserId]);
+
+  useEffect(() => {
+    setThreadsUserId(readSelectedThreadsUserId());
+    const handleSelectedAccount = (event: Event) => {
+      const nextThreadsUserId = (event as CustomEvent<{ threadsUserId?: string }>).detail?.threadsUserId?.trim() ?? "";
+      setThreadsUserId(nextThreadsUserId);
+    };
+    window.addEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+    return () => window.removeEventListener(SELECTED_THREADS_ACCOUNT_EVENT, handleSelectedAccount);
+  }, []);
 
   useEffect(() => {
     void loadPatterns();
@@ -126,6 +140,7 @@ export default function SavedPatternsPage() {
         },
         body: JSON.stringify({
           app_user_id: APP_USER_ID,
+          threads_user_id: threadsUserId,
           ids,
         }),
       });
