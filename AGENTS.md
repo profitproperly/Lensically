@@ -8,6 +8,13 @@
 - Prefer small, production-safe changes over broad rewrites.
 - Preserve unrelated local changes. Do not reset or overwrite work you did not make.
 
+## Global Skills
+
+- Do not read every skill at startup. Use skill metadata to choose the relevant skill, then read only that skill's `SKILL.md`.
+- Use `operational-memory` when the task involves repeated mistakes, token/usage efficiency, project memory, workflow fixes, failed commands, deploy traps, reusable lessons, or self-improvement.
+- Use `project-onboard` when the task involves onboarding a repo, Codex optimizer setup, `AGENTS.md` creation, project memory creation, or existing project merge.
+- When a new global skill is created, add its trigger rule here and to the global Project Onboard template so future projects know when to use it from startup.
+
 ## Current Reality
 
 - This repo is not a SaaS playbook. Do not describe it that way.
