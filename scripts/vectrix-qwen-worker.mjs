@@ -15,8 +15,8 @@ const API_BASE_URL = process.env.LENSICALLY_API_BASE_URL || "https://api.lensica
 const LLAMA_BASE_URL = process.env.VECTRIX_LLAMA_BASE_URL || "http://127.0.0.1:8080/v1";
 const MODEL = process.env.VECTRIX_QWEN_MODEL || "qwen3-4b-instruct";
 const PERFORMANCE_ANALYSIS_TIMEOUT_MS = 20_000;
-const GENERATION_TIMEOUT_MS = 30_000;
-const MAX_SLOTS_PER_GENERATION_PASS = 6;
+const GENERATION_TIMEOUT_MS = 480_000;
+const MAX_SLOTS_PER_GENERATION_PASS = 3;
 const VECTRIX_POST_FORMATS = [
   "specific online income play with a concrete first step",
   "wealth building mistake most beginners make and the better move",
@@ -42,32 +42,6 @@ const VECTRIX_BANNED_WEAK_PHRASES = [
   "on track",
   "what worked today",
   "what can you improve",
-];
-const VECTRIX_FALLBACK_POSTS = [
-  "A monetizable skill is not valuable because it sounds impressive. It is valuable when a business can point at it and see saved time, saved money, or new revenue.",
-  "Most people chase passive income before they build active income. Active income teaches the market, the buyer, the offer, and the skill that later creates leverage.",
-  "The fastest way to test an online business idea is simple. Find a painful problem, write one specific offer, send it to ten people who already have that problem.",
-  "If you want financial freedom, study cash flow before status. Status makes you spend to look successful. Cash flow gives you choices when nobody is watching.",
-  "A small audience can become valuable when it trusts your judgment on one clear problem. Broad attention is weaker than specific trust from the right people.",
-  "The best online income systems start with one repeatable result. Document the steps, sell the outcome, improve delivery, then automate the parts that stay stable.",
-  "Beginners ask what niche is profitable. Operators ask which painful problem they can solve repeatedly for people who already spend money to fix it.",
-  "Wealth building gets easier when your income is tied to assets, systems, or skills that keep improving after the first effort. Labor alone has a ceiling.",
-  "A useful money rule is to turn every expense into a question. Does this buy time, skill, distribution, health, or cash flow. If not, it needs a good reason.",
-  "Your first digital product should not be a giant course. Start with a checklist, template, script, or short guide that solves one annoying problem cleanly.",
-  "People overthink business ideas and underthink distribution. A simple offer with daily reach beats a perfect offer nobody sees.",
-  "Financial freedom is not one big leap. It is a stack of better decisions around earning, spending, saving, investing, and building things that can pay you again.",
-  "A strong side income usually starts ugly. One skill, one offer, one buyer type, one delivery process. Complexity can come after demand is proven.",
-  "The internet rewards clear thinking packaged well. If you can explain a painful problem better than most people, you are closer to an offer than you think.",
-  "Do not build a business around motivation. Build it around a measurable problem. Motivation fades, but a painful problem keeps looking for a solution.",
-  "A good cash flow system has inputs you control. Leads contacted, content published, offers tested, follow ups sent, delivery improved. Track those before revenue.",
-  "The money is usually in boring improvements. Faster onboarding, clearer offers, better follow up, cleaner delivery, stronger proof, simpler pricing.",
-  "Learning a skill is not the same as monetizing it. Monetizing starts when you package the skill into an outcome someone understands and already wants.",
-  "A practical wealth move is raising your earning power before inflating your lifestyle. Extra income with old spending habits creates room to build.",
-  "Online leverage comes from assets that sell, teach, persuade, or deliver while you sleep. Content, email lists, templates, systems, and software all count.",
-  "The first version of your offer only needs to answer one question. What painful result can I create for one specific type of person.",
-  "A broke business idea usually hides behind vague words. A better idea names the buyer, the pain, the result, the timeline, and the reason to act now.",
-  "If your income depends on attention, build trust faster than you build reach. Reach gets a click. Trust gets the sale.",
-  "Most people do not need a new opportunity. They need a cleaner way to turn one useful skill into a paid result for one clear market.",
 ];
 
 async function loadEnv() {
@@ -448,27 +422,6 @@ async function generatePosts(context, memory) {
     await log("generation_model_failed", { error: error instanceof Error ? error.message : String(error), missing_slots: missingSlots.length });
   }
 
-  if (posts.length) {
-    return posts;
-  }
-
-  for (const slot of missingSlots) {
-    const slotHour = Number(slot.slice(0, 2));
-    const fallbackOffset = Number.isFinite(slotHour) ? slotHour : posts.length;
-    const candidates = [
-      ...VECTRIX_FALLBACK_POSTS.slice(fallbackOffset),
-      ...VECTRIX_FALLBACK_POSTS.slice(0, fallbackOffset),
-    ];
-    const text = candidates.find((candidate) => {
-      const key = postKey(candidate);
-      return key && !duplicateKeys.has(key) && !seen.has(key);
-    });
-    if (!text) continue;
-    seen.add(postKey(text));
-    posts.push({ slot, text });
-  }
-
-  await log("generation_fallback_used", { requested: missingSlots.length, generated: posts.length });
   return posts;
 }
 
@@ -495,7 +448,7 @@ async function runOnce() {
   let totalCreated = 0;
   let totalSkipped = 0;
 
-  for (let pass = 1; pass <= 4; pass += 1) {
+  for (let pass = 1; pass <= 12; pass += 1) {
     const missingSlots = Array.isArray(context.missing_slots) ? context.missing_slots : [];
     if (!missingSlots.length) {
       await log("already_scheduled", { date, pass, memory_snapshot_count: memory.last_snapshot_count, total_created: totalCreated, total_skipped: totalSkipped });
