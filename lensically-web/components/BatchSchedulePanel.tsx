@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import { notifyScheduledPostsUpdated } from "@/lib/scheduledPostsRefresh";
+import { appendThreadsUserId } from "@/lib/selectedThreadsAccount";
 import {
   formatPickerTime,
   getLocalDateTimeParts,
@@ -13,6 +14,7 @@ import {
 
 type BatchSchedulePreset = {
   id: string;
+  threads_user_id?: string;
   name: string;
   times: string[];
   is_favorite: boolean;
@@ -30,6 +32,8 @@ type BatchSchedulePanelProps = {
   timezone: string;
   timezoneLabel: string;
   clockFormatPreference: "12h" | "24h";
+  importedPostsText?: string;
+  importSignal?: number;
 };
 
 type BatchPreviewRow = {
@@ -54,6 +58,8 @@ export default function BatchSchedulePanel({
   timezone,
   timezoneLabel,
   clockFormatPreference,
+  importedPostsText = "",
+  importSignal = 0,
 }: BatchSchedulePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [presets, setPresets] = useState<BatchSchedulePreset[]>([]);
@@ -73,12 +79,38 @@ export default function BatchSchedulePanel({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  function buildHourlySlots(count: number): string[] {
+    const base = new Date();
+    base.setMinutes(0, 0, 0);
+    base.setHours(base.getHours() + 1);
+    return Array.from({ length: Math.min(count, MAX_BATCH_SLOTS) }, (_, index) => {
+      const slot = new Date(base.getTime() + index * 60 * 60 * 1000);
+      return `${slot.getHours().toString().padStart(2, "0")}:00`;
+    });
+  }
+
   useEffect(() => {
     if (!isOpen || scheduleDate) {
       return;
     }
     setScheduleDate(getTomorrowDateForTimezone(timezone));
   }, [isOpen, scheduleDate, timezone]);
+
+  useEffect(() => {
+    if (!importSignal || !importedPostsText.trim()) {
+      return;
+    }
+    const importedPosts = parseNumberedBatchPosts(importedPostsText);
+    setIsOpen(true);
+    setRawPosts(importedPostsText);
+    setDraftTimes(buildHourlySlots(importedPosts.length));
+    setSelectedPresetId(null);
+    setPresetName("");
+    setSaveAsFavorite(false);
+    setScheduleDate((currentDate) => currentDate || getTomorrowDateForTimezone(timezone));
+    setErrorMessage("");
+    setSuccessMessage(`Loaded ${importedPosts.length} Hermes post${importedPosts.length === 1 ? "" : "s"} into Batch Schedule.`);
+  }, [importSignal, importedPostsText, timezone]);
 
   const normalizedTimes = useMemo(
     () => draftTimes.map((entry) => normalizeTimeValue(entry)),
@@ -131,7 +163,8 @@ export default function BatchSchedulePanel({
   }, [duplicateKeys, normalizedTimes, parsedPosts, scheduleDate]);
 
   const canSavePreset = Boolean(
-    isStructureReady
+    threadsUserId
+    && isStructureReady
     && presetName.trim()
     && !isSavingPreset,
   );
@@ -146,9 +179,14 @@ export default function BatchSchedulePanel({
   );
 
   const loadPresets = useCallback(async () => {
+    if (!threadsUserId) {
+      setPresets([]);
+      return;
+    }
+
     setLoadingPresets(true);
     try {
-      const response = await fetch(BATCH_PRESETS_URL, {
+      const response = await fetch(appendThreadsUserId(BATCH_PRESETS_URL, threadsUserId), {
         cache: "no-store",
         credentials: "include",
       });
@@ -165,12 +203,17 @@ export default function BatchSchedulePanel({
     } finally {
       setLoadingPresets(false);
     }
-  }, []);
+  }, [threadsUserId]);
 
   const loadScheduledPosts = useCallback(async () => {
+    if (!threadsUserId) {
+      setScheduledPosts([]);
+      return;
+    }
+
     setLoadingScheduledPosts(true);
     try {
-      const response = await fetch(THREADS_SCHEDULE_URL, {
+      const response = await fetch(appendThreadsUserId(THREADS_SCHEDULE_URL, threadsUserId), {
         cache: "no-store",
         credentials: "include",
       });
@@ -187,7 +230,7 @@ export default function BatchSchedulePanel({
     } finally {
       setLoadingScheduledPosts(false);
     }
-  }, []);
+  }, [threadsUserId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -196,6 +239,15 @@ export default function BatchSchedulePanel({
     void loadPresets();
     void loadScheduledPosts();
   }, [isOpen, loadPresets, loadScheduledPosts]);
+
+  useEffect(() => {
+    setPresets([]);
+    setScheduledPosts([]);
+    setSelectedPresetId(null);
+    setSaveAsFavorite(false);
+    setErrorMessage("");
+    setSuccessMessage("");
+  }, [threadsUserId]);
 
   function updateSlotCount(nextCount: number) {
     const clampedCount = Math.max(0, Math.min(MAX_BATCH_SLOTS, nextCount));
@@ -243,6 +295,7 @@ export default function BatchSchedulePanel({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          threads_user_id: threadsUserId,
           name: presetName.trim(),
           times: normalizedTimes,
           is_favorite: saveAsFavorite,
@@ -270,11 +323,16 @@ export default function BatchSchedulePanel({
   }
 
   async function handleFavoritePreset(presetId: string) {
+    if (!threadsUserId) {
+      setErrorMessage("Threads account is not connected.");
+      return;
+    }
+
     setFavoritingPresetId(presetId);
     setErrorMessage("");
     setSuccessMessage("");
     try {
-      const response = await fetch(`${BATCH_PRESETS_URL}/${presetId}/favorite`, {
+      const response = await fetch(appendThreadsUserId(`${BATCH_PRESETS_URL}/${presetId}/favorite`, threadsUserId), {
         method: "POST",
         credentials: "include",
       });
@@ -297,6 +355,11 @@ export default function BatchSchedulePanel({
   }
 
   async function handleDeletePreset(presetId: string) {
+    if (!threadsUserId) {
+      setErrorMessage("Threads account is not connected.");
+      return;
+    }
+
     if (!window.confirm("Delete this saved batch preset?")) {
       return;
     }
@@ -305,7 +368,7 @@ export default function BatchSchedulePanel({
     setErrorMessage("");
     setSuccessMessage("");
     try {
-      const response = await fetch(`${BATCH_PRESETS_URL}/${presetId}`, {
+      const response = await fetch(appendThreadsUserId(`${BATCH_PRESETS_URL}/${presetId}`, threadsUserId), {
         method: "DELETE",
         credentials: "include",
       });

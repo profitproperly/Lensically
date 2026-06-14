@@ -37,7 +37,8 @@
 		"APP_URL": "https://app.lensically.com",
 		"ROOT_SITE_URL": "https://lensically.com",
 		"WORKER_ORIGIN": "https://api.lensically.com",
-		"WEB_APP_URL": "https://app.lensically.com"
+		"WEB_APP_URL": "https://app.lensically.com",
+		"HERMES_MODEL": "gpt-5.5"
 	}
 	// Public compliance references: https://lensically.com/privacy and https://lensically.com/data-deletion
 	/**

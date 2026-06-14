@@ -41,6 +41,10 @@ const WORKSPACE_DEFAULT_TIMEZONE = "America/New_York";
 const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;
 const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;
 const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;
+const HERMES_DEFAULT_MODEL = "gpt-5.5";
+const HERMES_MAX_POST_COUNT = 50;
+const HERMES_CONTEXT_ARCHIVE_LIMIT = 48;
+const HERMES_CONTEXT_PATTERN_LIMIT = 48;
 const DASHBOARD_TIME_ZONE = "America/New_York";
 const DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS = 45;
 const DASHBOARD_HIT_RATE_LIKES_THRESHOLD = 30;
@@ -68,6 +72,8 @@ interface Env {
   WORKER_ORIGIN?: string;
   WEB_APP_URL?: string;
   SCHEDULED_POST_BATCH_SIZE?: string;
+  OPENAI_API_KEY?: string;
+  HERMES_MODEL?: string;
   THREADS_TOKEN_MANIFEST_MENTAL?: string;
   THREADS_TOKEN_VECTRIX?: string;
   DB: D1Database;
@@ -2239,6 +2245,7 @@ async function ensureBatchSchedulePresetsTable(env: Env): Promise<void> {
     `CREATE TABLE IF NOT EXISTS batch_schedule_presets (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
+      threads_user_id TEXT,
       name TEXT NOT NULL,
       times_json TEXT NOT NULL,
       is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0, 1)),
@@ -2248,15 +2255,32 @@ async function ensureBatchSchedulePresetsTable(env: Env): Promise<void> {
     )`,
   ).run();
 
+  const columnResult = await env.DB.prepare("PRAGMA table_info(batch_schedule_presets)").all<{ name?: string }>();
+  const columnNames = new Set(
+    (columnResult.results ?? [])
+      .map((row) => (typeof row?.name === "string" ? row.name : ""))
+      .filter(Boolean),
+  );
+  if (!columnNames.has("threads_user_id")) {
+    await env.DB.prepare("ALTER TABLE batch_schedule_presets ADD COLUMN threads_user_id TEXT").run();
+  }
+
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_id
      ON batch_schedule_presets (user_id, is_favorite DESC, updated_at DESC)`,
   ).run();
 
   await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_batch_schedule_presets_favorite_per_user
-     ON batch_schedule_presets (user_id)
-     WHERE is_favorite = 1`,
+    `CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_threads
+     ON batch_schedule_presets (user_id, threads_user_id, is_favorite DESC, updated_at DESC)`,
+  ).run();
+
+  await env.DB.prepare("DROP INDEX IF EXISTS idx_batch_schedule_presets_favorite_per_user").run();
+
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_batch_schedule_presets_favorite_per_user_threads
+     ON batch_schedule_presets (user_id, threads_user_id)
+     WHERE is_favorite = 1 AND threads_user_id IS NOT NULL`,
   ).run();
 
   await env.DB.prepare(
@@ -2285,17 +2309,20 @@ async function ensureBatchSchedulePresetsTable(env: Env): Promise<void> {
 async function listBatchSchedulePresetsForUser(
   env: Env,
   userId: string,
-): Promise<Array<{ id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string }>> {
+  threadsUserId: string,
+): Promise<Array<{ id: string; threads_user_id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string }>> {
   await ensureBatchSchedulePresetsTable(env);
   const rows = await env.DB.prepare(
-    `SELECT id, name, times_json, is_favorite, created_at, updated_at
+    `SELECT id, threads_user_id, name, times_json, is_favorite, created_at, updated_at
      FROM batch_schedule_presets
      WHERE user_id = ?
+       AND threads_user_id = ?
      ORDER BY is_favorite DESC, updated_at DESC, created_at DESC, id DESC`,
   )
-    .bind(userId)
+    .bind(userId, threadsUserId)
     .all<{
       id: string;
+      threads_user_id: string;
       name: string;
       times_json: string;
       is_favorite: number;
@@ -2313,6 +2340,7 @@ async function listBatchSchedulePresetsForUser(
     const normalizedTimes = normalizeBatchSchedulePresetTimes(parsedTimes) ?? [];
     return {
       id: row.id,
+      threads_user_id: row.threads_user_id,
       name: row.name,
       times: normalizedTimes,
       is_favorite: Number(row.is_favorite) === 1,
@@ -2323,8 +2351,8 @@ async function listBatchSchedulePresetsForUser(
 }
 
 function pickPreferredBatchSchedulePreset(
-  presets: Array<{ id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string }>,
-): { id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string } | null {
+  presets: Array<{ id: string; threads_user_id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string }>,
+): { id: string; threads_user_id: string; name: string; times: string[]; is_favorite: boolean; created_at: string; updated_at: string } | null {
   if (!Array.isArray(presets) || presets.length === 0) {
     return null;
   }
@@ -4467,6 +4495,232 @@ async function listArchivedThreadsPosts(
   };
 }
 
+async function listSavedPatternsForHermes(
+  env: Env,
+  threadsUserId: string,
+  limit: number,
+): Promise<ExternalPatternRow[]> {
+  await ensureExternalPatternsTable(env);
+  const accountId = await resolvePatternAccountId(env, threadsUserId, null);
+  const rows = await env.DB.prepare(
+    `SELECT id, app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
+            post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+            raw_payload, saved_at, updated_at
+     FROM external_patterns
+     WHERE app_user_id = ? AND account_id = ?
+     ORDER BY likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC
+     LIMIT ?`,
+  )
+    .bind(WORKSPACE_APP_USER_ID, accountId, limit)
+    .all<ExternalPatternRow>();
+
+  return rows.results ?? [];
+}
+
+async function listScheduledPostsForHermesContext(
+  env: Env,
+  threadsUserId: string,
+  limit: number,
+): Promise<Array<{ id: number; text: string; status: string; scheduled_time_utc: string }>> {
+  await ensureScheduledPostsTable(env);
+  const rows = await env.DB.prepare(
+    `SELECT id, post_text, status, scheduled_time
+     FROM scheduled_posts
+     WHERE threads_user_id = ?
+       AND status IN (?, ?)
+       AND scheduled_time >= ?
+     ORDER BY scheduled_time ASC, id ASC
+     LIMIT ?`,
+  )
+    .bind(
+      threadsUserId,
+      SCHEDULED_POST_STATUS_APPROVED,
+      SCHEDULED_POST_STATUS_POSTING,
+      new Date().toISOString(),
+      limit,
+    )
+    .all<{ id: number | string; post_text: string; status: string; scheduled_time: string }>();
+
+  return (rows.results ?? []).map((row) => ({
+    id: Number(row.id),
+    text: row.post_text,
+    status: row.status,
+    scheduled_time_utc: row.scheduled_time,
+  }));
+}
+
+function normalizeHermesPostCount(value: unknown): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 6;
+  }
+  return Math.max(1, Math.min(HERMES_MAX_POST_COUNT, Math.floor(number)));
+}
+
+function buildHermesPrompt(input: {
+  count: number;
+  account: {
+    username?: string | null;
+    name?: string | null;
+    threads_biography?: string | null;
+  };
+  topic?: string | null;
+  archiveRecent: CachedThreadsPost[];
+  archiveTop: CachedThreadsPost[];
+  scheduledPosts: Array<{ text: string; scheduled_time_utc: string; status: string }>;
+  savedPatterns: ExternalPatternRow[];
+}): string {
+  return JSON.stringify({
+    task: "Generate Threads post candidates for Lensically. Return only valid JSON with a posts array of strings.",
+    count: input.count,
+    account: input.account,
+    optional_topic: input.topic ?? null,
+    instructions: [
+      "Use the archive, top posts, scheduled posts, and saved patterns as context.",
+      "Create novelty and avoid repeating old wording or currently scheduled ideas.",
+      "Keep each post ready to publish on Threads.",
+      "Do not include numbering inside each post string.",
+    ],
+    context: {
+      archive_recent: input.archiveRecent.map((post) => ({
+        text: post.text,
+        timestamp: post.timestamp,
+        likes: post.likes,
+        replies: post.replies,
+        reposts: post.reposts,
+        views: post.views,
+        engagement_total: post.engagement_total,
+      })),
+      archive_top: input.archiveTop.map((post) => ({
+        text: post.text,
+        timestamp: post.timestamp,
+        likes: post.likes,
+        replies: post.replies,
+        reposts: post.reposts,
+        views: post.views,
+        engagement_total: post.engagement_total,
+      })),
+      scheduled_posts: input.scheduledPosts,
+      saved_patterns: input.savedPatterns.map((pattern) => ({
+        text: pattern.post_text,
+        author_handle: pattern.author_handle,
+        likes: pattern.likes,
+        replies: pattern.replies,
+        reposts: pattern.reposts,
+        shares: pattern.shares,
+        views: pattern.views,
+        saved_at: pattern.saved_at,
+      })),
+    },
+    output_schema: {
+      posts: ["string"],
+    },
+  });
+}
+
+function extractOpenAiText(data: unknown): string {
+  if (!data || typeof data !== "object") {
+    return "";
+  }
+  const response = data as {
+    output_text?: unknown;
+    output?: Array<{ content?: Array<{ text?: unknown; type?: unknown }> }>;
+    choices?: Array<{ message?: { content?: unknown } }>;
+  };
+  if (typeof response.output_text === "string") {
+    return response.output_text;
+  }
+  const outputText = response.output
+    ?.flatMap((item) => item.content ?? [])
+    .map((content) => (typeof content.text === "string" ? content.text : ""))
+    .join("")
+    .trim();
+  if (outputText) {
+    return outputText;
+  }
+  const chatText = response.choices?.[0]?.message?.content;
+  return typeof chatText === "string" ? chatText : "";
+}
+
+function parseHermesGeneratedPosts(rawText: string, count: number): string[] {
+  const trimmed = rawText.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch {
+        parsed = null;
+      }
+    }
+  }
+
+  const rawPosts = parsed && typeof parsed === "object" && Array.isArray((parsed as { posts?: unknown }).posts)
+    ? (parsed as { posts: unknown[] }).posts
+    : trimmed
+      .split(/\n+/)
+      .map((line) => line.replace(/^\s*\d+[\.)]\s*/, "").trim())
+      .filter(Boolean);
+
+  return rawPosts
+    .map((post) => String(post ?? "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, count);
+}
+
+async function generateHermesPosts(input: {
+  env: Env;
+  count: number;
+  account: {
+    username?: string | null;
+    name?: string | null;
+    threads_biography?: string | null;
+  };
+  topic?: string | null;
+  archiveRecent: CachedThreadsPost[];
+  archiveTop: CachedThreadsPost[];
+  scheduledPosts: Array<{ text: string; scheduled_time_utc: string; status: string }>;
+  savedPatterns: ExternalPatternRow[];
+}): Promise<{ model: string; posts: string[]; rawText: string }> {
+  const apiKey = input.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  const model = input.env.HERMES_MODEL?.trim() || HERMES_DEFAULT_MODEL;
+  const prompt = buildHermesPrompt(input);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input: prompt,
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const errorMessage = data && typeof data === "object" && "error" in data
+      ? JSON.stringify((data as { error?: unknown }).error)
+      : `OpenAI request failed with HTTP ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  const rawText = extractOpenAiText(data);
+  const posts = parseHermesGeneratedPosts(rawText, input.count);
+  return { model, posts, rawText };
+}
+
 async function getArchivedThreadsPostsMetricsMap(
   env: Env,
   threadsUserId: string,
@@ -6043,7 +6297,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return applyAuthCors(authUser);
       }
 
-      const presets = await listBatchSchedulePresetsForUser(env, authUser.id);
+      const threadsUserId = url.searchParams.get("threads_user_id")?.trim() || "";
+      const account = await getThreadsAccountForAppUser(env, authUser.id, threadsUserId || null);
+      if (!threadsUserId || !account?.threads_user_id || account.threads_user_id !== threadsUserId) {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Threads account not connected" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      const presets = await listBatchSchedulePresetsForUser(env, authUser.id, threadsUserId);
       return applyAuthCors(new Response(JSON.stringify({
         success: true,
         presets,
@@ -6061,7 +6324,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const presets = await listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID);
+      const threadsUserId = url.searchParams.get("threads_user_id")?.trim() || "";
+      const presets = threadsUserId
+        ? await listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, threadsUserId)
+        : [];
       return new Response(JSON.stringify({
         success: true,
         presets,
@@ -6081,6 +6347,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         name?: string;
         times?: unknown;
         is_favorite?: boolean;
+        threads_user_id?: string;
       };
       try {
         payload = await request.json();
@@ -6093,10 +6360,19 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
       const name = normalizeBatchSchedulePresetName(payload.name);
       const times = normalizeBatchSchedulePresetTimes(payload.times);
-      if (!name || !times) {
+      const threadsUserId = payload.threads_user_id?.trim() ?? "";
+      if (!name || !times || !threadsUserId) {
         return applyAuthCors(new Response(JSON.stringify({
-          error: "name and a valid ordered times array are required",
+          error: "threads_user_id, name, and a valid ordered times array are required",
         }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      const account = await getThreadsAccountForAppUser(env, authUser.id, threadsUserId);
+      if (!account?.threads_user_id || account.threads_user_id !== threadsUserId) {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Threads account not connected" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         }));
@@ -6113,9 +6389,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const existingCount = await env.DB.prepare(
         `SELECT COUNT(*) AS total
          FROM batch_schedule_presets
-         WHERE user_id = ?`,
+         WHERE user_id = ?
+           AND threads_user_id = ?`,
       )
-        .bind(authUser.id)
+        .bind(authUser.id, threadsUserId)
         .first<{ total: number | string }>();
 
       if (Number(existingCount?.total ?? 0) >= MAX_BATCH_SCHEDULE_PRESET_COUNT) {
@@ -6132,27 +6409,29 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         await env.DB.prepare(
           `UPDATE batch_schedule_presets
            SET is_favorite = 0
-           WHERE user_id = ?`,
+           WHERE user_id = ?
+             AND threads_user_id = ?`,
         )
-          .bind(authUser.id)
+          .bind(authUser.id, threadsUserId)
           .run();
       }
 
       const presetId = crypto.randomUUID();
       await env.DB.prepare(
-        `INSERT INTO batch_schedule_presets (id, user_id, name, times_json, is_favorite)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO batch_schedule_presets (id, user_id, threads_user_id, name, times_json, is_favorite)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           presetId,
           authUser.id,
+          threadsUserId,
           name,
           JSON.stringify(times),
           isFavorite ? 1 : 0,
         )
         .run();
 
-      const presets = await listBatchSchedulePresetsForUser(env, authUser.id);
+      const presets = await listBatchSchedulePresetsForUser(env, authUser.id, threadsUserId);
       const preset = presets.find((entry) => entry.id === presetId) ?? null;
 
       return applyAuthCors(new Response(JSON.stringify({
@@ -6172,15 +6451,25 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const presetId = favoritePresetMatch[1];
+      const threadsUserId = url.searchParams.get("threads_user_id")?.trim() || "";
+      const account = await getThreadsAccountForAppUser(env, authUser.id, threadsUserId || null);
+      if (!threadsUserId || !account?.threads_user_id || account.threads_user_id !== threadsUserId) {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Threads account not connected" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
       await ensureBatchSchedulePresetsTable(env);
       const existingPreset = await env.DB.prepare(
         `SELECT id
          FROM batch_schedule_presets
          WHERE id = ?
            AND user_id = ?
+           AND threads_user_id = ?
          LIMIT 1`,
       )
-        .bind(presetId, authUser.id)
+        .bind(presetId, authUser.id, threadsUserId)
         .first<{ id: string }>();
 
       if (!existingPreset) {
@@ -6193,21 +6482,23 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       await env.DB.prepare(
         `UPDATE batch_schedule_presets
          SET is_favorite = 0
-         WHERE user_id = ?`,
+         WHERE user_id = ?
+           AND threads_user_id = ?`,
       )
-        .bind(authUser.id)
+        .bind(authUser.id, threadsUserId)
         .run();
 
       await env.DB.prepare(
         `UPDATE batch_schedule_presets
          SET is_favorite = 1
          WHERE id = ?
-           AND user_id = ?`,
+           AND user_id = ?
+           AND threads_user_id = ?`,
       )
-        .bind(presetId, authUser.id)
+        .bind(presetId, authUser.id, threadsUserId)
         .run();
 
-      const presets = await listBatchSchedulePresetsForUser(env, authUser.id);
+      const presets = await listBatchSchedulePresetsForUser(env, authUser.id, threadsUserId);
       const preset = presets.find((entry) => entry.id === presetId) ?? null;
 
       return applyAuthCors(new Response(JSON.stringify({
@@ -6226,13 +6517,23 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return applyAuthCors(authUser);
       }
 
+      const threadsUserId = url.searchParams.get("threads_user_id")?.trim() || "";
+      const account = await getThreadsAccountForAppUser(env, authUser.id, threadsUserId || null);
+      if (!threadsUserId || !account?.threads_user_id || account.threads_user_id !== threadsUserId) {
+        return applyAuthCors(new Response(JSON.stringify({ error: "Threads account not connected" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
       await ensureBatchSchedulePresetsTable(env);
       const deleteResult = await env.DB.prepare(
         `DELETE FROM batch_schedule_presets
          WHERE id = ?
-           AND user_id = ?`,
+           AND user_id = ?
+           AND threads_user_id = ?`,
       )
-        .bind(deletePresetMatch[1], authUser.id)
+        .bind(deletePresetMatch[1], authUser.id, threadsUserId)
         .run();
 
       if (Number(deleteResult.meta?.changes ?? 0) === 0) {
@@ -7525,7 +7826,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           JSON.stringify({ error: "Invalid JSON body" }),
           {
             status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
+            headers: { "content-type": "application/json; charset=UTF-8", ...requestCorsHeaders },
           },
         );
       }
@@ -7631,6 +7932,121 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { "content-type": "application/json; charset=UTF-8" },
         },
       );
+    }
+
+    if (url.pathname === "/api/hermes/generate-posts" && request.method === "POST") {
+      const authUser = await requireAuth(request, env);
+      if (authUser instanceof Response) {
+        return authUser;
+      }
+
+      let payload: {
+        threads_user_id?: string;
+        count?: unknown;
+        topic?: string;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8", ...requestCorsHeaders },
+          },
+        );
+      }
+
+      const threadsUserId = payload.threads_user_id?.trim();
+      const count = normalizeHermesPostCount(payload.count);
+      const topic = payload.topic?.trim() || null;
+      if (!threadsUserId) {
+        return new Response(
+          JSON.stringify({ error: "threads_user_id is required" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8", ...requestCorsHeaders },
+          },
+        );
+      }
+
+      const ownedAppUserId = authUser.id || WORKSPACE_APP_USER_ID;
+      const account = await getThreadsAccountForAppUser(env, ownedAppUserId, threadsUserId);
+      const directThreadsAccount = account?.threads_user_id === threadsUserId
+        ? account
+        : await env.DB.prepare(
+          `SELECT threads_user_id
+           FROM threads_accounts
+           WHERE threads_user_id = ?
+           LIMIT 1`,
+        )
+          .bind(threadsUserId)
+          .first<{ threads_user_id: string }>();
+
+      if (!directThreadsAccount?.threads_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Threads account not connected" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8", ...requestCorsHeaders },
+          },
+        );
+      }
+
+      const cachedProfile = await getFreshThreadsProfileCache(env, threadsUserId);
+      const [archiveRecent, archiveTop, scheduledPosts, savedPatterns] = await Promise.all([
+        listArchivedThreadsPosts(env, threadsUserId, "recent", HERMES_CONTEXT_ARCHIVE_LIMIT, 0),
+        listArchivedThreadsPosts(env, threadsUserId, "top", HERMES_CONTEXT_ARCHIVE_LIMIT, 0),
+        listScheduledPostsForHermesContext(env, threadsUserId, HERMES_MAX_POST_COUNT),
+        listSavedPatternsForHermes(env, threadsUserId, HERMES_CONTEXT_PATTERN_LIMIT),
+      ]);
+
+      try {
+        const generated = await generateHermesPosts({
+          env,
+          count,
+          account: {
+            username: cachedProfile?.username ?? null,
+            name: cachedProfile?.name ?? null,
+            threads_biography: cachedProfile?.threads_biography ?? null,
+          },
+          topic,
+          archiveRecent: archiveRecent.posts,
+          archiveTop: archiveTop.posts,
+          scheduledPosts,
+          savedPatterns,
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            model: generated.model,
+            posts: generated.posts,
+            context_summary: {
+              archive_recent: archiveRecent.posts.length,
+              archive_top: archiveTop.posts.length,
+              scheduled_posts: scheduledPosts.length,
+              saved_patterns: savedPatterns.length,
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=UTF-8", ...requestCorsHeaders },
+          },
+        );
+      } catch (error) {
+        logWorkerEvent("HERMES_GENERATION_FAILURE", {
+          threads_user_id: threadsUserId,
+          message: getErrorMessage(error),
+        });
+        return new Response(
+          JSON.stringify({ error: getErrorMessage(error) || "Could not generate posts." }),
+          {
+            status: 502,
+            headers: { "content-type": "application/json; charset=UTF-8", ...requestCorsHeaders },
+          },
+        );
+      }
     }
 
     if (url.pathname === "/api/threads/schedule" && request.method === "POST") {
@@ -8456,7 +8872,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const [batchPresets, recentArchive, topArchive, scheduledPosts] = await Promise.all([
-        listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID),
+        listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, configuredProfile.threads_user_id),
         listArchivedThreadsPosts(env, configuredProfile.threads_user_id, "recent", 48, 0),
         listArchivedThreadsPosts(env, configuredProfile.threads_user_id, "top", 48, 0),
         listScheduledPostsForThreadsAccountOnLocalDate(

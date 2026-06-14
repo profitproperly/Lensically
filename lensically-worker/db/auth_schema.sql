@@ -98,6 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_banned_identity_expires
 CREATE TABLE IF NOT EXISTS batch_schedule_presets (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  threads_user_id TEXT,
   name TEXT NOT NULL,
   times_json TEXT NOT NULL,
   is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0, 1)),
@@ -108,3 +109,10 @@ CREATE TABLE IF NOT EXISTS batch_schedule_presets (
 
 CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_id
   ON batch_schedule_presets (user_id, is_favorite DESC, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_threads
+  ON batch_schedule_presets (user_id, threads_user_id, is_favorite DESC, updated_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_batch_schedule_presets_favorite_per_user_threads
+  ON batch_schedule_presets (user_id, threads_user_id)
+  WHERE is_favorite = 1 AND threads_user_id IS NOT NULL;

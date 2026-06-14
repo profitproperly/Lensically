@@ -34,6 +34,7 @@ type ThreadsMeResponse = {
 
 const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
+const HERMES_GENERATE_POSTS_URL = buildWorkerUrl("/api/hermes/generate-posts");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 const FALLBACK_TIMEZONE = "America/New_York";
@@ -229,6 +230,13 @@ export default function SchedulePage() {
   const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
   const [spoilerAllText, setSpoilerAllText] = useState(false);
   const [spoilerPhrasesInput, setSpoilerPhrasesInput] = useState("");
+  const [hermesCount, setHermesCount] = useState(6);
+  const [hermesTopic, setHermesTopic] = useState("");
+  const [hermesPosts, setHermesPosts] = useState<string[]>([]);
+  const [isGeneratingHermesPosts, setIsGeneratingHermesPosts] = useState(false);
+  const [hermesMessage, setHermesMessage] = useState("");
+  const [batchImportText, setBatchImportText] = useState("");
+  const [batchImportSignal, setBatchImportSignal] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
@@ -563,7 +571,95 @@ export default function SchedulePage() {
     setSuccessMessage("");
   }
 
+  async function handleGenerateHermesPosts() {
+    if (!threadsUserId) {
+      setErrorMessage("Threads account is not connected.");
+      return;
+    }
+
+    const count = Math.max(1, Math.min(50, Math.floor(Number(hermesCount) || 1)));
+    setIsGeneratingHermesPosts(true);
+    setHermesMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch(HERMES_GENERATE_POSTS_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          count,
+          topic: hermesTopic.trim() || undefined,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+        model?: string;
+        posts?: string[];
+        context_summary?: {
+          archive_recent?: number;
+          archive_top?: number;
+          scheduled_posts?: number;
+          saved_patterns?: number;
+        };
+      } | null;
+      if (!response.ok || !Array.isArray(data?.posts)) {
+        setHermesMessage("");
+        setErrorMessage(data?.error || "Could not generate Hermes posts.");
+        return;
+      }
+
+      setHermesPosts(data.posts);
+      const summary = data.context_summary;
+      setHermesMessage(
+        `Generated ${data.posts.length} post${data.posts.length === 1 ? "" : "s"} with ${data.model || "Hermes"} using ${summary?.archive_recent ?? 0} recent archive posts, ${summary?.archive_top ?? 0} top archive posts, ${summary?.saved_patterns ?? 0} saved patterns, and ${summary?.scheduled_posts ?? 0} scheduled posts.`,
+      );
+    } catch {
+      setErrorMessage("Could not generate Hermes posts.");
+    } finally {
+      setIsGeneratingHermesPosts(false);
+    }
+  }
+
+  function updateHermesPost(index: number, text: string) {
+    setHermesPosts((currentPosts) => currentPosts.map((post, postIndex) => (
+      postIndex === index ? text : post
+    )));
+    setHermesMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
+  function removeHermesPost(index: number) {
+    setHermesPosts((currentPosts) => currentPosts.filter((_, postIndex) => postIndex !== index));
+    setHermesMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
+  function sendHermesPostsToBatch() {
+    const numberedPosts = hermesPosts
+      .map((post) => post.trim())
+      .filter(Boolean)
+      .map((post, index) => `${index + 1}. ${post}`)
+      .join("\n");
+    if (!numberedPosts) {
+      setErrorMessage("Generate at least one Hermes post before sending to Batch Schedule.");
+      return;
+    }
+    setBatchImportText(numberedPosts);
+    setBatchImportSignal((currentSignal) => currentSignal + 1);
+    setSuccessMessage("Loaded Hermes posts into Batch Schedule.");
+    setErrorMessage("");
+  }
+
   const isSubmitting = isPostingNow || isScheduling;
+  const isHermesBusy = isGeneratingHermesPosts || isSubmitting;
 
   if (loadingConnection) {
     return (
@@ -840,11 +936,133 @@ export default function SchedulePage() {
         </div>
       </section>
 
+      <section className="w-full max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:max-w-4xl sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Hermes Generator</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Generate post candidates from the selected account&apos;s archive, saved patterns, and current schedule.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleGenerateHermesPosts()}
+            disabled={isHermesBusy || !threadsUserId}
+            className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            {isGeneratingHermesPosts ? "Generating..." : "Generate with Hermes"}
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+          <div>
+            <label htmlFor="hermes-count" className="block text-sm font-medium text-slate-900">
+              Number of posts
+            </label>
+            <input
+              id="hermes-count"
+              type="number"
+              min={1}
+              max={50}
+              value={hermesCount}
+              onChange={(event) => {
+                setHermesCount(Number(event.target.value));
+                setHermesMessage("");
+                setErrorMessage("");
+              }}
+              disabled={isHermesBusy}
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+          <div>
+            <label htmlFor="hermes-topic" className="block text-sm font-medium text-slate-900">
+              Optional topic or direction
+            </label>
+            <input
+              id="hermes-topic"
+              type="text"
+              value={hermesTopic}
+              onChange={(event) => {
+                setHermesTopic(event.target.value);
+                setHermesMessage("");
+                setErrorMessage("");
+              }}
+              disabled={isHermesBusy}
+              placeholder="Example: beginner online income systems"
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+        </div>
+
+        {hermesMessage ? (
+          <p className="mt-4 text-sm text-green-700">{hermesMessage}</p>
+        ) : null}
+
+        {hermesPosts.length > 0 ? (
+          <div className="mt-5 space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Generated Candidates</h3>
+              <button
+                type="button"
+                onClick={sendHermesPostsToBatch}
+                disabled={isSubmitting || hermesPosts.every((post) => !post.trim())}
+                className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              >
+                Send All to Batch Schedule
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {hermesPosts.map((post, index) => (
+                <div key={`hermes-post-${index + 1}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-medium uppercase text-slate-500">Post {index + 1}</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPostText(post);
+                          setSuccessMessage("Loaded Hermes post into the composer.");
+                          setErrorMessage("");
+                        }}
+                        disabled={isSubmitting || !post.trim()}
+                        className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Use in Composer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeHermesPost(index)}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={post}
+                    onChange={(event) => updateHermesPost(index, event.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    disabled={isSubmitting}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">{post.length}/500</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
       <BatchSchedulePanel
         threadsUserId={threadsUserId}
         timezone={timezone}
         timezoneLabel={timezoneLabel}
         clockFormatPreference={clockFormatPreference}
+        importedPostsText={batchImportText}
+        importSignal={batchImportSignal}
       />
 
       {showPostNowConfirmation ? (

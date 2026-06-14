@@ -6,9 +6,7 @@
   "scripts": {
     "agent:configure-lensically-api": "powershell -ExecutionPolicy Bypass -File ./scripts/configure-lensically-agent-api.ps1",
     "agent:context": "node ./scripts/lensically-agent-api.mjs context",
-    "agent:schedule-plan": "node ./scripts/lensically-agent-api.mjs schedule-plan",
-    "agent:vectrix": "powershell -ExecutionPolicy Bypass -File ./scripts/start-vectrix-qwen-worker.ps1",
-    "agent:vectrix:install-startup": "powershell -ExecutionPolicy Bypass -File ./scripts/install-vectrix-startup-task.ps1"
+    "agent:schedule-plan": "node ./scripts/lensically-agent-api.mjs schedule-plan"
   },
   "repository": {
     "type": "git",
