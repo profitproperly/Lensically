@@ -15,8 +15,8 @@ const API_BASE_URL = process.env.LENSICALLY_API_BASE_URL || "https://api.lensica
 const LLAMA_BASE_URL = process.env.VECTRIX_LLAMA_BASE_URL || "http://127.0.0.1:8080/v1";
 const MODEL = process.env.VECTRIX_QWEN_MODEL || "qwen3-4b-instruct";
 const PERFORMANCE_ANALYSIS_TIMEOUT_MS = 20_000;
-const GENERATION_TIMEOUT_MS = 480_000;
-const MAX_SLOTS_PER_GENERATION_PASS = 3;
+const GENERATION_TIMEOUT_MS = 240_000;
+const MAX_GENERATION_ATTEMPTS_PER_SLOT = 3;
 const VECTRIX_POST_FORMATS = [
   "specific online income play with a concrete first step",
   "wealth building mistake most beginners make and the better move",
@@ -42,6 +42,15 @@ const VECTRIX_BANNED_WEAK_PHRASES = [
   "on track",
   "what worked today",
   "what can you improve",
+  "you need a consistent way",
+  "start by identifying",
+  "identify one skill",
+  "track your monthly expenses",
+  "allocate 15 minutes",
+  "daily expenses",
+  "review your daily",
+  "checklist:",
+  "let me know",
 ];
 
 async function loadEnv() {
@@ -162,6 +171,17 @@ function containsDash(text) {
 function containsWeakPhrase(text) {
   const normalized = normalizePostText(text).toLowerCase();
   return VECTRIX_BANNED_WEAK_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
+function hasLowQualityShape(text) {
+  const normalized = normalizePostText(text);
+  if (normalized.length < 70 || normalized.length > 280) return true;
+  if (/^[a-z]/.test(normalized)) return true;
+  if (/\b(1\.|2\.|3\.)\b/.test(normalized)) return true;
+  if ((normalized.match(/\?/g) ?? []).length > 0) return true;
+  if (!/[.!]$/.test(normalized)) return true;
+  if (/\b(consistent|system|skill|income)\b.*\b(consistent|system|skill|income)\b.*\b(consistent|system|skill|income)\b/i.test(normalized)) return true;
+  return false;
 }
 
 function postKey(text) {
@@ -308,8 +328,9 @@ async function analyzePerformance(context, currentMemory) {
 
   const winners = snapshot.slice(0, 10);
   const losers = snapshot.slice(-10).reverse();
-  const prompt = [
-    "You are improving the Vectrix Threads strategy from actual post performance.",
+    const prompt = [
+      "/no_think",
+      "You are improving the Vectrix Threads strategy from actual post performance.",
     "Analyze winners and weak posts. Update strategy memory for tomorrow's generator.",
     "Do not suggest dashes. Do not include hyphens, en dashes, em dashes, or minus signs in any memory field.",
     "Keep advice practical and specific to making money online, building wealth, and financial freedom.",
@@ -329,7 +350,7 @@ async function analyzePerformance(context, currentMemory) {
         temperature: 0.25,
         max_tokens: 2048,
         messages: [
-          { role: "system", content: "You return clean JSON only." },
+          { role: "system", content: "/no_think\nYou return clean JSON only. Do not explain." },
           { role: "user", content: prompt },
         ],
       }),
@@ -351,78 +372,75 @@ async function analyzePerformance(context, currentMemory) {
   }
 }
 
-async function generatePosts(context, memory) {
-  const missingSlots = (Array.isArray(context.missing_slots) ? context.missing_slots : [])
-    .slice(0, MAX_SLOTS_PER_GENERATION_PASS);
-  const archiveSamples = [
-    ...(Array.isArray(context.archive_top) ? context.archive_top.slice(0, 8) : []),
-    ...(Array.isArray(context.archive_recent) ? context.archive_recent.slice(0, 12) : []),
-  ].map((post) => ({
-    text: normalizePostText(post.post_text || post.text),
-    likes: post.like_count ?? post.likes ?? null,
-    views: post.view_count ?? post.views ?? null,
-  }));
+function normalizeGeneratedPost(entry, slot, duplicateKeys, seen) {
+  const text = normalizePostText(typeof entry === "string" ? entry : entry?.text);
+  const key = postKey(text);
+  if (!text || !key) return null;
+  if (containsDash(text)) return null;
+  if (containsWeakPhrase(text)) return null;
+  if (hasLowQualityShape(text)) return null;
+  if (duplicateKeys.has(key) || seen.has(key)) return null;
+  return { slot, text, key };
+}
 
-  const prompt = [
-    "You are the Vectrix Threads growth worker.",
-    "Generate original Threads posts for the missing hourly slots that can attract followers, not generic motivation.",
-    "Niche: making money online, building wealth, financial freedom, online business systems, monetizable skills, disciplined investing, cash-flow thinking.",
-    "Rules: no scams, no guaranteed income claims, no fake results, no direct investment picks, no repeated wording, no hashtags, no emojis.",
-    "Never use dashes of any kind in post text. Do not use hyphens, en dashes, em dashes, minus signs, or dash separators.",
-    "Avoid vague coaching questions. Do not write generic lines like review your progress, reflect on your progress, stay motivated, or what is your strategy.",
-    "Each post needs a concrete idea, a useful distinction, a specific action, or a memorable point of view.",
-    "Use direct statements more than questions. If you use a question, make it sharp and specific.",
-    "Write like an operator building online cash flow in public. Short, practical, specific, and follow worthy.",
-    "Use archive samples to avoid repeating posts and to infer what should improve over time.",
-    "Use strategy memory to repeat proven patterns and avoid weak patterns without copying old posts.",
-    "Return only JSON in this exact shape: {\"posts\":[{\"slot\":\"HH:MM\",\"text\":\"post text\"}]}",
-    `Date: ${context.date}`,
-    `Missing slots: ${JSON.stringify(missingSlots)}`,
-    `Content brief: ${context.agent?.content_brief || ""}`,
-    `Strong post formats to rotate: ${JSON.stringify(VECTRIX_POST_FORMATS)}`,
-    `Banned weak phrases: ${JSON.stringify(VECTRIX_BANNED_WEAK_PHRASES)}`,
-    `Strategy memory: ${JSON.stringify(memory)}`,
-    `Archive samples: ${JSON.stringify(archiveSamples)}`,
-  ].join("\n\n");
-
+async function generatePostForSlot(context, memory, slot) {
   const duplicateKeys = existingPostKeys(context);
   const seen = new Set();
-  const requestedSlots = new Set(missingSlots);
-  const posts = [];
+  const recentExamples = [
+    ...(Array.isArray(context.archive_top) ? context.archive_top.slice(0, 4) : []),
+    ...(Array.isArray(context.archive_recent) ? context.archive_recent.slice(0, 4) : []),
+  ].map((post) => normalizePostText(post.post_text || post.text)).filter(Boolean);
 
-  try {
-    const data = await fetchJsonWithTimeout(new URL("/chat/completions", LLAMA_BASE_URL), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.75,
-        max_tokens: 1024,
-        messages: [
-          { role: "system", content: "You write concise, original JSON only." },
-          { role: "user", content: prompt },
-        ],
-      }),
-    }, GENERATION_TIMEOUT_MS);
+  for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS_PER_SLOT; attempt += 1) {
+    const prompt = [
+      "/no_think",
+      "Write one original Threads post for Vectrix.",
+      "Topic: making money online, wealth building, financial freedom, online business systems, monetizable skills, investing discipline, or cash flow.",
+      "Style: practical, specific, operator minded, not generic motivation.",
+      "Rules: no hashtags, no emojis, no income guarantees, no direct investment picks.",
+      "Do not use dashes, hyphens, en dashes, em dashes, or minus signs.",
+      "Do not ask questions. Do not write numbered lists. Do not begin with you need, you can, start by, identify, track, checklist, or beginners.",
+      "Use normal sentence capitalization. Keep it under 240 characters.",
+      "Make one sharp point with one concrete example.",
+      `Avoid these phrases: ${VECTRIX_BANNED_WEAK_PHRASES.join(", ")}`,
+      `Slot: ${slot}`,
+      `Strategy summary: ${memory.summary}`,
+      `Formats to rotate: ${VECTRIX_POST_FORMATS.join(", ")}`,
+      `Do not copy these examples: ${JSON.stringify(recentExamples)}`,
+      "Return only JSON: {\"text\":\"post text\"}",
+    ].join("\n");
 
-    const content = data?.choices?.[0]?.message?.content ?? "";
-    const parsed = extractJson(content);
-    for (const entry of Array.isArray(parsed.posts) ? parsed.posts : []) {
-      const slot = String(entry.slot ?? "").trim();
-      const text = normalizePostText(entry.text);
-      const key = postKey(text);
-      if (!requestedSlots.has(slot) || !text || !key) continue;
-      if (containsDash(text)) continue;
-      if (containsWeakPhrase(text)) continue;
-      if (duplicateKeys.has(key) || seen.has(key)) continue;
-      seen.add(key);
-      posts.push({ slot, text });
+    try {
+      await log("slot_generation_started", { slot, attempt });
+      const data = await fetchJsonWithTimeout(new URL("/chat/completions", LLAMA_BASE_URL), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: MODEL,
+          temperature: 0.78,
+          max_tokens: 220,
+          messages: [
+            { role: "system", content: "/no_think\nReturn valid JSON only. Do not explain." },
+            { role: "user", content: prompt },
+          ],
+        }),
+      }, GENERATION_TIMEOUT_MS);
+
+      const content = data?.choices?.[0]?.message?.content ?? "";
+      const parsed = extractJson(content);
+      const generated = normalizeGeneratedPost(parsed, slot, duplicateKeys, seen);
+      if (generated) {
+        seen.add(generated.key);
+        return { slot, text: generated.text };
+      }
+
+      await log("slot_generation_rejected", { slot, attempt });
+    } catch (error) {
+      await log("slot_generation_failed", { slot, attempt, error: error instanceof Error ? error.message : String(error) });
     }
-  } catch (error) {
-    await log("generation_model_failed", { error: error instanceof Error ? error.message : String(error), missing_slots: missingSlots.length });
   }
 
-  return posts;
+  return null;
 }
 
 async function runOnce() {
@@ -447,21 +465,31 @@ async function runOnce() {
   const memory = await analyzePerformance(context, currentMemory);
   let totalCreated = 0;
   let totalSkipped = 0;
+  const skippedSlots = new Set();
 
-  for (let pass = 1; pass <= 12; pass += 1) {
+  for (let pass = 1; pass <= 36; pass += 1) {
     const missingSlots = Array.isArray(context.missing_slots) ? context.missing_slots : [];
     if (!missingSlots.length) {
       await log("already_scheduled", { date, pass, memory_snapshot_count: memory.last_snapshot_count, total_created: totalCreated, total_skipped: totalSkipped });
       return;
     }
 
-    await log("generation_started", { date, pass, missing_slots: missingSlots.length });
-    const posts = await generatePosts(context, memory);
-    if (!posts.length) {
-      await log("no_posts_generated", { date, pass, missing_slots: missingSlots.length, total_created: totalCreated, total_skipped: totalSkipped });
+    const slot = missingSlots.find((missingSlot) => !skippedSlots.has(missingSlot));
+    if (!slot) {
+      await log("no_retryable_slots", { date, pass, missing_slots: missingSlots.length, skipped_slots: skippedSlots.size, total_created: totalCreated, total_skipped: totalSkipped });
       return;
     }
 
+    await log("generation_started", { date, pass, slot, missing_slots: missingSlots.length });
+    const post = await generatePostForSlot(context, memory, slot);
+    if (!post) {
+      skippedSlots.add(slot);
+      totalSkipped += 1;
+      await log("slot_skipped", { date, pass, slot, total_created: totalCreated, total_skipped: totalSkipped });
+      continue;
+    }
+
+    const posts = [post];
     const plan = { account_id: ACCOUNT_ID, date, timezone: TIMEZONE, posts };
     await writeJsonFile(path.join(STATE_DIR, `plan-${date}-pass-${pass}.json`), plan);
     const result = await schedulePlan(plan);
