@@ -64,7 +64,7 @@ Unless the user says `talk only` or explicitly opts out, implementation tasks de
 - For browser tasks, use both browser surfaces when available: use the Chrome extension browser for the user's real logged-in/live tab state, and use the Codex in-app browser for isolated verification, local app checks, and clean repro when relevant.
 - If `lensically-worker/src/index.ts` changed, include the backend auth/API smoke coverage used by this repo.
 - Do not tell the user to run checks, push, or deploy. The agent does that work.
-- If runtime code changed and any 5-hour usage remains, still shoot for deployment after relevant checks. Only skip/defer deployment when usage is effectively exhausted, credentials are unavailable, checks fail, or the user explicitly opts out.
+- The usage meter is for learning/planning, not a stop sign. If runtime code changed, still shoot for deployment after relevant checks even when usage is low. Only skip/defer deployment when credentials are unavailable, checks fail, the deploy command cannot run, or the user explicitly opts out.
 - In the final handoff, state what you ran and what you deployed.
 
 ## Response Rules
