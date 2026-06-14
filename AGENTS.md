@@ -33,6 +33,7 @@
 - Find the existing integration point before adding new code.
 - Reuse existing helpers and patterns where they still reflect the current product.
 - Keep changes narrow.
+- If you trip on a command, shell syntax, quoting, escaping, credential path, missing tool/package, stale assumption, wrong deploy path, or user-corrected persistent fact, store the reusable fix in global or project memory before final.
 - Do not invent placeholder UI, fake navigation, or dead controls.
 - Do not hardcode secrets or environment-specific URLs.
 - Do not edit `PROJECT_CONTEXT.md` unless the user explicitly asks.
