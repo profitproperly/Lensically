@@ -14,6 +14,9 @@ const TIMEZONE = "America/New_York";
 const API_BASE_URL = process.env.LENSICALLY_API_BASE_URL || "https://api.lensically.com";
 const LLAMA_BASE_URL = process.env.VECTRIX_LLAMA_BASE_URL || "http://127.0.0.1:8080/v1";
 const MODEL = process.env.VECTRIX_QWEN_MODEL || "qwen3-4b-instruct";
+const PERFORMANCE_ANALYSIS_TIMEOUT_MS = 20_000;
+const GENERATION_TIMEOUT_MS = 30_000;
+const MAX_SLOTS_PER_GENERATION_PASS = 6;
 const VECTRIX_POST_FORMATS = [
   "specific online income play with a concrete first step",
   "wealth building mistake most beginners make and the better move",
@@ -39,6 +42,32 @@ const VECTRIX_BANNED_WEAK_PHRASES = [
   "on track",
   "what worked today",
   "what can you improve",
+];
+const VECTRIX_FALLBACK_POSTS = [
+  "A monetizable skill is not valuable because it sounds impressive. It is valuable when a business can point at it and see saved time, saved money, or new revenue.",
+  "Most people chase passive income before they build active income. Active income teaches the market, the buyer, the offer, and the skill that later creates leverage.",
+  "The fastest way to test an online business idea is simple. Find a painful problem, write one specific offer, send it to ten people who already have that problem.",
+  "If you want financial freedom, study cash flow before status. Status makes you spend to look successful. Cash flow gives you choices when nobody is watching.",
+  "A small audience can become valuable when it trusts your judgment on one clear problem. Broad attention is weaker than specific trust from the right people.",
+  "The best online income systems start with one repeatable result. Document the steps, sell the outcome, improve delivery, then automate the parts that stay stable.",
+  "Beginners ask what niche is profitable. Operators ask which painful problem they can solve repeatedly for people who already spend money to fix it.",
+  "Wealth building gets easier when your income is tied to assets, systems, or skills that keep improving after the first effort. Labor alone has a ceiling.",
+  "A useful money rule is to turn every expense into a question. Does this buy time, skill, distribution, health, or cash flow. If not, it needs a good reason.",
+  "Your first digital product should not be a giant course. Start with a checklist, template, script, or short guide that solves one annoying problem cleanly.",
+  "People overthink business ideas and underthink distribution. A simple offer with daily reach beats a perfect offer nobody sees.",
+  "Financial freedom is not one big leap. It is a stack of better decisions around earning, spending, saving, investing, and building things that can pay you again.",
+  "A strong side income usually starts ugly. One skill, one offer, one buyer type, one delivery process. Complexity can come after demand is proven.",
+  "The internet rewards clear thinking packaged well. If you can explain a painful problem better than most people, you are closer to an offer than you think.",
+  "Do not build a business around motivation. Build it around a measurable problem. Motivation fades, but a painful problem keeps looking for a solution.",
+  "A good cash flow system has inputs you control. Leads contacted, content published, offers tested, follow ups sent, delivery improved. Track those before revenue.",
+  "The money is usually in boring improvements. Faster onboarding, clearer offers, better follow up, cleaner delivery, stronger proof, simpler pricing.",
+  "Learning a skill is not the same as monetizing it. Monetizing starts when you package the skill into an outcome someone understands and already wants.",
+  "A practical wealth move is raising your earning power before inflating your lifestyle. Extra income with old spending habits creates room to build.",
+  "Online leverage comes from assets that sell, teach, persuade, or deliver while you sleep. Content, email lists, templates, systems, and software all count.",
+  "The first version of your offer only needs to answer one question. What painful result can I create for one specific type of person.",
+  "A broke business idea usually hides behind vague words. A better idea names the buyer, the pain, the result, the timeline, and the reason to act now.",
+  "If your income depends on attention, build trust faster than you build reach. Reach gets a click. Trust gets the sale.",
+  "Most people do not need a new opportunity. They need a cleaner way to turn one useful skill into a paid result for one clear market.",
 ];
 
 async function loadEnv() {
@@ -106,6 +135,19 @@ async function fetchJson(url, options = {}) {
     throw new Error(`${url.pathname} HTTP ${response.status}: ${JSON.stringify(data)}`);
   }
   return data;
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = PERFORMANCE_ANALYSIS_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchJson(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function getContext(targetDate) {
@@ -290,8 +332,8 @@ async function analyzePerformance(context, currentMemory) {
     return memory;
   }
 
-  const winners = snapshot.slice(0, 20);
-  const losers = snapshot.slice(-20).reverse();
+  const winners = snapshot.slice(0, 10);
+  const losers = snapshot.slice(-10).reverse();
   const prompt = [
     "You are improving the Vectrix Threads strategy from actual post performance.",
     "Analyze winners and weak posts. Update strategy memory for tomorrow's generator.",
@@ -305,7 +347,7 @@ async function analyzePerformance(context, currentMemory) {
   ].join("\n\n");
 
   try {
-    const data = await fetchJson(new URL("/chat/completions", LLAMA_BASE_URL), {
+    const data = await fetchJsonWithTimeout(new URL("/chat/completions", LLAMA_BASE_URL), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -317,7 +359,7 @@ async function analyzePerformance(context, currentMemory) {
           { role: "user", content: prompt },
         ],
       }),
-    });
+    }, PERFORMANCE_ANALYSIS_TIMEOUT_MS);
     const content = data?.choices?.[0]?.message?.content ?? "";
     const parsed = extractJson(content);
     const memory = normalizePerformanceMemory({
@@ -336,10 +378,11 @@ async function analyzePerformance(context, currentMemory) {
 }
 
 async function generatePosts(context, memory) {
-  const missingSlots = Array.isArray(context.missing_slots) ? context.missing_slots : [];
+  const missingSlots = (Array.isArray(context.missing_slots) ? context.missing_slots : [])
+    .slice(0, MAX_SLOTS_PER_GENERATION_PASS);
   const archiveSamples = [
-    ...(Array.isArray(context.archive_top) ? context.archive_top.slice(0, 20) : []),
-    ...(Array.isArray(context.archive_recent) ? context.archive_recent.slice(0, 30) : []),
+    ...(Array.isArray(context.archive_top) ? context.archive_top.slice(0, 8) : []),
+    ...(Array.isArray(context.archive_recent) ? context.archive_recent.slice(0, 12) : []),
   ].map((post) => ({
     text: normalizePostText(post.post_text || post.text),
     likes: post.like_count ?? post.likes ?? null,
@@ -368,39 +411,64 @@ async function generatePosts(context, memory) {
     `Archive samples: ${JSON.stringify(archiveSamples)}`,
   ].join("\n\n");
 
-  const data = await fetchJson(new URL("/chat/completions", LLAMA_BASE_URL), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature: 0.75,
-      max_tokens: 4096,
-      messages: [
-        { role: "system", content: "You write concise, original JSON only." },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
-
-  const content = data?.choices?.[0]?.message?.content ?? "";
-  const parsed = extractJson(content);
   const duplicateKeys = existingPostKeys(context);
   const seen = new Set();
   const requestedSlots = new Set(missingSlots);
   const posts = [];
 
-  for (const entry of Array.isArray(parsed.posts) ? parsed.posts : []) {
-    const slot = String(entry.slot ?? "").trim();
-    const text = normalizePostText(entry.text);
-    const key = postKey(text);
-    if (!requestedSlots.has(slot) || !text || !key) continue;
-    if (containsDash(text)) continue;
-    if (containsWeakPhrase(text)) continue;
-    if (duplicateKeys.has(key) || seen.has(key)) continue;
-    seen.add(key);
+  try {
+    const data = await fetchJsonWithTimeout(new URL("/chat/completions", LLAMA_BASE_URL), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.75,
+        max_tokens: 1024,
+        messages: [
+          { role: "system", content: "You write concise, original JSON only." },
+          { role: "user", content: prompt },
+        ],
+      }),
+    }, GENERATION_TIMEOUT_MS);
+
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    const parsed = extractJson(content);
+    for (const entry of Array.isArray(parsed.posts) ? parsed.posts : []) {
+      const slot = String(entry.slot ?? "").trim();
+      const text = normalizePostText(entry.text);
+      const key = postKey(text);
+      if (!requestedSlots.has(slot) || !text || !key) continue;
+      if (containsDash(text)) continue;
+      if (containsWeakPhrase(text)) continue;
+      if (duplicateKeys.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      posts.push({ slot, text });
+    }
+  } catch (error) {
+    await log("generation_model_failed", { error: error instanceof Error ? error.message : String(error), missing_slots: missingSlots.length });
+  }
+
+  if (posts.length) {
+    return posts;
+  }
+
+  for (const slot of missingSlots) {
+    const slotHour = Number(slot.slice(0, 2));
+    const fallbackOffset = Number.isFinite(slotHour) ? slotHour : posts.length;
+    const candidates = [
+      ...VECTRIX_FALLBACK_POSTS.slice(fallbackOffset),
+      ...VECTRIX_FALLBACK_POSTS.slice(0, fallbackOffset),
+    ];
+    const text = candidates.find((candidate) => {
+      const key = postKey(candidate);
+      return key && !duplicateKeys.has(key) && !seen.has(key);
+    });
+    if (!text) continue;
+    seen.add(postKey(text));
     posts.push({ slot, text });
   }
 
+  await log("generation_fallback_used", { requested: missingSlots.length, generated: posts.length });
   return posts;
 }
 
@@ -409,34 +477,57 @@ async function runOnce() {
   await fs.mkdir(STATE_DIR, { recursive: true });
   await fs.mkdir(MEMORY_DIR, { recursive: true });
   const date = process.argv.find((arg) => arg.startsWith("--date="))?.split("=")[1] || localTomorrowDate();
-  const context = await getContext(date);
+  let context = await getContext(date);
   await writeJsonFile(path.join(STATE_DIR, "latest-context.json"), context);
+  await log("context_loaded", {
+    date,
+    enabled: context?.agent?.enabled === true,
+    missing_slots: Array.isArray(context.missing_slots) ? context.missing_slots.length : null,
+  });
 
   if (context?.agent?.enabled !== true) {
     await log("agent_disabled", { date });
     return;
   }
 
-  const missingSlots = Array.isArray(context.missing_slots) ? context.missing_slots : [];
   const currentMemory = normalizePerformanceMemory(await readJsonFile(PERFORMANCE_MEMORY_PATH, defaultPerformanceMemory()));
   const memory = await analyzePerformance(context, currentMemory);
+  let totalCreated = 0;
+  let totalSkipped = 0;
 
-  if (!missingSlots.length) {
-    await log("already_scheduled", { date, memory_snapshot_count: memory.last_snapshot_count });
-    return;
+  for (let pass = 1; pass <= 4; pass += 1) {
+    const missingSlots = Array.isArray(context.missing_slots) ? context.missing_slots : [];
+    if (!missingSlots.length) {
+      await log("already_scheduled", { date, pass, memory_snapshot_count: memory.last_snapshot_count, total_created: totalCreated, total_skipped: totalSkipped });
+      return;
+    }
+
+    await log("generation_started", { date, pass, missing_slots: missingSlots.length });
+    const posts = await generatePosts(context, memory);
+    if (!posts.length) {
+      await log("no_posts_generated", { date, pass, missing_slots: missingSlots.length, total_created: totalCreated, total_skipped: totalSkipped });
+      return;
+    }
+
+    const plan = { account_id: ACCOUNT_ID, date, timezone: TIMEZONE, posts };
+    await writeJsonFile(path.join(STATE_DIR, `plan-${date}-pass-${pass}.json`), plan);
+    const result = await schedulePlan(plan);
+    await writeJsonFile(path.join(STATE_DIR, `schedule-result-${date}-pass-${pass}.json`), result);
+    const created = result.created?.length ?? 0;
+    const skipped = result.skipped?.length ?? 0;
+    totalCreated += created;
+    totalSkipped += skipped;
+    await log("scheduled", { date, pass, requested: missingSlots.length, generated: posts.length, created, skipped, total_created: totalCreated, total_skipped: totalSkipped });
+
+    if (created === 0) {
+      return;
+    }
+
+    context = await getContext(date);
+    await writeJsonFile(path.join(STATE_DIR, "latest-context.json"), context);
   }
 
-  const posts = await generatePosts(context, memory);
-  if (!posts.length) {
-    await log("no_posts_generated", { date, missing_slots: missingSlots.length });
-    return;
-  }
-
-  const plan = { account_id: ACCOUNT_ID, date, timezone: TIMEZONE, posts };
-  await writeJsonFile(path.join(STATE_DIR, `plan-${date}.json`), plan);
-  const result = await schedulePlan(plan);
-  await writeJsonFile(path.join(STATE_DIR, `schedule-result-${date}.json`), result);
-  await log("scheduled", { date, requested: missingSlots.length, generated: posts.length, created: result.created?.length ?? 0, skipped: result.skipped?.length ?? 0 });
+  await log("pass_limit_reached", { date, total_created: totalCreated, total_skipped: totalSkipped });
 }
 
 runOnce().catch(async (error) => {
