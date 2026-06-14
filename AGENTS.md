@@ -77,6 +77,7 @@ Unless the user says `talk only` or explicitly opts out, implementation tasks de
 
 - Update `AGENTS.md` when workflow rules or default behavior change.
 - Update `CURRENT_STATE.md` only when product reality or normal workflow meaningfully changes.
+- Treat `AGENTS.md` and `OPERATING_MEMORY.md` as living files. Move durable workflow rules into `AGENTS.md`; store reusable facts, traps, fixes, tool limitations, and cost notes in `OPERATING_MEMORY.md`.
 - Remove stale guidance instead of layering new text on top of bad old text.
 
 ## Safety
