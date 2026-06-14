@@ -32,9 +32,17 @@ type ThreadsMeResponse = {
   error?: string;
 };
 
+type BatchSchedulePreset = {
+  id: string;
+  name: string;
+  times: string[];
+  is_favorite: boolean;
+};
+
 const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const HERMES_GENERATE_POSTS_URL = buildWorkerUrl("/api/hermes/generate-posts");
+const BATCH_PRESETS_URL = buildWorkerUrl("/api/batch-schedule/presets");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 const FALLBACK_TIMEZONE = "America/New_York";
@@ -230,13 +238,19 @@ export default function SchedulePage() {
   const [showPostNowConfirmation, setShowPostNowConfirmation] = useState(false);
   const [spoilerAllText, setSpoilerAllText] = useState(false);
   const [spoilerPhrasesInput, setSpoilerPhrasesInput] = useState("");
-  const [hermesCount, setHermesCount] = useState(6);
+  const [hermesCount, setHermesCount] = useState(0);
   const [hermesTopic, setHermesTopic] = useState("");
+  const [useHermesBatchPreset, setUseHermesBatchPreset] = useState(false);
+  const [hermesBatchPresets, setHermesBatchPresets] = useState<BatchSchedulePreset[]>([]);
+  const [selectedHermesPresetId, setSelectedHermesPresetId] = useState("");
+  const [loadingHermesPresets, setLoadingHermesPresets] = useState(false);
   const [hermesPosts, setHermesPosts] = useState<string[]>([]);
   const [isGeneratingHermesPosts, setIsGeneratingHermesPosts] = useState(false);
   const [hermesMessage, setHermesMessage] = useState("");
   const [batchImportText, setBatchImportText] = useState("");
+  const [batchImportTimes, setBatchImportTimes] = useState<string[]>([]);
   const [batchImportSignal, setBatchImportSignal] = useState(0);
+  const [batchOpenSignal, setBatchOpenSignal] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
@@ -265,6 +279,15 @@ export default function SchedulePage() {
 
     return options;
   }, [clockFormatPreference]);
+
+  const selectedHermesPreset = useMemo(
+    () => hermesBatchPresets.find((preset) => preset.id === selectedHermesPresetId) ?? null,
+    [hermesBatchPresets, selectedHermesPresetId],
+  );
+
+  const hermesGenerationCount = useHermesBatchPreset
+    ? selectedHermesPreset?.times.length ?? 0
+    : Math.max(0, Math.min(50, Math.floor(Number(hermesCount) || 0)));
 
   useEffect(() => {
     let isMounted = true;
@@ -378,6 +401,57 @@ export default function SchedulePage() {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function loadHermesBatchPresets() {
+      if (!threadsUserId) {
+        setHermesBatchPresets([]);
+        setSelectedHermesPresetId("");
+        return;
+      }
+
+      setLoadingHermesPresets(true);
+      try {
+        const response = await fetch(appendThreadsUserId(BATCH_PRESETS_URL, threadsUserId), {
+          cache: "no-store",
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const data = (await response.json().catch(() => null)) as {
+          presets?: BatchSchedulePreset[];
+        } | null;
+        if (!isMounted) {
+          return;
+        }
+        const presets = Array.isArray(data?.presets) ? data.presets : [];
+        setHermesBatchPresets(presets);
+        setSelectedHermesPresetId((currentId) => (
+          presets.some((preset) => preset.id === currentId)
+            ? currentId
+            : presets[0]?.id ?? ""
+        ));
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError") && isMounted) {
+          setHermesBatchPresets([]);
+          setSelectedHermesPresetId("");
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingHermesPresets(false);
+        }
+      }
+    }
+
+    void loadHermesBatchPresets();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [threadsUserId, batchImportSignal, batchOpenSignal]);
 
   useEffect(() => {
     if (!scheduleDate) {
@@ -577,7 +651,16 @@ export default function SchedulePage() {
       return;
     }
 
-    const count = Math.max(1, Math.min(50, Math.floor(Number(hermesCount) || 1)));
+    const count = hermesGenerationCount;
+    if (count < 1) {
+      setErrorMessage(
+        useHermesBatchPreset
+          ? "Choose a saved batch schedule before generating."
+          : "Choose how many posts Hermes should generate.",
+      );
+      return;
+    }
+
     setIsGeneratingHermesPosts(true);
     setHermesMessage("");
     setErrorMessage("");
@@ -653,6 +736,7 @@ export default function SchedulePage() {
       return;
     }
     setBatchImportText(numberedPosts);
+    setBatchImportTimes(useHermesBatchPreset && selectedHermesPreset ? selectedHermesPreset.times : []);
     setBatchImportSignal((currentSignal) => currentSignal + 1);
     setSuccessMessage("Loaded Hermes posts into Batch Schedule.");
     setErrorMessage("");
@@ -947,14 +1031,76 @@ export default function SchedulePage() {
           <button
             type="button"
             onClick={() => void handleGenerateHermesPosts()}
-            disabled={isHermesBusy || !threadsUserId}
+            disabled={isHermesBusy || !threadsUserId || hermesGenerationCount < 1}
             className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {isGeneratingHermesPosts ? "Generating..." : "Generate with Hermes"}
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+            <input
+              type="checkbox"
+              checked={useHermesBatchPreset}
+              onChange={(event) => {
+                setUseHermesBatchPreset(event.target.checked);
+                setHermesMessage("");
+                setErrorMessage("");
+              }}
+              disabled={isHermesBusy}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            Match an existing batch schedule
+          </label>
+
+          {useHermesBatchPreset ? (
+            <div className="mt-4 space-y-3">
+              {loadingHermesPresets ? (
+                <p className="text-sm text-slate-500">Loading saved batch schedules...</p>
+              ) : hermesBatchPresets.length > 0 ? (
+                <>
+                  <label htmlFor="hermes-batch-preset" className="block text-sm font-medium text-slate-900">
+                    Batch schedule
+                  </label>
+                  <select
+                    id="hermes-batch-preset"
+                    value={selectedHermesPresetId}
+                    onChange={(event) => {
+                      setSelectedHermesPresetId(event.target.value);
+                      setHermesMessage("");
+                      setErrorMessage("");
+                    }}
+                    disabled={isHermesBusy}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {hermesBatchPresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.name} ({preset.times.length} slot{preset.times.length === 1 ? "" : "s"})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-600">
+                    Hermes will generate {hermesGenerationCount} post{hermesGenerationCount === 1 ? "" : "s"} to match this batch schedule.
+                  </p>
+                </>
+              ) : (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-600">No saved batch schedules exist for this account yet.</p>
+                  <button
+                    type="button"
+                    onClick={() => setBatchOpenSignal((currentSignal) => currentSignal + 1)}
+                    className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+                  >
+                    Create Batch Schedule
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
           <div>
             <label htmlFor="hermes-count" className="block text-sm font-medium text-slate-900">
               Number of posts
@@ -962,25 +1108,24 @@ export default function SchedulePage() {
             <input
               id="hermes-count"
               type="number"
-              min={1}
+              min={0}
               max={50}
-              value={hermesCount}
+              value={useHermesBatchPreset ? hermesGenerationCount : hermesCount}
               onChange={(event) => {
                 setHermesCount(Number(event.target.value));
                 setHermesMessage("");
                 setErrorMessage("");
               }}
-              disabled={isHermesBusy}
+              disabled={isHermesBusy || useHermesBatchPreset}
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
           <div>
             <label htmlFor="hermes-topic" className="block text-sm font-medium text-slate-900">
-              Optional topic or direction
+              Optional prompt or direction
             </label>
-            <input
+            <textarea
               id="hermes-topic"
-              type="text"
               value={hermesTopic}
               onChange={(event) => {
                 setHermesTopic(event.target.value);
@@ -988,7 +1133,8 @@ export default function SchedulePage() {
                 setErrorMessage("");
               }}
               disabled={isHermesBusy}
-              placeholder="Example: beginner online income systems"
+              rows={4}
+              placeholder={"Example: Write practical posts for Vectrix about online income systems.\nAvoid hype, scams, guaranteed results, or direct financial advice.\nMake each post feel specific and non-repetitive."}
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
@@ -1062,7 +1208,9 @@ export default function SchedulePage() {
         timezoneLabel={timezoneLabel}
         clockFormatPreference={clockFormatPreference}
         importedPostsText={batchImportText}
+        importedTimes={batchImportTimes}
         importSignal={batchImportSignal}
+        openSignal={batchOpenSignal}
       />
 
       {showPostNowConfirmation ? (

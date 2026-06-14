@@ -33,7 +33,9 @@ type BatchSchedulePanelProps = {
   timezoneLabel: string;
   clockFormatPreference: "12h" | "24h";
   importedPostsText?: string;
+  importedTimes?: string[];
   importSignal?: number;
+  openSignal?: number;
 };
 
 type BatchPreviewRow = {
@@ -59,7 +61,9 @@ export default function BatchSchedulePanel({
   timezoneLabel,
   clockFormatPreference,
   importedPostsText = "",
+  importedTimes = [],
   importSignal = 0,
+  openSignal = 0,
 }: BatchSchedulePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [presets, setPresets] = useState<BatchSchedulePreset[]>([]);
@@ -101,16 +105,30 @@ export default function BatchSchedulePanel({
       return;
     }
     const importedPosts = parseNumberedBatchPosts(importedPostsText);
+    const normalizedImportedTimes = importedTimes
+      .map((time) => normalizeTimeValue(time))
+      .filter((time): time is string => Boolean(time));
     setIsOpen(true);
     setRawPosts(importedPostsText);
-    setDraftTimes(buildHourlySlots(importedPosts.length));
+    setDraftTimes(
+      normalizedImportedTimes.length === importedPosts.length
+        ? normalizedImportedTimes
+        : buildHourlySlots(importedPosts.length),
+    );
     setSelectedPresetId(null);
     setPresetName("");
     setSaveAsFavorite(false);
     setScheduleDate((currentDate) => currentDate || getTomorrowDateForTimezone(timezone));
     setErrorMessage("");
     setSuccessMessage(`Loaded ${importedPosts.length} Hermes post${importedPosts.length === 1 ? "" : "s"} into Batch Schedule.`);
-  }, [importSignal, importedPostsText, timezone]);
+  }, [importSignal, importedPostsText, importedTimes, timezone]);
+
+  useEffect(() => {
+    if (!openSignal) {
+      return;
+    }
+    setIsOpen(true);
+  }, [openSignal]);
 
   const normalizedTimes = useMemo(
     () => draftTimes.map((entry) => normalizeTimeValue(entry)),
