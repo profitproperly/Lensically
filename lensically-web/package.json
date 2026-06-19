@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "test:mobile-save": "node scripts/test-mobile-save-extractor.mjs",
     "prebuild": "node scripts/prepare-next-output.js",
     "build": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && next build --webpack",
     "start": "next start",
