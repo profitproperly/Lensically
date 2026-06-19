@@ -1,5 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "0.9.0";
+  const SCRIPT_VERSION = "1.0.0";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
 
   function clean(value) {
@@ -170,6 +170,7 @@
     metrics.views = parseMetricText(pageText, "view");
 
     const lines = clean(postEl.innerText).split("\n").map(clean).filter(Boolean);
+    const bodyLines = clean(document.body.innerText).split("\n").map(clean).filter(Boolean);
     const metricTokens = [];
     for (let index = 0; index < lines.length - 1; index += 1) {
       const label = lines[index].toLowerCase();
@@ -204,6 +205,36 @@
       }
     }
 
+    if (!metricTokens.length) {
+      const scopedBodyLines = [];
+      for (const line of bodyLines) {
+        const lower = line.toLowerCase();
+        if (lower === "top" || lower.startsWith("top ")) break;
+        if (lower.startsWith("view activity")) break;
+        scopedBodyLines.push(line);
+      }
+      for (const line of scopedBodyLines) {
+        if (line.includes("/") || line.includes(":")) continue;
+        const tokens = line.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
+        const parsedTokens = tokens
+          .map((token) => parseCompactNumber(token))
+          .filter((value) => Number.isFinite(value));
+        if (parsedTokens.length >= 4) {
+          metricTokens.push(...parsedTokens.slice(-4));
+          break;
+        }
+      }
+      if (!metricTokens.length) {
+        const standaloneBodyNumbers = scopedBodyLines
+          .filter((line) => /^\d+(?:[.,]\d+)?\s*[kmb]?$/i.test(line))
+          .map((line) => parseCompactNumber(line))
+          .filter((value) => Number.isFinite(value));
+        if (standaloneBodyNumbers.length >= 4) {
+          metricTokens.push(...standaloneBodyNumbers.slice(-4));
+        }
+      }
+    }
+
     if (metricTokens.length >= 4 && metrics.likes === 0 && metrics.replies === 0 && metrics.reposts === 0 && metrics.shares === 0) {
       metrics.likes = metricTokens[0] ?? 0;
       metrics.replies = metricTokens[1] ?? 0;
@@ -212,6 +243,19 @@
     }
 
     return metrics;
+  }
+
+  function hasAnyEngagement(metrics) {
+    return Boolean(
+      metrics
+      && (
+        metrics.likes > 0
+        || metrics.replies > 0
+        || metrics.reposts > 0
+        || metrics.shares > 0
+        || (typeof metrics.views === "number" && metrics.views > 0)
+      )
+    );
   }
 
   function mergeMetrics(primary, fallback) {
@@ -260,13 +304,46 @@
       raw_payload: {
         mode: "ios_safari_single_post",
         extractor_version: SCRIPT_VERSION,
+        metric_debug: {
+          article_lines: clean(postEl.innerText).split("\n").map(clean).filter(Boolean).slice(0, 40),
+          body_lines: clean(document.body.innerText).split("\n").map(clean).filter(Boolean).slice(0, 60),
+          aria_samples: Array.from(postEl.querySelectorAll("[aria-label], [title]"))
+            .map((node) => clean(node.getAttribute("aria-label") || node.getAttribute("title")))
+            .filter(Boolean)
+            .slice(0, 40),
+        },
       },
     };
   }
 
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function extractPayloadWithMetricRetry() {
+    let bestPayload = extractPayload();
+    if (hasAnyEngagement(bestPayload)) {
+      return bestPayload;
+    }
+
+    for (const delay of [700, 1200, 1800]) {
+      await wait(delay);
+      const nextPayload = extractPayload();
+      if (hasAnyEngagement(nextPayload)) {
+        return nextPayload;
+      }
+      bestPayload = nextPayload;
+    }
+
+    return bestPayload;
+  }
+
   try {
-    const payload = extractPayload();
-    location.href = `${TARGET_URL}#${encodeURIComponent(JSON.stringify(payload))}`;
+    extractPayloadWithMetricRetry().then((payload) => {
+      location.href = `${TARGET_URL}#${encodeURIComponent(JSON.stringify(payload))}`;
+    }).catch((error) => {
+      alert(error && error.message ? error.message : "Could not save this post.");
+    });
   } catch (error) {
     alert(error && error.message ? error.message : "Could not save this post.");
   }
