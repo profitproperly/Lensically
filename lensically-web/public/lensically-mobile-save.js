@@ -1,5 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "0.3.0";
+  const SCRIPT_VERSION = "0.4.0";
   const BUTTON_CLASS = "lensically-mobile-save-button";
   const STYLE_ID = "lensically-mobile-save-style";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
@@ -25,9 +25,11 @@
     style.id = STYLE_ID;
     style.textContent = `
       .${BUTTON_CLASS} {
-        position: absolute;
-        top: 10px;
-        right: 10px;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 8px 0 6px;
         z-index: 2147483647;
         border: 0;
         border-radius: 999px;
@@ -123,6 +125,14 @@
     }
   }
 
+  function hasOwnPostLink(postEl) {
+    return Boolean(postEl.querySelector('a[href*="/post/"]'));
+  }
+
+  function containsAnotherPost(candidate, allCandidates) {
+    return allCandidates.some((other) => other !== candidate && candidate.contains(other));
+  }
+
   function parseMetricText(text, label) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const patterns = [
@@ -216,8 +226,22 @@
   }
 
   function getPostElements() {
-    const candidates = Array.from(document.querySelectorAll("article, [role='article'], [data-pressable-container='true']"));
-    return candidates.filter((el) => el instanceof HTMLElement && clean(el.innerText).length > 20);
+    const articleCandidates = Array.from(document.querySelectorAll("article, [role='article']"))
+      .filter((el) => el instanceof HTMLElement && clean(el.innerText).length > 20 && hasOwnPostLink(el));
+
+    if (articleCandidates.length) {
+      return articleCandidates.filter((candidate) => !containsAnotherPost(candidate, articleCandidates));
+    }
+
+    const linkCandidates = Array.from(document.querySelectorAll('a[href*="/post/"]'))
+      .map((link) => link.closest("[data-pressable-container='true']"))
+      .filter((el, index, all) => (
+        el instanceof HTMLElement
+        && all.indexOf(el) === index
+        && clean(el.innerText).length > 20
+      ));
+
+    return linkCandidates.filter((candidate) => !containsAnotherPost(candidate, linkCandidates));
   }
 
   function injectButtons() {
@@ -225,9 +249,6 @@
     let count = 0;
     for (const postEl of getPostElements()) {
       if (postEl.querySelector(`:scope > .${BUTTON_CLASS}`)) continue;
-      if (getComputedStyle(postEl).position === "static") {
-        postEl.style.position = "relative";
-      }
       const button = document.createElement("button");
       button.type = "button";
       button.className = BUTTON_CLASS;
@@ -237,7 +258,7 @@
         event.stopPropagation();
         savePost(postEl);
       });
-      postEl.appendChild(button);
+      postEl.insertBefore(button, postEl.firstChild);
       count += 1;
     }
     if (!count) {
