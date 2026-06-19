@@ -65,7 +65,9 @@ describe("patterns import routes", () => {
     await expect(importResponse.json()).resolves.toMatchObject({
       success: true,
       app_user_id: "lensically_test",
+      account_id: "manifest-mental",
       pattern: expect.objectContaining({
+        account_id: "manifest-mental",
         source_url: "https://www.threads.com/@example/post/abc123",
         post_text: "Test post text from the extension",
         likes: 42,

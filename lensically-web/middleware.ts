@@ -11,6 +11,7 @@ const PROTECTED_PATHS = [
   "/post-archive",
   "/schedule",
   "/scheduled-posts",
+  "/mobile-save",
 ];
 
 async function workspaceSessionValue(password: string) {
@@ -57,5 +58,6 @@ export const config = {
     "/post-archive/:path*",
     "/schedule/:path*",
     "/scheduled-posts/:path*",
+    "/mobile-save/:path*",
   ],
 };

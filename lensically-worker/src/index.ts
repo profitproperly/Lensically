@@ -3796,12 +3796,11 @@ function normalizePatternRawPayload(value: unknown): string | null {
 async function importExternalPattern(
   env: Env,
   appUserId: string,
+  accountId: string,
   payload: Record<string, unknown>,
 ): Promise<ExternalPatternRow> {
   await ensureExternalPatternsTable(env);
 
-  const accountId = normalizePatternString(payload.account_id, { maxLength: 80 })?.toLowerCase()
-    || DEFAULT_PATTERNS_ACCOUNT_ID;
   const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
   const sourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
   const postText = normalizePatternString(payload.post_text, { maxLength: 20000 });
@@ -6153,10 +6152,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       try {
-        const imported = await importExternalPattern(env, appUserId, payload);
+        const accountId = await resolvePatternAccountId(
+          env,
+          typeof payload.threads_user_id === "string" ? payload.threads_user_id : null,
+          typeof payload.account_id === "string" ? payload.account_id : null,
+        );
+        const imported = await importExternalPattern(env, appUserId, accountId, payload);
         return new Response(JSON.stringify({
           success: true,
           app_user_id: appUserId,
+          account_id: accountId,
           updated_at: imported.updated_at,
           pattern: imported,
         }), {
