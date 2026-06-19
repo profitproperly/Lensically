@@ -24,7 +24,7 @@ type MobileSavePayload = {
   raw_payload?: Record<string, unknown>;
 };
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = "idle" | "ready" | "saving" | "saved" | "error";
 
 type ThreadsAccount = {
   threads_user_id?: string | null;
@@ -68,28 +68,25 @@ async function loadThreadsAccounts(): Promise<ThreadsAccountsResponse | null> {
   return response.json().catch(() => null) as Promise<ThreadsAccountsResponse | null>;
 }
 
-async function resolveActiveThreadsUserId(): Promise<{ threadsUserId: string; needsChoice: boolean; accounts: ThreadsAccount[] }> {
+async function resolveActiveThreadsUserId(): Promise<{ threadsUserId: string; accounts: ThreadsAccount[] }> {
   const storedThreadsUserId = readSelectedThreadsUserId();
-  if (storedThreadsUserId) {
-    return { threadsUserId: storedThreadsUserId, needsChoice: false, accounts: [] };
-  }
-
   const data = await loadThreadsAccounts();
   const accounts = Array.isArray(data?.accounts)
     ? data.accounts.filter((account) => account?.threads_user_id?.trim())
     : [];
-  if (accounts.length > 1) {
-    return { threadsUserId: "", needsChoice: true, accounts };
-  }
+  const storedAccount = accounts.find((account) => account.threads_user_id === storedThreadsUserId);
   const activeAccount = accounts.find((account) => account.threads_user_id === data?.active_threads_user_id)
     ?? accounts.find((account) => account.is_active)
     ?? accounts[0]
     ?? null;
-  const activeThreadsUserId = activeAccount?.threads_user_id?.trim() ?? "";
+  const activeThreadsUserId = storedAccount?.threads_user_id?.trim()
+    || activeAccount?.threads_user_id?.trim()
+    || storedThreadsUserId
+    || "";
   if (activeThreadsUserId) {
     writeSelectedThreadsUserId(activeThreadsUserId);
   }
-  return { threadsUserId: activeThreadsUserId, needsChoice: false, accounts };
+  return { threadsUserId: activeThreadsUserId, accounts };
 }
 
 export default function MobileSavePage() {
@@ -99,6 +96,7 @@ export default function MobileSavePage() {
   const [postText, setPostText] = useState("");
   const [pendingPayload, setPendingPayload] = useState<MobileSavePayload | null>(null);
   const [accountChoices, setAccountChoices] = useState<ThreadsAccount[]>([]);
+  const [selectedThreadsUserId, setSelectedThreadsUserId] = useState("");
 
   const statusClass = useMemo(() => {
     if (state === "saved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
@@ -109,36 +107,7 @@ export default function MobileSavePage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function importPost(payload: MobileSavePayload, threadsUserId: string) {
-      const response = await fetch(IMPORT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          app_user_id: APP_USER_ID,
-          threads_user_id: threadsUserId,
-          platform: "threads",
-          capture_confidence: "mobile-bookmarklet",
-          ...payload,
-        }),
-      });
-
-      const data = await response.json().catch(() => null) as {
-        account_id?: string;
-        error?: string;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(data?.error || `Save failed with HTTP ${response.status}`);
-      }
-
-      if (cancelled) return;
-      setSavedAccountId(data?.account_id ?? "");
-      setState("saved");
-      setMessage("Saved to the selected Lensically profile.");
-    }
-
-    async function savePost() {
+    async function preparePost() {
       const payload = parsePayloadFromHash();
 
       if (!payload?.source_url || !payload?.post_text) {
@@ -150,48 +119,40 @@ export default function MobileSavePage() {
       setPostText(payload.post_text);
       setPendingPayload(payload);
       const resolved = await resolveActiveThreadsUserId();
+      if (cancelled) return;
+      setAccountChoices(resolved.accounts);
+      setSelectedThreadsUserId(resolved.threadsUserId);
 
-      if (resolved.needsChoice) {
-        setAccountChoices(resolved.accounts);
-        setState("idle");
-        setMessage("Choose which Lensically profile to save this post to.");
-        return;
-      }
-
-      if (!resolved.threadsUserId) {
+      if (!resolved.threadsUserId && !resolved.accounts.length) {
         setState("error");
         setMessage("Select a Lensically profile first, then tap the save bookmark again.");
         return;
       }
 
-      setState("saving");
-      setMessage("Saving to the active Lensically profile...");
-
-      try {
-        await importPost(payload, resolved.threadsUserId);
-      } catch (error) {
-        if (cancelled) return;
-        setState("error");
-        setMessage(error instanceof Error ? error.message : "Could not save this Threads post.");
-      }
+      setState("ready");
+      setMessage("Review the capture, choose a profile, then tap Save.");
     }
 
-    void savePost();
+    void preparePost();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
-  async function handleAccountChoice(threadsUserId: string) {
-    const normalizedThreadsUserId = threadsUserId.trim();
-    if (!pendingPayload || !normalizedThreadsUserId) {
+  async function handleSave() {
+    const normalizedThreadsUserId = selectedThreadsUserId.trim();
+    if (!pendingPayload) {
+      return;
+    }
+    if (!normalizedThreadsUserId) {
+      setState("error");
+      setMessage("Choose a Lensically profile before saving.");
       return;
     }
     writeSelectedThreadsUserId(normalizedThreadsUserId);
     setState("saving");
     setMessage("Saving to the selected Lensically profile...");
-    setAccountChoices([]);
 
     try {
       const response = await fetch(IMPORT_URL, {
@@ -235,18 +196,36 @@ export default function MobileSavePage() {
           {savedAccountId ? (
             <p className="mt-2 text-sm opacity-80">Account: {savedAccountId}</p>
           ) : null}
-          {accountChoices.length ? (
-            <div className="mt-4 flex flex-col gap-2">
-              {accountChoices.map((account) => (
-                <button
-                  key={account.threads_user_id ?? account.account_id ?? account.username ?? ""}
-                  type="button"
-                  onClick={() => void handleAccountChoice(account.threads_user_id ?? "")}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-950"
-                >
-                  {account.name || account.label || account.username || account.account_id || account.threads_user_id}
-                </button>
-              ))}
+          {state === "ready" || state === "saving" ? (
+            <div className="mt-4 flex flex-col gap-3">
+              {accountChoices.length ? (
+                <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                  Save to profile
+                  <select
+                    value={selectedThreadsUserId}
+                    onChange={(event) => setSelectedThreadsUserId(event.target.value)}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-base font-semibold text-slate-950"
+                  >
+                    <option value="">Choose profile</option>
+                    {accountChoices.map((account) => (
+                      <option
+                        key={account.threads_user_id ?? account.account_id ?? account.username ?? ""}
+                        value={account.threads_user_id ?? ""}
+                      >
+                        {account.name || account.label || account.username || account.account_id || account.threads_user_id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={state === "saving" || !selectedThreadsUserId}
+                className="rounded-md bg-slate-950 px-4 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {state === "saving" ? "Saving..." : "Save"}
+              </button>
             </div>
           ) : null}
         </div>
