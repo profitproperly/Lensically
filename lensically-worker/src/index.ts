@@ -3834,7 +3834,8 @@ function sanitizeImportedPatternText(
         next = next.replace(new RegExp(`^${escapeRegExp(normalizedName)}\\s+`, "i"), "");
       }
       next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
-      next = next.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+      next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\s+/i, "");
+      next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\b\s*/i, "");
       return next.trim();
     })
     .filter((line) => {
@@ -3852,6 +3853,19 @@ function sanitizeImportedPatternText(
     });
 
   return cleanedLines.join("\n").trim() || null;
+}
+
+function sanitizeExternalPatternRow(row: ExternalPatternRow): ExternalPatternRow {
+  const sanitizedText = sanitizeImportedPatternText(
+    row.post_text,
+    row.author_handle ?? derivePatternAuthorHandleFromSourceUrl(row.source_url),
+    row.author_display_name,
+  );
+  return {
+    ...row,
+    post_text: sanitizedText ?? row.post_text,
+    author_handle: row.author_handle ?? derivePatternAuthorHandleFromSourceUrl(row.source_url),
+  };
 }
 
 async function importExternalPattern(
@@ -6298,6 +6312,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const total = Number(totalRow?.total ?? 0);
       const totalPages = Math.max(1, Math.ceil(total / limit));
 
+      const sanitizedRows = (rows.results ?? []).map(sanitizeExternalPatternRow);
+
       return new Response(JSON.stringify({
         success: true,
         app_user_id: appUserId,
@@ -6307,7 +6323,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         page,
         page_size: limit,
         total_pages: totalPages,
-        patterns: rows.results ?? [],
+        patterns: sanitizedRows,
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

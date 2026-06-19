@@ -40,6 +40,18 @@ function formatMetric(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US").format(safeValue);
 }
 
+function hasCapturedEngagement(pattern: SavedPatternRow): boolean {
+  return [pattern.likes, pattern.replies, pattern.reposts, pattern.shares, pattern.views]
+    .some((value) => typeof value === "number" && Number.isFinite(value) && value > 0);
+}
+
+function formatCapturedMetric(pattern: SavedPatternRow, value: number | null | undefined): string {
+  if (!hasCapturedEngagement(pattern)) {
+    return "Unavailable";
+  }
+  return formatMetric(value);
+}
+
 function formatDateTime(value: string | null | undefined): string {
   if (!value) {
     return "Unknown";
@@ -294,23 +306,23 @@ export default function SavedPatternsPage() {
                       <div className="grid grid-cols-3 gap-2 text-xs sm:grid-cols-6">
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                           <p className="text-slate-500">Likes</p>
-                          <p className="mt-1 text-base font-semibold text-slate-900">{formatMetric(pattern.likes)}</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900">{formatCapturedMetric(pattern, pattern.likes)}</p>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                           <p className="text-slate-500">Replies</p>
-                          <p className="mt-1 text-base font-semibold text-slate-900">{formatMetric(pattern.replies)}</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900">{formatCapturedMetric(pattern, pattern.replies)}</p>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                           <p className="text-slate-500">Reposts</p>
-                          <p className="mt-1 text-base font-semibold text-slate-900">{formatMetric(pattern.reposts)}</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900">{formatCapturedMetric(pattern, pattern.reposts)}</p>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                           <p className="text-slate-500">Shares</p>
-                          <p className="mt-1 text-base font-semibold text-slate-900">{formatMetric(pattern.shares)}</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900">{formatCapturedMetric(pattern, pattern.shares)}</p>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                           <p className="text-slate-500">Views</p>
-                          <p className="mt-1 text-base font-semibold text-slate-900">{formatMetric(pattern.views)}</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900">{formatCapturedMetric(pattern, pattern.views)}</p>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                           <p className="text-slate-500">Captured</p>

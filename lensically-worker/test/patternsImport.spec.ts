@@ -227,6 +227,33 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("cleans standalone relative time prefixes from listed saved patterns", async () => {
+    await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www.threads.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@jenny_nuel1/post/DZuaqSFIwUC",
+        post_text: "13h Does anybody actually go to the dentist every six months??",
+      }),
+    });
+
+    const listResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&limit=10");
+    await expect(listResponse.json()).resolves.toMatchObject({
+      success: true,
+      patterns: [
+        expect.objectContaining({
+          author_handle: "jenny_nuel1",
+          post_text: "Does anybody actually go to the dentist every six months??",
+        }),
+      ],
+    });
+  });
+
   it("scopes saved patterns to Manifest Mental by default", async () => {
     const origin = "chrome-extension://exampleextensionid";
 
