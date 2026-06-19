@@ -1,7 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "0.4.0";
-  const BUTTON_CLASS = "lensically-mobile-save-button";
-  const STYLE_ID = "lensically-mobile-save-style";
+  const SCRIPT_VERSION = "0.8.0";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
 
   function clean(value) {
@@ -9,7 +7,7 @@
   }
 
   function parseCompactNumber(raw) {
-    const value = clean(raw).toLowerCase().replace(/,/g, "");
+    const value = clean(raw).toLowerCase().replace(/,/g, "").replace(/\s+/g, "");
     const match = value.match(/^(\d+(?:\.\d+)?)([kmb])?$/);
     if (!match) return null;
     const base = Number(match[1]);
@@ -19,28 +17,62 @@
     return Math.floor(base * scale);
   }
 
-  function ensureStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      .${BUTTON_CLASS} {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin: 8px 0 6px;
-        z-index: 2147483647;
-        border: 0;
-        border-radius: 999px;
-        background: #0f172a;
-        color: #ffffff;
-        padding: 8px 11px;
-        font: 700 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25);
-      }
-    `;
-    document.documentElement.appendChild(style);
+  function parseMetricText(text, label) {
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const patterns = [
+      new RegExp(`(\\d+(?:[.,]\\d+)?\\s*[kmb]?)\\s+${escapedLabel}s?\\b`, "i"),
+      new RegExp(`${escapedLabel}s?\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?\\s*[kmb]?)`, "i"),
+    ];
+    for (const pattern of patterns) {
+      const match = clean(text).match(pattern);
+      if (!match || !match[1]) continue;
+      const parsed = parseCompactNumber(match[1]);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function isNoiseLine(line) {
+    const value = clean(line).toLowerCase();
+    if (!value) return true;
+    if (value === "follow" || value === "more" || value === "top" || value === "view activity") return true;
+    if (value.includes("post is shared to fediverse")) return true;
+    if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
+    if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
+    if (/^(likes?|replies|reply|reposts?|shares?|views?)$/i.test(value)) return true;
+    if (/^(like|reply|repost|share)\s*\d/i.test(value)) return true;
+    return false;
+  }
+
+  function cleanPostText(rawText, authorHandle, authorDisplayName) {
+    const normalizedHandle = clean(authorHandle).toLowerCase().replace(/^@/, "");
+    const normalizedName = clean(authorDisplayName).toLowerCase();
+    const lines = clean(rawText)
+      .split("\n")
+      .map(clean)
+      .map((line) => {
+        let next = line;
+        if (normalizedHandle) {
+          next = next.replace(new RegExp(`^@?${normalizedHandle}\\s+`, "i"), "");
+        }
+        if (normalizedName) {
+          next = next.replace(new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+`, "i"), "");
+        }
+        next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+        next = next.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+        return clean(next);
+      })
+      .filter((line) => !isNoiseLine(line));
+
+    const filtered = lines.filter((line, index) => {
+      const lower = line.toLowerCase();
+      if (normalizedHandle && (lower === normalizedHandle || lower === `@${normalizedHandle}`)) return false;
+      if (normalizedName && lower === normalizedName) return false;
+      if (index < 4 && /^@?[a-z0-9._]{2,40}$/i.test(line)) return false;
+      return true;
+    });
+
+    return filtered.join("\n").trim();
   }
 
   function parseJsonLdPost() {
@@ -53,13 +85,39 @@
           : Array.isArray(parsed && parsed["@graph"])
             ? parsed["@graph"]
             : [parsed];
+
         for (const item of items) {
-          const text = clean(item && (item.articleBody || item.text || item.description));
+          if (!item || typeof item !== "object") continue;
+          const text = clean(item.articleBody || item.text || item.description);
           if (!text) continue;
+
           const author = item.author || {};
+          const metrics = {
+            likes: 0,
+            replies: 0,
+            reposts: 0,
+            shares: 0,
+            views: null,
+          };
+
+          const stats = Array.isArray(item.interactionStatistic) ? item.interactionStatistic : [];
+          for (const stat of stats) {
+            const statName = clean(stat?.interactionType?.name || stat?.name).toLowerCase();
+            const count = Number(stat?.userInteractionCount ?? stat?.value);
+            if (!Number.isFinite(count)) continue;
+            if (statName.includes("like")) metrics.likes = Math.max(metrics.likes, Math.floor(count));
+            else if (statName.includes("comment") || statName.includes("reply")) metrics.replies = Math.max(metrics.replies, Math.floor(count));
+            else if (statName.includes("repost")) metrics.reposts = Math.max(metrics.reposts, Math.floor(count));
+            else if (statName.includes("share")) metrics.shares = Math.max(metrics.shares, Math.floor(count));
+            else if (statName.includes("view")) metrics.views = Math.floor(count);
+          }
+
           return {
             text,
             authorHandle: clean(author.alternateName || author.identifier).replace(/^@/, "") || null,
+            authorDisplayName: clean(author.name) || null,
+            postedAt: clean(item.datePublished) || null,
+            metrics,
           };
         }
       } catch {}
@@ -67,88 +125,31 @@
     return null;
   }
 
-  function isNoiseLine(line) {
-    const value = clean(line).toLowerCase();
-    if (!value) return true;
-    if (value === "follow" || value === "more" || value === "top" || value === "view activity") return true;
-    if (value.includes("post is shared to fediverse")) return true;
-    if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
-    if (/^\d+([.,]\d+)?\s*[kmb]?$/.test(value)) return true;
-    if (/^(like|reply|repost|share)\s*\d/.test(value)) return true;
-    if (/^(likes?|replies|reply|reposts?|shares?|views?)$/i.test(value)) return true;
-    return false;
-  }
+  function findCurrentPostElement() {
+    const currentPostMatch = location.href.match(/\/post\/([^/?#]+)/i);
+    const currentPostId = currentPostMatch ? currentPostMatch[1] : "";
+    const candidates = Array.from(document.querySelectorAll("article, [role='article']"))
+      .filter((el) => el instanceof HTMLElement && clean(el.innerText).length > 20);
 
-  function cleanPostText(rawText, authorHandle) {
-    const normalizedAuthor = clean(authorHandle).toLowerCase().replace(/^@/, "");
-    const lines = clean(rawText)
-      .split("\n")
-      .map(clean)
-      .map((line) => {
-        let next = line;
-        if (normalizedAuthor) {
-          next = next.replace(new RegExp(`^@?${normalizedAuthor}\\s+`, "i"), "");
-        }
-        next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
-        next = next.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
-        return clean(next);
-      })
-      .filter((line) => !isNoiseLine(line));
-    const filtered = lines.filter((line, index) => {
-      const lower = line.toLowerCase();
-      if (normalizedAuthor && (lower === normalizedAuthor || lower === `@${normalizedAuthor}`)) return false;
-      if (index < 3 && /^@?[a-z0-9._]{2,40}$/i.test(line)) return false;
-      return true;
-    });
-    return filtered.join("\n").trim();
+    if (currentPostId) {
+      const matched = candidates.find((candidate) => (
+        Array.from(candidate.querySelectorAll('a[href*="/post/"]'))
+          .some((link) => clean(link.getAttribute("href")).includes(currentPostId))
+      ));
+      if (matched) return matched;
+    }
+
+    return candidates[0] || document.body;
   }
 
   function findAuthorHandle(postEl) {
     const authorAnchor = postEl.querySelector('a[href^="/@"], a[href*="/@"]');
-    const href = authorAnchor ? String(authorAnchor.getAttribute("href") || "") : "";
+    const href = authorAnchor ? clean(authorAnchor.getAttribute("href")) : "";
     const match = href.match(/\/@([^/?#]+)/);
     return match ? match[1] : null;
   }
 
-  function findPostUrl(postEl) {
-    const links = Array.from(postEl.querySelectorAll('a[href*="/post/"]'));
-    const samePage = links.find((link) => {
-      const href = String(link.getAttribute("href") || "");
-      return href && location.href.includes(href.replace(/^https?:\/\/[^/]+/i, ""));
-    });
-    const chosen = samePage || links[0] || null;
-    if (!chosen) return location.href;
-    try {
-      return new URL(String(chosen.getAttribute("href") || ""), location.origin).href;
-    } catch {
-      return location.href;
-    }
-  }
-
-  function hasOwnPostLink(postEl) {
-    return Boolean(postEl.querySelector('a[href*="/post/"]'));
-  }
-
-  function containsAnotherPost(candidate, allCandidates) {
-    return allCandidates.some((other) => other !== candidate && candidate.contains(other));
-  }
-
-  function parseMetricText(text, label) {
-    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const patterns = [
-      new RegExp(`(\\d+(?:[.,]\\d+)?\\s*[kmb]?)\\s+${escapedLabel}s?\\b`, "i"),
-      new RegExp(`${escapedLabel}s?\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?\\s*[kmb]?)`, "i"),
-    ];
-    for (const pattern of patterns) {
-      const match = clean(text).match(pattern);
-      if (!match || !match[1]) continue;
-      const parsed = parseCompactNumber(match[1].replace(/\s+/g, ""));
-      if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
-  }
-
-  function extractMetrics(postEl) {
+  function extractMetricsFromDom(postEl) {
     const metrics = {
       likes: 0,
       replies: 0,
@@ -160,16 +161,15 @@
     const hintedText = Array.from(postEl.querySelectorAll("[aria-label], [title]"))
       .map((node) => `${node.getAttribute("aria-label") || ""}\n${node.getAttribute("title") || ""}`)
       .join("\n");
-    const visibleText = clean(postEl.innerText);
-    const combinedText = `${hintedText}\n${visibleText}`;
+    const pageText = `${hintedText}\n${clean(postEl.innerText)}\n${clean(document.body.innerText)}`;
 
-    metrics.likes = parseMetricText(combinedText, "like") ?? metrics.likes;
-    metrics.replies = parseMetricText(combinedText, "reply") ?? metrics.replies;
-    metrics.reposts = parseMetricText(combinedText, "repost") ?? metrics.reposts;
-    metrics.shares = parseMetricText(combinedText, "share") ?? metrics.shares;
-    metrics.views = parseMetricText(combinedText, "view");
+    metrics.likes = parseMetricText(pageText, "like") ?? metrics.likes;
+    metrics.replies = parseMetricText(pageText, "reply") ?? metrics.replies;
+    metrics.reposts = parseMetricText(pageText, "repost") ?? metrics.reposts;
+    metrics.shares = parseMetricText(pageText, "share") ?? metrics.shares;
+    metrics.views = parseMetricText(pageText, "view");
 
-    const lines = visibleText.split("\n").map(clean).filter(Boolean);
+    const lines = clean(postEl.innerText).split("\n").map(clean).filter(Boolean);
     for (let index = 0; index < lines.length - 1; index += 1) {
       const label = lines[index].toLowerCase();
       const value = parseCompactNumber(lines[index + 1]);
@@ -184,14 +184,30 @@
     return metrics;
   }
 
-  function extractPayload(postEl) {
-    const onSinglePostPage = /\/post\/[^/?#]+/i.test(location.href);
-    const jsonLd = onSinglePostPage ? parseJsonLdPost() : null;
-    const authorHandle = findAuthorHandle(postEl) || jsonLd?.authorHandle || null;
-    const sourceUrl = findPostUrl(postEl);
-    const postIdMatch = sourceUrl.match(/\/post\/([^/?#]+)/i);
-    const postText = jsonLd?.text || cleanPostText(postEl.innerText, authorHandle);
-    const metrics = extractMetrics(postEl);
+  function mergeMetrics(primary, fallback) {
+    return {
+      likes: primary?.likes || fallback.likes || 0,
+      replies: primary?.replies || fallback.replies || 0,
+      reposts: primary?.reposts || fallback.reposts || 0,
+      shares: primary?.shares || fallback.shares || 0,
+      views: primary?.views ?? fallback.views ?? null,
+    };
+  }
+
+  function extractPayload() {
+    if (!/\/post\/[^/?#]+/i.test(location.href)) {
+      throw new Error("Open the specific Threads post first, then tap the Lensically bookmarklet.");
+    }
+
+    const postEl = findCurrentPostElement();
+    const jsonLd = parseJsonLdPost();
+    const authorHandle = jsonLd?.authorHandle || findAuthorHandle(postEl);
+    const authorDisplayName = jsonLd?.authorDisplayName || null;
+    const rawText = jsonLd?.text || clean(postEl.innerText);
+    const postText = cleanPostText(rawText, authorHandle, authorDisplayName);
+    const postIdMatch = location.href.match(/\/post\/([^/?#]+)/i);
+    const domMetrics = extractMetricsFromDom(postEl);
+    const metrics = mergeMetrics(jsonLd?.metrics, domMetrics);
 
     if (!postText) {
       throw new Error("Could not find text for this post.");
@@ -199,72 +215,29 @@
 
     return {
       platform: "threads",
-      source_url: sourceUrl,
+      source_url: location.href,
       post_id: postIdMatch ? postIdMatch[1] : null,
       author_handle: authorHandle,
+      author_display_name: authorDisplayName,
       post_text: postText,
       likes: metrics.likes,
       replies: metrics.replies,
       reposts: metrics.reposts,
       shares: metrics.shares,
       views: metrics.views,
-      capture_confidence: onSinglePostPage ? "high" : "medium",
+      posted_at: jsonLd?.postedAt || null,
+      capture_confidence: "high",
       raw_payload: {
-        mode: "ios_safari_overlay",
+        mode: "ios_safari_single_post",
         extractor_version: SCRIPT_VERSION,
       },
     };
   }
 
-  function savePost(postEl) {
-    try {
-      const payload = extractPayload(postEl);
-      location.href = `${TARGET_URL}#${encodeURIComponent(JSON.stringify(payload))}`;
-    } catch (error) {
-      alert(error && error.message ? error.message : "Could not save this post.");
-    }
+  try {
+    const payload = extractPayload();
+    location.href = `${TARGET_URL}#${encodeURIComponent(JSON.stringify(payload))}`;
+  } catch (error) {
+    alert(error && error.message ? error.message : "Could not save this post.");
   }
-
-  function getPostElements() {
-    const articleCandidates = Array.from(document.querySelectorAll("article, [role='article']"))
-      .filter((el) => el instanceof HTMLElement && clean(el.innerText).length > 20 && hasOwnPostLink(el));
-
-    if (articleCandidates.length) {
-      return articleCandidates.filter((candidate) => !containsAnotherPost(candidate, articleCandidates));
-    }
-
-    const linkCandidates = Array.from(document.querySelectorAll('a[href*="/post/"]'))
-      .map((link) => link.closest("[data-pressable-container='true']"))
-      .filter((el, index, all) => (
-        el instanceof HTMLElement
-        && all.indexOf(el) === index
-        && clean(el.innerText).length > 20
-      ));
-
-    return linkCandidates.filter((candidate) => !containsAnotherPost(candidate, linkCandidates));
-  }
-
-  function injectButtons() {
-    ensureStyle();
-    let count = 0;
-    for (const postEl of getPostElements()) {
-      if (postEl.querySelector(`:scope > .${BUTTON_CLASS}`)) continue;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = BUTTON_CLASS;
-      button.textContent = "Save";
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        savePost(postEl);
-      });
-      postEl.insertBefore(button, postEl.firstChild);
-      count += 1;
-    }
-    if (!count) {
-      alert("No Threads posts found. Open a post or scroll the feed, then tap the bookmark again.");
-    }
-  }
-
-  injectButtons();
 })();
