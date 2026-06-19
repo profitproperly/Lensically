@@ -1,5 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "1.1.0";
+  const SCRIPT_VERSION = "1.1.1";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
 
   function clean(value) {
@@ -215,6 +215,29 @@
     return match ? match[1] : null;
   }
 
+  function normalizePostedAt(value) {
+    const raw = clean(value);
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+  }
+
+  function findPostedAt(postEl) {
+    const selectors = [
+      "time[datetime]",
+      "[datetime]",
+      "meta[property='article:published_time']",
+      "meta[name='article:published_time']",
+    ];
+    for (const selector of selectors) {
+      const node = postEl.querySelector(selector) || document.querySelector(selector);
+      if (!node) continue;
+      const parsed = normalizePostedAt(node.getAttribute("datetime") || node.getAttribute("content"));
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+
   function extractMetricsFromDom(postEl) {
     const metrics = {
       likes: 0,
@@ -361,6 +384,7 @@
     const postIdMatch = location.href.match(/\/post\/([^/?#]+)/i);
     const domMetrics = extractMetricsFromDom(postEl);
     const metrics = mergeMetrics(jsonLd?.metrics, domMetrics);
+    const postedAt = jsonLd?.postedAt || findPostedAt(postEl);
 
     if (!postText) {
       throw new Error("Could not find text for this post.");
@@ -378,7 +402,7 @@
       reposts: metrics.reposts,
       shares: metrics.shares,
       views: metrics.views,
-      posted_at: jsonLd?.postedAt || null,
+      posted_at: postedAt,
       capture_confidence: "high",
       raw_payload: {
         mode: "ios_safari_single_post",

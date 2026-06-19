@@ -3771,9 +3771,39 @@ function parsePublicThreadsViewCount(html: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null;
 }
 
-async function fetchPublicThreadsViewCount(sourceUrl: string | null): Promise<number | null> {
+function decodeHtmlEntity(value: string): string {
+  return value
+    .replace(/&quot;/g, "\"")
+    .replace(/&#34;/g, "\"")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function parsePublicThreadsPostedAt(html: string): string | null {
+  const patterns = [
+    /"datePublished"\s*:\s*"([^"]+)"/,
+    /"uploadDate"\s*:\s*"([^"]+)"/,
+    /"published_time"\s*:\s*"([^"]+)"/,
+    /<meta[^>]+(?:property|name)=["']article:published_time["'][^>]+content=["']([^"']+)["']/i,
+    /<time[^>]+datetime=["']([^"']+)["']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    const rawValue = match?.[1] ? decodeHtmlEntity(match[1]) : null;
+    const normalized = normalizePatternPostedAt(rawValue);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+async function fetchPublicThreadsMetadata(sourceUrl: string | null): Promise<{ views: number | null; postedAt: string | null }> {
   if (!sourceUrl || !/^https:\/\/(?:www\.)?threads\.com\//i.test(sourceUrl)) {
-    return null;
+    return { views: null, postedAt: null };
   }
   try {
     const response = await fetch(sourceUrl, {
@@ -3782,12 +3812,15 @@ async function fetchPublicThreadsViewCount(sourceUrl: string | null): Promise<nu
       },
     });
     if (!response.ok) {
-      return null;
+      return { views: null, postedAt: null };
     }
     const html = await response.text();
-    return parsePublicThreadsViewCount(html);
+    return {
+      views: parsePublicThreadsViewCount(html),
+      postedAt: parsePublicThreadsPostedAt(html),
+    };
   } catch {
-    return null;
+    return { views: null, postedAt: null };
   }
 }
 
@@ -3919,10 +3952,15 @@ async function importExternalPattern(
   const reposts = normalizePatternMetric(payload.reposts);
   const shares = normalizePatternMetric(payload.shares);
   const payloadViews = normalizePatternViews(payload.views);
+  const payloadPostedAt = normalizePatternPostedAt(payload.posted_at);
+  const needsPublicMetadata = (!payloadViews || payloadViews <= 0) || !payloadPostedAt;
+  const publicMetadata = needsPublicMetadata
+    ? await fetchPublicThreadsMetadata(sourceUrl)
+    : { views: null, postedAt: null };
   const views = payloadViews && payloadViews > 0
     ? payloadViews
-    : await fetchPublicThreadsViewCount(sourceUrl);
-  const postedAt = normalizePatternPostedAt(payload.posted_at);
+    : publicMetadata.views;
+  const postedAt = payloadPostedAt ?? publicMetadata.postedAt;
   const captureConfidence = normalizePatternConfidence(payload.capture_confidence);
   const rawPayload = normalizePatternRawPayload(payload.raw_payload);
 

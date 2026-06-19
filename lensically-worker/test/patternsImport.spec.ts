@@ -1,5 +1,5 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src";
 
 async function fetchFromWorker(path: string, init?: RequestInit): Promise<Response> {
@@ -17,6 +17,10 @@ async function resetTables(): Promise<void> {
 describe("patterns import routes", () => {
   beforeEach(async () => {
     await resetTables();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("allows extension preflight and stores a saved pattern", async () => {
@@ -286,6 +290,36 @@ describe("patterns import routes", () => {
           author_handle: "luvandrea.c",
         }),
       ],
+    });
+  });
+
+  it("fills the posted date from public Threads metadata when the mobile payload omits it", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      '<html><head><meta property="article:published_time" content="2026-06-18T21:07:00.000Z" /></head><body></body></html>',
+      { status: 200, headers: { "Content-Type": "text/html" } },
+    )));
+
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www.threads.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@example/post/posted-date",
+        post_text: "Post with a public timestamp",
+        views: 0,
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        posted_at: "2026-06-18T21:07:00.000Z",
+      }),
     });
   });
 
