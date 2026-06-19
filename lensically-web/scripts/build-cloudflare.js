@@ -38,6 +38,7 @@ async function main() {
     }
   }
   const nextDir = path.join(appRoot, ".next");
+  const openNextDir = path.join(appRoot, ".open-next");
   const pagesManifestPath = path.join(nextDir, "server", "pages-manifest.json");
   const standalonePagesManifestPath = path.join(
     nextDir,
@@ -48,6 +49,7 @@ async function main() {
   );
 
   fs.rmSync(nextDir, { recursive: true, force: true });
+  fs.rmSync(openNextDir, { recursive: true, force: true });
 
   // Always run the Next.js build directly before OpenNext packaging.
   run(resolveBin("next"), ["build", "--webpack"]);
