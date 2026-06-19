@@ -3918,7 +3918,9 @@ async function importExternalPattern(
   const reposts = normalizePatternMetric(payload.reposts);
   const shares = normalizePatternMetric(payload.shares);
   const payloadViews = normalizePatternViews(payload.views);
-  const views = payloadViews ?? await fetchPublicThreadsViewCount(sourceUrl);
+  const views = payloadViews && payloadViews > 0
+    ? payloadViews
+    : await fetchPublicThreadsViewCount(sourceUrl);
   const postedAt = normalizePatternPostedAt(payload.posted_at);
   const captureConfidence = normalizePatternConfidence(payload.capture_confidence);
   const rawPayload = normalizePatternRawPayload(payload.raw_payload);
