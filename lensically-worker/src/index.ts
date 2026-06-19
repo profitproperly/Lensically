@@ -3762,6 +3762,35 @@ function normalizePatternViews(value: unknown): number | null {
   return Math.floor(numericValue);
 }
 
+function parsePublicThreadsViewCount(html: string): number | null {
+  const match = html.match(/"view_counts"\s*:\s*(\d+)/);
+  if (!match?.[1]) {
+    return null;
+  }
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null;
+}
+
+async function fetchPublicThreadsViewCount(sourceUrl: string | null): Promise<number | null> {
+  if (!sourceUrl || !/^https:\/\/(?:www\.)?threads\.com\//i.test(sourceUrl)) {
+    return null;
+  }
+  try {
+    const response = await fetch(sourceUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1",
+      },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const html = await response.text();
+    return parsePublicThreadsViewCount(html);
+  } catch {
+    return null;
+  }
+}
+
 function normalizePatternPostedAt(value: unknown): string | null {
   const normalized = normalizePatternString(value, { maxLength: 100 });
   if (!normalized) {
@@ -3888,7 +3917,8 @@ async function importExternalPattern(
   const replies = normalizePatternMetric(payload.replies);
   const reposts = normalizePatternMetric(payload.reposts);
   const shares = normalizePatternMetric(payload.shares);
-  const views = normalizePatternViews(payload.views);
+  const payloadViews = normalizePatternViews(payload.views);
+  const views = payloadViews ?? await fetchPublicThreadsViewCount(sourceUrl);
   const postedAt = normalizePatternPostedAt(payload.posted_at);
   const captureConfidence = normalizePatternConfidence(payload.capture_confidence);
   const rawPayload = normalizePatternRawPayload(payload.raw_payload);

@@ -55,6 +55,10 @@ function parsePayloadFromHash(): MobileSavePayload | null {
   }
 }
 
+function isOldInlineBookmarkletPayload(payload: MobileSavePayload): boolean {
+  return payload.raw_payload?.mode === "ios_safari_bookmarklet";
+}
+
 async function loadThreadsAccounts(): Promise<ThreadsAccountsResponse | null> {
   const response = await fetch(`${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}`, {
     cache: "no-store",
@@ -113,6 +117,13 @@ export default function MobileSavePage() {
       if (!payload?.source_url || !payload?.post_text) {
         setState("error");
         setMessage("No Threads post was provided. Open a Threads post and tap the save bookmark again.");
+        return;
+      }
+
+      if (isOldInlineBookmarkletPayload(payload)) {
+        setState("error");
+        setMessage("This bookmarklet is outdated. Replace it with the current Lensically bookmarklet, then open the Threads post and try again.");
+        setPostText(payload.post_text);
         return;
       }
 
