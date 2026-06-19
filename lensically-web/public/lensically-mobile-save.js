@@ -1,5 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "1.0.0";
+  const SCRIPT_VERSION = "1.1.0";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
 
   function clean(value) {
@@ -30,6 +30,72 @@
       if (Number.isFinite(parsed)) return parsed;
     }
     return null;
+  }
+
+  function parseMetricFromTextVariants(text, labels) {
+    for (const label of labels) {
+      const parsed = parseMetricText(text, label);
+      if (parsed !== null) return parsed;
+    }
+    return null;
+  }
+
+  function findControlTextMetric(postEl, selector, labels) {
+    const controls = Array.from(postEl.querySelectorAll(selector));
+    for (const control of controls) {
+      const directText = [
+        control.getAttribute("aria-label"),
+        control.getAttribute("title"),
+        control.textContent,
+      ].map(clean).join("\n");
+      const directParsed = parseMetricFromTextVariants(directText, labels);
+      if (directParsed !== null) return directParsed;
+
+      let current = control;
+      for (let depth = 0; depth < 8 && current && current !== postEl; depth += 1) {
+        const text = clean(current.textContent);
+        if (text) {
+          const parsed = parseMetricFromTextVariants(text, labels);
+          if (parsed !== null) return parsed;
+
+          const tokens = text.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
+          if (tokens.length >= 3 && labels.includes("like")) {
+            const first = parseCompactNumber(tokens[0]);
+            if (Number.isFinite(first)) return first;
+          }
+        }
+        current = current.parentElement;
+      }
+    }
+    return null;
+  }
+
+  function extractActionRowMetrics(postEl) {
+    const metricSelectors = {
+      likes: {
+        selector: "[aria-label*='like' i], [title*='like' i], [role='button']",
+        labels: ["like"],
+      },
+      replies: {
+        selector: "[aria-label*='reply' i], [aria-label*='comment' i], [title*='reply' i], [title*='comment' i], [role='button']",
+        labels: ["reply", "comment"],
+      },
+      reposts: {
+        selector: "[aria-label*='repost' i], [aria-label*='quote' i], [title*='repost' i], [title*='quote' i], [role='button']",
+        labels: ["repost", "quote"],
+      },
+      shares: {
+        selector: "[aria-label*='share' i], [title*='share' i], [role='button']",
+        labels: ["share"],
+      },
+    };
+
+    return {
+      likes: findControlTextMetric(postEl, metricSelectors.likes.selector, metricSelectors.likes.labels),
+      replies: findControlTextMetric(postEl, metricSelectors.replies.selector, metricSelectors.replies.labels),
+      reposts: findControlTextMetric(postEl, metricSelectors.reposts.selector, metricSelectors.reposts.labels),
+      shares: findControlTextMetric(postEl, metricSelectors.shares.selector, metricSelectors.shares.labels),
+    };
   }
 
   function isNoiseLine(line) {
@@ -163,6 +229,12 @@
       .join("\n");
     const pageText = `${hintedText}\n${clean(postEl.innerText)}\n${clean(document.body.innerText)}`;
 
+    const actionRowMetrics = extractActionRowMetrics(postEl);
+    metrics.likes = actionRowMetrics.likes ?? metrics.likes;
+    metrics.replies = actionRowMetrics.replies ?? metrics.replies;
+    metrics.reposts = actionRowMetrics.reposts ?? metrics.reposts;
+    metrics.shares = actionRowMetrics.shares ?? metrics.shares;
+
     metrics.likes = parseMetricText(pageText, "like") ?? metrics.likes;
     metrics.replies = parseMetricText(pageText, "reply") ?? metrics.replies;
     metrics.reposts = parseMetricText(pageText, "repost") ?? metrics.reposts;
@@ -171,10 +243,17 @@
 
     const lines = clean(postEl.innerText).split("\n").map(clean).filter(Boolean);
     const bodyLines = clean(document.body.innerText).split("\n").map(clean).filter(Boolean);
+    const scopedLines = [];
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (lower === "top" || lower.startsWith("top ")) break;
+      if (lower.startsWith("view activity")) break;
+      scopedLines.push(line);
+    }
     const metricTokens = [];
-    for (let index = 0; index < lines.length - 1; index += 1) {
-      const label = lines[index].toLowerCase();
-      const value = parseCompactNumber(lines[index + 1]);
+    for (let index = 0; index < scopedLines.length - 1; index += 1) {
+      const label = scopedLines[index].toLowerCase();
+      const value = parseCompactNumber(scopedLines[index + 1]);
       if (!Number.isFinite(value)) continue;
       if (/^likes?$/.test(label)) metrics.likes = value;
       if (/^(replies|reply)$/.test(label)) metrics.replies = value;
@@ -183,7 +262,7 @@
       if (/^views?$/.test(label)) metrics.views = value;
     }
 
-    for (const line of lines) {
+    for (const line of scopedLines) {
       if (line.includes("/") || line.includes(":")) continue;
       const tokens = line.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
       const parsedTokens = tokens
@@ -309,6 +388,10 @@
           body_lines: clean(document.body.innerText).split("\n").map(clean).filter(Boolean).slice(0, 60),
           aria_samples: Array.from(postEl.querySelectorAll("[aria-label], [title]"))
             .map((node) => clean(node.getAttribute("aria-label") || node.getAttribute("title")))
+            .filter(Boolean)
+            .slice(0, 40),
+          role_button_samples: Array.from(postEl.querySelectorAll("button, [role='button']"))
+            .map((node) => clean(`${node.getAttribute("aria-label") || ""} ${node.getAttribute("title") || ""} ${node.textContent || ""}`))
             .filter(Boolean)
             .slice(0, 40),
         },
