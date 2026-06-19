@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
-import { readSelectedThreadsUserId } from "@/lib/selectedThreadsAccount";
+import { readSelectedThreadsUserId, writeSelectedThreadsUserId } from "@/lib/selectedThreadsAccount";
 
 const APP_USER_ID = "lensically";
 const IMPORT_URL = buildWorkerUrl("/api/patterns/import");
+const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 
 type MobileSavePayload = {
   platform?: string;
@@ -19,6 +20,17 @@ type MobileSavePayload = {
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+type ThreadsAccount = {
+  threads_user_id?: string | null;
+  account_id?: string | null;
+  is_active?: boolean;
+};
+
+type ThreadsAccountsResponse = {
+  accounts?: ThreadsAccount[] | null;
+  active_threads_user_id?: string | null;
+};
 
 function parsePayloadFromHash(): MobileSavePayload | null {
   const rawHash = window.location.hash.replace(/^#/, "");
@@ -33,6 +45,36 @@ function parsePayloadFromHash(): MobileSavePayload | null {
   } catch {
     return null;
   }
+}
+
+async function resolveActiveThreadsUserId(): Promise<string> {
+  const storedThreadsUserId = readSelectedThreadsUserId();
+  if (storedThreadsUserId) {
+    return storedThreadsUserId;
+  }
+
+  const response = await fetch(`${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    return "";
+  }
+
+  const data = await response.json().catch(() => null) as ThreadsAccountsResponse | null;
+  const accounts = Array.isArray(data?.accounts)
+    ? data.accounts.filter((account) => account?.threads_user_id?.trim())
+    : [];
+  const activeAccount = accounts.find((account) => account.threads_user_id === data?.active_threads_user_id)
+    ?? accounts.find((account) => account.is_active)
+    ?? accounts[0]
+    ?? null;
+  const activeThreadsUserId = activeAccount?.threads_user_id?.trim() ?? "";
+  if (activeThreadsUserId) {
+    writeSelectedThreadsUserId(activeThreadsUserId);
+  }
+  return activeThreadsUserId;
 }
 
 export default function MobileSavePage() {
@@ -52,7 +94,6 @@ export default function MobileSavePage() {
 
     async function savePost() {
       const payload = parsePayloadFromHash();
-      const threadsUserId = readSelectedThreadsUserId();
 
       if (!payload?.source_url || !payload?.post_text) {
         setState("error");
@@ -61,6 +102,7 @@ export default function MobileSavePage() {
       }
 
       setPostText(payload.post_text);
+      const threadsUserId = await resolveActiveThreadsUserId();
 
       if (!threadsUserId) {
         setState("error");
