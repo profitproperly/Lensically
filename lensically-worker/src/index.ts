@@ -3885,15 +3885,16 @@ function sanitizeImportedPatternText(
 }
 
 function sanitizeExternalPatternRow(row: ExternalPatternRow): ExternalPatternRow {
+  const sourceAuthorHandle = derivePatternAuthorHandleFromSourceUrl(row.source_url);
   const sanitizedText = sanitizeImportedPatternText(
     row.post_text,
-    row.author_handle ?? derivePatternAuthorHandleFromSourceUrl(row.source_url),
+    sourceAuthorHandle ?? row.author_handle,
     row.author_display_name,
   );
   return {
     ...row,
     post_text: sanitizedText ?? row.post_text,
-    author_handle: row.author_handle ?? derivePatternAuthorHandleFromSourceUrl(row.source_url),
+    author_handle: sourceAuthorHandle ?? row.author_handle,
   };
 }
 
@@ -3908,8 +3909,8 @@ async function importExternalPattern(
   const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
   const sourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
   const postId = normalizePatternString(payload.post_id, { maxLength: 255 });
-  const authorHandle = normalizePatternString(payload.author_handle, { maxLength: 255 })
-    ?? derivePatternAuthorHandleFromSourceUrl(sourceUrl);
+  const authorHandle = derivePatternAuthorHandleFromSourceUrl(sourceUrl)
+    ?? normalizePatternString(payload.author_handle, { maxLength: 255 });
   const authorDisplayName = normalizePatternString(payload.author_display_name, { maxLength: 255 });
   const rawPostText = normalizePatternString(payload.post_text, { maxLength: 20000 });
   const postText = sanitizeImportedPatternText(rawPostText, authorHandle, authorDisplayName);

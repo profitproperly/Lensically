@@ -254,6 +254,41 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("prefers the Threads source URL author over the logged-in importer handle", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www.threads.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@luvandrea.c/post/DZuZ7TWoP77",
+        author_handle: "profitproperly",
+        post_text: "hitting the gym because I can't hit someone",
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        author_handle: "luvandrea.c",
+      }),
+    });
+
+    const listResponse = await fetchFromWorker("/api/patterns/list?app_user_id=lensically_test&limit=10");
+    await expect(listResponse.json()).resolves.toMatchObject({
+      success: true,
+      patterns: [
+        expect.objectContaining({
+          author_handle: "luvandrea.c",
+        }),
+      ],
+    });
+  });
+
   it("scopes saved patterns to Manifest Mental by default", async () => {
     const origin = "chrome-extension://exampleextensionid";
 
