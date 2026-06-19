@@ -202,6 +202,31 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("cleans author and relative time prefixes from imported mobile post text", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www.threads.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@julietemirella/post/DZpKBkd-Fd2",
+        post_text: "julietemirella 2d A lot of anxiety disappears when your finances are in order.",
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        author_handle: "julietemirella",
+        post_text: "A lot of anxiety disappears when your finances are in order.",
+      }),
+    });
+  });
+
   it("scopes saved patterns to Manifest Mental by default", async () => {
     const origin = "chrome-extension://exampleextensionid";
 

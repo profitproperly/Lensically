@@ -1,5 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "0.8.0";
+  const SCRIPT_VERSION = "0.9.0";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
 
   function clean(value) {
@@ -170,6 +170,7 @@
     metrics.views = parseMetricText(pageText, "view");
 
     const lines = clean(postEl.innerText).split("\n").map(clean).filter(Boolean);
+    const metricTokens = [];
     for (let index = 0; index < lines.length - 1; index += 1) {
       const label = lines[index].toLowerCase();
       const value = parseCompactNumber(lines[index + 1]);
@@ -179,6 +180,35 @@
       if (/^reposts?$/.test(label)) metrics.reposts = value;
       if (/^shares?$/.test(label)) metrics.shares = value;
       if (/^views?$/.test(label)) metrics.views = value;
+    }
+
+    for (const line of lines) {
+      if (line.includes("/") || line.includes(":")) continue;
+      const tokens = line.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
+      const parsedTokens = tokens
+        .map((token) => parseCompactNumber(token))
+        .filter((value) => Number.isFinite(value));
+      if (parsedTokens.length >= 4) {
+        metricTokens.push(...parsedTokens.slice(-4));
+        break;
+      }
+    }
+
+    if (!metricTokens.length) {
+      const standaloneNumbers = lines
+        .filter((line) => /^\d+(?:[.,]\d+)?\s*[kmb]?$/i.test(line))
+        .map((line) => parseCompactNumber(line))
+        .filter((value) => Number.isFinite(value));
+      if (standaloneNumbers.length >= 4) {
+        metricTokens.push(...standaloneNumbers.slice(-4));
+      }
+    }
+
+    if (metricTokens.length >= 4 && metrics.likes === 0 && metrics.replies === 0 && metrics.reposts === 0 && metrics.shares === 0) {
+      metrics.likes = metricTokens[0] ?? 0;
+      metrics.replies = metricTokens[1] ?? 0;
+      metrics.reposts = metricTokens[2] ?? 0;
+      metrics.shares = metricTokens[3] ?? 0;
     }
 
     return metrics;

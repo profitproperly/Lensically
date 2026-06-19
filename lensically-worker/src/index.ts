@@ -3793,6 +3793,67 @@ function normalizePatternRawPayload(value: unknown): string | null {
   }
 }
 
+function derivePatternAuthorHandleFromSourceUrl(sourceUrl: string | null): string | null {
+  if (!sourceUrl) {
+    return null;
+  }
+  try {
+    const parsed = new URL(sourceUrl);
+    const match = parsed.pathname.match(/\/@([^/]+)/);
+    return match?.[1]?.trim() || null;
+  } catch {
+    const match = sourceUrl.match(/\/@([^/?#]+)/);
+    return match?.[1]?.trim() || null;
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function sanitizeImportedPatternText(
+  text: string | null,
+  authorHandle: string | null,
+  authorDisplayName: string | null,
+): string | null {
+  if (!text) {
+    return null;
+  }
+
+  const normalizedHandle = authorHandle?.trim().replace(/^@/, "") ?? "";
+  const normalizedName = authorDisplayName?.trim() ?? "";
+  const cleanedLines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .map((line) => {
+      let next = line;
+      if (normalizedHandle) {
+        next = next.replace(new RegExp(`^@?${escapeRegExp(normalizedHandle)}\\s+`, "i"), "");
+      }
+      if (normalizedName) {
+        next = next.replace(new RegExp(`^${escapeRegExp(normalizedName)}\\s+`, "i"), "");
+      }
+      next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+      next = next.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+      return next.trim();
+    })
+    .filter((line) => {
+      if (!line) {
+        return false;
+      }
+      const lower = line.toLowerCase();
+      if (normalizedHandle && (lower === normalizedHandle.toLowerCase() || lower === `@${normalizedHandle.toLowerCase()}`)) {
+        return false;
+      }
+      if (normalizedName && lower === normalizedName.toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+
+  return cleanedLines.join("\n").trim() || null;
+}
+
 async function importExternalPattern(
   env: Env,
   appUserId: string,
@@ -3803,10 +3864,12 @@ async function importExternalPattern(
 
   const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
   const sourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
-  const postText = normalizePatternString(payload.post_text, { maxLength: 20000 });
   const postId = normalizePatternString(payload.post_id, { maxLength: 255 });
-  const authorHandle = normalizePatternString(payload.author_handle, { maxLength: 255 });
+  const authorHandle = normalizePatternString(payload.author_handle, { maxLength: 255 })
+    ?? derivePatternAuthorHandleFromSourceUrl(sourceUrl);
   const authorDisplayName = normalizePatternString(payload.author_display_name, { maxLength: 255 });
+  const rawPostText = normalizePatternString(payload.post_text, { maxLength: 20000 });
+  const postText = sanitizeImportedPatternText(rawPostText, authorHandle, authorDisplayName);
   const likes = normalizePatternMetric(payload.likes);
   const replies = normalizePatternMetric(payload.replies);
   const reposts = normalizePatternMetric(payload.reposts);
