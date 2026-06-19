@@ -61,7 +61,7 @@ export default function InternalLayout({
           </Link>
         </div>
 
-        <div className="hidden sm:block">
+        <div className="block max-w-[11rem] sm:max-w-none">
           <ThreadsAccountSwitcher />
         </div>
       </header>
