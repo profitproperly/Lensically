@@ -27,7 +27,7 @@ const WORKSPACE_USER: CurrentUser = {
   timezone: "America/New_York",
   clock_format: "12h",
   email_verified: true,
-  has_password: true,
+  has_password: false,
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

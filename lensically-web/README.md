@@ -12,13 +12,12 @@ These URLs are the official public pages for the current private workspace build
 
 ## Public App Shape
 
-- Root route is a password gate for the private workspace.
-- Active internal routes are `/dashboard`, `/insights`, `/followers`, `/post-archive`, `/schedule`, and `/scheduled-posts`.
+- Root route redirects to `/dashboard`.
+- Active internal routes are `/dashboard`, `/insights`, `/followers`, `/post-archive`, `/saved-patterns`, `/schedule`, `/scheduled-posts`, and `/mobile-save`.
 - Public routes are `/terms`, `/privacy`, and `/data-deletion`.
 
 ## Application Scope
 
-- Password-gated workspace access
 - Threads dashboard and insights surfaces
 - Followers and post archive reporting
 - Immediate publishing and scheduled posting
