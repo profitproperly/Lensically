@@ -59,6 +59,23 @@ function isOldInlineBookmarkletPayload(payload: MobileSavePayload): boolean {
   return payload.raw_payload?.mode === "ios_safari_bookmarklet";
 }
 
+function cleanPreviewPostText(value: string): string {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (!line) {
+        return false;
+      }
+      if (line === "/") {
+        return false;
+      }
+      return !/^\/\s*\d+$/.test(line);
+    })
+    .join("\n")
+    .trim();
+}
+
 async function loadThreadsAccounts(): Promise<ThreadsAccountsResponse | null> {
   const response = await fetch(`${THREADS_ACCOUNTS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}`, {
     cache: "no-store",
@@ -123,12 +140,17 @@ export default function MobileSavePage() {
       if (isOldInlineBookmarkletPayload(payload)) {
         setState("error");
         setMessage("This bookmarklet is outdated. Replace it with the current Lensically bookmarklet, then open the Threads post and try again.");
-        setPostText(payload.post_text);
+        setPostText(cleanPreviewPostText(payload.post_text));
         return;
       }
 
-      setPostText(payload.post_text);
-      setPendingPayload(payload);
+      const cleanedPostText = cleanPreviewPostText(payload.post_text);
+      const cleanedPayload = {
+        ...payload,
+        post_text: cleanedPostText,
+      };
+      setPostText(cleanedPostText);
+      setPendingPayload(cleanedPayload);
       const resolved = await resolveActiveThreadsUserId();
       if (cancelled) return;
       setAccountChoices(resolved.accounts);
