@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { buildWorkerUrl } from "../lib/apiClient";
 import { preloadRouteDataForNavigation } from "../lib/routeDataPrefetch";
 import {
+  appendAppUserId,
   appendThreadsUserId,
   readSelectedThreadsUserId,
   SELECTED_THREADS_ACCOUNT_EVENT,
@@ -36,6 +37,7 @@ type ThreadsMeResponse = {
 };
 
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
+const APP_USER_ID = "workspace-owner";
 
 type SidebarProps = {
   mobile?: boolean;
@@ -61,7 +63,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         const selected = readSelectedThreadsUserId();
         setSelectedThreadsUserId(selected);
         const res = await fetch(
-          appendThreadsUserId(THREADS_ME_URL, selected),
+          appendThreadsUserId(appendAppUserId(THREADS_ME_URL, APP_USER_ID), selected),
           { cache: "no-store", credentials: "include" },
         );
         if (!res.ok) {

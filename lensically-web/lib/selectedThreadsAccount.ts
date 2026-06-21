@@ -39,12 +39,20 @@ export function writeSelectedThreadsUserId(threadsUserId: string) {
   }
 }
 
-export function appendThreadsUserId(url: string, threadsUserId: string): string {
-  const normalizedThreadsUserId = threadsUserId.trim();
-  if (!normalizedThreadsUserId) {
+function appendQueryParam(url: string, key: string, value: string): string {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) {
     return url;
   }
 
   const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}threads_user_id=${encodeURIComponent(normalizedThreadsUserId)}`;
+  return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(normalizedValue)}`;
+}
+
+export function appendAppUserId(url: string, appUserId: string): string {
+  return appendQueryParam(url, "app_user_id", appUserId);
+}
+
+export function appendThreadsUserId(url: string, threadsUserId: string): string {
+  return appendQueryParam(url, "threads_user_id", threadsUserId);
 }

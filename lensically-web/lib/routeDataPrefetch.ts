@@ -2,6 +2,7 @@
 
 import { buildWorkerUrl } from "./apiClient";
 import {
+  appendAppUserId,
   appendThreadsUserId,
   readSelectedThreadsUserId,
 } from "./selectedThreadsAccount";
@@ -62,7 +63,7 @@ async function preloadThreadsStatus(appUserId: string) {
 
   const selectedThreadsUserId = readSelectedThreadsUserId();
   const response = await fetch(
-    appendThreadsUserId(THREADS_ME_URL, selectedThreadsUserId),
+    appendThreadsUserId(appendAppUserId(THREADS_ME_URL, appUserId), selectedThreadsUserId),
     { cache: "no-store", credentials: "include" },
   );
 

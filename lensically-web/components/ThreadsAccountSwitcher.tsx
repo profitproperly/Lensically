@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import {
+  appendAppUserId,
   readSelectedThreadsUserId,
   SELECTED_THREADS_ACCOUNT_EVENT,
   writeSelectedThreadsUserId,
@@ -25,6 +26,7 @@ type ThreadsAccountsResponse = {
 };
 
 const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
+const APP_USER_ID = "workspace-owner";
 
 export function ThreadsAccountSwitcher() {
   const [accounts, setAccounts] = useState<ThreadsAccount[]>([]);
@@ -38,7 +40,7 @@ export function ThreadsAccountSwitcher() {
     async function loadAccounts() {
       setIsLoading(true);
       try {
-        const response = await fetch(THREADS_ACCOUNTS_URL, {
+        const response = await fetch(appendAppUserId(THREADS_ACCOUNTS_URL, APP_USER_ID), {
           cache: "no-store",
           credentials: "include",
           signal: controller.signal,

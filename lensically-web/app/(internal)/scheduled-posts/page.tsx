@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import { useAuth } from "@/lib/AuthProvider";
 import {
+  appendAppUserId,
   appendThreadsUserId,
   readSelectedThreadsUserId,
   SELECTED_THREADS_ACCOUNT_EVENT,
@@ -51,6 +52,7 @@ type ScheduledPostsResponse = {
 
 const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
+const APP_USER_ID = "workspace-owner";
 const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 const THREADS_SCHEDULE_UPDATE_URL = buildWorkerUrl("/api/threads/schedule/update");
 const THREADS_SCHEDULE_RETRY_URL = buildWorkerUrl("/api/threads/schedule/retry");
@@ -316,7 +318,7 @@ export default function ScheduledPostsPage() {
         const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
           const selectedThreadsUserId = readSelectedThreadsUserId();
           const accountsResponse = await fetch(
-            appendThreadsUserId(THREADS_ACCOUNTS_URL, selectedThreadsUserId),
+            appendThreadsUserId(appendAppUserId(THREADS_ACCOUNTS_URL, APP_USER_ID), selectedThreadsUserId),
             {
               cache: "no-store",
               credentials: "include",
@@ -328,7 +330,7 @@ export default function ScheduledPostsPage() {
           }
 
           const meResponse = await fetch(
-            appendThreadsUserId(THREADS_ME_URL, selectedThreadsUserId),
+            appendThreadsUserId(appendAppUserId(THREADS_ME_URL, APP_USER_ID), selectedThreadsUserId),
             {
               cache: "no-store",
               credentials: "include",

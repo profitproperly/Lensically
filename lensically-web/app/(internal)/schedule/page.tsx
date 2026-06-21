@@ -6,6 +6,7 @@ import BatchSchedulePanel from "@/components/BatchSchedulePanel";
 import { buildWorkerUrl } from "@/lib/apiClient";
 import { useAuth } from "@/lib/AuthProvider";
 import {
+  appendAppUserId,
   appendThreadsUserId,
   readSelectedThreadsUserId,
   SELECTED_THREADS_ACCOUNT_EVENT,
@@ -41,6 +42,7 @@ type BatchSchedulePreset = {
 
 const THREADS_ACCOUNTS_URL = buildWorkerUrl("/api/threads/accounts");
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
+const APP_USER_ID = "workspace-owner";
 const HERMES_GENERATE_POSTS_URL = buildWorkerUrl("/api/hermes/generate-posts");
 const BATCH_PRESETS_URL = buildWorkerUrl("/api/batch-schedule/presets");
 const THREADS_POST_NOW_URL = buildWorkerUrl("/api/threads/post-now");
@@ -301,7 +303,7 @@ export default function SchedulePage() {
         const fetchConnectionPayload = async (): Promise<ThreadsMeResponse | null> => {
           const selectedThreadsUserId = readSelectedThreadsUserId();
           const accountsResponse = await fetch(
-            appendThreadsUserId(THREADS_ACCOUNTS_URL, selectedThreadsUserId),
+            appendThreadsUserId(appendAppUserId(THREADS_ACCOUNTS_URL, APP_USER_ID), selectedThreadsUserId),
             {
               cache: "no-store",
               credentials: "include",
@@ -313,7 +315,7 @@ export default function SchedulePage() {
           }
 
           const meResponse = await fetch(
-            appendThreadsUserId(THREADS_ME_URL, selectedThreadsUserId),
+            appendThreadsUserId(appendAppUserId(THREADS_ME_URL, APP_USER_ID), selectedThreadsUserId),
             {
               cache: "no-store",
               credentials: "include",
