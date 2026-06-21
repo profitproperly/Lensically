@@ -76,6 +76,7 @@ interface Env {
   HERMES_MODEL?: string;
   THREADS_TOKEN_MANIFEST_MENTAL?: string;
   THREADS_TOKEN_VECTRIX?: string;
+  THREADS_TOKEN_DEADMAN?: string;
   DB: D1Database;
 }
 
@@ -166,6 +167,12 @@ const CONFIGURED_THREADS_ACCOUNTS: ConfiguredThreadsAccount[] = [
     label: "Vectrix",
     username: "vectrixvoltmore",
     tokenEnv: "THREADS_TOKEN_VECTRIX",
+  },
+  {
+    id: "deadman",
+    label: "Deadman",
+    username: "opmgdeadman",
+    tokenEnv: "THREADS_TOKEN_DEADMAN",
   },
 ];
 
