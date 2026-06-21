@@ -3905,6 +3905,8 @@ function sanitizeImportedPatternText(
       next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
       next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\s+/i, "");
       next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\b\s*/i, "");
+      next = next.replace(/^\d+\s*\/\s*\d+\s+/i, "");
+      next = next.replace(/^\/\s*\d+\s+/i, "");
       return next.trim();
     })
     .filter((line) => {
@@ -3916,6 +3918,15 @@ function sanitizeImportedPatternText(
         return false;
       }
       if (normalizedName && lower === normalizedName.toLowerCase()) {
+        return false;
+      }
+      if (lower === "/" || lower === "thread") {
+        return false;
+      }
+      if (/^\d+\s*\/\s*\d+$/.test(lower) || /^\/\s*\d+$/.test(lower)) {
+        return false;
+      }
+      if (/^\d{1,2}$/.test(lower)) {
         return false;
       }
       return true;

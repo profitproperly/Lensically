@@ -1,5 +1,5 @@
 (function () {
-  const SCRIPT_VERSION = "1.1.2";
+  const SCRIPT_VERSION = "1.1.3";
   const TARGET_URL = "https://app.lensically.com/mobile-save";
 
   function clean(value) {
@@ -102,6 +102,9 @@
     const value = clean(line).toLowerCase();
     if (!value) return true;
     if (value === "follow" || value === "more" || value === "top" || value === "view activity") return true;
+    if (value === "/" || value === "thread") return true;
+    if (/^\d+\s*\/\s*\d+$/.test(value)) return true;
+    if (/^\/\s*\d+$/.test(value)) return true;
     if (value.includes("post is shared to fediverse")) return true;
     if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
     if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
@@ -126,6 +129,8 @@
         }
         next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
         next = next.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+        next = next.replace(/^\d+\s*\/\s*\d+\s+/i, "");
+        next = next.replace(/^\/\s*\d+\s+/i, "");
         return clean(next);
       })
       .filter((line) => !isNoiseLine(line));
@@ -181,6 +186,8 @@
       }
       line = line.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
       line = line.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+      line = line.replace(/^\d+\s*\/\s*\d+\s+/i, "");
+      line = line.replace(/^\/\s*\d+\s+/i, "");
       line = clean(line);
 
       if (!line || isNoiseLine(line)) continue;
@@ -188,6 +195,11 @@
     }
 
     return bodyLines.join("\n").trim();
+  }
+
+  function isProbablyTruncatedText(value) {
+    const text = clean(value);
+    return /(?:\.\.\.|…)$/.test(text);
   }
 
   function parseJsonLdPost() {
@@ -431,7 +443,9 @@
     const metaDescription = clean(document.querySelector('meta[property="og:description"]')?.getAttribute("content"));
     const domBodyText = extractPostBodyTextFromDom(postEl, authorHandle, authorDisplayName);
     const domBodyLineCount = domBodyText ? domBodyText.split("\n").filter(Boolean).length : 0;
-    const rawText = jsonLd?.text || (domBodyLineCount > 1 ? domBodyText : metaDescription || domBodyText || clean(postEl.innerText));
+    const structuredText = jsonLd?.text && !isProbablyTruncatedText(jsonLd.text) ? jsonLd.text : "";
+    const descriptionText = metaDescription && !isProbablyTruncatedText(metaDescription) ? metaDescription : "";
+    const rawText = structuredText || (domBodyLineCount > 1 ? domBodyText : descriptionText || domBodyText || clean(postEl.innerText));
     const postText = cleanPostText(rawText, authorHandle, authorDisplayName);
     const postIdMatch = location.href.match(/\/post\/([^/?#]+)/i);
     const domMetrics = extractMetricsFromDom(postEl);

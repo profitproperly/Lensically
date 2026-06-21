@@ -69,13 +69,6 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(new Date(parsed));
 }
 
-function truncateText(value: string, maxLength = 160): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, maxLength).trimEnd()}...`;
-}
-
 export default function SavedPatternsPage() {
   const [patterns, setPatterns] = useState<SavedPatternRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -290,7 +283,7 @@ export default function SavedPatternsPage() {
                               <span className="text-xs text-slate-500">@{pattern.author_handle}</span>
                             ) : null}
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-800">{truncateText(pattern.post_text)}</p>
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{pattern.post_text}</p>
                         </div>
 
                         <button

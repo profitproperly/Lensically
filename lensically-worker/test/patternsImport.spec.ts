@@ -258,6 +258,38 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("cleans mobile thread counters from imported saved pattern text", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://app.lensically.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@zara_olivio/post/DZ1JSTaFLlm",
+        post_text: [
+          "zara_olivio 1d",
+          "1/2",
+          "I would love to be a content creator.",
+          "/",
+          "2",
+          "Unfortunately, I don't want y'all knowing where I shop.",
+        ].join("\n"),
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        author_handle: "zara_olivio",
+        post_text: "I would love to be a content creator.\nUnfortunately, I don't want y'all knowing where I shop.",
+      }),
+    });
+  });
+
   it("prefers the Threads source URL author over the logged-in importer handle", async () => {
     const importResponse = await fetchFromWorker("/api/patterns/import", {
       method: "POST",

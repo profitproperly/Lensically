@@ -8,6 +8,9 @@ function isNoiseLine(line) {
   const value = clean(line).toLowerCase();
   if (!value) return true;
   if (value === "follow" || value === "more" || value === "top" || value === "view activity") return true;
+  if (value === "/" || value === "thread") return true;
+  if (/^\d+\s*\/\s*\d+$/.test(value)) return true;
+  if (/^\/\s*\d+$/.test(value)) return true;
   if (value.includes("post is shared to fediverse")) return true;
   if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
   if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
@@ -56,6 +59,8 @@ function extractPostBodyTextFromInnerText(innerText, authorHandle, authorDisplay
     }
     line = line.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
     line = line.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
+    line = line.replace(/^\d+\s*\/\s*\d+\s+/i, "");
+    line = line.replace(/^\/\s*\d+\s+/i, "");
     line = clean(line);
 
     if (!line || isNoiseLine(line)) continue;
@@ -102,6 +107,26 @@ assert.equal(
     null,
   ),
   "First line\nindented second line\nthird line",
+);
+
+assert.equal(
+  extractPostBodyTextFromInnerText(
+    [
+      "zara_olivio",
+      "@zara_olivio",
+      "1d",
+      "1/2",
+      "I would love to be a content creator.",
+      "/",
+      "2",
+      "Unfortunately, I don't want y'all knowing where I shop.",
+      "Like",
+      "Reply",
+    ].join("\n"),
+    "zara_olivio",
+    null,
+  ),
+  "I would love to be a content creator.\nUnfortunately, I don't want y'all knowing where I shop.",
 );
 
 console.log("mobile save extractor fixtures passed");
