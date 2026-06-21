@@ -11,6 +11,7 @@ function isNoiseLine(line) {
   if (value === "/" || value === "thread") return true;
   if (/^\d+\s*\/\s*\d+$/.test(value)) return true;
   if (/^\/\s*\d+$/.test(value)) return true;
+  if (/^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value)) return true;
   if (value.includes("post is shared to fediverse")) return true;
   if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
   if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
@@ -24,6 +25,7 @@ function isPostBodyBoundary(line, hasBodyText) {
   if (!value) return false;
   if (value === "top" || value.startsWith("top ")) return true;
   if (value === "view activity" || value.startsWith("view activity")) return true;
+  if (hasBodyText && /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value)) return true;
   if (value === "more" || value === "follow") return hasBodyText;
   if (/^(like|reply|repost|share)$/.test(value)) return hasBodyText;
   if (/^(likes?|replies|reply|reposts?|shares?|views?)$/.test(value)) return hasBodyText;
@@ -120,6 +122,24 @@ assert.equal(
       "/",
       "2",
       "Unfortunately, I don't want y'all knowing where I shop.",
+      "Like",
+      "Reply",
+    ].join("\n"),
+    "zara_olivio",
+    null,
+  ),
+  "I would love to be a content creator.\nUnfortunately, I don't want y'all knowing where I shop.",
+);
+
+assert.equal(
+  extractPostBodyTextFromInnerText(
+    [
+      "zara_olivio",
+      "@zara_olivio",
+      "1d",
+      "I would love to be a content creator.",
+      "Unfortunately, I don't want y'all knowing where I shop.",
+      "Jun 20, 2026, 10:00 PM",
       "Like",
       "Reply",
     ].join("\n"),

@@ -3891,6 +3891,7 @@ function sanitizeImportedPatternText(
 
   const normalizedHandle = authorHandle?.trim().replace(/^@/, "") ?? "";
   const normalizedName = authorDisplayName?.trim() ?? "";
+  const dateMetadataPattern = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i;
   const cleanedLines = text
     .split("\n")
     .map((line) => line.trim())
@@ -3927,6 +3928,9 @@ function sanitizeImportedPatternText(
         return false;
       }
       if (/^\d{1,2}$/.test(lower)) {
+        return false;
+      }
+      if (dateMetadataPattern.test(line)) {
         return false;
       }
       return true;

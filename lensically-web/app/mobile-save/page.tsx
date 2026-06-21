@@ -59,6 +59,10 @@ function isOldInlineBookmarkletPayload(payload: MobileSavePayload): boolean {
   return payload.raw_payload?.mode === "ios_safari_bookmarklet";
 }
 
+function isDateMetadataLine(line: string): boolean {
+  return /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(line.trim());
+}
+
 function cleanPreviewPostText(value: string): string {
   return value
     .split("\n")
@@ -68,6 +72,9 @@ function cleanPreviewPostText(value: string): string {
         return false;
       }
       if (line === "/") {
+        return false;
+      }
+      if (isDateMetadataLine(line)) {
         return false;
       }
       return !/^\/\s*\d+$/.test(line);

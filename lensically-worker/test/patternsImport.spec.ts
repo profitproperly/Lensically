@@ -290,6 +290,34 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("cleans mobile published-date metadata from imported saved pattern text", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://app.lensically.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@zara_olivio/post/DZ1JSTaFLlm-date",
+        post_text: [
+          "I would love to be a content creator.",
+          "Unfortunately, I don't want y'all knowing where I shop.",
+          "Jun 20, 2026, 10:00 PM",
+        ].join("\n"),
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        post_text: "I would love to be a content creator.\nUnfortunately, I don't want y'all knowing where I shop.",
+      }),
+    });
+  });
+
   it("prefers the Threads source URL author over the logged-in importer handle", async () => {
     const importResponse = await fetchFromWorker("/api/patterns/import", {
       method: "POST",
