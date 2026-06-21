@@ -44,6 +44,7 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 - If Browser tooling is unavailable, local production build plus route HTTP checks are acceptable fallback verification, but state the limitation.
 - The bundled Playwright package may be incomplete on this Windows box (`playwright-core` missing). Do not waste time repeatedly trying it without checking the dependency path first.
 - For Threads mobile save extraction, do not prefer raw `article.innerText` just because it has newlines. It captures action rows/comments/footer text. Preserve multiline post text with bounded post-body fixture tests (`lensically-web/scripts/test-mobile-save-extractor.mjs`) before changing the bookmarklet/extractor.
+- For iPhone Threads mobile save, the user expects an inline `javascript:(()=>{...})()` bookmarklet pasted as the bookmark URL. Do not give a hosted-script loader bookmarklet (`document.createElement('script').src=...`) unless explicitly requested; that format failed for the user. Use the latest inline format from the `Locate Threads save post extension` thread as the base.
 
 ## Usage Cost Notes
 

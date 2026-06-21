@@ -43,7 +43,7 @@
   function isDateMetadataLine(line) {
     const value = clean(line);
     if (!value) return false;
-    return /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value);
+    return /^(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value);
   }
 
   function findControlTextMetric(postEl, selector, labels) {
@@ -136,7 +136,6 @@
         }
         next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
         next = next.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
-        next = next.replace(/^\d+\s*\/\s*\d+\s+/i, "");
         next = next.replace(/^\/\s*\d+\s+/i, "");
         return clean(next);
       })
@@ -194,7 +193,6 @@
       }
       line = line.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
       line = line.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
-      line = line.replace(/^\d+\s*\/\s*\d+\s+/i, "");
       line = line.replace(/^\/\s*\d+\s+/i, "");
       line = clean(line);
 

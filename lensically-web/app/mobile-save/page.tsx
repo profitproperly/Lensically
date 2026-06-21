@@ -60,7 +60,7 @@ function isOldInlineBookmarkletPayload(payload: MobileSavePayload): boolean {
 }
 
 function isDateMetadataLine(line: string): boolean {
-  return /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(line.trim());
+  return /^(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(line.trim());
 }
 
 function cleanPreviewPostText(value: string): string {

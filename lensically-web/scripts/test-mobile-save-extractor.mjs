@@ -11,7 +11,7 @@ function isNoiseLine(line) {
   if (value === "/" || value === "thread") return true;
   if (/^\d+\s*\/\s*\d+$/.test(value)) return true;
   if (/^\/\s*\d+$/.test(value)) return true;
-  if (/^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value)) return true;
+  if (/^(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value)) return true;
   if (value.includes("post is shared to fediverse")) return true;
   if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
   if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
@@ -25,7 +25,7 @@ function isPostBodyBoundary(line, hasBodyText) {
   if (!value) return false;
   if (value === "top" || value.startsWith("top ")) return true;
   if (value === "view activity" || value.startsWith("view activity")) return true;
-  if (hasBodyText && /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value)) return true;
+  if (hasBodyText && /^(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value)) return true;
   if (value === "more" || value === "follow") return hasBodyText;
   if (/^(like|reply|repost|share)$/.test(value)) return hasBodyText;
   if (/^(likes?|replies|reply|reposts?|shares?|views?)$/.test(value)) return hasBodyText;
@@ -61,7 +61,6 @@ function extractPostBodyTextFromInnerText(innerText, authorHandle, authorDisplay
     }
     line = line.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
     line = line.replace(/^\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
-    line = line.replace(/^\d+\s*\/\s*\d+\s+/i, "");
     line = line.replace(/^\/\s*\d+\s+/i, "");
     line = clean(line);
 
@@ -129,6 +128,25 @@ assert.equal(
     null,
   ),
   "I would love to be a content creator.\nUnfortunately, I don't want y'all knowing where I shop.",
+);
+
+assert.equal(
+  extractPostBodyTextFromInnerText(
+    [
+      "beesrecipes1",
+      "@beesrecipes1",
+      "5h",
+      "04/21/26",
+      "Juicy Steak with Creamy Garlic Sauce Ingredients",
+      "1/2 cup heavy cream",
+      "1/4 cup parmesan",
+      "Like",
+      "Reply",
+    ].join("\n"),
+    "beesrecipes1",
+    null,
+  ),
+  "Juicy Steak with Creamy Garlic Sauce Ingredients\n1/2 cup heavy cream\n1/4 cup parmesan",
 );
 
 assert.equal(

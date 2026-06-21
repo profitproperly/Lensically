@@ -3891,7 +3891,7 @@ function sanitizeImportedPatternText(
 
   const normalizedHandle = authorHandle?.trim().replace(/^@/, "") ?? "";
   const normalizedName = authorDisplayName?.trim() ?? "";
-  const dateMetadataPattern = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i;
+  const dateMetadataPattern = /^(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i;
   const cleanedLines = text
     .split("\n")
     .map((line) => line.trim())
@@ -3906,7 +3906,6 @@ function sanitizeImportedPatternText(
       next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
       next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\s+/i, "");
       next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\b\s*/i, "");
-      next = next.replace(/^\d+\s*\/\s*\d+\s+/i, "");
       next = next.replace(/^\/\s*\d+\s+/i, "");
       return next.trim();
     })

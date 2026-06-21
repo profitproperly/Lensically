@@ -318,6 +318,35 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("cleans numeric date metadata without removing recipe fractions", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://app.lensically.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@beesrecipes1/post/DXaISvhADRI",
+        post_text: [
+          "04/21/26",
+          "Juicy Steak with Creamy Garlic Sauce Ingredients",
+          "1/2 cup heavy cream",
+          "1/4 cup parmesan",
+        ].join("\n"),
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        post_text: "Juicy Steak with Creamy Garlic Sauce Ingredients\n1/2 cup heavy cream\n1/4 cup parmesan",
+      }),
+    });
+  });
+
   it("prefers the Threads source URL author over the logged-in importer handle", async () => {
     const importResponse = await fetchFromWorker("/api/patterns/import", {
       method: "POST",
