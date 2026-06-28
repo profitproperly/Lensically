@@ -5412,21 +5412,32 @@ async function fetchThreadsPostsPageWithInsights(
   hasMore: boolean;
 } | null> {
   try {
-    const params = new URLSearchParams({
-      fields: "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply,views_count,likes_count,replies_count,reposts_count,quotes_count",
-      limit: "40",
-    });
+    const basePostFields = "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply";
+    const postCountFields = "view_count,like_count,reply_count,repost_count,quote_count";
+    const buildPostsUrl = (fields: string): string => {
+      const params = new URLSearchParams({
+        fields,
+        limit: "40",
+      });
 
-    if (cursor) {
-      params.set("after", cursor);
-    }
+      if (cursor) {
+        params.set("after", cursor);
+      }
 
-    const response = await fetch(
-      `https://graph.threads.net/v1.0/${threadsUserId}/threads?${params.toString()}`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
+      return `https://graph.threads.net/v1.0/${threadsUserId}/threads?${params.toString()}`;
+    };
+
+    let response = await fetch(
+      buildPostsUrl(`${basePostFields},${postCountFields}`),
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
+
+    if (!response.ok) {
+      response = await fetch(
+        buildPostsUrl(basePostFields),
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+    }
 
     if (!response.ok) {
       return null;
@@ -5444,6 +5455,11 @@ async function fetchThreadsPostsPageWithInsights(
         timestamp?: string;
         permalink?: string;
         username?: string;
+        view_count?: number | string | null;
+        like_count?: number | string | null;
+        reply_count?: number | string | null;
+        repost_count?: number | string | null;
+        quote_count?: number | string | null;
         views_count?: number | string | null;
         likes_count?: number | string | null;
         replies_count?: number | string | null;
@@ -5481,17 +5497,17 @@ async function fetchThreadsPostsPageWithInsights(
             permalink: typeof post.permalink === "string" ? post.permalink : null,
             username: typeof post.username === "string" ? post.username : null,
             profile_picture_url: profilePicture,
-            views: normalizeThreadsPostCount(post.views_count),
-            likes: normalizeThreadsPostCount(post.likes_count),
-            replies: normalizeThreadsPostCount(post.replies_count),
-            reposts: normalizeThreadsPostCount(post.reposts_count),
-            quotes: normalizeThreadsPostCount(post.quotes_count),
+            views: normalizeThreadsPostCount(post.view_count ?? post.views_count),
+            likes: normalizeThreadsPostCount(post.like_count ?? post.likes_count),
+            replies: normalizeThreadsPostCount(post.reply_count ?? post.replies_count),
+            reposts: normalizeThreadsPostCount(post.repost_count ?? post.reposts_count),
+            quotes: normalizeThreadsPostCount(post.quote_count ?? post.quotes_count),
             shares: 0,
             engagement_total:
-              normalizeThreadsPostCount(post.likes_count) +
-              normalizeThreadsPostCount(post.replies_count) +
-              normalizeThreadsPostCount(post.reposts_count) +
-              normalizeThreadsPostCount(post.quotes_count),
+              normalizeThreadsPostCount(post.like_count ?? post.likes_count) +
+              normalizeThreadsPostCount(post.reply_count ?? post.replies_count) +
+              normalizeThreadsPostCount(post.repost_count ?? post.reposts_count) +
+              normalizeThreadsPostCount(post.quote_count ?? post.quotes_count),
           };
 
           if (!postId) {
