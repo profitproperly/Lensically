@@ -5224,6 +5224,18 @@ function getThreadsMetricValue(
   return Number(value ?? 0);
 }
 
+function normalizeThreadsPostCount(value: unknown): number {
+  const numericValue = Number(value ?? 0);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return 0;
+  }
+  return Math.trunc(numericValue);
+}
+
+function pickThreadsMetricValue(primaryValue: number, fallbackValue: number): number {
+  return primaryValue > 0 ? primaryValue : fallbackValue;
+}
+
 function buildThreadsMetricMap(
   metrics: Array<{
     name?: string;
@@ -5401,7 +5413,7 @@ async function fetchThreadsPostsPageWithInsights(
 } | null> {
   try {
     const params = new URLSearchParams({
-      fields: "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply",
+      fields: "id,text,media_type,permalink,timestamp,username,has_replies,is_quote_post,is_reply,views_count,likes_count,replies_count,reposts_count,quotes_count",
       limit: "40",
     });
 
@@ -5432,6 +5444,11 @@ async function fetchThreadsPostsPageWithInsights(
         timestamp?: string;
         permalink?: string;
         username?: string;
+        views_count?: number | string | null;
+        likes_count?: number | string | null;
+        replies_count?: number | string | null;
+        reposts_count?: number | string | null;
+        quotes_count?: number | string | null;
       }>;
       paging?: {
         next?: string;
@@ -5464,13 +5481,17 @@ async function fetchThreadsPostsPageWithInsights(
             permalink: typeof post.permalink === "string" ? post.permalink : null,
             username: typeof post.username === "string" ? post.username : null,
             profile_picture_url: profilePicture,
-            views: 0,
-            likes: 0,
-            replies: 0,
-            reposts: 0,
-            quotes: 0,
+            views: normalizeThreadsPostCount(post.views_count),
+            likes: normalizeThreadsPostCount(post.likes_count),
+            replies: normalizeThreadsPostCount(post.replies_count),
+            reposts: normalizeThreadsPostCount(post.reposts_count),
+            quotes: normalizeThreadsPostCount(post.quotes_count),
             shares: 0,
-            engagement_total: 0,
+            engagement_total:
+              normalizeThreadsPostCount(post.likes_count) +
+              normalizeThreadsPostCount(post.replies_count) +
+              normalizeThreadsPostCount(post.reposts_count) +
+              normalizeThreadsPostCount(post.quotes_count),
           };
 
           if (!postId) {
@@ -5531,21 +5552,22 @@ async function fetchThreadsPostsPageWithInsights(
               }>;
             };
             const metricMap = buildThreadsMetricMap(metricsJson.data);
+            const views = pickThreadsMetricValue(metricMap.views, basePost.views);
+            const likes = pickThreadsMetricValue(metricMap.likes, basePost.likes);
+            const replies = pickThreadsMetricValue(metricMap.replies, basePost.replies);
+            const reposts = pickThreadsMetricValue(metricMap.reposts, basePost.reposts);
+            const quotes = pickThreadsMetricValue(metricMap.quotes, basePost.quotes);
+            const shares = metricMap.shares;
 
             return {
               ...basePost,
-              views: metricMap.views,
-              likes: metricMap.likes,
-              replies: metricMap.replies,
-              reposts: metricMap.reposts,
-              quotes: metricMap.quotes,
-              shares: metricMap.shares,
-              engagement_total:
-                metricMap.likes +
-                metricMap.replies +
-                metricMap.reposts +
-                metricMap.quotes +
-                metricMap.shares,
+              views,
+              likes,
+              replies,
+              reposts,
+              quotes,
+              shares,
+              engagement_total: likes + replies + reposts + quotes + shares,
               metrics_loaded: true,
             };
           } catch {
