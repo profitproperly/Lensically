@@ -17,6 +17,17 @@
     return Math.floor(base * scale);
   }
 
+  function extractCompactNumberTokens(text) {
+    const tokens = [];
+    const pattern = /(?:^|[^a-z0-9])(\d+(?:[.,]\d+)?\s*[kmb]?)(?![a-z0-9])/gi;
+    let match;
+    while ((match = pattern.exec(clean(text))) !== null) {
+      const parsed = parseCompactNumber(match[1]);
+      if (Number.isFinite(parsed)) tokens.push(parsed);
+    }
+    return tokens;
+  }
+
   function parseMetricText(text, label) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const patterns = [
@@ -77,10 +88,9 @@
           const parsed = parseMetricFromTextVariants(text, labels);
           if (parsed !== null) return parsed;
 
-          const tokens = text.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
+          const tokens = extractCompactNumberTokens(text);
           if (tokens.length >= 3 && labels.includes("like")) {
-            const first = parseCompactNumber(tokens[0]);
-            if (Number.isFinite(first)) return first;
+            return tokens[0];
           }
         }
         current = current.parentElement;
@@ -129,6 +139,7 @@
     if (value.includes("post is shared to fediverse")) return true;
     if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
     if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
+    if (/^(like|reply|repost|share)$/i.test(value)) return true;
     if (/^(likes?|replies|reply|reposts?|shares?|views?)$/i.test(value)) return true;
     if (/^(like|reply|repost|share)\s*\d/i.test(value)) return true;
     return false;
@@ -370,10 +381,7 @@
 
     for (const line of scopedLines) {
       if (line.includes("/") || line.includes(":")) continue;
-      const tokens = line.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
-      const parsedTokens = tokens
-        .map((token) => parseCompactNumber(token))
-        .filter((value) => Number.isFinite(value));
+      const parsedTokens = extractCompactNumberTokens(line);
       if (parsedTokens.length >= 4) {
         metricTokens.push(...parsedTokens.slice(-4));
         break;
@@ -400,10 +408,7 @@
       }
       for (const line of scopedBodyLines) {
         if (line.includes("/") || line.includes(":")) continue;
-        const tokens = line.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
-        const parsedTokens = tokens
-          .map((token) => parseCompactNumber(token))
-          .filter((value) => Number.isFinite(value));
+        const parsedTokens = extractCompactNumberTokens(line);
         if (parsedTokens.length >= 4) {
           metricTokens.push(...parsedTokens.slice(-4));
           break;

@@ -4,6 +4,28 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+function parseCompactNumber(raw) {
+  const value = clean(raw).toLowerCase().replace(/,/g, "").replace(/\s+/g, "");
+  const match = value.match(/^(\d+(?:\.\d+)?)([kmb])?$/);
+  if (!match) return null;
+  const base = Number(match[1]);
+  if (!Number.isFinite(base)) return null;
+  const suffix = match[2] || "";
+  const scale = suffix === "k" ? 1000 : suffix === "m" ? 1000000 : suffix === "b" ? 1000000000 : 1;
+  return Math.floor(base * scale);
+}
+
+function extractCompactNumberTokens(text) {
+  const tokens = [];
+  const pattern = /(?:^|[^a-z0-9])(\d+(?:[.,]\d+)?\s*[kmb]?)(?![a-z0-9])/gi;
+  let match;
+  while ((match = pattern.exec(clean(text))) !== null) {
+    const parsed = parseCompactNumber(match[1]);
+    if (Number.isFinite(parsed)) tokens.push(parsed);
+  }
+  return tokens;
+}
+
 function isNoiseLine(line) {
   const value = clean(line).toLowerCase();
   if (!value) return true;
@@ -16,6 +38,7 @@ function isNoiseLine(line) {
   if (value.includes("post is shared to fediverse")) return true;
   if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
   if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
+  if (/^(like|reply|repost|share)$/i.test(value)) return true;
   if (/^(likes?|replies|reply|reposts?|shares?|views?)$/i.test(value)) return true;
   if (/^(like|reply|repost|share)\s*\d/i.test(value)) return true;
   return false;
@@ -184,6 +207,29 @@ assert.equal(
     null,
   ),
   "in survival mode so long that i can’t remember half my life lol",
+);
+
+assert.equal(
+  extractPostBodyTextFromInnerText(
+    [
+      "kennad0ll",
+      "22h",
+      "stay in the gym and eat well. don’t let yourself go. life is a long journey & your body is the vehicle.",
+      "Share",
+      "259",
+      "3",
+      "31",
+      "Top",
+    ].join("\n"),
+    "kennad0ll",
+    null,
+  ),
+  "stay in the gym and eat well. don’t let yourself go. life is a long journey & your body is the vehicle.",
+);
+
+assert.deepEqual(
+  extractCompactNumberTokens("kennad0ll 22h stay in the gym 259 3 31 Share"),
+  [259, 3, 31],
 );
 
 console.log("mobile save extractor fixtures passed");
