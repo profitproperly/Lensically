@@ -46,6 +46,19 @@
     return /^(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:,?\s*(?:at\s*)?\d{1,2}:\d{2}\s*(?:am|pm)?)?$/i.test(value);
   }
 
+  function isLensicallyInjectedLabelLine(line) {
+    const value = clean(line).toLowerCase();
+    if (!value) return false;
+    return /^(?:\d+(?:[.,]\d+)?\s*[kmb]?|\+)\+?\s+likes?$/.test(value);
+  }
+
+  function getTextWithoutLensicallyLabels(el) {
+    if (!el) return "";
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll(".lensically-like-label").forEach((node) => node.remove());
+    return clean(clone.innerText || clone.textContent);
+  }
+
   function findControlTextMetric(postEl, selector, labels) {
     const controls = Array.from(postEl.querySelectorAll(selector));
     for (const control of controls) {
@@ -112,6 +125,7 @@
     if (/^\d+\s*\/\s*\d+$/.test(value)) return true;
     if (/^\/\s*\d+$/.test(value)) return true;
     if (isDateMetadataLine(line)) return true;
+    if (isLensicallyInjectedLabelLine(line)) return true;
     if (value.includes("post is shared to fediverse")) return true;
     if (/^\d+\s*(s|m|h|d|w|mo|y)$/.test(value)) return true;
     if (/^\d+(?:[.,]\d+)?\s*[kmb]?$/.test(value)) return true;
@@ -158,6 +172,7 @@
     if (value === "top" || value.startsWith("top ")) return true;
     if (value === "view activity" || value.startsWith("view activity")) return true;
     if (hasBodyText && isDateMetadataLine(line)) return true;
+    if (isLensicallyInjectedLabelLine(line)) return hasBodyText;
     if (value === "more" || value === "follow") return hasBodyText;
     if (/^(like|reply|repost|share)$/.test(value)) return hasBodyText;
     if (/^(likes?|replies|reply|reposts?|shares?|views?)$/.test(value)) return hasBodyText;
@@ -170,7 +185,7 @@
     const normalizedHandle = clean(authorHandle).toLowerCase().replace(/^@/, "");
     const normalizedName = clean(authorDisplayName).toLowerCase();
     const bodyLines = [];
-    const rawLines = clean(postEl.innerText).split("\n").map(clean).filter(Boolean);
+    const rawLines = getTextWithoutLensicallyLabels(postEl).split("\n").map(clean).filter(Boolean);
 
     for (const rawLine of rawLines) {
       let line = rawLine;
@@ -262,7 +277,7 @@
     const currentPostMatch = location.href.match(/\/post\/([^/?#]+)/i);
     const currentPostId = currentPostMatch ? currentPostMatch[1] : "";
     const candidates = Array.from(document.querySelectorAll("article, [role='article']"))
-      .filter((el) => el instanceof HTMLElement && clean(el.innerText).length > 20);
+      .filter((el) => el instanceof HTMLElement && getTextWithoutLensicallyLabels(el).length > 20);
 
     if (currentPostId) {
       const matched = candidates.find((candidate) => (
@@ -317,7 +332,8 @@
     const hintedText = Array.from(postEl.querySelectorAll("[aria-label], [title]"))
       .map((node) => `${node.getAttribute("aria-label") || ""}\n${node.getAttribute("title") || ""}`)
       .join("\n");
-    const pageText = `${hintedText}\n${clean(postEl.innerText)}\n${clean(document.body.innerText)}`;
+    const strippedPostText = getTextWithoutLensicallyLabels(postEl);
+    const pageText = `${hintedText}\n${strippedPostText}\n${clean(document.body.innerText)}`;
 
     const actionRowMetrics = extractActionRowMetrics(postEl);
     metrics.likes = actionRowMetrics.likes ?? metrics.likes;
@@ -331,7 +347,7 @@
     metrics.shares = parseMetricText(pageText, "share") ?? metrics.shares;
     metrics.views = parseMetricText(pageText, "view");
 
-    const lines = clean(postEl.innerText).split("\n").map(clean).filter(Boolean);
+    const lines = strippedPostText.split("\n").map(clean).filter(Boolean);
     const bodyLines = clean(document.body.innerText).split("\n").map(clean).filter(Boolean);
     const scopedLines = [];
     for (const line of lines) {
@@ -451,7 +467,8 @@
     const domBodyLineCount = domBodyText ? domBodyText.split("\n").filter(Boolean).length : 0;
     const structuredText = jsonLd?.text && !isProbablyTruncatedText(jsonLd.text) ? jsonLd.text : "";
     const descriptionText = metaDescription && !isProbablyTruncatedText(metaDescription) ? metaDescription : "";
-    const rawText = structuredText || (domBodyLineCount > 1 ? domBodyText : descriptionText || domBodyText || clean(postEl.innerText));
+    const strippedPostText = getTextWithoutLensicallyLabels(postEl);
+    const rawText = structuredText || (domBodyLineCount > 1 ? domBodyText : descriptionText || domBodyText || strippedPostText);
     const postText = cleanPostText(rawText, authorHandle, authorDisplayName);
     const postIdMatch = location.href.match(/\/post\/([^/?#]+)/i);
     const domMetrics = extractMetricsFromDom(postEl);
@@ -480,7 +497,7 @@
         mode: "ios_safari_single_post",
         extractor_version: SCRIPT_VERSION,
         metric_debug: {
-          article_lines: clean(postEl.innerText).split("\n").map(clean).filter(Boolean).slice(0, 40),
+          article_lines: getTextWithoutLensicallyLabels(postEl).split("\n").map(clean).filter(Boolean).slice(0, 40),
           body_lines: clean(document.body.innerText).split("\n").map(clean).filter(Boolean).slice(0, 60),
           aria_samples: Array.from(postEl.querySelectorAll("[aria-label], [title]"))
             .map((node) => clean(node.getAttribute("aria-label") || node.getAttribute("title")))
