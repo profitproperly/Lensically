@@ -67,6 +67,7 @@ interface Env {
   THREADS_CLIENT_ID: string;
   THREADS_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
+  LENSICALLY_GPT_API_KEY?: string;
   APP_URL?: string;
   ROOT_SITE_URL?: string;
   WORKER_ORIGIN?: string;
@@ -111,6 +112,39 @@ type AgentAccountControl = ConfiguredThreadsAccountProfile & {
   agent_updated_at: string | null;
   agent_schedule_slots: string[];
   agent_content_brief: string | null;
+};
+
+type GptBrandKey = "manifest_mental" | "vectrix" | "opmg_deadman";
+
+type GptStrategyMemoryKind =
+  | "winner"
+  | "loser"
+  | "hook"
+  | "pillar"
+  | "voice_rule"
+  | "experiment"
+  | "scheduled_batch"
+  | "result_note"
+  | "rule_proposal"
+  | "approved_rule";
+
+type GptStrategyMemoryRow = {
+  id: number | string;
+  account_id: string;
+  threads_user_id: string;
+  kind: string;
+  title: string | null;
+  body: string;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type GptResolvedBrand = {
+  brand_key: GptBrandKey;
+  account_id: string;
+  configured_account: ResolvedConfiguredThreadsAccount;
+  profile: ConfiguredThreadsAccountProfile;
 };
 
 const VECTRIX_AGENT_SCHEDULE_SLOTS = Array.from(
@@ -175,6 +209,25 @@ const CONFIGURED_THREADS_ACCOUNTS: ConfiguredThreadsAccount[] = [
     tokenEnv: "THREADS_TOKEN_DEADMAN",
   },
 ];
+
+const GPT_BRAND_ACCOUNT_ALIASES: Record<GptBrandKey, string> = {
+  manifest_mental: "manifest-mental",
+  vectrix: "vectrix",
+  opmg_deadman: "deadman",
+};
+
+const GPT_STRATEGY_MEMORY_KINDS = new Set<string>([
+  "winner",
+  "loser",
+  "hook",
+  "pillar",
+  "voice_rule",
+  "experiment",
+  "scheduled_batch",
+  "result_note",
+  "rule_proposal",
+  "approved_rule",
+]);
 
 const DEFAULT_PATTERNS_ACCOUNT_ID = "manifest-mental";
 
@@ -1368,6 +1421,75 @@ function safeParseJsonString(value: string): unknown | null {
 function isInternalRequestAuthorized(request: Request, env: Env): boolean {
   const internalKey = request.headers.get("x-internal-key")?.trim();
   return Boolean(internalKey && env.INTERNAL_API_KEY && internalKey === env.INTERNAL_API_KEY);
+}
+
+function getBearerToken(request: Request): string | null {
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || null;
+}
+
+function isGptRequestAuthorized(request: Request, env: Env): boolean {
+  const configuredKey = env.LENSICALLY_GPT_API_KEY?.trim() || "";
+  const providedKey = getBearerToken(request);
+  return Boolean(configuredKey && providedKey && providedKey === configuredKey);
+}
+
+function unauthorizedGptResponse(): Response {
+  return new Response(
+    JSON.stringify({ success: false, error: "Unauthorized" }),
+    { status: 401, headers: { "content-type": "application/json; charset=UTF-8" } },
+  );
+}
+
+function normalizeGptBrandKey(value: unknown): GptBrandKey | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "manifest_mental" || normalized === "vectrix" || normalized === "opmg_deadman") {
+    return normalized;
+  }
+  if (normalized === "deadman" || normalized === "opmgdeadman" || normalized === "opmg") {
+    return "opmg_deadman";
+  }
+  if (normalized === "manifestmental") {
+    return "manifest_mental";
+  }
+  if (normalized === "vectrixvoltmore") {
+    return "vectrix";
+  }
+  return null;
+}
+
+function gptBrandKeyForAccountId(accountId: string): GptBrandKey | null {
+  for (const [brandKey, configuredAccountId] of Object.entries(GPT_BRAND_ACCOUNT_ALIASES)) {
+    if (configuredAccountId === accountId) {
+      return brandKey as GptBrandKey;
+    }
+  }
+  return null;
+}
+
+async function resolveGptBrand(env: Env, rawBrandKey: unknown): Promise<GptResolvedBrand | null> {
+  const brandKey = normalizeGptBrandKey(rawBrandKey);
+  if (!brandKey) {
+    return null;
+  }
+
+  const accountId = GPT_BRAND_ACCOUNT_ALIASES[brandKey];
+  const configuredAccount = await getConfiguredThreadsAccountById(env, accountId);
+  if (!configuredAccount) {
+    return null;
+  }
+
+  const profile = await fetchConfiguredThreadsProfile(env, configuredAccount, 0);
+  return {
+    brand_key: brandKey,
+    account_id: accountId,
+    configured_account: configuredAccount,
+    profile,
+  };
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -3730,6 +3852,383 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_external_patterns_user_account_source
      ON external_patterns (app_user_id, account_id, source_url)`,
   ).run();
+}
+
+async function ensureGptStrategyMemoryTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS gpt_strategy_memory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      title TEXT,
+      body TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_strategy_memory_account_kind_updated
+     ON gpt_strategy_memory (account_id, kind, updated_at DESC, id DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_strategy_memory_threads_updated
+     ON gpt_strategy_memory (threads_user_id, updated_at DESC, id DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_gpt_strategy_memory_touch_updated_at
+     AFTER UPDATE ON gpt_strategy_memory
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE gpt_strategy_memory
+       SET updated_at = CURRENT_TIMESTAMP
+       WHERE id = NEW.id;
+     END`,
+  ).run();
+}
+
+function normalizeGptStrategyMemoryKind(value: unknown): GptStrategyMemoryKind | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  return GPT_STRATEGY_MEMORY_KINDS.has(normalized)
+    ? normalized as GptStrategyMemoryKind
+    : null;
+}
+
+function normalizeGptMemoryText(value: unknown, maxLength: number, allowEmpty = false): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!allowEmpty && !trimmed) {
+    return null;
+  }
+  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function normalizeGptMemoryMetadata(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized.length > 20000 ? serialized.slice(0, 20000) : serialized;
+  } catch {
+    return null;
+  }
+}
+
+function serializeGptStrategyMemoryRow(row: GptStrategyMemoryRow): {
+  id: number;
+  account_id: string;
+  threads_user_id: string;
+  kind: string;
+  title: string | null;
+  body: string;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    id: Number(row.id),
+    account_id: row.account_id,
+    threads_user_id: row.threads_user_id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    metadata: row.metadata_json ? safeParseJsonString(row.metadata_json) ?? null : null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function listGptStrategyMemory(
+  env: Env,
+  accountId: string,
+  kinds: string[],
+  limit: number,
+): Promise<ReturnType<typeof serializeGptStrategyMemoryRow>[]> {
+  await ensureGptStrategyMemoryTable(env);
+
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const normalizedKinds = kinds
+    .map((kind) => normalizeGptStrategyMemoryKind(kind))
+    .filter((kind): kind is GptStrategyMemoryKind => Boolean(kind));
+  const kindClause = normalizedKinds.length
+    ? `AND kind IN (${normalizedKinds.map(() => "?").join(", ")})`
+    : "";
+  const rows = await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, kind, title, body, metadata_json, created_at, updated_at
+     FROM gpt_strategy_memory
+     WHERE account_id = ?
+       ${kindClause}
+     ORDER BY datetime(updated_at) DESC, id DESC
+     LIMIT ?`,
+  )
+    .bind(accountId, ...normalizedKinds, normalizedLimit)
+    .all<GptStrategyMemoryRow>();
+
+  return (rows.results ?? []).map(serializeGptStrategyMemoryRow);
+}
+
+async function saveGptStrategyMemory(
+  env: Env,
+  input: {
+    accountId: string;
+    threadsUserId: string;
+    kind: GptStrategyMemoryKind;
+    title: string | null;
+    body: string;
+    metadataJson: string | null;
+  },
+): Promise<ReturnType<typeof serializeGptStrategyMemoryRow> | null> {
+  await ensureGptStrategyMemoryTable(env);
+  const insert = await env.DB.prepare(
+    `INSERT INTO gpt_strategy_memory (
+      account_id,
+      threads_user_id,
+      kind,
+      title,
+      body,
+      metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      input.accountId,
+      input.threadsUserId,
+      input.kind,
+      input.title,
+      input.body,
+      input.metadataJson,
+    )
+    .run();
+
+  const insertedId = Number(insert.meta?.last_row_id ?? 0);
+  if (!insertedId) {
+    return null;
+  }
+
+  const row = await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, kind, title, body, metadata_json, created_at, updated_at
+     FROM gpt_strategy_memory
+     WHERE id = ?
+     LIMIT 1`,
+  )
+    .bind(insertedId)
+    .first<GptStrategyMemoryRow>();
+
+  return row ? serializeGptStrategyMemoryRow(row) : null;
+}
+
+function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
+  return {
+    openapi: "3.1.0",
+    info: {
+      title: "Lensically GPT Actions",
+      version: "1.0.0",
+      description: "Manual Custom GPT actions for Lensically Threads account context, memory, and scheduling.",
+    },
+    servers: [{ url: workerOrigin }],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+        },
+      },
+      schemas: {
+        BrandKey: {
+          type: "string",
+          enum: ["opmg_deadman", "manifest_mental", "vectrix"],
+        },
+      },
+    },
+    security: [{ bearerAuth: [] }],
+    paths: {
+      "/api/gpt/accounts": {
+        get: {
+          operationId: "listAccounts",
+          summary: "List Lensically Threads brand accounts available to this GPT.",
+          responses: { "200": { description: "Accounts" } },
+        },
+      },
+      "/api/gpt/context": {
+        get: {
+          operationId: "getBrandContext",
+          summary: "Get account context, recent/top/weak posts, schedule slots, scheduled posts, presets, patterns, and memory.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
+            { name: "timezone", in: "query", required: false, schema: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE } },
+          ],
+          responses: { "200": { description: "Brand context" } },
+        },
+      },
+      "/api/gpt/posts/recent": {
+        get: {
+          operationId: "listRecentPosts",
+          summary: "List recent or top archived posts for a brand.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "order", in: "query", required: false, schema: { type: "string", enum: ["recent", "top"], default: "recent" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
+          ],
+          responses: { "200": { description: "Posts" } },
+        },
+      },
+      "/api/gpt/scheduled": {
+        get: {
+          operationId: "listScheduledPosts",
+          summary: "List upcoming scheduled posts for a brand.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+          ],
+          responses: { "200": { description: "Scheduled posts" } },
+        },
+      },
+      "/api/gpt/schedule": {
+        post: {
+          operationId: "schedulePost",
+          summary: "Schedule one Threads post for a brand.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "text", "date", "time"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    text: { type: "string" },
+                    date: { type: "string", format: "date" },
+                    time: { type: "string", description: "HH:MM local time" },
+                    timezone: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE },
+                    spoiler_all_text: { type: "boolean" },
+                    spoiler_phrases: { type: "array", items: { type: "string" } },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Scheduled post" } },
+        },
+      },
+      "/api/gpt/schedule/batch": {
+        post: {
+          operationId: "scheduleBatchPosts",
+          summary: "Schedule a batch of Threads posts for a brand.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "date", "entries"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    date: { type: "string", format: "date" },
+                    timezone: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE },
+                    entries: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        required: ["text", "time"],
+                        properties: {
+                          text: { type: "string" },
+                          time: { type: "string", description: "HH:MM local time" },
+                          date: { type: "string", format: "date" },
+                          spoiler_all_text: { type: "boolean" },
+                          spoiler_phrases: { type: "array", items: { type: "string" } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Batch scheduling results" } },
+        },
+      },
+      "/api/gpt/batch-presets": {
+        get: {
+          operationId: "listBatchPresets",
+          summary: "List account-scoped batch schedule presets.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+          ],
+          responses: { "200": { description: "Batch presets" } },
+        },
+        post: {
+          operationId: "saveBatchPreset",
+          summary: "Save an account-scoped batch schedule preset.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "name", "times"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    name: { type: "string" },
+                    times: { type: "array", items: { type: "string" } },
+                    is_favorite: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved preset" } },
+        },
+      },
+      "/api/gpt/strategy-memory": {
+        get: {
+          operationId: "listStrategyMemory",
+          summary: "List persistent strategy memory for a brand.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "kind", in: "query", required: false, schema: { type: "string" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
+          ],
+          responses: { "200": { description: "Strategy memory" } },
+        },
+        post: {
+          operationId: "saveStrategyMemory",
+          summary: "Save persistent strategy memory for a brand.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "kind", "body"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    kind: {
+                      type: "string",
+                      enum: Array.from(GPT_STRATEGY_MEMORY_KINDS),
+                    },
+                    title: { type: "string" },
+                    body: { type: "string" },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved memory" } },
+        },
+      },
+    },
+  };
 }
 
 function normalizePatternString(
@@ -6335,6 +6834,448 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }, "error");
         return notFoundJsonResponse(requestCorsHeaders);
       }
+    }
+
+    if (normalizedPath === "/api/gpt/openapi.json" && request.method === "GET") {
+      return new Response(
+        JSON.stringify(buildGptOpenApiSchema(getConfiguredWorkerOrigin(env))),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
+    if (normalizedPath.startsWith("/api/gpt/")) {
+      if (!isGptRequestAuthorized(request, env)) {
+        return unauthorizedGptResponse();
+      }
+
+      if (normalizedPath === "/api/gpt/accounts" && request.method === "GET") {
+        const profiles = await getConfiguredThreadsProfiles(env);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            accounts: profiles.map((profile) => ({
+              brand_key: gptBrandKeyForAccountId(profile.account_id),
+              account_id: profile.account_id,
+              label: profile.label,
+              username: profile.username,
+              name: profile.name,
+              threads_user_id: profile.threads_user_id,
+              is_active: profile.is_active,
+              threads_biography: profile.threads_biography,
+            })),
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      if (normalizedPath === "/api/gpt/context" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }),
+            { status: 404, headers: { "content-type": "application/json; charset=UTF-8" } },
+          );
+        }
+
+        const requestedTimeZone = url.searchParams.get("timezone")?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
+        const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
+        const requestedDate = url.searchParams.get("date")?.trim() || null;
+        const targetDate = requestedDate && isValidIsoDate(requestedDate)
+          ? requestedDate
+          : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? getLocalDateInTimeZone(timeZone) ?? new Date().toISOString().slice(0, 10);
+
+        const [batchPresets, recentArchive, topArchive, scheduledPostsForDate, upcomingScheduledPosts, savedPatterns, strategyMemory] = await Promise.all([
+          listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id),
+          listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", 48, 0),
+          listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", 48, 0),
+          listScheduledPostsForThreadsAccountOnLocalDate(
+            env,
+            brand.profile.threads_user_id,
+            targetDate,
+            timeZone,
+          ),
+          listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100),
+          listSavedPatternsForHermes(env, brand.profile.threads_user_id, 48),
+          listGptStrategyMemory(env, brand.account_id, [], 60),
+        ]);
+
+        const selectedBatchPreset = pickPreferredBatchSchedulePreset(batchPresets);
+        const agentControls = await listAgentAccountControls(env);
+        const agentControl = agentControls.find((control) => control.account_id === brand.account_id) ?? null;
+        const desiredSlots = agentControl?.agent_schedule_slots?.length
+          ? agentControl.agent_schedule_slots
+          : selectedBatchPreset?.times?.length
+          ? selectedBatchPreset.times
+          : buildHourlySlotTimes(7, 23);
+        const occupiedSlots = new Set(
+          scheduledPostsForDate
+            .map((post) => post.local_time)
+            .filter((slot) => Boolean(slot)),
+        );
+        const weakPosts = recentArchive.posts
+          .filter((post) => Number(post.engagement_total ?? 0) <= 1 && Number(post.likes ?? 0) <= 1)
+          .slice(0, 12);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            brand_key: brand.brand_key,
+            account: {
+              account_id: brand.account_id,
+              label: brand.profile.label,
+              username: brand.profile.username,
+              name: brand.profile.name,
+              threads_user_id: brand.profile.threads_user_id,
+              threads_biography: brand.profile.threads_biography,
+            },
+            date: targetDate,
+            timezone: timeZone,
+            desired_slots: desiredSlots,
+            occupied_slots: Array.from(occupiedSlots),
+            missing_slots: desiredSlots.filter((slot) => !occupiedSlots.has(slot)),
+            batch_preset: selectedBatchPreset,
+            scheduled_posts_for_date: scheduledPostsForDate,
+            upcoming_scheduled_posts: upcomingScheduledPosts,
+            archive_summary: {
+              total_posts: recentArchive.totalCount,
+              recent_sample_count: recentArchive.posts.length,
+              top_sample_count: topArchive.posts.length,
+              weak_sample_count: weakPosts.length,
+            },
+            archive_recent: recentArchive.posts,
+            archive_top: topArchive.posts,
+            archive_weak: weakPosts,
+            saved_patterns: savedPatterns,
+            strategy_memory: strategyMemory,
+            operating_rules: [
+              "Use proven hook structures when they fit, but do not copy exact wording.",
+              "Avoid repeating recent or already scheduled post angles.",
+              "Prefer proven patterns unless fatigue risk is visible.",
+              "Use novelty deliberately when the recent batch overuses the same hook, style, or pillar.",
+              "Suggest rule changes when data supports them; save approved changes as approved_rule memory.",
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
+
+      if (normalizedPath === "/api/gpt/posts/recent" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const requestedOrder = url.searchParams.get("order")?.trim().toLowerCase();
+        const order = requestedOrder === "top" ? "top" : "recent";
+        const rawLimit = Number(url.searchParams.get("limit") ?? "50");
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 50;
+        const archive = await listArchivedThreadsPosts(env, brand.profile.threads_user_id, order, limit, 0);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          threads_user_id: brand.profile.threads_user_id,
+          order,
+          posts: archive.posts,
+          total_count: archive.totalCount,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/scheduled" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const scheduledPosts = await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          threads_user_id: brand.profile.threads_user_id,
+          scheduled_posts: scheduledPosts,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/schedule" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const text = normalizeGptMemoryText(payload.text, 20000);
+        const date = normalizeGptMemoryText(payload.date, 20);
+        const time = normalizeGptMemoryText(payload.time, 20);
+        const requestedTimeZone = normalizeGptMemoryText(payload.timezone, 100) ?? WORKSPACE_DEFAULT_TIMEZONE;
+        const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
+        const spoilerAllText = normalizeSpoilerFlag(payload.spoiler_all_text);
+        const spoilerPhrases = normalizeSpoilerPhrasesInput(payload.spoiler_phrases);
+        if (!brand || !text || !date || !time) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key, text, date, and time are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const scheduled = await createScheduledPostForAppUser(
+          env,
+          WORKSPACE_APP_USER_ID,
+          brand.profile.threads_user_id,
+          text,
+          date,
+          time,
+          timeZone,
+          spoilerAllText,
+          spoilerPhrases,
+        );
+        if (!scheduled.success) {
+          return new Response(JSON.stringify({ success: false, error: scheduled.error ?? "schedule_failed" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          threads_user_id: brand.profile.threads_user_id,
+          scheduled_post: {
+            id: scheduled.scheduledPostId ?? null,
+            status: SCHEDULED_POST_STATUS_APPROVED,
+            scheduled_time_utc: scheduled.scheduledTimeUtc ?? null,
+            reused: scheduled.reused === true,
+            spoiler_all_text: spoilerAllText,
+            spoiler_phrases: spoilerPhrases,
+          },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/schedule/batch" && request.method === "POST") {
+        let payload: { brand_key?: unknown; timezone?: unknown; date?: unknown; entries?: unknown };
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const sharedDate = normalizeGptMemoryText(payload.date, 20);
+        const requestedTimeZone = normalizeGptMemoryText(payload.timezone, 100) ?? WORKSPACE_DEFAULT_TIMEZONE;
+        const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
+        const entries = Array.isArray(payload.entries) ? payload.entries : [];
+        if (!brand || !sharedDate || entries.length === 0 || entries.length > MAX_SCHEDULED_POST_MAX_BATCH_SIZE) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key, date, and a non-empty entries array are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const results = [];
+        for (let index = 0; index < entries.length; index += 1) {
+          const entry = entries[index] as Record<string, unknown>;
+          const text = normalizeGptMemoryText(entry.text, 20000);
+          const time = normalizeGptMemoryText(entry.time, 20);
+          const date = normalizeGptMemoryText(entry.date, 20) ?? sharedDate;
+          if (!text || !time || !date) {
+            results.push({ row_number: index + 1, success: false, reused: false, scheduled_post_id: null, scheduled_time_utc: null, error: "missing_required_fields" });
+            continue;
+          }
+          const scheduled = await createScheduledPostForAppUser(
+            env,
+            WORKSPACE_APP_USER_ID,
+            brand.profile.threads_user_id,
+            text,
+            date,
+            time,
+            timeZone,
+            normalizeSpoilerFlag(entry.spoiler_all_text),
+            normalizeSpoilerPhrasesInput(entry.spoiler_phrases),
+          );
+          results.push({
+            row_number: index + 1,
+            success: scheduled.success,
+            reused: scheduled.reused === true,
+            scheduled_post_id: scheduled.scheduledPostId ?? null,
+            scheduled_time_utc: scheduled.scheduledTimeUtc ?? null,
+            error: scheduled.success ? null : scheduled.error ?? "schedule_failed",
+          });
+        }
+        await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind: "scheduled_batch",
+          title: `Scheduled batch for ${sharedDate}`,
+          body: `GPT scheduled ${results.filter((result) => result.success).length} of ${results.length} requested posts for ${brand.brand_key}.`,
+          metadataJson: normalizeGptMemoryMetadata({ date: sharedDate, timezone: timeZone, results }),
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          threads_user_id: brand.profile.threads_user_id,
+          results,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/batch-presets" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const presets = await listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id);
+        return new Response(JSON.stringify({ success: true, brand_key: brand.brand_key, presets }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/batch-presets" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const name = normalizeBatchSchedulePresetName(payload.name);
+        const times = normalizeBatchSchedulePresetTimes(payload.times);
+        if (!brand || !name || !times) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key, name, and valid times are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        await ensureWorkspaceUserRecord(env, {
+          id: WORKSPACE_APP_USER_ID,
+          email: "workspace@lensically.local",
+          timezone: WORKSPACE_DEFAULT_TIMEZONE,
+          clock_format: "12h",
+        });
+        await ensureBatchSchedulePresetsTable(env);
+        if (payload.is_favorite === true) {
+          await env.DB.prepare(
+            `UPDATE batch_schedule_presets
+             SET is_favorite = 0
+             WHERE user_id = ?
+               AND threads_user_id = ?`,
+          )
+            .bind(WORKSPACE_APP_USER_ID, brand.profile.threads_user_id)
+            .run();
+        }
+        const presetId = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO batch_schedule_presets (id, user_id, threads_user_id, name, times_json, is_favorite)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+          .bind(
+            presetId,
+            WORKSPACE_APP_USER_ID,
+            brand.profile.threads_user_id,
+            name,
+            JSON.stringify(times),
+            payload.is_favorite === true ? 1 : 0,
+          )
+          .run();
+        const presets = await listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          preset: presets.find((preset) => preset.id === presetId) ?? null,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/strategy-memory" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const rawKinds = url.searchParams.getAll("kind").flatMap((value) => value.split(","));
+        const rawLimit = Number(url.searchParams.get("limit") ?? "60");
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 60;
+        const memory = await listGptStrategyMemory(env, brand.account_id, rawKinds, limit);
+        return new Response(JSON.stringify({ success: true, brand_key: brand.brand_key, memory }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/strategy-memory" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const kind = normalizeGptStrategyMemoryKind(payload.kind);
+        const title = normalizeGptMemoryText(payload.title, 200, true);
+        const body = normalizeGptMemoryText(payload.body, 10000);
+        if (!brand || !kind || !body) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key, kind, and body are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const memory = await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind,
+          title,
+          body,
+          metadataJson: normalizeGptMemoryMetadata(payload.metadata),
+        });
+        return new Response(JSON.stringify({ success: true, brand_key: brand.brand_key, memory }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: false, error: "GPT route not found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
     }
 
     if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
