@@ -125,6 +125,7 @@ type GptStrategyMemoryKind =
   | "experiment"
   | "scheduled_batch"
   | "result_note"
+  | "rejection_feedback"
   | "rule_proposal"
   | "approved_rule";
 
@@ -250,6 +251,7 @@ const GPT_STRATEGY_MEMORY_KINDS = new Set<string>([
   "experiment",
   "scheduled_batch",
   "result_note",
+  "rejection_feedback",
   "rule_proposal",
   "approved_rule",
 ]);
