@@ -34,6 +34,11 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 - First priority is wiring Hermes to the data Lensically already has: post archive, top posts, saved patterns, scheduled posts, and selected Threads account context.
 - Hold off on heavy quality gates until the generation workflow is usable.
 
+## Custom GPT Growth Direction
+
+- Lensically Operator GPT should evolve from post generation into page-growth optimization. Add a GPT growth context action that exposes follower trend, net daily follower change, best/weak growth days, posts near growth windows, saved patterns, scheduled posts, and strategy memory.
+- Advanced loop: GPT tags each scheduled post with pillar/hook/style/experiment metadata, Lensically later compares those tags against follower growth and engagement, then GPT proposes rule changes with sample-size caution. Approved changes should persist as `approved_rule` strategy memory.
+
 ## Account Separation
 
 - Batch Schedule presets are account-specific, not user-global. Always pass `threads_user_id` when listing, saving, favoriting, deleting, or internally selecting batch presets.

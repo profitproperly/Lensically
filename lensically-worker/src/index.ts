@@ -140,6 +140,31 @@ type GptStrategyMemoryRow = {
   updated_at: string;
 };
 
+type GptPostStrategyInput = {
+  pillar: string | null;
+  hook_style: string | null;
+  format: string | null;
+  intent: string | null;
+  experiment: string | null;
+  novelty_level: string | null;
+  metadata_json: string | null;
+};
+
+type GptPostStrategyTagRow = {
+  scheduled_post_id: number | string;
+  account_id: string;
+  threads_user_id: string;
+  pillar: string | null;
+  hook_style: string | null;
+  format: string | null;
+  intent: string | null;
+  experiment: string | null;
+  novelty_level: string | null;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type GptResolvedBrand = {
   brand_key: GptBrandKey;
   account_id: string;
@@ -4027,6 +4052,377 @@ async function saveGptStrategyMemory(
   return row ? serializeGptStrategyMemoryRow(row) : null;
 }
 
+async function ensureGptPostStrategyTagsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS gpt_post_strategy_tags (
+      scheduled_post_id INTEGER PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      pillar TEXT,
+      hook_style TEXT,
+      format TEXT,
+      intent TEXT,
+      experiment TEXT,
+      novelty_level TEXT,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (scheduled_post_id) REFERENCES scheduled_posts(id) ON DELETE CASCADE
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_post_strategy_tags_account_updated
+     ON gpt_post_strategy_tags (account_id, updated_at DESC, scheduled_post_id DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_post_strategy_tags_threads
+     ON gpt_post_strategy_tags (threads_user_id, pillar, hook_style, format, intent)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_gpt_post_strategy_tags_touch_updated_at
+     AFTER UPDATE ON gpt_post_strategy_tags
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE gpt_post_strategy_tags
+       SET updated_at = CURRENT_TIMESTAMP
+       WHERE scheduled_post_id = NEW.scheduled_post_id;
+     END`,
+  ).run();
+}
+
+function normalizeGptStrategyToken(value: unknown, maxLength = 100): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_ -]+/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/-+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!normalized) {
+    return null;
+  }
+  return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+}
+
+function normalizeGptPostStrategyInput(value: unknown): GptPostStrategyInput | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const strategy = {
+    pillar: normalizeGptStrategyToken(record.pillar),
+    hook_style: normalizeGptStrategyToken(record.hook_style),
+    format: normalizeGptStrategyToken(record.format),
+    intent: normalizeGptStrategyToken(record.intent),
+    experiment: normalizeGptStrategyToken(record.experiment),
+    novelty_level: normalizeGptStrategyToken(record.novelty_level),
+    metadata_json: normalizeGptMemoryMetadata(record.metadata),
+  };
+  return Object.values(strategy).some((entry) => entry !== null) ? strategy : null;
+}
+
+function serializeGptPostStrategyTag(row: GptPostStrategyTagRow): {
+  scheduled_post_id: number;
+  account_id: string;
+  threads_user_id: string;
+  pillar: string | null;
+  hook_style: string | null;
+  format: string | null;
+  intent: string | null;
+  experiment: string | null;
+  novelty_level: string | null;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    scheduled_post_id: Number(row.scheduled_post_id),
+    account_id: row.account_id,
+    threads_user_id: row.threads_user_id,
+    pillar: row.pillar,
+    hook_style: row.hook_style,
+    format: row.format,
+    intent: row.intent,
+    experiment: row.experiment,
+    novelty_level: row.novelty_level,
+    metadata: row.metadata_json ? safeParseJsonString(row.metadata_json) ?? null : null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function upsertGptPostStrategyTag(
+  env: Env,
+  input: {
+    scheduledPostId: number;
+    accountId: string;
+    threadsUserId: string;
+    strategy: GptPostStrategyInput | null;
+  },
+): Promise<void> {
+  if (!input.strategy || !Number.isInteger(input.scheduledPostId) || input.scheduledPostId <= 0) {
+    return;
+  }
+  await ensureGptPostStrategyTagsTable(env);
+  await env.DB.prepare(
+    `INSERT INTO gpt_post_strategy_tags (
+      scheduled_post_id,
+      account_id,
+      threads_user_id,
+      pillar,
+      hook_style,
+      format,
+      intent,
+      experiment,
+      novelty_level,
+      metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(scheduled_post_id) DO UPDATE SET
+      account_id = excluded.account_id,
+      threads_user_id = excluded.threads_user_id,
+      pillar = excluded.pillar,
+      hook_style = excluded.hook_style,
+      format = excluded.format,
+      intent = excluded.intent,
+      experiment = excluded.experiment,
+      novelty_level = excluded.novelty_level,
+      metadata_json = excluded.metadata_json`,
+  )
+    .bind(
+      input.scheduledPostId,
+      input.accountId,
+      input.threadsUserId,
+      input.strategy.pillar,
+      input.strategy.hook_style,
+      input.strategy.format,
+      input.strategy.intent,
+      input.strategy.experiment,
+      input.strategy.novelty_level,
+      input.strategy.metadata_json,
+    )
+    .run();
+}
+
+async function listGptPostStrategyTagsForScheduledPosts(
+  env: Env,
+  scheduledPostIds: number[],
+): Promise<Map<number, ReturnType<typeof serializeGptPostStrategyTag>>> {
+  const normalizedIds = Array.from(new Set(scheduledPostIds.filter((id) => Number.isInteger(id) && id > 0)));
+  const result = new Map<number, ReturnType<typeof serializeGptPostStrategyTag>>();
+  if (!normalizedIds.length || !(await doesTableExist(env, "gpt_post_strategy_tags"))) {
+    return result;
+  }
+  const placeholders = normalizedIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT scheduled_post_id, account_id, threads_user_id, pillar, hook_style, format, intent,
+            experiment, novelty_level, metadata_json, created_at, updated_at
+     FROM gpt_post_strategy_tags
+     WHERE scheduled_post_id IN (${placeholders})`,
+  )
+    .bind(...normalizedIds)
+    .all<GptPostStrategyTagRow>();
+  for (const row of rows.results ?? []) {
+    const serialized = serializeGptPostStrategyTag(row);
+    result.set(serialized.scheduled_post_id, serialized);
+  }
+  return result;
+}
+
+function calculateMedian(values: number[]): number {
+  const sorted = values.filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
+  if (!sorted.length) {
+    return 0;
+  }
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+function calculatePercentile(values: number[], percentile: number): number {
+  const sorted = values.filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
+  if (!sorted.length) {
+    return 0;
+  }
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((percentile / 100) * sorted.length) - 1));
+  return sorted[index];
+}
+
+function summarizeTagUsage(
+  tags: Array<ReturnType<typeof serializeGptPostStrategyTag>>,
+  field: "pillar" | "hook_style" | "format" | "intent" | "experiment" | "novelty_level",
+): Array<{ key: string; used: number; fatigue_risk: "low" | "medium" | "high" }> {
+  const counts = new Map<string, number>();
+  for (const tag of tags) {
+    const key = tag[field];
+    if (!key) {
+      continue;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([key, used]) => ({
+      key,
+      used,
+      fatigue_risk: used >= 5 ? "high" : used >= 3 ? "medium" : "low",
+    }));
+}
+
+async function buildGptGrowthContext(
+  env: Env,
+  brand: GptResolvedBrand,
+  days: number,
+): Promise<Record<string, unknown>> {
+  const normalizedDays = Math.min(Math.max(Math.trunc(days), 7), 90);
+  const account: ThreadsAccount = {
+    threads_user_id: brand.profile.threads_user_id,
+    access_token: brand.configured_account.accessToken,
+  };
+  const currentFollowers = await refreshCurrentThreadsFollowerSnapshot(env, account, THREADS_INSIGHTS_TIME_ZONE);
+  const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, normalizedDays);
+  const dailyGrowth = followerSnapshots.map((snapshot, index) => {
+    const previous = index > 0 ? followerSnapshots[index - 1] : null;
+    const netChange = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
+      ? snapshot.followers_count - snapshot.baseline_followers_count
+      : (previous ? snapshot.followers_count - previous.followers_count : 0);
+    return {
+      date: snapshot.snapshot_date,
+      start_of_day_followers: snapshot.baseline_followers_count ?? previous?.followers_count ?? snapshot.followers_count,
+      latest_followers: snapshot.followers_count,
+      net_change: netChange,
+      captured_at: snapshot.captured_at,
+    };
+  });
+
+  const archiveLimit = Math.min(Math.max(normalizedDays * 8, 80), 500);
+  const [recentArchive, topArchive, scheduledPosts, strategyMemory] = await Promise.all([
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", archiveLimit, 0),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", 80, 0),
+    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100),
+    listGptStrategyMemory(env, brand.account_id, ["approved_rule", "rule_proposal", "experiment", "result_note", "scheduled_batch"], 80),
+  ]);
+
+  const scheduledTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+  const scheduledPostsWithTags = scheduledPosts.map((post) => ({
+    ...post,
+    strategy: scheduledTagMap.get(post.id) ?? null,
+  }));
+  const scheduledTags = Array.from(scheduledTagMap.values());
+
+  const postsByDate = new Map<string, CachedThreadsPost[]>();
+  for (const post of recentArchive.posts) {
+    const localDate = getPostLocalDate(post, THREADS_INSIGHTS_TIME_ZONE);
+    if (!localDate) {
+      continue;
+    }
+    const posts = postsByDate.get(localDate) ?? [];
+    posts.push(post);
+    postsByDate.set(localDate, posts);
+  }
+
+  const growthWindows = dailyGrowth.map((day) => {
+    const posts = postsByDate.get(day.date) ?? [];
+    const previousDate = addDaysToIsoDate(day.date, -1);
+    const adjacentPosts = previousDate ? postsByDate.get(previousDate) ?? [] : [];
+    const candidatePosts = [...posts, ...adjacentPosts]
+      .sort((left, right) => right.engagement_total - left.engagement_total || right.likes - left.likes)
+      .slice(0, 12);
+    return {
+      date: day.date,
+      net_followers: day.net_change,
+      posts_published: posts.length,
+      posts: candidatePosts,
+      likely_drivers: candidatePosts.slice(0, 5),
+    };
+  });
+
+  const bestGrowthDays = [...growthWindows]
+    .sort((left, right) => right.net_followers - left.net_followers || left.date.localeCompare(right.date))
+    .slice(0, 7);
+  const weakGrowthDays = [...growthWindows]
+    .sort((left, right) => left.net_followers - right.net_followers || left.date.localeCompare(right.date))
+    .slice(0, 7);
+
+  const recentPostsForFloor = recentArchive.posts.slice(0, 50);
+  const likes = recentPostsForFloor.map((post) => post.likes);
+  const views = recentPostsForFloor.map((post) => post.views);
+  const engagementTotals = recentPostsForFloor.map((post) => post.engagement_total);
+  const netChanges = dailyGrowth.map((day) => day.net_change);
+  const netChangePeriod = dailyGrowth.length >= 2
+    ? dailyGrowth[dailyGrowth.length - 1].latest_followers - dailyGrowth[0].latest_followers
+    : netChanges.reduce((sum, value) => sum + value, 0);
+  const averageDailyGrowth = netChanges.length
+    ? netChanges.reduce((sum, value) => sum + value, 0) / netChanges.length
+    : 0;
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    account: {
+      account_id: brand.account_id,
+      label: brand.profile.label,
+      username: brand.profile.username,
+      name: brand.profile.name,
+      threads_user_id: brand.profile.threads_user_id,
+      followers_current: currentFollowers,
+    },
+    period: {
+      days: normalizedDays,
+      timezone: THREADS_INSIGHTS_TIME_ZONE,
+      snapshot_count: dailyGrowth.length,
+    },
+    followers: {
+      current: currentFollowers ?? dailyGrowth[dailyGrowth.length - 1]?.latest_followers ?? null,
+      net_change_period: netChangePeriod,
+      avg_daily_growth: Number(averageDailyGrowth.toFixed(2)),
+      best_growth_days: bestGrowthDays.map((day) => ({ date: day.date, net_followers: day.net_followers })),
+      weak_growth_days: weakGrowthDays.map((day) => ({ date: day.date, net_followers: day.net_followers })),
+    },
+    daily_growth: dailyGrowth,
+    growth_windows: growthWindows,
+    top_growth_windows: bestGrowthDays,
+    weak_growth_windows: weakGrowthDays,
+    engagement_floor: {
+      sample_size: recentPostsForFloor.length,
+      median_likes: Number(calculateMedian(likes).toFixed(2)),
+      median_views: Number(calculateMedian(views).toFixed(2)),
+      median_engagement_total: Number(calculateMedian(engagementTotals).toFixed(2)),
+      top_quartile_likes: Number(calculatePercentile(likes, 75).toFixed(2)),
+      top_quartile_views: Number(calculatePercentile(views, 75).toFixed(2)),
+      top_quartile_engagement_total: Number(calculatePercentile(engagementTotals, 75).toFixed(2)),
+      weak_likes_threshold: Number(calculatePercentile(likes, 25).toFixed(2)),
+      weak_engagement_threshold: Number(calculatePercentile(engagementTotals, 25).toFixed(2)),
+    },
+    archive_recent: recentArchive.posts.slice(0, 80),
+    archive_top: topArchive.posts,
+    scheduled_posts: scheduledPostsWithTags,
+    tag_usage: {
+      pillars: summarizeTagUsage(scheduledTags, "pillar"),
+      hook_styles: summarizeTagUsage(scheduledTags, "hook_style"),
+      formats: summarizeTagUsage(scheduledTags, "format"),
+      intents: summarizeTagUsage(scheduledTags, "intent"),
+      experiments: summarizeTagUsage(scheduledTags, "experiment"),
+      novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
+    },
+    strategy_memory: strategyMemory,
+    growth_rules: [
+      "Separate engagement winners from follower-growth winners.",
+      "Prioritize posts that raise the engagement floor and create qualified follower growth.",
+      "When evidence is thin, propose an experiment instead of a rule.",
+      "When evidence is strong, propose a rule change with specific supporting data.",
+    ],
+  };
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
   return {
     openapi: "3.1.0",
@@ -4083,6 +4479,17 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
           responses: { "200": { description: "Posts" } },
         },
       },
+      "/api/gpt/growth-context": {
+        get: {
+          operationId: "getGrowthContext",
+          summary: "Get follower growth context, growth windows, engagement floor metrics, scheduled strategy tags, and growth memory for a brand.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 45 } },
+          ],
+          responses: { "200": { description: "Growth context" } },
+        },
+      },
       "/api/gpt/scheduled": {
         get: {
           operationId: "listScheduledPosts",
@@ -4112,6 +4519,19 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                     timezone: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE },
                     spoiler_all_text: { type: "boolean" },
                     spoiler_phrases: { type: "array", items: { type: "string" } },
+                    strategy: {
+                      type: "object",
+                      additionalProperties: true,
+                      properties: {
+                        pillar: { type: "string" },
+                        hook_style: { type: "string" },
+                        format: { type: "string" },
+                        intent: { type: "string" },
+                        experiment: { type: "string" },
+                        novelty_level: { type: "string" },
+                        metadata: { type: "object", additionalProperties: true },
+                      },
+                    },
                   },
                 },
               },
@@ -4146,6 +4566,19 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                           date: { type: "string", format: "date" },
                           spoiler_all_text: { type: "boolean" },
                           spoiler_phrases: { type: "array", items: { type: "string" } },
+                          strategy: {
+                            type: "object",
+                            additionalProperties: true,
+                            properties: {
+                              pillar: { type: "string" },
+                              hook_style: { type: "string" },
+                              format: { type: "string" },
+                              intent: { type: "string" },
+                              experiment: { type: "string" },
+                              novelty_level: { type: "string" },
+                              metadata: { type: "object", additionalProperties: true },
+                            },
+                          },
                         },
                       },
                     },
@@ -6906,6 +7339,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         ]);
 
         const selectedBatchPreset = pickPreferredBatchSchedulePreset(batchPresets);
+        const upcomingTagMap = await listGptPostStrategyTagsForScheduledPosts(env, upcomingScheduledPosts.map((post) => post.id));
+        const upcomingScheduledPostsWithTags = upcomingScheduledPosts.map((post) => ({
+          ...post,
+          strategy: upcomingTagMap.get(post.id) ?? null,
+        }));
         const agentControls = await listAgentAccountControls(env);
         const agentControl = agentControls.find((control) => control.account_id === brand.account_id) ?? null;
         const desiredSlots = agentControl?.agent_schedule_slots?.length
@@ -6941,7 +7379,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             missing_slots: desiredSlots.filter((slot) => !occupiedSlots.has(slot)),
             batch_preset: selectedBatchPreset,
             scheduled_posts_for_date: scheduledPostsForDate,
-            upcoming_scheduled_posts: upcomingScheduledPosts,
+            upcoming_scheduled_posts: upcomingScheduledPostsWithTags,
             archive_summary: {
               total_posts: recentArchive.totalCount,
               recent_sample_count: recentArchive.posts.length,
@@ -6992,6 +7430,23 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
       }
 
+      if (normalizedPath === "/api/gpt/growth-context" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const rawDays = Number(url.searchParams.get("days") ?? "45");
+        const days = Number.isFinite(rawDays) ? rawDays : 45;
+        const growthContext = await buildGptGrowthContext(env, brand, days);
+        return new Response(JSON.stringify(growthContext), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
       if (normalizedPath === "/api/gpt/scheduled" && request.method === "GET") {
         const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
         if (!brand) {
@@ -7001,12 +7456,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           });
         }
         const scheduledPosts = await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100);
+        const tagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
           account_id: brand.account_id,
           threads_user_id: brand.profile.threads_user_id,
-          scheduled_posts: scheduledPosts,
+          scheduled_posts: scheduledPosts.map((post) => ({
+            ...post,
+            strategy: tagMap.get(post.id) ?? null,
+          })),
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -7031,6 +7490,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
         const spoilerAllText = normalizeSpoilerFlag(payload.spoiler_all_text);
         const spoilerPhrases = normalizeSpoilerPhrasesInput(payload.spoiler_phrases);
+        const strategy = normalizeGptPostStrategyInput(payload.strategy);
         if (!brand || !text || !date || !time) {
           return new Response(JSON.stringify({ success: false, error: "brand_key, text, date, and time are required" }), {
             status: 400,
@@ -7054,6 +7514,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           });
         }
+        if (scheduled.scheduledPostId) {
+          await upsertGptPostStrategyTag(env, {
+            scheduledPostId: scheduled.scheduledPostId,
+            accountId: brand.account_id,
+            threadsUserId: brand.profile.threads_user_id,
+            strategy,
+          });
+        }
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
@@ -7066,6 +7534,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             reused: scheduled.reused === true,
             spoiler_all_text: spoilerAllText,
             spoiler_phrases: spoilerPhrases,
+            strategy,
           },
         }), {
           status: 200,
@@ -7100,6 +7569,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           const text = normalizeGptMemoryText(entry.text, 20000);
           const time = normalizeGptMemoryText(entry.time, 20);
           const date = normalizeGptMemoryText(entry.date, 20) ?? sharedDate;
+          const strategy = normalizeGptPostStrategyInput(entry.strategy);
           if (!text || !time || !date) {
             results.push({ row_number: index + 1, success: false, reused: false, scheduled_post_id: null, scheduled_time_utc: null, error: "missing_required_fields" });
             continue;
@@ -7115,12 +7585,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             normalizeSpoilerFlag(entry.spoiler_all_text),
             normalizeSpoilerPhrasesInput(entry.spoiler_phrases),
           );
+          if (scheduled.success && scheduled.scheduledPostId) {
+            await upsertGptPostStrategyTag(env, {
+              scheduledPostId: scheduled.scheduledPostId,
+              accountId: brand.account_id,
+              threadsUserId: brand.profile.threads_user_id,
+              strategy,
+            });
+          }
           results.push({
             row_number: index + 1,
             success: scheduled.success,
             reused: scheduled.reused === true,
             scheduled_post_id: scheduled.scheduledPostId ?? null,
             scheduled_time_utc: scheduled.scheduledTimeUtc ?? null,
+            strategy,
             error: scheduled.success ? null : scheduled.error ?? "schedule_failed",
           });
         }
