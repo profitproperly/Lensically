@@ -166,6 +166,36 @@ type GptPostStrategyTagRow = {
   updated_at: string;
 };
 
+type GptGenerationRunRow = {
+  id: string;
+  account_id: string;
+  threads_user_id: string;
+  objective: string | null;
+  prompt_summary: string | null;
+  status: string;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type GptGenerationDraftRow = {
+  id: string;
+  run_id: string;
+  account_id: string;
+  threads_user_id: string;
+  draft_index: number | string;
+  text: string;
+  status: string;
+  rejection_reason: string | null;
+  score_json: string | null;
+  strategy_json: string | null;
+  replacement_for_draft_id: string | null;
+  scheduled_post_id: number | string | null;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type GptResolvedBrand = {
   brand_key: GptBrandKey;
   account_id: string;
@@ -4279,6 +4309,409 @@ function summarizeTagUsage(
     }));
 }
 
+async function ensureGptGenerationRunsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS gpt_generation_runs (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      objective TEXT,
+      prompt_summary TEXT,
+      status TEXT NOT NULL DEFAULT 'drafted',
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_generation_runs_account_updated
+     ON gpt_generation_runs (account_id, updated_at DESC, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_gpt_generation_runs_touch_updated_at
+     AFTER UPDATE ON gpt_generation_runs
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE gpt_generation_runs
+       SET updated_at = CURRENT_TIMESTAMP
+       WHERE id = NEW.id;
+     END`,
+  ).run();
+}
+
+async function ensureGptGenerationDraftsTable(env: Env): Promise<void> {
+  await ensureGptGenerationRunsTable(env);
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS gpt_generation_drafts (
+      id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      draft_index INTEGER NOT NULL DEFAULT 0,
+      text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'drafted',
+      rejection_reason TEXT,
+      score_json TEXT,
+      strategy_json TEXT,
+      replacement_for_draft_id TEXT,
+      scheduled_post_id INTEGER,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (run_id) REFERENCES gpt_generation_runs(id) ON DELETE CASCADE
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_generation_drafts_run_index
+     ON gpt_generation_drafts (run_id, draft_index ASC, created_at ASC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_generation_drafts_account_status
+     ON gpt_generation_drafts (account_id, status, updated_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_gpt_generation_drafts_touch_updated_at
+     AFTER UPDATE ON gpt_generation_drafts
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE gpt_generation_drafts
+       SET updated_at = CURRENT_TIMESTAMP
+       WHERE id = NEW.id;
+     END`,
+  ).run();
+}
+
+function normalizeGptGenerationStatus(value: unknown): string {
+  if (typeof value !== "string") {
+    return "drafted";
+  }
+  const normalized = value.trim().toLowerCase();
+  return [
+    "drafted",
+    "self_rejected",
+    "shown",
+    "approved",
+    "rejected",
+    "rewritten",
+    "scheduled",
+    "completed",
+  ].includes(normalized) ? normalized : "drafted";
+}
+
+function normalizeGptDraftScore(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {};
+  for (const key of [
+    "hook_strength",
+    "specificity",
+    "repeat_risk",
+    "brand_fit",
+    "follower_growth_intent",
+    "shareability",
+    "engagement_floor_likelihood",
+    "overall",
+  ]) {
+    const numeric = Number(record[key]);
+    if (Number.isFinite(numeric)) {
+      normalized[key] = Math.min(Math.max(Math.round(numeric), 0), 10);
+    }
+  }
+  if (typeof record.notes === "string" && record.notes.trim()) {
+    normalized.notes = record.notes.trim().slice(0, 1000);
+  }
+  return Object.keys(normalized).length ? normalizeGptMemoryMetadata(normalized) : null;
+}
+
+function serializeGptGenerationRun(row: GptGenerationRunRow): {
+  id: string;
+  account_id: string;
+  threads_user_id: string;
+  objective: string | null;
+  prompt_summary: string | null;
+  status: string;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    id: row.id,
+    account_id: row.account_id,
+    threads_user_id: row.threads_user_id,
+    objective: row.objective,
+    prompt_summary: row.prompt_summary,
+    status: row.status,
+    metadata: row.metadata_json ? safeParseJsonString(row.metadata_json) ?? null : null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function serializeGptGenerationDraft(row: GptGenerationDraftRow): {
+  id: string;
+  run_id: string;
+  account_id: string;
+  threads_user_id: string;
+  draft_index: number;
+  text: string;
+  status: string;
+  rejection_reason: string | null;
+  score: unknown;
+  strategy: unknown;
+  replacement_for_draft_id: string | null;
+  scheduled_post_id: number | null;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    id: row.id,
+    run_id: row.run_id,
+    account_id: row.account_id,
+    threads_user_id: row.threads_user_id,
+    draft_index: Number(row.draft_index ?? 0),
+    text: row.text,
+    status: row.status,
+    rejection_reason: row.rejection_reason,
+    score: row.score_json ? safeParseJsonString(row.score_json) ?? null : null,
+    strategy: row.strategy_json ? safeParseJsonString(row.strategy_json) ?? null : null,
+    replacement_for_draft_id: row.replacement_for_draft_id,
+    scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined
+      ? null
+      : Number(row.scheduled_post_id),
+    metadata: row.metadata_json ? safeParseJsonString(row.metadata_json) ?? null : null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function createGptGenerationRun(
+  env: Env,
+  input: {
+    accountId: string;
+    threadsUserId: string;
+    objective: string | null;
+    promptSummary: string | null;
+    metadataJson: string | null;
+  },
+): Promise<ReturnType<typeof serializeGptGenerationRun>> {
+  await ensureGptGenerationRunsTable(env);
+  const runId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO gpt_generation_runs (
+      id,
+      account_id,
+      threads_user_id,
+      objective,
+      prompt_summary,
+      status,
+      metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      runId,
+      input.accountId,
+      input.threadsUserId,
+      input.objective,
+      input.promptSummary,
+      "drafted",
+      input.metadataJson,
+    )
+    .run();
+
+  const row = await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, objective, prompt_summary, status, metadata_json, created_at, updated_at
+     FROM gpt_generation_runs
+     WHERE id = ?
+     LIMIT 1`,
+  )
+    .bind(runId)
+    .first<GptGenerationRunRow>();
+
+  if (!row) {
+    throw new Error("generation_run_create_failed");
+  }
+  return serializeGptGenerationRun(row);
+}
+
+async function addGptGenerationDrafts(
+  env: Env,
+  input: {
+    runId: string;
+    accountId: string;
+    threadsUserId: string;
+    drafts: Array<Record<string, unknown>>;
+  },
+): Promise<Array<ReturnType<typeof serializeGptGenerationDraft>>> {
+  await ensureGptGenerationDraftsTable(env);
+  const saved: Array<ReturnType<typeof serializeGptGenerationDraft>> = [];
+  for (let index = 0; index < input.drafts.length; index += 1) {
+    const draft = input.drafts[index];
+    const text = normalizeGptMemoryText(draft.text, 20000);
+    if (!text) {
+      continue;
+    }
+    const draftId = crypto.randomUUID();
+    const draftIndex = Number.isFinite(Number(draft.draft_index))
+      ? Math.max(0, Math.trunc(Number(draft.draft_index)))
+      : index + 1;
+    const status = normalizeGptGenerationStatus(draft.status);
+    const strategy = normalizeGptPostStrategyInput(draft.strategy);
+    const replacementForDraftId = typeof draft.replacement_for_draft_id === "string"
+      ? draft.replacement_for_draft_id.trim() || null
+      : null;
+    await env.DB.prepare(
+      `INSERT INTO gpt_generation_drafts (
+        id,
+        run_id,
+        account_id,
+        threads_user_id,
+        draft_index,
+        text,
+        status,
+        rejection_reason,
+        score_json,
+        strategy_json,
+        replacement_for_draft_id,
+        metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        draftId,
+        input.runId,
+        input.accountId,
+        input.threadsUserId,
+        draftIndex,
+        text,
+        status,
+        normalizeGptMemoryText(draft.rejection_reason, 1000, true),
+        normalizeGptDraftScore(draft.score),
+        strategy ? normalizeGptMemoryMetadata(strategy) : null,
+        replacementForDraftId,
+        normalizeGptMemoryMetadata(draft.metadata),
+      )
+      .run();
+
+    const row = await env.DB.prepare(
+      `SELECT id, run_id, account_id, threads_user_id, draft_index, text, status, rejection_reason,
+              score_json, strategy_json, replacement_for_draft_id, scheduled_post_id, metadata_json,
+              created_at, updated_at
+       FROM gpt_generation_drafts
+       WHERE id = ?
+       LIMIT 1`,
+    )
+      .bind(draftId)
+      .first<GptGenerationDraftRow>();
+    if (row) {
+      saved.push(serializeGptGenerationDraft(row));
+    }
+  }
+  return saved;
+}
+
+async function updateGptGenerationDraft(
+  env: Env,
+  input: {
+    draftId: string;
+    accountId: string;
+    status: string;
+    rejectionReason: string | null;
+    scheduledPostId: number | null;
+    metadataJson: string | null;
+  },
+): Promise<ReturnType<typeof serializeGptGenerationDraft> | null> {
+  await ensureGptGenerationDraftsTable(env);
+  await env.DB.prepare(
+    `UPDATE gpt_generation_drafts
+     SET status = ?,
+         rejection_reason = COALESCE(?, rejection_reason),
+         scheduled_post_id = COALESCE(?, scheduled_post_id),
+         metadata_json = COALESCE(?, metadata_json)
+     WHERE id = ?
+       AND account_id = ?`,
+  )
+    .bind(
+      input.status,
+      input.rejectionReason,
+      input.scheduledPostId,
+      input.metadataJson,
+      input.draftId,
+      input.accountId,
+    )
+    .run();
+
+  const row = await env.DB.prepare(
+    `SELECT id, run_id, account_id, threads_user_id, draft_index, text, status, rejection_reason,
+            score_json, strategy_json, replacement_for_draft_id, scheduled_post_id, metadata_json,
+            created_at, updated_at
+     FROM gpt_generation_drafts
+     WHERE id = ?
+       AND account_id = ?
+     LIMIT 1`,
+  )
+    .bind(input.draftId, input.accountId)
+    .first<GptGenerationDraftRow>();
+
+  return row ? serializeGptGenerationDraft(row) : null;
+}
+
+async function listGptGenerationRuns(
+  env: Env,
+  accountId: string,
+  limit: number,
+): Promise<Array<ReturnType<typeof serializeGptGenerationRun> & { drafts: ReturnType<typeof serializeGptGenerationDraft>[] }>> {
+  await ensureGptGenerationDraftsTable(env);
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 25);
+  const rows = await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, objective, prompt_summary, status, metadata_json, created_at, updated_at
+     FROM gpt_generation_runs
+     WHERE account_id = ?
+     ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
+     LIMIT ?`,
+  )
+    .bind(accountId, normalizedLimit)
+    .all<GptGenerationRunRow>();
+
+  const runs = (rows.results ?? []).map(serializeGptGenerationRun);
+  if (!runs.length) {
+    return [];
+  }
+
+  const placeholders = runs.map(() => "?").join(", ");
+  const draftRows = await env.DB.prepare(
+    `SELECT id, run_id, account_id, threads_user_id, draft_index, text, status, rejection_reason,
+            score_json, strategy_json, replacement_for_draft_id, scheduled_post_id, metadata_json,
+            created_at, updated_at
+     FROM gpt_generation_drafts
+     WHERE run_id IN (${placeholders})
+     ORDER BY run_id, draft_index ASC, datetime(created_at) ASC`,
+  )
+    .bind(...runs.map((run) => run.id))
+    .all<GptGenerationDraftRow>();
+
+  const draftsByRun = new Map<string, ReturnType<typeof serializeGptGenerationDraft>[]>();
+  for (const row of draftRows.results ?? []) {
+    const serialized = serializeGptGenerationDraft(row);
+    const drafts = draftsByRun.get(serialized.run_id) ?? [];
+    drafts.push(serialized);
+    draftsByRun.set(serialized.run_id, drafts);
+  }
+
+  return runs.map((run) => ({
+    ...run,
+    drafts: draftsByRun.get(run.id) ?? [],
+  }));
+}
+
 async function buildGptGrowthContext(
   env: Env,
   brand: GptResolvedBrand,
@@ -4490,6 +4923,104 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 45 } },
           ],
           responses: { "200": { description: "Growth context" } },
+        },
+      },
+      "/api/gpt/generation-runs": {
+        get: {
+          operationId: "listGenerationRuns",
+          summary: "List recent generation runs and draft feedback for a brand.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 25, default: 10 } },
+          ],
+          responses: { "200": { description: "Generation runs" } },
+        },
+        post: {
+          operationId: "createGenerationRun",
+          summary: "Create a generation run before producing or showing drafts.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    objective: { type: "string" },
+                    prompt_summary: { type: "string" },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Created generation run" } },
+        },
+      },
+      "/api/gpt/generation-drafts": {
+        post: {
+          operationId: "saveGenerationDrafts",
+          summary: "Save generated drafts with quality scores and strategy tags.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "run_id", "drafts"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    run_id: { type: "string" },
+                    drafts: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        required: ["text"],
+                        properties: {
+                          draft_index: { type: "integer" },
+                          text: { type: "string" },
+                          status: { type: "string" },
+                          score: { type: "object", additionalProperties: true },
+                          strategy: { type: "object", additionalProperties: true },
+                          rejection_reason: { type: "string" },
+                          replacement_for_draft_id: { type: "string" },
+                          metadata: { type: "object", additionalProperties: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved generation drafts" } },
+        },
+      },
+      "/api/gpt/generation-drafts/update": {
+        post: {
+          operationId: "updateGenerationDraft",
+          summary: "Update one generation draft with approval, rejection, rewrite, or scheduling feedback.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "draft_id", "status"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    draft_id: { type: "string" },
+                    status: { type: "string" },
+                    rejection_reason: { type: "string" },
+                    scheduled_post_id: { type: "integer" },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Updated generation draft" } },
         },
       },
       "/api/gpt/scheduled": {
@@ -7445,6 +7976,133 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const growthContext = await buildGptGrowthContext(env, brand, days);
         return new Response(JSON.stringify(growthContext), {
           status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/generation-runs" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const rawLimit = Number(url.searchParams.get("limit") ?? "10");
+        const limit = Number.isFinite(rawLimit) ? rawLimit : 10;
+        const runs = await listGptGenerationRuns(env, brand.account_id, limit);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          runs,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/generation-runs" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const run = await createGptGenerationRun(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          objective: normalizeGptMemoryText(payload.objective, 1000, true),
+          promptSummary: normalizeGptMemoryText(payload.prompt_summary, 2000, true),
+          metadataJson: normalizeGptMemoryMetadata(payload.metadata),
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          run,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/generation-drafts" && request.method === "POST") {
+        let payload: { brand_key?: unknown; run_id?: unknown; drafts?: unknown };
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const runId = typeof payload.run_id === "string" ? payload.run_id.trim() : "";
+        const drafts = Array.isArray(payload.drafts) ? payload.drafts as Array<Record<string, unknown>> : [];
+        if (!brand || !runId || !drafts.length) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key, run_id, and drafts are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const savedDrafts = await addGptGenerationDrafts(env, {
+          runId,
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          drafts,
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          drafts: savedDrafts,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/generation-drafts/update" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const draftId = typeof payload.draft_id === "string" ? payload.draft_id.trim() : "";
+        if (!brand || !draftId) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and draft_id are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const scheduledPostId = Number(payload.scheduled_post_id);
+        const draft = await updateGptGenerationDraft(env, {
+          draftId,
+          accountId: brand.account_id,
+          status: normalizeGptGenerationStatus(payload.status),
+          rejectionReason: normalizeGptMemoryText(payload.rejection_reason, 1000, true),
+          scheduledPostId: Number.isInteger(scheduledPostId) && scheduledPostId > 0 ? scheduledPostId : null,
+          metadataJson: normalizeGptMemoryMetadata(payload.metadata),
+        });
+        return new Response(JSON.stringify({
+          success: Boolean(draft),
+          brand_key: brand.brand_key,
+          draft,
+        }), {
+          status: draft ? 200 : 404,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }
