@@ -116,6 +116,31 @@ describe("GPT memory browser routes", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({}), { status: 500 })));
   });
 
+  it("advertises and returns the GPT operator playbook", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const schemaResponse = await fetchFromWorker("/api/gpt/openapi.json");
+    expect(schemaResponse.status).toBe(200);
+    const schema = await schemaResponse.json() as { paths?: Record<string, unknown> };
+    expect(schema.paths?.["/api/gpt/operator-playbook"]).toBeTruthy();
+
+    const response = await fetchFromWorker(`/api/gpt/operator-playbook?brand_key=${TEST_BRAND_KEY}&objective=generate%20posts`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      playbook_version: "operator_playbook_v1",
+      brand_key: TEST_BRAND_KEY,
+      objective: "generate posts",
+      useful_actions_by_job: expect.objectContaining({
+        generate_posts: expect.arrayContaining(["prepareGenerationBrief", "checkDraftSimilarity"]),
+        learn_from_results: expect.arrayContaining(["prepareGrowthReview", "saveExperiment"]),
+      }),
+    });
+  });
+
   it("stores owner taste feedback for the selected configured account", async () => {
     const response = await fetchFromWorker("/api/gpt-memory/taste-feedback", {
       method: "POST",

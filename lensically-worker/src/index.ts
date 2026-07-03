@@ -6291,6 +6291,103 @@ function buildGptTasteInterviewBrief(
   };
 }
 
+function buildGptOperatorPlaybook(
+  brand: GptResolvedBrand | null,
+  objective: string | null,
+): Record<string, unknown> {
+  return {
+    success: true,
+    playbook_version: "operator_playbook_v1",
+    brand_key: brand?.brand_key ?? null,
+    objective,
+    account: brand
+      ? {
+        account_id: brand.account_id,
+        label: brand.profile.label,
+        username: brand.profile.username,
+        threads_user_id: brand.profile.threads_user_id,
+      }
+      : null,
+    operating_mode: [
+      "Act as a manual growth operator, not an autonomous cron agent.",
+      "Before generating, fetch the smallest useful context slices for the brand and objective.",
+      "Use saved patterns and winning posts for mechanisms, not exact wording.",
+      "Treat tags, scores, rules, and pillars as descriptive signals, not creative boxes.",
+      "Prefer flexible hypotheses, experiments, and reviewable beliefs over permanent rules.",
+    ],
+    default_action_sequence: [
+      "If the brand is unclear, call listAccounts and map the user request to opmg_deadman, manifest_mental, or vectrix.",
+      "Call getOperatorPlaybook when the user asks for generation, scheduling, growth review, rule changes, or strategy.",
+      "Call prepareGenerationBrief before writing a batch; if it says to ask a taste question, ask one concrete question before generating.",
+      "Use getGenerationContext or smaller list actions for archive, saved patterns, scheduled posts, strategy memory, and recent draft feedback.",
+      "Create more internal candidates than requested, self-reject weak drafts, then show only the best.",
+      "Run checkDraftSimilarity for surviving drafts before scheduling or presenting a final batch.",
+      "Save shown drafts with saveGenerationDrafts, then use updateGenerationDraft when the owner approves, rejects, self-rejects, rewrites, or schedules.",
+      "When scheduling, include strategy tags so later growth review can connect posts to outcomes.",
+    ],
+    generation_rules: [
+      "Ask taste questions only when the answer would change the batch.",
+      "Do not repeat exact hooks, first lines, sentence skeletons, or saved-pattern wording.",
+      "When copying a strong hook mechanism, change the subject, nouns, emotional frame, payoff, and surface wording.",
+      "Mix proven variants with novelty; increase novelty when fatigue signals are high or growth is flat.",
+      "Do not overfit to one approval, one rejection, or one recent winner.",
+      "Score drafts for hook strength, specificity, brand fit, taste fit, novelty, clarity, naturalness, duplicate risk, follower-growth potential, engagement-floor potential, and overall quality.",
+    ],
+    learning_loop: [
+      "Save owner preferences as taste_profile, approval_feedback, rejection_feedback, brand_voice_note, current_belief, or banned_phrase when they will affect future generation.",
+      "Save uncertain learnings as rule_proposal or experiment, not approved_rule.",
+      "Use saveRuleReview to keep, revise, cooldown, retire, retest, promote, or challenge beliefs as data changes.",
+      "Use saveExperiment and later experiment_result to decide exploit, explore, stop, retest, cooldown, or inconclusive.",
+      "Use savePatternAdaptation when a saved pattern or archive mechanism is adapted, rejected, approved, cooled down, or needs retesting.",
+    ],
+    growth_review_rules: [
+      "Separate engagement winners from follower-growth winners.",
+      "Focus on raising the engagement floor, not just chasing one viral outlier.",
+      "Use follower context, post archive, scheduled strategy tags, experiments, and owner feedback together.",
+      "Require sample-size caution before turning data into a durable rule.",
+      "If evidence is thin, propose a test and define the sample size, success criteria, and review window.",
+    ],
+    anti_rigidity_rules: [
+      "Rules decay; revisit them when the account, audience, market, offer, or owner taste changes.",
+      "Do not force every post into a predefined pillar or hook type.",
+      "Use novelty deliberately instead of randomizing for its own sake.",
+      "Cooldown overused moves instead of banning useful moves forever.",
+      "Let strong new evidence challenge old memories.",
+    ],
+    useful_actions_by_job: {
+      generate_posts: [
+        "prepareGenerationBrief",
+        "prepareTasteInterview",
+        "getGenerationContext",
+        "checkDraftSimilarity",
+        "saveGenerationDrafts",
+        "updateGenerationDraft",
+      ],
+      schedule_posts: [
+        "listScheduledPosts",
+        "listBatchPresets",
+        "schedulePost",
+        "scheduleBatchPosts",
+        "saveBatchPreset",
+      ],
+      learn_from_results: [
+        "getGrowthContext",
+        "prepareGrowthReview",
+        "prepareRuleSuggestions",
+        "getNoveltyFatigueReport",
+        "saveRuleReview",
+        "saveExperiment",
+      ],
+      learn_taste: [
+        "listStrategyMemory",
+        "saveTasteFeedback",
+        "savePatternAdaptation",
+        "updateGenerationDraft",
+      ],
+    },
+  };
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
   return {
     openapi: "3.1.0",
@@ -6316,6 +6413,17 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
     },
     security: [{ bearerAuth: [] }],
     paths: {
+      "/api/gpt/operator-playbook": {
+        get: {
+          operationId: "getOperatorPlaybook",
+          summary: "Call before generation, scheduling, growth review, or strategy work to get the flexible Lensically growth-operator workflow and action sequence.",
+          parameters: [
+            { name: "brand_key", in: "query", required: false, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's current generation, scheduling, growth, or strategy objective." } },
+          ],
+          responses: { "200": { description: "Operator playbook" } },
+        },
+      },
       "/api/gpt/accounts": {
         get: {
           operationId: "listAccounts",
@@ -9632,6 +9740,24 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     if (normalizedPath.startsWith("/api/gpt/")) {
       if (!isGptRequestAuthorized(request, env)) {
         return unauthorizedGptResponse();
+      }
+
+      if (normalizedPath === "/api/gpt/operator-playbook" && request.method === "GET") {
+        const rawBrandKey = url.searchParams.get("brand_key");
+        const brand = rawBrandKey ? await resolveGptBrand(env, rawBrandKey) : null;
+        if (rawBrandKey && !brand) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }),
+            { status: 404, headers: { "content-type": "application/json; charset=UTF-8" } },
+          );
+        }
+        return new Response(
+          JSON.stringify(buildGptOperatorPlaybook(
+            brand,
+            normalizeGptMemoryText(url.searchParams.get("objective"), 500, true),
+          )),
+          { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
       }
 
       if (normalizedPath === "/api/gpt/accounts" && request.method === "GET") {
