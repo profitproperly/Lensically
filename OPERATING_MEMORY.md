@@ -14,6 +14,7 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 - Use the repo deploy scripts so credentials are sourced:
   - Worker: `cd lensically-worker; npm run deploy:cf`
   - Web: `cd lensically-web; npm run deploy:cf`
+- `lensically-web` has no plain `npm run deploy` script; use `deploy:cf`.
 - Direct `npx wrangler ...` calls need the same credential loader sourced first.
 
 ## GitHub Credentials

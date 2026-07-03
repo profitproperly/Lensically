@@ -32,6 +32,7 @@ type SavedPatternsResponse = {
 
 const SAVED_PATTERNS_URL = buildWorkerUrl("/api/patterns/list");
 const DELETE_PATTERNS_URL = buildWorkerUrl("/api/patterns/delete");
+const REVIEW_PATTERN_URL = buildWorkerUrl("/api/gpt-memory/saved-patterns/review");
 const APP_USER_ID = "lensically";
 const DEFAULT_LIMIT = 200;
 
@@ -75,13 +76,16 @@ export default function SavedPatternsPage() {
   const [order, setOrder] = useState<"newest" | "likes">("newest");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [total, setTotal] = useState(0);
   const [threadsUserId, setThreadsUserId] = useState("");
 
   const loadPatterns = useCallback(async () => {
     setLoading(true);
     setError("");
+    setMessage("");
 
     try {
       const baseUrl = `${SAVED_PATTERNS_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}&limit=${DEFAULT_LIMIT}&order=${encodeURIComponent(order)}`;
@@ -135,6 +139,7 @@ export default function SavedPatternsPage() {
 
     setDeleting(true);
     setError("");
+    setMessage("");
 
     try {
       const response = await fetch(DELETE_PATTERNS_URL, {
@@ -160,6 +165,58 @@ export default function SavedPatternsPage() {
       setError(deleteError instanceof Error ? deleteError.message : "Could not delete saved patterns.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function reviewPattern(
+    pattern: SavedPatternRow,
+    verdict: "approved" | "rejected" | "cooldown" | "watch",
+  ) {
+    const note = window.prompt("Optional note for the GPT to remember about this pattern:", "");
+    if (note === null) {
+      return;
+    }
+
+    setReviewingId(pattern.id);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(REVIEW_PATTERN_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          saved_pattern_ids: [pattern.id],
+          verdict,
+          note,
+          title: `Saved pattern review: ${verdict}`,
+          metadata: {
+            author_handle: pattern.author_handle ?? null,
+            source_url: pattern.source_url,
+            captured_likes: pattern.likes,
+            captured_replies: pattern.replies,
+            captured_reposts: pattern.reposts,
+            captured_shares: pattern.shares,
+            captured_views: pattern.views ?? null,
+          },
+          cooldown_days: verdict === "cooldown" ? 14 : 0,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save pattern review.");
+      }
+
+      setMessage(`Saved ${verdict} review for pattern ${pattern.id}.`);
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : "Could not save pattern review.");
+    } finally {
+      setReviewingId(null);
     }
   }
 
@@ -238,6 +295,12 @@ export default function SavedPatternsPage() {
         </div>
       </section>
 
+      {message ? (
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm">
+          {message}
+        </section>
+      ) : null}
+
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {error ? (
           <p className="text-sm text-red-600">{error}</p>
@@ -293,6 +356,41 @@ export default function SavedPatternsPage() {
                           className="shrink-0 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Delete
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "approved")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Mark Useful
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "watch")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Watch
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "cooldown")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-amber-200 bg-white px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Cooldown
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "rejected")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Reject Pattern
                         </button>
                       </div>
 

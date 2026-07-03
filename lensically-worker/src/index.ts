@@ -11204,6 +11204,97 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/saved-patterns/review" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const savedPatternIds = normalizeGptNumberArray(payload.saved_pattern_ids, 25);
+      const verdictRaw = typeof payload.verdict === "string" ? payload.verdict.trim().toLowerCase() : "";
+      const verdict = ["approved", "rejected", "cooldown", "retest", "watch", "adapted"].includes(verdictRaw)
+        ? verdictRaw
+        : null;
+      const note = normalizeGptMemoryText(payload.note, 8000, true);
+      if (!brand || !savedPatternIds.length || !verdict) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id, saved_pattern_ids, and valid verdict are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const cooldownDays = parseBoundedIntegerParam(
+        typeof payload.cooldown_days === "number" || typeof payload.cooldown_days === "string"
+          ? String(payload.cooldown_days)
+          : null,
+        0,
+        0,
+        365,
+      );
+      const reviewAfter = cooldownDays > 0
+        ? new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      const kind: GptStrategyMemoryKind = verdict === "approved"
+        ? "approved_pattern"
+        : verdict === "rejected"
+        ? "rejected_pattern"
+        : verdict === "cooldown"
+        ? "cooldown"
+        : "saved_pattern_note";
+      const title = normalizeGptMemoryText(payload.title, 200, true)
+        ?? `Saved pattern review: ${verdict}`;
+      const mechanism = normalizeGptMemoryText(payload.mechanism, 1000, true);
+      const reason = normalizeGptMemoryText(payload.reason, 4000, true);
+      const memory = await saveGptStrategyMemory(env, {
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+        kind,
+        title,
+        body: [
+          `Verdict: ${verdict}`,
+          `Saved pattern ids: ${savedPatternIds.join(", ")}`,
+          mechanism ? `Mechanism: ${mechanism}` : null,
+          note ? `Owner note: ${note}` : null,
+          reason ? `Reason: ${reason}` : null,
+          reviewAfter ? `Review after: ${reviewAfter}` : null,
+        ].filter(Boolean).join("\n"),
+        metadataJson: normalizeGptMemoryMetadata({
+          source: "lensically_saved_patterns",
+          verdict,
+          saved_pattern_ids: savedPatternIds,
+          mechanism,
+          reason,
+          review_after: reviewAfter,
+          flexible_note: "This marks current taste and pattern usefulness without permanently boxing creative direction.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        }),
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        brand_key: brand.brand_key,
+        memory,
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {
