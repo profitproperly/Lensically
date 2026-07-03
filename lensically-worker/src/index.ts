@@ -11153,6 +11153,57 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/generation-drafts/update" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const draftId = typeof payload.draft_id === "string" ? payload.draft_id.trim() : "";
+      if (!brand || !draftId) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id and draft_id are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const scheduledPostId = Number(payload.scheduled_post_id);
+      const draft = await updateGptGenerationDraft(env, {
+        draftId,
+        accountId: brand.account_id,
+        status: normalizeGptGenerationStatus(payload.status),
+        rejectionReason: normalizeGptMemoryText(payload.rejection_reason, 1000, true),
+        scheduledPostId: Number.isInteger(scheduledPostId) && scheduledPostId > 0 ? scheduledPostId : null,
+        metadataJson: normalizeGptMemoryMetadata({
+          source: "lensically_memory_dashboard",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        }),
+      });
+      return new Response(JSON.stringify({
+        success: Boolean(draft),
+        brand_key: brand.brand_key,
+        draft,
+      }), {
+        status: draft ? 200 : 404,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {

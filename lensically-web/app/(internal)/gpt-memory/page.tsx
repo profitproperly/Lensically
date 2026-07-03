@@ -74,6 +74,7 @@ type GptMemoryDashboard = {
 
 const DASHBOARD_URL = buildWorkerUrl("/api/gpt-memory/dashboard");
 const RULE_REVIEW_URL = buildWorkerUrl("/api/gpt-memory/rule-review");
+const DRAFT_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/generation-drafts/update");
 
 const MEMORY_SECTIONS: Array<{ kind: string; label: string }> = [
   { kind: "current_belief", label: "Current Beliefs" },
@@ -195,6 +196,38 @@ export default function GptMemoryPage() {
       await loadDashboard();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save rule review.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function updateDraft(draft: GenerationDraft, status: string) {
+    setSaving(`${draft.id}-${status}`);
+    setError("");
+    try {
+      const response = await fetch(DRAFT_UPDATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          draft_id: draft.id,
+          status,
+          rejection_reason: status === "rejected" || status === "self_rejected"
+            ? `Marked ${status.replace(/_/g, " ")} from Lensically GPT Memory dashboard.`
+            : undefined,
+          metadata: {
+            dashboard_previous_status: draft.status,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not update draft.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not update draft.");
     } finally {
       setSaving(null);
     }
@@ -363,6 +396,23 @@ export default function GptMemoryPage() {
                         {draft.rejection_reason ? (
                           <p className="mt-2 text-xs text-rose-700">{draft.rejection_reason}</p>
                         ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {[
+                            ["approved", "Approve"],
+                            ["rejected", "Reject"],
+                            ["self_rejected", "Self Reject"],
+                          ].map(([status, label]) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => void updateDraft(draft, status)}
+                              disabled={Boolean(saving) || draft.status === status}
+                              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {saving === `${draft.id}-${status}` ? "Saving..." : label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
