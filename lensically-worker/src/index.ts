@@ -4011,10 +4011,12 @@ async function listGptStrategyMemory(
   accountId: string,
   kinds: string[],
   limit: number,
+  offset = 0,
 ): Promise<ReturnType<typeof serializeGptStrategyMemoryRow>[]> {
   await ensureGptStrategyMemoryTable(env);
 
   const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const normalizedOffset = Math.max(Math.trunc(offset), 0);
   const normalizedKinds = kinds
     .map((kind) => normalizeGptStrategyMemoryKind(kind))
     .filter((kind): kind is GptStrategyMemoryKind => Boolean(kind));
@@ -4027,12 +4029,33 @@ async function listGptStrategyMemory(
      WHERE account_id = ?
        ${kindClause}
      ORDER BY datetime(updated_at) DESC, id DESC
-     LIMIT ?`,
+     LIMIT ? OFFSET ?`,
   )
-    .bind(accountId, ...normalizedKinds, normalizedLimit)
+    .bind(accountId, ...normalizedKinds, normalizedLimit, normalizedOffset)
     .all<GptStrategyMemoryRow>();
 
   return (rows.results ?? []).map(serializeGptStrategyMemoryRow);
+}
+
+async function countGptStrategyMemory(env: Env, accountId: string, kinds: string[]): Promise<number> {
+  await ensureGptStrategyMemoryTable(env);
+
+  const normalizedKinds = kinds
+    .map((kind) => normalizeGptStrategyMemoryKind(kind))
+    .filter((kind): kind is GptStrategyMemoryKind => Boolean(kind));
+  const kindClause = normalizedKinds.length
+    ? `AND kind IN (${normalizedKinds.map(() => "?").join(", ")})`
+    : "";
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total
+     FROM gpt_strategy_memory
+     WHERE account_id = ?
+       ${kindClause}`,
+  )
+    .bind(accountId, ...normalizedKinds)
+    .first<{ total: number }>();
+
+  return Number(row?.total ?? 0);
 }
 
 async function saveGptStrategyMemory(
@@ -4142,6 +4165,29 @@ function normalizeGptStrategyToken(value: unknown, maxLength = 100): string | nu
     return null;
   }
   return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+}
+
+function parseGptFieldsParam(value: string | null): Set<string> | null {
+  if (!value?.trim()) {
+    return null;
+  }
+  const fields = value
+    .split(",")
+    .map((field) => field.trim().toLowerCase())
+    .filter(Boolean);
+  return fields.length ? new Set(fields) : null;
+}
+
+function wantsGptField(fields: Set<string> | null, field: string): boolean {
+  return fields === null || fields.has(field);
+}
+
+function parseBoundedIntegerParam(value: string | null, fallback: number, min: number, max: number): number {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.trunc(parsed), min), max);
 }
 
 function normalizeGptPostStrategyInput(value: unknown): GptPostStrategyInput | null {
@@ -4893,13 +4939,34 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/context": {
         get: {
           operationId: "getBrandContext",
-          summary: "Get account context, recent/top/weak posts, schedule slots, scheduled posts, presets, patterns, and memory.",
+          summary: "Get lightweight brand context with optional field selection and bounded slices.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
             { name: "timezone", in: "query", required: false, schema: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE } },
+            { name: "fields", in: "query", required: false, schema: { type: "string", description: "Comma-separated fields such as saved_patterns,upcoming_scheduled_posts,missing_slots,archive_recent,archive_top,archive_weak,strategy_memory,batch_preset" } },
+            { name: "recent_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 5 } },
+            { name: "recent_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "top_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 5 } },
+            { name: "top_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "weak_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 50, default: 3 } },
+            { name: "weak_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "memory_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 20 } },
+            { name: "memory_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 10 } },
           ],
           responses: { "200": { description: "Brand context" } },
+        },
+      },
+      "/api/gpt/saved-patterns": {
+        get: {
+          operationId: "listSavedPatterns",
+          summary: "List saved outside/reference patterns for a brand.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 48 } },
+          ],
+          responses: { "200": { description: "Saved patterns" } },
         },
       },
       "/api/gpt/posts/recent": {
@@ -4910,6 +4977,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "order", in: "query", required: false, schema: { type: "string", enum: ["recent", "top"], default: "recent" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
           ],
           responses: { "200": { description: "Posts" } },
         },
@@ -5163,6 +5231,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "kind", in: "query", required: false, schema: { type: "string" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
           ],
           responses: { "200": { description: "Strategy memory" } },
         },
@@ -7856,23 +7925,76 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           ? requestedDate
           : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? getLocalDateInTimeZone(timeZone) ?? new Date().toISOString().slice(0, 10);
 
-        const [batchPresets, recentArchive, topArchive, scheduledPostsForDate, upcomingScheduledPosts, savedPatterns, strategyMemory] = await Promise.all([
-          listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id),
-          listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", 48, 0),
-          listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", 48, 0),
-          listScheduledPostsForThreadsAccountOnLocalDate(
-            env,
-            brand.profile.threads_user_id,
-            targetDate,
-            timeZone,
-          ),
-          listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100),
-          listSavedPatternsForHermes(env, brand.profile.threads_user_id, 48),
-          listGptStrategyMemory(env, brand.account_id, [], 60),
+        const requestedFields = parseGptFieldsParam(url.searchParams.get("fields"));
+        const recentLimit = parseBoundedIntegerParam(url.searchParams.get("recent_limit"), 5, 0, 100);
+        const recentOffset = parseBoundedIntegerParam(url.searchParams.get("recent_offset"), 0, 0, 100000);
+        const topLimit = parseBoundedIntegerParam(url.searchParams.get("top_limit"), 5, 0, 100);
+        const topOffset = parseBoundedIntegerParam(url.searchParams.get("top_offset"), 0, 0, 100000);
+        const weakLimit = parseBoundedIntegerParam(url.searchParams.get("weak_limit"), 3, 0, 50);
+        const weakOffset = parseBoundedIntegerParam(url.searchParams.get("weak_offset"), 0, 0, 100000);
+        const memoryLimit = parseBoundedIntegerParam(url.searchParams.get("memory_limit"), 20, 0, 100);
+        const memoryOffset = parseBoundedIntegerParam(url.searchParams.get("memory_offset"), 0, 0, 100000);
+        const savedPatternsLimit = parseBoundedIntegerParam(url.searchParams.get("saved_patterns_limit"), 10, 0, 100);
+
+        const includeSlots = wantsGptField(requestedFields, "missing_slots") || wantsGptField(requestedFields, "desired_slots");
+        const includeBatchPreset = wantsGptField(requestedFields, "batch_preset") || includeSlots;
+        const includeScheduledForDate = wantsGptField(requestedFields, "scheduled_posts_for_date") || includeSlots;
+        const includeUpcomingScheduled = wantsGptField(requestedFields, "upcoming_scheduled_posts");
+        const includeRecent = wantsGptField(requestedFields, "archive_recent") && recentLimit > 0;
+        const includeTop = wantsGptField(requestedFields, "archive_top") && topLimit > 0;
+        const includeWeak = wantsGptField(requestedFields, "archive_weak") && weakLimit > 0;
+        const includeSavedPatterns = wantsGptField(requestedFields, "saved_patterns") && savedPatternsLimit > 0;
+        const includeStrategyMemory = wantsGptField(requestedFields, "strategy_memory") && memoryLimit > 0;
+
+        const [
+          batchPresets,
+          recentArchive,
+          topArchive,
+          weakArchiveSource,
+          scheduledPostsForDate,
+          upcomingScheduledPosts,
+          savedPatterns,
+          strategyMemory,
+          strategyMemoryTotal,
+        ] = await Promise.all([
+          includeBatchPreset
+            ? listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id)
+            : Promise.resolve([]),
+          includeRecent
+            ? listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", recentLimit, recentOffset)
+            : Promise.resolve({ posts: [], totalCount: 0 }),
+          includeTop
+            ? listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, topOffset)
+            : Promise.resolve({ posts: [], totalCount: 0 }),
+          includeWeak
+            ? listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.max(weakLimit * 8, 24), weakOffset)
+            : Promise.resolve({ posts: [], totalCount: 0 }),
+          includeScheduledForDate
+            ? listScheduledPostsForThreadsAccountOnLocalDate(
+              env,
+              brand.profile.threads_user_id,
+              targetDate,
+              timeZone,
+            )
+            : Promise.resolve([]),
+          includeUpcomingScheduled
+            ? listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 50)
+            : Promise.resolve([]),
+          includeSavedPatterns
+            ? listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit)
+            : Promise.resolve([]),
+          includeStrategyMemory
+            ? listGptStrategyMemory(env, brand.account_id, [], memoryLimit, memoryOffset)
+            : Promise.resolve([]),
+          includeStrategyMemory
+            ? countGptStrategyMemory(env, brand.account_id, [])
+            : Promise.resolve(0),
         ]);
 
-        const selectedBatchPreset = pickPreferredBatchSchedulePreset(batchPresets);
-        const upcomingTagMap = await listGptPostStrategyTagsForScheduledPosts(env, upcomingScheduledPosts.map((post) => post.id));
+        const selectedBatchPreset = includeBatchPreset ? pickPreferredBatchSchedulePreset(batchPresets) : null;
+        const upcomingTagMap = includeUpcomingScheduled
+          ? await listGptPostStrategyTagsForScheduledPosts(env, upcomingScheduledPosts.map((post) => post.id))
+          : new Map<number, ReturnType<typeof serializeGptPostStrategyTag>>();
         const upcomingScheduledPostsWithTags = upcomingScheduledPosts.map((post) => ({
           ...post,
           strategy: upcomingTagMap.get(post.id) ?? null,
@@ -7889,12 +8011,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             .map((post) => post.local_time)
             .filter((slot) => Boolean(slot)),
         );
-        const weakPosts = recentArchive.posts
+        const weakPosts = weakArchiveSource.posts
           .filter((post) => Number(post.engagement_total ?? 0) <= 1 && Number(post.likes ?? 0) <= 1)
-          .slice(0, 12);
+          .slice(0, weakLimit);
 
-        return new Response(
-          JSON.stringify({
+        const payload: Record<string, unknown> = {
             success: true,
             brand_key: brand.brand_key,
             account: {
@@ -7907,23 +8028,30 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             },
             date: targetDate,
             timezone: timeZone,
-            desired_slots: desiredSlots,
-            occupied_slots: Array.from(occupiedSlots),
-            missing_slots: desiredSlots.filter((slot) => !occupiedSlots.has(slot)),
-            batch_preset: selectedBatchPreset,
-            scheduled_posts_for_date: scheduledPostsForDate,
-            upcoming_scheduled_posts: upcomingScheduledPostsWithTags,
             archive_summary: {
-              total_posts: recentArchive.totalCount,
+              archive_total_count: recentArchive.totalCount || topArchive.totalCount || weakArchiveSource.totalCount,
               recent_sample_count: recentArchive.posts.length,
               top_sample_count: topArchive.posts.length,
               weak_sample_count: weakPosts.length,
+              has_more_recent: includeRecent ? recentArchive.totalCount > recentOffset + recentArchive.posts.length : null,
+              has_more_top: includeTop ? topArchive.totalCount > topOffset + topArchive.posts.length : null,
+              recent_offset: recentOffset,
+              top_offset: topOffset,
+              weak_offset: weakOffset,
+              has_more_weak_source: includeWeak ? weakArchiveSource.totalCount > weakOffset + weakArchiveSource.posts.length : null,
+              has_more_memory: includeStrategyMemory ? strategyMemoryTotal > memoryOffset + strategyMemory.length : null,
+              memory_returned_count: strategyMemory.length,
+              memory_total_count: strategyMemoryTotal,
+              memory_offset: memoryOffset,
+              omitted_fields: [
+                !includeRecent ? "archive_recent" : null,
+                !includeTop ? "archive_top" : null,
+                !includeWeak ? "archive_weak" : null,
+                !includeSavedPatterns ? "saved_patterns" : null,
+                !includeStrategyMemory ? "strategy_memory" : null,
+                !includeUpcomingScheduled ? "upcoming_scheduled_posts" : null,
+              ].filter(Boolean),
             },
-            archive_recent: recentArchive.posts,
-            archive_top: topArchive.posts,
-            archive_weak: weakPosts,
-            saved_patterns: savedPatterns,
-            strategy_memory: strategyMemory,
             operating_rules: [
               "Use proven hook structures when they fit, but do not copy exact wording.",
               "Avoid repeating recent or already scheduled post angles.",
@@ -7931,7 +8059,40 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
               "Use novelty deliberately when the recent batch overuses the same hook, style, or pillar.",
               "Suggest rule changes when data supports them; save approved changes as approved_rule memory.",
             ],
-          }),
+        };
+
+        if (includeSlots) {
+          payload.desired_slots = desiredSlots;
+          payload.occupied_slots = Array.from(occupiedSlots);
+          payload.missing_slots = desiredSlots.filter((slot) => !occupiedSlots.has(slot));
+        }
+        if (includeBatchPreset) {
+          payload.batch_preset = selectedBatchPreset;
+        }
+        if (includeScheduledForDate) {
+          payload.scheduled_posts_for_date = scheduledPostsForDate;
+        }
+        if (includeUpcomingScheduled) {
+          payload.upcoming_scheduled_posts = upcomingScheduledPostsWithTags;
+        }
+        if (includeRecent) {
+          payload.archive_recent = recentArchive.posts;
+        }
+        if (includeTop) {
+          payload.archive_top = topArchive.posts;
+        }
+        if (includeWeak) {
+          payload.archive_weak = weakPosts;
+        }
+        if (includeSavedPatterns) {
+          payload.saved_patterns = savedPatterns;
+        }
+        if (includeStrategyMemory) {
+          payload.strategy_memory = strategyMemory;
+        }
+
+        return new Response(
+          JSON.stringify(payload),
           { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } },
         );
       }
@@ -7946,9 +8107,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
         const requestedOrder = url.searchParams.get("order")?.trim().toLowerCase();
         const order = requestedOrder === "top" ? "top" : "recent";
-        const rawLimit = Number(url.searchParams.get("limit") ?? "50");
-        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 50;
-        const archive = await listArchivedThreadsPosts(env, brand.profile.threads_user_id, order, limit, 0);
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 50, 1, 100);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const archive = await listArchivedThreadsPosts(env, brand.profile.threads_user_id, order, limit, offset);
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
@@ -7957,6 +8118,34 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           order,
           posts: archive.posts,
           total_count: archive.totalCount,
+          returned_count: archive.posts.length,
+          limit,
+          offset,
+          has_more: archive.totalCount > offset + archive.posts.length,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/saved-patterns" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 48, 1, 100);
+        const patterns = await listSavedPatternsForHermes(env, brand.profile.threads_user_id, limit);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          threads_user_id: brand.profile.threads_user_id,
+          patterns,
+          returned_count: patterns.length,
+          limit,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -8368,10 +8557,22 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           });
         }
         const rawKinds = url.searchParams.getAll("kind").flatMap((value) => value.split(","));
-        const rawLimit = Number(url.searchParams.get("limit") ?? "60");
-        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 60;
-        const memory = await listGptStrategyMemory(env, brand.account_id, rawKinds, limit);
-        return new Response(JSON.stringify({ success: true, brand_key: brand.brand_key, memory }), {
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 60, 1, 100);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const [memory, totalCount] = await Promise.all([
+          listGptStrategyMemory(env, brand.account_id, rawKinds, limit, offset),
+          countGptStrategyMemory(env, brand.account_id, rawKinds),
+        ]);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          memory,
+          total_count: totalCount,
+          returned_count: memory.length,
+          limit,
+          offset,
+          has_more: totalCount > offset + memory.length,
+        }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
