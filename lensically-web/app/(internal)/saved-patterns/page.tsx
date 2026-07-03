@@ -220,6 +220,53 @@ export default function SavedPatternsPage() {
     }
   }
 
+  async function reviewSelectedPatterns(verdict: "approved" | "rejected" | "cooldown" | "watch") {
+    if (!selectedIds.length) {
+      return;
+    }
+
+    const note = window.prompt("Optional note for the GPT to remember about these selected patterns:", "");
+    if (note === null) {
+      return;
+    }
+
+    setReviewingId(-1);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(REVIEW_PATTERN_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          saved_pattern_ids: selectedIds,
+          verdict,
+          note,
+          title: `Selected saved patterns review: ${verdict}`,
+          metadata: {
+            selected_count: selectedIds.length,
+          },
+          cooldown_days: verdict === "cooldown" ? 14 : 0,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save selected pattern review.");
+      }
+
+      setMessage(`Saved ${verdict} review for ${formatMetric(selectedIds.length)} selected patterns.`);
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : "Could not save selected pattern review.");
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
   function toggleSelection(id: number) {
     setSelectedIds((current) => (
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
@@ -283,6 +330,32 @@ export default function SavedPatternsPage() {
           </button>
         </div>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-slate-700">
+            {selectedIds.length ? `${formatMetric(selectedIds.length)} selected for GPT pattern memory` : "Select patterns to review them in bulk"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["approved", "Mark Useful"],
+              ["watch", "Watch"],
+              ["cooldown", "Cooldown"],
+              ["rejected", "Reject"],
+            ].map(([verdict, label]) => (
+              <button
+                key={verdict}
+                type="button"
+                onClick={() => void reviewSelectedPatterns(verdict as "approved" | "rejected" | "cooldown" | "watch")}
+                disabled={loading || deleting || reviewingId === -1 || selectedIds.length === 0}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reviewingId === -1 ? "Saving..." : label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
