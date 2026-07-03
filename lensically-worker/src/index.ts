@@ -6172,6 +6172,7 @@ async function buildGptGenerationContext(
     approvedDrafts,
     rejectedDrafts,
     followerSnapshots,
+    taggedPostResults,
   ] = await Promise.all([
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", recentLimit, recentOffset),
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, topOffset),
@@ -6183,6 +6184,7 @@ async function buildGptGenerationContext(
     listGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"], approvedDraftsLimit, approvedDraftsOffset),
     listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"], rejectedDraftsLimit, rejectedDraftsOffset),
     listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, growthDays),
+    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 80),
   ]);
   const savedPatterns = savedPatternsPage.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, false, !compact));
 
@@ -6223,6 +6225,15 @@ async function buildGptGenerationContext(
   const netGrowth = growthDeltas.length >= 2
     ? growthDeltas[growthDeltas.length - 1].followers - growthDeltas[0].followers
     : growthDeltas.reduce((sum, day) => sum + day.net_change, 0);
+  const growthByDate = new Map(growthDeltas.map((day) => [day.date, day]));
+  const taggedPostResultsWithGrowth = taggedPostResults.map((taggedPost) => {
+    const localDate = getPostLocalDate({ timestamp: taggedPost.published_at ?? taggedPost.scheduled_time_utc } as Pick<CachedThreadsPost, "timestamp">, THREADS_INSIGHTS_TIME_ZONE);
+    return {
+      ...taggedPost,
+      local_date: localDate,
+      follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
+    };
+  });
 
   return {
     success: true,
@@ -6287,6 +6298,15 @@ async function buildGptGenerationContext(
     },
     saved_patterns: savedPatterns,
     scheduled_posts: scheduledPostsWithTags,
+    posted_tagged_results: taggedPostResultsWithGrowth.slice(0, compact ? 20 : 80),
+    tag_performance: {
+      pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
+      hook_styles: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "hook_style"),
+      formats: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "format"),
+      intents: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "intent"),
+      experiments: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "experiment"),
+      novelty_levels: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "novelty_level"),
+    },
     growth_signals: {
       days: growthDays,
       net_growth: netGrowth,
@@ -6353,7 +6373,9 @@ function buildGptGenerationWorkflowBrief(
     run: input.run,
     workflow_version: "generation_brief_v1",
     generation_contract: [
+      "Use getOperatorPlaybook as the operating workflow for generation, scheduling, and learning loops.",
       "Study the returned context before writing.",
+      "Use posted tag performance and follower-day movement as directional evidence, not as rigid creative categories.",
       "Create an internal candidate pool larger than the requested batch before showing drafts.",
       "Self-reject weak, corny, generic, repetitive, off-brand, unclear, or overfit drafts before showing them.",
       "Use flexible creative directions; do not force posts into fixed categories.",

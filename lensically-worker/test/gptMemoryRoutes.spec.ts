@@ -511,6 +511,30 @@ describe("GPT memory browser routes", () => {
         ],
       }),
     });
+
+    const generationResponse = await fetchFromWorker(`/api/gpt/generation-context?brand_key=${TEST_BRAND_KEY}&compact=true`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(generationResponse.status).toBe(200);
+    await expect(generationResponse.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      posted_tagged_results: [
+        expect.objectContaining({
+          scheduled_post_id: 888,
+          follower_day_net_change: 8,
+        }),
+      ],
+      tag_performance: expect.objectContaining({
+        pillars: [
+          expect.objectContaining({
+            key: "offer",
+            median_follower_day_net_change: 8,
+          }),
+        ],
+      }),
+    });
   });
 
   it("returns a dashboard scoped to the selected account", async () => {
