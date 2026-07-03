@@ -36,6 +36,7 @@ const MAX_THREADS_POST_CURSOR_DEPTH = 250;
 const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const WORKSPACE_APP_USER_ID = "workspace-owner";
+const SAVED_PATTERNS_APP_USER_ID = "lensically";
 const WORKSPACE_IS_ADMIN = true;
 const WORKSPACE_DEFAULT_TIMEZONE = "America/New_York";
 const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;
@@ -6213,7 +6214,7 @@ async function listSavedPatternsForHermes(
      ORDER BY likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC
      LIMIT ?`,
   )
-    .bind(WORKSPACE_APP_USER_ID, accountId, limit)
+    .bind(SAVED_PATTERNS_APP_USER_ID, accountId, limit)
     .all<ExternalPatternRow>();
 
   return rows.results ?? [];
