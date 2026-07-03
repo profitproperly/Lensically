@@ -206,6 +206,11 @@ export default function GptMemoryPage() {
   }
 
   async function updateDraft(draft: GenerationDraft, status: string) {
+    const feedbackNote = window.prompt("Optional feedback for the GPT to remember about this draft:", "");
+    if (feedbackNote === null) {
+      return;
+    }
+
     setSaving(`${draft.id}-${status}`);
     setError("");
     try {
@@ -218,8 +223,9 @@ export default function GptMemoryPage() {
           draft_id: draft.id,
           status,
           rejection_reason: status === "rejected" || status === "self_rejected"
-            ? `Marked ${status.replace(/_/g, " ")} from Lensically GPT Memory dashboard.`
+            ? feedbackNote || `Marked ${status.replace(/_/g, " ")} from Lensically GPT Memory dashboard.`
             : undefined,
+          feedback_note: feedbackNote,
           metadata: {
             dashboard_previous_status: draft.status,
           },
