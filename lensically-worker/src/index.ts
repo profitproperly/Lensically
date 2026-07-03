@@ -5094,6 +5094,101 @@ async function buildGptGrowthContext(
   };
 }
 
+async function buildGptGrowthReview(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    days: number;
+    objective: string | null;
+  },
+): Promise<Record<string, unknown>> {
+  const normalizedDays = Math.min(Math.max(Math.trunc(input.days), 7), 90);
+  const growthContext = await buildGptGrowthContext(env, brand, normalizedDays);
+  const followers = growthContext.followers && typeof growthContext.followers === "object"
+    ? growthContext.followers as Record<string, unknown>
+    : {};
+  const engagementFloor = growthContext.engagement_floor && typeof growthContext.engagement_floor === "object"
+    ? growthContext.engagement_floor as Record<string, unknown>
+    : {};
+  const archiveRecent = Array.isArray(growthContext.archive_recent)
+    ? growthContext.archive_recent as CachedThreadsPost[]
+    : [];
+  const topGrowthWindows = Array.isArray(growthContext.top_growth_windows)
+    ? growthContext.top_growth_windows as Array<Record<string, unknown>>
+    : [];
+  const weakGrowthWindows = Array.isArray(growthContext.weak_growth_windows)
+    ? growthContext.weak_growth_windows as Array<Record<string, unknown>>
+    : [];
+  const tagUsage = growthContext.tag_usage && typeof growthContext.tag_usage === "object"
+    ? growthContext.tag_usage as Record<string, unknown>
+    : {};
+  const experimentSummary = growthContext.experiment_summary && typeof growthContext.experiment_summary === "object"
+    ? growthContext.experiment_summary as Record<string, unknown>
+    : {};
+  const sampleSize = archiveRecent.length;
+  const weakLikesThreshold = Number(engagementFloor.weak_likes_threshold ?? 0);
+  const topQuartileLikes = Number(engagementFloor.top_quartile_likes ?? 0);
+  const weakPosts = archiveRecent.filter((post) => Number(post.likes ?? 0) <= weakLikesThreshold);
+  const winnerPosts = archiveRecent.filter((post) => Number(post.likes ?? 0) >= topQuartileLikes);
+  const weakPostRate = sampleSize ? weakPosts.length / sampleSize : 0;
+  const winnerRate = sampleSize ? winnerPosts.length / sampleSize : 0;
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    objective: input.objective,
+    review_version: "growth_review_v1",
+    review_contract: [
+      "Separate follower-growth evidence from engagement-only evidence.",
+      "Name what to exploit, what to explore, what to stop, and what needs a retest.",
+      "Use sample-size caution; propose experiments when evidence is thin.",
+      "Suggest rule changes only when the evidence is strong enough and still fits owner taste.",
+      "Keep recommendations flexible so the GPT can adapt as the brand, audience, and market change.",
+    ],
+    period: growthContext.period,
+    account: growthContext.account,
+    growth_summary: {
+      followers_current: followers.current ?? null,
+      net_change_period: followers.net_change_period ?? null,
+      avg_daily_growth: followers.avg_daily_growth ?? null,
+      sample_size: sampleSize,
+      winner_count: winnerPosts.length,
+      weak_count: weakPosts.length,
+      winner_rate: Number(winnerRate.toFixed(3)),
+      weak_post_rate: Number(weakPostRate.toFixed(3)),
+      median_likes: engagementFloor.median_likes ?? null,
+      median_views: engagementFloor.median_views ?? null,
+      median_engagement_total: engagementFloor.median_engagement_total ?? null,
+      weak_likes_threshold: engagementFloor.weak_likes_threshold ?? null,
+      top_quartile_likes: engagementFloor.top_quartile_likes ?? null,
+    },
+    likely_drivers: topGrowthWindows.slice(0, 5),
+    weak_windows: weakGrowthWindows.slice(0, 5),
+    post_samples: {
+      recent: archiveRecent.slice(0, 15),
+      winners: winnerPosts
+        .sort((left, right) => Number(right.engagement_total ?? 0) - Number(left.engagement_total ?? 0))
+        .slice(0, 8),
+      weak: weakPosts.slice(0, 8),
+    },
+    tag_usage: tagUsage,
+    experiment_summary: experimentSummary,
+    recommendation_prompts: [
+      "What is working well enough to exploit next week?",
+      "What needs a small novelty test instead of a rule?",
+      "What is repeating enough to cool down?",
+      "Which saved pattern or archive mechanism should be adapted next without copying surface wording?",
+      "Which rule proposal deserves a rule review, cooldown, retest, or promotion to current belief?",
+    ],
+    suggested_follow_up_actions: [
+      "Use saveExperiment for tests with hypotheses, criteria, sample size, and review date.",
+      "Use saveRuleReview when a belief/rule should be kept, revised, cooled down, retired, retested, promoted, or challenged.",
+      "Use saveTasteFeedback when the owner's taste feedback changes the growth strategy.",
+      "Use saveStrategyMemory with kind result_note for weekly review notes that should persist.",
+    ],
+  };
+}
+
 function normalizeCreativeComparisonText(value: string | null | undefined): string {
   return (value ?? "")
     .toLowerCase()
@@ -5902,6 +5997,18 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 45 } },
           ],
           responses: { "200": { description: "Growth context" } },
+        },
+      },
+      "/api/gpt/growth-review": {
+        get: {
+          operationId: "prepareGrowthReview",
+          summary: "Prepare a compact periodic growth review packet with follower trend, engagement floor, winner/weak rates, experiments, and flexible recommendation prompts.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 30 } },
+            { name: "objective", in: "query", required: false, schema: { type: "string", description: "Optional review focus, such as weekly review, follower growth, engagement floor, or novelty fatigue." } },
+          ],
+          responses: { "200": { description: "Growth review" } },
         },
       },
       "/api/gpt/generation-runs": {
@@ -9414,6 +9521,25 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const days = Number.isFinite(rawDays) ? rawDays : 45;
         const growthContext = await buildGptGrowthContext(env, brand, days);
         return new Response(JSON.stringify(growthContext), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/growth-review" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const days = parseBoundedIntegerParam(url.searchParams.get("days"), 30, 7, 90);
+        const review = await buildGptGrowthReview(env, brand, {
+          days,
+          objective: normalizeGptMemoryText(url.searchParams.get("objective"), 500, true),
+        });
+        return new Response(JSON.stringify(review), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
