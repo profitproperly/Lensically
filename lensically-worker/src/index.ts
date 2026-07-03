@@ -6709,7 +6709,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/generation-context": {
         get: {
           operationId: "getGenerationContext",
-          summary: "Get a compact pre-generation context packet with taste memory, current beliefs, archive samples, saved patterns, scheduled posts, generation history, growth signals, and duplicate/fatigue hints.",
+          summary: "Get a compact pre-generation context packet with taste memory, current beliefs, archive samples, saved patterns, scheduled posts, posted tag performance, follower movement, generation history, and duplicate/fatigue hints.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's generation objective or prompt summary." } },
@@ -6825,7 +6825,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/growth-context": {
         get: {
           operationId: "getGrowthContext",
-          summary: "Get follower growth context, growth windows, engagement floor metrics, scheduled strategy tags, and growth memory for a brand.",
+          summary: "Get follower growth context, growth windows, engagement floor metrics, scheduled strategy tags, posted tag performance, follower-day attribution, and growth memory for a brand.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 45 } },
@@ -6836,7 +6836,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/growth-review": {
         get: {
           operationId: "prepareGrowthReview",
-          summary: "Prepare a compact periodic growth review packet with follower trend, engagement floor, winner/weak rates, experiments, and flexible recommendation prompts.",
+          summary: "Prepare a compact periodic growth review packet with follower trend, engagement floor, winner/weak rates, posted tag performance, experiments, and flexible recommendation prompts.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 30 } },
