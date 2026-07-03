@@ -178,6 +178,17 @@ type GptPostStrategyTagRow = {
   updated_at: string;
 };
 
+type GptTaggedPostedPost = {
+  scheduled_post_id: number;
+  published_post_id: string | null;
+  text: string;
+  status: string;
+  scheduled_time_utc: string;
+  published_at: string | null;
+  strategy: ReturnType<typeof serializeGptPostStrategyTag>;
+  post: CachedThreadsPost | null;
+};
+
 type GptGenerationRunRow = {
   id: string;
   account_id: string;
@@ -2363,6 +2374,7 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
     { name: "spoiler_all_text", definition: "INTEGER NOT NULL DEFAULT 0" },
     { name: "spoiler_phrases_json", definition: "TEXT" },
     { name: "publish_request_id", definition: "TEXT" },
+    { name: "published_post_id", definition: "TEXT" },
     { name: "idempotency_key", definition: "TEXT" },
     { name: "published_at", definition: "TEXT" },
     { name: "failed_at", definition: "TEXT" },
@@ -4382,6 +4394,158 @@ async function listGptPostStrategyTagsForScheduledPosts(
   return result;
 }
 
+async function listPostedGptStrategyTaggedPosts(
+  env: Env,
+  threadsUserId: string,
+  limit = 100,
+): Promise<GptTaggedPostedPost[]> {
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 250);
+  const [scheduledExists, tagsExists, archiveExists] = await Promise.all([
+    doesTableExist(env, "scheduled_posts"),
+    doesTableExist(env, "gpt_post_strategy_tags"),
+    doesTableExist(env, "threads_posts_archive"),
+  ]);
+  if (!scheduledExists || !tagsExists) {
+    return [];
+  }
+
+  const archiveSelect = archiveExists
+    ? `a.post_id,
+       a.post_text AS archive_post_text,
+       a.post_timestamp,
+       a.post_permalink,
+       a.post_username,
+       a.profile_picture_url,
+       a.views,
+       a.likes,
+       a.replies,
+       a.reposts,
+       a.quotes,
+       a.shares,
+       a.engagement_total`
+    : `NULL AS post_id,
+       NULL AS archive_post_text,
+       NULL AS post_timestamp,
+       NULL AS post_permalink,
+       NULL AS post_username,
+       NULL AS profile_picture_url,
+       NULL AS views,
+       NULL AS likes,
+       NULL AS replies,
+       NULL AS reposts,
+       NULL AS quotes,
+       NULL AS shares,
+       NULL AS engagement_total`;
+  const archiveJoin = archiveExists
+    ? `LEFT JOIN threads_posts_archive a
+         ON a.threads_user_id = s.threads_user_id
+        AND a.post_id = s.published_post_id`
+    : "";
+
+  const rows = await env.DB.prepare(
+    `SELECT
+       s.id AS scheduled_post_id,
+       s.post_text,
+       s.status,
+       s.scheduled_time,
+       s.published_at,
+       s.published_post_id,
+       t.account_id,
+       t.threads_user_id,
+       t.pillar,
+       t.hook_style,
+       t.format,
+       t.intent,
+       t.experiment,
+       t.novelty_level,
+       t.metadata_json,
+       t.created_at AS tag_created_at,
+       t.updated_at AS tag_updated_at,
+       ${archiveSelect}
+     FROM scheduled_posts s
+     INNER JOIN gpt_post_strategy_tags t
+       ON t.scheduled_post_id = s.id
+     ${archiveJoin}
+     WHERE s.threads_user_id = ?
+       AND s.status = ?
+     ORDER BY COALESCE(s.published_at, s.scheduled_time) DESC, s.id DESC
+     LIMIT ?`,
+  )
+    .bind(threadsUserId, SCHEDULED_POST_STATUS_POSTED, normalizedLimit)
+    .all<{
+      scheduled_post_id: number | string;
+      post_text: string;
+      status: string;
+      scheduled_time: string;
+      published_at: string | null;
+      published_post_id: string | null;
+      account_id: string;
+      threads_user_id: string;
+      pillar: string | null;
+      hook_style: string | null;
+      format: string | null;
+      intent: string | null;
+      experiment: string | null;
+      novelty_level: string | null;
+      metadata_json: string | null;
+      tag_created_at: string;
+      tag_updated_at: string;
+      post_id: string | null;
+      archive_post_text: string | null;
+      post_timestamp: string | null;
+      post_permalink: string | null;
+      post_username: string | null;
+      profile_picture_url: string | null;
+      views: number | string | null;
+      likes: number | string | null;
+      replies: number | string | null;
+      reposts: number | string | null;
+      quotes: number | string | null;
+      shares: number | string | null;
+      engagement_total: number | string | null;
+    }>();
+
+  return (rows.results ?? []).map((row) => ({
+    scheduled_post_id: Number(row.scheduled_post_id),
+    published_post_id: row.published_post_id,
+    text: row.post_text,
+    status: row.status,
+    scheduled_time_utc: row.scheduled_time,
+    published_at: row.published_at,
+    strategy: serializeGptPostStrategyTag({
+      scheduled_post_id: row.scheduled_post_id,
+      account_id: row.account_id,
+      threads_user_id: row.threads_user_id,
+      pillar: row.pillar,
+      hook_style: row.hook_style,
+      format: row.format,
+      intent: row.intent,
+      experiment: row.experiment,
+      novelty_level: row.novelty_level,
+      metadata_json: row.metadata_json,
+      created_at: row.tag_created_at,
+      updated_at: row.tag_updated_at,
+    }),
+    post: row.post_id
+      ? {
+        id: row.post_id,
+        text: row.archive_post_text,
+        timestamp: row.post_timestamp,
+        permalink: row.post_permalink,
+        username: row.post_username,
+        profile_picture_url: row.profile_picture_url,
+        views: Number(row.views ?? 0),
+        likes: Number(row.likes ?? 0),
+        replies: Number(row.replies ?? 0),
+        reposts: Number(row.reposts ?? 0),
+        quotes: Number(row.quotes ?? 0),
+        shares: Number(row.shares ?? 0),
+        engagement_total: Number(row.engagement_total ?? 0),
+      }
+      : null,
+  }));
+}
+
 function calculateMedian(values: number[]): number {
   const sorted = values.filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
   if (!sorted.length) {
@@ -4421,6 +4585,43 @@ function summarizeTagUsage(
       used,
       fatigue_risk: used >= 5 ? "high" : used >= 3 ? "medium" : "low",
     }));
+}
+
+function summarizeTaggedPostPerformance(
+  taggedPosts: GptTaggedPostedPost[],
+  field: "pillar" | "hook_style" | "format" | "intent" | "experiment" | "novelty_level",
+): Array<{
+  key: string;
+  posts: number;
+  posts_with_metrics: number;
+  median_engagement_total: number;
+  median_likes: number;
+  median_views: number;
+}> {
+  const grouped = new Map<string, GptTaggedPostedPost[]>();
+  for (const taggedPost of taggedPosts) {
+    const key = taggedPost.strategy[field];
+    if (!key) {
+      continue;
+    }
+    const posts = grouped.get(key) ?? [];
+    posts.push(taggedPost);
+    grouped.set(key, posts);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([key, posts]) => {
+      const postsWithMetrics = posts.filter((post) => post.post !== null);
+      return {
+        key,
+        posts: posts.length,
+        posts_with_metrics: postsWithMetrics.length,
+        median_engagement_total: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.engagement_total ?? 0)).toFixed(2)),
+        median_likes: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.likes ?? 0)).toFixed(2)),
+        median_views: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.views ?? 0)).toFixed(2)),
+      };
+    })
+    .sort((left, right) => right.posts_with_metrics - left.posts_with_metrics || right.median_engagement_total - left.median_engagement_total || left.key.localeCompare(right.key));
 }
 
 async function ensureGptGenerationRunsTable(env: Env): Promise<void> {
@@ -4985,7 +5186,7 @@ async function buildGptGrowthContext(
   });
 
   const archiveLimit = Math.min(Math.max(normalizedDays * 8, 80), 500);
-  const [recentArchive, topArchive, scheduledPosts, strategyMemory] = await Promise.all([
+  const [recentArchive, topArchive, scheduledPosts, strategyMemory, taggedPostResults] = await Promise.all([
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", archiveLimit, 0),
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", 80, 0),
     listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100),
@@ -4999,6 +5200,7 @@ async function buildGptGrowthContext(
       "result_note",
       "scheduled_batch",
     ], 80),
+    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 120),
   ]);
 
   const scheduledTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
@@ -5103,6 +5305,15 @@ async function buildGptGrowthContext(
       experiments: summarizeTagUsage(scheduledTags, "experiment"),
       novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
     },
+    tagged_post_results: taggedPostResults,
+    tag_performance: {
+      pillars: summarizeTaggedPostPerformance(taggedPostResults, "pillar"),
+      hook_styles: summarizeTaggedPostPerformance(taggedPostResults, "hook_style"),
+      formats: summarizeTaggedPostPerformance(taggedPostResults, "format"),
+      intents: summarizeTaggedPostPerformance(taggedPostResults, "intent"),
+      experiments: summarizeTaggedPostPerformance(taggedPostResults, "experiment"),
+      novelty_levels: summarizeTaggedPostPerformance(taggedPostResults, "novelty_level"),
+    },
     strategy_memory: strategyMemory,
     experiment_summary: buildGptExperimentSummary(strategyMemory),
     growth_rules: [
@@ -5141,6 +5352,9 @@ async function buildGptGrowthReview(
     : [];
   const tagUsage = growthContext.tag_usage && typeof growthContext.tag_usage === "object"
     ? growthContext.tag_usage as Record<string, unknown>
+    : {};
+  const tagPerformance = growthContext.tag_performance && typeof growthContext.tag_performance === "object"
+    ? growthContext.tag_performance as Record<string, unknown>
     : {};
   const experimentSummary = growthContext.experiment_summary && typeof growthContext.experiment_summary === "object"
     ? growthContext.experiment_summary as Record<string, unknown>
@@ -5192,6 +5406,7 @@ async function buildGptGrowthReview(
       weak: weakPosts.slice(0, 8),
     },
     tag_usage: tagUsage,
+    tag_performance: tagPerformance,
     experiment_summary: experimentSummary,
     recommendation_prompts: [
       "What is working well enough to exploit next week?",

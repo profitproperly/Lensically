@@ -22,6 +22,8 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_strategy_memory").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_generation_drafts").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_generation_runs").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS threads_posts_archive").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS threads_follower_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_accounts").run();
   await env.DB.prepare(
     `CREATE TABLE users (
@@ -108,6 +110,79 @@ async function createScheduledPostFixture(): Promise<void> {
     `INSERT INTO scheduled_posts (id, user_id, threads_user_id, post_text, status, scheduled_time)
      VALUES (777, 'workspace-owner', ?, 'Scheduled strategy fixture', 'approved', '2099-01-01T15:00:00.000Z')`,
   ).bind(TEST_THREADS_USER_ID).run();
+}
+
+async function createPostedTaggedPostFixture(): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE scheduled_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      post_text TEXT NOT NULL,
+      spoiler_all_text INTEGER NOT NULL DEFAULT 0,
+      spoiler_phrases_json TEXT,
+      status TEXT NOT NULL,
+      scheduled_time TEXT NOT NULL,
+      publish_request_id TEXT,
+      published_post_id TEXT,
+      publish_error_message TEXT,
+      idempotency_key TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processing_started_at TEXT,
+      published_at TEXT,
+      failed_at TEXT,
+      cancelled_at TEXT,
+      last_attempted_at TEXT
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE threads_posts_archive (
+      threads_user_id TEXT NOT NULL,
+      post_id TEXT NOT NULL,
+      post_text TEXT,
+      post_timestamp TEXT,
+      post_permalink TEXT,
+      post_username TEXT,
+      profile_picture_url TEXT,
+      views INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      quotes INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      engagement_total INTEGER NOT NULL DEFAULT 0,
+      source_rank INTEGER NOT NULL DEFAULT 0,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (threads_user_id, post_id)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO scheduled_posts (id, user_id, threads_user_id, post_text, status, scheduled_time, published_post_id, published_at)
+     VALUES (888, 'workspace-owner', ?, 'Posted strategy fixture', 'posted', '2026-07-01T15:00:00.000Z', 'post-888', '2026-07-01T15:01:00.000Z')`,
+  ).bind(TEST_THREADS_USER_ID).run();
+  await env.DB.prepare(
+    `INSERT INTO threads_posts_archive (
+      threads_user_id, post_id, post_text, post_timestamp, post_permalink, post_username,
+      views, likes, replies, reposts, quotes, shares, engagement_total, source_rank
+    ) VALUES (?, 'post-888', 'Posted strategy fixture', '2026-07-01T15:01:00.000Z', 'https://threads.net/post-888', 'vectrixvoltmore',
+      1200, 90, 12, 8, 2, 1, 113, 0)`,
+  ).bind(TEST_THREADS_USER_ID).run();
+  await fetchFromWorker("/api/threads/schedule/strategy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scheduled_post_id: 888,
+      pillar: "offer",
+      hook_style: "direct",
+      format: "short",
+      intent: "follower_growth",
+      experiment: "posted tag learning",
+      novelty_level: "medium",
+    }),
+  });
 }
 
 describe("GPT memory browser routes", () => {
@@ -378,6 +453,46 @@ describe("GPT memory browser routes", () => {
           }),
         }),
       ],
+    });
+  });
+
+  it("includes posted strategy-tag performance in GPT growth context", async () => {
+    await createPostedTaggedPostFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker(`/api/gpt/growth-context?brand_key=${TEST_BRAND_KEY}`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      tagged_post_results: [
+        expect.objectContaining({
+          scheduled_post_id: 888,
+          published_post_id: "post-888",
+          strategy: expect.objectContaining({
+            pillar: "offer",
+            hook_style: "direct",
+          }),
+          post: expect.objectContaining({
+            id: "post-888",
+            likes: 90,
+            engagement_total: 113,
+          }),
+        }),
+      ],
+      tag_performance: expect.objectContaining({
+        pillars: [
+          expect.objectContaining({
+            key: "offer",
+            posts: 1,
+            posts_with_metrics: 1,
+            median_engagement_total: 113,
+          }),
+        ],
+      }),
     });
   });
 
