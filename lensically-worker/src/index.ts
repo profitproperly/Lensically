@@ -11538,6 +11538,69 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/strategy-memory" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const allowedKinds = new Set<GptStrategyMemoryKind>([
+        "rule_proposal",
+        "current_belief",
+        "approved_rule",
+        "result_note",
+        "brand_voice_note",
+        "banned_phrase",
+        "scheduled_batch",
+      ]);
+      const requestedKind = normalizeGptStrategyMemoryKind(payload.kind);
+      const kind = requestedKind && allowedKinds.has(requestedKind) ? requestedKind : null;
+      const body = normalizeGptMemoryText(payload.body, 10000);
+      if (!brand || !kind || !body) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id, valid kind, and body are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const title = normalizeGptMemoryText(payload.title, 200, true);
+      const memory = await saveGptStrategyMemory(env, {
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+        kind,
+        title,
+        body,
+        metadataJson: normalizeGptMemoryMetadata({
+          source: "lensically_memory_dashboard",
+          flexible_note: "Treat saved strategy memory as reviewable working knowledge, not permanent truth.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        }),
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        brand_key: brand.brand_key,
+        memory,
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/gpt-memory/generation-brief" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {

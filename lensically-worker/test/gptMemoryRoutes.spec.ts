@@ -141,6 +141,33 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("stores browser-safe strategy memory for rule proposals", async () => {
+    const response = await fetchFromWorker("/api/gpt-memory/strategy-memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threads_user_id: TEST_THREADS_USER_ID,
+        kind: "rule_proposal",
+        title: "Test direct hooks",
+        body: "Try sharper direct hooks with sample-size caution.",
+        metadata: { test_case: "rule_proposal" },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      memory: expect.objectContaining({
+        account_id: TEST_ACCOUNT_ID,
+        threads_user_id: TEST_THREADS_USER_ID,
+        kind: "rule_proposal",
+        title: "Test direct hooks",
+        body: "Try sharper direct hooks with sample-size caution.",
+      }),
+    });
+  });
+
   it("stores saved pattern reviews as pattern memory", async () => {
     const response = await fetchFromWorker("/api/gpt-memory/saved-patterns/review", {
       method: "POST",

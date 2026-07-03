@@ -100,6 +100,7 @@ const DRAFT_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/generation-drafts/updat
 const EXPERIMENT_URL = buildWorkerUrl("/api/gpt-memory/experiment");
 const TASTE_FEEDBACK_URL = buildWorkerUrl("/api/gpt-memory/taste-feedback");
 const GENERATION_BRIEF_URL = buildWorkerUrl("/api/gpt-memory/generation-brief");
+const STRATEGY_MEMORY_URL = buildWorkerUrl("/api/gpt-memory/strategy-memory");
 
 const MEMORY_SECTIONS: Array<{ kind: string; label: string }> = [
   { kind: "current_belief", label: "Current Beliefs" },
@@ -309,6 +310,45 @@ export default function GptMemoryPage() {
       await loadDashboard();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save experiment.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveRuleProposalFromSuggestion(suggestion: RuleSuggestion) {
+    const note = window.prompt("Optional note before saving this rule proposal:", "");
+    if (note === null) {
+      return;
+    }
+
+    setSaving(`proposal-${suggestion.suggestion_type}-${suggestion.title}`);
+    setError("");
+    try {
+      const response = await fetch(STRATEGY_MEMORY_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          kind: "rule_proposal",
+          title: suggestion.title,
+          body: suggestion.proposed_rule,
+          metadata: {
+            suggestion_type: suggestion.suggestion_type,
+            recommended_action: suggestion.recommended_action,
+            evidence_level: suggestion.evidence_level,
+            caution: suggestion.caution,
+            owner_note: note,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save rule proposal.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save rule proposal.");
     } finally {
       setSaving(null);
     }
@@ -667,6 +707,14 @@ export default function GptMemoryPage() {
                         className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {saving === `suggestion-${suggestion.suggestion_type}-${suggestion.title}` ? "Saving..." : "Start Test"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveRuleProposalFromSuggestion(suggestion)}
+                        disabled={Boolean(saving)}
+                        className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {saving === `proposal-${suggestion.suggestion_type}-${suggestion.title}` ? "Saving..." : "Save Proposal"}
                       </button>
                     </div>
                   </article>
