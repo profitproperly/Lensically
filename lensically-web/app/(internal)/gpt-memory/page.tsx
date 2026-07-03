@@ -174,6 +174,7 @@ export default function GptMemoryPage() {
   const [briefObjective, setBriefObjective] = useState("");
   const [briefBatchSize, setBriefBatchSize] = useState(8);
   const [generationBrief, setGenerationBrief] = useState<GenerationBrief | null>(null);
+  const [memoryFilter, setMemoryFilter] = useState<"active" | "archived" | "all">("active");
 
   const loadDashboard = useCallback(async (selectedThreadsUserId = threadsUserId) => {
     setLoading(true);
@@ -213,9 +214,34 @@ export default function GptMemoryPage() {
   const visibleSections = useMemo(() => (
     MEMORY_SECTIONS.map((section) => ({
       ...section,
-      items: dashboard?.memory_by_kind?.[section.kind] ?? [],
+      items: (dashboard?.memory_by_kind?.[section.kind] ?? []).filter((memory) => {
+        const archived = memoryMetadata(memory).archived === true;
+        if (memoryFilter === "archived") {
+          return archived;
+        }
+        if (memoryFilter === "active") {
+          return !archived;
+        }
+        return true;
+      }),
     })).filter((section) => section.items.length > 0)
-  ), [dashboard?.memory_by_kind]);
+  ), [dashboard?.memory_by_kind, memoryFilter]);
+
+  const memoryFilterCounts = useMemo(() => {
+    const allItems = Object.values(dashboard?.memory_by_kind ?? {}).flat();
+    return allItems.reduce(
+      (counts, memory) => {
+        counts.all += 1;
+        if (memoryMetadata(memory).archived === true) {
+          counts.archived += 1;
+        } else {
+          counts.active += 1;
+        }
+        return counts;
+      },
+      { active: 0, archived: 0, all: 0 },
+    );
+  }, [dashboard?.memory_by_kind]);
 
   const topTagPerformance = useMemo(() => {
     const performance = dashboard?.growth_review?.tag_performance ?? {};
@@ -335,6 +361,32 @@ export default function GptMemoryPage() {
       await loadDashboard();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not archive memory.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function unarchiveMemory(memory: StrategyMemory) {
+    setSaving(`${memory.id}-unarchive`);
+    setError("");
+    try {
+      const response = await fetch(STRATEGY_MEMORY_UPDATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          memory_id: memory.id,
+          archived: false,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not unarchive memory.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not unarchive memory.");
     } finally {
       setSaving(null);
     }
@@ -934,7 +986,34 @@ export default function GptMemoryPage() {
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-950">Memory Review</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Memory Review</h2>
+                <p className="text-sm text-slate-500">
+                  {formatNumber(memoryFilterCounts.active)} active, {formatNumber(memoryFilterCounts.archived)} archived
+                </p>
+              </div>
+              <div className="flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                {[
+                  ["active", "Active", memoryFilterCounts.active],
+                  ["archived", "Archived", memoryFilterCounts.archived],
+                  ["all", "All", memoryFilterCounts.all],
+                ].map(([value, label, count]) => (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    onClick={() => setMemoryFilter(value as "active" | "archived" | "all")}
+                    className={`rounded px-2.5 py-1.5 text-xs font-semibold ${
+                      memoryFilter === value
+                        ? "bg-white text-slate-950 shadow-sm"
+                        : "text-slate-600 hover:text-slate-950"
+                    }`}
+                  >
+                    {label} {formatNumber(Number(count))}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-4 grid gap-4 xl:grid-cols-2">
               {visibleSections.length ? visibleSections.map((section) => (
                 <div key={section.kind} className="rounded-lg border border-slate-200">
@@ -966,7 +1045,16 @@ export default function GptMemoryPage() {
                           >
                             {saving === `${memory.id}-edit` ? "Saving..." : "Edit"}
                           </button>
-                          {memoryMetadata(memory).archived === true ? null : (
+                          {memoryMetadata(memory).archived === true ? (
+                            <button
+                              type="button"
+                              onClick={() => void unarchiveMemory(memory)}
+                              disabled={Boolean(saving)}
+                              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {saving === `${memory.id}-unarchive` ? "Saving..." : "Unarchive"}
+                            </button>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => void archiveMemory(memory)}
