@@ -219,6 +219,40 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("stores GPT action draft feedback as strategy memory", async () => {
+    await createGenerationDraftFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker("/api/gpt/generation-drafts/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        draft_id: "draft-test",
+        status: "rejected",
+        rejection_reason: "Too generic.",
+        feedback_note: "Reject wording that sounds like generic internet advice.",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      draft: expect.objectContaining({
+        id: "draft-test",
+        status: "rejected",
+      }),
+      feedback_memory: expect.objectContaining({
+        kind: "rejection_feedback",
+        body: expect.stringContaining("Reject wording that sounds like generic internet advice."),
+      }),
+    });
+  });
+
   it("returns a browser-safe generation brief without creating a run by default", async () => {
     const response = await fetchFromWorker("/api/gpt-memory/generation-brief", {
       method: "POST",

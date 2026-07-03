@@ -6600,6 +6600,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                     draft_id: { type: "string" },
                     status: { type: "string" },
                     rejection_reason: { type: "string" },
+                    feedback_note: { type: "string", description: "Approval or rejection lesson to save as flexible strategy memory for future generation." },
                     scheduled_post_id: { type: "integer" },
                     metadata: { type: "object", additionalProperties: true },
                   },
@@ -10270,18 +10271,41 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           });
         }
         const scheduledPostId = Number(payload.scheduled_post_id);
+        const nextStatus = normalizeGptGenerationStatus(payload.status);
+        const feedbackNote = normalizeGptMemoryText(payload.feedback_note, 8000, true);
         const draft = await updateGptGenerationDraft(env, {
           draftId,
           accountId: brand.account_id,
-          status: normalizeGptGenerationStatus(payload.status),
+          status: nextStatus,
           rejectionReason: normalizeGptMemoryText(payload.rejection_reason, 1000, true),
           scheduledPostId: Number.isInteger(scheduledPostId) && scheduledPostId > 0 ? scheduledPostId : null,
           metadataJson: normalizeGptMemoryMetadata(payload.metadata),
         });
+        const feedbackMemory = draft && feedbackNote && ["approved", "rejected", "self_rejected"].includes(nextStatus)
+          ? await saveGptStrategyMemory(env, {
+            accountId: brand.account_id,
+            threadsUserId: brand.profile.threads_user_id,
+            kind: nextStatus === "approved" ? "approval_feedback" : "rejection_feedback",
+            title: `Draft ${nextStatus.replace(/_/g, " ")} feedback`,
+            body: [
+              `Draft id: ${draft.id}`,
+              `Status: ${nextStatus}`,
+              `Lesson: ${feedbackNote}`,
+            ].join("\n"),
+            metadataJson: normalizeGptMemoryMetadata({
+              source: "gpt_generation_draft_update",
+              draft_id: draft.id,
+              run_id: draft.run_id,
+              status: nextStatus,
+              flexible_note: "Use this as owner or GPT taste evidence for future generation, not a permanent rule.",
+            }),
+          })
+          : null;
         return new Response(JSON.stringify({
           success: Boolean(draft),
           brand_key: brand.brand_key,
           draft,
+          feedback_memory: feedbackMemory,
         }), {
           status: draft ? 200 : 404,
           headers: { "content-type": "application/json; charset=UTF-8" },
