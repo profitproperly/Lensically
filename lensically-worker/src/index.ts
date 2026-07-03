@@ -4005,6 +4005,25 @@ function normalizeGptMemoryMetadata(value: unknown): string | null {
   }
 }
 
+function normalizeGptStringArray(value: unknown, maxItems: number, maxLength: number): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeGptMemoryText(item, maxLength, true))
+    .filter((item): item is string => Boolean(item))
+    .slice(0, maxItems);
+}
+
+function normalizeGptRecordArray(value: unknown, maxItems: number): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    .slice(0, maxItems);
+}
+
 function serializeGptStrategyMemoryRow(row: GptStrategyMemoryRow): {
   id: number;
   account_id: string;
@@ -5392,6 +5411,41 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             },
           },
           responses: { "200": { description: "Updated generation draft" } },
+        },
+      },
+      "/api/gpt/taste-feedback": {
+        post: {
+          operationId: "saveTasteFeedback",
+          summary: "Save flexible owner taste feedback from a taste interview, draft review, approval, rejection, or brand voice discussion.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "lesson"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    feedback_type: {
+                      type: "string",
+                      enum: ["taste_profile", "approval_feedback", "rejection_feedback", "approved_pattern", "rejected_pattern", "brand_voice_note", "current_belief", "banned_phrase", "cooldown", "rule_review"],
+                      default: "taste_profile",
+                    },
+                    title: { type: "string" },
+                    lesson: { type: "string", description: "Natural-language taste lesson. Keep flexible; do not force rigid categories." },
+                    liked: { type: "array", items: { type: "string" } },
+                    disliked: { type: "array", items: { type: "string" } },
+                    examples: { type: "array", items: { type: "object", additionalProperties: true } },
+                    source: { type: "string", description: "taste_interview, draft_review, approval, rejection, saved_pattern_review, archive_review, or conversation." },
+                    confidence: { type: "string", enum: ["low", "medium", "high"] },
+                    review_after_days: { type: "integer", minimum: 1, maximum: 365 },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved taste feedback memory" } },
         },
       },
       "/api/gpt/scheduled": {
@@ -8621,6 +8675,89 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           draft,
         }), {
           status: draft ? 200 : 404,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/taste-feedback" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const allowedTasteKinds = new Set<GptStrategyMemoryKind>([
+          "taste_profile",
+          "approval_feedback",
+          "rejection_feedback",
+          "approved_pattern",
+          "rejected_pattern",
+          "brand_voice_note",
+          "current_belief",
+          "banned_phrase",
+          "cooldown",
+          "rule_review",
+        ]);
+        const requestedKind = normalizeGptStrategyMemoryKind(payload.feedback_type);
+        const kind = requestedKind && allowedTasteKinds.has(requestedKind) ? requestedKind : "taste_profile";
+        const lesson = normalizeGptMemoryText(payload.lesson, 8000);
+        if (!brand || !lesson) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and lesson are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+
+        const title = normalizeGptMemoryText(payload.title, 200, true)
+          ?? `${kind.replace(/_/g, " ")} feedback`;
+        const liked = normalizeGptStringArray(payload.liked, 20, 1000);
+        const disliked = normalizeGptStringArray(payload.disliked, 20, 1000);
+        const examples = normalizeGptRecordArray(payload.examples, 20);
+        const source = normalizeGptMemoryText(payload.source, 100, true) ?? "conversation";
+        const confidence = normalizeGptMemoryText(payload.confidence, 20, true);
+        const reviewAfterDays = parseBoundedIntegerParam(
+          typeof payload.review_after_days === "number" || typeof payload.review_after_days === "string"
+            ? String(payload.review_after_days)
+            : null,
+          0,
+          0,
+          365,
+        );
+        const reviewAfter = reviewAfterDays > 0
+          ? new Date(Date.now() + reviewAfterDays * 24 * 60 * 60 * 1000).toISOString()
+          : null;
+        const metadata = {
+          source,
+          confidence: confidence || null,
+          liked,
+          disliked,
+          examples,
+          review_after: reviewAfter,
+          flexible_note: "Use this as owner taste evidence, not a rigid creative category.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        };
+        const bodyParts = [
+          `Lesson: ${lesson}`,
+          liked.length ? `What worked: ${liked.join(" | ")}` : null,
+          disliked.length ? `What did not work: ${disliked.join(" | ")}` : null,
+          reviewAfter ? `Review after: ${reviewAfter}` : null,
+        ].filter(Boolean);
+        const memory = await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind,
+          title,
+          body: bodyParts.join("\n"),
+          metadataJson: normalizeGptMemoryMetadata(metadata),
+        });
+        return new Response(JSON.stringify({ success: true, brand_key: brand.brand_key, memory }), {
+          status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }
