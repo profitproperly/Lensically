@@ -7544,6 +7544,14 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function stripThreadsInlineUiTail(value: string): string {
+  return value
+    .replace(/\s*(?:Sort\s*)?Top\s*More\s*View activity.*$/i, "")
+    .replace(/\s*View activity\s*View activity\s*Reply to .*/i, "")
+    .replace(/\s*Reply to [^\n]*?(?:Attach media|Add a GIF|Expand composer).*$/i, "")
+    .trim();
+}
+
 function sanitizeImportedPatternText(
   text: string | null,
   authorHandle: string | null,
@@ -7560,7 +7568,7 @@ function sanitizeImportedPatternText(
     .split("\n")
     .map((line) => line.trim())
     .map((line) => {
-      let next = line;
+      let next = stripThreadsInlineUiTail(line);
       if (normalizedHandle) {
         next = next.replace(new RegExp(`^@?${escapeRegExp(normalizedHandle)}\\s+`, "i"), "");
       }
@@ -7585,6 +7593,9 @@ function sanitizeImportedPatternText(
         return false;
       }
       if (lower === "/" || lower === "thread") {
+        return false;
+      }
+      if (lower.includes("view activity") || lower.includes("expand composer") || lower.includes("attach media") || lower.includes("add a gif")) {
         return false;
       }
       if (/^\d+\s*\/\s*\d+$/.test(lower) || /^\/\s*\d+$/.test(lower)) {

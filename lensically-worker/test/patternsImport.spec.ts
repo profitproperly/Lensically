@@ -290,6 +290,34 @@ describe("patterns import routes", () => {
     });
   });
 
+  it("cleans desktop Threads activity and composer controls from imported saved pattern text", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www.threads.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@theuntamedwriter.1/post/DaU3g3GGfxC",
+        author_handle: "theuntamedwriter.1",
+        post_text: "YOU MARRY SOMEONE who gives you calm and keeps the spark alive.\nSortTopMoreView activityView activityReply to theuntamedwriter.1...Attach mediaAdd a GIFExpand composer",
+        views: 55500,
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        author_handle: "theuntamedwriter.1",
+        post_text: "YOU MARRY SOMEONE who gives you calm and keeps the spark alive.",
+        views: 55500,
+      }),
+    });
+  });
+
   it("cleans mobile published-date metadata from imported saved pattern text", async () => {
     const importResponse = await fetchFromWorker("/api/patterns/import", {
       method: "POST",
