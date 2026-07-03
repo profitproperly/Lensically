@@ -188,6 +188,34 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("returns a browser-safe generation brief without creating a run by default", async () => {
+    const response = await fetchFromWorker("/api/gpt-memory/generation-brief", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threads_user_id: TEST_THREADS_USER_ID,
+        objective: "Generate a tighter batch",
+        batch_size: 4,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      objective: "Generate a tighter batch",
+      run: null,
+      context_readiness: expect.objectContaining({
+        should_ask_taste_question: expect.any(Boolean),
+      }),
+      candidate_pool: expect.objectContaining({
+        requested_batch_size: 4,
+        minimum_internal_candidates: 12,
+        show_after_self_rejection: 4,
+      }),
+    });
+  });
+
   it("returns a dashboard scoped to the selected account", async () => {
     await fetchFromWorker("/api/gpt-memory/taste-feedback", {
       method: "POST",

@@ -11514,6 +11514,87 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/generation-brief" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      if (!brand) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id is required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const objective = normalizeGptMemoryText(payload.objective, 1000, true);
+      const batchSize = normalizeGptBatchSize(payload.batch_size, 8);
+      const context = await buildGptGenerationContext(env, brand, {
+        objective,
+        draftText: null,
+        recentLimit: 8,
+        recentOffset: 0,
+        topLimit: 8,
+        topOffset: 0,
+        weakLimit: 4,
+        weakOffset: 0,
+        savedPatternsLimit: 10,
+        savedPatternsOffset: 0,
+        memoryLimit: 50,
+        memoryOffset: 0,
+        runsLimit: 4,
+        runsOffset: 0,
+        approvedDraftsLimit: 12,
+        approvedDraftsOffset: 0,
+        rejectedDraftsLimit: 12,
+        rejectedDraftsOffset: 0,
+        growthDays: 14,
+        compact: true,
+      });
+      const shouldCreateRun = payload.create_run === true;
+      const run = shouldCreateRun
+        ? await createGptGenerationRun(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          objective,
+          promptSummary: normalizeGptMemoryText(payload.prompt_summary, 2000, true)
+            ?? `Lensically dashboard generation brief for ${brand.brand_key}`,
+          metadataJson: normalizeGptMemoryMetadata({
+            source: "lensically_memory_dashboard",
+            batch_size: batchSize,
+            workflow_version: "generation_brief_v1",
+            ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+              ? payload.metadata
+              : {}),
+          }),
+        })
+        : null;
+      const brief = buildGptGenerationWorkflowBrief(brand, {
+        objective,
+        batchSize,
+        context,
+        run,
+      });
+      return new Response(JSON.stringify(brief), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {

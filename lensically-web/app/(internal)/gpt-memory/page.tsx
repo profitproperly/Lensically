@@ -72,11 +72,34 @@ type GptMemoryDashboard = {
   error?: string;
 };
 
+type GenerationBrief = {
+  success?: boolean;
+  context_readiness?: {
+    memory_count?: number;
+    saved_patterns_count?: number;
+    approved_drafts_count?: number;
+    rejected_drafts_count?: number;
+    should_ask_taste_question?: boolean;
+    ask_taste_question_reasons?: string[];
+  };
+  candidate_pool?: {
+    requested_batch_size?: number;
+    minimum_internal_candidates?: number;
+    show_after_self_rejection?: number;
+    flexible_direction_prompts?: string[];
+  };
+  scoring_rubric?: {
+    self_reject_when?: string[];
+  };
+  error?: string;
+};
+
 const DASHBOARD_URL = buildWorkerUrl("/api/gpt-memory/dashboard");
 const RULE_REVIEW_URL = buildWorkerUrl("/api/gpt-memory/rule-review");
 const DRAFT_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/generation-drafts/update");
 const EXPERIMENT_URL = buildWorkerUrl("/api/gpt-memory/experiment");
 const TASTE_FEEDBACK_URL = buildWorkerUrl("/api/gpt-memory/taste-feedback");
+const GENERATION_BRIEF_URL = buildWorkerUrl("/api/gpt-memory/generation-brief");
 
 const MEMORY_SECTIONS: Array<{ kind: string; label: string }> = [
   { kind: "current_belief", label: "Current Beliefs" },
@@ -129,6 +152,9 @@ export default function GptMemoryPage() {
   const [error, setError] = useState("");
   const [tasteType, setTasteType] = useState("taste_profile");
   const [tasteLesson, setTasteLesson] = useState("");
+  const [briefObjective, setBriefObjective] = useState("");
+  const [briefBatchSize, setBriefBatchSize] = useState(8);
+  const [generationBrief, setGenerationBrief] = useState<GenerationBrief | null>(null);
 
   const loadDashboard = useCallback(async (selectedThreadsUserId = threadsUserId) => {
     setLoading(true);
@@ -368,6 +394,34 @@ export default function GptMemoryPage() {
     }
   }
 
+  async function loadGenerationBrief() {
+    setSaving("generation-brief");
+    setError("");
+    try {
+      const response = await fetch(GENERATION_BRIEF_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          objective: briefObjective,
+          batch_size: briefBatchSize,
+          create_run: false,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as GenerationBrief | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not load generation brief.");
+      }
+      setGenerationBrief(data);
+    } catch (saveError) {
+      setGenerationBrief(null);
+      setError(saveError instanceof Error ? saveError.message : "Could not load generation brief.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -473,6 +527,77 @@ export default function GptMemoryPage() {
                 {saving === "taste-feedback" ? "Saving..." : "Save Taste"}
               </button>
             </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="min-w-0 flex-1">
+                <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500" htmlFor="brief-objective">
+                  Generation Objective
+                </label>
+                <input
+                  id="brief-objective"
+                  value={briefObjective}
+                  onChange={(event) => setBriefObjective(event.target.value)}
+                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                  placeholder="Example: 8 posts for next week focused on raising engagement floor."
+                />
+              </div>
+              <div className="w-32">
+                <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500" htmlFor="brief-batch-size">
+                  Batch
+                </label>
+                <input
+                  id="brief-batch-size"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={briefBatchSize}
+                  onChange={(event) => setBriefBatchSize(Math.min(Math.max(Number(event.target.value) || 1, 1), 30))}
+                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadGenerationBrief()}
+                disabled={saving === "generation-brief"}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving === "generation-brief" ? "Checking..." : "Check Brief"}
+              </button>
+            </div>
+            {generationBrief ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Readiness</p>
+                  <p className="mt-2 text-sm text-slate-700">
+                    Memory {formatNumber(generationBrief.context_readiness?.memory_count)} · Saved patterns {formatNumber(generationBrief.context_readiness?.saved_patterns_count)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Approved {formatNumber(generationBrief.context_readiness?.approved_drafts_count)} · Rejected {formatNumber(generationBrief.context_readiness?.rejected_drafts_count)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Candidate Pool</p>
+                  <p className="mt-2 text-sm text-slate-700">
+                    Generate at least {formatNumber(generationBrief.candidate_pool?.minimum_internal_candidates)} internally to show {formatNumber(generationBrief.candidate_pool?.show_after_self_rejection)}.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Taste Question</p>
+                  <p className="mt-2 text-sm text-slate-700">
+                    {generationBrief.context_readiness?.should_ask_taste_question ? "Ask before generating." : "Enough signal to generate."}
+                  </p>
+                </div>
+                <div className="md:col-span-3">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {(generationBrief.candidate_pool?.flexible_direction_prompts ?? []).slice(0, 4).map((prompt) => (
+                      <p key={prompt} className="rounded-md bg-slate-100 px-3 py-2 text-sm leading-6 text-slate-700">{prompt}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
