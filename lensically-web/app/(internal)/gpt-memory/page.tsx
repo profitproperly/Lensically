@@ -75,6 +75,7 @@ type GptMemoryDashboard = {
 const DASHBOARD_URL = buildWorkerUrl("/api/gpt-memory/dashboard");
 const RULE_REVIEW_URL = buildWorkerUrl("/api/gpt-memory/rule-review");
 const DRAFT_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/generation-drafts/update");
+const EXPERIMENT_URL = buildWorkerUrl("/api/gpt-memory/experiment");
 
 const MEMORY_SECTIONS: Array<{ kind: string; label: string }> = [
   { kind: "current_belief", label: "Current Beliefs" },
@@ -233,6 +234,92 @@ export default function GptMemoryPage() {
     }
   }
 
+  async function saveExperimentFromSuggestion(suggestion: RuleSuggestion) {
+    const note = window.prompt("Optional test note or sample-size target:", "");
+    if (note === null) {
+      return;
+    }
+
+    setSaving(`suggestion-${suggestion.suggestion_type}-${suggestion.title}`);
+    setError("");
+    try {
+      const response = await fetch(EXPERIMENT_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          title: suggestion.title,
+          hypothesis: suggestion.proposed_rule,
+          status: "running",
+          success_criteria: [
+            "Compare engagement floor against recent account baseline.",
+            "Watch follower movement near posts using this idea.",
+            "Look for owner approval/rejection feedback before promoting to a rule.",
+          ],
+          sample_size_target: 5,
+          review_after_days: 14,
+          metadata: {
+            source_suggestion_type: suggestion.suggestion_type,
+            recommended_action: suggestion.recommended_action,
+            evidence_level: suggestion.evidence_level,
+            owner_note: note,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save experiment.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save experiment.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveExperimentDecision(memory: StrategyMemory, decision: string) {
+    const note = window.prompt(`Optional result note for ${decision}:`, "");
+    if (note === null) {
+      return;
+    }
+
+    setSaving(`${memory.id}-experiment-${decision}`);
+    setError("");
+    try {
+      const response = await fetch(EXPERIMENT_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          title: memory.title || "Experiment decision",
+          hypothesis: memory.body,
+          status: decision === "retest" ? "retest" : "completed",
+          decision,
+          result_notes: note || `Marked ${decision} from Lensically GPT Memory dashboard.`,
+          related_memory_id: memory.id,
+          confidence: "low",
+          review_after_days: decision === "retest" || decision === "explore" ? 14 : 30,
+          metadata: {
+            dashboard_kind: memory.kind,
+            dashboard_memory_updated_at: memory.updated_at,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save experiment decision.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save experiment decision.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -312,6 +399,16 @@ export default function GptMemoryPage() {
                     <h3 className="mt-3 text-sm font-semibold text-slate-950">{suggestion.title}</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-700">{suggestion.proposed_rule}</p>
                     <p className="mt-2 text-xs leading-5 text-slate-500">{suggestion.caution}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveExperimentFromSuggestion(suggestion)}
+                        disabled={Boolean(saving)}
+                        className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {saving === `suggestion-${suggestion.suggestion_type}-${suggestion.title}` ? "Saving..." : "Start Test"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -364,6 +461,27 @@ export default function GptMemoryPage() {
                                 className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {saving === `${memory.id}-${decision}` ? "Saving..." : decision}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {memory.kind === "experiment" ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {[
+                              ["explore", "Explore"],
+                              ["exploit", "Exploit"],
+                              ["retest", "Retest"],
+                              ["cooldown", "Cooldown"],
+                              ["stop", "Stop"],
+                            ].map(([decision, label]) => (
+                              <button
+                                key={decision}
+                                type="button"
+                                onClick={() => void saveExperimentDecision(memory, decision)}
+                                disabled={Boolean(saving)}
+                                className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {saving === `${memory.id}-experiment-${decision}` ? "Saving..." : label}
                               </button>
                             ))}
                           </div>

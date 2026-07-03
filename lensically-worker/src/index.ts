@@ -11295,6 +11295,112 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/experiment" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const hypothesis = normalizeGptMemoryText(payload.hypothesis, 8000);
+      if (!brand || !hypothesis) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id and hypothesis are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const status = normalizeGptExperimentStatus(payload.status);
+      const decision = normalizeGptExperimentDecision(payload.decision);
+      const resultNotes = normalizeGptMemoryText(payload.result_notes, 8000, true);
+      const title = normalizeGptMemoryText(payload.title, 200, true)
+        ?? normalizeGptMemoryText(payload.experiment_name, 200, true)
+        ?? "Growth experiment";
+      const successCriteria = normalizeGptStringArray(payload.success_criteria, 20, 1000);
+      const sampleSizeTarget = parseBoundedIntegerParam(
+        typeof payload.sample_size_target === "number" || typeof payload.sample_size_target === "string"
+          ? String(payload.sample_size_target)
+          : null,
+        0,
+        0,
+        10000,
+      );
+      const relatedMemoryId = Number(payload.related_memory_id);
+      const reviewAfterDays = parseBoundedIntegerParam(
+        typeof payload.review_after_days === "number" || typeof payload.review_after_days === "string"
+          ? String(payload.review_after_days)
+          : null,
+        14,
+        0,
+        365,
+      );
+      const reviewAfter = reviewAfterDays > 0
+        ? new Date(Date.now() + reviewAfterDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      const evidence = normalizeGptRecordArray(payload.evidence, 25);
+      const confidence = normalizeGptExperimentConfidence(payload.confidence);
+      const isResult = status === "completed" || Boolean(decision) || Boolean(resultNotes);
+      const kind: GptStrategyMemoryKind = isResult ? "experiment_result" : "experiment";
+      const metadata = {
+        status,
+        decision,
+        success_criteria: successCriteria,
+        sample_size_target: sampleSizeTarget || null,
+        start_date: normalizeGptIsoDateText(payload.start_date),
+        end_date: normalizeGptIsoDateText(payload.end_date),
+        related_memory_id: Number.isInteger(relatedMemoryId) && relatedMemoryId > 0 ? relatedMemoryId : null,
+        related_saved_pattern_ids: normalizeGptNumberArray(payload.related_saved_pattern_ids, 25),
+        related_generation_run_ids: normalizeGptStringIdArray(payload.related_generation_run_ids, 25, 100),
+        evidence,
+        confidence,
+        review_after: reviewAfter,
+        source: "lensically_memory_dashboard",
+        flexible_note: "Use this as a learning loop for growth, not a rigid creative category.",
+        sample_size_caution: "Do not promote this to a durable rule until evidence quality and sample size support it.",
+        ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+          ? payload.metadata
+          : {}),
+      };
+      const body = [
+        `Hypothesis: ${hypothesis}`,
+        successCriteria.length ? `Success criteria: ${successCriteria.join(" | ")}` : null,
+        sampleSizeTarget > 0 ? `Sample size target: ${sampleSizeTarget}` : null,
+        resultNotes ? `Result notes: ${resultNotes}` : null,
+        decision ? `Decision: ${decision}` : null,
+        confidence ? `Confidence: ${confidence}` : null,
+        reviewAfter ? `Review after: ${reviewAfter}` : null,
+      ].filter(Boolean).join("\n");
+      const memory = await saveGptStrategyMemory(env, {
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+        kind,
+        title,
+        body,
+        metadataJson: normalizeGptMemoryMetadata(metadata),
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        brand_key: brand.brand_key,
+        memory,
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {
