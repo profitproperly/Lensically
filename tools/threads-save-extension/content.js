@@ -553,16 +553,21 @@
 
   function extractMainPost() {
     const jsonLd = parseJsonLdMainPost();
-    if (jsonLd && jsonLd.ok) return jsonLd;
 
     const containers = candidateContainersFromDom();
-    if (!containers.length) return { ok: false, error: "No post card detected on this page." };
+    if (!containers.length) {
+      if (jsonLd && jsonLd.ok) return jsonLd;
+      return { ok: false, error: "No post card detected on this page." };
+    }
 
     const topArticle = pickTopContainer(containers);
-    if (!topArticle) return { ok: false, error: "No post card detected on this page." };
+    if (!topArticle) {
+      if (jsonLd && jsonLd.ok) return jsonLd;
+      return { ok: false, error: "No post card detected on this page." };
+    }
 
     const text = getTextWithoutLensicallyLabels(topArticle).trim();
-    if (!text) return { ok: false, error: "Top post card has no readable text." };
+    if (!text && (!jsonLd || !jsonLd.ok)) return { ok: false, error: "Top post card has no readable text." };
 
     const lines = text
       .split("\n")
@@ -571,7 +576,7 @@
 
     const scopedLines = linesBeforeReplies(lines);
     const extractedText = extractPostTextBlock(scopedLines) || pickPrimaryText(scopedLines);
-    if (!extractedText) return { ok: false, error: "Could not confidently isolate post text." };
+    if (!extractedText && (!jsonLd || !jsonLd.ok)) return { ok: false, error: "Could not confidently isolate post text." };
 
     let authorHandle = null;
     let authorDisplayName = null;
@@ -598,6 +603,13 @@
       }
     }
     if (!actionMetrics.length) {
+      const beforeReplyText = linesBeforeReplies(text.split(/\n|(?=View activity)|(?=SortTopMore)|(?=Reply to )/i)).join("\n");
+      const tokens = extractCompactNumberTokens(beforeReplyText);
+      if (tokens.length >= 4) {
+        actionMetrics = tokens.slice(-4);
+      }
+    }
+    if (!actionMetrics.length) {
       actionMetrics = metricCandidates.length >= 4 ? metricCandidates.slice(-4) : metricCandidates;
     }
 
@@ -619,7 +631,8 @@
       if (candidate) postedAt = candidate;
     }
 
-    const primaryText = sanitizePostText(extractedText, authorHandle);
+    const jsonPayload = jsonLd && jsonLd.ok ? jsonLd.payload : null;
+    const primaryText = sanitizePostText(extractedText || (jsonPayload && jsonPayload.post_text) || "", authorHandle);
     if (!primaryText) return { ok: false, error: "Could not cleanly isolate post text." };
 
     const confidence = url.includes("/post/") && primaryText.length >= 20 ? "high" : "medium";
@@ -630,19 +643,19 @@
         platform: "threads",
         source_url: url,
         post_id: postId,
-        author_handle: authorHandle,
-        author_display_name: authorDisplayName,
+        author_handle: authorHandle || (jsonPayload && jsonPayload.author_handle) || null,
+        author_display_name: authorDisplayName || (jsonPayload && jsonPayload.author_display_name) || null,
         post_text: primaryText,
-        likes,
-        replies,
-        reposts,
-        shares,
-        views,
-        posted_at: postedAt,
+        likes: likes || (jsonPayload && jsonPayload.likes) || 0,
+        replies: replies || (jsonPayload && jsonPayload.replies) || 0,
+        reposts: reposts || (jsonPayload && jsonPayload.reposts) || 0,
+        shares: shares || (jsonPayload && jsonPayload.shares) || 0,
+        views: views || (jsonPayload && jsonPayload.views) || null,
+        posted_at: postedAt || (jsonPayload && jsonPayload.posted_at) || null,
         capture_confidence: confidence,
         raw_payload: {
-          extractor_version: "0.1.0",
-          mode: "dom",
+          extractor_version: "0.1.1",
+          mode: jsonPayload ? "json_ld_with_dom_metrics" : "dom",
           container_count: containers.length,
           top_article_line_sample: lines.slice(0, 25),
           scoped_line_sample: scopedLines.slice(0, 25),
