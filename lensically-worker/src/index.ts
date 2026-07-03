@@ -666,6 +666,35 @@ async function setAgentAccountEnabled(
   return controls.find((control) => control.account_id === normalizedAccountId) ?? null;
 }
 
+async function setAgentAccountScheduleSlots(
+  env: Env,
+  accountId: string,
+  slots: string[],
+): Promise<AgentAccountControl | null> {
+  const normalizedAccountId = accountId.trim().toLowerCase();
+  const normalizedSlots = normalizeBatchSchedulePresetTimes(slots) ?? [];
+  if (!normalizedAccountId || !normalizedSlots.length) {
+    return null;
+  }
+
+  const configuredAccount = await getConfiguredThreadsAccountById(env, normalizedAccountId);
+  if (!configuredAccount) {
+    return null;
+  }
+
+  await ensureAgentAccountControlsTable(env);
+  await env.DB.prepare(
+    `INSERT INTO agent_account_controls (account_id, schedule_slots_json, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(account_id) DO UPDATE SET
+       schedule_slots_json = excluded.schedule_slots_json,
+       updated_at = excluded.updated_at`,
+  ).bind(normalizedAccountId, JSON.stringify(normalizedSlots)).run();
+
+  const controls = await listAgentAccountControls(env);
+  return controls.find((control) => control.account_id === normalizedAccountId) ?? null;
+}
+
 async function bootstrapConfiguredThreadsAccounts(env: Env): Promise<void> {
   const accounts = await Promise.all(
     getConfiguredThreadsAccountDefinitions(env).map((account) => resolveConfiguredThreadsAccount(env, account)),
@@ -6001,6 +6030,29 @@ function buildGptRuleReviewSummary(
   const ruleKinds = new Set(["current_belief", "approved_rule", "rule_proposal", "rule_review", "cooldown"]);
   const ruleMemory = strategyMemory.filter((memory) => ruleKinds.has(memory.kind));
   const closedProposalIds = new Set<number>();
+  const normalizeRuleSignature = (value: string | null | undefined) => String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  const approvedRuleSignatures = new Set<string>();
+  for (const memory of ruleMemory) {
+    if (memory.kind !== "approved_rule" && memory.kind !== "current_belief") {
+      continue;
+    }
+    const metadata = getGptMemoryMetadataRecord(memory);
+    const promotedFromMemoryId = Number(metadata.promoted_from_memory_id);
+    if (Number.isInteger(promotedFromMemoryId) && promotedFromMemoryId > 0) {
+      closedProposalIds.add(promotedFromMemoryId);
+    }
+    const titleSignature = normalizeRuleSignature(memory.title);
+    const bodySignature = normalizeRuleSignature(memory.body);
+    if (titleSignature) {
+      approvedRuleSignatures.add(`title:${titleSignature}`);
+    }
+    if (bodySignature) {
+      approvedRuleSignatures.add(`body:${bodySignature}`);
+    }
+  }
   for (const memory of ruleMemory) {
     if (memory.kind !== "rule_review") {
       continue;
@@ -6010,7 +6062,7 @@ function buildGptRuleReviewSummary(
     const reviewedMemoryId = Number(metadata.reviewed_memory_id);
     if (
       Number.isInteger(reviewedMemoryId)
-      && ["revise", "cooldown", "retire", "promote_to_current_belief", "challenge"].includes(decision ?? "")
+      && ["revise", "cooldown", "retire", "superseded", "approved", "promote_to_current_belief", "challenge"].includes(decision ?? "")
     ) {
       closedProposalIds.add(reviewedMemoryId);
     }
@@ -6048,7 +6100,17 @@ function buildGptRuleReviewSummary(
     current_beliefs: strategyMemory.filter((memory) => memory.kind === "current_belief").slice(0, 20),
     approved_rules: strategyMemory.filter((memory) => memory.kind === "approved_rule").slice(0, 20),
     open_rule_proposals: strategyMemory
-      .filter((memory) => memory.kind === "rule_proposal" && !closedProposalIds.has(memory.id))
+      .filter((memory) => {
+        if (memory.kind !== "rule_proposal" || closedProposalIds.has(memory.id)) {
+          return false;
+        }
+        const titleSignature = normalizeRuleSignature(memory.title);
+        const bodySignature = normalizeRuleSignature(memory.body);
+        return !(
+          (titleSignature && approvedRuleSignatures.has(`title:${titleSignature}`))
+          || (bodySignature && approvedRuleSignatures.has(`body:${bodySignature}`))
+        );
+      })
       .slice(0, 20),
     recent_rule_reviews: strategyMemory.filter((memory) => memory.kind === "rule_review").slice(0, 20),
     active_cooldowns: activeCooldowns,
@@ -6306,6 +6368,22 @@ async function buildGptGenerationContext(
       follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
     };
   });
+  const recentArchivePosts = compact ? recentArchive.posts.map(serializeArchivePostCompact) : recentArchive.posts;
+  const topArchivePosts = compact ? topArchive.posts.map(serializeArchivePostCompact) : topArchive.posts;
+  const weakArchivePosts = compact ? weakPosts.map(serializeArchivePostCompact) : weakPosts;
+  const scheduledPostsForPayload = compact ? scheduledPostsWithTags.map(serializeScheduledPostCompact) : scheduledPostsWithTags;
+  const generationRunsForPayload = compact
+    ? generationRuns.map((run) => ({
+        id: run.id,
+        objective: run.objective,
+        status: run.status,
+        created_at: run.created_at,
+        updated_at: run.updated_at,
+        drafts: run.drafts.map(serializeGenerationDraftCompact),
+      }))
+    : generationRuns;
+  const approvedDraftsForPayload = compact ? approvedDrafts.map(serializeGenerationDraftCompact) : approvedDrafts;
+  const rejectedDraftsForPayload = compact ? rejectedDrafts.map(serializeGenerationDraftCompact) : rejectedDrafts;
 
   return {
     success: true,
@@ -6359,17 +6437,17 @@ async function buildGptGenerationContext(
       saved_pattern_adaptation_summary: buildGptPatternAdaptationSummary(strategyMemory),
     },
     generation_history: {
-      runs: generationRuns,
-      approved_drafts: approvedDrafts,
-      rejected_drafts: rejectedDrafts,
+      runs: generationRunsForPayload,
+      approved_drafts: approvedDraftsForPayload,
+      rejected_drafts: rejectedDraftsForPayload,
     },
     archive: {
-      recent: recentArchive.posts,
-      top: topArchive.posts,
-      weak: weakPosts,
+      recent: recentArchivePosts,
+      top: topArchivePosts,
+      weak: weakArchivePosts,
     },
     saved_patterns: savedPatterns,
-    scheduled_posts: scheduledPostsWithTags,
+    scheduled_posts: scheduledPostsForPayload,
     posted_tagged_results: taggedPostResultsWithGrowth.slice(0, compact ? 20 : 80),
     tag_performance: {
       pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
@@ -7193,11 +7271,39 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/scheduled": {
         get: {
           operationId: "listScheduledPosts",
-          summary: "List upcoming scheduled posts for a brand.",
+          summary: "List upcoming scheduled posts for a brand, optionally scoped to a local date and timezone.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "date", in: "query", required: false, schema: { type: "string", format: "date", description: "Local date to list in the provided timezone." } },
+            { name: "timezone", in: "query", required: false, schema: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE } },
           ],
           responses: { "200": { description: "Scheduled posts" } },
+        },
+      },
+      "/api/gpt/desired-slots": {
+        post: {
+          operationId: "updateDesiredSlots",
+          summary: "Update desired local posting slots for a brand.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "slots"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    slots: {
+                      type: "array",
+                      items: { type: "string", description: "HH:MM local time" },
+                    },
+                    timezone: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Updated desired slots" } },
         },
       },
       "/api/gpt/schedule": {
@@ -8398,6 +8504,47 @@ function serializeSavedPatternForGpt(
   };
 }
 
+function serializeArchivePostCompact(post: CachedThreadsPost): Record<string, unknown> {
+  return {
+    id: post.id,
+    text: post.text,
+    timestamp: post.timestamp,
+    views: post.views,
+    likes: post.likes,
+    replies: post.replies,
+    reposts: post.reposts,
+    quotes: post.quotes,
+    shares: post.shares,
+    engagement_total: post.engagement_total,
+  };
+}
+
+function serializeGenerationDraftCompact(
+  draft: ReturnType<typeof serializeGptGenerationDraft>,
+): Record<string, unknown> {
+  return {
+    id: draft.id,
+    text: draft.text,
+    status: draft.status,
+    rejection_reason: draft.rejection_reason,
+    scheduled_post_id: draft.scheduled_post_id,
+    created_at: draft.created_at,
+    strategy: draft.strategy,
+  };
+}
+
+function serializeScheduledPostCompact(
+  post: { id: number; text?: string; post_text?: string; status: string; scheduled_time_utc: string; strategy?: unknown },
+): Record<string, unknown> {
+  return {
+    id: post.id,
+    text: post.text ?? post.post_text ?? "",
+    status: post.status,
+    scheduled_time_utc: post.scheduled_time_utc,
+    strategy: post.strategy ?? null,
+  };
+}
+
 async function listSavedPatternsForHermes(
   env: Env,
   threadsUserId: string,
@@ -9028,6 +9175,19 @@ function getLocalDateInTimeZone(timeZone: string, timestampMs = Date.now()): str
   }
 
   return formatIsoDateParts(parts.year, parts.month, parts.day);
+}
+
+function getLocalTimeInTimeZone(timeZone: string, timestampMs = Date.now()): string | null {
+  const parts = getPartsInTimeZone(timestampMs, timeZone);
+  if (!parts) {
+    return null;
+  }
+
+  return [
+    parts.hour.toString().padStart(2, "0"),
+    parts.minute.toString().padStart(2, "0"),
+    parts.second.toString().padStart(2, "0"),
+  ].join(":");
 }
 
 function addDaysToIsoDate(date: string, days: number): string | null {
@@ -10155,10 +10315,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
         const requestedTimeZone = url.searchParams.get("timezone")?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
         const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
+        const now = new Date();
+        const nowMs = now.getTime();
+        const localDate = getLocalDateInTimeZone(timeZone, nowMs) ?? now.toISOString().slice(0, 10);
+        const localTime = getLocalTimeInTimeZone(timeZone, nowMs) ?? now.toISOString().slice(11, 19);
         const requestedDate = url.searchParams.get("date")?.trim() || null;
         const targetDate = requestedDate && isValidIsoDate(requestedDate)
           ? requestedDate
-          : buildDefaultTomorrowSlotPlan(timeZone)?.date ?? getLocalDateInTimeZone(timeZone) ?? new Date().toISOString().slice(0, 10);
+          : localDate;
 
         const requestedFields = parseGptFieldsParam(url.searchParams.get("fields"));
         const recentLimit = parseBoundedIntegerParam(url.searchParams.get("recent_limit"), 5, 0, 100);
@@ -10267,7 +10431,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
               threads_biography: brand.profile.threads_biography,
             },
             date: targetDate,
+            local_date: localDate,
+            local_time: localTime,
             timezone: timeZone,
+            server_date_utc: now.toISOString().slice(0, 10),
+            server_time_utc: now.toISOString().slice(11, 19),
+            target_date: targetDate,
             archive_summary: {
               archive_total_count: archiveTotalCount,
               recent_sample_count: recentArchive.posts.length,
@@ -11205,19 +11374,60 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           });
         }
-        const scheduledPosts = await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100);
+        const requestedTimeZone = url.searchParams.get("timezone")?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
+        const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
+        const requestedDate = url.searchParams.get("date")?.trim() || null;
+        const scheduledPosts = requestedDate && isValidIsoDate(requestedDate)
+          ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, requestedDate, timeZone)
+          : await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100);
         const tagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
           account_id: brand.account_id,
           threads_user_id: brand.profile.threads_user_id,
+          date: requestedDate && isValidIsoDate(requestedDate) ? requestedDate : null,
+          timezone: timeZone,
           scheduled_posts: scheduledPosts.map((post) => ({
             ...post,
             strategy: tagMap.get(post.id) ?? null,
           })),
         }), {
           status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/desired-slots" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const slots = Array.isArray(payload.slots) ? normalizeBatchSchedulePresetTimes(payload.slots) ?? [] : [];
+        const requestedTimeZone = normalizeGptMemoryText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+        const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
+        if (!brand || !slots.length) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and valid slots are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const control = await setAgentAccountScheduleSlots(env, brand.account_id, slots);
+        return new Response(JSON.stringify({
+          success: Boolean(control),
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          timezone: timeZone,
+          desired_slots: control?.agent_schedule_slots ?? slots,
+          control,
+        }), {
+          status: control ? 200 : 404,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }

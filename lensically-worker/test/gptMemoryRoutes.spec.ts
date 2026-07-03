@@ -25,6 +25,7 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DROP TABLE IF EXISTS threads_posts_archive").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_follower_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_accounts").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS agent_account_controls").run();
   await env.DB.prepare(
     `CREATE TABLE users (
       id TEXT PRIMARY KEY,
@@ -634,6 +635,93 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("returns timezone-explicit GPT brand context dates", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker(`/api/gpt/context?brand_key=${TEST_BRAND_KEY}&timezone=America/New_York`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      date?: string;
+      local_date?: string;
+      local_time?: string;
+      timezone?: string;
+      server_date_utc?: string;
+      server_time_utc?: string;
+      target_date?: string;
+    };
+    expect(payload.timezone).toBe("America/New_York");
+    expect(payload.local_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(payload.local_time).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    expect(payload.server_date_utc).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(payload.server_time_utc).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    expect(payload.date).toBe(payload.local_date);
+    expect(payload.target_date).toBe(payload.local_date);
+  });
+
+  it("lists scheduled posts by local date and timezone", async () => {
+    await createScheduledPostFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker(`/api/gpt/scheduled?brand_key=${TEST_BRAND_KEY}&date=2099-01-01&timezone=America/New_York`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      date: "2099-01-01",
+      timezone: "America/New_York",
+      scheduled_posts: [
+        expect.objectContaining({
+          id: 777,
+          scheduled_time_utc: "2099-01-01T15:00:00.000Z",
+          scheduled_time_local: "2099-01-01 10:00",
+          local_time: "10:00",
+        }),
+      ],
+    });
+  });
+
+  it("updates desired posting slots for GPT context", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const slots = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
+
+    const updateResponse = await fetchFromWorker("/api/gpt/desired-slots", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        slots,
+        timezone: "America/New_York",
+      }),
+    });
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      timezone: "America/New_York",
+      desired_slots: slots,
+    });
+
+    const contextResponse = await fetchFromWorker(`/api/gpt/context?brand_key=${TEST_BRAND_KEY}&fields=desired_slots&timezone=America/New_York`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(contextResponse.status).toBe(200);
+    await expect(contextResponse.json()).resolves.toMatchObject({
+      success: true,
+      desired_slots: slots,
+    });
+  });
+
   it("includes posted strategy-tag performance in GPT growth context", async () => {
     await createPostedTaggedPostFixture();
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
@@ -681,7 +769,12 @@ describe("GPT memory browser routes", () => {
     });
 
     expect(generationResponse.status).toBe(200);
-    await expect(generationResponse.json()).resolves.toMatchObject({
+    const generationPayload = await generationResponse.json() as {
+      archive?: { recent?: Array<Record<string, unknown>> };
+      posted_tagged_results?: unknown[];
+      tag_performance?: Record<string, Array<Record<string, unknown>>>;
+    };
+    expect(generationPayload).toMatchObject({
       success: true,
       brand_key: TEST_BRAND_KEY,
       posted_tagged_results: [
@@ -699,6 +792,60 @@ describe("GPT memory browser routes", () => {
         ],
       }),
     });
+    expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("profile_picture_url");
+    expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("permalink");
+  });
+
+  it("hides rule proposals that have duplicate approved rules", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const title = "Archive-aware candidate pool before showing drafts";
+    const body = "Create more internal candidates than shown and self-reject weak archive-overfit drafts.";
+
+    const proposalResponse = await fetchFromWorker("/api/gpt/strategy-memory", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        kind: "rule_proposal",
+        title,
+        body,
+      }),
+    });
+    const proposal = await proposalResponse.json() as { memory?: { id?: number } };
+
+    await fetchFromWorker("/api/gpt/strategy-memory", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        kind: "approved_rule",
+        title,
+        body,
+        metadata: {
+          promoted_from_memory_id: proposal.memory?.id,
+        },
+      }),
+    });
+
+    const contextResponse = await fetchFromWorker(`/api/gpt/generation-context?brand_key=${TEST_BRAND_KEY}&compact=true`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(contextResponse.status).toBe(200);
+    const context = await contextResponse.json() as {
+      taste_and_beliefs?: {
+        rule_review_summary?: {
+          open_rule_proposals?: Array<{ title?: string }>;
+        };
+      };
+    };
+    expect(context.taste_and_beliefs?.rule_review_summary?.open_rule_proposals ?? []).toEqual([]);
   });
 
   it("returns a dashboard scoped to the selected account", async () => {
