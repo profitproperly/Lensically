@@ -13981,6 +13981,106 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
+    if (url.pathname === "/api/threads/schedule/strategy" && request.method === "POST") {
+      let payload: {
+        scheduled_post_id?: number | string;
+        pillar?: string | null;
+        hook_style?: string | null;
+        format?: string | null;
+        intent?: string | null;
+        experiment?: string | null;
+        novelty_level?: string | null;
+        metadata?: unknown;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const scheduledPostId = Number(payload.scheduled_post_id);
+      if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
+        return new Response(
+          JSON.stringify({ error: "scheduled_post_id is required" }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      await ensureScheduledPostsTable(env);
+      const ownedAppUserId = WORKSPACE_APP_USER_ID;
+      const scheduledPost = await env.DB.prepare(
+        `SELECT id, threads_user_id
+         FROM scheduled_posts
+         WHERE id = ?
+           AND user_id = ?
+         LIMIT 1`,
+      )
+        .bind(scheduledPostId, ownedAppUserId)
+        .first<{ id: number | string; threads_user_id: string }>();
+      if (!scheduledPost?.threads_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Scheduled post not found" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+
+      const brand = await resolveGptBrandForThreadsUserId(env, scheduledPost.threads_user_id);
+      if (!brand) {
+        return new Response(
+          JSON.stringify({ error: "Configured Threads account not found" }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          },
+        );
+      }
+      const strategy: GptPostStrategyInput = {
+        pillar: normalizeGptMemoryText(payload.pillar, 120, true),
+        hook_style: normalizeGptMemoryText(payload.hook_style, 120, true),
+        format: normalizeGptMemoryText(payload.format, 120, true),
+        intent: normalizeGptMemoryText(payload.intent, 120, true),
+        experiment: normalizeGptMemoryText(payload.experiment, 200, true),
+        novelty_level: normalizeGptMemoryText(payload.novelty_level, 80, true),
+        metadata_json: normalizeGptMemoryMetadata({
+          source: "lensically_scheduled_posts",
+          flexible_note: "Tags are descriptive signals for growth review, not rigid creative categories.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        }),
+      };
+      await upsertGptPostStrategyTag(env, {
+        scheduledPostId,
+        accountId: brand.account_id,
+        threadsUserId: scheduledPost.threads_user_id,
+        strategy,
+      });
+      const tagMap = await listGptPostStrategyTagsForScheduledPosts(env, [scheduledPostId]);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scheduled_post_id: scheduledPostId,
+          strategy: tagMap.get(scheduledPostId) ?? null,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        },
+      );
+    }
+
     if (url.pathname === "/api/threads/schedule/retry" && request.method === "POST") {
       let payload: {
         app_user_id?: string;
@@ -14166,19 +14266,25 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           processing_started_at: string | null;
         }>();
 
+      const scheduledPosts = (rows.results ?? []).map((row) => ({
+        id: Number(row.id),
+        text: row.post_text,
+        status: row.status,
+        scheduled_time_utc: row.scheduled_time,
+        spoiler_all_text: row.spoiler_all_text === 1,
+        spoiler_phrases: parseSpoilerPhrasesJson(row.spoiler_phrases_json),
+        publish_error_message: row.publish_error_message ?? null,
+        last_attempted_at: row.last_attempted_at ?? null,
+        processing_started_at: row.processing_started_at ?? null,
+      }));
+      const strategyTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+
       return new Response(
         JSON.stringify({
           success: true,
-          scheduled_posts: (rows.results ?? []).map((row) => ({
-            id: Number(row.id),
-            text: row.post_text,
-            status: row.status,
-            scheduled_time_utc: row.scheduled_time,
-            spoiler_all_text: row.spoiler_all_text === 1,
-            spoiler_phrases: parseSpoilerPhrasesJson(row.spoiler_phrases_json),
-            publish_error_message: row.publish_error_message ?? null,
-            last_attempted_at: row.last_attempted_at ?? null,
-            processing_started_at: row.processing_started_at ?? null,
+          scheduled_posts: scheduledPosts.map((post) => ({
+            ...post,
+            strategy: strategyTagMap.get(post.id) ?? null,
           })),
         }),
         {

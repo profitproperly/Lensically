@@ -42,6 +42,16 @@ type ScheduledPost = {
   publish_error_message?: string | null;
   last_attempted_at?: string | null;
   processing_started_at?: string | null;
+  strategy?: ScheduledPostStrategy | null;
+};
+
+type ScheduledPostStrategy = {
+  pillar?: string | null;
+  hook_style?: string | null;
+  format?: string | null;
+  intent?: string | null;
+  experiment?: string | null;
+  novelty_level?: string | null;
 };
 
 type ScheduledPostsResponse = {
@@ -57,6 +67,7 @@ const THREADS_SCHEDULE_URL = buildWorkerUrl("/api/threads/schedule");
 const THREADS_SCHEDULE_UPDATE_URL = buildWorkerUrl("/api/threads/schedule/update");
 const THREADS_SCHEDULE_RETRY_URL = buildWorkerUrl("/api/threads/schedule/retry");
 const THREADS_SCHEDULE_DELETE_URL = buildWorkerUrl("/api/threads/schedule/delete");
+const THREADS_SCHEDULE_STRATEGY_URL = buildWorkerUrl("/api/threads/schedule/strategy");
 const FALLBACK_TIMEZONE = "America/New_York";
 const FALLBACK_CLOCK_FORMAT = "12h";
 
@@ -294,6 +305,9 @@ export default function ScheduledPostsPage() {
   const [editScheduledPostSuccess, setEditScheduledPostSuccess] = useState("");
   const [retryScheduledPostError, setRetryScheduledPostError] = useState("");
   const [retryScheduledPostSuccess, setRetryScheduledPostSuccess] = useState("");
+  const [editingStrategyPostId, setEditingStrategyPostId] = useState<number | null>(null);
+  const [savingStrategyPostId, setSavingStrategyPostId] = useState<number | null>(null);
+  const [strategyForm, setStrategyForm] = useState<ScheduledPostStrategy>({});
 
   const orderedScheduledPosts = useMemo(() => {
     return [...scheduledPosts].sort((left, right) => {
@@ -693,6 +707,73 @@ export default function ScheduledPostsPage() {
     setRetryScheduledPostError("");
   }
 
+  function startEditingStrategy(post: ScheduledPost) {
+    setEditingStrategyPostId(post.id);
+    setStrategyForm({
+      pillar: post.strategy?.pillar ?? "",
+      hook_style: post.strategy?.hook_style ?? "",
+      format: post.strategy?.format ?? "",
+      intent: post.strategy?.intent ?? "",
+      experiment: post.strategy?.experiment ?? "",
+      novelty_level: post.strategy?.novelty_level ?? "",
+    });
+    setEditScheduledPostError("");
+    setEditScheduledPostSuccess("");
+  }
+
+  function cancelEditingStrategy() {
+    setEditingStrategyPostId(null);
+    setStrategyForm({});
+  }
+
+  function updateStrategyField(field: keyof ScheduledPostStrategy, value: string) {
+    setStrategyForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function saveStrategyTags(scheduledPostId: number) {
+    setSavingStrategyPostId(scheduledPostId);
+    setEditScheduledPostError("");
+    setEditScheduledPostSuccess("");
+
+    try {
+      const response = await fetch(THREADS_SCHEDULE_STRATEGY_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scheduled_post_id: scheduledPostId,
+          ...strategyForm,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; strategy?: ScheduledPostStrategy | null }
+        | null;
+      if (!response.ok || data?.success === false) {
+        setEditScheduledPostError(data?.error || "Could not save strategy tags.");
+        return;
+      }
+      setScheduledPosts((currentPosts) =>
+        currentPosts.map((post) => (
+          post.id === scheduledPostId
+            ? { ...post, strategy: data?.strategy ?? null }
+            : post
+        )),
+      );
+      setEditingStrategyPostId(null);
+      setStrategyForm({});
+      setEditScheduledPostSuccess("Strategy tags saved.");
+    } catch {
+      setEditScheduledPostError("Could not save strategy tags.");
+    } finally {
+      setSavingStrategyPostId(null);
+    }
+  }
+
   async function retryScheduledPost(scheduledPostId: number) {
     setRetryingScheduledPostId(scheduledPostId);
     setRetryScheduledPostError("");
@@ -1035,6 +1116,22 @@ export default function ScheduledPostsPage() {
                       ) : null}
                     </div>
                   ) : null}
+                  {post.strategy && Object.values(post.strategy).some(Boolean) ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {[
+                        ["Pillar", post.strategy.pillar],
+                        ["Hook", post.strategy.hook_style],
+                        ["Format", post.strategy.format],
+                        ["Intent", post.strategy.intent],
+                        ["Experiment", post.strategy.experiment],
+                        ["Novelty", post.strategy.novelty_level],
+                      ].filter(([, value]) => Boolean(value)).map(([label, value]) => (
+                        <span key={`${label}-${value}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                          {label}: {value}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
@@ -1082,6 +1179,19 @@ export default function ScheduledPostsPage() {
                             Edit
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => startEditingStrategy(post)}
+                          disabled={deletingScheduledPostId === post.id || retryingScheduledPostId === post.id}
+                          className={`rounded-md border px-3 py-1 text-xs font-medium ${
+                            deletingScheduledPostId === post.id || retryingScheduledPostId === post.id
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                              : "cursor-pointer border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                          }`}
+                          aria-label={`Edit strategy tags for scheduled post ${post.id}`}
+                        >
+                          Tags
+                        </button>
                         <button
                           type="button"
                           onClick={() => void deleteScheduledPost(post.id)}
@@ -1225,6 +1335,59 @@ export default function ScheduledPostsPage() {
                               ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                               : "cursor-pointer border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                           }`}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {editingStrategyPostId === post.id ? (
+                    <form
+                      className="mt-3 space-y-3 rounded-md border border-emerald-100 bg-white p-3"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void saveStrategyTags(post.id);
+                      }}
+                    >
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          ["pillar", "Pillar"],
+                          ["hook_style", "Hook style"],
+                          ["format", "Format"],
+                          ["intent", "Intent"],
+                          ["experiment", "Experiment"],
+                          ["novelty_level", "Novelty level"],
+                        ].map(([field, label]) => (
+                          <div key={field}>
+                            <label className="block text-xs font-medium text-slate-700" htmlFor={`strategy-${field}-${post.id}`}>
+                              {label}
+                            </label>
+                            <input
+                              id={`strategy-${field}-${post.id}`}
+                              value={String(strategyForm[field as keyof ScheduledPostStrategy] ?? "")}
+                              onChange={(event) => updateStrategyField(field as keyof ScheduledPostStrategy, event.target.value)}
+                              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={savingStrategyPostId === post.id}
+                          className={`rounded-md px-3 py-1 text-xs font-medium text-white ${
+                            savingStrategyPostId === post.id
+                              ? "cursor-not-allowed bg-slate-400"
+                              : "cursor-pointer bg-slate-900 hover:bg-slate-800"
+                          }`}
+                        >
+                          {savingStrategyPostId === post.id ? "Saving..." : "Save Tags"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditingStrategy}
+                          disabled={savingStrategyPostId === post.id}
+                          className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Cancel
                         </button>

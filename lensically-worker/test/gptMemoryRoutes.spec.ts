@@ -16,6 +16,8 @@ async function fetchFromWorker(path: string, init?: RequestInit): Promise<Respon
 
 async function resetTables(): Promise<void> {
   await env.DB.prepare("DROP TABLE IF EXISTS app_threads_accounts").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS gpt_post_strategy_tags").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS scheduled_posts").run();
   await env.DB.prepare("DROP TABLE IF EXISTS users").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_strategy_memory").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_generation_drafts").run();
@@ -33,6 +35,10 @@ async function resetTables(): Promise<void> {
       created_at INTEGER NOT NULL DEFAULT 0
     )`,
   ).run();
+  await env.DB.prepare(
+    `INSERT INTO users (id, threads_user_id, threads_username, access_token, token_expires_at, is_admin, connection_active, created_at)
+     VALUES ('workspace-owner', ?, 'vectrixvoltmore', 'test-token', 0, 1, 1, 0)`,
+  ).bind(TEST_THREADS_USER_ID).run();
 }
 
 async function createGenerationDraftFixture(): Promise<void> {
@@ -77,6 +83,31 @@ async function createGenerationDraftFixture(): Promise<void> {
     `INSERT INTO gpt_generation_drafts (id, run_id, account_id, threads_user_id, draft_index, text, status)
      VALUES ('draft-test', 'run-test', ?, ?, 0, 'A grounded test draft.', 'shown')`,
   ).bind(TEST_ACCOUNT_ID, TEST_THREADS_USER_ID).run();
+}
+
+async function createScheduledPostFixture(): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE scheduled_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      post_text TEXT NOT NULL,
+      spoiler_all_text INTEGER NOT NULL DEFAULT 0,
+      spoiler_phrases_json TEXT,
+      status TEXT NOT NULL,
+      scheduled_time TEXT NOT NULL,
+      idempotency_key TEXT,
+      publish_error_message TEXT,
+      last_attempted_at TEXT,
+      processing_started_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO scheduled_posts (id, user_id, threads_user_id, post_text, status, scheduled_time)
+     VALUES (777, 'workspace-owner', ?, 'Scheduled strategy fixture', 'approved', '2099-01-01T15:00:00.000Z')`,
+  ).bind(TEST_THREADS_USER_ID).run();
 }
 
 describe("GPT memory browser routes", () => {
@@ -213,6 +244,54 @@ describe("GPT memory browser routes", () => {
         minimum_internal_candidates: 12,
         show_after_self_rejection: 4,
       }),
+    });
+  });
+
+  it("saves strategy tags for scheduled posts and returns them from the schedule list", async () => {
+    await createScheduledPostFixture();
+
+    const updateResponse = await fetchFromWorker("/api/threads/schedule/strategy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scheduled_post_id: 777,
+        pillar: "offer",
+        hook_style: "direct",
+        format: "short",
+        intent: "follower_growth",
+        experiment: "test direct hooks",
+        novelty_level: "medium",
+      }),
+    });
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      success: true,
+      scheduled_post_id: 777,
+      strategy: expect.objectContaining({
+        pillar: "offer",
+        hook_style: "direct",
+        format: "short",
+        intent: "follower_growth",
+        experiment: "test direct hooks",
+        novelty_level: "medium",
+      }),
+    });
+
+    const listResponse = await fetchFromWorker(`/api/threads/schedule?threads_user_id=${TEST_THREADS_USER_ID}`);
+
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toMatchObject({
+      success: true,
+      scheduled_posts: [
+        expect.objectContaining({
+          id: 777,
+          strategy: expect.objectContaining({
+            pillar: "offer",
+            hook_style: "direct",
+          }),
+        }),
+      ],
     });
   });
 
