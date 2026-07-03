@@ -5485,6 +5485,46 @@ function buildGptRuleReviewSummary(
   };
 }
 
+function buildGptPatternAdaptationSummary(
+  strategyMemory: ReturnType<typeof serializeGptStrategyMemoryRow>[],
+): Record<string, unknown> {
+  const patternMemory = strategyMemory
+    .filter((memory) => ["saved_pattern_note", "approved_pattern", "rejected_pattern", "cooldown"].includes(memory.kind))
+    .filter((memory) => {
+      const metadata = getGptMemoryMetadataRecord(memory);
+      return memory.kind !== "cooldown" || metadata.source === "pattern_adaptation";
+    });
+  const savedPatternUsage = patternMemory.reduce<Record<string, number>>((counts, memory) => {
+    const metadata = getGptMemoryMetadataRecord(memory);
+    for (const id of Array.isArray(metadata.saved_pattern_ids) ? metadata.saved_pattern_ids : []) {
+      const key = String(id);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+  const archivePostUsage = patternMemory.reduce<Record<string, number>>((counts, memory) => {
+    const metadata = getGptMemoryMetadataRecord(memory);
+    for (const id of Array.isArray(metadata.archive_post_ids) ? metadata.archive_post_ids : []) {
+      const key = String(id);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+
+  return {
+    recent_adaptations: patternMemory.slice(0, 20),
+    saved_pattern_usage_counts: savedPatternUsage,
+    archive_post_usage_counts: archivePostUsage,
+    active_pattern_cooldowns: patternMemory.filter((memory) => memory.kind === "cooldown").slice(0, 10),
+    guidance: [
+      "Reuse the mechanism when it is clearly strong, but change subject, nouns, payoff, emotional frame, and surface wording.",
+      "Avoid repeatedly adapting the same saved pattern or archive post unless there is fresh evidence it still works.",
+      "Use cooldowns when the same mechanism, opening, or emotional move starts to feel overused.",
+      "Track rejected adaptations so the GPT learns taste boundaries, not just winning formulas.",
+    ],
+  };
+}
+
 async function buildGptGenerationContext(
   env: Env,
   brand: GptResolvedBrand,
@@ -5660,6 +5700,7 @@ async function buildGptGenerationContext(
       by_kind: memoryByKind,
       rule_review_summary: buildGptRuleReviewSummary(strategyMemory),
       experiment_summary: buildGptExperimentSummary(strategyMemory),
+      saved_pattern_adaptation_summary: buildGptPatternAdaptationSummary(strategyMemory),
     },
     generation_history: {
       runs: generationRuns,
@@ -6220,6 +6261,43 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             },
           },
           responses: { "200": { description: "Saved experiment memory" } },
+        },
+      },
+      "/api/gpt/pattern-adaptation": {
+        post: {
+          operationId: "savePatternAdaptation",
+          summary: "Log how a saved pattern or archive mechanism was adapted, rejected, approved, or cooled down.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "adaptation_note"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    title: { type: "string" },
+                    adaptation_note: { type: "string", description: "What mechanism was used and how the GPT changed it." },
+                    verdict: {
+                      type: "string",
+                      enum: ["adapted", "approved", "rejected", "cooldown", "retest", "watch"],
+                      default: "adapted",
+                    },
+                    saved_pattern_ids: { type: "array", items: { type: "integer" } },
+                    archive_post_ids: { type: "array", items: { type: "string" } },
+                    generated_draft_ids: { type: "array", items: { type: "string" } },
+                    mechanism: { type: "string" },
+                    surface_changes: { type: "array", items: { type: "string" } },
+                    reason: { type: "string" },
+                    evidence: { type: "array", items: { type: "object", additionalProperties: true } },
+                    cooldown_days: { type: "integer", minimum: 1, maximum: 365 },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved pattern adaptation memory" } },
         },
       },
       "/api/gpt/scheduled": {
@@ -9967,6 +10045,102 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           experiment_summary_guidance: [
             "Read generation-context or growth-context after saving experiments to see open tests and recent decisions.",
             "Use experiment results to decide what to exploit, explore, stop, retest, or cool down.",
+          ],
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/pattern-adaptation" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const adaptationNote = normalizeGptMemoryText(payload.adaptation_note, 8000);
+        if (!brand || !adaptationNote) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and adaptation_note are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+
+        const verdictRaw = typeof payload.verdict === "string" ? payload.verdict.trim().toLowerCase() : "adapted";
+        const verdict = ["adapted", "approved", "rejected", "cooldown", "retest", "watch"].includes(verdictRaw)
+          ? verdictRaw
+          : "adapted";
+        const kind: GptStrategyMemoryKind = verdict === "approved"
+          ? "approved_pattern"
+          : verdict === "rejected"
+          ? "rejected_pattern"
+          : verdict === "cooldown"
+          ? "cooldown"
+          : "saved_pattern_note";
+        const title = normalizeGptMemoryText(payload.title, 200, true)
+          ?? `Pattern adaptation: ${verdict}`;
+        const savedPatternIds = normalizeGptNumberArray(payload.saved_pattern_ids, 25);
+        const archivePostIds = normalizeGptStringIdArray(payload.archive_post_ids, 25, 100);
+        const generatedDraftIds = normalizeGptStringIdArray(payload.generated_draft_ids, 25, 100);
+        const surfaceChanges = normalizeGptStringArray(payload.surface_changes, 20, 1000);
+        const mechanism = normalizeGptMemoryText(payload.mechanism, 1000, true);
+        const reason = normalizeGptMemoryText(payload.reason, 4000, true);
+        const evidence = normalizeGptRecordArray(payload.evidence, 25);
+        const cooldownDays = parseBoundedIntegerParam(
+          typeof payload.cooldown_days === "number" || typeof payload.cooldown_days === "string"
+            ? String(payload.cooldown_days)
+            : null,
+          0,
+          0,
+          365,
+        );
+        const reviewAfter = cooldownDays > 0
+          ? new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000).toISOString()
+          : null;
+        const metadata = {
+          source: "pattern_adaptation",
+          verdict,
+          saved_pattern_ids: savedPatternIds,
+          archive_post_ids: archivePostIds,
+          generated_draft_ids: generatedDraftIds,
+          mechanism,
+          surface_changes: surfaceChanges,
+          evidence,
+          review_after: reviewAfter,
+          flexible_note: "Track mechanism reuse without trapping creativity into rigid categories.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        };
+        const body = [
+          `Verdict: ${verdict}`,
+          mechanism ? `Mechanism: ${mechanism}` : null,
+          `Adaptation note: ${adaptationNote}`,
+          surfaceChanges.length ? `Surface changes: ${surfaceChanges.join(" | ")}` : null,
+          reason ? `Reason: ${reason}` : null,
+          reviewAfter ? `Review after: ${reviewAfter}` : null,
+        ].filter(Boolean).join("\n");
+        const memory = await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind,
+          title,
+          body,
+          metadataJson: normalizeGptMemoryMetadata(metadata),
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          memory,
+          adaptation_guidance: [
+            "Read getGenerationContext before generating so repeated saved/archive mechanisms are visible.",
+            "Copy useful logic, not exact wording.",
+            "Cool down overused mechanisms instead of banning them forever.",
           ],
         }), {
           status: 200,
