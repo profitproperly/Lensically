@@ -41,6 +41,15 @@ type RuleSuggestion = {
   caution: string;
 };
 
+type TagPerformanceItem = {
+  key?: string;
+  posts?: number;
+  posts_with_metrics?: number;
+  median_engagement_total?: number;
+  median_likes?: number;
+  median_views?: number;
+};
+
 type GptMemoryDashboard = {
   success?: boolean;
   brand_key?: string;
@@ -60,6 +69,7 @@ type GptMemoryDashboard = {
   growth_review?: {
     growth_summary?: Record<string, number | string | null>;
     recommendation_prompts?: string[];
+    tag_performance?: Record<string, TagPerformanceItem[]>;
   };
   rule_suggestions?: {
     rule_suggestions?: RuleSuggestion[];
@@ -198,6 +208,19 @@ export default function GptMemoryPage() {
       items: dashboard?.memory_by_kind?.[section.kind] ?? [],
     })).filter((section) => section.items.length > 0)
   ), [dashboard?.memory_by_kind]);
+
+  const topTagPerformance = useMemo(() => {
+    const performance = dashboard?.growth_review?.tag_performance ?? {};
+    return Object.entries(performance)
+      .flatMap(([group, items]) => (items ?? []).map((item) => ({ ...item, group })))
+      .filter((item) => item.key && Number(item.posts_with_metrics ?? 0) > 0)
+      .sort((left, right) => (
+        Number(right.median_engagement_total ?? 0) - Number(left.median_engagement_total ?? 0)
+        || Number(right.posts_with_metrics ?? 0) - Number(left.posts_with_metrics ?? 0)
+        || String(left.key).localeCompare(String(right.key))
+      ))
+      .slice(0, 8);
+  }, [dashboard?.growth_review?.tag_performance]);
 
   async function saveRuleReview(memory: StrategyMemory, decision: string) {
     setSaving(`${memory.id}-${decision}`);
@@ -779,6 +802,45 @@ export default function GptMemoryPage() {
                   <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 sm:col-span-2">No high-use tags flagged.</p>
                 )}
               </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-950">Tag Performance</h2>
+            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {topTagPerformance.length ? (
+                topTagPerformance.map((item, index) => (
+                  <div key={`${item.group}-${String(item.key)}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{String(item.key)}</p>
+                        <p className="mt-1 text-xs text-slate-500">{String(item.group).replace(/_/g, " ")}</p>
+                      </div>
+                      <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                        {formatNumber(item.posts_with_metrics)} posts
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-600">
+                      <div>
+                        <p className="font-semibold text-slate-900">{formatNumber(item.median_engagement_total)}</p>
+                        <p>eng</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{formatNumber(item.median_likes)}</p>
+                        <p>likes</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{formatNumber(item.median_views)}</p>
+                        <p>views</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 md:col-span-2 xl:col-span-4">
+                  No posted strategy tags have enough archived metrics yet.
+                </p>
+              )}
             </div>
           </section>
 
