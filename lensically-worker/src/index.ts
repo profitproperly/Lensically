@@ -4756,17 +4756,19 @@ async function listGptGenerationRuns(
   env: Env,
   accountId: string,
   limit: number,
+  offset = 0,
 ): Promise<Array<ReturnType<typeof serializeGptGenerationRun> & { drafts: ReturnType<typeof serializeGptGenerationDraft>[] }>> {
   await ensureGptGenerationDraftsTable(env);
   const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 25);
+  const normalizedOffset = Math.max(Math.trunc(offset), 0);
   const rows = await env.DB.prepare(
     `SELECT id, account_id, threads_user_id, objective, prompt_summary, status, metadata_json, created_at, updated_at
      FROM gpt_generation_runs
      WHERE account_id = ?
      ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
-     LIMIT ?`,
+     LIMIT ? OFFSET ?`,
   )
-    .bind(accountId, normalizedLimit)
+    .bind(accountId, normalizedLimit, normalizedOffset)
     .all<GptGenerationRunRow>();
 
   const runs = (rows.results ?? []).map(serializeGptGenerationRun);
@@ -4798,6 +4800,39 @@ async function listGptGenerationRuns(
     ...run,
     drafts: draftsByRun.get(run.id) ?? [],
   }));
+}
+
+async function listGptGenerationDraftsByStatus(
+  env: Env,
+  accountId: string,
+  statuses: string[],
+  limit: number,
+  offset = 0,
+): Promise<Array<ReturnType<typeof serializeGptGenerationDraft>>> {
+  await ensureGptGenerationDraftsTable(env);
+  const normalizedStatuses = statuses
+    .map((status) => normalizeGptGenerationStatus(status))
+    .filter((status, index, all) => all.indexOf(status) === index);
+  if (!normalizedStatuses.length) {
+    return [];
+  }
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+  const normalizedOffset = Math.max(Math.trunc(offset), 0);
+  const placeholders = normalizedStatuses.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT id, run_id, account_id, threads_user_id, draft_index, text, status, rejection_reason,
+            score_json, strategy_json, replacement_for_draft_id, scheduled_post_id, metadata_json,
+            created_at, updated_at
+     FROM gpt_generation_drafts
+     WHERE account_id = ?
+       AND status IN (${placeholders})
+     ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC, draft_index ASC
+     LIMIT ? OFFSET ?`,
+  )
+    .bind(accountId, ...normalizedStatuses, normalizedLimit, normalizedOffset)
+    .all<GptGenerationDraftRow>();
+
+  return (rows.results ?? []).map(serializeGptGenerationDraft);
 }
 
 async function buildGptGrowthContext(
@@ -5031,6 +5066,143 @@ function findNearDuplicateReferences(
     .slice(0, 10);
 }
 
+function getSentenceSkeleton(value: string | null | undefined): string | null {
+  const normalized = normalizeCreativeComparisonText(value);
+  if (!normalized) {
+    return null;
+  }
+  const tokens = normalized
+    .split(" ")
+    .filter((token) => token.length > 2 && !DASHBOARD_STOP_WORDS.has(token))
+    .slice(0, 14);
+  return tokens.length >= 4 ? tokens.join(" ") : null;
+}
+
+function findRepeatedSentenceSkeletons(
+  draftText: string,
+  references: Array<{ source: string; id: string | number | null; text?: string | null }>,
+): Array<{ source: string; id: string | number | null; similarity: number; skeleton: string; text: string | null }> {
+  const draftSkeleton = getSentenceSkeleton(draftText);
+  if (!draftSkeleton) {
+    return [];
+  }
+  return references
+    .map((reference) => {
+      const skeleton = getSentenceSkeleton(reference.text);
+      return {
+        source: reference.source,
+        id: reference.id,
+        skeleton,
+        similarity: skeleton ? Number(calculateTextSimilarity(draftSkeleton, skeleton).toFixed(3)) : 0,
+        text: reference.text ?? null,
+      };
+    })
+    .filter((reference): reference is { source: string; id: string | number | null; similarity: number; skeleton: string; text: string | null } => (
+      Boolean(reference.skeleton) && reference.similarity >= 0.45
+    ))
+    .sort((left, right) => right.similarity - left.similarity)
+    .slice(0, 10);
+}
+
+async function buildGptDraftSimilarityCheck(
+  env: Env,
+  brand: GptResolvedBrand,
+  draftText: string,
+): Promise<Record<string, unknown>> {
+  const [
+    recentArchive,
+    topArchive,
+    weakArchiveSource,
+    savedPatternsPage,
+    scheduledPosts,
+    approvedDrafts,
+    rejectedDrafts,
+    strategyMemory,
+  ] = await Promise.all([
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", 40, 0),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", 40, 0),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", 80, 0),
+    listSavedPatternsForHermes(env, brand.profile.threads_user_id, 40),
+    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 80),
+    listGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"], 30, 0),
+    listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"], 30, 0),
+    listGptStrategyMemory(env, brand.account_id, ["banned_phrase", "current_belief", "approved_rule", "rejected_pattern"], 80, 0),
+  ]);
+  const weakPosts = weakArchiveSource.posts
+    .filter((post) => Number(post.engagement_total ?? 0) <= 1 || Number(post.likes ?? 0) <= 1)
+    .slice(0, 20);
+  const references = [
+    ...recentArchive.posts.map((post) => ({ source: "archive_recent", id: post.id, text: post.text })),
+    ...topArchive.posts.map((post) => ({ source: "archive_top", id: post.id, text: post.text })),
+    ...weakPosts.map((post) => ({ source: "archive_weak", id: post.id, text: post.text })),
+    ...scheduledPosts.map((post) => ({ source: "scheduled", id: post.id, text: post.text })),
+    ...savedPatternsPage.patterns.map((pattern) => ({ source: "saved_pattern", id: pattern.id, text: pattern.post_text })),
+    ...approvedDrafts.map((draft) => ({ source: "approved_draft", id: draft.id, text: draft.text })),
+    ...rejectedDrafts.map((draft) => ({ source: "rejected_draft", id: draft.id, text: draft.text })),
+  ];
+  const normalizedDraft = normalizeCreativeComparisonText(draftText);
+  const exactMatches = references
+    .filter((reference) => normalizeCreativeComparisonText(reference.text) === normalizedDraft)
+    .map((reference) => ({
+      source: reference.source,
+      id: reference.id,
+      text: reference.text ?? null,
+    }));
+  const nearDuplicates = findNearDuplicateReferences(draftText, references);
+  const repeatedSkeletons = findRepeatedSentenceSkeletons(draftText, references);
+  const bannedPhraseHits = strategyMemory
+    .filter((memory) => memory.kind === "banned_phrase")
+    .flatMap((memory) => {
+      const candidates = [memory.title, memory.body]
+        .map((value) => normalizeCreativeComparisonText(value))
+        .filter((value) => value.length >= 3);
+      return candidates
+        .filter((phrase, index, all) => all.indexOf(phrase) === index && normalizedDraft.includes(phrase))
+        .map((phrase) => ({
+          memory_id: memory.id,
+          phrase,
+          title: memory.title,
+          reason: memory.body,
+        }));
+    });
+  const highestSimilarity = nearDuplicates[0]?.similarity ?? 0;
+  const collisionRisk = exactMatches.length || highestSimilarity >= 0.55 || bannedPhraseHits.length
+    ? "high"
+    : highestSimilarity >= 0.4 || repeatedSkeletons.length >= 2
+    ? "medium"
+    : "low";
+  const reasons = [
+    exactMatches.length ? "Exact text match found in existing context." : null,
+    highestSimilarity >= 0.55 ? "Very high wording overlap with prior or scheduled content." : null,
+    highestSimilarity >= 0.4 && highestSimilarity < 0.55 ? "Moderate wording overlap; rewrite surface language and payoff." : null,
+    repeatedSkeletons.length ? "Sentence skeleton resembles prior content." : null,
+    bannedPhraseHits.length ? "Draft contains a banned phrase or rejected wording." : null,
+  ].filter(Boolean);
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    draft_text: draftText,
+    archive_collision_risk: collisionRisk,
+    reasons,
+    exact_matches: exactMatches,
+    near_duplicates: nearDuplicates,
+    repeated_openings: summarizeRepeatedOpenings([{ source: "draft", text: draftText }, ...references]),
+    repeated_sentence_skeletons: repeatedSkeletons,
+    banned_phrase_hits: bannedPhraseHits,
+    compared_counts: {
+      archive_recent: recentArchive.posts.length,
+      archive_top: topArchive.posts.length,
+      archive_weak: weakPosts.length,
+      scheduled: scheduledPosts.length,
+      saved_patterns: savedPatternsPage.patterns.length,
+      approved_drafts: approvedDrafts.length,
+      rejected_drafts: rejectedDrafts.length,
+      strategy_memory: strategyMemory.length,
+    },
+  };
+}
+
 function getGptMemoryMetadataRecord(
   memory: ReturnType<typeof serializeGptStrategyMemoryRow>,
 ): Record<string, unknown> {
@@ -5051,6 +5223,21 @@ function buildGptRuleReviewSummary(
 ): Record<string, unknown> {
   const ruleKinds = new Set(["current_belief", "approved_rule", "rule_proposal", "rule_review", "cooldown"]);
   const ruleMemory = strategyMemory.filter((memory) => ruleKinds.has(memory.kind));
+  const closedProposalIds = new Set<number>();
+  for (const memory of ruleMemory) {
+    if (memory.kind !== "rule_review") {
+      continue;
+    }
+    const metadata = getGptMemoryMetadataRecord(memory);
+    const decision = typeof metadata.decision === "string" ? metadata.decision : null;
+    const reviewedMemoryId = Number(metadata.reviewed_memory_id);
+    if (
+      Number.isInteger(reviewedMemoryId)
+      && ["revise", "cooldown", "retire", "promote_to_current_belief", "challenge"].includes(decision ?? "")
+    ) {
+      closedProposalIds.add(reviewedMemoryId);
+    }
+  }
   const pendingReviews = ruleMemory
     .map((memory) => ({ memory, reviewAfter: getGptMemoryReviewAfter(memory) }))
     .filter((entry) => {
@@ -5083,7 +5270,9 @@ function buildGptRuleReviewSummary(
   return {
     current_beliefs: strategyMemory.filter((memory) => memory.kind === "current_belief").slice(0, 20),
     approved_rules: strategyMemory.filter((memory) => memory.kind === "approved_rule").slice(0, 20),
-    open_rule_proposals: strategyMemory.filter((memory) => memory.kind === "rule_proposal").slice(0, 20),
+    open_rule_proposals: strategyMemory
+      .filter((memory) => memory.kind === "rule_proposal" && !closedProposalIds.has(memory.id))
+      .slice(0, 20),
     recent_rule_reviews: strategyMemory.filter((memory) => memory.kind === "rule_review").slice(0, 20),
     active_cooldowns: activeCooldowns,
     pending_reviews: pendingReviews.slice(0, 20),
@@ -5103,21 +5292,43 @@ async function buildGptGenerationContext(
     objective: string | null;
     draftText: string | null;
     recentLimit: number;
+    recentOffset: number;
     topLimit: number;
+    topOffset: number;
     weakLimit: number;
+    weakOffset: number;
     savedPatternsLimit: number;
+    savedPatternsOffset: number;
     memoryLimit: number;
+    memoryOffset: number;
     runsLimit: number;
+    runsOffset: number;
+    approvedDraftsLimit: number;
+    approvedDraftsOffset: number;
+    rejectedDraftsLimit: number;
+    rejectedDraftsOffset: number;
     growthDays: number;
+    compact: boolean;
   },
 ): Promise<Record<string, unknown>> {
   const recentLimit = Math.min(Math.max(Math.trunc(input.recentLimit), 1), 50);
+  const recentOffset = Math.max(Math.trunc(input.recentOffset), 0);
   const topLimit = Math.min(Math.max(Math.trunc(input.topLimit), 1), 50);
+  const topOffset = Math.max(Math.trunc(input.topOffset), 0);
   const weakLimit = Math.min(Math.max(Math.trunc(input.weakLimit), 1), 25);
+  const weakOffset = Math.max(Math.trunc(input.weakOffset), 0);
   const savedPatternsLimit = Math.min(Math.max(Math.trunc(input.savedPatternsLimit), 1), 50);
+  const savedPatternsOffset = Math.max(Math.trunc(input.savedPatternsOffset), 0);
   const memoryLimit = Math.min(Math.max(Math.trunc(input.memoryLimit), 1), 100);
+  const memoryOffset = Math.max(Math.trunc(input.memoryOffset), 0);
   const runsLimit = Math.min(Math.max(Math.trunc(input.runsLimit), 1), 15);
+  const runsOffset = Math.max(Math.trunc(input.runsOffset), 0);
+  const approvedDraftsLimit = Math.min(Math.max(Math.trunc(input.approvedDraftsLimit), 1), 50);
+  const approvedDraftsOffset = Math.max(Math.trunc(input.approvedDraftsOffset), 0);
+  const rejectedDraftsLimit = Math.min(Math.max(Math.trunc(input.rejectedDraftsLimit), 1), 50);
+  const rejectedDraftsOffset = Math.max(Math.trunc(input.rejectedDraftsOffset), 0);
   const growthDays = Math.min(Math.max(Math.trunc(input.growthDays), 7), 45);
+  const compact = input.compact === true;
   const generationMemoryKinds = [
     "taste_profile",
     "brand_voice_note",
@@ -5141,21 +5352,26 @@ async function buildGptGenerationContext(
     recentArchive,
     topArchive,
     weakArchiveSource,
-    savedPatterns,
+    savedPatternsPage,
     scheduledPosts,
     strategyMemory,
     generationRuns,
+    approvedDrafts,
+    rejectedDrafts,
     followerSnapshots,
   ] = await Promise.all([
-    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", recentLimit, 0),
-    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, 0),
-    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.max(weakLimit * 8, 24), 0),
-    listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", recentLimit, recentOffset),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, topOffset),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.max(weakLimit * 8, 24), weakOffset),
+    listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit, savedPatternsOffset),
     listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 50),
-    listGptStrategyMemory(env, brand.account_id, generationMemoryKinds, memoryLimit, 0),
-    listGptGenerationRuns(env, brand.account_id, runsLimit),
+    listGptStrategyMemory(env, brand.account_id, generationMemoryKinds, memoryLimit, memoryOffset),
+    listGptGenerationRuns(env, brand.account_id, runsLimit, runsOffset),
+    listGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"], approvedDraftsLimit, approvedDraftsOffset),
+    listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"], rejectedDraftsLimit, rejectedDraftsOffset),
     listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, growthDays),
   ]);
+  const savedPatterns = savedPatternsPage.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, false, !compact));
 
   const scheduledTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
   const scheduledPostsWithTags = scheduledPosts.map((post) => ({
@@ -5171,18 +5387,11 @@ async function buildGptGenerationContext(
     groups[memory.kind] = group;
     return groups;
   }, {});
-  const recentDrafts = generationRuns.flatMap((run) => run.drafts.map((draft) => ({
-    ...draft,
-    run_id: run.id,
-    run_objective: run.objective,
-  })));
-  const approvedDrafts = recentDrafts.filter((draft) => draft.status === "approved" || draft.status === "scheduled").slice(0, 20);
-  const rejectedDrafts = recentDrafts.filter((draft) => draft.status === "rejected" || draft.status === "self_rejected").slice(0, 20);
   const referenceItems = [
     ...recentArchive.posts.map((post) => ({ source: "archive_recent", id: post.id, text: post.text })),
     ...topArchive.posts.map((post) => ({ source: "archive_top", id: post.id, text: post.text })),
     ...scheduledPostsWithTags.map((post) => ({ source: "scheduled", id: post.id, text: post.text })),
-    ...savedPatterns.map((pattern) => ({ source: "saved_pattern", id: pattern.id, text: pattern.post_text })),
+    ...savedPatternsPage.patterns.map((pattern) => ({ source: "saved_pattern", id: pattern.id, text: pattern.post_text })),
     ...approvedDrafts.map((draft) => ({ source: "approved_draft", id: draft.id, text: draft.text })),
     ...rejectedDrafts.map((draft) => ({ source: "rejected_draft", id: draft.id, text: draft.text })),
   ];
@@ -5212,7 +5421,7 @@ async function buildGptGenerationContext(
       username: brand.profile.username,
       name: brand.profile.name,
       threads_user_id: brand.profile.threads_user_id,
-      threads_biography: brand.profile.threads_biography,
+      threads_biography: compact ? null : brand.profile.threads_biography,
     },
     generation_philosophy: [
       "Use tags, scores, rules, and categories as descriptive tools, not creative limits.",
@@ -5227,10 +5436,24 @@ async function buildGptGenerationContext(
       top_returned_count: topArchive.posts.length,
       weak_returned_count: weakPosts.length,
       saved_patterns_returned_count: savedPatterns.length,
+      saved_patterns_total_count: savedPatternsPage.totalCount,
+      has_more_saved_patterns: savedPatternsPage.totalCount > savedPatternsOffset + savedPatterns.length,
       scheduled_returned_count: scheduledPostsWithTags.length,
       memory_returned_count: strategyMemory.length,
       generation_runs_returned_count: generationRuns.length,
+      approved_drafts_returned_count: approvedDrafts.length,
+      rejected_drafts_returned_count: rejectedDrafts.length,
       growth_snapshot_count: growthDeltas.length,
+      offsets: {
+        recent: recentOffset,
+        top: topOffset,
+        weak: weakOffset,
+        saved_patterns: savedPatternsOffset,
+        memory: memoryOffset,
+        runs: runsOffset,
+        approved_drafts: approvedDraftsOffset,
+        rejected_drafts: rejectedDraftsOffset,
+      },
     },
     taste_and_beliefs: {
       all_memory: strategyMemory,
@@ -5323,6 +5546,9 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "memory_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 20 } },
             { name: "memory_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 10 } },
+            { name: "saved_patterns_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "order_by", in: "query", required: false, schema: { type: "string", enum: ["saved_at_desc", "likes_desc", "views_desc", "engagement_desc"], default: "likes_desc" } },
+            { name: "include_raw_payload", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Brand context" } },
         },
@@ -5336,14 +5562,47 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's generation objective or prompt summary." } },
             { name: "draft_text", in: "query", required: false, schema: { type: "string", description: "Optional draft to compare against archive, scheduled posts, saved patterns, and prior drafts." } },
             { name: "recent_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 12 } },
+            { name: "recent_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "top_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 12 } },
+            { name: "top_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "weak_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 25, default: 5 } },
+            { name: "weak_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+            { name: "saved_patterns_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "memory_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 60 } },
+            { name: "memory_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "runs_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 15, default: 5 } },
+            { name: "runs_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "approved_drafts_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+            { name: "approved_drafts_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "rejected_drafts_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+            { name: "rejected_drafts_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "growth_days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 45, default: 14 } },
+            { name: "compact", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Generation context" } },
+        },
+      },
+      "/api/gpt/draft-similarity": {
+        post: {
+          operationId: "checkDraftSimilarity",
+          summary: "Check a draft against archive, saved patterns, scheduled posts, prior drafts, and banned phrase memory.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "draft_text"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    draft_text: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Draft similarity report" } },
         },
       },
       "/api/gpt/saved-patterns": {
@@ -5353,6 +5612,9 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 48 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "order_by", in: "query", required: false, schema: { type: "string", enum: ["saved_at_desc", "likes_desc", "views_desc", "engagement_desc"], default: "likes_desc" } },
+            { name: "include_raw_payload", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Saved patterns" } },
         },
@@ -6652,26 +6914,102 @@ async function listArchivedThreadsPosts(
   };
 }
 
+async function countArchivedThreadsPosts(env: Env, threadsUserId: string): Promise<number> {
+  await ensureThreadsPostsArchiveTable(env);
+  const countRow = await env.DB.prepare(
+    `SELECT COUNT(*) AS total_count
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?`,
+  )
+    .bind(threadsUserId)
+    .first<{ total_count: number | string }>();
+  return Number(countRow?.total_count ?? 0);
+}
+
+type SavedPatternsOrderBy = "saved_at_desc" | "likes_desc" | "views_desc" | "engagement_desc";
+
+function normalizeSavedPatternsOrderBy(value: string | null | undefined): SavedPatternsOrderBy {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "saved_at_desc"
+    || normalized === "likes_desc"
+    || normalized === "views_desc"
+    || normalized === "engagement_desc"
+    ? normalized
+    : "likes_desc";
+}
+
+function getSavedPatternsOrderClause(orderBy: SavedPatternsOrderBy): string {
+  switch (orderBy) {
+    case "saved_at_desc":
+      return "datetime(saved_at) DESC, id DESC";
+    case "views_desc":
+      return "COALESCE(views, 0) DESC, likes DESC, datetime(saved_at) DESC, id DESC";
+    case "engagement_desc":
+      return "(likes + replies + reposts + shares) DESC, COALESCE(views, 0) DESC, datetime(saved_at) DESC, id DESC";
+    case "likes_desc":
+    default:
+      return "likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC";
+  }
+}
+
+function serializeSavedPatternForGpt(
+  pattern: ExternalPatternRow,
+  includeRawPayload: boolean,
+  includeSourceUrl = true,
+): Record<string, unknown> {
+  return {
+    id: pattern.id,
+    post_text: pattern.post_text,
+    author_handle: pattern.author_handle,
+    author_display_name: pattern.author_display_name,
+    likes: pattern.likes,
+    replies: pattern.replies,
+    reposts: pattern.reposts,
+    shares: pattern.shares,
+    views: pattern.views,
+    posted_at: pattern.posted_at,
+    saved_at: pattern.saved_at,
+    ...(includeSourceUrl ? { source_url: pattern.source_url } : {}),
+    ...(includeRawPayload ? { raw_payload: pattern.raw_payload } : {}),
+  };
+}
+
 async function listSavedPatternsForHermes(
   env: Env,
   threadsUserId: string,
   limit: number,
-): Promise<ExternalPatternRow[]> {
+  offset = 0,
+  orderBy: SavedPatternsOrderBy = "likes_desc",
+): Promise<{ patterns: ExternalPatternRow[]; totalCount: number }> {
   await ensureExternalPatternsTable(env);
   const accountId = await resolvePatternAccountId(env, threadsUserId, null);
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 0), 100);
+  const normalizedOffset = Math.max(Math.trunc(offset), 0);
+  const orderClause = getSavedPatternsOrderClause(orderBy);
   const rows = await env.DB.prepare(
     `SELECT id, app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
             post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
             raw_payload, saved_at, updated_at
      FROM external_patterns
      WHERE app_user_id = ? AND account_id = ?
-     ORDER BY likes DESC, COALESCE(views, 0) DESC, datetime(updated_at) DESC, id DESC
-     LIMIT ?`,
+     ORDER BY ${orderClause}
+     LIMIT ? OFFSET ?`,
   )
-    .bind(SAVED_PATTERNS_APP_USER_ID, accountId, limit)
+    .bind(SAVED_PATTERNS_APP_USER_ID, accountId, normalizedLimit, normalizedOffset)
     .all<ExternalPatternRow>();
 
-  return rows.results ?? [];
+  const countRow = await env.DB.prepare(
+    `SELECT COUNT(*) AS total_count
+     FROM external_patterns
+     WHERE app_user_id = ? AND account_id = ?`,
+  )
+    .bind(SAVED_PATTERNS_APP_USER_ID, accountId)
+    .first<{ total_count: number | string }>();
+
+  return {
+    patterns: rows.results ?? [],
+    totalCount: Number(countRow?.total_count ?? 0),
+  };
 }
 
 async function listScheduledPostsForHermesContext(
@@ -8390,6 +8728,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const memoryLimit = parseBoundedIntegerParam(url.searchParams.get("memory_limit"), 20, 0, 100);
         const memoryOffset = parseBoundedIntegerParam(url.searchParams.get("memory_offset"), 0, 0, 100000);
         const savedPatternsLimit = parseBoundedIntegerParam(url.searchParams.get("saved_patterns_limit"), 10, 0, 100);
+        const savedPatternsOffset = parseBoundedIntegerParam(url.searchParams.get("saved_patterns_offset"), 0, 0, 100000);
+        const savedPatternsOrderBy = normalizeSavedPatternsOrderBy(url.searchParams.get("order_by"));
+        const includeSavedPatternsRawPayload = url.searchParams.get("include_raw_payload") === "true";
 
         const includeSlots = wantsGptField(requestedFields, "missing_slots") || wantsGptField(requestedFields, "desired_slots");
         const includeBatchPreset = wantsGptField(requestedFields, "batch_preset") || includeSlots;
@@ -8408,9 +8749,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           weakArchiveSource,
           scheduledPostsForDate,
           upcomingScheduledPosts,
-          savedPatterns,
+          savedPatternsPage,
           strategyMemory,
           strategyMemoryTotal,
+          archiveTotalCount,
         ] = await Promise.all([
           includeBatchPreset
             ? listBatchSchedulePresetsForUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id)
@@ -8436,14 +8778,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             ? listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 50)
             : Promise.resolve([]),
           includeSavedPatterns
-            ? listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit)
-            : Promise.resolve([]),
+            ? listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit, savedPatternsOffset, savedPatternsOrderBy)
+            : Promise.resolve({ patterns: [], totalCount: 0 }),
           includeStrategyMemory
             ? listGptStrategyMemory(env, brand.account_id, [], memoryLimit, memoryOffset)
             : Promise.resolve([]),
           includeStrategyMemory
             ? countGptStrategyMemory(env, brand.account_id, [])
             : Promise.resolve(0),
+          countArchivedThreadsPosts(env, brand.profile.threads_user_id),
         ]);
 
         const selectedBatchPreset = includeBatchPreset ? pickPreferredBatchSchedulePreset(batchPresets) : null;
@@ -8484,7 +8827,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             date: targetDate,
             timezone: timeZone,
             archive_summary: {
-              archive_total_count: recentArchive.totalCount || topArchive.totalCount || weakArchiveSource.totalCount,
+              archive_total_count: archiveTotalCount,
               recent_sample_count: recentArchive.posts.length,
               top_sample_count: topArchive.posts.length,
               weak_sample_count: weakPosts.length,
@@ -8498,6 +8841,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
               memory_returned_count: strategyMemory.length,
               memory_total_count: strategyMemoryTotal,
               memory_offset: memoryOffset,
+              saved_patterns_returned_count: savedPatternsPage.patterns.length,
+              saved_patterns_total_count: savedPatternsPage.totalCount,
+              has_more_saved_patterns: includeSavedPatterns ? savedPatternsPage.totalCount > savedPatternsOffset + savedPatternsPage.patterns.length : null,
+              saved_patterns_offset: savedPatternsOffset,
               omitted_fields: [
                 !includeRecent ? "archive_recent" : null,
                 !includeTop ? "archive_top" : null,
@@ -8540,7 +8887,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           payload.archive_weak = weakPosts;
         }
         if (includeSavedPatterns) {
-          payload.saved_patterns = savedPatterns;
+          payload.saved_patterns = savedPatternsPage.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, includeSavedPatternsRawPayload));
         }
         if (includeStrategyMemory) {
           payload.strategy_memory = strategyMemory;
@@ -8565,14 +8912,50 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           objective: normalizeGptMemoryText(url.searchParams.get("objective"), 1000, true),
           draftText: normalizeGptMemoryText(url.searchParams.get("draft_text"), 2000, true),
           recentLimit: parseBoundedIntegerParam(url.searchParams.get("recent_limit"), 12, 1, 50),
+          recentOffset: parseBoundedIntegerParam(url.searchParams.get("recent_offset"), 0, 0, 100000),
           topLimit: parseBoundedIntegerParam(url.searchParams.get("top_limit"), 12, 1, 50),
+          topOffset: parseBoundedIntegerParam(url.searchParams.get("top_offset"), 0, 0, 100000),
           weakLimit: parseBoundedIntegerParam(url.searchParams.get("weak_limit"), 5, 1, 25),
+          weakOffset: parseBoundedIntegerParam(url.searchParams.get("weak_offset"), 0, 0, 100000),
           savedPatternsLimit: parseBoundedIntegerParam(url.searchParams.get("saved_patterns_limit"), 20, 1, 50),
+          savedPatternsOffset: parseBoundedIntegerParam(url.searchParams.get("saved_patterns_offset"), 0, 0, 100000),
           memoryLimit: parseBoundedIntegerParam(url.searchParams.get("memory_limit"), 60, 1, 100),
+          memoryOffset: parseBoundedIntegerParam(url.searchParams.get("memory_offset"), 0, 0, 100000),
           runsLimit: parseBoundedIntegerParam(url.searchParams.get("runs_limit"), 5, 1, 15),
+          runsOffset: parseBoundedIntegerParam(url.searchParams.get("runs_offset"), 0, 0, 100000),
+          approvedDraftsLimit: parseBoundedIntegerParam(url.searchParams.get("approved_drafts_limit"), 20, 1, 50),
+          approvedDraftsOffset: parseBoundedIntegerParam(url.searchParams.get("approved_drafts_offset"), 0, 0, 100000),
+          rejectedDraftsLimit: parseBoundedIntegerParam(url.searchParams.get("rejected_drafts_limit"), 20, 1, 50),
+          rejectedDraftsOffset: parseBoundedIntegerParam(url.searchParams.get("rejected_drafts_offset"), 0, 0, 100000),
           growthDays: parseBoundedIntegerParam(url.searchParams.get("growth_days"), 14, 7, 45),
+          compact: url.searchParams.get("compact") === "true",
         });
         return new Response(JSON.stringify(context), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/draft-similarity" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const draftText = normalizeGptMemoryText(payload.draft_text, 20000);
+        if (!brand || !draftText) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and draft_text are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const report = await buildGptDraftSimilarityCheck(env, brand, draftText);
+        return new Response(JSON.stringify(report), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
@@ -8618,7 +9001,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           });
         }
         const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 48, 1, 100);
-        const patterns = await listSavedPatternsForHermes(env, brand.profile.threads_user_id, limit);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const orderBy = normalizeSavedPatternsOrderBy(url.searchParams.get("order_by"));
+        const includeRawPayload = url.searchParams.get("include_raw_payload") === "true";
+        const page = await listSavedPatternsForHermes(env, brand.profile.threads_user_id, limit, offset, orderBy);
+        const patterns = page.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, includeRawPayload));
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
@@ -8626,7 +9013,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           threads_user_id: brand.profile.threads_user_id,
           patterns,
           returned_count: patterns.length,
+          total_count: page.totalCount,
+          has_more: page.totalCount > offset + patterns.length,
           limit,
+          offset,
+          order_by: orderBy,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -11189,7 +11580,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           archiveRecent: archiveRecent.posts,
           archiveTop: archiveTop.posts,
           scheduledPosts,
-          savedPatterns,
+          savedPatterns: savedPatterns.patterns,
         });
 
         return new Response(
@@ -11201,7 +11592,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
               archive_recent: archiveRecent.posts.length,
               archive_top: archiveTop.posts.length,
               scheduled_posts: scheduledPosts.length,
-              saved_patterns: savedPatterns.length,
+              saved_patterns: savedPatterns.patterns.length,
             },
           }),
           {
