@@ -76,6 +76,7 @@ const DASHBOARD_URL = buildWorkerUrl("/api/gpt-memory/dashboard");
 const RULE_REVIEW_URL = buildWorkerUrl("/api/gpt-memory/rule-review");
 const DRAFT_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/generation-drafts/update");
 const EXPERIMENT_URL = buildWorkerUrl("/api/gpt-memory/experiment");
+const TASTE_FEEDBACK_URL = buildWorkerUrl("/api/gpt-memory/taste-feedback");
 
 const MEMORY_SECTIONS: Array<{ kind: string; label: string }> = [
   { kind: "current_belief", label: "Current Beliefs" },
@@ -126,6 +127,8 @@ export default function GptMemoryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [tasteType, setTasteType] = useState("taste_profile");
+  const [tasteLesson, setTasteLesson] = useState("");
 
   const loadDashboard = useCallback(async (selectedThreadsUserId = threadsUserId) => {
     setLoading(true);
@@ -320,6 +323,45 @@ export default function GptMemoryPage() {
     }
   }
 
+  async function saveTasteFeedback() {
+    const lesson = tasteLesson.trim();
+    if (!lesson) {
+      setError("Write a taste lesson before saving.");
+      return;
+    }
+
+    setSaving("taste-feedback");
+    setError("");
+    try {
+      const response = await fetch(TASTE_FEEDBACK_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          feedback_type: tasteType,
+          lesson,
+          title: "Owner taste note",
+          confidence: "medium",
+          review_after_days: tasteType === "cooldown" ? 14 : 45,
+          metadata: {
+            entry_surface: "gpt_memory_dashboard",
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save taste feedback.");
+      }
+      setTasteLesson("");
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save taste feedback.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -379,6 +421,51 @@ export default function GptMemoryPage() {
                 {metricValue(dashboard.growth_review?.growth_summary, "weak_post_rate")}
               </p>
               <p className="text-sm text-slate-500">Recent archive sample</p>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="lg:w-56">
+                <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500" htmlFor="taste-type">
+                  Taste Type
+                </label>
+                <select
+                  id="taste-type"
+                  value={tasteType}
+                  onChange={(event) => setTasteType(event.target.value)}
+                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                >
+                  <option value="taste_profile">Taste Profile</option>
+                  <option value="approval_feedback">Approval Feedback</option>
+                  <option value="rejection_feedback">Rejection Feedback</option>
+                  <option value="brand_voice_note">Brand Voice Note</option>
+                  <option value="current_belief">Current Belief</option>
+                  <option value="banned_phrase">Banned Phrase</option>
+                  <option value="cooldown">Cooldown</option>
+                </select>
+              </div>
+              <div className="min-w-0 flex-1">
+                <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500" htmlFor="taste-lesson">
+                  Owner Taste Lesson
+                </label>
+                <textarea
+                  id="taste-lesson"
+                  value={tasteLesson}
+                  onChange={(event) => setTasteLesson(event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-800"
+                  placeholder="Example: I like this because it feels direct and earned, but avoid sounding like generic motivation."
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void saveTasteFeedback()}
+                disabled={saving === "taste-feedback"}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving === "taste-feedback" ? "Saving..." : "Save Taste"}
+              </button>
             </div>
           </section>
 

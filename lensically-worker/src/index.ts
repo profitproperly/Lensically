@@ -11401,6 +11401,96 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/taste-feedback" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const allowedTasteKinds = new Set<GptStrategyMemoryKind>([
+        "taste_profile",
+        "approval_feedback",
+        "rejection_feedback",
+        "brand_voice_note",
+        "current_belief",
+        "banned_phrase",
+        "cooldown",
+      ]);
+      const requestedKind = normalizeGptStrategyMemoryKind(payload.feedback_type);
+      const kind = requestedKind && allowedTasteKinds.has(requestedKind) ? requestedKind : "taste_profile";
+      const lesson = normalizeGptMemoryText(payload.lesson, 8000);
+      if (!brand || !lesson) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id and lesson are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const title = normalizeGptMemoryText(payload.title, 200, true)
+        ?? `${kind.replace(/_/g, " ")} feedback`;
+      const liked = normalizeGptStringArray(payload.liked, 20, 1000);
+      const disliked = normalizeGptStringArray(payload.disliked, 20, 1000);
+      const examples = normalizeGptRecordArray(payload.examples, 20);
+      const confidence = normalizeGptMemoryText(payload.confidence, 20, true);
+      const reviewAfterDays = parseBoundedIntegerParam(
+        typeof payload.review_after_days === "number" || typeof payload.review_after_days === "string"
+          ? String(payload.review_after_days)
+          : null,
+        0,
+        0,
+        365,
+      );
+      const reviewAfter = reviewAfterDays > 0
+        ? new Date(Date.now() + reviewAfterDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      const memory = await saveGptStrategyMemory(env, {
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+        kind,
+        title,
+        body: [
+          `Lesson: ${lesson}`,
+          liked.length ? `What worked: ${liked.join(" | ")}` : null,
+          disliked.length ? `What did not work: ${disliked.join(" | ")}` : null,
+          reviewAfter ? `Review after: ${reviewAfter}` : null,
+        ].filter(Boolean).join("\n"),
+        metadataJson: normalizeGptMemoryMetadata({
+          source: "lensically_memory_dashboard",
+          confidence: confidence || null,
+          liked,
+          disliked,
+          examples,
+          review_after: reviewAfter,
+          flexible_note: "Use this as owner taste evidence, not a rigid creative category.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        }),
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        brand_key: brand.brand_key,
+        memory,
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/patterns/import" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {
