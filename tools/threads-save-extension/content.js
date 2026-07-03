@@ -435,6 +435,20 @@
     return extractCompactNumberTokens(s);
   }
 
+  function extractActionMetricsFromText(raw) {
+    const text = String(raw || "");
+    if (!text) return [];
+    const compactNumber = "(\\d+(?:[.,]\\d+)?\\s*[kmb]?)";
+    const match = text.match(new RegExp(
+      `like\\s*${compactNumber}(?=\\s*reply)\\s*reply\\s*${compactNumber}(?=\\s*repost)\\s*repost\\s*${compactNumber}(?=\\s*share)\\s*share\\s*${compactNumber}`,
+      "i",
+    ));
+    if (!match) return [];
+    return match.slice(1, 5)
+      .map((value) => parseCompactNumber(String(value || "").replace(/\s+/g, "")))
+      .filter((value) => Number.isFinite(value));
+  }
+
   function extractViewsFromPage() {
     const body = (document.body && document.body.innerText) || "";
     const m = body.match(/(\d+(?:[.,]\d+)?\s*[kmb]?)\s+views\b/i);
@@ -601,6 +615,11 @@
 
     let actionMetrics = [];
     for (const line of scopedLines) {
+      const labeledMetrics = extractActionMetricsFromText(line);
+      if (labeledMetrics.length === 4) {
+        actionMetrics = labeledMetrics;
+        break;
+      }
       const tokens = extractCompactMetricTokens(line);
       if (tokens.length >= 4) {
         actionMetrics = tokens.slice(-4);
@@ -609,9 +628,14 @@
     }
     if (!actionMetrics.length) {
       const beforeReplyText = linesBeforeReplies(text.split(/\n|(?=View activity)|(?=SortTopMore)|(?=Reply to )/i)).join("\n");
-      const tokens = extractCompactNumberTokens(beforeReplyText);
-      if (tokens.length >= 4) {
-        actionMetrics = tokens.slice(-4);
+      const labeledMetrics = extractActionMetricsFromText(beforeReplyText);
+      if (labeledMetrics.length === 4) {
+        actionMetrics = labeledMetrics;
+      } else {
+        const tokens = extractCompactNumberTokens(beforeReplyText);
+        if (tokens.length >= 4) {
+          actionMetrics = tokens.slice(-4);
+        }
       }
     }
     if (!actionMetrics.length) {
@@ -659,7 +683,7 @@
         posted_at: postedAt || (jsonPayload && jsonPayload.posted_at) || null,
         capture_confidence: confidence,
         raw_payload: {
-          extractor_version: "0.1.1",
+          extractor_version: "0.1.2",
           mode: jsonPayload ? "json_ld_with_dom_metrics" : "dom",
           container_count: containers.length,
           top_article_line_sample: rawLines.slice(0, 25),
