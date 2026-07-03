@@ -36,7 +36,7 @@
 - bulk delete currently reuses the existing delete API in a controlled client loop.
 - Scheduled posts can be tagged with flexible strategy metadata: pillar, hook style, format, intent, experiment, and novelty level.
 - Scheduled strategy tags are descriptive signals for GPT growth review and novelty/fatigue analysis, not rigid content categories.
-- GPT growth context links posted scheduled-post strategy tags back to archived post metrics when possible, exposing tagged post results and tag-performance summaries for growth review.
+- GPT growth context links posted scheduled-post strategy tags back to archived post metrics and follower-day movement when possible, exposing tagged post results and tag-performance summaries for growth review.
 
 ## GPT Operator State
 

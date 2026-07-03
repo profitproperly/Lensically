@@ -160,6 +160,16 @@ async function createPostedTaggedPostFixture(): Promise<void> {
     )`,
   ).run();
   await env.DB.prepare(
+    `CREATE TABLE threads_follower_snapshots (
+      threads_user_id TEXT NOT NULL,
+      snapshot_date TEXT NOT NULL,
+      followers_count INTEGER NOT NULL DEFAULT 0,
+      baseline_followers_count INTEGER,
+      captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (threads_user_id, snapshot_date)
+    )`,
+  ).run();
+  await env.DB.prepare(
     `INSERT INTO scheduled_posts (id, user_id, threads_user_id, post_text, status, scheduled_time, published_post_id, published_at)
      VALUES (888, 'workspace-owner', ?, 'Posted strategy fixture', 'posted', '2026-07-01T15:00:00.000Z', 'post-888', '2026-07-01T15:01:00.000Z')`,
   ).bind(TEST_THREADS_USER_ID).run();
@@ -169,6 +179,10 @@ async function createPostedTaggedPostFixture(): Promise<void> {
       views, likes, replies, reposts, quotes, shares, engagement_total, source_rank
     ) VALUES (?, 'post-888', 'Posted strategy fixture', '2026-07-01T15:01:00.000Z', 'https://threads.net/post-888', 'vectrixvoltmore',
       1200, 90, 12, 8, 2, 1, 113, 0)`,
+  ).bind(TEST_THREADS_USER_ID).run();
+  await env.DB.prepare(
+    `INSERT INTO threads_follower_snapshots (threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at)
+     VALUES (?, '2026-07-01', 1050, 1042, '2026-07-01T23:00:00.000Z')`,
   ).bind(TEST_THREADS_USER_ID).run();
   await fetchFromWorker("/api/threads/schedule/strategy", {
     method: "POST",
@@ -472,6 +486,8 @@ describe("GPT memory browser routes", () => {
         expect.objectContaining({
           scheduled_post_id: 888,
           published_post_id: "post-888",
+          local_date: "2026-07-01",
+          follower_day_net_change: 8,
           strategy: expect.objectContaining({
             pillar: "offer",
             hook_style: "direct",
@@ -490,6 +506,7 @@ describe("GPT memory browser routes", () => {
             posts: 1,
             posts_with_metrics: 1,
             median_engagement_total: 113,
+            median_follower_day_net_change: 8,
           }),
         ],
       }),

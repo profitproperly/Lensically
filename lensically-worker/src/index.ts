@@ -185,6 +185,8 @@ type GptTaggedPostedPost = {
   status: string;
   scheduled_time_utc: string;
   published_at: string | null;
+  local_date?: string | null;
+  follower_day_net_change?: number | null;
   strategy: ReturnType<typeof serializeGptPostStrategyTag>;
   post: CachedThreadsPost | null;
 };
@@ -4597,6 +4599,7 @@ function summarizeTaggedPostPerformance(
   median_engagement_total: number;
   median_likes: number;
   median_views: number;
+  median_follower_day_net_change: number;
 }> {
   const grouped = new Map<string, GptTaggedPostedPost[]>();
   for (const taggedPost of taggedPosts) {
@@ -4619,6 +4622,7 @@ function summarizeTaggedPostPerformance(
         median_engagement_total: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.engagement_total ?? 0)).toFixed(2)),
         median_likes: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.likes ?? 0)).toFixed(2)),
         median_views: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.views ?? 0)).toFixed(2)),
+        median_follower_day_net_change: Number(calculateMedian(posts.map((post) => post.follower_day_net_change ?? 0)).toFixed(2)),
       };
     })
     .sort((left, right) => right.posts_with_metrics - left.posts_with_metrics || right.median_engagement_total - left.median_engagement_total || left.key.localeCompare(right.key));
@@ -5209,6 +5213,15 @@ async function buildGptGrowthContext(
     strategy: scheduledTagMap.get(post.id) ?? null,
   }));
   const scheduledTags = Array.from(scheduledTagMap.values());
+  const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day]));
+  const taggedPostResultsWithGrowth = taggedPostResults.map((taggedPost) => {
+    const localDate = getPostLocalDate({ timestamp: taggedPost.published_at ?? taggedPost.scheduled_time_utc } as Pick<CachedThreadsPost, "timestamp">, THREADS_INSIGHTS_TIME_ZONE);
+    return {
+      ...taggedPost,
+      local_date: localDate,
+      follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
+    };
+  });
 
   const postsByDate = new Map<string, CachedThreadsPost[]>();
   for (const post of recentArchive.posts) {
@@ -5305,14 +5318,14 @@ async function buildGptGrowthContext(
       experiments: summarizeTagUsage(scheduledTags, "experiment"),
       novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
     },
-    tagged_post_results: taggedPostResults,
+    tagged_post_results: taggedPostResultsWithGrowth,
     tag_performance: {
-      pillars: summarizeTaggedPostPerformance(taggedPostResults, "pillar"),
-      hook_styles: summarizeTaggedPostPerformance(taggedPostResults, "hook_style"),
-      formats: summarizeTaggedPostPerformance(taggedPostResults, "format"),
-      intents: summarizeTaggedPostPerformance(taggedPostResults, "intent"),
-      experiments: summarizeTaggedPostPerformance(taggedPostResults, "experiment"),
-      novelty_levels: summarizeTaggedPostPerformance(taggedPostResults, "novelty_level"),
+      pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
+      hook_styles: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "hook_style"),
+      formats: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "format"),
+      intents: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "intent"),
+      experiments: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "experiment"),
+      novelty_levels: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "novelty_level"),
     },
     strategy_memory: strategyMemory,
     experiment_summary: buildGptExperimentSummary(strategyMemory),

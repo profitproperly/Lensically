@@ -48,6 +48,7 @@ type TagPerformanceItem = {
   median_engagement_total?: number;
   median_likes?: number;
   median_views?: number;
+  median_follower_day_net_change?: number;
 };
 
 type GptMemoryDashboard = {
@@ -820,7 +821,7 @@ export default function GptMemoryPage() {
                         {formatNumber(item.posts_with_metrics)} posts
                       </span>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-600">
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-xs text-slate-600">
                       <div>
                         <p className="font-semibold text-slate-900">{formatNumber(item.median_engagement_total)}</p>
                         <p>eng</p>
@@ -832,6 +833,10 @@ export default function GptMemoryPage() {
                       <div>
                         <p className="font-semibold text-slate-900">{formatNumber(item.median_views)}</p>
                         <p>views</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{formatNumber(item.median_follower_day_net_change)}</p>
+                        <p>foll</p>
                       </div>
                     </div>
                   </div>
