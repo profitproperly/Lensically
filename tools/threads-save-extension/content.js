@@ -567,9 +567,14 @@
     }
 
     const text = getTextWithoutLensicallyLabels(topArticle).trim();
+    const postTextSource = stripInlineMetaNoise(text);
     if (!text && (!jsonLd || !jsonLd.ok)) return { ok: false, error: "Top post card has no readable text." };
 
-    const lines = text
+    const lines = postTextSource
+      .split("\n")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const rawLines = text
       .split("\n")
       .map((x) => x.trim())
       .filter(Boolean);
@@ -657,7 +662,7 @@
           extractor_version: "0.1.1",
           mode: jsonPayload ? "json_ld_with_dom_metrics" : "dom",
           container_count: containers.length,
-          top_article_line_sample: lines.slice(0, 25),
+          top_article_line_sample: rawLines.slice(0, 25),
           scoped_line_sample: scopedLines.slice(0, 25),
           metric_candidates: metricCandidates,
           action_metrics: actionMetrics
