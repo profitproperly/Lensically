@@ -105,11 +105,27 @@ type GenerationBrief = {
   error?: string;
 };
 
+type TasteInterview = {
+  success?: boolean;
+  brand_key?: string;
+  objective?: string | null;
+  should_ask_before_generating?: boolean;
+  max_questions_to_ask?: number;
+  prioritized_questions?: string[];
+  save_answers_with?: {
+    recommended_feedback_types?: string[];
+    guidance?: string;
+  };
+  context_signals?: Record<string, number>;
+  error?: string;
+};
+
 const DASHBOARD_URL = buildWorkerUrl("/api/gpt-memory/dashboard");
 const RULE_REVIEW_URL = buildWorkerUrl("/api/gpt-memory/rule-review");
 const DRAFT_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/generation-drafts/update");
 const EXPERIMENT_URL = buildWorkerUrl("/api/gpt-memory/experiment");
 const TASTE_FEEDBACK_URL = buildWorkerUrl("/api/gpt-memory/taste-feedback");
+const TASTE_INTERVIEW_URL = buildWorkerUrl("/api/gpt-memory/taste-interview");
 const GENERATION_BRIEF_URL = buildWorkerUrl("/api/gpt-memory/generation-brief");
 const STRATEGY_MEMORY_URL = buildWorkerUrl("/api/gpt-memory/strategy-memory");
 const STRATEGY_MEMORY_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/strategy-memory/update");
@@ -171,6 +187,8 @@ export default function GptMemoryPage() {
   const [error, setError] = useState("");
   const [tasteType, setTasteType] = useState("taste_profile");
   const [tasteLesson, setTasteLesson] = useState("");
+  const [tasteInterview, setTasteInterview] = useState<TasteInterview | null>(null);
+  const [tasteInterviewAnswers, setTasteInterviewAnswers] = useState<Record<string, string>>({});
   const [briefObjective, setBriefObjective] = useState("");
   const [briefBatchSize, setBriefBatchSize] = useState(8);
   const [generationBrief, setGenerationBrief] = useState<GenerationBrief | null>(null);
@@ -636,6 +654,76 @@ export default function GptMemoryPage() {
     }
   }
 
+  async function loadTasteInterview() {
+    setSaving("taste-interview");
+    setError("");
+    try {
+      const url = new URL(TASTE_INTERVIEW_URL);
+      if (threadsUserId) {
+        url.searchParams.set("threads_user_id", threadsUserId);
+      }
+      if (briefObjective.trim()) {
+        url.searchParams.set("objective", briefObjective.trim());
+      }
+      const response = await fetch(url.toString(), {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = (await response.json().catch(() => null)) as TasteInterview | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not load taste calibration.");
+      }
+      setTasteInterview(data);
+      setTasteInterviewAnswers({});
+    } catch (loadError) {
+      setTasteInterview(null);
+      setError(loadError instanceof Error ? loadError.message : "Could not load taste calibration.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveTasteInterviewAnswer(question: string) {
+    const answer = (tasteInterviewAnswers[question] ?? "").trim();
+    if (!answer) {
+      setError("Write an answer before saving taste calibration.");
+      return;
+    }
+
+    setSaving(`taste-interview-${question}`);
+    setError("");
+    try {
+      const response = await fetch(TASTE_FEEDBACK_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          feedback_type: "taste_profile",
+          lesson: answer,
+          title: "Taste calibration answer",
+          confidence: "medium",
+          review_after_days: 45,
+          metadata: {
+            entry_surface: "gpt_memory_dashboard_taste_interview",
+            interview_question: question,
+            objective: briefObjective.trim() || null,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save taste calibration.");
+      }
+      setTasteInterviewAnswers((current) => ({ ...current, [question]: "" }));
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save taste calibration.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function loadGenerationBrief() {
     setSaving("generation-brief");
     setError("");
@@ -768,6 +856,59 @@ export default function GptMemoryPage() {
               >
                 {saving === "taste-feedback" ? "Saving..." : "Save Taste"}
               </button>
+            </div>
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-950">Taste Calibration</h2>
+                  <p className="mt-1 text-sm text-slate-500">Pull focused questions before generation when taste, novelty, or direction needs sharpening.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadTasteInterview()}
+                  disabled={saving === "taste-interview"}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving === "taste-interview" ? "Loading..." : "Load Questions"}
+                </button>
+              </div>
+              {tasteInterview ? (
+                <div className="mt-4 space-y-3">
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                    <span className="rounded-md bg-slate-100 px-2 py-1">
+                      Ask up to {formatNumber(tasteInterview.max_questions_to_ask)}
+                    </span>
+                    <span className="rounded-md bg-slate-100 px-2 py-1">
+                      {tasteInterview.should_ask_before_generating ? "Ask before generating" : "Optional calibration"}
+                    </span>
+                  </div>
+                  {(tasteInterview.prioritized_questions ?? []).slice(0, 6).map((question) => (
+                    <article key={question} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold leading-6 text-slate-950">{question}</p>
+                      <textarea
+                        value={tasteInterviewAnswers[question] ?? ""}
+                        onChange={(event) => setTasteInterviewAnswers((current) => ({
+                          ...current,
+                          [question]: event.target.value,
+                        }))}
+                        rows={2}
+                        className="mt-3 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-800"
+                        placeholder="Answer only if this would change the next batch."
+                      />
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => void saveTasteInterviewAnswer(question)}
+                          disabled={Boolean(saving)}
+                          className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {saving === `taste-interview-${question}` ? "Saving..." : "Save Answer"}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </section>
 

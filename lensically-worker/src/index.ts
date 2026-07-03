@@ -12247,6 +12247,51 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    if (normalizedPath === "/api/gpt-memory/taste-interview" && request.method === "GET") {
+      const brand = await resolveGptBrandForThreadsUserId(env, url.searchParams.get("threads_user_id"));
+      if (!brand) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id is required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const objective = normalizeGptMemoryText(url.searchParams.get("objective"), 1000, true);
+      const context = await buildGptGenerationContext(env, brand, {
+        objective,
+        draftText: null,
+        recentLimit: 8,
+        recentOffset: 0,
+        topLimit: 8,
+        topOffset: 0,
+        weakLimit: 4,
+        weakOffset: 0,
+        savedPatternsLimit: 10,
+        savedPatternsOffset: 0,
+        memoryLimit: 50,
+        memoryOffset: 0,
+        runsLimit: 4,
+        runsOffset: 0,
+        approvedDraftsLimit: 12,
+        approvedDraftsOffset: 0,
+        rejectedDraftsLimit: 12,
+        rejectedDraftsOffset: 0,
+        growthDays: 14,
+        compact: true,
+      });
+      const interview = buildGptTasteInterviewBrief(brand, { objective, context });
+      return new Response(JSON.stringify(interview), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/gpt-memory/generation-brief" && request.method === "POST") {
       let payload: Record<string, unknown>;
       try {

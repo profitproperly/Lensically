@@ -568,6 +568,24 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("returns browser-safe taste interview prompts", async () => {
+    const response = await fetchFromWorker(`/api/gpt-memory/taste-interview?threads_user_id=${TEST_THREADS_USER_ID}&objective=Generate%20a%20calibrated%20batch`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      objective: "Generate a calibrated batch",
+      should_ask_before_generating: true,
+      prioritized_questions: expect.arrayContaining([
+        expect.any(String),
+      ]),
+      save_answers_with: expect.objectContaining({
+        action: "saveTasteFeedback",
+      }),
+    });
+  });
+
   it("saves strategy tags for scheduled posts and returns them from the schedule list", async () => {
     await createScheduledPostFixture();
 
