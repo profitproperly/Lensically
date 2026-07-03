@@ -5202,6 +5202,145 @@ function buildGptEvidenceLevel(sampleSize: number, supportingItems: number): "th
   return "strong";
 }
 
+function summarizeMemoryMetadataTokenUsage(
+  memories: ReturnType<typeof serializeGptStrategyMemoryRow>[],
+  field: string,
+): Array<{ value: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const memory of memories) {
+    const metadata = getGptMemoryMetadataRecord(memory);
+    const rawValue = metadata[field];
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      if (typeof value !== "string" && typeof value !== "number") {
+        continue;
+      }
+      const normalized = String(value).trim();
+      if (!normalized) {
+        continue;
+      }
+      counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 20)
+    .map(([value, count]) => ({ value, count }));
+}
+
+async function buildGptNoveltyFatigueReport(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    days: number;
+    objective: string | null;
+  },
+): Promise<Record<string, unknown>> {
+  const normalizedDays = Math.min(Math.max(Math.trunc(input.days), 7), 90);
+  const [recentArchive, scheduledPosts, strategyMemory, generationRuns] = await Promise.all([
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.min(Math.max(normalizedDays * 6, 60), 300), 0),
+    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100),
+    listGptStrategyMemory(env, brand.account_id, [
+      "saved_pattern_note",
+      "approved_pattern",
+      "rejected_pattern",
+      "cooldown",
+      "approval_feedback",
+      "rejection_feedback",
+      "current_belief",
+    ], 100),
+    listGptGenerationRuns(env, brand.account_id, 10, 0),
+  ]);
+  const scheduledTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+  const scheduledTags = Array.from(scheduledTagMap.values());
+  const drafts = generationRuns.flatMap((run) => run.drafts ?? []);
+  const recentTexts = [
+    ...recentArchive.posts.map((post) => ({ source: "archive_recent", text: post.text })),
+    ...scheduledPosts.map((post) => ({ source: "scheduled", text: post.text })),
+    ...drafts.map((draft) => ({ source: `draft_${draft.status}`, text: draft.text })),
+  ];
+  const tagUsage = {
+    scheduled_pillars: summarizeTagUsage(scheduledTags, "pillar"),
+    scheduled_hook_styles: summarizeTagUsage(scheduledTags, "hook_style"),
+    scheduled_formats: summarizeTagUsage(scheduledTags, "format"),
+    scheduled_intents: summarizeTagUsage(scheduledTags, "intent"),
+    scheduled_experiments: summarizeTagUsage(scheduledTags, "experiment"),
+    scheduled_novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
+  };
+  const adaptationSummary = buildGptPatternAdaptationSummary(strategyMemory);
+  const repeatedOpenings = summarizeRepeatedOpenings(recentTexts);
+  const repeatedSkeletons = recentTexts
+    .map((item) => ({ source: item.source, skeleton: getSentenceSkeleton(item.text), text: item.text ?? null }))
+    .filter((item): item is { source: string; skeleton: string; text: string | null } => Boolean(item.skeleton))
+    .reduce<Map<string, { count: number; sources: Set<string>; examples: Array<{ source: string; text: string | null }> }>>((groups, item) => {
+      const group = groups.get(item.skeleton) ?? { count: 0, sources: new Set<string>(), examples: [] };
+      group.count += 1;
+      group.sources.add(item.source);
+      if (group.examples.length < 3) {
+        group.examples.push({ source: item.source, text: item.text });
+      }
+      groups.set(item.skeleton, group);
+      return groups;
+    }, new Map());
+  const repeatedSkeletonSummary = Array.from(repeatedSkeletons.entries())
+    .filter(([, group]) => group.count > 1)
+    .sort((left, right) => right[1].count - left[1].count || left[0].localeCompare(right[0]))
+    .slice(0, 12)
+    .map(([skeleton, group]) => ({
+      skeleton,
+      count: group.count,
+      sources: Array.from(group.sources),
+      examples: group.examples,
+    }));
+  const scheduledCount = scheduledPosts.length;
+  const highUseTags = Object.entries(tagUsage).flatMap(([field, values]) => (
+    values
+      .filter((value) => value.used >= Math.max(3, Math.ceil(scheduledCount * 0.25)))
+      .map((value) => ({ field, ...value }))
+  ));
+  const fatigueSignals = [
+    highUseTags.length ? "One or more scheduled strategy tags dominate the upcoming queue." : null,
+    repeatedOpenings.length ? "Recent, scheduled, or draft openings repeat." : null,
+    repeatedSkeletonSummary.length ? "Sentence skeletons repeat across recent content." : null,
+    Array.isArray((adaptationSummary as Record<string, unknown>).active_pattern_cooldowns)
+      && ((adaptationSummary as Record<string, unknown>).active_pattern_cooldowns as unknown[]).length
+      ? "Pattern cooldowns are active." : null,
+  ].filter(Boolean);
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    objective: input.objective,
+    report_version: "novelty_fatigue_v1",
+    period: {
+      days: normalizedDays,
+      archive_recent_count: recentArchive.posts.length,
+      scheduled_count: scheduledCount,
+      generation_run_count: generationRuns.length,
+      draft_count: drafts.length,
+      memory_count: strategyMemory.length,
+    },
+    tag_usage: tagUsage,
+    high_use_tags: highUseTags,
+    repeated_openings: repeatedOpenings,
+    repeated_sentence_skeletons: repeatedSkeletonSummary,
+    pattern_adaptation_summary: adaptationSummary,
+    memory_mechanism_usage: summarizeMemoryMetadataTokenUsage(strategyMemory, "mechanism"),
+    fatigue_signals: fatigueSignals,
+    novelty_recommendation: fatigueSignals.length >= 2
+      ? "Increase novelty in the next batch and avoid dominant openings/mechanisms."
+      : fatigueSignals.length === 1
+      ? "Add one or two novelty tests while keeping proven mechanisms in rotation."
+      : "No major fatigue signal; keep exploiting proven ideas while preserving some exploration.",
+    guidance: [
+      "Use these counts as descriptive signals, not rigid rules.",
+      "Novelty should change mechanism, emotional frame, nouns, payoff, or structure, not just synonyms.",
+      "When fatigue is high, create a fresh experiment or cooldown overused mechanisms.",
+      "When fatigue is low, keep exploiting proven patterns with enough variation to avoid audience numbness.",
+    ],
+  };
+}
+
 async function buildGptRuleSuggestions(
   env: Env,
   brand: GptResolvedBrand,
@@ -6270,6 +6409,18 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "Optional focus such as rule review, novelty fatigue, engagement floor, or follower growth." } },
           ],
           responses: { "200": { description: "Rule suggestions" } },
+        },
+      },
+      "/api/gpt/novelty-fatigue": {
+        get: {
+          operationId: "getNoveltyFatigueReport",
+          summary: "Get novelty and fatigue math from scheduled tags, recent archive text, drafts, pattern adaptations, repeated openings, and cooldown memory.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 30 } },
+            { name: "objective", in: "query", required: false, schema: { type: "string", description: "Optional generation or growth focus." } },
+          ],
+          responses: { "200": { description: "Novelty and fatigue report" } },
         },
       },
       "/api/gpt/generation-runs": {
@@ -9895,6 +10046,25 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           objective: normalizeGptMemoryText(url.searchParams.get("objective"), 500, true),
         });
         return new Response(JSON.stringify(suggestions), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/novelty-fatigue" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const days = parseBoundedIntegerParam(url.searchParams.get("days"), 30, 7, 90);
+        const report = await buildGptNoveltyFatigueReport(env, brand, {
+          days,
+          objective: normalizeGptMemoryText(url.searchParams.get("objective"), 500, true),
+        });
+        return new Response(JSON.stringify(report), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
