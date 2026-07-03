@@ -5496,6 +5496,135 @@ async function buildGptGenerationContext(
   };
 }
 
+function normalizeGptBatchSize(value: unknown, fallback = 8): number {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.trunc(parsed), 1), 30);
+}
+
+function buildGptGenerationWorkflowBrief(
+  brand: GptResolvedBrand,
+  input: {
+    objective: string | null;
+    batchSize: number;
+    context: Record<string, unknown>;
+    run: ReturnType<typeof serializeGptGenerationRun> | null;
+  },
+): Record<string, unknown> {
+  const contextSummary = input.context.context_summary && typeof input.context.context_summary === "object"
+    ? input.context.context_summary as Record<string, unknown>
+    : {};
+  const tasteAndBeliefs = input.context.taste_and_beliefs && typeof input.context.taste_and_beliefs === "object"
+    ? input.context.taste_and_beliefs as Record<string, unknown>
+    : {};
+  const ruleSummary = tasteAndBeliefs.rule_review_summary && typeof tasteAndBeliefs.rule_review_summary === "object"
+    ? tasteAndBeliefs.rule_review_summary
+    : null;
+  const duplicateAndFatigue = input.context.duplicate_and_fatigue && typeof input.context.duplicate_and_fatigue === "object"
+    ? input.context.duplicate_and_fatigue as Record<string, unknown>
+    : {};
+  const savedPatternsCount = Number(contextSummary.saved_patterns_returned_count ?? 0);
+  const approvedDraftsCount = Number(contextSummary.approved_drafts_returned_count ?? 0);
+  const rejectedDraftsCount = Number(contextSummary.rejected_drafts_returned_count ?? 0);
+  const memoryCount = Number(contextSummary.memory_returned_count ?? 0);
+  const shouldAskTasteQuestion = memoryCount < 3 || (approvedDraftsCount === 0 && rejectedDraftsCount === 0);
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    objective: input.objective,
+    run: input.run,
+    workflow_version: "generation_brief_v1",
+    generation_contract: [
+      "Study the returned context before writing.",
+      "Create an internal candidate pool larger than the requested batch before showing drafts.",
+      "Self-reject weak, corny, generic, repetitive, off-brand, unclear, or overfit drafts before showing them.",
+      "Use flexible creative directions; do not force posts into fixed categories.",
+      "Run checkDraftSimilarity on drafts that survive internal review before scheduling or presenting a final batch.",
+      "Save shown drafts with saveGenerationDrafts and update approvals, rejections, rewrites, or scheduled drafts later.",
+    ],
+    context_readiness: {
+      memory_count: memoryCount,
+      saved_patterns_count: savedPatternsCount,
+      approved_drafts_count: approvedDraftsCount,
+      rejected_drafts_count: rejectedDraftsCount,
+      should_ask_taste_question: shouldAskTasteQuestion,
+      ask_taste_question_reasons: [
+        memoryCount < 3 ? "Thin owner taste/strategy memory for this brand." : null,
+        approvedDraftsCount === 0 && rejectedDraftsCount === 0 ? "No approved or rejected draft calibration examples returned." : null,
+      ].filter(Boolean),
+    },
+    candidate_pool: {
+      requested_batch_size: input.batchSize,
+      minimum_internal_candidates: Math.max(input.batchSize * 3, input.batchSize + 8),
+      show_after_self_rejection: input.batchSize,
+      direction_mix_guidance: {
+        proven_variants: "Roughly 60-75% when strong winners/saved patterns fit the objective.",
+        distant_variants: "Roughly 15-30% to avoid fatigue and surface-level copying.",
+        fresh_experiments: "Roughly 10-20% when recent posts look repetitive or growth is flat.",
+      },
+      flexible_direction_prompts: [
+        "Adapt a proven archive or saved-pattern mechanism with different nouns, payoff, emotional frame, and surface wording.",
+        "Write a distant variant that keeps the emotional logic but changes the subject and structure.",
+        "Write one fresh experiment aimed at follower growth or raising the engagement floor.",
+        "Write one clarity-first draft that says the point more directly than the current brand default.",
+      ],
+    },
+    scoring_rubric: {
+      scale: "0-10",
+      required_scores: [
+        "hook_strength",
+        "specificity",
+        "brand_fit",
+        "taste_fit",
+        "novelty",
+        "clarity",
+        "naturalness",
+        "duplicate_risk",
+        "follower_growth_potential",
+        "engagement_floor_potential",
+        "overall",
+      ],
+      self_reject_when: [
+        "overall < 7",
+        "duplicate_risk > 6",
+        "brand_fit < 7",
+        "taste_fit < 7 when taste evidence is clear",
+        "hook_strength < 7 unless the draft is intentionally quiet/direct",
+        "naturalness < 7 because the post sounds generated, corny, try-hard, or generic",
+      ],
+    },
+    taste_question_triggers: [
+      "Ask a targeted taste question before generating if the objective conflicts with stored taste or current beliefs.",
+      "Ask before generating if recent rejection feedback points in multiple directions.",
+      "Ask if you need to choose between a proven repetitive style and a fresh experimental style.",
+      "Do not ask broad questions; ask one concrete question that changes the batch.",
+    ],
+    duplicate_and_fatigue_guidance: {
+      from_context: duplicateAndFatigue,
+      check_action: "checkDraftSimilarity",
+      block_or_rewrite_when: [
+        "exact_matches is non-empty",
+        "archive_collision_risk is high",
+        "near duplicate similarity is 0.55 or higher",
+        "banned_phrase_hits is non-empty",
+        "opening or sentence skeleton repeats a scheduled post or recent approved draft",
+      ],
+    },
+    rule_and_memory_guidance: {
+      rule_review_summary: ruleSummary,
+      save_after_generation: [
+        "Save useful owner taste as taste_profile, approval_feedback, rejection_feedback, brand_voice_note, current_belief, or banned_phrase.",
+        "Use rule_proposal for uncertain learnings and saveRuleReview for keep, revise, cooldown, retire, retest, promote, or challenge decisions.",
+        "Do not convert weak evidence into a permanent rule.",
+      ],
+    },
+    context: input.context,
+  };
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
   return {
     openapi: "3.1.0",
@@ -5583,6 +5712,32 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
           responses: { "200": { description: "Generation context" } },
         },
       },
+      "/api/gpt/generation-brief": {
+        post: {
+          operationId: "prepareGenerationBrief",
+          summary: "Prepare a structured generation workflow brief before writing drafts, optionally creating a generation run.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    objective: { type: "string" },
+                    batch_size: { type: "integer", minimum: 1, maximum: 30, default: 8 },
+                    create_run: { type: "boolean", default: true },
+                    prompt_summary: { type: "string" },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Generation workflow brief" } },
+        },
+      },
       "/api/gpt/draft-similarity": {
         post: {
           operationId: "checkDraftSimilarity",
@@ -5650,6 +5805,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 25, default: 10 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
           ],
           responses: { "200": { description: "Generation runs" } },
         },
@@ -8936,6 +9092,77 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
       }
 
+      if (normalizedPath === "/api/gpt/generation-brief" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const objective = normalizeGptMemoryText(payload.objective, 1000, true);
+        const batchSize = normalizeGptBatchSize(payload.batch_size, 8);
+        const context = await buildGptGenerationContext(env, brand, {
+          objective,
+          draftText: null,
+          recentLimit: 12,
+          recentOffset: 0,
+          topLimit: 12,
+          topOffset: 0,
+          weakLimit: 5,
+          weakOffset: 0,
+          savedPatternsLimit: 16,
+          savedPatternsOffset: 0,
+          memoryLimit: 60,
+          memoryOffset: 0,
+          runsLimit: 5,
+          runsOffset: 0,
+          approvedDraftsLimit: 20,
+          approvedDraftsOffset: 0,
+          rejectedDraftsLimit: 20,
+          rejectedDraftsOffset: 0,
+          growthDays: 14,
+          compact: true,
+        });
+        const shouldCreateRun = payload.create_run !== false;
+        const run = shouldCreateRun
+          ? await createGptGenerationRun(env, {
+            accountId: brand.account_id,
+            threadsUserId: brand.profile.threads_user_id,
+            objective,
+            promptSummary: normalizeGptMemoryText(payload.prompt_summary, 2000, true)
+              ?? `Generation brief for ${brand.brand_key}`,
+            metadataJson: normalizeGptMemoryMetadata({
+              source: "generation_brief",
+              batch_size: batchSize,
+              workflow_version: "generation_brief_v1",
+              ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+                ? payload.metadata
+                : {}),
+            }),
+          })
+          : null;
+        const brief = buildGptGenerationWorkflowBrief(brand, {
+          objective,
+          batchSize,
+          context,
+          run,
+        });
+        return new Response(JSON.stringify(brief), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
       if (normalizedPath === "/api/gpt/draft-similarity" && request.method === "POST") {
         let payload: Record<string, unknown>;
         try {
@@ -9051,11 +9278,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
         const rawLimit = Number(url.searchParams.get("limit") ?? "10");
         const limit = Number.isFinite(rawLimit) ? rawLimit : 10;
-        const runs = await listGptGenerationRuns(env, brand.account_id, limit);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const runs = await listGptGenerationRuns(env, brand.account_id, limit, offset);
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
           runs,
+          limit,
+          offset,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
