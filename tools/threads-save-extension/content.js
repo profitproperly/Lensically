@@ -1,10 +1,12 @@
 (function () {
   const DEFAULT_WORKER = "https://api.lensically.com";
   const DEFAULT_APP_USER_ID = "lensically";
+  const DEFAULT_ACCOUNT_ID = "";
   const DEFAULT_LABEL_ENABLED = true;
   const DEFAULT_LABEL_THRESHOLD = 1000;
   const DEFAULT_LABEL_TEXT = "1K+ Likes";
   const FAB_ID = "lensically-save-fab";
+  const ACCOUNT_SELECT_ID = "lensically-account-select";
   const TOAST_ID = "lensically-save-toast";
   const LABEL_STYLE_ID = "lensically-label-style";
   const LABEL_BADGE_CLASS = "lensically-like-label";
@@ -29,6 +31,17 @@
     const suffix = m[3] || "";
     const scale = suffix === "k" ? 1000 : suffix === "m" ? 1000000 : suffix === "b" ? 1000000000 : 1;
     return Math.floor(base * scale);
+  }
+
+  function extractCompactNumberTokens(text) {
+    const tokens = [];
+    const pattern = /(?:^|[^a-z0-9])(\d+(?:[.,]\d+)?\s*[kmb]?)(?![a-z0-9])/gi;
+    let match;
+    while ((match = pattern.exec(String(text || ""))) !== null) {
+      const parsed = parseCompactNumber(match[1]);
+      if (Number.isFinite(parsed)) tokens.push(parsed);
+    }
+    return tokens;
   }
 
   function formatCompactNumber(value) {
@@ -74,10 +87,9 @@
         const explicit = parseLikesFromText(text);
         if (explicit !== null) return explicit;
 
-        const tokens = text.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
+        const tokens = extractCompactNumberTokens(text);
         if (tokens.length >= 3) {
-          const first = parseCompactNumber(tokens[0].replace(/\s+/g, ""));
-          if (Number.isFinite(first)) return first;
+          return tokens[0];
         }
 
         current = current.parentElement;
@@ -245,9 +257,23 @@
     return /^\d+([.,]\d+)?\s*[kmb]?$/i.test(s);
   }
 
+  function isLensicallyInjectedLabelLine(line) {
+    const s = String(line || "").trim().toLowerCase();
+    if (!s) return false;
+    return /^(?:\d+(?:[.,]\d+)?\s*[kmb]?|\+)\+?\s+likes?$/.test(s);
+  }
+
+  function getTextWithoutLensicallyLabels(el) {
+    if (!el) return "";
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll(`.${LABEL_BADGE_CLASS}`).forEach((node) => node.remove());
+    return String(clone.innerText || clone.textContent || "");
+  }
+
   function isLikelyMetaLine(line) {
     const s = line.trim().toLowerCase();
     if (!s) return true;
+    if (isLensicallyInjectedLabelLine(s)) return true;
     if (s === "top" || s === "view activity") return true;
     if (s.includes("post is shared to fediverse")) return true;
     if (/^\d+\s*(s|m|h|d|w|mo|y)$/i.test(s)) return true;
@@ -259,7 +285,11 @@
     if (!text) return "";
 
     text = text
+      .replace(/\s*(?:Sort\s*)?Top\s*More\s*View activity.*$/gi, "")
+      .replace(/\s*View activity\s*View activity\s*Reply to .*/gi, "")
+      .replace(/\s*Reply to [^\n]*?(?:Attach media|Add a GIF|Expand composer).*$/gi, "")
       .replace(/post is shared to fediverse/gi, "\n")
+      .replace(/(?:^|\n)\s*(?:\d+(?:[.,]\d+)?\s*[kmb]?|\+)\+?\s+likes?\s*(?=\n|$)/gi, "\n")
       .replace(/\bfollow[a-z0-9._]{2,40}\b/gi, "\n")
       .replace(/\bmore\b/gi, "\n")
       .replace(/\b\d+\s*(?:s|m|h|d|w|mo|y)\b/gi, "\n")
@@ -348,7 +378,9 @@
     const cleaned = [];
     for (let line of lines) {
       const lower = line.toLowerCase();
+      if (isLensicallyInjectedLabelLine(line)) continue;
       if (lower === "follow" || lower === "more" || lower === "thread") continue;
+      if (/^(like|reply|repost|share)$/i.test(line)) continue;
       if (lower.includes("post is shared to fediverse")) continue;
       if (lower.includes("follow") && lower.includes("more") && line.length < 80) continue;
       if (/^(like|reply|repost|share)\s*\d[\d.,kmb]*$/i.test(line)) continue;
@@ -386,6 +418,9 @@
       if (!s) continue;
       const lower = s.toLowerCase();
       if (lower === "top" || lower.startsWith("top ")) break;
+      if (lower.includes("view activity")) break;
+      if (lower.includes("expand composer")) break;
+      if (lower.includes("attach media") || lower.includes("add a gif")) break;
       if (lower.startsWith("view activity")) break;
       out.push(s);
     }
@@ -397,8 +432,7 @@
     if (!s) return [];
     if (s.includes("/")) return [];
     if (s.toLowerCase().includes(":")) return [];
-    const tokens = s.match(/\d+(?:[.,]\d+)?\s*[kmb]?/gi) || [];
-    return tokens.map((t) => parseCompactNumber(t)).filter((n) => Number.isFinite(n));
+    return extractCompactNumberTokens(s);
   }
 
   function extractViewsFromPage() {
@@ -527,7 +561,7 @@
     const topArticle = pickTopContainer(containers);
     if (!topArticle) return { ok: false, error: "No post card detected on this page." };
 
-    const text = (topArticle.innerText || "").trim();
+    const text = getTextWithoutLensicallyLabels(topArticle).trim();
     if (!text) return { ok: false, error: "Top post card has no readable text." };
 
     const lines = text
@@ -622,23 +656,34 @@
   function getSettings() {
     return new Promise((resolve) => {
       try {
-        chrome.storage.local.get(["workerUrl", "appUserId"], (stored) => {
+        chrome.storage.local.get(["workerUrl", "appUserId", "accountId"], (stored) => {
           const workerUrl = String(stored.workerUrl || DEFAULT_WORKER).trim().replace(/\/+$/, "");
           const appUserId = String(stored.appUserId || DEFAULT_APP_USER_ID).trim();
-          resolve({ workerUrl, appUserId });
+          const accountId = String(stored.accountId || DEFAULT_ACCOUNT_ID).trim().toLowerCase();
+          resolve({ workerUrl, appUserId, accountId });
         });
       } catch {
-        resolve({ workerUrl: DEFAULT_WORKER, appUserId: DEFAULT_APP_USER_ID });
+        resolve({ workerUrl: DEFAULT_WORKER, appUserId: DEFAULT_APP_USER_ID, accountId: DEFAULT_ACCOUNT_ID });
       }
     });
   }
 
-  async function importPattern(workerUrl, appUserId, payload) {
+  async function saveAccountId(accountId) {
+    try {
+      await chrome.storage.local.set({ accountId: String(accountId || "").trim().toLowerCase() });
+    } catch {
+      // Ignore storage failures; the current save still uses the selected value.
+    }
+  }
+
+  async function importPattern(workerUrl, appUserId, accountId, payload) {
+    const accountPayload = accountId ? { account_id: accountId } : {};
     const res = await fetch(`${workerUrl}/api/patterns/import`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         app_user_id: appUserId,
+        ...accountPayload,
         ...payload
       })
     });
@@ -699,9 +744,12 @@
       if (!extracted || !extracted.ok) {
         throw new Error((extracted && extracted.error) || "Extraction failed.");
       }
-      const { workerUrl, appUserId } = await getSettings();
-      await importPattern(workerUrl, appUserId, extracted.payload);
-      showToast("Saved", false);
+      const { workerUrl, appUserId, accountId } = await getSettings();
+      const picker = document.getElementById(ACCOUNT_SELECT_ID);
+      const selectedAccountId = String(picker?.value || accountId || "").trim().toLowerCase();
+      await saveAccountId(selectedAccountId);
+      await importPattern(workerUrl, appUserId, selectedAccountId, extracted.payload);
+      showToast(selectedAccountId ? `Saved to ${selectedAccountId}` : "Saved", false);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Save failed", true);
     } finally {
@@ -712,14 +760,50 @@
 
   function ensureFloatingButton() {
     if (document.getElementById(FAB_ID)) return;
+    const wrapper = document.createElement("div");
+    wrapper.id = FAB_ID;
+    wrapper.style.position = "fixed";
+    wrapper.style.top = "20px";
+    wrapper.style.right = "20px";
+    wrapper.style.zIndex = "2147483647";
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "center";
+    wrapper.style.gap = "6px";
+
+    const select = document.createElement("select");
+    select.id = ACCOUNT_SELECT_ID;
+    select.title = "Save to profile";
+    select.innerHTML = [
+      '<option value="">Default</option>',
+      '<option value="deadman">Deadman</option>',
+      '<option value="manifest-mental">Manifest Mental</option>',
+      '<option value="vectrix">Vectrix</option>'
+    ].join("");
+    select.style.width = "32px";
+    select.style.height = "32px";
+    select.style.border = "0";
+    select.style.borderRadius = "999px";
+    select.style.background = "#22c55e";
+    select.style.color = "transparent";
+    select.style.fontSize = "16px";
+    select.style.fontWeight = "900";
+    select.style.textAlign = "center";
+    select.style.cursor = "pointer";
+    select.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+    select.style.appearance = "none";
+    select.style.webkitAppearance = "none";
+    select.style.backgroundImage = "linear-gradient(45deg, transparent 50%, #052e16 50%), linear-gradient(135deg, #052e16 50%, transparent 50%)";
+    select.style.backgroundPosition = "9px 13px, 15px 13px";
+    select.style.backgroundSize = "7px 7px, 7px 7px";
+    select.style.backgroundRepeat = "no-repeat";
+    select.addEventListener("change", () => {
+      void saveAccountId(select.value);
+      showToast(select.value ? `Profile: ${select.options[select.selectedIndex]?.text || select.value}` : "Profile: Default", false);
+    });
+
     const button = document.createElement("button");
-    button.id = FAB_ID;
     button.type = "button";
     button.textContent = "Save Post";
-    button.style.position = "fixed";
-    button.style.top = "20px";
-    button.style.right = "20px";
-    button.style.zIndex = "2147483647";
     button.style.padding = "9px 12px";
     button.style.border = "0";
     button.style.borderRadius = "999px";
@@ -732,7 +816,15 @@
     button.addEventListener("click", () => {
       void handleFabClick(button);
     });
-    document.body.appendChild(button);
+    wrapper.appendChild(select);
+    wrapper.appendChild(button);
+    document.body.appendChild(wrapper);
+
+    getSettings().then((settings) => {
+      select.value = settings.accountId || "";
+    }).catch(() => {
+      select.value = "";
+    });
   }
 
   function watchDomForLabels() {

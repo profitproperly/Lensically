@@ -6,6 +6,7 @@ const DEFAULT_LABEL_TEXT = "1K+ Likes";
 
 const workerUrlInput = document.getElementById("workerUrl");
 const appUserIdInput = document.getElementById("appUserId");
+const accountIdInput = document.getElementById("accountId");
 const saveBtn = document.getElementById("saveBtn");
 const statusEl = document.getElementById("status");
 
@@ -43,10 +44,15 @@ function ensureThreadsUrl(url) {
   return /^https:\/\/(www\.)?threads\.com\//i.test(url) || /^https:\/\/threads\.net\//i.test(url);
 }
 
-async function saveConnectionSettings(workerUrl, appUserId) {
+function normalizeAccountId(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+async function saveConnectionSettings(workerUrl, appUserId, accountId) {
   await chrome.storage.local.set({
     workerUrl,
-    appUserId
+    appUserId,
+    accountId
   });
 }
 
@@ -58,6 +64,7 @@ async function loadSettings() {
   const stored = await chrome.storage.local.get([
     "workerUrl",
     "appUserId",
+    "accountId",
     "labelEnabled",
     "labelThreshold",
     "labelText"
@@ -65,6 +72,7 @@ async function loadSettings() {
 
   const workerUrl = normalizeWorkerUrl(stored.workerUrl || DEFAULT_WORKER);
   const appUserId = String(stored.appUserId || DEFAULT_APP_USER_ID).trim();
+  const accountId = normalizeAccountId(stored.accountId);
 
   const labelEnabled = typeof stored.labelEnabled === "boolean" ? stored.labelEnabled : DEFAULT_LABEL_ENABLED;
   const labelThreshold = clampThreshold(stored.labelThreshold);
@@ -72,6 +80,7 @@ async function loadSettings() {
 
   workerUrlInput.value = workerUrl;
   appUserIdInput.value = appUserId;
+  accountIdInput.value = accountId;
   labelEnabledInput.checked = labelEnabled;
   labelThresholdInput.value = String(labelThreshold);
   labelTextInput.value = labelText;
@@ -104,12 +113,14 @@ async function notifyLabelSettingsChanged(tab) {
   });
 }
 
-async function importPattern(workerUrl, appUserId, payload) {
+async function importPattern(workerUrl, appUserId, accountId, payload) {
+  const accountPayload = accountId ? { account_id: accountId } : {};
   const res = await fetch(`${workerUrl}/api/patterns/import`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       app_user_id: appUserId,
+      ...accountPayload,
       ...payload
     })
   });
@@ -150,16 +161,28 @@ saveLabelSettingsBtn.addEventListener("click", async () => {
   }
 });
 
+accountIdInput.addEventListener("change", async () => {
+  try {
+    await chrome.storage.local.set({
+      accountId: normalizeAccountId(accountIdInput.value)
+    });
+  } catch {
+    // Save again on the next post if Orion ignores this storage write.
+  }
+});
+
 saveBtn.addEventListener("click", async () => {
   saveBtn.disabled = true;
   try {
     const workerUrl = normalizeWorkerUrl(workerUrlInput.value || DEFAULT_WORKER);
     const appUserId = String(appUserIdInput.value || DEFAULT_APP_USER_ID).trim();
+    const accountId = normalizeAccountId(accountIdInput.value);
     if (!workerUrl || !appUserId) {
       throw new Error("Worker URL and App User ID are required.");
     }
 
-    await saveConnectionSettings(workerUrl, appUserId);
+    accountIdInput.value = accountId;
+    await saveConnectionSettings(workerUrl, appUserId, accountId);
 
     const tab = await getActiveTab();
     if (!tab || !tab.id || !tab.url) {
@@ -180,8 +203,8 @@ saveBtn.addEventListener("click", async () => {
     }
 
     setStatus("Saving to backend...");
-    const result = await importPattern(workerUrl, appUserId, extracted.payload);
-    setStatus(`Saved. Updated ${result.updated_at || "just now"}`);
+    const result = await importPattern(workerUrl, appUserId, accountId, extracted.payload);
+    setStatus(`Saved to ${result.account_id || accountId}. Updated ${result.updated_at || "just now"}`);
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Unexpected error", true);
   } finally {
@@ -192,6 +215,7 @@ saveBtn.addEventListener("click", async () => {
 loadSettings().catch(() => {
   workerUrlInput.value = DEFAULT_WORKER;
   appUserIdInput.value = DEFAULT_APP_USER_ID;
+  accountIdInput.value = "";
   labelEnabledInput.checked = DEFAULT_LABEL_ENABLED;
   labelThresholdInput.value = String(DEFAULT_LABEL_THRESHOLD);
   labelTextInput.value = DEFAULT_LABEL_TEXT;

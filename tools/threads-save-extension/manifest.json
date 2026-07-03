@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lensically Threads Saver",
   "description": "Save the current Threads post into a Lensically-compatible patterns endpoint.",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "permissions": ["activeTab", "storage", "tabs", "scripting"],
   "host_permissions": [
     "https://www.threads.com/*",
