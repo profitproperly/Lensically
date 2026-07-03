@@ -5189,6 +5189,124 @@ async function buildGptGrowthReview(
   };
 }
 
+function buildGptEvidenceLevel(sampleSize: number, supportingItems: number): "thin" | "emerging" | "moderate" | "strong" {
+  if (sampleSize < 12 || supportingItems < 2) {
+    return "thin";
+  }
+  if (sampleSize < 25 || supportingItems < 4) {
+    return "emerging";
+  }
+  if (sampleSize < 50 || supportingItems < 7) {
+    return "moderate";
+  }
+  return "strong";
+}
+
+async function buildGptRuleSuggestions(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    days: number;
+    objective: string | null;
+  },
+): Promise<Record<string, unknown>> {
+  const normalizedDays = Math.min(Math.max(Math.trunc(input.days), 7), 90);
+  const review = await buildGptGrowthReview(env, brand, {
+    days: normalizedDays,
+    objective: input.objective,
+  });
+  const growthSummary = review.growth_summary && typeof review.growth_summary === "object"
+    ? review.growth_summary as Record<string, unknown>
+    : {};
+  const postSamples = review.post_samples && typeof review.post_samples === "object"
+    ? review.post_samples as Record<string, unknown>
+    : {};
+  const tagUsage = review.tag_usage && typeof review.tag_usage === "object"
+    ? review.tag_usage as Record<string, unknown>
+    : {};
+  const experimentSummary = review.experiment_summary && typeof review.experiment_summary === "object"
+    ? review.experiment_summary as Record<string, unknown>
+    : {};
+  const sampleSize = Number(growthSummary.sample_size ?? 0);
+  const winnerCount = Number(growthSummary.winner_count ?? 0);
+  const weakCount = Number(growthSummary.weak_count ?? 0);
+  const winnerRate = Number(growthSummary.winner_rate ?? 0);
+  const weakPostRate = Number(growthSummary.weak_post_rate ?? 0);
+  const winners = Array.isArray(postSamples.winners) ? postSamples.winners : [];
+  const weak = Array.isArray(postSamples.weak) ? postSamples.weak : [];
+  const openExperiments = Array.isArray(experimentSummary.open_experiments) ? experimentSummary.open_experiments : [];
+  const recentExperimentResults = Array.isArray(experimentSummary.recent_experiment_results)
+    ? experimentSummary.recent_experiment_results
+    : [];
+  const suggestions = [
+    {
+      suggestion_type: winnerRate >= 0.18 ? "exploit" : "explore",
+      title: winnerRate >= 0.18 ? "Exploit recent winner mechanisms carefully" : "Find new winner mechanisms before forming a rule",
+      proposed_rule: winnerRate >= 0.18
+        ? "Lean into mechanisms visible across recent winners, but keep changing surface wording and emotional frame."
+        : "Do not overfit to recent winners yet; create experiments that test why the current winners worked.",
+      evidence_level: buildGptEvidenceLevel(sampleSize, winnerCount),
+      evidence: {
+        sample_size: sampleSize,
+        winner_count: winnerCount,
+        winner_rate: winnerRate,
+        winner_examples: winners.slice(0, 5),
+      },
+      recommended_action: winnerRate >= 0.18 && sampleSize >= 25 ? "save_rule_proposal" : "save_experiment",
+      caution: "Engagement winners are not automatically follower-growth winners.",
+    },
+    {
+      suggestion_type: weakPostRate >= 0.35 ? "cooldown" : "watch",
+      title: weakPostRate >= 0.35 ? "Cool down weak-post patterns" : "Watch weak-post patterns without overreacting",
+      proposed_rule: weakPostRate >= 0.35
+        ? "Reduce mechanisms that resemble the recent weak-post set until a retest proves they can recover."
+        : "Keep monitoring weak posts, but do not ban mechanisms from a small weak sample.",
+      evidence_level: buildGptEvidenceLevel(sampleSize, weakCount),
+      evidence: {
+        sample_size: sampleSize,
+        weak_count: weakCount,
+        weak_post_rate: weakPostRate,
+        weak_examples: weak.slice(0, 5),
+      },
+      recommended_action: weakPostRate >= 0.35 && weakCount >= 5 ? "save_rule_proposal_or_cooldown" : "watch",
+      caution: "Weak posts can fail from timing, freshness, or audience context; use cooldowns before permanent bans.",
+    },
+    {
+      suggestion_type: openExperiments.length ? "review_experiments" : "explore",
+      title: openExperiments.length ? "Review open experiments before adding new rules" : "Create a fresh growth experiment",
+      proposed_rule: openExperiments.length
+        ? "Do not add a new rule until open experiments are reviewed or enough new evidence arrives."
+        : "Run one small experiment aimed at follower growth or raising the engagement floor before promoting a new rule.",
+      evidence_level: recentExperimentResults.length >= 3 ? "moderate" : "thin",
+      evidence: {
+        open_experiments: openExperiments.slice(0, 5),
+        recent_experiment_results: recentExperimentResults.slice(0, 5),
+      },
+      recommended_action: openExperiments.length ? "review_or_update_experiments" : "save_experiment",
+      caution: "Experiments should have hypotheses, success criteria, sample size, and a review date.",
+    },
+  ];
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    objective: input.objective,
+    suggestions_version: "rule_suggestions_v1",
+    period: review.period,
+    account: review.account,
+    rule_suggestions: suggestions,
+    tag_usage: tagUsage,
+    review,
+    persistence_guidance: {
+      save_uncertain_learning_as: "rule_proposal",
+      save_strong_owner_belief_as: "current_belief",
+      save_tests_as: "saveExperiment",
+      review_existing_rules_with: "saveRuleReview",
+      caution: "Do not save suggestions as approved_rule unless the owner approves or evidence is strong enough.",
+    },
+  };
+}
+
 function normalizeCreativeComparisonText(value: string | null | undefined): string {
   return (value ?? "")
     .toLowerCase()
@@ -6140,6 +6258,18 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "Optional review focus, such as weekly review, follower growth, engagement floor, or novelty fatigue." } },
           ],
           responses: { "200": { description: "Growth review" } },
+        },
+      },
+      "/api/gpt/rule-suggestions": {
+        get: {
+          operationId: "prepareRuleSuggestions",
+          summary: "Prepare evidence-based rule suggestions with sample-size caution, using growth review, winner/weak rates, experiments, and current context.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 30 } },
+            { name: "objective", in: "query", required: false, schema: { type: "string", description: "Optional focus such as rule review, novelty fatigue, engagement floor, or follower growth." } },
+          ],
+          responses: { "200": { description: "Rule suggestions" } },
         },
       },
       "/api/gpt/generation-runs": {
@@ -9746,6 +9876,25 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           objective: normalizeGptMemoryText(url.searchParams.get("objective"), 500, true),
         });
         return new Response(JSON.stringify(review), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/rule-suggestions" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const days = parseBoundedIntegerParam(url.searchParams.get("days"), 30, 7, 90);
+        const suggestions = await buildGptRuleSuggestions(env, brand, {
+          days,
+          objective: normalizeGptMemoryText(url.searchParams.get("objective"), 500, true),
+        });
+        return new Response(JSON.stringify(suggestions), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
