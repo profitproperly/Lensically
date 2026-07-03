@@ -23,6 +23,7 @@ const links = [
   { href: "/saved-patterns", label: "Saved Patterns" },
   { href: "/followers", label: "Followers" },
   { href: "/post-archive", label: "Post Archive" },
+  { href: "/gpt-memory", label: "GPT Memory" },
   { href: "/schedule", label: "Create Post" },
   { href: "/scheduled-posts", label: "Scheduled Posts" },
 ];

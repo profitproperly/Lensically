@@ -1572,6 +1572,26 @@ async function resolveGptBrand(env: Env, rawBrandKey: unknown): Promise<GptResol
   };
 }
 
+async function resolveGptBrandForThreadsUserId(
+  env: Env,
+  rawThreadsUserId: unknown,
+): Promise<GptResolvedBrand | null> {
+  const threadsUserId = typeof rawThreadsUserId === "string" ? rawThreadsUserId.trim() : "";
+  const profiles = await getConfiguredThreadsProfiles(env);
+  const profile = profiles.find((account) => threadsUserId && account.threads_user_id === threadsUserId)
+    ?? profiles.find((account) => account.is_active)
+    ?? profiles[0]
+    ?? null;
+  if (!profile) {
+    return null;
+  }
+  const brandKey = gptBrandKeyForAccountId(profile.account_id);
+  if (!brandKey) {
+    return null;
+  }
+  return resolveGptBrand(env, brandKey);
+}
+
 function isValidIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
@@ -5779,6 +5799,74 @@ function buildGptPatternAdaptationSummary(
       "Use cooldowns when the same mechanism, opening, or emotional move starts to feel overused.",
       "Track rejected adaptations so the GPT learns taste boundaries, not just winning formulas.",
     ],
+  };
+}
+
+async function buildGptMemoryDashboard(
+  env: Env,
+  brand: GptResolvedBrand,
+): Promise<Record<string, unknown>> {
+  const memoryKinds: GptStrategyMemoryKind[] = [
+    "taste_profile",
+    "brand_voice_note",
+    "current_belief",
+    "approved_rule",
+    "rule_proposal",
+    "rule_review",
+    "approved_pattern",
+    "rejected_pattern",
+    "approval_feedback",
+    "rejection_feedback",
+    "banned_phrase",
+    "cooldown",
+    "experiment",
+    "experiment_result",
+    "saved_pattern_note",
+    "result_note",
+  ];
+  const [memory, totalCount, generationRuns, growthReview, ruleSuggestions, noveltyFatigue] = await Promise.all([
+    listGptStrategyMemory(env, brand.account_id, memoryKinds, 100, 0),
+    countGptStrategyMemory(env, brand.account_id, memoryKinds),
+    listGptGenerationRuns(env, brand.account_id, 8, 0),
+    buildGptGrowthReview(env, brand, { days: 30, objective: "memory dashboard" }),
+    buildGptRuleSuggestions(env, brand, { days: 30, objective: "memory dashboard" }),
+    buildGptNoveltyFatigueReport(env, brand, { days: 30, objective: "memory dashboard" }),
+  ]);
+  const memoryByKind = memory.reduce<Record<string, typeof memory>>((groups, item) => {
+    const group = groups[item.kind] ?? [];
+    group.push(item);
+    groups[item.kind] = group;
+    return groups;
+  }, {});
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    account: {
+      account_id: brand.account_id,
+      label: brand.profile.label,
+      username: brand.profile.username,
+      name: brand.profile.name,
+      threads_user_id: brand.profile.threads_user_id,
+      threads_profile_picture_url: brand.profile.threads_profile_picture_url,
+    },
+    memory_summary: {
+      total_count: totalCount,
+      returned_count: memory.length,
+      counts_by_kind: Object.fromEntries(
+        Object.entries(memoryByKind)
+          .map(([kind, items]) => [kind, items.length]),
+      ),
+      has_more: totalCount > memory.length,
+    },
+    memory_by_kind: memoryByKind,
+    rule_review_summary: buildGptRuleReviewSummary(memory),
+    experiment_summary: buildGptExperimentSummary(memory),
+    pattern_adaptation_summary: buildGptPatternAdaptationSummary(memory),
+    generation_runs: generationRuns,
+    growth_review: growthReview,
+    rule_suggestions: ruleSuggestions,
+    novelty_fatigue: noveltyFatigue,
   };
 }
 
@@ -10914,6 +11002,154 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return new Response(JSON.stringify({ success: false, error: "GPT route not found" }), {
         status: 404,
         headers: { "content-type": "application/json; charset=UTF-8" },
+      });
+    }
+
+    if (normalizedPath === "/api/gpt-memory/dashboard" && request.method === "GET") {
+      const brand = await resolveGptBrandForThreadsUserId(env, url.searchParams.get("threads_user_id"));
+      if (!brand) {
+        return new Response(JSON.stringify({ success: false, error: "Configured Threads account not found" }), {
+          status: 404,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const dashboard = await buildGptMemoryDashboard(env, brand);
+      return new Response(JSON.stringify(dashboard), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
+    if (normalizedPath === "/api/gpt-memory/rule-review" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const allowedDecisions = new Set(["keep", "revise", "cooldown", "retire", "retest", "promote_to_current_belief", "challenge"]);
+      const decision = typeof payload.decision === "string" && allowedDecisions.has(payload.decision.trim().toLowerCase())
+        ? payload.decision.trim().toLowerCase()
+        : null;
+      const reason = normalizeGptMemoryText(payload.reason, 8000);
+      if (!brand || !decision || !reason) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id, valid decision, and reason are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+
+      const memoryId = Number(payload.memory_id);
+      const reviewedMemoryId = Number.isInteger(memoryId) && memoryId > 0 ? memoryId : null;
+      const title = normalizeGptMemoryText(payload.title, 200, true)
+        ?? `Rule review: ${decision.replace(/_/g, " ")}`;
+      const replacementBelief = normalizeGptMemoryText(payload.replacement_belief, 8000, true);
+      const evidence = normalizeGptRecordArray(payload.evidence, 25);
+      const reviewAfterDays = parseBoundedIntegerParam(
+        typeof payload.review_after_days === "number" || typeof payload.review_after_days === "string"
+          ? String(payload.review_after_days)
+          : null,
+        0,
+        0,
+        365,
+      );
+      const reviewAfter = reviewAfterDays > 0
+        ? new Date(Date.now() + reviewAfterDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      const metadata = {
+        reviewed_memory_id: reviewedMemoryId,
+        decision,
+        evidence,
+        review_after: reviewAfter,
+        source: "lensically_memory_dashboard",
+        flexible_note: "This is a current strategic judgment, not permanent creative law.",
+        ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+          ? payload.metadata
+          : {}),
+      };
+      const reviewMemory = await saveGptStrategyMemory(env, {
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+        kind: "rule_review",
+        title,
+        body: [
+          `Decision: ${decision}`,
+          reviewedMemoryId ? `Reviewed memory id: ${reviewedMemoryId}` : null,
+          `Reason: ${reason}`,
+          replacementBelief ? `Replacement belief: ${replacementBelief}` : null,
+          reviewAfter ? `Review after: ${reviewAfter}` : null,
+        ].filter(Boolean).join("\n"),
+        metadataJson: normalizeGptMemoryMetadata(metadata),
+      });
+
+      const followUpMemories = [];
+      if (replacementBelief && (decision === "revise" || decision === "promote_to_current_belief")) {
+        const beliefMemory = await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind: "current_belief",
+          title: normalizeGptMemoryText(payload.title, 200, true) ?? "Current belief",
+          body: replacementBelief,
+          metadataJson: normalizeGptMemoryMetadata({
+            source: "lensically_memory_dashboard",
+            rule_review_memory_id: reviewMemory?.id ?? null,
+            reviewed_memory_id: reviewedMemoryId,
+            review_after: reviewAfter,
+            flexible_note: "Use this as a working belief that can be challenged by future data or owner taste.",
+          }),
+        });
+        if (beliefMemory) {
+          followUpMemories.push(beliefMemory);
+        }
+      }
+      if (decision === "cooldown") {
+        const cooldownMemory = await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind: "cooldown",
+          title: normalizeGptMemoryText(payload.title, 200, true) ?? "Rule cooldown",
+          body: reason,
+          metadataJson: normalizeGptMemoryMetadata({
+            source: "lensically_memory_dashboard",
+            rule_review_memory_id: reviewMemory?.id ?? null,
+            reviewed_memory_id: reviewedMemoryId,
+            review_after: reviewAfter,
+            flexible_note: "Pause or reduce this pattern temporarily; retest when context changes.",
+          }),
+        });
+        if (cooldownMemory) {
+          followUpMemories.push(cooldownMemory);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        brand_key: brand.brand_key,
+        review_memory: reviewMemory,
+        follow_up_memory: followUpMemories,
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
       });
     }
 
