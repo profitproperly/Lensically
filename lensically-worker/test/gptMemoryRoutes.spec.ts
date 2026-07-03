@@ -282,6 +282,152 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("updates and archives browser-safe strategy memory", async () => {
+    const createResponse = await fetchFromWorker("/api/gpt-memory/strategy-memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threads_user_id: TEST_THREADS_USER_ID,
+        kind: "rule_proposal",
+        title: "Edit me",
+        body: "Original rule proposal.",
+      }),
+    });
+    const created = await createResponse.json() as { memory: { id: number } };
+
+    const updateResponse = await fetchFromWorker("/api/gpt-memory/strategy-memory/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threads_user_id: TEST_THREADS_USER_ID,
+        memory_id: created.memory.id,
+        kind: "current_belief",
+        title: "Edited belief",
+        body: "Edited memory body.",
+        archived: true,
+        archive_reason: "No longer useful.",
+      }),
+    });
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      memory: expect.objectContaining({
+        id: created.memory.id,
+        kind: "current_belief",
+        title: "Edited belief",
+        body: "Edited memory body.",
+        metadata: expect.objectContaining({
+          archived: true,
+          archive_reason: "No longer useful.",
+          last_memory_update_source: "lensically_memory_dashboard_update",
+        }),
+      }),
+    });
+
+    const editResponse = await fetchFromWorker("/api/gpt-memory/strategy-memory/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threads_user_id: TEST_THREADS_USER_ID,
+        memory_id: created.memory.id,
+        title: "Edited archived belief",
+      }),
+    });
+
+    expect(editResponse.status).toBe(200);
+    await expect(editResponse.json()).resolves.toMatchObject({
+      success: true,
+      memory: expect.objectContaining({
+        title: "Edited archived belief",
+        metadata: expect.objectContaining({
+          archived: true,
+          archive_reason: "No longer useful.",
+        }),
+      }),
+    });
+  });
+
+  it("advertises and updates GPT strategy memory action", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const createResponse = await fetchFromWorker("/api/gpt/strategy-memory", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        kind: "rule_proposal",
+        title: "GPT edit me",
+        body: "Original GPT memory.",
+      }),
+    });
+    const created = await createResponse.json() as { memory: { id: number } };
+
+    const schemaResponse = await fetchFromWorker("/api/gpt/openapi.json");
+    const schema = await schemaResponse.json() as { paths?: Record<string, unknown> };
+    expect(schema.paths?.["/api/gpt/strategy-memory/update"]).toBeTruthy();
+
+    const updateResponse = await fetchFromWorker("/api/gpt/strategy-memory/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        memory_id: created.memory.id,
+        title: "GPT edited",
+        body: "Updated GPT memory.",
+        archived: true,
+        archive_reason: "Stale after review.",
+      }),
+    });
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      memory: expect.objectContaining({
+        id: created.memory.id,
+        title: "GPT edited",
+        body: "Updated GPT memory.",
+        metadata: expect.objectContaining({
+          archived: true,
+          archive_reason: "Stale after review.",
+          last_memory_update_source: "gpt_strategy_memory_update",
+        }),
+      }),
+    });
+
+    const editResponse = await fetchFromWorker("/api/gpt/strategy-memory/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        memory_id: created.memory.id,
+        body: "Edited without changing archive state.",
+      }),
+    });
+
+    expect(editResponse.status).toBe(200);
+    await expect(editResponse.json()).resolves.toMatchObject({
+      success: true,
+      memory: expect.objectContaining({
+        body: "Edited without changing archive state.",
+        metadata: expect.objectContaining({
+          archived: true,
+          archive_reason: "Stale after review.",
+        }),
+      }),
+    });
+  });
+
   it("stores saved pattern reviews as pattern memory", async () => {
     const response = await fetchFromWorker("/api/gpt-memory/saved-patterns/review", {
       method: "POST",

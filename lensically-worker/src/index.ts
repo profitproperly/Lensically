@@ -4189,6 +4189,78 @@ async function saveGptStrategyMemory(
   return row ? serializeGptStrategyMemoryRow(row) : null;
 }
 
+async function updateGptStrategyMemory(
+  env: Env,
+  input: {
+    memoryId: number;
+    accountId: string;
+    kind?: GptStrategyMemoryKind | null;
+    title?: string | null;
+    body?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<ReturnType<typeof serializeGptStrategyMemoryRow> | null> {
+  await ensureGptStrategyMemoryTable(env);
+  if (!Number.isInteger(input.memoryId) || input.memoryId <= 0) {
+    return null;
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, kind, title, body, metadata_json, created_at, updated_at
+     FROM gpt_strategy_memory
+     WHERE id = ?
+       AND account_id = ?
+     LIMIT 1`,
+  )
+    .bind(input.memoryId, input.accountId)
+    .first<GptStrategyMemoryRow>();
+  if (!existing) {
+    return null;
+  }
+
+  const existingMetadata = existing.metadata_json
+    ? safeParseJsonString(existing.metadata_json)
+    : null;
+  const metadata = {
+    ...(existingMetadata && typeof existingMetadata === "object" && !Array.isArray(existingMetadata)
+      ? existingMetadata as Record<string, unknown>
+      : {}),
+    ...(input.metadata ?? {}),
+    last_memory_update_source: input.metadata?.last_memory_update_source ?? "strategy_memory_update",
+  };
+
+  await env.DB.prepare(
+    `UPDATE gpt_strategy_memory
+     SET kind = ?,
+         title = ?,
+         body = ?,
+         metadata_json = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+       AND account_id = ?`,
+  )
+    .bind(
+      input.kind ?? existing.kind,
+      input.title !== undefined ? input.title : existing.title,
+      input.body !== undefined ? input.body : existing.body,
+      normalizeGptMemoryMetadata(metadata),
+      input.memoryId,
+      input.accountId,
+    )
+    .run();
+
+  const row = await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, kind, title, body, metadata_json, created_at, updated_at
+     FROM gpt_strategy_memory
+     WHERE id = ?
+       AND account_id = ?
+     LIMIT 1`,
+  )
+    .bind(input.memoryId, input.accountId)
+    .first<GptStrategyMemoryRow>();
+  return row ? serializeGptStrategyMemoryRow(row) : null;
+}
+
 async function ensureGptPostStrategyTagsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS gpt_post_strategy_tags (
@@ -7287,6 +7359,37 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             },
           },
           responses: { "200": { description: "Saved memory" } },
+        },
+      },
+      "/api/gpt/strategy-memory/update": {
+        post: {
+          operationId: "updateStrategyMemory",
+          summary: "Edit or archive one strategy memory item for a brand without deleting audit history.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "memory_id"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    memory_id: { type: "integer" },
+                    kind: {
+                      type: "string",
+                      enum: Array.from(GPT_STRATEGY_MEMORY_KINDS),
+                    },
+                    title: { type: "string" },
+                    body: { type: "string" },
+                    archived: { type: "boolean", description: "Set true to archive stale/noisy memory while preserving audit history." },
+                    archive_reason: { type: "string" },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Updated memory" } },
         },
       },
     },
@@ -11399,6 +11502,73 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
       }
 
+      if (normalizedPath === "/api/gpt/strategy-memory/update" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const memoryId = Math.trunc(Number(payload.memory_id));
+        if (!brand || !Number.isInteger(memoryId) || memoryId <= 0) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and memory_id are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const kind = payload.kind === undefined ? undefined : normalizeGptStrategyMemoryKind(payload.kind);
+        if (payload.kind !== undefined && !kind) {
+          return new Response(JSON.stringify({ success: false, error: "valid kind is required when kind is provided" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const title = payload.title === undefined ? undefined : normalizeGptMemoryText(payload.title, 200, true);
+        const body = payload.body === undefined ? undefined : normalizeGptMemoryText(payload.body, 10000);
+        if (payload.body !== undefined && !body) {
+          return new Response(JSON.stringify({ success: false, error: "body cannot be empty when provided" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const archiveStateProvided = payload.archived !== undefined;
+        const archived = payload.archived === true;
+        const archiveReason = normalizeGptMemoryText(payload.archive_reason, 1000, true);
+        const memory = await updateGptStrategyMemory(env, {
+          memoryId,
+          accountId: brand.account_id,
+          kind,
+          title,
+          body,
+          metadata: {
+            ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+              ? payload.metadata
+              : {}),
+            ...(archiveStateProvided
+              ? {
+                  archived,
+                  archived_at: archived ? new Date().toISOString() : null,
+                  archive_reason: archived ? archiveReason : null,
+                }
+              : {}),
+            last_memory_update_source: "gpt_strategy_memory_update",
+            flexible_note: "Edits and archives update working memory without deleting audit history.",
+          },
+        });
+        return new Response(JSON.stringify({
+          success: Boolean(memory),
+          brand_key: brand.brand_key,
+          memory,
+        }), {
+          status: memory ? 200 : 404,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
       return new Response(JSON.stringify({ success: false, error: "GPT route not found" }), {
         status: 404,
         headers: { "content-type": "application/json; charset=UTF-8" },
@@ -11970,6 +12140,106 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         memory,
       }), {
         status: 200,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
+    if (normalizedPath === "/api/gpt-memory/strategy-memory/update" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const brand = await resolveGptBrandForThreadsUserId(env, payload.threads_user_id);
+      const memoryId = Math.trunc(Number(payload.memory_id));
+      if (!brand || !Number.isInteger(memoryId) || memoryId <= 0) {
+        return new Response(JSON.stringify({ success: false, error: "threads_user_id and memory_id are required" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const allowedKinds = new Set<GptStrategyMemoryKind>([
+        "rule_proposal",
+        "current_belief",
+        "approved_rule",
+        "result_note",
+        "brand_voice_note",
+        "banned_phrase",
+        "cooldown",
+        "experiment",
+        "experiment_result",
+        "rule_review",
+        "saved_pattern_note",
+        "approval_feedback",
+        "rejection_feedback",
+        "approved_pattern",
+        "rejected_pattern",
+      ]);
+      const requestedKind = payload.kind === undefined ? undefined : normalizeGptStrategyMemoryKind(payload.kind);
+      const kind = requestedKind && allowedKinds.has(requestedKind) ? requestedKind : requestedKind === undefined ? undefined : null;
+      if (kind === null) {
+        return new Response(JSON.stringify({ success: false, error: "valid kind is required when kind is provided" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const title = payload.title === undefined ? undefined : normalizeGptMemoryText(payload.title, 200, true);
+      const body = payload.body === undefined ? undefined : normalizeGptMemoryText(payload.body, 10000);
+      if (payload.body !== undefined && !body) {
+        return new Response(JSON.stringify({ success: false, error: "body cannot be empty when provided" }), {
+          status: 400,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+            ...requestCorsHeaders,
+          },
+        });
+      }
+      const archiveStateProvided = payload.archived !== undefined;
+      const archived = payload.archived === true;
+      const archiveReason = normalizeGptMemoryText(payload.archive_reason, 1000, true);
+      const memory = await updateGptStrategyMemory(env, {
+        memoryId,
+        accountId: brand.account_id,
+        kind,
+        title,
+        body,
+        metadata: {
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+          ...(archiveStateProvided
+            ? {
+                archived,
+                archived_at: archived ? new Date().toISOString() : null,
+                archive_reason: archived ? archiveReason : null,
+              }
+            : {}),
+          last_memory_update_source: "lensically_memory_dashboard_update",
+          flexible_note: "Edits and archives update working memory without deleting audit history.",
+        },
+      });
+      return new Response(JSON.stringify({
+        success: Boolean(memory),
+        brand_key: brand.brand_key,
+        memory,
+      }), {
+        status: memory ? 200 : 404,
         headers: {
           "content-type": "application/json; charset=UTF-8",
           ...requestCorsHeaders,

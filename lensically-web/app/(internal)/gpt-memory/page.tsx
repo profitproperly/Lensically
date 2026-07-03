@@ -112,6 +112,7 @@ const EXPERIMENT_URL = buildWorkerUrl("/api/gpt-memory/experiment");
 const TASTE_FEEDBACK_URL = buildWorkerUrl("/api/gpt-memory/taste-feedback");
 const GENERATION_BRIEF_URL = buildWorkerUrl("/api/gpt-memory/generation-brief");
 const STRATEGY_MEMORY_URL = buildWorkerUrl("/api/gpt-memory/strategy-memory");
+const STRATEGY_MEMORY_UPDATE_URL = buildWorkerUrl("/api/gpt-memory/strategy-memory/update");
 
 const MEMORY_SECTIONS: Array<{ kind: string; label: string }> = [
   { kind: "current_belief", label: "Current Beliefs" },
@@ -154,6 +155,12 @@ function metricValue(summary: Record<string, number | string | null> | undefined
 
 function memoryPreview(memory: StrategyMemory) {
   return memory.body.length > 260 ? `${memory.body.slice(0, 260)}...` : memory.body;
+}
+
+function memoryMetadata(memory: StrategyMemory): Record<string, unknown> {
+  return memory.metadata && typeof memory.metadata === "object" && !Array.isArray(memory.metadata)
+    ? memory.metadata as Record<string, unknown>
+    : {};
 }
 
 export default function GptMemoryPage() {
@@ -251,6 +258,83 @@ export default function GptMemoryPage() {
       await loadDashboard();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save rule review.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function editMemory(memory: StrategyMemory) {
+    const nextTitle = window.prompt("Edit memory title:", memory.title || "");
+    if (nextTitle === null) {
+      return;
+    }
+    const nextBody = window.prompt("Edit memory body:", memory.body);
+    if (nextBody === null) {
+      return;
+    }
+    const body = nextBody.trim();
+    if (!body) {
+      setError("Memory body cannot be empty.");
+      return;
+    }
+
+    setSaving(`${memory.id}-edit`);
+    setError("");
+    try {
+      const response = await fetch(STRATEGY_MEMORY_UPDATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          memory_id: memory.id,
+          title: nextTitle.trim() || null,
+          body,
+          metadata: {
+            dashboard_previous_title: memory.title,
+            dashboard_previous_body_preview: memoryPreview(memory),
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not edit memory.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not edit memory.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function archiveMemory(memory: StrategyMemory) {
+    const reason = window.prompt("Why archive this memory?", "");
+    if (reason === null) {
+      return;
+    }
+
+    setSaving(`${memory.id}-archive`);
+    setError("");
+    try {
+      const response = await fetch(STRATEGY_MEMORY_UPDATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          memory_id: memory.id,
+          archived: true,
+          archive_reason: reason.trim() || "Archived from Lensically GPT Memory dashboard.",
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not archive memory.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not archive memory.");
     } finally {
       setSaving(null);
     }
@@ -863,10 +947,35 @@ export default function GptMemoryPage() {
                       <article key={memory.id} className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-950">{memory.title || memory.kind}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-950">{memory.title || memory.kind}</p>
+                              {memoryMetadata(memory).archived === true ? (
+                                <span className="rounded-md bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">Archived</span>
+                              ) : null}
+                            </div>
                             <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700">{memoryPreview(memory)}</p>
                             <p className="mt-2 text-xs text-slate-500">Updated {formatDate(memory.updated_at)}</p>
                           </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void editMemory(memory)}
+                            disabled={Boolean(saving)}
+                            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {saving === `${memory.id}-edit` ? "Saving..." : "Edit"}
+                          </button>
+                          {memoryMetadata(memory).archived === true ? null : (
+                            <button
+                              type="button"
+                              onClick={() => void archiveMemory(memory)}
+                              disabled={Boolean(saving)}
+                              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {saving === `${memory.id}-archive` ? "Saving..." : "Archive"}
+                            </button>
+                          )}
                         </div>
                         {["current_belief", "approved_rule", "rule_proposal", "cooldown", "saved_pattern_note"].includes(memory.kind) ? (
                           <div className="mt-3 flex flex-wrap gap-2">
