@@ -128,7 +128,18 @@ type GptStrategyMemoryKind =
   | "result_note"
   | "rejection_feedback"
   | "rule_proposal"
-  | "approved_rule";
+  | "approved_rule"
+  | "taste_profile"
+  | "approved_pattern"
+  | "rejected_pattern"
+  | "current_belief"
+  | "brand_voice_note"
+  | "banned_phrase"
+  | "cooldown"
+  | "experiment_result"
+  | "rule_review"
+  | "saved_pattern_note"
+  | "approval_feedback";
 
 type GptStrategyMemoryRow = {
   id: number | string;
@@ -285,6 +296,17 @@ const GPT_STRATEGY_MEMORY_KINDS = new Set<string>([
   "rejection_feedback",
   "rule_proposal",
   "approved_rule",
+  "taste_profile",
+  "approved_pattern",
+  "rejected_pattern",
+  "current_belief",
+  "brand_voice_note",
+  "banned_phrase",
+  "cooldown",
+  "experiment_result",
+  "rule_review",
+  "saved_pattern_note",
+  "approval_feedback",
 ]);
 
 const DEFAULT_PATTERNS_ACCOUNT_ID = "manifest-mental";
@@ -4905,6 +4927,267 @@ async function buildGptGrowthContext(
   };
 }
 
+function normalizeCreativeComparisonText(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[^a-z0-9\s'$]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getOpeningSignature(value: string | null | undefined, words = 8): string | null {
+  const normalized = normalizeCreativeComparisonText(value);
+  if (!normalized) {
+    return null;
+  }
+  const tokens = normalized.split(" ").filter(Boolean).slice(0, words);
+  return tokens.length >= 3 ? tokens.join(" ") : null;
+}
+
+function getTextTokenSet(value: string | null | undefined): Set<string> {
+  const normalized = normalizeCreativeComparisonText(value);
+  return new Set(
+    normalized
+      .split(" ")
+      .filter((token) => token.length > 2),
+  );
+}
+
+function calculateTextSimilarity(left: string | null | undefined, right: string | null | undefined): number {
+  const leftTokens = getTextTokenSet(left);
+  const rightTokens = getTextTokenSet(right);
+  if (!leftTokens.size || !rightTokens.size) {
+    return 0;
+  }
+  let intersection = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      intersection += 1;
+    }
+  }
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return union ? intersection / union : 0;
+}
+
+function summarizeRepeatedOpenings(items: Array<{ text?: string | null; source: string }>): Array<{ opening: string; count: number; sources: string[] }> {
+  const openings = new Map<string, { count: number; sources: Set<string> }>();
+  for (const item of items) {
+    const opening = getOpeningSignature(item.text);
+    if (!opening) {
+      continue;
+    }
+    const entry = openings.get(opening) ?? { count: 0, sources: new Set<string>() };
+    entry.count += 1;
+    entry.sources.add(item.source);
+    openings.set(opening, entry);
+  }
+  return Array.from(openings.entries())
+    .filter(([, entry]) => entry.count > 1)
+    .sort((left, right) => right[1].count - left[1].count || left[0].localeCompare(right[0]))
+    .slice(0, 12)
+    .map(([opening, entry]) => ({
+      opening,
+      count: entry.count,
+      sources: Array.from(entry.sources),
+    }));
+}
+
+function findNearDuplicateReferences(
+  draftText: string,
+  references: Array<{ source: string; id: string | number | null; text?: string | null }>,
+): Array<{ source: string; id: string | number | null; similarity: number; text: string | null }> {
+  if (!draftText.trim()) {
+    return [];
+  }
+  return references
+    .map((reference) => ({
+      source: reference.source,
+      id: reference.id,
+      similarity: Number(calculateTextSimilarity(draftText, reference.text).toFixed(3)),
+      text: reference.text ?? null,
+    }))
+    .filter((reference) => reference.similarity >= 0.35)
+    .sort((left, right) => right.similarity - left.similarity)
+    .slice(0, 10);
+}
+
+async function buildGptGenerationContext(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    objective: string | null;
+    draftText: string | null;
+    recentLimit: number;
+    topLimit: number;
+    weakLimit: number;
+    savedPatternsLimit: number;
+    memoryLimit: number;
+    runsLimit: number;
+    growthDays: number;
+  },
+): Promise<Record<string, unknown>> {
+  const recentLimit = Math.min(Math.max(Math.trunc(input.recentLimit), 1), 50);
+  const topLimit = Math.min(Math.max(Math.trunc(input.topLimit), 1), 50);
+  const weakLimit = Math.min(Math.max(Math.trunc(input.weakLimit), 1), 25);
+  const savedPatternsLimit = Math.min(Math.max(Math.trunc(input.savedPatternsLimit), 1), 50);
+  const memoryLimit = Math.min(Math.max(Math.trunc(input.memoryLimit), 1), 100);
+  const runsLimit = Math.min(Math.max(Math.trunc(input.runsLimit), 1), 15);
+  const growthDays = Math.min(Math.max(Math.trunc(input.growthDays), 7), 45);
+  const generationMemoryKinds = [
+    "taste_profile",
+    "brand_voice_note",
+    "current_belief",
+    "approved_rule",
+    "rule_proposal",
+    "rule_review",
+    "approved_pattern",
+    "rejected_pattern",
+    "approval_feedback",
+    "rejection_feedback",
+    "banned_phrase",
+    "cooldown",
+    "experiment",
+    "experiment_result",
+    "result_note",
+    "saved_pattern_note",
+  ];
+
+  const [
+    recentArchive,
+    topArchive,
+    weakArchiveSource,
+    savedPatterns,
+    scheduledPosts,
+    strategyMemory,
+    generationRuns,
+    followerSnapshots,
+  ] = await Promise.all([
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", recentLimit, 0),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, 0),
+    listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.max(weakLimit * 8, 24), 0),
+    listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit),
+    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 50),
+    listGptStrategyMemory(env, brand.account_id, generationMemoryKinds, memoryLimit, 0),
+    listGptGenerationRuns(env, brand.account_id, runsLimit),
+    listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, growthDays),
+  ]);
+
+  const scheduledTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+  const scheduledPostsWithTags = scheduledPosts.map((post) => ({
+    ...post,
+    strategy: scheduledTagMap.get(post.id) ?? null,
+  }));
+  const weakPosts = weakArchiveSource.posts
+    .filter((post) => Number(post.engagement_total ?? 0) <= 1 || Number(post.likes ?? 0) <= 1)
+    .slice(0, weakLimit);
+  const memoryByKind = strategyMemory.reduce<Record<string, typeof strategyMemory>>((groups, memory) => {
+    const group = groups[memory.kind] ?? [];
+    group.push(memory);
+    groups[memory.kind] = group;
+    return groups;
+  }, {});
+  const recentDrafts = generationRuns.flatMap((run) => run.drafts.map((draft) => ({
+    ...draft,
+    run_id: run.id,
+    run_objective: run.objective,
+  })));
+  const approvedDrafts = recentDrafts.filter((draft) => draft.status === "approved" || draft.status === "scheduled").slice(0, 20);
+  const rejectedDrafts = recentDrafts.filter((draft) => draft.status === "rejected" || draft.status === "self_rejected").slice(0, 20);
+  const referenceItems = [
+    ...recentArchive.posts.map((post) => ({ source: "archive_recent", id: post.id, text: post.text })),
+    ...topArchive.posts.map((post) => ({ source: "archive_top", id: post.id, text: post.text })),
+    ...scheduledPostsWithTags.map((post) => ({ source: "scheduled", id: post.id, text: post.text })),
+    ...savedPatterns.map((pattern) => ({ source: "saved_pattern", id: pattern.id, text: pattern.post_text })),
+    ...approvedDrafts.map((draft) => ({ source: "approved_draft", id: draft.id, text: draft.text })),
+    ...rejectedDrafts.map((draft) => ({ source: "rejected_draft", id: draft.id, text: draft.text })),
+  ];
+  const growthDeltas = followerSnapshots.map((snapshot, index) => {
+    const previous = index > 0 ? followerSnapshots[index - 1] : null;
+    const netChange = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
+      ? snapshot.followers_count - snapshot.baseline_followers_count
+      : (previous ? snapshot.followers_count - previous.followers_count : 0);
+    return {
+      date: snapshot.snapshot_date,
+      followers: snapshot.followers_count,
+      net_change: netChange,
+      captured_at: snapshot.captured_at,
+    };
+  });
+  const netGrowth = growthDeltas.length >= 2
+    ? growthDeltas[growthDeltas.length - 1].followers - growthDeltas[0].followers
+    : growthDeltas.reduce((sum, day) => sum + day.net_change, 0);
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    objective: input.objective,
+    account: {
+      account_id: brand.account_id,
+      label: brand.profile.label,
+      username: brand.profile.username,
+      name: brand.profile.name,
+      threads_user_id: brand.profile.threads_user_id,
+      threads_biography: brand.profile.threads_biography,
+    },
+    generation_philosophy: [
+      "Use tags, scores, rules, and categories as descriptive tools, not creative limits.",
+      "Treat rules as current beliefs that can decay, be challenged, cooled down, or retested.",
+      "Create flexible creative directions; do not force drafts into fixed buckets.",
+      "Ask targeted taste questions when the context is ambiguous instead of blindly generating.",
+      "Self-reject drafts that are repetitive, corny, generic, unclear, off-brand, or overfit to one recent correction.",
+    ],
+    context_summary: {
+      archive_total_count: recentArchive.totalCount || topArchive.totalCount,
+      recent_returned_count: recentArchive.posts.length,
+      top_returned_count: topArchive.posts.length,
+      weak_returned_count: weakPosts.length,
+      saved_patterns_returned_count: savedPatterns.length,
+      scheduled_returned_count: scheduledPostsWithTags.length,
+      memory_returned_count: strategyMemory.length,
+      generation_runs_returned_count: generationRuns.length,
+      growth_snapshot_count: growthDeltas.length,
+    },
+    taste_and_beliefs: {
+      all_memory: strategyMemory,
+      by_kind: memoryByKind,
+    },
+    generation_history: {
+      runs: generationRuns,
+      approved_drafts: approvedDrafts,
+      rejected_drafts: rejectedDrafts,
+    },
+    archive: {
+      recent: recentArchive.posts,
+      top: topArchive.posts,
+      weak: weakPosts,
+    },
+    saved_patterns: savedPatterns,
+    scheduled_posts: scheduledPostsWithTags,
+    growth_signals: {
+      days: growthDays,
+      net_growth: netGrowth,
+      daily: growthDeltas,
+      best_recent_days: [...growthDeltas]
+        .sort((left, right) => right.net_change - left.net_change || left.date.localeCompare(right.date))
+        .slice(0, 5),
+      weakest_recent_days: [...growthDeltas]
+        .sort((left, right) => left.net_change - right.net_change || left.date.localeCompare(right.date))
+        .slice(0, 5),
+    },
+    duplicate_and_fatigue: {
+      repeated_openings: summarizeRepeatedOpenings(referenceItems),
+      near_duplicate_references: input.draftText ? findNearDuplicateReferences(input.draftText, referenceItems) : [],
+      check_against_sources: ["archive_recent", "archive_top", "scheduled", "saved_pattern", "approved_draft", "rejected_draft"],
+      guidance: [
+        "Do not copy exact saved-pattern wording.",
+        "Avoid first-line or sentence-skeleton overlap with recent, scheduled, approved, or rejected drafts.",
+        "If a strong mechanism is reused, change subject, nouns, payoff, emotional frame, and surface wording.",
+      ],
+    },
+  };
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
   return {
     openapi: "3.1.0",
@@ -4957,6 +5240,25 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 100, default: 10 } },
           ],
           responses: { "200": { description: "Brand context" } },
+        },
+      },
+      "/api/gpt/generation-context": {
+        get: {
+          operationId: "getGenerationContext",
+          summary: "Get a compact pre-generation context packet with taste memory, current beliefs, archive samples, saved patterns, scheduled posts, generation history, growth signals, and duplicate/fatigue hints.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's generation objective or prompt summary." } },
+            { name: "draft_text", in: "query", required: false, schema: { type: "string", description: "Optional draft to compare against archive, scheduled posts, saved patterns, and prior drafts." } },
+            { name: "recent_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 12 } },
+            { name: "top_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 12 } },
+            { name: "weak_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 25, default: 5 } },
+            { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+            { name: "memory_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 60 } },
+            { name: "runs_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 15, default: 5 } },
+            { name: "growth_days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 45, default: 14 } },
+          ],
+          responses: { "200": { description: "Generation context" } },
         },
       },
       "/api/gpt/saved-patterns": {
@@ -8096,6 +8398,32 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           JSON.stringify(payload),
           { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } },
         );
+      }
+
+      if (normalizedPath === "/api/gpt/generation-context" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+
+        const context = await buildGptGenerationContext(env, brand, {
+          objective: normalizeGptMemoryText(url.searchParams.get("objective"), 1000, true),
+          draftText: normalizeGptMemoryText(url.searchParams.get("draft_text"), 2000, true),
+          recentLimit: parseBoundedIntegerParam(url.searchParams.get("recent_limit"), 12, 1, 50),
+          topLimit: parseBoundedIntegerParam(url.searchParams.get("top_limit"), 12, 1, 50),
+          weakLimit: parseBoundedIntegerParam(url.searchParams.get("weak_limit"), 5, 1, 25),
+          savedPatternsLimit: parseBoundedIntegerParam(url.searchParams.get("saved_patterns_limit"), 20, 1, 50),
+          memoryLimit: parseBoundedIntegerParam(url.searchParams.get("memory_limit"), 60, 1, 100),
+          runsLimit: parseBoundedIntegerParam(url.searchParams.get("runs_limit"), 5, 1, 15),
+          growthDays: parseBoundedIntegerParam(url.searchParams.get("growth_days"), 14, 7, 45),
+        });
+        return new Response(JSON.stringify(context), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
       }
 
       if (normalizedPath === "/api/gpt/posts/recent" && request.method === "GET") {
