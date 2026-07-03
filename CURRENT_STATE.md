@@ -3,7 +3,7 @@
 ## Product Shape
 
 - Lensically is operating as a private workspace build with `lensically-web/` as the frontend and `lensically-worker/` as the backend.
-- Main active user workflows currently center on the password gate, Create Post, Scheduled Posts, dashboard, insights, followers, and post archive flows.
+- Main active user workflows currently center on the password gate, Create Post, Scheduled Posts, GPT Memory, saved patterns, dashboard, insights, followers, and post archive flows.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
 - `/dashboard` now targets an operator-dashboard role rather than a simple profile/stats card.
 - `/followers` is a dedicated paginated follower-history surface for daily snapshot tracking.
@@ -13,7 +13,7 @@
 - `/schedule` is the Create Post surface.
 - single-post publishing and scheduling already exist and must remain stable.
 - Batch Schedule exists as a manual-only helper inside the Create Post flow.
-- Batch Schedule does not use AI generation, taste analysis, or autonomous posting logic.
+- Batch Schedule remains manual-only in the Lensically UI; GPT-assisted generation and learning now happen through Lensically Operator GPT actions and GPT Memory, not through autonomous cron posting.
 - Batch Schedule supports:
   - one-off unsaved slot/time structures
   - saved backend presets per user
@@ -34,6 +34,17 @@
 - `/scheduled-posts` is the management surface for upcoming scheduled posts.
 - It supports edit, retry, single delete, and bulk delete selection mode.
 - bulk delete currently reuses the existing delete API in a controlled client loop.
+- Scheduled posts can be tagged with flexible strategy metadata: pillar, hook style, format, intent, experiment, and novelty level.
+- Scheduled strategy tags are descriptive signals for GPT growth review and novelty/fatigue analysis, not rigid content categories.
+
+## GPT Operator State
+
+- Lensically Operator is a Custom GPT connected to `/api/gpt/*` actions with API-key auth.
+- GPT actions expose compact brand context, generation context, generation brief, taste interview, draft similarity, saved patterns, recent posts, growth context/review, rule suggestions, novelty fatigue, scheduled posts, scheduling, batch presets, strategy memory, generation runs/drafts, taste feedback, rule review, experiments, and pattern adaptations.
+- GPT Memory in Lensically is available at `/gpt-memory` for reviewing brand-specific taste notes, current beliefs, rules, pattern adaptations, experiments, generation runs, growth prompts, novelty/fatigue signals, and generation readiness.
+- Browser-safe `/api/gpt-memory/*` routes let Lensically UI save taste feedback, rule reviews, experiments, saved-pattern reviews, generation brief checks, and draft approval/rejection feedback without exposing the GPT API key.
+- Draft approvals/rejections should include optional feedback notes when useful; those notes persist as flexible `approval_feedback` or `rejection_feedback` memory.
+- Saved Patterns supports per-pattern and selected-pattern reviews that persist as approved, rejected, cooldown, or watch/adaptation memory.
 
 ## Dashboard State
 

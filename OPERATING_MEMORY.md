@@ -10,6 +10,7 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 ## Deployment Credentials
 
 - Do not assume Cloudflare credentials are unavailable because direct `wrangler` lacks `CLOUDFLARE_API_TOKEN`.
+- Do not inspect `.dev.vars` with commands that print matching lines; it contains live token-looking secrets. Verify env presence with booleans or key names only.
 - The Cloudflare deploy token/account are loaded by `lensically-worker/.cloudflare.deploy.ps1`.
 - Use the repo deploy scripts so credentials are sourced:
   - Worker: `cd lensically-worker; npm run deploy:cf`
