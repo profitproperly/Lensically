@@ -314,6 +314,48 @@ export default function GptMemoryPage() {
     }
   }
 
+  async function saveExperimentFromPrompt(prompt: string) {
+    const note = window.prompt("Optional experiment note:", "");
+    if (note === null) {
+      return;
+    }
+
+    setSaving(`growth-prompt-${prompt}`);
+    setError("");
+    try {
+      const response = await fetch(EXPERIMENT_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threads_user_id: threadsUserId,
+          title: "Growth review experiment",
+          hypothesis: prompt,
+          status: "running",
+          success_criteria: [
+            "Compare follower movement and weak-post rate against recent baseline.",
+            "Review with sample-size caution before turning into a durable rule.",
+          ],
+          sample_size_target: 5,
+          review_after_days: 14,
+          metadata: {
+            source_prompt: prompt,
+            owner_note: note,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save growth experiment.");
+      }
+      await loadDashboard();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save growth experiment.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function saveExperimentDecision(memory: StrategyMemory, decision: string) {
     const note = window.prompt(`Optional result note for ${decision}:`, "");
     if (note === null) {
@@ -644,6 +686,49 @@ export default function GptMemoryPage() {
                   ))
                 ) : (
                   <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">No major fatigue signal.</p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-950">Growth Review</h2>
+              <div className="mt-4 space-y-2">
+                {(dashboard.growth_review?.recommendation_prompts ?? []).length ? (
+                  dashboard.growth_review?.recommendation_prompts?.map((prompt) => (
+                    <div key={prompt} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-sm leading-6 text-slate-700">{prompt}</p>
+                      <button
+                        type="button"
+                        onClick={() => void saveExperimentFromPrompt(prompt)}
+                        disabled={Boolean(saving)}
+                        className="mt-3 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {saving === `growth-prompt-${prompt}` ? "Saving..." : "Start Experiment"}
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">No growth prompts available yet.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-950">High-Use Tags</h2>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {(dashboard.novelty_fatigue?.high_use_tags ?? []).length ? (
+                  dashboard.novelty_fatigue?.high_use_tags?.slice(0, 8).map((tag, index) => (
+                    <div key={`${String(tag.key ?? index)}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-sm font-semibold text-slate-900">{String(tag.key ?? "Unknown")}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Used {formatNumber(typeof tag.used === "number" ? tag.used : Number(tag.used))} · Risk {String(tag.fatigue_risk ?? "unknown")}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 sm:col-span-2">No high-use tags flagged.</p>
                 )}
               </div>
             </div>
