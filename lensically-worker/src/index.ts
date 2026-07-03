@@ -4048,6 +4048,12 @@ function serializeGptStrategyMemoryRow(row: GptStrategyMemoryRow): {
   };
 }
 
+function getGptMemoryMetadataRecord(memory: ReturnType<typeof serializeGptStrategyMemoryRow>): Record<string, unknown> {
+  return memory.metadata && typeof memory.metadata === "object" && !Array.isArray(memory.metadata)
+    ? memory.metadata as Record<string, unknown>
+    : {};
+}
+
 async function listGptStrategyMemory(
   env: Env,
   accountId: string,
@@ -4835,6 +4841,103 @@ async function listGptGenerationDraftsByStatus(
   return (rows.results ?? []).map(serializeGptGenerationDraft);
 }
 
+function normalizeGptExperimentStatus(value: unknown): string {
+  if (typeof value !== "string") {
+    return "proposed";
+  }
+  const normalized = value.trim().toLowerCase();
+  return ["proposed", "running", "completed", "paused", "stopped", "retest"].includes(normalized)
+    ? normalized
+    : "proposed";
+}
+
+function normalizeGptExperimentDecision(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ["exploit", "explore", "stop", "retest", "cooldown", "inconclusive"].includes(normalized)
+    ? normalized
+    : null;
+}
+
+function normalizeGptExperimentConfidence(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ["low", "medium", "high"].includes(normalized) ? normalized : null;
+}
+
+function normalizeGptNumberArray(value: unknown, maxItems: number): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0)
+    .slice(0, maxItems);
+}
+
+function normalizeGptStringIdArray(value: unknown, maxItems: number, maxLength: number): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeGptMemoryText(item, maxLength, true))
+    .filter((item): item is string => Boolean(item))
+    .slice(0, maxItems);
+}
+
+function normalizeGptIsoDateText(value: unknown): string | null {
+  const text = normalizeGptMemoryText(value, 30, true);
+  if (!text) {
+    return null;
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) || !Number.isNaN(Date.parse(text))
+    ? text
+    : null;
+}
+
+function buildGptExperimentSummary(memories: ReturnType<typeof serializeGptStrategyMemoryRow>[]): Record<string, unknown> {
+  const experiments = memories.filter((memory) => memory.kind === "experiment");
+  const results = memories.filter((memory) => memory.kind === "experiment_result");
+  const nowMs = Date.now();
+  const openExperiments = experiments
+    .filter((memory) => {
+      const metadata = getGptMemoryMetadataRecord(memory);
+      const status = typeof metadata.status === "string" ? metadata.status.toLowerCase() : null;
+      return status !== "completed" && status !== "stopped";
+    })
+    .slice(0, 12);
+  const pendingReviews = [...experiments, ...results]
+    .filter((memory) => {
+      const metadata = getGptMemoryMetadataRecord(memory);
+      const reviewAfter = typeof metadata.review_after === "string" ? Date.parse(metadata.review_after) : Number.NaN;
+      return Number.isFinite(reviewAfter) && reviewAfter <= nowMs;
+    })
+    .slice(0, 10);
+  const decisionCounts = results.reduce<Record<string, number>>((counts, memory) => {
+    const metadata = getGptMemoryMetadataRecord(memory);
+    const decision = typeof metadata.decision === "string" ? metadata.decision : "unspecified";
+    counts[decision] = (counts[decision] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  return {
+    open_experiments: openExperiments,
+    recent_experiment_results: results.slice(0, 12),
+    pending_reviews: pendingReviews,
+    decision_counts: decisionCounts,
+    guidance: [
+      "Use experiments to learn without turning weak evidence into permanent rules.",
+      "Decide explicitly: exploit, explore, stop, retest, cooldown, or mark inconclusive.",
+      "Prefer sample-size caution when post count, follower movement, or feedback evidence is thin.",
+      "Retest old experiments when the brand, market, audience, or owner taste changes.",
+    ],
+  };
+}
+
 async function buildGptGrowthContext(
   env: Env,
   brand: GptResolvedBrand,
@@ -4866,7 +4969,16 @@ async function buildGptGrowthContext(
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", archiveLimit, 0),
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", 80, 0),
     listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100),
-    listGptStrategyMemory(env, brand.account_id, ["approved_rule", "rule_proposal", "experiment", "result_note", "scheduled_batch"], 80),
+    listGptStrategyMemory(env, brand.account_id, [
+      "approved_rule",
+      "rule_proposal",
+      "rule_review",
+      "current_belief",
+      "experiment",
+      "experiment_result",
+      "result_note",
+      "scheduled_batch",
+    ], 80),
   ]);
 
   const scheduledTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
@@ -4972,6 +5084,7 @@ async function buildGptGrowthContext(
       novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
     },
     strategy_memory: strategyMemory,
+    experiment_summary: buildGptExperimentSummary(strategyMemory),
     growth_rules: [
       "Separate engagement winners from follower-growth winners.",
       "Prioritize posts that raise the engagement floor and create qualified follower growth.",
@@ -5201,14 +5314,6 @@ async function buildGptDraftSimilarityCheck(
       strategy_memory: strategyMemory.length,
     },
   };
-}
-
-function getGptMemoryMetadataRecord(
-  memory: ReturnType<typeof serializeGptStrategyMemoryRow>,
-): Record<string, unknown> {
-  return memory.metadata && typeof memory.metadata === "object" && !Array.isArray(memory.metadata)
-    ? memory.metadata as Record<string, unknown>
-    : {};
 }
 
 function getGptMemoryReviewAfter(memory: ReturnType<typeof serializeGptStrategyMemoryRow>): string | null {
@@ -5459,6 +5564,7 @@ async function buildGptGenerationContext(
       all_memory: strategyMemory,
       by_kind: memoryByKind,
       rule_review_summary: buildGptRuleReviewSummary(strategyMemory),
+      experiment_summary: buildGptExperimentSummary(strategyMemory),
     },
     generation_history: {
       runs: generationRuns,
@@ -5962,6 +6068,51 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             },
           },
           responses: { "200": { description: "Saved rule review and optional follow-up memory" } },
+        },
+      },
+      "/api/gpt/experiment": {
+        post: {
+          operationId: "saveExperiment",
+          summary: "Save a flexible growth experiment, result, or decision for a brand.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "hypothesis"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    title: { type: "string" },
+                    experiment_name: { type: "string" },
+                    hypothesis: { type: "string", description: "What the GPT thinks this experiment may prove or disprove." },
+                    status: {
+                      type: "string",
+                      enum: ["proposed", "running", "completed", "paused", "stopped", "retest"],
+                      default: "proposed",
+                    },
+                    success_criteria: { type: "array", items: { type: "string" } },
+                    sample_size_target: { type: "integer", minimum: 1, maximum: 10000 },
+                    start_date: { type: "string" },
+                    end_date: { type: "string" },
+                    related_memory_id: { type: "integer" },
+                    related_saved_pattern_ids: { type: "array", items: { type: "integer" } },
+                    related_generation_run_ids: { type: "array", items: { type: "string" } },
+                    decision: {
+                      type: "string",
+                      enum: ["exploit", "explore", "stop", "retest", "cooldown", "inconclusive"],
+                    },
+                    result_notes: { type: "string" },
+                    evidence: { type: "array", items: { type: "object", additionalProperties: true } },
+                    confidence: { type: "string", enum: ["low", "medium", "high"] },
+                    review_after_days: { type: "integer", minimum: 1, maximum: 365 },
+                    metadata: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved experiment memory" } },
         },
       },
       "/api/gpt/scheduled": {
@@ -9591,6 +9742,106 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           brand_key: brand.brand_key,
           review_memory: reviewMemory,
           follow_up_memory: followUpMemories,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/experiment" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const hypothesis = normalizeGptMemoryText(payload.hypothesis, 8000);
+        if (!brand || !hypothesis) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and hypothesis are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+
+        const status = normalizeGptExperimentStatus(payload.status);
+        const decision = normalizeGptExperimentDecision(payload.decision);
+        const resultNotes = normalizeGptMemoryText(payload.result_notes, 8000, true);
+        const title = normalizeGptMemoryText(payload.title, 200, true)
+          ?? normalizeGptMemoryText(payload.experiment_name, 200, true)
+          ?? "Growth experiment";
+        const successCriteria = normalizeGptStringArray(payload.success_criteria, 20, 1000);
+        const sampleSizeTarget = parseBoundedIntegerParam(
+          typeof payload.sample_size_target === "number" || typeof payload.sample_size_target === "string"
+            ? String(payload.sample_size_target)
+            : null,
+          0,
+          0,
+          10000,
+        );
+        const relatedMemoryId = Number(payload.related_memory_id);
+        const reviewAfterDays = parseBoundedIntegerParam(
+          typeof payload.review_after_days === "number" || typeof payload.review_after_days === "string"
+            ? String(payload.review_after_days)
+            : null,
+          0,
+          0,
+          365,
+        );
+        const reviewAfter = reviewAfterDays > 0
+          ? new Date(Date.now() + reviewAfterDays * 24 * 60 * 60 * 1000).toISOString()
+          : null;
+        const evidence = normalizeGptRecordArray(payload.evidence, 25);
+        const confidence = normalizeGptExperimentConfidence(payload.confidence);
+        const isResult = status === "completed" || Boolean(decision) || Boolean(resultNotes);
+        const kind: GptStrategyMemoryKind = isResult ? "experiment_result" : "experiment";
+        const metadata = {
+          status,
+          decision,
+          success_criteria: successCriteria,
+          sample_size_target: sampleSizeTarget || null,
+          start_date: normalizeGptIsoDateText(payload.start_date),
+          end_date: normalizeGptIsoDateText(payload.end_date),
+          related_memory_id: Number.isInteger(relatedMemoryId) && relatedMemoryId > 0 ? relatedMemoryId : null,
+          related_saved_pattern_ids: normalizeGptNumberArray(payload.related_saved_pattern_ids, 25),
+          related_generation_run_ids: normalizeGptStringIdArray(payload.related_generation_run_ids, 25, 100),
+          evidence,
+          confidence,
+          review_after: reviewAfter,
+          flexible_note: "Use this as a learning loop for growth, not a rigid creative category.",
+          sample_size_caution: "Do not promote this to a durable rule until evidence quality and sample size support it.",
+          ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+            ? payload.metadata
+            : {}),
+        };
+        const body = [
+          `Hypothesis: ${hypothesis}`,
+          successCriteria.length ? `Success criteria: ${successCriteria.join(" | ")}` : null,
+          sampleSizeTarget > 0 ? `Sample size target: ${sampleSizeTarget}` : null,
+          resultNotes ? `Result notes: ${resultNotes}` : null,
+          decision ? `Decision: ${decision}` : null,
+          confidence ? `Confidence: ${confidence}` : null,
+          reviewAfter ? `Review after: ${reviewAfter}` : null,
+        ].filter(Boolean).join("\n");
+        const memory = await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind,
+          title,
+          body,
+          metadataJson: normalizeGptMemoryMetadata(metadata),
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          memory,
+          experiment_summary_guidance: [
+            "Read generation-context or growth-context after saving experiments to see open tests and recent decisions.",
+            "Use experiment results to decide what to exploit, explore, stop, retest, or cool down.",
+          ],
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
