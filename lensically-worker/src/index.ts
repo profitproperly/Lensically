@@ -5867,6 +5867,85 @@ function buildGptGenerationWorkflowBrief(
   };
 }
 
+function buildGptTasteInterviewBrief(
+  brand: GptResolvedBrand,
+  input: {
+    objective: string | null;
+    context: Record<string, unknown>;
+  },
+): Record<string, unknown> {
+  const contextSummary = input.context.context_summary && typeof input.context.context_summary === "object"
+    ? input.context.context_summary as Record<string, unknown>
+    : {};
+  const tasteAndBeliefs = input.context.taste_and_beliefs && typeof input.context.taste_and_beliefs === "object"
+    ? input.context.taste_and_beliefs as Record<string, unknown>
+    : {};
+  const generationHistory = input.context.generation_history && typeof input.context.generation_history === "object"
+    ? input.context.generation_history as Record<string, unknown>
+    : {};
+  const approvedDrafts = Array.isArray(generationHistory.approved_drafts) ? generationHistory.approved_drafts : [];
+  const rejectedDrafts = Array.isArray(generationHistory.rejected_drafts) ? generationHistory.rejected_drafts : [];
+  const memoryCount = Number(contextSummary.memory_returned_count ?? 0);
+  const savedPatternsCount = Number(contextSummary.saved_patterns_returned_count ?? 0);
+  const ruleSummary = tasteAndBeliefs.rule_review_summary && typeof tasteAndBeliefs.rule_review_summary === "object"
+    ? tasteAndBeliefs.rule_review_summary as Record<string, unknown>
+    : {};
+  const pendingRuleReviews = Array.isArray(ruleSummary.pending_reviews) ? ruleSummary.pending_reviews : [];
+  const activeCooldowns = Array.isArray(ruleSummary.active_cooldowns) ? ruleSummary.active_cooldowns : [];
+  const questions = [
+    memoryCount < 3
+      ? "What should this brand sound less like and more like in the next batch?"
+      : null,
+    approvedDrafts.length === 0 && rejectedDrafts.length === 0
+      ? "If I show you a batch, what would make you instantly reject a post even if the hook is strong?"
+      : null,
+    rejectedDrafts.length > approvedDrafts.length
+      ? "Your recent rejection feedback is heavier than approval evidence. What specific trait should I avoid most in this batch?"
+      : null,
+    savedPatternsCount > 0
+      ? "Do you want me to adapt saved-pattern logic aggressively here, or keep it more original and distant?"
+      : null,
+    activeCooldowns.length > 0
+      ? "There are active cooldowns. Should this batch avoid those moves completely or only reduce them?"
+      : null,
+    pendingRuleReviews.length > 0
+      ? "A rule or belief is due for review. Should I follow it for this batch, challenge it, or retest it?"
+      : null,
+    input.objective
+      ? `For this objective, what would be a win: more followers, higher engagement floor, stronger taste fit, or a fresh experiment?`
+      : "What is the main outcome for this batch: followers, engagement floor, taste calibration, novelty, or testing a belief?",
+  ].filter((question): question is string => Boolean(question));
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    objective: input.objective,
+    interview_version: "taste_interview_v1",
+    should_ask_before_generating: questions.length > 0,
+    max_questions_to_ask: Math.min(3, questions.length),
+    prioritized_questions: questions.slice(0, 6),
+    save_answers_with: {
+      action: "saveTasteFeedback",
+      recommended_feedback_types: ["taste_profile", "brand_voice_note", "current_belief", "rejection_feedback", "approval_feedback"],
+      guidance: "Save only answers that will affect future generation. Keep them flexible and reviewable.",
+    },
+    context_signals: {
+      memory_count: memoryCount,
+      saved_patterns_count: savedPatternsCount,
+      approved_drafts_count: approvedDrafts.length,
+      rejected_drafts_count: rejectedDrafts.length,
+      active_cooldowns_count: activeCooldowns.length,
+      pending_rule_reviews_count: pendingRuleReviews.length,
+    },
+    question_rules: [
+      "Ask one to three concrete questions, not a broad questionnaire.",
+      "Ask only questions whose answers would change the batch.",
+      "If the user gives a strong preference, save it before generating.",
+      "Do not let taste questions box the brand into permanent categories.",
+    ],
+  };
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
   return {
     openapi: "3.1.0",
@@ -5978,6 +6057,17 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             },
           },
           responses: { "200": { description: "Generation workflow brief" } },
+        },
+      },
+      "/api/gpt/taste-interview": {
+        get: {
+          operationId: "prepareTasteInterview",
+          summary: "Prepare targeted owner taste questions before generation when context, approvals, rejections, cooldowns, or rules are uncertain.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's generation objective or batch focus." } },
+          ],
+          responses: { "200": { description: "Taste interview brief" } },
         },
       },
       "/api/gpt/draft-similarity": {
@@ -9494,6 +9584,44 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           run,
         });
         return new Response(JSON.stringify(brief), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/taste-interview" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const objective = normalizeGptMemoryText(url.searchParams.get("objective"), 500, true);
+        const context = await buildGptGenerationContext(env, brand, {
+          objective,
+          draftText: null,
+          recentLimit: 5,
+          recentOffset: 0,
+          topLimit: 5,
+          topOffset: 0,
+          weakLimit: 3,
+          weakOffset: 0,
+          savedPatternsLimit: 6,
+          savedPatternsOffset: 0,
+          memoryLimit: 40,
+          memoryOffset: 0,
+          runsLimit: 3,
+          runsOffset: 0,
+          approvedDraftsLimit: 8,
+          approvedDraftsOffset: 0,
+          rejectedDraftsLimit: 8,
+          rejectedDraftsOffset: 0,
+          growthDays: 14,
+          compact: true,
+        });
+        const interview = buildGptTasteInterviewBrief(brand, { objective, context });
+        return new Response(JSON.stringify(interview), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
