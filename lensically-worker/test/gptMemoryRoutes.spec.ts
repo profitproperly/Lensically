@@ -441,9 +441,16 @@ describe("GPT memory browser routes", () => {
       expect.objectContaining({ section: "strategy_memory", total_count: 5, returned_count: 5, truncated: false }),
       expect.objectContaining({ section: "saved_patterns", total_count: 5, returned_count: 5, truncated: false }),
       expect.objectContaining({ section: "archive_recent", total_count: 5, returned_count: 5, truncated: false }),
+      expect.objectContaining({ section: "recent_insights", total_count: expect.any(Number), returned_count: expect.any(Number), truncated: false }),
       expect.objectContaining({ section: "scheduled_posts", total_count: 1, returned_count: 1, truncated: false }),
       expect.objectContaining({ section: "generation_runs", total_count: 1, returned_count: 1, truncated: false }),
     ]));
+    const recentInsightsSection = created.sections.find((section) => section.section === "recent_insights");
+    expect(recentInsightsSection?.total_count).toBeGreaterThan(0);
+    expect(created).toEqual(expect.objectContaining({
+      recent_insights_count: recentInsightsSection?.total_count,
+      recent_insights_hours: 72,
+    }));
 
     const pageResponse = await fetchFromWorker(
       `/api/gpt/preflight-snapshot/page?brand_key=${TEST_BRAND_KEY}&snapshot_id=${created.snapshot_id}&section=saved_patterns&limit=2&offset=0`,
@@ -475,6 +482,22 @@ describe("GPT memory browser routes", () => {
     const archivePage = await archivePageResponse.json() as { items: Array<Record<string, unknown>> };
     expect(archivePage.items[0]).not.toHaveProperty("permalink");
     expect(archivePage.items[0]).not.toHaveProperty("profile_picture_url");
+
+    const insightsPageResponse = await fetchFromWorker(
+      `/api/gpt/preflight-snapshot/page?brand_key=${TEST_BRAND_KEY}&snapshot_id=${created.snapshot_id}&section=recent_insights&limit=2`,
+      { headers: { Authorization: "Bearer test-gpt-key" } },
+    );
+    expect(insightsPageResponse.status).toBe(200);
+    const insightsPage = await insightsPageResponse.json() as { total_count: number; items: Array<Record<string, unknown>> };
+    expect(insightsPage.total_count).toBeGreaterThan(0);
+    expect(insightsPage.items[0]).toEqual(expect.objectContaining({
+      post_id: expect.any(String),
+      text: expect.any(String),
+      active_window_status: expect.any(String),
+      views: expect.any(Number),
+      likes: expect.any(Number),
+      engagement_total: expect.any(Number),
+    }));
 
     const replaceResponse = await fetchFromWorker("/api/gpt/preflight-snapshot", {
       method: "POST",
@@ -1309,6 +1332,95 @@ describe("GPT memory browser routes", () => {
           }),
         }),
       }),
+    });
+  });
+
+  it("refreshes Threads insights before returning the standalone recent insights pull", async () => {
+    await createPostedTaggedPostFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const nowIso = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const requestUrl = typeof input === "string" ? input : input.toString();
+      if (requestUrl.includes("/me?fields=")) {
+        return new Response(JSON.stringify({
+          id: TEST_THREADS_USER_ID,
+          username: "vectrixvoltmore",
+          name: "Vectrix",
+          threads_profile_picture_url: "https://cdn.example.com/profile.jpg",
+        }), { status: 200 });
+      }
+      if (requestUrl.includes(`/${TEST_THREADS_USER_ID}/threads?`)) {
+        return new Response(JSON.stringify({
+          data: [
+            {
+              id: "post-888",
+              text: "Freshly pulled post text",
+              timestamp: nowIso,
+              permalink: "https://threads.net/post-888",
+              username: "vectrixvoltmore",
+              view_count: 10,
+              like_count: 1,
+              reply_count: 0,
+              repost_count: 0,
+              quote_count: 0,
+            },
+          ],
+          paging: { cursors: {} },
+        }), { status: 200 });
+      }
+      if (requestUrl.includes("/post-888/insights?")) {
+        return new Response(JSON.stringify({
+          data: [
+            { name: "views", total_value: { value: 3210 } },
+            { name: "likes", total_value: { value: 210 } },
+            { name: "replies", total_value: { value: 31 } },
+            { name: "reposts", total_value: { value: 22 } },
+            { name: "quotes", total_value: { value: 7 } },
+            { name: "shares", total_value: { value: 5 } },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 500 });
+    }));
+
+    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&hours=72&limit=1`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      purpose: "fresh_recent_insights_pull",
+      hours: 72,
+      returned_count: 1,
+      refresh: expect.objectContaining({
+        attempted: true,
+        refreshed: true,
+        pages_fetched: 1,
+        posts_upserted: 1,
+      }),
+      insights: [
+        expect.objectContaining({
+          post_id: "post-888",
+          scheduled_post_id: 888,
+          text: "Freshly pulled post text",
+          active_window_status: "active_0_24h",
+          views: 3210,
+          likes: 210,
+          replies: 31,
+          comments: 31,
+          reposts: 22,
+          quote_posts: 7,
+          shares: 5,
+          engagement_total: 275,
+          strategy: expect.objectContaining({
+            pillar: "offer",
+            hook_style: "direct",
+          }),
+          permalink: "https://threads.net/post-888",
+        }),
+      ],
     });
   });
 

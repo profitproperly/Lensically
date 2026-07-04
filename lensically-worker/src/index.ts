@@ -244,6 +244,7 @@ const GPT_PREFLIGHT_SECTION_KEYS = [
   "follower_snapshots",
   "posted_tagged_results",
   "taste_gate",
+  "recent_insights",
 ] as const;
 
 type GptPreflightSectionKey = typeof GPT_PREFLIGHT_SECTION_KEYS[number];
@@ -5333,6 +5334,387 @@ function serializePostedTaggedPostCompact(post: GptTaggedPostedPost): Record<str
   };
 }
 
+type GptRecentInsightsSort =
+  | "published_at_desc"
+  | "engagement_total_desc"
+  | "likes_desc"
+  | "views_desc"
+  | "follower_day_net_change_desc";
+
+type GptRecentInsightRecord = {
+  post_id: string;
+  scheduled_post_id: number | null;
+  text: string | null;
+  published_at: string | null;
+  local_published_at: string | null;
+  age_hours: number | null;
+  active_window_status: "active_0_24h" | "cooling_24_48h" | "finalizing_48_72h" | "stale_72h_plus" | "unknown";
+  views: number;
+  likes: number;
+  replies: number;
+  comments: number;
+  reposts: number;
+  quote_posts: number;
+  shares: number;
+  engagement_total: number;
+  follower_day_net_change: number | null;
+  strategy: ReturnType<typeof serializeGptPostStrategyTag> | null;
+  permalink: string | null;
+  account_username?: string | null;
+  last_synced_at?: string | null;
+};
+
+function normalizeGptRecentInsightsSort(value: string | null | undefined): GptRecentInsightsSort {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "engagement_total_desc"
+    || normalized === "likes_desc"
+    || normalized === "views_desc"
+    || normalized === "follower_day_net_change_desc"
+    || normalized === "published_at_desc"
+    ? normalized
+    : "published_at_desc";
+}
+
+function getRecentInsightActiveWindowStatus(ageHours: number | null): GptRecentInsightRecord["active_window_status"] {
+  if (ageHours === null || !Number.isFinite(ageHours)) {
+    return "unknown";
+  }
+  if (ageHours < 24) {
+    return "active_0_24h";
+  }
+  if (ageHours < 48) {
+    return "cooling_24_48h";
+  }
+  if (ageHours < 72) {
+    return "finalizing_48_72h";
+  }
+  return "stale_72h_plus";
+}
+
+function serializeRecentInsightRecord(
+  insight: GptRecentInsightRecord,
+  includeDetail: boolean,
+): Record<string, unknown> {
+  return {
+    post_id: insight.post_id,
+    scheduled_post_id: insight.scheduled_post_id,
+    text: insight.text,
+    published_at: insight.published_at,
+    local_published_at: insight.local_published_at,
+    age_hours: insight.age_hours,
+    active_window_status: insight.active_window_status,
+    views: insight.views,
+    likes: insight.likes,
+    replies: insight.replies,
+    comments: insight.comments,
+    reposts: insight.reposts,
+    quote_posts: insight.quote_posts,
+    shares: insight.shares,
+    engagement_total: insight.engagement_total,
+    follower_day_net_change: insight.follower_day_net_change,
+    strategy: insight.strategy
+      ? {
+          pillar: insight.strategy.pillar,
+          hook_style: insight.strategy.hook_style,
+          format: insight.strategy.format,
+          intent: insight.strategy.intent,
+          experiment: insight.strategy.experiment,
+          novelty_level: insight.strategy.novelty_level,
+        }
+      : null,
+    permalink: insight.permalink,
+    ...(includeDetail ? {
+      account_username: insight.account_username,
+      last_synced_at: insight.last_synced_at,
+      strategy_detail: insight.strategy,
+    } : {}),
+  };
+}
+
+async function listGptRecentInsights(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    hours: number;
+    limit: number;
+    offset: number;
+    sort: GptRecentInsightsSort;
+    timezone: string;
+    includeDetail: boolean;
+  },
+): Promise<{
+  insights: Array<Record<string, unknown>>;
+  totalCount: number;
+  hours: number;
+  timezone: string;
+  sort: GptRecentInsightsSort;
+}> {
+  await ensureThreadsPostsArchiveTable(env);
+  const hours = Math.min(Math.max(Math.trunc(input.hours), 1), 168);
+  const limit = Math.min(Math.max(Math.trunc(input.limit), 1), 200);
+  const offset = Math.max(Math.trunc(input.offset), 0);
+  const timezone = isValidIanaTimezone(input.timezone) ? input.timezone : THREADS_INSIGHTS_TIME_ZONE;
+  const sinceIso = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const [scheduledExists, tagsExists] = await Promise.all([
+    doesTableExist(env, "scheduled_posts"),
+    doesTableExist(env, "gpt_post_strategy_tags"),
+  ]);
+  const scheduledSelect = scheduledExists
+    ? `s.id AS scheduled_post_id,
+       s.published_at AS scheduled_published_at,
+       s.scheduled_time AS scheduled_time`
+    : `NULL AS scheduled_post_id,
+       NULL AS scheduled_published_at,
+       NULL AS scheduled_time`;
+  const scheduledJoin = scheduledExists
+    ? `LEFT JOIN scheduled_posts s
+         ON s.threads_user_id = a.threads_user_id
+        AND s.published_post_id = a.post_id`
+    : "";
+  const tagSelect = tagsExists
+    ? `t.account_id AS tag_account_id,
+       t.threads_user_id AS tag_threads_user_id,
+       t.pillar,
+       t.hook_style,
+       t.format,
+       t.intent,
+       t.experiment,
+       t.novelty_level,
+       t.metadata_json AS tag_metadata_json,
+       t.created_at AS tag_created_at,
+       t.updated_at AS tag_updated_at`
+    : `NULL AS tag_account_id,
+       NULL AS tag_threads_user_id,
+       NULL AS pillar,
+       NULL AS hook_style,
+       NULL AS format,
+       NULL AS intent,
+       NULL AS experiment,
+       NULL AS novelty_level,
+       NULL AS tag_metadata_json,
+       NULL AS tag_created_at,
+       NULL AS tag_updated_at`;
+  const tagJoin = scheduledExists && tagsExists
+    ? `LEFT JOIN gpt_post_strategy_tags t
+         ON t.scheduled_post_id = s.id`
+    : "";
+
+  const rows = await env.DB.prepare(
+    `SELECT
+       a.post_id,
+       a.post_text,
+       a.post_timestamp,
+       a.post_permalink,
+       a.post_username,
+       a.views,
+       a.likes,
+       a.replies,
+       a.reposts,
+       a.quotes,
+       a.shares,
+       a.engagement_total,
+       a.last_synced_at,
+       ${scheduledSelect},
+       ${tagSelect}
+     FROM threads_posts_archive a
+     ${scheduledJoin}
+     ${tagJoin}
+     WHERE a.threads_user_id = ?
+       AND datetime(a.post_timestamp) >= datetime(?)
+     ORDER BY datetime(a.post_timestamp) DESC, a.engagement_total DESC, a.likes DESC
+     LIMIT 2500`,
+  )
+    .bind(brand.profile.threads_user_id, sinceIso)
+    .all<{
+      post_id: string;
+      post_text: string | null;
+      post_timestamp: string | null;
+      post_permalink: string | null;
+      post_username: string | null;
+      views: number | string | null;
+      likes: number | string | null;
+      replies: number | string | null;
+      reposts: number | string | null;
+      quotes: number | string | null;
+      shares: number | string | null;
+      engagement_total: number | string | null;
+      last_synced_at: string | null;
+      scheduled_post_id: number | string | null;
+      scheduled_published_at: string | null;
+      scheduled_time: string | null;
+      tag_account_id: string | null;
+      tag_threads_user_id: string | null;
+      pillar: string | null;
+      hook_style: string | null;
+      format: string | null;
+      intent: string | null;
+      experiment: string | null;
+      novelty_level: string | null;
+      tag_metadata_json: string | null;
+      tag_created_at: string | null;
+      tag_updated_at: string | null;
+    }>();
+  const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, Math.max(Math.ceil(hours / 24) + 3, 7));
+  const dailyGrowth = followerSnapshots.map((snapshot, index) => {
+    const previous = index > 0 ? followerSnapshots[index - 1] : null;
+    const netChange = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
+      ? snapshot.followers_count - snapshot.baseline_followers_count
+      : (previous ? snapshot.followers_count - previous.followers_count : 0);
+    return { date: snapshot.snapshot_date, net_change: netChange };
+  });
+  const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day.net_change]));
+  const nowMs = Date.now();
+  const records: GptRecentInsightRecord[] = (rows.results ?? []).map((row) => {
+    const publishedAt = row.post_timestamp ?? row.scheduled_published_at ?? row.scheduled_time ?? null;
+    const publishedMs = publishedAt ? Date.parse(publishedAt) : Number.NaN;
+    const ageHours = Number.isFinite(publishedMs)
+      ? Number(((nowMs - publishedMs) / (60 * 60 * 1000)).toFixed(2))
+      : null;
+    const localDate = getPostLocalDate({ timestamp: publishedAt } as Pick<CachedThreadsPost, "timestamp">, timezone);
+    const localTime = publishedAt && Number.isFinite(publishedMs) ? getLocalTimeInTimeZone(timezone, publishedMs) : null;
+    const scheduledPostId = row.scheduled_post_id === null || row.scheduled_post_id === undefined
+      ? null
+      : Number(row.scheduled_post_id);
+    const hasStrategy = scheduledPostId !== null && row.tag_account_id !== null;
+    return {
+      post_id: row.post_id,
+      scheduled_post_id: scheduledPostId,
+      text: row.post_text,
+      published_at: publishedAt,
+      local_published_at: localDate && localTime ? `${localDate} ${localTime}` : localDate,
+      age_hours: ageHours,
+      active_window_status: getRecentInsightActiveWindowStatus(ageHours),
+      views: Number(row.views ?? 0),
+      likes: Number(row.likes ?? 0),
+      replies: Number(row.replies ?? 0),
+      comments: Number(row.replies ?? 0),
+      reposts: Number(row.reposts ?? 0),
+      quote_posts: Number(row.quotes ?? 0),
+      shares: Number(row.shares ?? 0),
+      engagement_total: Number(row.engagement_total ?? 0),
+      follower_day_net_change: localDate ? growthByDate.get(localDate) ?? null : null,
+      strategy: hasStrategy ? serializeGptPostStrategyTag({
+        scheduled_post_id: scheduledPostId,
+        account_id: row.tag_account_id ?? brand.account_id,
+        threads_user_id: row.tag_threads_user_id ?? brand.profile.threads_user_id,
+        pillar: row.pillar,
+        hook_style: row.hook_style,
+        format: row.format,
+        intent: row.intent,
+        experiment: row.experiment,
+        novelty_level: row.novelty_level,
+        metadata_json: row.tag_metadata_json,
+        created_at: row.tag_created_at ?? "",
+        updated_at: row.tag_updated_at ?? "",
+      }) : null,
+      permalink: row.post_permalink,
+      account_username: row.post_username,
+      last_synced_at: row.last_synced_at,
+    };
+  });
+  const sortedRecords = [...records].sort((left, right) => {
+    switch (input.sort) {
+      case "engagement_total_desc":
+        return right.engagement_total - left.engagement_total || String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+      case "likes_desc":
+        return right.likes - left.likes || right.engagement_total - left.engagement_total || String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+      case "views_desc":
+        return right.views - left.views || right.engagement_total - left.engagement_total || String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+      case "follower_day_net_change_desc":
+        return (right.follower_day_net_change ?? -999999) - (left.follower_day_net_change ?? -999999) || right.engagement_total - left.engagement_total;
+      case "published_at_desc":
+      default:
+        return String(right.published_at ?? "").localeCompare(String(left.published_at ?? "")) || right.engagement_total - left.engagement_total;
+    }
+  });
+  return {
+    insights: sortedRecords.slice(offset, offset + limit).map((item) => serializeRecentInsightRecord(item, input.includeDetail)),
+    totalCount: sortedRecords.length,
+    hours,
+    timezone,
+    sort: input.sort,
+  };
+}
+
+async function refreshGptRecentInsightsArchive(
+  env: Env,
+  brand: GptResolvedBrand,
+  hours: number,
+): Promise<{
+  attempted: boolean;
+  refreshed: boolean;
+  pages_fetched: number;
+  posts_seen: number;
+  posts_upserted: number;
+  stopped_reason: "window_complete" | "no_more_pages" | "fetch_failed" | "page_cap_reached" | "not_attempted";
+}> {
+  const normalizedHours = Math.min(Math.max(Math.trunc(hours), 1), 168);
+  const sinceMs = Date.now() - normalizedHours * 60 * 60 * 1000;
+  let cursor: string | null = null;
+  let pagesFetched = 0;
+  let postsSeen = 0;
+  let postsUpserted = 0;
+  const maxPages = Math.min(Math.max(Math.ceil(normalizedHours / 24) + 2, 3), 10);
+
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+    const page = await fetchThreadsPostsPageWithInsights(
+      env,
+      brand.configured_account.accessToken,
+      brand.profile.threads_user_id,
+      cursor,
+    );
+    if (!page) {
+      return {
+        attempted: true,
+        refreshed: postsUpserted > 0,
+        pages_fetched: pagesFetched,
+        posts_seen: postsSeen,
+        posts_upserted: postsUpserted,
+        stopped_reason: postsUpserted > 0 ? "window_complete" : "fetch_failed",
+      };
+    }
+    pagesFetched += 1;
+    postsSeen += page.posts.length;
+    await upsertThreadsPostsArchive(env, brand.profile.threads_user_id, page.posts);
+    postsUpserted += page.posts.length;
+
+    const timestamps = page.posts
+      .map((post) => getPostTimestampMs(post))
+      .filter((timestamp): timestamp is number => timestamp !== null);
+    const oldestPostMs = timestamps.length ? Math.min(...timestamps) : null;
+    if (!page.hasMore || !page.nextCursor) {
+      return {
+        attempted: true,
+        refreshed: true,
+        pages_fetched: pagesFetched,
+        posts_seen: postsSeen,
+        posts_upserted: postsUpserted,
+        stopped_reason: "no_more_pages",
+      };
+    }
+    if (oldestPostMs !== null && oldestPostMs < sinceMs) {
+      return {
+        attempted: true,
+        refreshed: true,
+        pages_fetched: pagesFetched,
+        posts_seen: postsSeen,
+        posts_upserted: postsUpserted,
+        stopped_reason: "window_complete",
+      };
+    }
+    cursor = page.nextCursor;
+  }
+
+  return {
+    attempted: true,
+    refreshed: true,
+    pages_fetched: pagesFetched,
+    posts_seen: postsSeen,
+    posts_upserted: postsUpserted,
+    stopped_reason: "page_cap_reached",
+  };
+}
+
 async function collectGptPreflightPage<T>(
   fetchPage: (limit: number, offset: number) => Promise<T[]>,
   pageSize: number,
@@ -5366,9 +5748,12 @@ function buildGptPreflightSection(
 async function buildGptPreflightSnapshotSections(
   env: Env,
   brand: GptResolvedBrand,
+  input: { recentInsightsHours: number },
 ): Promise<GptPreflightSnapshotSections> {
   const pageSize = 100;
   const maxItems = 2000;
+  const recentInsightsHours = Math.min(Math.max(Math.trunc(input.recentInsightsHours), 1), 168);
+  await refreshGptRecentInsightsArchive(env, brand, recentInsightsHours);
 
   const [
     strategyMemoryTotal,
@@ -5401,6 +5786,7 @@ async function buildGptPreflightSnapshotSections(
     rejectedDrafts,
     followerSnapshots,
     postedTaggedResults,
+    recentInsights,
   ] = await Promise.all([
     collectGptPreflightPage(
       (limit, offset) => listGptStrategyMemory(env, brand.account_id, [], limit, offset)
@@ -5463,6 +5849,18 @@ async function buildGptPreflightSnapshotSections(
     ),
     listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 250)
       .then((items) => ({ items: items.map(serializePostedTaggedPostCompact), truncated: items.length >= 250 })),
+    listGptRecentInsights(env, brand, {
+      hours: recentInsightsHours,
+      limit: maxItems,
+      offset: 0,
+      sort: "published_at_desc",
+      timezone: THREADS_INSIGHTS_TIME_ZONE,
+      includeDetail: false,
+    }).then((page) => ({
+      items: page.insights,
+      totalCount: page.totalCount,
+      truncated: page.totalCount > maxItems,
+    })),
   ]);
 
   return {
@@ -5477,6 +5875,7 @@ async function buildGptPreflightSnapshotSections(
     follower_snapshots: buildGptPreflightSection(followerSnapshots.items, followerSnapshotsTotal, followerSnapshots.truncated),
     posted_tagged_results: buildGptPreflightSection(postedTaggedResults.items, postedTaggedResults.items.length, postedTaggedResults.truncated),
     taste_gate: buildGptPreflightSection([buildGptTasteGate(strategyMemory.items as ReturnType<typeof serializeGptStrategyMemoryRow>[])], 1, false),
+    recent_insights: buildGptPreflightSection(recentInsights.items, recentInsights.totalCount, recentInsights.truncated),
   };
 }
 
@@ -5486,6 +5885,7 @@ function buildGptPreflightManifest(
   objective: string | null,
   sections: GptPreflightSnapshotSections,
   createdAt: string,
+  input: { recentInsightsHours: number },
 ): Record<string, unknown> {
   return {
     success: true,
@@ -5497,6 +5897,8 @@ function buildGptPreflightManifest(
     created_at: createdAt,
     replaces_previous_active_snapshot: true,
     paging_guidance: "Use getPreflightSnapshotPage for each section needed in the current generation. Report exact returned_count and total_count.",
+    recent_insights_count: sections.recent_insights.total_count,
+    recent_insights_hours: input.recentInsightsHours,
     sections: GPT_PREFLIGHT_SECTION_KEYS.map((section) => ({
       section,
       total_count: sections[section].total_count,
@@ -5511,12 +5913,14 @@ async function createGptPreflightSnapshot(
   env: Env,
   brand: GptResolvedBrand,
   objective: string | null,
+  input: { recentInsightsHours?: number } = {},
 ): Promise<Record<string, unknown>> {
   await ensureGptPreflightSnapshotsTable(env);
   const snapshotId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const sections = await buildGptPreflightSnapshotSections(env, brand);
-  const manifest = buildGptPreflightManifest(brand, snapshotId, objective, sections, createdAt);
+  const recentInsightsHours = Math.min(Math.max(Math.trunc(input.recentInsightsHours ?? 72), 1), 168);
+  const sections = await buildGptPreflightSnapshotSections(env, brand, { recentInsightsHours });
+  const manifest = buildGptPreflightManifest(brand, snapshotId, objective, sections, createdAt, { recentInsightsHours });
 
   await env.DB.prepare(
     `DELETE FROM gpt_preflight_snapshots
@@ -7600,6 +8004,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                   properties: {
                     brand_key: { "$ref": "#/components/schemas/BrandKey" },
                     objective: { type: "string", description: "Current generation, growth, scheduling, or review objective." },
+                    recent_insights_hours: { type: "integer", minimum: 1, maximum: 168, default: 72, description: "Fresh insights window to include in the recent_insights preflight section." },
                   },
                 },
               },
@@ -7642,6 +8047,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                   "follower_snapshots",
                   "posted_tagged_results",
                   "taste_gate",
+                  "recent_insights",
                 ],
               },
             },
@@ -7793,6 +8199,31 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Posts" } },
+        },
+      },
+      "/api/gpt/insights/recent": {
+        get: {
+          operationId: "getRecentInsights",
+          summary: "Refresh Threads post insights, then return a compact paginated recent insights pull for live 72-hour recon before generation, scheduling, or near-term strategy decisions.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "hours", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 168, default: 72 } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 100 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
+            { name: "timezone", in: "query", required: false, schema: { type: "string", default: THREADS_INSIGHTS_TIME_ZONE } },
+            {
+              name: "sort",
+              in: "query",
+              required: false,
+              schema: {
+                type: "string",
+                enum: ["published_at_desc", "engagement_total_desc", "likes_desc", "views_desc", "follower_day_net_change_desc"],
+                default: "published_at_desc",
+              },
+            },
+          ],
+          responses: { "200": { description: "Fresh recent insights pull" } },
         },
       },
       "/api/gpt/growth-context": {
@@ -11295,6 +11726,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           env,
           brand,
           normalizeGptMemoryText(payload.objective, 1000, true),
+          {
+            recentInsightsHours: parseBoundedIntegerParam(
+              typeof payload.recent_insights_hours === "number" || typeof payload.recent_insights_hours === "string"
+                ? String(payload.recent_insights_hours)
+                : null,
+              72,
+              1,
+              168,
+            ),
+          },
         );
         return new Response(JSON.stringify(manifest), {
           status: 200,
@@ -11816,6 +12257,51 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           limit,
           offset,
           order_by: orderBy,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/insights/recent" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const hours = parseBoundedIntegerParam(url.searchParams.get("hours"), 72, 1, 168);
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 100, 1, 200);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const timezoneParam = url.searchParams.get("timezone")?.trim() || THREADS_INSIGHTS_TIME_ZONE;
+        const timezone = isValidIanaTimezone(timezoneParam) ? timezoneParam : THREADS_INSIGHTS_TIME_ZONE;
+        const sort = normalizeGptRecentInsightsSort(url.searchParams.get("sort"));
+        const refresh = await refreshGptRecentInsightsArchive(env, brand, hours);
+        const page = await listGptRecentInsights(env, brand, {
+          hours,
+          limit,
+          offset,
+          sort,
+          timezone,
+          includeDetail: url.searchParams.get("include_detail") === "true",
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          account_id: brand.account_id,
+          threads_user_id: brand.profile.threads_user_id,
+          purpose: "fresh_recent_insights_pull",
+          hours: page.hours,
+          timezone: page.timezone,
+          sort: page.sort,
+          refresh,
+          insights: page.insights,
+          total_count: page.totalCount,
+          returned_count: page.insights.length,
+          limit,
+          offset,
+          has_more: page.totalCount > offset + page.insights.length,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
