@@ -7502,13 +7502,17 @@ async function buildGptGenerationContext(
   const weakArchivePosts = compact ? weakPosts.map(serializeArchivePostCompact) : weakPosts;
   const scheduledPostsForPayload = compact ? scheduledPostsWithTags.map(serializeScheduledPostCompact) : scheduledPostsWithTags;
   const strategyMemoryForPayload: Array<Record<string, unknown>> = compact
-    ? strategyMemory.map((memory) => serializeGptStrategyMemoryCompact(memory))
+    ? strategyMemory.map((memory) => serializeGptStrategyMemorySummary(memory))
     : strategyMemory;
   const memoryByKindForPayload = strategyMemoryForPayload.reduce<Record<string, typeof strategyMemoryForPayload>>((groups, memory) => {
     const kind = String(memory.kind ?? "unknown");
     const group = groups[kind] ?? [];
     group.push(memory);
     groups[kind] = group;
+    return groups;
+  }, {});
+  const memoryByKindCounts = strategyMemory.reduce<Record<string, number>>((groups, memory) => {
+    groups[memory.kind] = (groups[memory.kind] ?? 0) + 1;
     return groups;
   }, {});
   const taggedPostResultsForPayload = compact
@@ -7521,11 +7525,11 @@ async function buildGptGenerationContext(
         status: run.status,
         created_at: run.created_at,
         updated_at: run.updated_at,
-        drafts: run.drafts.map(serializeGenerationDraftCompact),
+        drafts: run.drafts.map(serializeGenerationDraftSummary),
       }))
     : generationRuns;
-  const approvedDraftsForPayload = compact ? approvedDrafts.map(serializeGenerationDraftCompact) : approvedDrafts;
-  const rejectedDraftsForPayload = compact ? rejectedDrafts.map(serializeGenerationDraftCompact) : rejectedDrafts;
+  const approvedDraftsForPayload = compact ? approvedDrafts.map(serializeGenerationDraftSummary) : approvedDrafts;
+  const rejectedDraftsForPayload = compact ? rejectedDrafts.map(serializeGenerationDraftSummary) : rejectedDrafts;
 
   return {
     success: true,
@@ -7574,7 +7578,7 @@ async function buildGptGenerationContext(
     taste_and_beliefs: {
       taste_gate: buildGptTasteGate(strategyMemory),
       all_memory: strategyMemoryForPayload,
-      by_kind: memoryByKindForPayload,
+      by_kind: compact ? memoryByKindCounts : memoryByKindForPayload,
       rule_review_summary: buildGptRuleReviewSummary(strategyMemory),
       experiment_summary: buildGptExperimentSummary(strategyMemory),
       saved_pattern_adaptation_summary: buildGptPatternAdaptationSummary(strategyMemory),
@@ -9886,6 +9890,21 @@ function serializeGenerationDraftCompact(
   };
 }
 
+function serializeGenerationDraftSummary(
+  draft: ReturnType<typeof serializeGptGenerationDraft>,
+): Record<string, unknown> {
+  return {
+    id: draft.id,
+    text_preview: draft.text.slice(0, 300),
+    status: draft.status,
+    rejection_reason: draft.rejection_reason ? draft.rejection_reason.slice(0, 300) : null,
+    score: draft.score,
+    scheduled_post_id: draft.scheduled_post_id,
+    created_at: draft.created_at,
+    strategy: draft.strategy,
+  };
+}
+
 function serializeGptStrategyMemoryCompact(
   memory: ReturnType<typeof serializeGptStrategyMemoryRow>,
   includeDetail = false,
@@ -9902,6 +9921,19 @@ function serializeGptStrategyMemoryCompact(
       threads_user_id: memory.threads_user_id,
       metadata: memory.metadata,
     } : {}),
+  };
+}
+
+function serializeGptStrategyMemorySummary(
+  memory: ReturnType<typeof serializeGptStrategyMemoryRow>,
+): Record<string, unknown> {
+  return {
+    id: memory.id,
+    kind: memory.kind,
+    title: memory.title,
+    body_preview: memory.body.slice(0, 500),
+    created_at: memory.created_at,
+    updated_at: memory.updated_at,
   };
 }
 
