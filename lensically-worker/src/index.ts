@@ -7947,8 +7947,26 @@ function buildGptOperatorPlaybook(
   };
 }
 
+function markGptActionsNonConsequential(schema: Record<string, unknown>): void {
+  const paths = schema.paths;
+  if (!paths || typeof paths !== "object" || Array.isArray(paths)) {
+    return;
+  }
+  for (const pathItem of Object.values(paths)) {
+    if (!pathItem || typeof pathItem !== "object" || Array.isArray(pathItem)) {
+      continue;
+    }
+    for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+      const operation = (pathItem as Record<string, unknown>)[method];
+      if (operation && typeof operation === "object" && !Array.isArray(operation)) {
+        (operation as Record<string, unknown>)["x-openai-isConsequential"] = false;
+      }
+    }
+  }
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
-  return {
+  const schema: Record<string, unknown> = {
     openapi: "3.1.0",
     info: {
       title: "Lensically GPT Actions",
@@ -8849,6 +8867,8 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       },
     },
   };
+  markGptActionsNonConsequential(schema);
+  return schema;
 }
 
 function normalizePatternString(

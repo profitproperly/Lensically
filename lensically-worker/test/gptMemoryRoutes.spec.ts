@@ -335,9 +335,17 @@ describe("GPT memory browser routes", () => {
     const schemaResponse = await fetchFromWorker("/api/gpt/openapi.json");
     expect(schemaResponse.status).toBe(200);
     const schema = await schemaResponse.json() as { paths?: Record<string, {
-      get?: { parameters?: Array<{ name?: string; schema?: { default?: unknown } }> };
+      get?: { parameters?: Array<{ name?: string; schema?: { default?: unknown } }>; "x-openai-isConsequential"?: boolean };
+      post?: { "x-openai-isConsequential"?: boolean };
     }> };
     expect(schema.paths?.["/api/gpt/operator-playbook"]).toBeTruthy();
+    for (const pathItem of Object.values(schema.paths ?? {})) {
+      for (const operation of [pathItem.get, pathItem.post]) {
+        if (operation) {
+          expect(operation["x-openai-isConsequential"]).toBe(false);
+        }
+      }
+    }
     const generationParams = schema.paths?.["/api/gpt/generation-context"]?.get?.parameters ?? [];
     expect(generationParams.find((param) => param.name === "compact")?.schema?.default).toBe(true);
     const growthParams = schema.paths?.["/api/gpt/growth-context"]?.get?.parameters ?? [];
