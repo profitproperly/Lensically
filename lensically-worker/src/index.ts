@@ -7465,12 +7465,6 @@ async function buildGptGenerationContext(
   const weakPosts = weakArchiveSource.posts
     .filter((post) => Number(post.engagement_total ?? 0) <= 1 || Number(post.likes ?? 0) <= 1)
     .slice(0, weakLimit);
-  const memoryByKind = strategyMemory.reduce<Record<string, typeof strategyMemory>>((groups, memory) => {
-    const group = groups[memory.kind] ?? [];
-    group.push(memory);
-    groups[memory.kind] = group;
-    return groups;
-  }, {});
   const referenceItems = [
     ...recentArchive.posts.map((post) => ({ source: "archive_recent", id: post.id, text: post.text })),
     ...topArchive.posts.map((post) => ({ source: "archive_top", id: post.id, text: post.text })),
@@ -7507,6 +7501,19 @@ async function buildGptGenerationContext(
   const topArchivePosts = compact ? topArchive.posts.map(serializeArchivePostCompact) : topArchive.posts;
   const weakArchivePosts = compact ? weakPosts.map(serializeArchivePostCompact) : weakPosts;
   const scheduledPostsForPayload = compact ? scheduledPostsWithTags.map(serializeScheduledPostCompact) : scheduledPostsWithTags;
+  const strategyMemoryForPayload: Array<Record<string, unknown>> = compact
+    ? strategyMemory.map((memory) => serializeGptStrategyMemoryCompact(memory))
+    : strategyMemory;
+  const memoryByKindForPayload = strategyMemoryForPayload.reduce<Record<string, typeof strategyMemoryForPayload>>((groups, memory) => {
+    const kind = String(memory.kind ?? "unknown");
+    const group = groups[kind] ?? [];
+    group.push(memory);
+    groups[kind] = group;
+    return groups;
+  }, {});
+  const taggedPostResultsForPayload = compact
+    ? taggedPostResultsWithGrowth.slice(0, 20).map(serializePostedTaggedPostCompact)
+    : taggedPostResultsWithGrowth.slice(0, 80);
   const generationRunsForPayload = compact
     ? generationRuns.map((run) => ({
         id: run.id,
@@ -7566,8 +7573,8 @@ async function buildGptGenerationContext(
     },
     taste_and_beliefs: {
       taste_gate: buildGptTasteGate(strategyMemory),
-      all_memory: strategyMemory,
-      by_kind: memoryByKind,
+      all_memory: strategyMemoryForPayload,
+      by_kind: memoryByKindForPayload,
       rule_review_summary: buildGptRuleReviewSummary(strategyMemory),
       experiment_summary: buildGptExperimentSummary(strategyMemory),
       saved_pattern_adaptation_summary: buildGptPatternAdaptationSummary(strategyMemory),
@@ -7584,7 +7591,7 @@ async function buildGptGenerationContext(
     },
     saved_patterns: savedPatterns,
     scheduled_posts: scheduledPostsForPayload,
-    posted_tagged_results: taggedPostResultsWithGrowth.slice(0, compact ? 20 : 80),
+    posted_tagged_results: taggedPostResultsForPayload,
     tag_performance: {
       pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
       hook_styles: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "hook_style"),
