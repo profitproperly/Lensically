@@ -20,7 +20,7 @@ const SCHEDULED_POST_STATUS_POSTING = "posting";
 const SCHEDULED_POST_STATUS_POSTED = "posted";
 const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;
 const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;
-const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 15 * 60 * 1000;
+const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 3 * 60 * 1000;
 const SCHEDULED_POST_PUBLISH_CRON = "* * * * *";
 const THREADS_TOKEN_REFRESH_CRON = "0 */12 * * *";
 const LEGACY_COMBINED_SCHEDULED_CRON = "0 3 * * *";
@@ -15236,6 +15236,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
+
+      await ensureScheduledPostsTable(env);
+      await recoverStalePostingScheduledPosts(env);
 
       const rows = await env.DB.prepare(
         `SELECT id, post_text, status, scheduled_time, spoiler_all_text, spoiler_phrases_json, publish_error_message, last_attempted_at, processing_started_at
