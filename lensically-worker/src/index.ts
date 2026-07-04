@@ -221,6 +221,41 @@ type GptGenerationDraftRow = {
   updated_at: string;
 };
 
+type GptPreflightSnapshotRow = {
+  id: string;
+  account_id: string;
+  threads_user_id: string;
+  objective: string | null;
+  sections_json: string;
+  manifest_json: string;
+  created_at: string;
+  updated_at: string;
+};
+
+const GPT_PREFLIGHT_SECTION_KEYS = [
+  "strategy_memory",
+  "saved_patterns",
+  "archive_recent",
+  "archive_top",
+  "scheduled_posts",
+  "generation_runs",
+  "approved_drafts",
+  "rejected_drafts",
+  "follower_snapshots",
+  "posted_tagged_results",
+] as const;
+
+type GptPreflightSectionKey = typeof GPT_PREFLIGHT_SECTION_KEYS[number];
+
+type GptPreflightSnapshotSection = {
+  total_count: number;
+  returned_count: number;
+  truncated: boolean;
+  items: Array<Record<string, unknown>>;
+};
+
+type GptPreflightSnapshotSections = Record<GptPreflightSectionKey, GptPreflightSnapshotSection>;
+
 type GptResolvedBrand = {
   brand_key: GptBrandKey;
   account_id: string;
@@ -5156,6 +5191,30 @@ async function countGptGenerationRuns(env: Env, accountId: string): Promise<numb
   return Number(row?.total ?? 0);
 }
 
+async function countGptGenerationDraftsByStatus(
+  env: Env,
+  accountId: string,
+  statuses: string[],
+): Promise<number> {
+  await ensureGptGenerationDraftsTable(env);
+  const normalizedStatuses = statuses
+    .map((status) => normalizeGptGenerationStatus(status))
+    .filter((status, index, all) => all.indexOf(status) === index);
+  if (!normalizedStatuses.length) {
+    return 0;
+  }
+  const placeholders = normalizedStatuses.map(() => "?").join(", ");
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total
+     FROM gpt_generation_drafts
+     WHERE account_id = ?
+       AND status IN (${placeholders})`,
+  )
+    .bind(accountId, ...normalizedStatuses)
+    .first<{ total: number | string }>();
+  return Number(row?.total ?? 0);
+}
+
 async function listGptGenerationDraftsByStatus(
   env: Env,
   accountId: string,
@@ -5187,6 +5246,306 @@ async function listGptGenerationDraftsByStatus(
     .all<GptGenerationDraftRow>();
 
   return (rows.results ?? []).map(serializeGptGenerationDraft);
+}
+
+async function ensureGptPreflightSnapshotsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS gpt_preflight_snapshots (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      objective TEXT,
+      sections_json TEXT NOT NULL,
+      manifest_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_gpt_preflight_snapshots_account_updated
+     ON gpt_preflight_snapshots (account_id, updated_at DESC)`,
+  ).run();
+}
+
+function isGptPreflightSectionKey(value: string | null): value is GptPreflightSectionKey {
+  return Boolean(value && (GPT_PREFLIGHT_SECTION_KEYS as readonly string[]).includes(value));
+}
+
+function parseGptPreflightSections(value: string): GptPreflightSnapshotSections | null {
+  const parsed = safeParseJsonString(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as GptPreflightSnapshotSections;
+}
+
+function parseGptPreflightManifest(value: string): Record<string, unknown> | null {
+  const parsed = safeParseJsonString(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function serializePostedTaggedPostCompact(post: GptTaggedPostedPost): Record<string, unknown> {
+  return {
+    scheduled_post_id: post.scheduled_post_id,
+    published_post_id: post.published_post_id,
+    text: post.text,
+    status: post.status,
+    scheduled_time_utc: post.scheduled_time_utc,
+    published_at: post.published_at,
+    follower_day_net_change: post.follower_day_net_change ?? null,
+    strategy: post.strategy,
+    post: post.post ? serializeArchivePostCompact(post.post) : null,
+  };
+}
+
+async function collectGptPreflightPage<T>(
+  fetchPage: (limit: number, offset: number) => Promise<T[]>,
+  pageSize: number,
+  maxItems: number,
+): Promise<{ items: T[]; truncated: boolean }> {
+  const items: T[] = [];
+  for (let offset = 0; offset < maxItems; offset += pageSize) {
+    const limit = Math.min(pageSize, maxItems - offset);
+    const page = await fetchPage(limit, offset);
+    items.push(...page);
+    if (page.length < limit) {
+      return { items, truncated: false };
+    }
+  }
+  return { items, truncated: true };
+}
+
+function buildGptPreflightSection(
+  items: Array<Record<string, unknown>>,
+  totalCount: number,
+  truncated: boolean,
+): GptPreflightSnapshotSection {
+  return {
+    total_count: totalCount,
+    returned_count: items.length,
+    truncated,
+    items,
+  };
+}
+
+async function buildGptPreflightSnapshotSections(
+  env: Env,
+  brand: GptResolvedBrand,
+): Promise<GptPreflightSnapshotSections> {
+  const pageSize = 100;
+  const maxItems = 2000;
+
+  const [
+    strategyMemoryTotal,
+    savedPatternsFirstPage,
+    archiveTotal,
+    scheduledTotal,
+    generationRunsTotal,
+    approvedDraftsTotal,
+    rejectedDraftsTotal,
+    followerSnapshotsTotal,
+  ] = await Promise.all([
+    countGptStrategyMemory(env, brand.account_id, []),
+    listSavedPatternsForHermes(env, brand.profile.threads_user_id, 1, 0, "engagement_desc"),
+    countArchivedThreadsPosts(env, brand.profile.threads_user_id),
+    countScheduledPostsForHermesContext(env, brand.profile.threads_user_id),
+    countGptGenerationRuns(env, brand.account_id),
+    countGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"]),
+    countGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"]),
+    countThreadsFollowerSnapshots(env, brand.profile.threads_user_id),
+  ]);
+
+  const [
+    strategyMemory,
+    savedPatterns,
+    archiveRecent,
+    archiveTop,
+    scheduledPosts,
+    generationRuns,
+    approvedDrafts,
+    rejectedDrafts,
+    followerSnapshots,
+    postedTaggedResults,
+  ] = await Promise.all([
+    collectGptPreflightPage(
+      (limit, offset) => listGptStrategyMemory(env, brand.account_id, [], limit, offset)
+        .then((items) => items.map((item) => serializeGptStrategyMemoryCompact(item))),
+      pageSize,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listSavedPatternsForHermes(env, brand.profile.threads_user_id, limit, offset, "engagement_desc")
+        .then((page) => page.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, false, false, false))),
+      pageSize,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", limit, offset)
+        .then((page) => page.posts.map(serializeArchivePostCompact)),
+      pageSize,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", limit, offset)
+        .then((page) => page.posts.map(serializeArchivePostCompact)),
+      pageSize,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      async (limit, offset) => {
+        const posts = await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, limit, offset);
+        const tagMap = await listGptPostStrategyTagsForScheduledPosts(env, posts.map((post) => post.id));
+        return posts.map((post) => serializeScheduledPostCompact({
+          ...post,
+          strategy: tagMap.get(post.id) ?? null,
+        }));
+      },
+      pageSize,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listGptGenerationRuns(env, brand.account_id, limit, offset)
+        .then((items) => items.map((item) => serializeGptGenerationRunCompact(item))),
+      25,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"], limit, offset)
+        .then((items) => items.map(serializeGenerationDraftCompact)),
+      50,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"], limit, offset)
+        .then((items) => items.map(serializeGenerationDraftCompact)),
+      50,
+      maxItems,
+    ),
+    collectGptPreflightPage(
+      (limit, offset) => listThreadsFollowerSnapshotsPage(env, brand.profile.threads_user_id, limit, offset),
+      pageSize,
+      maxItems,
+    ),
+    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 250)
+      .then((items) => ({ items: items.map(serializePostedTaggedPostCompact), truncated: items.length >= 250 })),
+  ]);
+
+  return {
+    strategy_memory: buildGptPreflightSection(strategyMemory.items, strategyMemoryTotal, strategyMemory.truncated),
+    saved_patterns: buildGptPreflightSection(savedPatterns.items, savedPatternsFirstPage.totalCount, savedPatterns.truncated),
+    archive_recent: buildGptPreflightSection(archiveRecent.items, archiveTotal, archiveRecent.truncated),
+    archive_top: buildGptPreflightSection(archiveTop.items, archiveTotal, archiveTop.truncated),
+    scheduled_posts: buildGptPreflightSection(scheduledPosts.items, scheduledTotal, scheduledPosts.truncated),
+    generation_runs: buildGptPreflightSection(generationRuns.items, generationRunsTotal, generationRuns.truncated),
+    approved_drafts: buildGptPreflightSection(approvedDrafts.items, approvedDraftsTotal, approvedDrafts.truncated),
+    rejected_drafts: buildGptPreflightSection(rejectedDrafts.items, rejectedDraftsTotal, rejectedDrafts.truncated),
+    follower_snapshots: buildGptPreflightSection(followerSnapshots.items, followerSnapshotsTotal, followerSnapshots.truncated),
+    posted_tagged_results: buildGptPreflightSection(postedTaggedResults.items, postedTaggedResults.items.length, postedTaggedResults.truncated),
+  };
+}
+
+function buildGptPreflightManifest(
+  brand: GptResolvedBrand,
+  snapshotId: string,
+  objective: string | null,
+  sections: GptPreflightSnapshotSections,
+  createdAt: string,
+): Record<string, unknown> {
+  return {
+    success: true,
+    snapshot_id: snapshotId,
+    brand_key: brand.brand_key,
+    account_id: brand.account_id,
+    threads_user_id: brand.profile.threads_user_id,
+    objective,
+    created_at: createdAt,
+    replaces_previous_active_snapshot: true,
+    paging_guidance: "Use getPreflightSnapshotPage for each section needed in the current generation. Report exact returned_count and total_count.",
+    sections: GPT_PREFLIGHT_SECTION_KEYS.map((section) => ({
+      section,
+      total_count: sections[section].total_count,
+      returned_count: sections[section].returned_count,
+      truncated: sections[section].truncated,
+      suggested_page_size: section === "generation_runs" ? 25 : 100,
+    })),
+  };
+}
+
+async function createGptPreflightSnapshot(
+  env: Env,
+  brand: GptResolvedBrand,
+  objective: string | null,
+): Promise<Record<string, unknown>> {
+  await ensureGptPreflightSnapshotsTable(env);
+  const snapshotId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const sections = await buildGptPreflightSnapshotSections(env, brand);
+  const manifest = buildGptPreflightManifest(brand, snapshotId, objective, sections, createdAt);
+
+  await env.DB.prepare(
+    `DELETE FROM gpt_preflight_snapshots
+     WHERE account_id = ?`,
+  )
+    .bind(brand.account_id)
+    .run();
+
+  await env.DB.prepare(
+    `INSERT INTO gpt_preflight_snapshots (
+      id,
+      account_id,
+      threads_user_id,
+      objective,
+      sections_json,
+      manifest_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      snapshotId,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      objective,
+      JSON.stringify(sections),
+      JSON.stringify(manifest),
+      createdAt,
+      createdAt,
+    )
+    .run();
+
+  return manifest;
+}
+
+async function getGptPreflightSnapshotRow(
+  env: Env,
+  brand: GptResolvedBrand,
+  snapshotId: string | null,
+): Promise<GptPreflightSnapshotRow | null> {
+  await ensureGptPreflightSnapshotsTable(env);
+  if (snapshotId) {
+    return await env.DB.prepare(
+      `SELECT id, account_id, threads_user_id, objective, sections_json, manifest_json, created_at, updated_at
+       FROM gpt_preflight_snapshots
+       WHERE id = ?
+         AND account_id = ?
+       LIMIT 1`,
+    )
+      .bind(snapshotId, brand.account_id)
+      .first<GptPreflightSnapshotRow>();
+  }
+  return await env.DB.prepare(
+    `SELECT id, account_id, threads_user_id, objective, sections_json, manifest_json, created_at, updated_at
+     FROM gpt_preflight_snapshots
+     WHERE account_id = ?
+     ORDER BY datetime(updated_at) DESC
+     LIMIT 1`,
+  )
+    .bind(brand.account_id)
+    .first<GptPreflightSnapshotRow>();
 }
 
 function normalizeGptExperimentStatus(value: unknown): string {
@@ -6732,7 +7091,7 @@ function buildGptOperatorPlaybook(
       : null,
     operating_mode: [
       "Act as a manual growth operator, not an autonomous cron agent.",
-      "Before generating, fetch the smallest useful context slices for the brand and objective.",
+      "Before generating, fetch the smallest useful context slices for the brand and objective; for repeated batches in one chat, create a preflight snapshot once and page through it.",
       "Use saved patterns and winning posts for mechanisms, not exact wording.",
       "Treat tags, scores, rules, and pillars as descriptive signals, not creative boxes.",
       "Prefer flexible hypotheses, experiments, and reviewable beliefs over permanent rules.",
@@ -6740,8 +7099,9 @@ function buildGptOperatorPlaybook(
     default_action_sequence: [
       "If the brand is unclear, call listAccounts and map the user request to opmg_deadman, manifest_mental, or vectrix.",
       "Call getOperatorPlaybook when the user asks for generation, scheduling, growth review, rule changes, or strategy.",
-      "For meaningful generation, use compact paginated list actions first and report exact counts pulled.",
+      "For meaningful generation, call createPreflightSnapshot or use compact paginated list actions first and report exact counts pulled.",
       "Do not treat pagination as permission to sample; page through all relevant data for the objective.",
+      "Reuse an existing preflight snapshot inside the same chat until new approvals, rejections, schedules, saved patterns, or archive updates make a refresh useful.",
       "Use getGenerationContext or prepareGenerationBrief only as compact summaries unless the user explicitly asks for a helper.",
       "Create more internal candidates than requested, self-reject weak drafts, then show only the best.",
       "Run checkDraftSimilarity for surviving drafts before scheduling or presenting a final batch.",
@@ -6779,6 +7139,9 @@ function buildGptOperatorPlaybook(
     ],
     useful_actions_by_job: {
       generate_posts: [
+        "createPreflightSnapshot",
+        "getPreflightSnapshotManifest",
+        "getPreflightSnapshotPage",
         "prepareGenerationBrief",
         "prepareTasteInterview",
         "getGenerationContext",
@@ -6880,6 +7243,70 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
           operationId: "listAccounts",
           summary: "List Lensically Threads brand accounts available to this GPT.",
           responses: { "200": { description: "Accounts" } },
+        },
+      },
+      "/api/gpt/preflight-snapshot": {
+        post: {
+          operationId: "createPreflightSnapshot",
+          summary: "Create and store a compact full-context preflight snapshot for one brand. This overwrites the prior active snapshot for that brand.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    objective: { type: "string", description: "Current generation, growth, scheduling, or review objective." },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Preflight snapshot manifest with section counts" } },
+        },
+        get: {
+          operationId: "getPreflightSnapshotManifest",
+          summary: "Get the active preflight snapshot manifest for a brand, or one specific snapshot id.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "snapshot_id", in: "query", required: false, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Preflight snapshot manifest" } },
+        },
+      },
+      "/api/gpt/preflight-snapshot/page": {
+        get: {
+          operationId: "getPreflightSnapshotPage",
+          summary: "Read one compact paginated section from a stored preflight snapshot.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "snapshot_id", in: "query", required: false, schema: { type: "string", description: "Optional. If omitted, reads the active snapshot for the brand." } },
+            {
+              name: "section",
+              in: "query",
+              required: true,
+              schema: {
+                type: "string",
+                enum: [
+                  "strategy_memory",
+                  "saved_patterns",
+                  "archive_recent",
+                  "archive_top",
+                  "scheduled_posts",
+                  "generation_runs",
+                  "approved_drafts",
+                  "rejected_drafts",
+                  "follower_snapshots",
+                  "posted_tagged_results",
+                ],
+              },
+            },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 100 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+          ],
+          responses: { "200": { description: "Snapshot section page" } },
         },
       },
       "/api/gpt/context": {
@@ -10446,6 +10873,109 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           }),
           { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } },
         );
+      }
+
+      if (normalizedPath === "/api/gpt/preflight-snapshot" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const manifest = await createGptPreflightSnapshot(
+          env,
+          brand,
+          normalizeGptMemoryText(payload.objective, 1000, true),
+        );
+        return new Response(JSON.stringify(manifest), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/preflight-snapshot" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const snapshotId = normalizeGptMemoryText(url.searchParams.get("snapshot_id"), 100, true);
+        const row = await getGptPreflightSnapshotRow(env, brand, snapshotId);
+        const manifest = row ? parseGptPreflightManifest(row.manifest_json) : null;
+        return new Response(JSON.stringify({
+          success: Boolean(row && manifest),
+          brand_key: brand.brand_key,
+          active_snapshot_id: row?.id ?? null,
+          manifest,
+          error: row ? null : "No preflight snapshot found for this brand",
+        }), {
+          status: row && manifest ? 200 : 404,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/preflight-snapshot/page" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const sectionKey = url.searchParams.get("section");
+        if (!isGptPreflightSectionKey(sectionKey)) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown preflight snapshot section" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const snapshotId = normalizeGptMemoryText(url.searchParams.get("snapshot_id"), 100, true);
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 100, 1, 200);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const row = await getGptPreflightSnapshotRow(env, brand, snapshotId);
+        const sections = row ? parseGptPreflightSections(row.sections_json) : null;
+        const section = sections?.[sectionKey] ?? null;
+        if (!row || !sections || !section) {
+          return new Response(JSON.stringify({
+            success: false,
+            brand_key: brand.brand_key,
+            error: "No preflight snapshot found for this brand or section",
+          }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const items = section.items.slice(offset, offset + limit);
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          snapshot_id: row.id,
+          section: sectionKey,
+          items,
+          total_count: section.total_count,
+          snapshot_returned_count: section.returned_count,
+          returned_count: items.length,
+          limit,
+          offset,
+          has_more: section.items.length > offset + items.length,
+          truncated: section.truncated,
+          created_at: row.created_at,
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
       }
 
       if (normalizedPath === "/api/gpt/context" && request.method === "GET") {

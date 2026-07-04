@@ -49,7 +49,7 @@
 - GPT Memory review separates active, archived, and all strategy memory; archived memory can be restored from the UI without deleting the original audit trail.
 - GPT Memory includes a Taste Calibration panel backed by browser-safe `/api/gpt-memory/taste-interview`; it can load objective-aware questions and save useful answers as taste memory before generation.
 - GPT brand and generation context are timezone-explicit: brand context returns local/server UTC date-time fields, scheduled reads can filter by local date/timezone, compact generation context strips heavy archive/draft fields, and GPT action `updateDesiredSlots` can update brand posting slots.
-- GPT generation preflight should use compact paginated list actions by default and report exact counts pulled; heavy aggregate helpers are compact summaries, not the full-context path.
+- GPT generation preflight should prefer `createPreflightSnapshot` for repeated generation in one GPT chat, then page through `getPreflightSnapshotPage` sections by snapshot id and report exact counts pulled; compact paginated list actions remain the fallback, and heavy aggregate helpers are compact summaries.
 - Draft approvals/rejections should include optional feedback notes when useful; those notes persist as flexible `approval_feedback` or `rejection_feedback` memory.
 - Saved Patterns supports per-pattern and selected-pattern reviews that persist as approved, rejected, cooldown, or watch/adaptation memory.
 

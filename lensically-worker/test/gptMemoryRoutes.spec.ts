@@ -22,6 +22,7 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_strategy_memory").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_generation_drafts").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_generation_runs").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS gpt_preflight_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_posts_archive").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_follower_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_accounts").run();
@@ -416,6 +417,90 @@ describe("GPT memory browser routes", () => {
       likes: expect.any(Number),
       engagement_total: expect.any(Number),
     }));
+  });
+
+  it("creates, pages, and replaces compact GPT preflight snapshots", async () => {
+    await createCompactPaginationFixture();
+    await createGenerationDraftFixture();
+    await createScheduledPostFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const authHeaders = { Authorization: "Bearer test-gpt-key", "Content-Type": "application/json" };
+
+    const createResponse = await fetchFromWorker("/api/gpt/preflight-snapshot", {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ brand_key: TEST_BRAND_KEY, objective: "generate a test batch" }),
+    });
+    expect(createResponse.status).toBe(200);
+    const created = await createResponse.json() as {
+      snapshot_id: string;
+      sections: Array<{ section: string; total_count: number; returned_count: number; truncated: boolean }>;
+    };
+    expect(created.snapshot_id).toEqual(expect.any(String));
+    expect(created.sections).toEqual(expect.arrayContaining([
+      expect.objectContaining({ section: "strategy_memory", total_count: 5, returned_count: 5, truncated: false }),
+      expect.objectContaining({ section: "saved_patterns", total_count: 5, returned_count: 5, truncated: false }),
+      expect.objectContaining({ section: "archive_recent", total_count: 5, returned_count: 5, truncated: false }),
+      expect.objectContaining({ section: "scheduled_posts", total_count: 1, returned_count: 1, truncated: false }),
+      expect.objectContaining({ section: "generation_runs", total_count: 1, returned_count: 1, truncated: false }),
+    ]));
+
+    const pageResponse = await fetchFromWorker(
+      `/api/gpt/preflight-snapshot/page?brand_key=${TEST_BRAND_KEY}&snapshot_id=${created.snapshot_id}&section=saved_patterns&limit=2&offset=0`,
+      { headers: { Authorization: "Bearer test-gpt-key" } },
+    );
+    expect(pageResponse.status).toBe(200);
+    const page = await pageResponse.json() as {
+      snapshot_id: string;
+      section: string;
+      items: Array<Record<string, unknown>>;
+      total_count: number;
+      returned_count: number;
+      has_more: boolean;
+    };
+    expect(page.snapshot_id).toBe(created.snapshot_id);
+    expect(page.section).toBe("saved_patterns");
+    expect(page.total_count).toBe(5);
+    expect(page.returned_count).toBe(2);
+    expect(page.has_more).toBe(true);
+    expect(page.items[0]).not.toHaveProperty("source_url");
+    expect(page.items[0]).not.toHaveProperty("raw_payload");
+    expect(page.items[0]).not.toHaveProperty("author_display_name");
+
+    const archivePageResponse = await fetchFromWorker(
+      `/api/gpt/preflight-snapshot/page?brand_key=${TEST_BRAND_KEY}&snapshot_id=${created.snapshot_id}&section=archive_recent&limit=1`,
+      { headers: { Authorization: "Bearer test-gpt-key" } },
+    );
+    expect(archivePageResponse.status).toBe(200);
+    const archivePage = await archivePageResponse.json() as { items: Array<Record<string, unknown>> };
+    expect(archivePage.items[0]).not.toHaveProperty("permalink");
+    expect(archivePage.items[0]).not.toHaveProperty("profile_picture_url");
+
+    const replaceResponse = await fetchFromWorker("/api/gpt/preflight-snapshot", {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ brand_key: TEST_BRAND_KEY, objective: "second snapshot" }),
+    });
+    expect(replaceResponse.status).toBe(200);
+    const replacement = await replaceResponse.json() as { snapshot_id: string };
+    expect(replacement.snapshot_id).not.toBe(created.snapshot_id);
+
+    const oldSnapshotResponse = await fetchFromWorker(
+      `/api/gpt/preflight-snapshot?brand_key=${TEST_BRAND_KEY}&snapshot_id=${created.snapshot_id}`,
+      { headers: { Authorization: "Bearer test-gpt-key" } },
+    );
+    expect(oldSnapshotResponse.status).toBe(404);
+
+    const activeManifestResponse = await fetchFromWorker(
+      `/api/gpt/preflight-snapshot?brand_key=${TEST_BRAND_KEY}`,
+      { headers: { Authorization: "Bearer test-gpt-key" } },
+    );
+    expect(activeManifestResponse.status).toBe(200);
+    await expect(activeManifestResponse.json()).resolves.toMatchObject({
+      success: true,
+      active_snapshot_id: replacement.snapshot_id,
+      manifest: expect.objectContaining({ snapshot_id: replacement.snapshot_id }),
+    });
   });
 
   it("stores owner taste feedback for the selected configured account", async () => {
