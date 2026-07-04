@@ -51,20 +51,23 @@
 Unless the user says `talk only` or explicitly opts out, implementation tasks default to:
 
 1. make the code change
-2. run the relevant checks yourself
-3. commit the task files
-4. push to `origin`
-5. deploy the affected runtime
+2. batch related edits into a coherent work set before expensive checks
+3. run focused checks during development only when they unblock debugging or reduce meaningful risk
+4. run the relevant final checks yourself once the coherent work set is complete
+5. commit the task files
+6. push to `origin`
+7. deploy the affected runtime once after final verification
 
 ## Verification And Deploys
 
-- If `lensically-web/**` changed, run frontend checks and deploy the frontend if runtime code changed.
-- If `lensically-worker/**` changed, run backend checks and deploy the worker if runtime code changed.
+- Prefer one final verification/deploy pass per coherent work set. Avoid repeated full tests, frontend builds, Chrome schema refreshes, and Cloudflare deploys inside the same larger task unless a focused check or live deploy is needed to diagnose a blocker.
+- If `lensically-web/**` changed, run frontend checks and deploy the frontend once at the end if runtime code changed.
+- If `lensically-worker/**` changed, run backend checks and deploy the worker once at the end if runtime code changed.
 - Local agent work is multi-account by default. Do not add brand-specific agent runtimes unless the user explicitly asks for a one-off experiment.
 - For browser tasks, use both browser surfaces when available: use the Chrome extension browser for the user's real logged-in/live tab state, and use the Codex in-app browser for isolated verification, local app checks, and clean repro when relevant.
 - If `lensically-worker/src/index.ts` changed, include the backend auth/API smoke coverage used by this repo.
 - Do not tell the user to run checks, push, or deploy. The agent does that work.
-- The usage meter is for learning/planning, not a stop sign. If runtime code changed, still shoot for deployment after relevant checks even when usage is low. Only skip/defer deployment when credentials are unavailable, checks fail, the deploy command cannot run, or the user explicitly opts out.
+- The usage meter is for learning/planning, not a stop sign. If runtime code changed, still shoot for deployment after final relevant checks. Only skip/defer deployment when credentials are unavailable, checks fail, the deploy command cannot run, or the user explicitly opts out.
 - In the final handoff, state what you ran and what you deployed.
 
 ## Response Rules
