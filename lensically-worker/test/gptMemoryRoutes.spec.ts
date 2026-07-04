@@ -699,6 +699,86 @@ describe("GPT memory browser routes", () => {
         }),
       }),
     });
+
+    const defaultListResponse = await fetchFromWorker(`/api/gpt/strategy-memory?brand_key=${TEST_BRAND_KEY}`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+    expect(defaultListResponse.status).toBe(200);
+    const defaultList = await defaultListResponse.json() as { memory: Array<{ id: number }>; total_count: number; archive_filter: string };
+    expect(defaultList.archive_filter).toBe("active");
+    expect(defaultList.memory.find((item) => item.id === created.memory.id)).toBeUndefined();
+    expect(defaultList.total_count).toBe(0);
+
+    const archivedListResponse = await fetchFromWorker(`/api/gpt/strategy-memory?brand_key=${TEST_BRAND_KEY}&archive_filter=archived`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+    expect(archivedListResponse.status).toBe(200);
+    await expect(archivedListResponse.json()).resolves.toMatchObject({
+      archive_filter: "archived",
+      total_count: 1,
+      memory: [
+        expect.objectContaining({ id: created.memory.id }),
+      ],
+    });
+  });
+
+  it("reviews and applies GPT memory hygiene for duplicate operating rules", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const authHeaders = {
+      "Content-Type": "application/json",
+      Authorization: "Bearer test-gpt-key",
+    };
+
+    for (const [title, body] of [
+      ["Full context via pagination", "Before generation, use paginated full context pulls and avoid heavy aggregate helpers."],
+      ["Use paginated preflight", "Use compact paginated preflight context because heavy aggregate helpers can cause ResponseTooLarge."],
+      ["No heavy aggregate helpers", "Full context should come through compact pagination, not one giant aggregate helper."],
+    ]) {
+      await fetchFromWorker("/api/gpt/strategy-memory", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          brand_key: TEST_BRAND_KEY,
+          kind: "approved_rule",
+          title,
+          body,
+        }),
+      });
+    }
+
+    const reviewResponse = await fetchFromWorker(`/api/gpt/memory-hygiene-review?brand_key=${TEST_BRAND_KEY}`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+    expect(reviewResponse.status).toBe(200);
+    const review = await reviewResponse.json() as {
+      duplicate_groups: Array<{ archive_memory_ids: number[]; keep_memory_id: number }>;
+    };
+    expect(review.duplicate_groups.length).toBeGreaterThan(0);
+    const archiveIds = review.duplicate_groups[0].archive_memory_ids;
+    expect(archiveIds.length).toBeGreaterThan(0);
+
+    const applyResponse = await fetchFromWorker("/api/gpt/memory-hygiene/apply", {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        archive_memory_ids: archiveIds,
+        archive_reason: "Duplicate full-context operating rule.",
+        replacement_rule: {
+          kind: "approved_rule",
+          title: "Full context via compact paginated pulls; no heavy aggregate helpers.",
+          body: "Full context should be collected through compact paginated pulls. Do not rely on heavy aggregate helpers for generation.",
+        },
+      }),
+    });
+    expect(applyResponse.status).toBe(200);
+    await expect(applyResponse.json()).resolves.toMatchObject({
+      success: true,
+      archived_count: archiveIds.length,
+      replacement_memory: expect.objectContaining({
+        title: "Full context via compact paginated pulls; no heavy aggregate helpers.",
+      }),
+    });
   });
 
   it("stores saved pattern reviews as pattern memory", async () => {
@@ -1186,6 +1266,50 @@ describe("GPT memory browser routes", () => {
     });
     expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("profile_picture_url");
     expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("permalink");
+  });
+
+  it("returns recent GPT post performance windows for learning before generation", async () => {
+    await createPostedTaggedPostFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker(`/api/gpt/recent-performance?brand_key=${TEST_BRAND_KEY}&hours=24&days=7`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      windows: expect.objectContaining({
+        last_days: expect.objectContaining({
+          label: "last_7_days",
+          posts_count: 1,
+          posts_with_metrics: 1,
+          winners: [
+            expect.objectContaining({
+              scheduled_post_id: 888,
+              published_post_id: "post-888",
+              strategy: expect.objectContaining({
+                pillar: "offer",
+                hook_style: "direct",
+              }),
+              post: expect.objectContaining({
+                likes: 90,
+                engagement_total: 113,
+              }),
+            }),
+          ],
+          tag_performance: expect.objectContaining({
+            pillars: [
+              expect.objectContaining({
+                key: "offer",
+                median_engagement_total: 113,
+              }),
+            ],
+          }),
+        }),
+      }),
+    });
   });
 
   it("hides rule proposals that have duplicate approved rules", async () => {

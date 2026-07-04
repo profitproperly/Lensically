@@ -243,6 +243,7 @@ const GPT_PREFLIGHT_SECTION_KEYS = [
   "rejected_drafts",
   "follower_snapshots",
   "posted_tagged_results",
+  "taste_gate",
 ] as const;
 
 type GptPreflightSectionKey = typeof GPT_PREFLIGHT_SECTION_KEYS[number];
@@ -4152,12 +4153,33 @@ function getGptMemoryMetadataRecord(memory: ReturnType<typeof serializeGptStrate
     : {};
 }
 
+type GptStrategyMemoryArchiveFilter = "active" | "archived" | "all";
+
+function normalizeGptStrategyMemoryArchiveFilter(value: unknown): GptStrategyMemoryArchiveFilter {
+  if (typeof value !== "string") {
+    return "active";
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "archived" || normalized === "all" ? normalized : "active";
+}
+
+function buildGptStrategyMemoryArchiveClause(filter: GptStrategyMemoryArchiveFilter): string {
+  if (filter === "all") {
+    return "";
+  }
+  if (filter === "archived") {
+    return "AND COALESCE(json_extract(metadata_json, '$.archived'), 0) = 1";
+  }
+  return "AND COALESCE(json_extract(metadata_json, '$.archived'), 0) != 1";
+}
+
 async function listGptStrategyMemory(
   env: Env,
   accountId: string,
   kinds: string[],
   limit: number,
   offset = 0,
+  archiveFilter: GptStrategyMemoryArchiveFilter = "active",
 ): Promise<ReturnType<typeof serializeGptStrategyMemoryRow>[]> {
   await ensureGptStrategyMemoryTable(env);
 
@@ -4169,11 +4191,13 @@ async function listGptStrategyMemory(
   const kindClause = normalizedKinds.length
     ? `AND kind IN (${normalizedKinds.map(() => "?").join(", ")})`
     : "";
+  const archiveClause = buildGptStrategyMemoryArchiveClause(archiveFilter);
   const rows = await env.DB.prepare(
     `SELECT id, account_id, threads_user_id, kind, title, body, metadata_json, created_at, updated_at
      FROM gpt_strategy_memory
      WHERE account_id = ?
        ${kindClause}
+       ${archiveClause}
      ORDER BY datetime(updated_at) DESC, id DESC
      LIMIT ? OFFSET ?`,
   )
@@ -4183,7 +4207,12 @@ async function listGptStrategyMemory(
   return (rows.results ?? []).map(serializeGptStrategyMemoryRow);
 }
 
-async function countGptStrategyMemory(env: Env, accountId: string, kinds: string[]): Promise<number> {
+async function countGptStrategyMemory(
+  env: Env,
+  accountId: string,
+  kinds: string[],
+  archiveFilter: GptStrategyMemoryArchiveFilter = "active",
+): Promise<number> {
   await ensureGptStrategyMemoryTable(env);
 
   const normalizedKinds = kinds
@@ -4192,11 +4221,13 @@ async function countGptStrategyMemory(env: Env, accountId: string, kinds: string
   const kindClause = normalizedKinds.length
     ? `AND kind IN (${normalizedKinds.map(() => "?").join(", ")})`
     : "";
+  const archiveClause = buildGptStrategyMemoryArchiveClause(archiveFilter);
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS total
      FROM gpt_strategy_memory
      WHERE account_id = ?
-       ${kindClause}`,
+       ${kindClause}
+       ${archiveClause}`,
   )
     .bind(accountId, ...normalizedKinds)
     .first<{ total: number }>();
@@ -5445,6 +5476,7 @@ async function buildGptPreflightSnapshotSections(
     rejected_drafts: buildGptPreflightSection(rejectedDrafts.items, rejectedDraftsTotal, rejectedDrafts.truncated),
     follower_snapshots: buildGptPreflightSection(followerSnapshots.items, followerSnapshotsTotal, followerSnapshots.truncated),
     posted_tagged_results: buildGptPreflightSection(postedTaggedResults.items, postedTaggedResults.items.length, postedTaggedResults.truncated),
+    taste_gate: buildGptPreflightSection([buildGptTasteGate(strategyMemory.items as ReturnType<typeof serializeGptStrategyMemoryRow>[])], 1, false),
   };
 }
 
@@ -5641,6 +5673,307 @@ function buildGptExperimentSummary(memories: ReturnType<typeof serializeGptStrat
       "Decide explicitly: exploit, explore, stop, retest, cooldown, or mark inconclusive.",
       "Prefer sample-size caution when post count, follower movement, or feedback evidence is thin.",
       "Retest old experiments when the brand, market, audience, or owner taste changes.",
+    ],
+  };
+}
+
+function buildGptTasteGate(memories: ReturnType<typeof serializeGptStrategyMemoryRow>[]): Record<string, unknown> {
+  const byKind = new Map<string, ReturnType<typeof serializeGptStrategyMemoryRow>[]>();
+  for (const memory of memories) {
+    const group = byKind.get(memory.kind) ?? [];
+    group.push(memory);
+    byKind.set(memory.kind, group);
+  }
+  const compact = (kinds: string[], limit: number) => kinds
+    .flatMap((kind) => byKind.get(kind) ?? [])
+    .sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at) || right.id - left.id)
+    .slice(0, limit)
+    .map((memory) => ({
+      id: memory.id,
+      kind: memory.kind,
+      title: memory.title,
+      body: memory.body,
+      updated_at: memory.updated_at,
+    }));
+
+  const positiveAnchors = compact([
+    "approval_feedback",
+    "approved_pattern",
+    "taste_profile",
+    "brand_voice_note",
+  ], 18);
+  const rejectionFilters = compact([
+    "rejection_feedback",
+    "rejected_pattern",
+    "banned_phrase",
+    "cooldown",
+  ], 24);
+  const workingRules = compact([
+    "approved_rule",
+    "current_belief",
+    "rule_review",
+  ], 20);
+
+  return {
+    positive_anchors: positiveAnchors,
+    rejection_filters: rejectionFilters,
+    working_rules: workingRules,
+    pre_show_gate: [
+      "Before showing drafts, compare each survivor against rejection_filters and banned/cooldown patterns.",
+      "Use saved-pattern logic aggressively only when it improves owner taste fit and does not copy surface wording.",
+      "Keep flexible creative direction: the tags describe the post after writing; they do not box the post in before writing.",
+      "Self-reject drafts that feel generic, try-hard, over-explained, corny, AI-written, or like a weaker cousin of an approved/saved pattern.",
+      "If recent positive anchors and rejection filters conflict, ask one narrow taste question before generating instead of guessing.",
+    ],
+    evidence_counts: {
+      positive_anchors: positiveAnchors.length,
+      rejection_filters: rejectionFilters.length,
+      working_rules: workingRules.length,
+    },
+  };
+}
+
+function normalizeGptMemorySimilarityText(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenizeGptMemory(value: string): Set<string> {
+  const stopWords = new Set([
+    "the", "and", "for", "with", "that", "this", "from", "into", "before", "after",
+    "use", "uses", "using", "rule", "rules", "memory", "context", "post", "posts",
+    "gpt", "brand", "generation", "generate", "draft", "drafts",
+  ]);
+  return new Set(
+    normalizeGptMemorySimilarityText(value)
+      .split(" ")
+      .filter((token) => token.length >= 4 && !stopWords.has(token)),
+  );
+}
+
+function calculateTokenJaccard(left: Set<string>, right: Set<string>): number {
+  if (!left.size || !right.size) {
+    return 0;
+  }
+  let intersection = 0;
+  for (const token of left) {
+    if (right.has(token)) {
+      intersection += 1;
+    }
+  }
+  return intersection / (left.size + right.size - intersection);
+}
+
+function buildGptMemoryHygieneReview(
+  brand: GptResolvedBrand,
+  memory: ReturnType<typeof serializeGptStrategyMemoryRow>[],
+): Record<string, unknown> {
+  const candidates = memory.map((item) => ({
+    item,
+    normalized_title: normalizeGptMemorySimilarityText(item.title),
+    tokens: tokenizeGptMemory(`${item.title ?? ""} ${item.body}`),
+  }));
+  const duplicateGroups: Array<Record<string, unknown>> = [];
+  const usedIds = new Set<number>();
+
+  const themedGroups = [
+    {
+      key: "full_context_compact_pagination",
+      label: "Full context via compact paginated pulls; no heavy aggregate helpers.",
+      terms: ["pagination", "paginated", "preflight", "full context", "aggregate", "responsetoolarge", "response too large"],
+    },
+    {
+      key: "candidate_pool_quality_gate",
+      label: "Internal candidate pool and self-rejection quality gate.",
+      terms: ["candidate", "self reject", "self rejection", "private pool", "shown drafts", "approval ratio"],
+    },
+  ];
+
+  for (const theme of themedGroups) {
+    const matches = memory.filter((item) => {
+      const haystack = normalizeGptMemorySimilarityText(`${item.title ?? ""} ${item.body}`);
+      return theme.terms.filter((term) => haystack.includes(normalizeGptMemorySimilarityText(term))).length >= 2;
+    });
+    if (matches.length < 2) {
+      continue;
+    }
+    const sorted = [...matches].sort((left, right) => {
+      const leftScore = (left.kind === "approved_rule" ? 2 : 0) + (left.kind === "current_belief" ? 1 : 0);
+      const rightScore = (right.kind === "approved_rule" ? 2 : 0) + (right.kind === "current_belief" ? 1 : 0);
+      return rightScore - leftScore || Date.parse(right.updated_at) - Date.parse(left.updated_at) || right.id - left.id;
+    });
+    const keep = sorted[0];
+    const archive = sorted.slice(1);
+    archive.forEach((item) => usedIds.add(item.id));
+    duplicateGroups.push({
+      group_key: theme.key,
+      reason: `Multiple active memories cover ${theme.label}`,
+      keep_memory_id: keep.id,
+      archive_memory_ids: archive.map((item) => item.id),
+      suggested_master_rule: {
+        title: theme.label,
+        body: theme.label,
+      },
+      items: sorted.map((item) => serializeGptStrategyMemoryCompact(item, true)),
+    });
+  }
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    const left = candidates[index];
+    if (usedIds.has(left.item.id)) {
+      continue;
+    }
+    const matches = [left.item];
+    for (let compareIndex = index + 1; compareIndex < candidates.length; compareIndex += 1) {
+      const right = candidates[compareIndex];
+      if (usedIds.has(right.item.id) || left.item.kind !== right.item.kind) {
+        continue;
+      }
+      const exactTitleMatch = Boolean(left.normalized_title && left.normalized_title === right.normalized_title);
+      const similarity = calculateTokenJaccard(left.tokens, right.tokens);
+      if (exactTitleMatch || similarity >= 0.58) {
+        matches.push(right.item);
+      }
+    }
+    if (matches.length < 2) {
+      continue;
+    }
+    const sorted = [...matches].sort((leftItem, rightItem) => Date.parse(rightItem.updated_at) - Date.parse(leftItem.updated_at) || rightItem.id - leftItem.id);
+    const keep = sorted[0];
+    const archive = sorted.slice(1);
+    archive.forEach((item) => usedIds.add(item.id));
+    duplicateGroups.push({
+      group_key: `near_duplicate_${keep.id}`,
+      reason: "Near-duplicate active memory records are competing for attention.",
+      keep_memory_id: keep.id,
+      archive_memory_ids: archive.map((item) => item.id),
+      items: sorted.map((item) => serializeGptStrategyMemoryCompact(item, true)),
+    });
+  }
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    active_memory_count: memory.length,
+    duplicate_groups: duplicateGroups,
+    recommended_actions_count: duplicateGroups.reduce((sum, group) => sum + (Array.isArray(group.archive_memory_ids) ? group.archive_memory_ids.length : 0), 0),
+    guidance: [
+      "Archive stale duplicates instead of deleting them.",
+      "Keep one active master rule per operating behavior so taste notes and rejection evidence stay visible.",
+      "If two memories conflict, create a rule_review or current_belief instead of keeping both as equal active instructions.",
+    ],
+  };
+}
+
+function summarizeGptRecentPerformanceWindow(
+  taggedPosts: GptTaggedPostedPost[],
+  sinceMs: number,
+  label: string,
+): Record<string, unknown> {
+  const posts = taggedPosts.filter((post) => {
+    const timestamp = Date.parse(post.published_at ?? post.scheduled_time_utc);
+    return Number.isFinite(timestamp) && timestamp >= sinceMs;
+  });
+  const postsWithMetrics = posts.filter((post) => post.post !== null);
+  const engagementTotals = postsWithMetrics.map((post) => post.post?.engagement_total ?? 0);
+  const likes = postsWithMetrics.map((post) => post.post?.likes ?? 0);
+  const views = postsWithMetrics.map((post) => post.post?.views ?? 0);
+  const winners = [...postsWithMetrics]
+    .sort((left, right) => (right.post?.engagement_total ?? 0) - (left.post?.engagement_total ?? 0) || (right.post?.views ?? 0) - (left.post?.views ?? 0))
+    .slice(0, 8)
+    .map(serializePostedTaggedPostCompact);
+  const weak = [...postsWithMetrics]
+    .sort((left, right) => (left.post?.engagement_total ?? 0) - (right.post?.engagement_total ?? 0) || (left.post?.views ?? 0) - (right.post?.views ?? 0))
+    .slice(0, 8)
+    .map(serializePostedTaggedPostCompact);
+
+  return {
+    label,
+    since_utc: new Date(sinceMs).toISOString(),
+    posts_count: posts.length,
+    posts_with_metrics: postsWithMetrics.length,
+    metrics: {
+      median_engagement_total: Number(calculateMedian(engagementTotals).toFixed(2)),
+      median_likes: Number(calculateMedian(likes).toFixed(2)),
+      median_views: Number(calculateMedian(views).toFixed(2)),
+      total_engagement: engagementTotals.reduce((sum, value) => sum + value, 0),
+      total_likes: likes.reduce((sum, value) => sum + value, 0),
+      total_views: views.reduce((sum, value) => sum + value, 0),
+    },
+    winners,
+    weak,
+    tag_performance: {
+      pillars: summarizeTaggedPostPerformance(posts, "pillar"),
+      hook_styles: summarizeTaggedPostPerformance(posts, "hook_style"),
+      formats: summarizeTaggedPostPerformance(posts, "format"),
+      intents: summarizeTaggedPostPerformance(posts, "intent"),
+      experiments: summarizeTaggedPostPerformance(posts, "experiment"),
+      novelty_levels: summarizeTaggedPostPerformance(posts, "novelty_level"),
+    },
+  };
+}
+
+async function buildGptRecentPostPerformance(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: { hours: number; days: number },
+): Promise<Record<string, unknown>> {
+  const hours = Math.min(Math.max(Math.trunc(input.hours), 1), 168);
+  const days = Math.min(Math.max(Math.trunc(input.days), 1), 30);
+  const nowMs = Date.now();
+  const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, Math.max(days + 2, 7));
+  const dailyGrowth = followerSnapshots.map((snapshot, index) => {
+    const previous = index > 0 ? followerSnapshots[index - 1] : null;
+    const netChange = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
+      ? snapshot.followers_count - snapshot.baseline_followers_count
+      : (previous ? snapshot.followers_count - previous.followers_count : 0);
+    return {
+      date: snapshot.snapshot_date,
+      latest_followers: snapshot.followers_count,
+      net_change: netChange,
+      captured_at: snapshot.captured_at,
+    };
+  });
+  const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day]));
+  const taggedPosts = await listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 250);
+  const taggedPostsWithGrowth = taggedPosts.map((taggedPost) => {
+    const localDate = getPostLocalDate({ timestamp: taggedPost.published_at ?? taggedPost.scheduled_time_utc } as Pick<CachedThreadsPost, "timestamp">, THREADS_INSIGHTS_TIME_ZONE);
+    return {
+      ...taggedPost,
+      local_date: localDate,
+      follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
+    };
+  });
+
+  return {
+    success: true,
+    brand_key: brand.brand_key,
+    account: {
+      account_id: brand.account_id,
+      label: brand.profile.label,
+      username: brand.profile.username,
+      threads_user_id: brand.profile.threads_user_id,
+    },
+    evaluated_at_utc: new Date(nowMs).toISOString(),
+    windows: {
+      last_hours: summarizeGptRecentPerformanceWindow(taggedPostsWithGrowth, nowMs - hours * 60 * 60 * 1000, `last_${hours}_hours`),
+      last_days: summarizeGptRecentPerformanceWindow(taggedPostsWithGrowth, nowMs - days * 24 * 60 * 60 * 1000, `last_${days}_days`),
+    },
+    follower_growth: {
+      timezone: THREADS_INSIGHTS_TIME_ZONE,
+      daily: dailyGrowth,
+      net_change_period: dailyGrowth.length >= 2
+        ? dailyGrowth[dailyGrowth.length - 1].latest_followers - dailyGrowth[0].latest_followers
+        : dailyGrowth.reduce((sum, day) => sum + day.net_change, 0),
+    },
+    guidance: [
+      "Use last-hours results as freshness, not final proof.",
+      "Use the last-days window for stronger directional learning.",
+      "Compare winners and weak posts by tag, text mechanism, and follower-day movement before proposing rule changes.",
+      "Save durable learnings as rule_proposal, experiment_result, approval_feedback, rejection_feedback, or current_belief only when the evidence supports it.",
     ],
   };
 }
@@ -6811,6 +7144,7 @@ async function buildGptGenerationContext(
       },
     },
     taste_and_beliefs: {
+      taste_gate: buildGptTasteGate(strategyMemory),
       all_memory: strategyMemory,
       by_kind: memoryByKind,
       rule_review_summary: buildGptRuleReviewSummary(strategyMemory),
@@ -7102,6 +7436,8 @@ function buildGptOperatorPlaybook(
       "For meaningful generation, call createPreflightSnapshot or use compact paginated list actions first and report exact counts pulled.",
       "Do not treat pagination as permission to sample; page through all relevant data for the objective.",
       "Reuse an existing preflight snapshot inside the same chat until new approvals, rejections, schedules, saved patterns, or archive updates make a refresh useful.",
+      "Use the taste_gate from context or the preflight snapshot as a pre-show filter; do not let archived/stale memory override active owner taste.",
+      "Call getRecentPostPerformance before serious generation or review when posts have gone out recently, especially after the last 24 hours or week.",
       "Use getGenerationContext or prepareGenerationBrief only as compact summaries unless the user explicitly asks for a helper.",
       "Create more internal candidates than requested, self-reject weak drafts, then show only the best.",
       "Run checkDraftSimilarity for surviving drafts before scheduling or presenting a final batch.",
@@ -7122,6 +7458,7 @@ function buildGptOperatorPlaybook(
       "Use saveRuleReview to keep, revise, cooldown, retire, retest, promote, or challenge beliefs as data changes.",
       "Use saveExperiment and later experiment_result to decide exploit, explore, stop, retest, cooldown, or inconclusive.",
       "Use savePatternAdaptation when a saved pattern or archive mechanism is adapted, rejected, approved, cooled down, or needs retesting.",
+      "Use prepareMemoryHygieneReview and applyMemoryHygieneActions when duplicate or stale memory is crowding the current taste signal.",
     ],
     growth_review_rules: [
       "Separate engagement winners from follower-growth winners.",
@@ -7142,6 +7479,7 @@ function buildGptOperatorPlaybook(
         "createPreflightSnapshot",
         "getPreflightSnapshotManifest",
         "getPreflightSnapshotPage",
+        "getRecentPostPerformance",
         "prepareGenerationBrief",
         "prepareTasteInterview",
         "getGenerationContext",
@@ -7158,9 +7496,12 @@ function buildGptOperatorPlaybook(
       ],
       learn_from_results: [
         "getGrowthContext",
+        "getRecentPostPerformance",
         "prepareGrowthReview",
         "prepareRuleSuggestions",
         "getNoveltyFatigueReport",
+        "prepareMemoryHygieneReview",
+        "applyMemoryHygieneActions",
         "saveRuleReview",
         "saveExperiment",
       ],
@@ -7300,6 +7641,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                   "rejected_drafts",
                   "follower_snapshots",
                   "posted_tagged_results",
+                  "taste_gate",
                 ],
               },
             },
@@ -7474,6 +7816,18 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "Optional review focus, such as weekly review, follower growth, engagement floor, or novelty fatigue." } },
           ],
           responses: { "200": { description: "Growth review" } },
+        },
+      },
+      "/api/gpt/recent-performance": {
+        get: {
+          operationId: "getRecentPostPerformance",
+          summary: "Evaluate GPT-tagged posts that already went out in recent windows, including last hours, last days, winners, weak posts, tag performance, and follower-day movement.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "hours", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 168, default: 24 } },
+            { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 30, default: 7 } },
+          ],
+          responses: { "200": { description: "Recent post performance review" } },
         },
       },
       "/api/gpt/rule-suggestions": {
@@ -7926,6 +8280,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "kind", in: "query", required: false, schema: { type: "string" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
             { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "archive_filter", in: "query", required: false, schema: { type: "string", enum: ["active", "archived", "all"], default: "active" } },
             { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Strategy memory" } },
@@ -7986,6 +8341,50 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             },
           },
           responses: { "200": { description: "Updated memory" } },
+        },
+      },
+      "/api/gpt/memory-hygiene-review": {
+        get: {
+          operationId: "prepareMemoryHygieneReview",
+          summary: "Review active GPT strategy memory for duplicate, stale, or competing operating rules so the GPT can keep one clear active rule and archive noisy duplicates.",
+          parameters: [
+            { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 160 } },
+          ],
+          responses: { "200": { description: "Memory hygiene review" } },
+        },
+      },
+      "/api/gpt/memory-hygiene/apply": {
+        post: {
+          operationId: "applyMemoryHygieneActions",
+          summary: "Archive stale duplicate memory records and optionally save one replacement master rule. This preserves audit history; it does not delete memory.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["brand_key", "archive_memory_ids"],
+                  properties: {
+                    brand_key: { "$ref": "#/components/schemas/BrandKey" },
+                    archive_memory_ids: { type: "array", items: { type: "integer" }, minItems: 1, maxItems: 50 },
+                    archive_reason: { type: "string" },
+                    replacement_rule: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        kind: { type: "string", enum: Array.from(GPT_STRATEGY_MEMORY_KINDS), default: "approved_rule" },
+                        title: { type: "string" },
+                        body: { type: "string" },
+                        metadata: { type: "object", additionalProperties: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Applied memory hygiene actions" } },
         },
       },
     },
@@ -11459,6 +11858,24 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
       }
 
+      if (normalizedPath === "/api/gpt/recent-performance" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const performance = await buildGptRecentPostPerformance(env, brand, {
+          hours: parseBoundedIntegerParam(url.searchParams.get("hours"), 24, 1, 168),
+          days: parseBoundedIntegerParam(url.searchParams.get("days"), 7, 1, 30),
+        });
+        return new Response(JSON.stringify(performance), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
       if (normalizedPath === "/api/gpt/rule-suggestions" && request.method === "GET") {
         const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
         if (!brand) {
@@ -12371,10 +12788,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const rawKinds = url.searchParams.getAll("kind").flatMap((value) => value.split(","));
         const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 60, 1, 100);
         const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const archiveFilter = normalizeGptStrategyMemoryArchiveFilter(url.searchParams.get("archive_filter"));
         const includeDetail = url.searchParams.get("include_detail") === "true";
         const [memory, totalCount] = await Promise.all([
-          listGptStrategyMemory(env, brand.account_id, rawKinds, limit, offset),
-          countGptStrategyMemory(env, brand.account_id, rawKinds),
+          listGptStrategyMemory(env, brand.account_id, rawKinds, limit, offset, archiveFilter),
+          countGptStrategyMemory(env, brand.account_id, rawKinds, archiveFilter),
         ]);
         return new Response(JSON.stringify({
           success: true,
@@ -12384,6 +12802,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           returned_count: memory.length,
           limit,
           offset,
+          archive_filter: archiveFilter,
           has_more: totalCount > offset + memory.length,
         }), {
           status: 200,
@@ -12488,6 +12907,94 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           memory,
         }), {
           status: memory ? 200 : 404,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/memory-hygiene-review" && request.method === "GET") {
+        const brand = await resolveGptBrand(env, url.searchParams.get("brand_key"));
+        if (!brand) {
+          return new Response(JSON.stringify({ success: false, error: "Unknown or unavailable brand_key" }), {
+            status: 404,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 160, 1, 200);
+        const memory = await listGptStrategyMemory(env, brand.account_id, [], limit, 0, "active");
+        return new Response(JSON.stringify(buildGptMemoryHygieneReview(brand, memory)), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
+      }
+
+      if (normalizedPath === "/api/gpt/memory-hygiene/apply" && request.method === "POST") {
+        let payload: Record<string, unknown>;
+        try {
+          payload = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const brand = await resolveGptBrand(env, payload.brand_key);
+        const memoryIds = normalizeGptNumberArray(payload.archive_memory_ids, 50);
+        if (!brand || !memoryIds.length) {
+          return new Response(JSON.stringify({ success: false, error: "brand_key and archive_memory_ids are required" }), {
+            status: 400,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const archiveReason = normalizeGptMemoryText(payload.archive_reason, 1000, true)
+          ?? "Archived by GPT memory hygiene because this item duplicated or competed with better active memory.";
+        const archivedMemory = [];
+        for (const memoryId of memoryIds) {
+          const memory = await updateGptStrategyMemory(env, {
+            memoryId,
+            accountId: brand.account_id,
+            metadata: {
+              archived: true,
+              archived_at: new Date().toISOString(),
+              archive_reason: archiveReason,
+              last_memory_update_source: "gpt_memory_hygiene_apply",
+            },
+          });
+          if (memory) {
+            archivedMemory.push(memory);
+          }
+        }
+
+        const replacementRule = payload.replacement_rule && typeof payload.replacement_rule === "object" && !Array.isArray(payload.replacement_rule)
+          ? payload.replacement_rule as Record<string, unknown>
+          : null;
+        const replacementKind = replacementRule ? normalizeGptStrategyMemoryKind(replacementRule.kind ?? "approved_rule") : null;
+        const replacementBody = replacementRule ? normalizeGptMemoryText(replacementRule.body, 10000, true) : null;
+        const replacement = replacementRule && replacementKind && replacementBody
+          ? await saveGptStrategyMemory(env, {
+              accountId: brand.account_id,
+              threadsUserId: brand.profile.threads_user_id,
+              kind: replacementKind,
+              title: normalizeGptMemoryText(replacementRule.title, 200, true) ?? "Memory hygiene master rule",
+              body: replacementBody,
+              metadataJson: normalizeGptMemoryMetadata({
+                source: "gpt_memory_hygiene_apply",
+                archived_memory_ids: memoryIds,
+                flexible_note: "This replaces noisy duplicate memory with one active working rule. It can be challenged by future data.",
+                ...(replacementRule.metadata && typeof replacementRule.metadata === "object" && !Array.isArray(replacementRule.metadata)
+                  ? replacementRule.metadata
+                  : {}),
+              }),
+            })
+          : null;
+
+        return new Response(JSON.stringify({
+          success: true,
+          brand_key: brand.brand_key,
+          archived_count: archivedMemory.length,
+          archived_memory: archivedMemory.map((item) => serializeGptStrategyMemoryCompact(item, true)),
+          replacement_memory: replacement,
+        }), {
+          status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }
