@@ -48,6 +48,7 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Browser/Verification Notes
 
+- For all Lensically Chrome/browser automation, capture reusable roadblocks immediately in this file: broken browser APIs, stale DOM ids/selectors, internal scroll containers, login/editor quirks, import/save flows, and the exact working workaround. Do this during the same turn once verified, not only at final handoff.
 - If Browser tooling is unavailable, local production build plus route HTTP checks are acceptable fallback verification, but state the limitation.
 - The bundled Playwright package may be incomplete on this Windows box (`playwright-core` missing). Do not waste time repeatedly trying it without checking the dependency path first.
 - Lensically frontend profile/avatar images intentionally use some plain `<img>` tags for external Threads CDN URLs. Treat `@next/next/no-img-element` profile-picture warnings as known non-blocking noise unless they become a failing error or the task specifically targets image optimization.
