@@ -7394,23 +7394,23 @@ async function buildGptGenerationContext(
   },
 ): Promise<Record<string, unknown>> {
   const compact = input.compact === true;
-  const recentLimit = Math.min(Math.max(Math.trunc(input.recentLimit), 1), compact ? 8 : 50);
+  const recentLimit = Math.min(Math.max(Math.trunc(input.recentLimit), 1), compact ? 3 : 50);
   const recentOffset = Math.max(Math.trunc(input.recentOffset), 0);
-  const topLimit = Math.min(Math.max(Math.trunc(input.topLimit), 1), compact ? 8 : 50);
+  const topLimit = Math.min(Math.max(Math.trunc(input.topLimit), 1), compact ? 3 : 50);
   const topOffset = Math.max(Math.trunc(input.topOffset), 0);
-  const weakLimit = Math.min(Math.max(Math.trunc(input.weakLimit), 1), compact ? 5 : 25);
+  const weakLimit = Math.min(Math.max(Math.trunc(input.weakLimit), 1), compact ? 2 : 25);
   const weakOffset = Math.max(Math.trunc(input.weakOffset), 0);
-  const savedPatternsLimit = Math.min(Math.max(Math.trunc(input.savedPatternsLimit), 0), compact ? 8 : 50);
+  const savedPatternsLimit = Math.min(Math.max(Math.trunc(input.savedPatternsLimit), 0), compact ? 3 : 50);
   const savedPatternsOffset = Math.max(Math.trunc(input.savedPatternsOffset), 0);
-  const memoryLimit = Math.min(Math.max(Math.trunc(input.memoryLimit), 1), compact ? 20 : 100);
+  const memoryLimit = Math.min(Math.max(Math.trunc(input.memoryLimit), 1), compact ? 10 : 100);
   const memoryOffset = Math.max(Math.trunc(input.memoryOffset), 0);
-  const runsLimit = Math.min(Math.max(Math.trunc(input.runsLimit), 1), compact ? 5 : 15);
+  const runsLimit = Math.min(Math.max(Math.trunc(input.runsLimit), 1), compact ? 2 : 15);
   const runsOffset = Math.max(Math.trunc(input.runsOffset), 0);
-  const approvedDraftsLimit = Math.min(Math.max(Math.trunc(input.approvedDraftsLimit), 1), compact ? 10 : 50);
+  const approvedDraftsLimit = Math.min(Math.max(Math.trunc(input.approvedDraftsLimit), 1), compact ? 3 : 50);
   const approvedDraftsOffset = Math.max(Math.trunc(input.approvedDraftsOffset), 0);
-  const rejectedDraftsLimit = Math.min(Math.max(Math.trunc(input.rejectedDraftsLimit), 1), compact ? 10 : 50);
+  const rejectedDraftsLimit = Math.min(Math.max(Math.trunc(input.rejectedDraftsLimit), 1), compact ? 3 : 50);
   const rejectedDraftsOffset = Math.max(Math.trunc(input.rejectedDraftsOffset), 0);
-  const growthDays = Math.min(Math.max(Math.trunc(input.growthDays), 7), compact ? 21 : 45);
+  const growthDays = Math.min(Math.max(Math.trunc(input.growthDays), 7), compact ? 7 : 45);
   const generationMemoryKinds = [
     "taste_profile",
     "brand_voice_note",
@@ -7447,13 +7447,13 @@ async function buildGptGenerationContext(
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, topOffset),
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.max(weakLimit * 8, 24), weakOffset),
     listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit, savedPatternsOffset),
-    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, compact ? 20 : 50),
+    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, compact ? 10 : 50),
     listGptStrategyMemory(env, brand.account_id, generationMemoryKinds, memoryLimit, memoryOffset),
     listGptGenerationRuns(env, brand.account_id, runsLimit, runsOffset),
     listGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"], approvedDraftsLimit, approvedDraftsOffset),
     listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"], rejectedDraftsLimit, rejectedDraftsOffset),
     listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, growthDays),
-    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, compact ? 25 : 80),
+    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, compact ? 8 : 80),
   ]);
   const savedPatterns = savedPatternsPage.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, false, !compact));
 
@@ -7516,7 +7516,7 @@ async function buildGptGenerationContext(
     return groups;
   }, {});
   const taggedPostResultsForPayload = compact
-    ? taggedPostResultsWithGrowth.slice(0, 20).map(serializePostedTaggedPostCompact)
+    ? taggedPostResultsWithGrowth.slice(0, 8).map(serializePostedTaggedPostCompact)
     : taggedPostResultsWithGrowth.slice(0, 80);
   const generationRunsForPayload = compact
     ? generationRuns.map((run) => ({
