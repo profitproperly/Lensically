@@ -26,6 +26,7 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DROP TABLE IF EXISTS threads_follower_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_accounts").run();
   await env.DB.prepare("DROP TABLE IF EXISTS agent_account_controls").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS external_patterns").run();
   await env.DB.prepare(
     `CREATE TABLE users (
       id TEXT PRIMARY KEY,
@@ -42,6 +43,127 @@ async function resetTables(): Promise<void> {
     `INSERT INTO users (id, threads_user_id, threads_username, access_token, token_expires_at, is_admin, connection_active, created_at)
      VALUES ('workspace-owner', ?, 'vectrixvoltmore', 'test-token', 0, 1, 1, 0)`,
   ).bind(TEST_THREADS_USER_ID).run();
+}
+
+async function createCompactPaginationFixture(): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE gpt_strategy_memory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      title TEXT,
+      body TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE threads_posts_archive (
+      threads_user_id TEXT NOT NULL,
+      post_id TEXT NOT NULL,
+      post_text TEXT,
+      post_timestamp TEXT,
+      post_permalink TEXT,
+      post_username TEXT,
+      profile_picture_url TEXT,
+      views INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      quotes INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      engagement_total INTEGER NOT NULL DEFAULT 0,
+      source_rank INTEGER NOT NULL DEFAULT 0,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (threads_user_id, post_id)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE external_patterns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_user_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      source_url TEXT,
+      post_id TEXT,
+      author_handle TEXT,
+      author_display_name TEXT,
+      post_text TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      views INTEGER NOT NULL DEFAULT 0,
+      posted_at TEXT,
+      capture_confidence TEXT,
+      raw_payload TEXT,
+      saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  for (let index = 1; index <= 5; index += 1) {
+    await env.DB.prepare(
+      `INSERT INTO gpt_strategy_memory (account_id, threads_user_id, kind, title, body, metadata_json)
+       VALUES (?, ?, 'current_belief', ?, ?, ?)`,
+    )
+      .bind(
+        TEST_ACCOUNT_ID,
+        TEST_THREADS_USER_ID,
+        `Rule ${index}`,
+        `Compact memory body ${index}`,
+        JSON.stringify({ heavy_debug: "x".repeat(1000), source: "test" }),
+      )
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink, post_username,
+        profile_picture_url, views, likes, replies, reposts, quotes, shares, engagement_total, source_rank
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        TEST_THREADS_USER_ID,
+        `archive-${index}`,
+        `Archive post ${index}`,
+        `2026-07-0${index}T15:00:00.000Z`,
+        `https://threads.net/@vectrix/post/archive-${index}`,
+        "vectrixvoltmore",
+        `https://cdn.example.com/avatar-${index}.jpg`,
+        index * 100,
+        index * 10,
+        index,
+        index + 1,
+        0,
+        0,
+        index * 12,
+        index,
+      )
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
+        post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence, raw_payload
+      ) VALUES ('lensically', ?, 'threads', ?, ?, 'reference', 'Reference Account', ?, ?, ?, ?, ?, ?, ?, 'high', ?)`,
+    )
+      .bind(
+        TEST_ACCOUNT_ID,
+        `https://threads.net/@reference/post/pattern-${index}`,
+        `pattern-${index}`,
+        `Saved pattern ${index}`,
+        index * 20,
+        index,
+        index + 2,
+        index + 3,
+        index * 200,
+        `2026-07-0${index}T16:00:00.000Z`,
+        JSON.stringify({ raw: "x".repeat(1000) }),
+      )
+      .run();
+  }
 }
 
 async function createGenerationDraftFixture(): Promise<void> {
@@ -229,6 +351,71 @@ describe("GPT memory browser routes", () => {
         learn_from_results: expect.arrayContaining(["prepareGrowthReview", "saveExperiment"]),
       }),
     });
+  });
+
+  it("supports full compact paginated GPT context pulls without heavy fields", async () => {
+    await createCompactPaginationFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const authHeaders = { Authorization: "Bearer test-gpt-key" };
+
+    const memoryItems: Array<Record<string, unknown>> = [];
+    for (let offset = 0; ; offset += 2) {
+      const response = await fetchFromWorker(`/api/gpt/strategy-memory?brand_key=${TEST_BRAND_KEY}&limit=2&offset=${offset}`, {
+        headers: authHeaders,
+      });
+      expect(response.status).toBe(200);
+      const page = await response.json() as { memory: Array<Record<string, unknown>>; has_more: boolean; total_count: number };
+      memoryItems.push(...page.memory);
+      if (!page.has_more) {
+        expect(memoryItems).toHaveLength(page.total_count);
+        break;
+      }
+    }
+
+    const savedPatterns: Array<Record<string, unknown>> = [];
+    for (let offset = 0; ; offset += 2) {
+      const response = await fetchFromWorker(`/api/gpt/saved-patterns?brand_key=${TEST_BRAND_KEY}&limit=2&offset=${offset}`, {
+        headers: authHeaders,
+      });
+      expect(response.status).toBe(200);
+      const page = await response.json() as { patterns: Array<Record<string, unknown>>; has_more: boolean; total_count: number };
+      savedPatterns.push(...page.patterns);
+      if (!page.has_more) {
+        expect(savedPatterns).toHaveLength(page.total_count);
+        break;
+      }
+    }
+
+    const archivePosts: Array<Record<string, unknown>> = [];
+    for (let offset = 0; ; offset += 2) {
+      const response = await fetchFromWorker(`/api/gpt/posts/recent?brand_key=${TEST_BRAND_KEY}&limit=2&offset=${offset}`, {
+        headers: authHeaders,
+      });
+      expect(response.status).toBe(200);
+      const page = await response.json() as { posts: Array<Record<string, unknown>>; has_more: boolean; total_count: number };
+      archivePosts.push(...page.posts);
+      if (!page.has_more) {
+        expect(archivePosts).toHaveLength(page.total_count);
+        break;
+      }
+    }
+
+    expect(memoryItems).toHaveLength(5);
+    expect(savedPatterns).toHaveLength(5);
+    expect(archivePosts).toHaveLength(5);
+    expect(memoryItems[0]).not.toHaveProperty("metadata");
+    expect(savedPatterns[0]).not.toHaveProperty("source_url");
+    expect(savedPatterns[0]).not.toHaveProperty("raw_payload");
+    expect(savedPatterns[0]).not.toHaveProperty("author_display_name");
+    expect(archivePosts[0]).not.toHaveProperty("permalink");
+    expect(archivePosts[0]).not.toHaveProperty("profile_picture_url");
+    expect(archivePosts[0]).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      text: expect.any(String),
+      views: expect.any(Number),
+      likes: expect.any(Number),
+      engagement_total: expect.any(Number),
+    }));
   });
 
   it("stores owner taste feedback for the selected configured account", async () => {

@@ -5144,6 +5144,18 @@ async function listGptGenerationRuns(
   }));
 }
 
+async function countGptGenerationRuns(env: Env, accountId: string): Promise<number> {
+  await ensureGptGenerationRunsTable(env);
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total
+     FROM gpt_generation_runs
+     WHERE account_id = ?`,
+  )
+    .bind(accountId)
+    .first<{ total: number | string }>();
+  return Number(row?.total ?? 0);
+}
+
 async function listGptGenerationDraftsByStatus(
   env: Env,
   accountId: string,
@@ -6728,8 +6740,9 @@ function buildGptOperatorPlaybook(
     default_action_sequence: [
       "If the brand is unclear, call listAccounts and map the user request to opmg_deadman, manifest_mental, or vectrix.",
       "Call getOperatorPlaybook when the user asks for generation, scheduling, growth review, rule changes, or strategy.",
-      "Call prepareGenerationBrief before writing a batch; if it says to ask a taste question, ask one concrete question before generating.",
-      "Use getGenerationContext or smaller list actions for archive, saved patterns, scheduled posts, strategy memory, and recent draft feedback.",
+      "For meaningful generation, use compact paginated list actions first and report exact counts pulled.",
+      "Do not treat pagination as permission to sample; page through all relevant data for the objective.",
+      "Use getGenerationContext or prepareGenerationBrief only as compact summaries unless the user explicitly asks for a helper.",
       "Create more internal candidates than requested, self-reject weak drafts, then show only the best.",
       "Run checkDraftSimilarity for surviving drafts before scheduling or presenting a final batch.",
       "Save shown drafts with saveGenerationDrafts, then use updateGenerationDraft when the owner approves, rejects, self-rejects, rewrites, or schedules.",
@@ -6897,7 +6910,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/generation-context": {
         get: {
           operationId: "getGenerationContext",
-          summary: "Get a compact pre-generation context packet with taste memory, current beliefs, archive samples, saved patterns, scheduled posts, posted tag performance, follower movement, generation history, and duplicate/fatigue hints.",
+          summary: "Get a compact summary context packet. For full-context generation, prefer paginated list actions and exact pulled counts.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's generation objective or prompt summary." } },
@@ -6927,7 +6940,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/generation-brief": {
         post: {
           operationId: "prepareGenerationBrief",
-          summary: "Prepare a structured generation workflow brief before writing drafts, optionally creating a generation run.",
+          summary: "Prepare a compact generation workflow brief before writing drafts, optionally creating a generation run. For full preflight, prefer paginated list actions.",
           requestBody: {
             required: true,
             content: {
@@ -6986,12 +6999,14 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/saved-patterns": {
         get: {
           operationId: "listSavedPatterns",
-          summary: "List saved outside/reference patterns for a brand.",
+          summary: "List compact saved outside/reference patterns for a brand with pagination.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 48 } },
             { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "order_by", in: "query", required: false, schema: { type: "string", enum: ["saved_at_desc", "likes_desc", "views_desc", "engagement_desc"], default: "likes_desc" } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
+            { name: "include_source_url", in: "query", required: false, schema: { type: "boolean", default: false } },
             { name: "include_raw_payload", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Saved patterns" } },
@@ -7000,12 +7015,13 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/posts/recent": {
         get: {
           operationId: "listRecentPosts",
-          summary: "List recent or top archived posts for a brand.",
+          summary: "List compact recent or top archived posts for a brand with pagination.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "order", in: "query", required: false, schema: { type: "string", enum: ["recent", "top"], default: "recent" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
             { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Posts" } },
         },
@@ -7060,11 +7076,12 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/generation-runs": {
         get: {
           operationId: "listGenerationRuns",
-          summary: "List recent generation runs and draft feedback for a brand.",
+          summary: "List compact generation runs and draft feedback for a brand with pagination.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 25, default: 10 } },
             { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Generation runs" } },
         },
@@ -7318,6 +7335,9 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "date", in: "query", required: false, schema: { type: "string", format: "date", description: "Local date to list in the provided timezone." } },
             { name: "timezone", in: "query", required: false, schema: { type: "string", default: WORKSPACE_DEFAULT_TIMEZONE } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } },
+            { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Scheduled posts" } },
         },
@@ -7473,12 +7493,13 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/strategy-memory": {
         get: {
           operationId: "listStrategyMemory",
-          summary: "List persistent strategy memory for a brand.",
+          summary: "List compact persistent strategy memory for a brand with pagination.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "kind", in: "query", required: false, schema: { type: "string" } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
             { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
           ],
           responses: { "200": { description: "Strategy memory" } },
         },
@@ -8528,12 +8549,11 @@ function serializeSavedPatternForGpt(
   pattern: ExternalPatternRow,
   includeRawPayload: boolean,
   includeSourceUrl = true,
+  includeDetail = false,
 ): Record<string, unknown> {
   return {
     id: pattern.id,
-    post_text: pattern.post_text,
-    author_handle: pattern.author_handle,
-    author_display_name: pattern.author_display_name,
+    text: pattern.post_text,
     likes: pattern.likes,
     replies: pattern.replies,
     reposts: pattern.reposts,
@@ -8541,6 +8561,14 @@ function serializeSavedPatternForGpt(
     views: pattern.views,
     posted_at: pattern.posted_at,
     saved_at: pattern.saved_at,
+    updated_at: pattern.updated_at,
+    ...(includeDetail ? {
+      author_handle: pattern.author_handle,
+      author_display_name: pattern.author_display_name,
+      post_id: pattern.post_id,
+      platform: pattern.platform,
+      capture_confidence: pattern.capture_confidence,
+    } : {}),
     ...(includeSourceUrl ? { source_url: pattern.source_url } : {}),
     ...(includeRawPayload ? { raw_payload: pattern.raw_payload } : {}),
   };
@@ -8576,14 +8604,64 @@ function serializeGenerationDraftCompact(
   };
 }
 
+function serializeGptStrategyMemoryCompact(
+  memory: ReturnType<typeof serializeGptStrategyMemoryRow>,
+  includeDetail = false,
+): Record<string, unknown> {
+  return {
+    id: memory.id,
+    kind: memory.kind,
+    title: memory.title,
+    body: memory.body,
+    created_at: memory.created_at,
+    updated_at: memory.updated_at,
+    ...(includeDetail ? {
+      account_id: memory.account_id,
+      threads_user_id: memory.threads_user_id,
+      metadata: memory.metadata,
+    } : {}),
+  };
+}
+
+function serializeGptGenerationRunCompact(
+  run: ReturnType<typeof serializeGptGenerationRun> & { drafts: ReturnType<typeof serializeGptGenerationDraft>[] },
+  includeDetail = false,
+): Record<string, unknown> {
+  return {
+    id: run.id,
+    objective: run.objective,
+    prompt_summary: run.prompt_summary,
+    status: run.status,
+    created_at: run.created_at,
+    updated_at: run.updated_at,
+    drafts: run.drafts.map(serializeGenerationDraftCompact),
+    ...(includeDetail ? {
+      account_id: run.account_id,
+      threads_user_id: run.threads_user_id,
+      metadata: run.metadata,
+    } : {}),
+  };
+}
+
 function serializeScheduledPostCompact(
-  post: { id: number; text?: string; post_text?: string; status: string; scheduled_time_utc: string; strategy?: unknown },
+  post: {
+    id: number;
+    text?: string;
+    post_text?: string;
+    status: string;
+    scheduled_time_utc: string;
+    scheduled_time_local?: string | null;
+    local_time?: string | null;
+    strategy?: unknown;
+  },
 ): Record<string, unknown> {
   return {
     id: post.id,
     text: post.text ?? post.post_text ?? "",
     status: post.status,
     scheduled_time_utc: post.scheduled_time_utc,
+    ...(post.scheduled_time_local ? { scheduled_time_local: post.scheduled_time_local } : {}),
+    ...(post.local_time ? { local_time: post.local_time } : {}),
     strategy: post.strategy ?? null,
   };
 }
@@ -8630,8 +8708,11 @@ async function listScheduledPostsForHermesContext(
   env: Env,
   threadsUserId: string,
   limit: number,
+  offset = 0,
 ): Promise<Array<{ id: number; text: string; status: string; scheduled_time_utc: string }>> {
   await ensureScheduledPostsTable(env);
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const normalizedOffset = Math.max(Math.trunc(offset), 0);
   const rows = await env.DB.prepare(
     `SELECT id, post_text, status, scheduled_time
      FROM scheduled_posts
@@ -8639,14 +8720,15 @@ async function listScheduledPostsForHermesContext(
        AND status IN (?, ?)
        AND scheduled_time >= ?
      ORDER BY scheduled_time ASC, id ASC
-     LIMIT ?`,
+     LIMIT ? OFFSET ?`,
   )
     .bind(
       threadsUserId,
       SCHEDULED_POST_STATUS_APPROVED,
       SCHEDULED_POST_STATUS_POSTING,
       new Date().toISOString(),
-      limit,
+      normalizedLimit,
+      normalizedOffset,
     )
     .all<{ id: number | string; post_text: string; status: string; scheduled_time: string }>();
 
@@ -8656,6 +8738,25 @@ async function listScheduledPostsForHermesContext(
     status: row.status,
     scheduled_time_utc: row.scheduled_time,
   }));
+}
+
+async function countScheduledPostsForHermesContext(env: Env, threadsUserId: string): Promise<number> {
+  await ensureScheduledPostsTable(env);
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total_count
+     FROM scheduled_posts
+     WHERE threads_user_id = ?
+       AND status IN (?, ?)
+       AND scheduled_time >= ?`,
+  )
+    .bind(
+      threadsUserId,
+      SCHEDULED_POST_STATUS_APPROVED,
+      SCHEDULED_POST_STATUS_POSTING,
+      new Date().toISOString(),
+    )
+    .first<{ total_count: number | string }>();
+  return Number(row?.total_count ?? 0);
 }
 
 function normalizeHermesPostCount(value: unknown): number {
@@ -10736,6 +10837,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const order = requestedOrder === "top" ? "top" : "recent";
         const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 50, 1, 100);
         const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const includeDetail = url.searchParams.get("include_detail") === "true";
         const archive = await listArchivedThreadsPosts(env, brand.profile.threads_user_id, order, limit, offset);
         return new Response(JSON.stringify({
           success: true,
@@ -10743,7 +10845,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           account_id: brand.account_id,
           threads_user_id: brand.profile.threads_user_id,
           order,
-          posts: archive.posts,
+          posts: includeDetail ? archive.posts : archive.posts.map(serializeArchivePostCompact),
           total_count: archive.totalCount,
           returned_count: archive.posts.length,
           limit,
@@ -10767,8 +10869,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
         const orderBy = normalizeSavedPatternsOrderBy(url.searchParams.get("order_by"));
         const includeRawPayload = url.searchParams.get("include_raw_payload") === "true";
+        const includeDetail = url.searchParams.get("include_detail") === "true";
+        const includeSourceUrl = includeDetail && url.searchParams.get("include_source_url") === "true";
         const page = await listSavedPatternsForHermes(env, brand.profile.threads_user_id, limit, offset, orderBy);
-        const patterns = page.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, includeRawPayload));
+        const patterns = page.patterns.map((pattern) =>
+          serializeSavedPatternForGpt(pattern, includeRawPayload, includeSourceUrl, includeDetail)
+        );
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
@@ -10869,16 +10975,20 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           });
         }
-        const rawLimit = Number(url.searchParams.get("limit") ?? "10");
-        const limit = Number.isFinite(rawLimit) ? rawLimit : 10;
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 10, 1, 25);
         const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const includeDetail = url.searchParams.get("include_detail") === "true";
         const runs = await listGptGenerationRuns(env, brand.account_id, limit, offset);
+        const totalCount = await countGptGenerationRuns(env, brand.account_id);
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
-          runs,
+          runs: includeDetail ? runs : runs.map((run) => serializeGptGenerationRunCompact(run)),
+          total_count: totalCount,
+          returned_count: runs.length,
           limit,
           offset,
+          has_more: totalCount > offset + runs.length,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -11423,10 +11533,23 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const requestedTimeZone = url.searchParams.get("timezone")?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
         const timeZone = isValidIanaTimezone(requestedTimeZone) ? requestedTimeZone : WORKSPACE_DEFAULT_TIMEZONE;
         const requestedDate = url.searchParams.get("date")?.trim() || null;
-        const scheduledPosts = requestedDate && isValidIsoDate(requestedDate)
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 50, 1, 100);
+        const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const includeDetail = url.searchParams.get("include_detail") === "true";
+        const dateScopedPosts = requestedDate && isValidIsoDate(requestedDate)
           ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, requestedDate, timeZone)
-          : await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 100);
+          : null;
+        const totalCount = dateScopedPosts
+          ? dateScopedPosts.length
+          : await countScheduledPostsForHermesContext(env, brand.profile.threads_user_id);
+        const scheduledPosts = dateScopedPosts
+          ? dateScopedPosts.slice(offset, offset + limit)
+          : await listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, limit, offset);
         const tagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+        const postsWithTags = scheduledPosts.map((post) => ({
+          ...post,
+          strategy: tagMap.get(post.id) ?? null,
+        }));
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
@@ -11434,10 +11557,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           threads_user_id: brand.profile.threads_user_id,
           date: requestedDate && isValidIsoDate(requestedDate) ? requestedDate : null,
           timezone: timeZone,
-          scheduled_posts: scheduledPosts.map((post) => ({
-            ...post,
-            strategy: tagMap.get(post.id) ?? null,
-          })),
+          scheduled_posts: includeDetail ? postsWithTags : postsWithTags.map(serializeScheduledPostCompact),
+          total_count: totalCount,
+          returned_count: postsWithTags.length,
+          limit,
+          offset,
+          has_more: totalCount > offset + postsWithTags.length,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -11716,6 +11841,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const rawKinds = url.searchParams.getAll("kind").flatMap((value) => value.split(","));
         const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 60, 1, 100);
         const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
+        const includeDetail = url.searchParams.get("include_detail") === "true";
         const [memory, totalCount] = await Promise.all([
           listGptStrategyMemory(env, brand.account_id, rawKinds, limit, offset),
           countGptStrategyMemory(env, brand.account_id, rawKinds),
@@ -11723,7 +11849,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
-          memory,
+          memory: memory.map((item) => serializeGptStrategyMemoryCompact(item, includeDetail)),
           total_count: totalCount,
           returned_count: memory.length,
           limit,
