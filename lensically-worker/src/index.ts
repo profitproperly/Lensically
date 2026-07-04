@@ -4852,6 +4852,10 @@ function normalizeGptDraftScore(value: unknown): string | null {
   return Object.keys(normalized).length ? normalizeGptMemoryMetadata(normalized) : null;
 }
 
+function getGptDraftScoreInput(value: Record<string, unknown>): unknown {
+  return value.scores ?? value.score;
+}
+
 function serializeGptGenerationRun(row: GptGenerationRunRow): {
   id: string;
   account_id: string;
@@ -5014,7 +5018,7 @@ async function addGptGenerationDrafts(
         text,
         status,
         normalizeGptMemoryText(draft.rejection_reason, 1000, true),
-        normalizeGptDraftScore(draft.score),
+        normalizeGptDraftScore(getGptDraftScoreInput(draft)),
         strategy ? normalizeGptMemoryMetadata(strategy) : null,
         replacementForDraftId,
         normalizeGptMemoryMetadata(draft.metadata),
@@ -5046,6 +5050,8 @@ async function updateGptGenerationDraft(
     status: string;
     rejectionReason: string | null;
     scheduledPostId: number | null;
+    scoreJson: string | null;
+    strategyJson: string | null;
     metadataJson: string | null;
   },
 ): Promise<ReturnType<typeof serializeGptGenerationDraft> | null> {
@@ -5055,6 +5061,8 @@ async function updateGptGenerationDraft(
      SET status = ?,
          rejection_reason = COALESCE(?, rejection_reason),
          scheduled_post_id = COALESCE(?, scheduled_post_id),
+         score_json = COALESCE(?, score_json),
+         strategy_json = COALESCE(?, strategy_json),
          metadata_json = COALESCE(?, metadata_json)
      WHERE id = ?
        AND account_id = ?`,
@@ -5063,6 +5071,8 @@ async function updateGptGenerationDraft(
       input.status,
       input.rejectionReason,
       input.scheduledPostId,
+      input.scoreJson,
+      input.strategyJson,
       input.metadataJson,
       input.draftId,
       input.accountId,
@@ -6258,24 +6268,24 @@ async function buildGptGenerationContext(
     compact: boolean;
   },
 ): Promise<Record<string, unknown>> {
-  const recentLimit = Math.min(Math.max(Math.trunc(input.recentLimit), 1), 50);
-  const recentOffset = Math.max(Math.trunc(input.recentOffset), 0);
-  const topLimit = Math.min(Math.max(Math.trunc(input.topLimit), 1), 50);
-  const topOffset = Math.max(Math.trunc(input.topOffset), 0);
-  const weakLimit = Math.min(Math.max(Math.trunc(input.weakLimit), 1), 25);
-  const weakOffset = Math.max(Math.trunc(input.weakOffset), 0);
-  const savedPatternsLimit = Math.min(Math.max(Math.trunc(input.savedPatternsLimit), 1), 50);
-  const savedPatternsOffset = Math.max(Math.trunc(input.savedPatternsOffset), 0);
-  const memoryLimit = Math.min(Math.max(Math.trunc(input.memoryLimit), 1), 100);
-  const memoryOffset = Math.max(Math.trunc(input.memoryOffset), 0);
-  const runsLimit = Math.min(Math.max(Math.trunc(input.runsLimit), 1), 15);
-  const runsOffset = Math.max(Math.trunc(input.runsOffset), 0);
-  const approvedDraftsLimit = Math.min(Math.max(Math.trunc(input.approvedDraftsLimit), 1), 50);
-  const approvedDraftsOffset = Math.max(Math.trunc(input.approvedDraftsOffset), 0);
-  const rejectedDraftsLimit = Math.min(Math.max(Math.trunc(input.rejectedDraftsLimit), 1), 50);
-  const rejectedDraftsOffset = Math.max(Math.trunc(input.rejectedDraftsOffset), 0);
-  const growthDays = Math.min(Math.max(Math.trunc(input.growthDays), 7), 45);
   const compact = input.compact === true;
+  const recentLimit = Math.min(Math.max(Math.trunc(input.recentLimit), 1), compact ? 8 : 50);
+  const recentOffset = Math.max(Math.trunc(input.recentOffset), 0);
+  const topLimit = Math.min(Math.max(Math.trunc(input.topLimit), 1), compact ? 8 : 50);
+  const topOffset = Math.max(Math.trunc(input.topOffset), 0);
+  const weakLimit = Math.min(Math.max(Math.trunc(input.weakLimit), 1), compact ? 5 : 25);
+  const weakOffset = Math.max(Math.trunc(input.weakOffset), 0);
+  const savedPatternsLimit = Math.min(Math.max(Math.trunc(input.savedPatternsLimit), 0), compact ? 8 : 50);
+  const savedPatternsOffset = Math.max(Math.trunc(input.savedPatternsOffset), 0);
+  const memoryLimit = Math.min(Math.max(Math.trunc(input.memoryLimit), 1), compact ? 20 : 100);
+  const memoryOffset = Math.max(Math.trunc(input.memoryOffset), 0);
+  const runsLimit = Math.min(Math.max(Math.trunc(input.runsLimit), 1), compact ? 5 : 15);
+  const runsOffset = Math.max(Math.trunc(input.runsOffset), 0);
+  const approvedDraftsLimit = Math.min(Math.max(Math.trunc(input.approvedDraftsLimit), 1), compact ? 10 : 50);
+  const approvedDraftsOffset = Math.max(Math.trunc(input.approvedDraftsOffset), 0);
+  const rejectedDraftsLimit = Math.min(Math.max(Math.trunc(input.rejectedDraftsLimit), 1), compact ? 10 : 50);
+  const rejectedDraftsOffset = Math.max(Math.trunc(input.rejectedDraftsOffset), 0);
+  const growthDays = Math.min(Math.max(Math.trunc(input.growthDays), 7), compact ? 21 : 45);
   const generationMemoryKinds = [
     "taste_profile",
     "brand_voice_note",
@@ -6312,13 +6322,13 @@ async function buildGptGenerationContext(
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "top", topLimit, topOffset),
     listArchivedThreadsPosts(env, brand.profile.threads_user_id, "recent", Math.max(weakLimit * 8, 24), weakOffset),
     listSavedPatternsForHermes(env, brand.profile.threads_user_id, savedPatternsLimit, savedPatternsOffset),
-    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, 50),
+    listScheduledPostsForHermesContext(env, brand.profile.threads_user_id, compact ? 20 : 50),
     listGptStrategyMemory(env, brand.account_id, generationMemoryKinds, memoryLimit, memoryOffset),
     listGptGenerationRuns(env, brand.account_id, runsLimit, runsOffset),
     listGptGenerationDraftsByStatus(env, brand.account_id, ["approved", "scheduled"], approvedDraftsLimit, approvedDraftsOffset),
     listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected", "self_rejected"], rejectedDraftsLimit, rejectedDraftsOffset),
     listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, growthDays),
-    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 80),
+    listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, compact ? 25 : 80),
   ]);
   const savedPatterns = savedPatternsPage.patterns.map((pattern) => serializeSavedPatternForGpt(pattern, false, !compact));
 
@@ -6809,6 +6819,34 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
           type: "string",
           enum: ["opmg_deadman", "manifest_mental", "vectrix"],
         },
+        DraftScores: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hook_strength: { type: "integer", minimum: 0, maximum: 10 },
+            specificity: { type: "integer", minimum: 0, maximum: 10 },
+            repeat_risk: { type: "integer", minimum: 0, maximum: 10 },
+            brand_fit: { type: "integer", minimum: 0, maximum: 10 },
+            follower_growth_intent: { type: "integer", minimum: 0, maximum: 10 },
+            shareability: { type: "integer", minimum: 0, maximum: 10 },
+            engagement_floor_likelihood: { type: "integer", minimum: 0, maximum: 10 },
+            overall: { type: "integer", minimum: 0, maximum: 10 },
+            notes: { type: "string" },
+          },
+        },
+        DraftStrategy: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            pillar: { type: "string" },
+            hook_style: { type: "string" },
+            format: { type: "string" },
+            intent: { type: "string" },
+            experiment: { type: "string" },
+            novelty_level: { type: "string" },
+            metadata: { type: "object", additionalProperties: true },
+          },
+        },
       },
     },
     security: [{ bearerAuth: [] }],
@@ -6870,7 +6908,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "top_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "weak_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 25, default: 5 } },
             { name: "weak_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
-            { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+            { name: "saved_patterns_limit", in: "query", required: false, schema: { type: "integer", minimum: 0, maximum: 50, default: 20 } },
             { name: "saved_patterns_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "memory_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 60 } },
             { name: "memory_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
@@ -7076,8 +7114,9 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                           draft_index: { type: "integer" },
                           text: { type: "string" },
                           status: { type: "string" },
-                          score: { type: "object", additionalProperties: true },
-                          strategy: { type: "object", additionalProperties: true },
+                          score: { "$ref": "#/components/schemas/DraftScores" },
+                          scores: { "$ref": "#/components/schemas/DraftScores" },
+                          strategy: { "$ref": "#/components/schemas/DraftStrategy" },
                           rejection_reason: { type: "string" },
                           replacement_for_draft_id: { type: "string" },
                           metadata: { type: "object", additionalProperties: true },
@@ -7110,6 +7149,9 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
                     rejection_reason: { type: "string" },
                     feedback_note: { type: "string", description: "Approval or rejection lesson to save as flexible strategy memory for future generation." },
                     scheduled_post_id: { type: "integer" },
+                    score: { "$ref": "#/components/schemas/DraftScores" },
+                    scores: { "$ref": "#/components/schemas/DraftScores" },
+                    strategy: { "$ref": "#/components/schemas/DraftStrategy" },
                     metadata: { type: "object", additionalProperties: true },
                   },
                 },
@@ -8527,6 +8569,7 @@ function serializeGenerationDraftCompact(
     text: draft.text,
     status: draft.status,
     rejection_reason: draft.rejection_reason,
+    score: draft.score,
     scheduled_post_id: draft.scheduled_post_id,
     created_at: draft.created_at,
     strategy: draft.strategy,
@@ -10528,7 +10571,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           topOffset: parseBoundedIntegerParam(url.searchParams.get("top_offset"), 0, 0, 100000),
           weakLimit: parseBoundedIntegerParam(url.searchParams.get("weak_limit"), 5, 1, 25),
           weakOffset: parseBoundedIntegerParam(url.searchParams.get("weak_offset"), 0, 0, 100000),
-          savedPatternsLimit: parseBoundedIntegerParam(url.searchParams.get("saved_patterns_limit"), 20, 1, 50),
+          savedPatternsLimit: parseBoundedIntegerParam(url.searchParams.get("saved_patterns_limit"), 20, 0, 50),
           savedPatternsOffset: parseBoundedIntegerParam(url.searchParams.get("saved_patterns_offset"), 0, 0, 100000),
           memoryLimit: parseBoundedIntegerParam(url.searchParams.get("memory_limit"), 60, 1, 100),
           memoryOffset: parseBoundedIntegerParam(url.searchParams.get("memory_offset"), 0, 0, 100000),
@@ -10932,12 +10975,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const scheduledPostId = Number(payload.scheduled_post_id);
         const nextStatus = normalizeGptGenerationStatus(payload.status);
         const feedbackNote = normalizeGptMemoryText(payload.feedback_note, 8000, true);
+        const strategy = normalizeGptPostStrategyInput(payload.strategy);
         const draft = await updateGptGenerationDraft(env, {
           draftId,
           accountId: brand.account_id,
           status: nextStatus,
           rejectionReason: normalizeGptMemoryText(payload.rejection_reason, 1000, true),
           scheduledPostId: Number.isInteger(scheduledPostId) && scheduledPostId > 0 ? scheduledPostId : null,
+          scoreJson: normalizeGptDraftScore(getGptDraftScoreInput(payload)),
+          strategyJson: strategy ? normalizeGptMemoryMetadata(strategy) : null,
           metadataJson: normalizeGptMemoryMetadata(payload.metadata),
         });
         const feedbackMemory = draft && feedbackNote && ["approved", "rejected", "self_rejected"].includes(nextStatus)
@@ -11971,12 +12017,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const scheduledPostId = Number(payload.scheduled_post_id);
       const nextStatus = normalizeGptGenerationStatus(payload.status);
       const feedbackNote = normalizeGptMemoryText(payload.feedback_note, 8000, true);
+      const strategy = normalizeGptPostStrategyInput(payload.strategy);
       const draft = await updateGptGenerationDraft(env, {
         draftId,
         accountId: brand.account_id,
         status: nextStatus,
         rejectionReason: normalizeGptMemoryText(payload.rejection_reason, 1000, true),
         scheduledPostId: Number.isInteger(scheduledPostId) && scheduledPostId > 0 ? scheduledPostId : null,
+        scoreJson: normalizeGptDraftScore(getGptDraftScoreInput(payload)),
+        strategyJson: strategy ? normalizeGptMemoryMetadata(strategy) : null,
         metadataJson: normalizeGptMemoryMetadata({
           source: "lensically_memory_dashboard",
           ...(payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)

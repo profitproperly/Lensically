@@ -541,6 +541,126 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("saves GPT generation draft scores and strategy tags", async () => {
+    await createGenerationDraftFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker("/api/gpt/generation-drafts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        run_id: "run-test",
+        drafts: [
+          {
+            draft_index: 1,
+            text: "Money is about to start acting like it knows where you live.",
+            status: "shown",
+            scores: {
+              hook_strength: 8,
+              specificity: 7,
+              repeat_risk: 2,
+              brand_fit: 9,
+              follower_growth_intent: 8,
+              shareability: 7,
+              engagement_floor_likelihood: 8,
+              overall: 8,
+            },
+            strategy: {
+              pillar: "money_relief",
+              hook_style: "definite_prophecy",
+              format: "one_line_prophecy",
+              intent: "follower_growth",
+              experiment: "survival_career_money_relief",
+              novelty_level: "proven_variant",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      drafts: [
+        expect.objectContaining({
+          text: "Money is about to start acting like it knows where you live.",
+          score: expect.objectContaining({
+            hook_strength: 8,
+            repeat_risk: 2,
+            overall: 8,
+          }),
+          strategy: expect.objectContaining({
+            pillar: "money_relief",
+            hook_style: "definite_prophecy",
+            intent: "follower_growth",
+            novelty_level: "proven_variant",
+          }),
+        }),
+      ],
+    });
+  });
+
+  it("updates GPT generation draft scores and strategy tags", async () => {
+    await createGenerationDraftFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+
+    const response = await fetchFromWorker("/api/gpt/generation-drafts/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-gpt-key",
+      },
+      body: JSON.stringify({
+        brand_key: TEST_BRAND_KEY,
+        draft_id: "draft-test",
+        status: "approved",
+        score: {
+          hook_strength: 9,
+          specificity: 8,
+          repeat_risk: 1,
+          brand_fit: 10,
+          follower_growth_intent: 9,
+          shareability: 8,
+          engagement_floor_likelihood: 9,
+          overall: 9,
+        },
+        strategy: {
+          pillar: "identity_shift",
+          hook_style: "quiet_command",
+          format: "one_line_identity",
+          intent: "engagement_floor",
+          experiment: "approved_rewrite_tagging",
+          novelty_level: "fresh_variant",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      brand_key: TEST_BRAND_KEY,
+      draft: expect.objectContaining({
+        id: "draft-test",
+        status: "approved",
+        score: expect.objectContaining({
+          hook_strength: 9,
+          brand_fit: 10,
+          overall: 9,
+        }),
+        strategy: expect.objectContaining({
+          pillar: "identity_shift",
+          hook_style: "quiet_command",
+          intent: "engagement_floor",
+        }),
+      }),
+    });
+  });
+
   it("returns a browser-safe generation brief without creating a run by default", async () => {
     const response = await fetchFromWorker("/api/gpt-memory/generation-brief", {
       method: "POST",
