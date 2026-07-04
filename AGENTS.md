@@ -58,9 +58,12 @@ Unless the user says `talk only` or explicitly opts out, implementation tasks de
 6. push to `origin`
 7. deploy the affected runtime once after final verification
 
+For long goals, use checkpoint commits: when a coherent safe milestone is reached, or the user says limits are close / asks to checkpoint, run only targeted checks needed for that milestone, commit and push the safe state, and deploy only if that milestone is independently useful or required for the next step.
+
 ## Verification And Deploys
 
 - Prefer one final verification/deploy pass per coherent work set. Avoid repeated full tests, frontend builds, Chrome schema refreshes, and Cloudflare deploys inside the same larger task unless a focused check or live deploy is needed to diagnose a blocker.
+- During larger goals, avoid refreshing the Lensically Operator GPT schema after each intermediate GPT action change. Batch schema/instruction refreshes at the end, unless the GPT needs the new action immediately for the next step or the user asks for a checkpoint that should be usable from the GPT.
 - If `lensically-web/**` changed, run frontend checks and deploy the frontend once at the end if runtime code changed.
 - If `lensically-worker/**` changed, run backend checks and deploy the worker once at the end if runtime code changed.
 - Local agent work is multi-account by default. Do not add brand-specific agent runtimes unless the user explicitly asks for a one-off experiment.

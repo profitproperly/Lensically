@@ -18,6 +18,7 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 - `lensically-web` has no plain `npm run deploy` script; use `deploy:cf`.
 - Direct `npx wrangler ...` calls need the same credential loader sourced first.
 - For usage efficiency, batch Lensically verification and deploys at the end of a coherent work set. Avoid repeated full worker tests, frontend builds, Chrome GPT schema refreshes, and Cloudflare deploys inside the same larger task unless a focused check/live deploy is needed to diagnose a blocker.
+- For long Lensically goals, checkpoint safe milestones with targeted checks plus commit/push. Deploy or refresh the Custom GPT only when the checkpoint is independently useful, required for the next step, or the user explicitly asks to checkpoint usable live state.
 
 ## GitHub Credentials
 
