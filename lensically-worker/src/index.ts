@@ -5328,6 +5328,7 @@ function serializePostedTaggedPostCompact(post: GptTaggedPostedPost): Record<str
     status: post.status,
     scheduled_time_utc: post.scheduled_time_utc,
     published_at: post.published_at,
+    local_date: post.local_date ?? null,
     follower_day_net_change: post.follower_day_net_change ?? null,
     strategy: post.strategy,
     post: post.post ? serializeArchivePostCompact(post.post) : null,
@@ -6386,7 +6387,9 @@ async function buildGptGrowthContext(
   env: Env,
   brand: GptResolvedBrand,
   days: number,
+  options: { includeDetail?: boolean } = {},
 ): Promise<Record<string, unknown>> {
+  const includeDetail = options.includeDetail === true;
   const normalizedDays = Math.min(Math.max(Math.trunc(days), 7), 90);
   const account: ThreadsAccount = {
     threads_user_id: brand.profile.threads_user_id,
@@ -6488,9 +6491,19 @@ async function buildGptGrowthContext(
     ? netChanges.reduce((sum, value) => sum + value, 0) / netChanges.length
     : 0;
 
+  const compactGrowthWindow = (window: typeof growthWindows[number]) => ({
+    date: window.date,
+    net_followers: window.net_followers,
+    posts_published: window.posts_published,
+    likely_drivers: window.likely_drivers.slice(0, 5).map(serializeArchivePostCompact),
+  });
+
   return {
     success: true,
     brand_key: brand.brand_key,
+    compact: !includeDetail,
+    detail_available_with: "include_detail=true",
+    payload_guidance: "Default response is compact. For full context before generation, prefer createPreflightSnapshot plus getPreflightSnapshotPage.",
     account: {
       account_id: brand.account_id,
       label: brand.profile.label,
@@ -6512,9 +6525,9 @@ async function buildGptGrowthContext(
       weak_growth_days: weakGrowthDays.map((day) => ({ date: day.date, net_followers: day.net_followers })),
     },
     daily_growth: dailyGrowth,
-    growth_windows: growthWindows,
-    top_growth_windows: bestGrowthDays,
-    weak_growth_windows: weakGrowthDays,
+    growth_windows: includeDetail ? growthWindows : growthWindows.map(compactGrowthWindow),
+    top_growth_windows: includeDetail ? bestGrowthDays : bestGrowthDays.map(compactGrowthWindow),
+    weak_growth_windows: includeDetail ? weakGrowthDays : weakGrowthDays.map(compactGrowthWindow),
     engagement_floor: {
       sample_size: recentPostsForFloor.length,
       median_likes: Number(calculateMedian(likes).toFixed(2)),
@@ -6526,9 +6539,11 @@ async function buildGptGrowthContext(
       weak_likes_threshold: Number(calculatePercentile(likes, 25).toFixed(2)),
       weak_engagement_threshold: Number(calculatePercentile(engagementTotals, 25).toFixed(2)),
     },
-    archive_recent: recentArchive.posts.slice(0, 80),
-    archive_top: topArchive.posts,
-    scheduled_posts: scheduledPostsWithTags,
+    archive_recent: includeDetail
+      ? recentArchive.posts.slice(0, 80)
+      : recentArchive.posts.slice(0, 40).map(serializeArchivePostCompact),
+    archive_top: includeDetail ? topArchive.posts : topArchive.posts.slice(0, 30).map(serializeArchivePostCompact),
+    scheduled_posts: includeDetail ? scheduledPostsWithTags : scheduledPostsWithTags.map(serializeScheduledPostCompact),
     tag_usage: {
       pillars: summarizeTagUsage(scheduledTags, "pillar"),
       hook_styles: summarizeTagUsage(scheduledTags, "hook_style"),
@@ -6537,7 +6552,9 @@ async function buildGptGrowthContext(
       experiments: summarizeTagUsage(scheduledTags, "experiment"),
       novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
     },
-    tagged_post_results: taggedPostResultsWithGrowth,
+    tagged_post_results: includeDetail
+      ? taggedPostResultsWithGrowth
+      : taggedPostResultsWithGrowth.slice(0, 60).map(serializePostedTaggedPostCompact),
     tag_performance: {
       pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
       hook_styles: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "hook_style"),
@@ -6546,7 +6563,7 @@ async function buildGptGrowthContext(
       experiments: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "experiment"),
       novelty_levels: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "novelty_level"),
     },
-    strategy_memory: strategyMemory,
+    strategy_memory: includeDetail ? strategyMemory : strategyMemory.map((memory) => serializeGptStrategyMemoryCompact(memory)),
     experiment_summary: buildGptExperimentSummary(strategyMemory),
     growth_rules: [
       "Separate engagement winners from follower-growth winners.",
@@ -7842,7 +7859,7 @@ function buildGptOperatorPlaybook(
       "Reuse an existing preflight snapshot inside the same chat until new approvals, rejections, schedules, saved patterns, or archive updates make a refresh useful.",
       "Use the taste_gate from context or the preflight snapshot as a pre-show filter; do not let archived/stale memory override active owner taste.",
       "Call getRecentPostPerformance before serious generation or review when posts have gone out recently, especially after the last 24 hours or week.",
-      "Use getGenerationContext or prepareGenerationBrief only as compact summaries unless the user explicitly asks for a helper.",
+      "Avoid getGenerationContext, prepareGenerationBrief, getGrowthContext, and prepareGrowthReview for normal generation preflight; use them only as compact summaries or when explicitly requested.",
       "Create more internal candidates than requested, self-reject weak drafts, then show only the best.",
       "Run checkDraftSimilarity for surviving drafts before scheduling or presenting a final batch.",
       "Save shown drafts with saveGenerationDrafts, then use updateGenerationDraft when the owner approves, rejects, self-rejects, rewrites, or schedules.",
@@ -7883,10 +7900,9 @@ function buildGptOperatorPlaybook(
         "createPreflightSnapshot",
         "getPreflightSnapshotManifest",
         "getPreflightSnapshotPage",
+        "getRecentInsights",
         "getRecentPostPerformance",
-        "prepareGenerationBrief",
         "prepareTasteInterview",
-        "getGenerationContext",
         "checkDraftSimilarity",
         "saveGenerationDrafts",
         "updateGenerationDraft",
@@ -7899,8 +7915,9 @@ function buildGptOperatorPlaybook(
         "saveBatchPreset",
       ],
       learn_from_results: [
-        "getGrowthContext",
+        "getRecentInsights",
         "getRecentPostPerformance",
+        "getGrowthContext",
         "prepareGrowthReview",
         "prepareRuleSuggestions",
         "getNoveltyFatigueReport",
@@ -8085,7 +8102,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/generation-context": {
         get: {
           operationId: "getGenerationContext",
-          summary: "Get a compact summary context packet. For full-context generation, prefer paginated list actions and exact pulled counts.",
+          summary: "Get a compact summary context packet. Do not use as the main generation preflight; prefer createPreflightSnapshot plus getPreflightSnapshotPage for full-context pulls.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "objective", in: "query", required: false, schema: { type: "string", description: "The user's generation objective or prompt summary." } },
@@ -8107,7 +8124,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
             { name: "rejected_drafts_limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
             { name: "rejected_drafts_offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "growth_days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 45, default: 14 } },
-            { name: "compact", in: "query", required: false, schema: { type: "boolean", default: false } },
+            { name: "compact", in: "query", required: false, schema: { type: "boolean", default: true, description: "Defaults to true. Set false only for deliberate debugging when a larger response is acceptable." } },
           ],
           responses: { "200": { description: "Generation context" } },
         },
@@ -8115,7 +8132,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/generation-brief": {
         post: {
           operationId: "prepareGenerationBrief",
-          summary: "Prepare a compact generation workflow brief before writing drafts, optionally creating a generation run. For full preflight, prefer paginated list actions.",
+          summary: "Prepare a compact generation workflow brief, optionally creating a generation run. Do not use as the main full-context preflight; prefer createPreflightSnapshot plus pages.",
           requestBody: {
             required: true,
             content: {
@@ -8229,10 +8246,11 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/growth-context": {
         get: {
           operationId: "getGrowthContext",
-          summary: "Get follower growth context, growth windows, engagement floor metrics, scheduled strategy tags, posted tag performance, follower-day attribution, and growth memory for a brand.",
+          summary: "Get compact follower growth context for review. For full generation context, prefer createPreflightSnapshot plus pages; full detail requires include_detail=true.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 7, maximum: 90, default: 45 } },
+            { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false, description: "Defaults false to keep Custom GPT payloads compact. Set true only for one-off debugging." } },
           ],
           responses: { "200": { description: "Growth context" } },
         },
@@ -12053,7 +12071,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           rejectedDraftsLimit: parseBoundedIntegerParam(url.searchParams.get("rejected_drafts_limit"), 20, 1, 50),
           rejectedDraftsOffset: parseBoundedIntegerParam(url.searchParams.get("rejected_drafts_offset"), 0, 0, 100000),
           growthDays: parseBoundedIntegerParam(url.searchParams.get("growth_days"), 14, 7, 45),
-          compact: url.searchParams.get("compact") === "true",
+          compact: url.searchParams.get("compact") !== "false",
         });
         return new Response(JSON.stringify(context), {
           status: 200,
@@ -12318,7 +12336,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
         const rawDays = Number(url.searchParams.get("days") ?? "45");
         const days = Number.isFinite(rawDays) ? rawDays : 45;
-        const growthContext = await buildGptGrowthContext(env, brand, days);
+        const growthContext = await buildGptGrowthContext(env, brand, days, {
+          includeDetail: url.searchParams.get("include_detail") === "true",
+        });
         return new Response(JSON.stringify(growthContext), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },

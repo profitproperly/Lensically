@@ -334,24 +334,36 @@ describe("GPT memory browser routes", () => {
 
     const schemaResponse = await fetchFromWorker("/api/gpt/openapi.json");
     expect(schemaResponse.status).toBe(200);
-    const schema = await schemaResponse.json() as { paths?: Record<string, unknown> };
+    const schema = await schemaResponse.json() as { paths?: Record<string, {
+      get?: { parameters?: Array<{ name?: string; schema?: { default?: unknown } }> };
+    }> };
     expect(schema.paths?.["/api/gpt/operator-playbook"]).toBeTruthy();
+    const generationParams = schema.paths?.["/api/gpt/generation-context"]?.get?.parameters ?? [];
+    expect(generationParams.find((param) => param.name === "compact")?.schema?.default).toBe(true);
+    const growthParams = schema.paths?.["/api/gpt/growth-context"]?.get?.parameters ?? [];
+    expect(growthParams.find((param) => param.name === "include_detail")?.schema?.default).toBe(false);
 
     const response = await fetchFromWorker(`/api/gpt/operator-playbook?brand_key=${TEST_BRAND_KEY}&objective=generate%20posts`, {
       headers: { Authorization: "Bearer test-gpt-key" },
     });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const playbook = await response.json() as {
+      useful_actions_by_job?: { generate_posts?: string[]; learn_from_results?: string[] };
+      [key: string]: unknown;
+    };
+    expect(playbook).toMatchObject({
       success: true,
       playbook_version: "operator_playbook_v1",
       brand_key: TEST_BRAND_KEY,
       objective: "generate posts",
       useful_actions_by_job: expect.objectContaining({
-        generate_posts: expect.arrayContaining(["prepareGenerationBrief", "checkDraftSimilarity"]),
+        generate_posts: expect.arrayContaining(["createPreflightSnapshot", "getPreflightSnapshotPage", "getRecentInsights", "checkDraftSimilarity"]),
         learn_from_results: expect.arrayContaining(["prepareGrowthReview", "saveExperiment"]),
       }),
     });
+    expect(playbook.useful_actions_by_job?.generate_posts).not.toContain("prepareGenerationBrief");
+    expect(playbook.useful_actions_by_job?.generate_posts).not.toContain("getGenerationContext");
   });
 
   it("supports full compact paginated GPT context pulls without heavy fields", async () => {
@@ -1226,9 +1238,16 @@ describe("GPT memory browser routes", () => {
     });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const growthPayload = await response.json() as {
+      compact?: boolean;
+      growth_windows?: Array<Record<string, unknown>>;
+      tagged_post_results?: Array<Record<string, unknown>>;
+      [key: string]: unknown;
+    };
+    expect(growthPayload).toMatchObject({
       success: true,
       brand_key: TEST_BRAND_KEY,
+      compact: true,
       tagged_post_results: [
         expect.objectContaining({
           scheduled_post_id: 888,
@@ -1258,13 +1277,25 @@ describe("GPT memory browser routes", () => {
         ],
       }),
     });
+    expect(growthPayload.growth_windows?.[0]).not.toHaveProperty("posts");
 
-    const generationResponse = await fetchFromWorker(`/api/gpt/generation-context?brand_key=${TEST_BRAND_KEY}&compact=true`, {
+    const detailedGrowthResponse = await fetchFromWorker(`/api/gpt/growth-context?brand_key=${TEST_BRAND_KEY}&include_detail=true`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(detailedGrowthResponse.status).toBe(200);
+    await expect(detailedGrowthResponse.json()).resolves.toMatchObject({
+      success: true,
+      compact: false,
+    });
+
+    const generationResponse = await fetchFromWorker(`/api/gpt/generation-context?brand_key=${TEST_BRAND_KEY}`, {
       headers: { Authorization: "Bearer test-gpt-key" },
     });
 
     expect(generationResponse.status).toBe(200);
     const generationPayload = await generationResponse.json() as {
+      account?: { threads_biography?: unknown };
       archive?: { recent?: Array<Record<string, unknown>> };
       posted_tagged_results?: unknown[];
       tag_performance?: Record<string, Array<Record<string, unknown>>>;
@@ -1287,6 +1318,7 @@ describe("GPT memory browser routes", () => {
         ],
       }),
     });
+    expect(generationPayload.account?.threads_biography).toBeNull();
     expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("profile_picture_url");
     expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("permalink");
   });
