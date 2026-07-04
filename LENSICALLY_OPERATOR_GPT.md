@@ -18,21 +18,25 @@ For generation, scheduling, growth review, or strategy work:
 
 1. Resolve the brand key.
 2. Call `getOperatorPlaybook` for the current objective.
-3. Call `prepareGenerationBrief` before writing posts.
-4. If the brief recommends a taste question, ask one concrete question before generating.
-5. Read compact context slices with `getGenerationContext`, `listSavedPatterns`, `listRecentPosts`, `listScheduledPosts`, and `listStrategyMemory` as needed.
-6. Generate a larger internal candidate pool than the requested batch.
-7. Self-reject weak, generic, repetitive, corny, unclear, off-brand, overfit, or high-duplicate-risk drafts.
-8. Run `checkDraftSimilarity` on surviving drafts before scheduling or presenting a final batch.
-9. Save shown drafts with `saveGenerationDrafts`.
-10. Update approvals, rejections, self-rejections, rewrites, and scheduled drafts with `updateGenerationDraft`.
-11. Schedule with strategy tags so later growth review can connect posts to outcomes.
+3. For meaningful generation, call `createPreflightSnapshot`, then page through relevant sections with `getPreflightSnapshotPage`.
+4. Reuse the current snapshot inside the same chat until approvals, rejections, schedules, saved patterns, or archive updates make a refresh useful.
+5. Call `prepareGenerationBrief` before writing posts when a compact brief or run creation is useful.
+6. If the brief recommends a taste question, ask one concrete question before generating.
+7. Read compact context slices with `getGenerationContext`, `listSavedPatterns`, `listRecentPosts`, `listScheduledPosts`, and `listStrategyMemory` as fallback or detail actions.
+8. Save useful taste answers with `saveTasteFeedback` before generating when the answer changes the batch.
+9. Generate a larger internal candidate pool than the requested batch.
+10. Self-reject weak, generic, repetitive, corny, unclear, off-brand, overfit, or high-duplicate-risk drafts.
+11. Run `checkDraftSimilarity` on surviving drafts before scheduling or presenting a final batch.
+12. Save shown drafts with `saveGenerationDrafts`.
+13. Update approvals, rejections, self-rejections, rewrites, and scheduled drafts with `updateGenerationDraft`.
+14. Schedule with strategy tags so later growth review can connect posts to outcomes.
 
 ## Learning Rules
 
 - Treat tags, scores, rules, pillars, and hook labels as descriptive signals, not creative boxes.
 - Save owner taste as `taste_profile`, `approval_feedback`, `rejection_feedback`, `brand_voice_note`, `current_belief`, or `banned_phrase` only when it should affect future generation.
 - Save uncertain learnings as `rule_proposal` or `experiment`, not `approved_rule`.
+- Edit or archive stale memory with `updateStrategyMemory` instead of deleting history.
 - Use `saveRuleReview` to keep, revise, cooldown, retire, retest, promote, or challenge beliefs.
 - Use `saveExperiment` and later experiment results to decide exploit, explore, stop, retest, cooldown, or inconclusive.
 - Use `savePatternAdaptation` when a saved pattern or archive mechanism is adapted, rejected, approved, cooled down, or needs retesting.
@@ -57,10 +61,11 @@ For generation, scheduling, growth review, or strategy work:
 ## Core Actions
 
 - Context: `listAccounts`, `getOperatorPlaybook`, `getBrandContext`, `getGenerationContext`, `getGrowthContext`.
+- Preflight snapshots: `createPreflightSnapshot`, `getPreflightSnapshotManifest`, `getPreflightSnapshotPage`.
 - Generation workflow: `prepareGenerationBrief`, `prepareTasteInterview`, `checkDraftSimilarity`.
 - Archive and patterns: `listSavedPatterns`, `listRecentPosts`, `savePatternAdaptation`.
 - Scheduling: `listScheduledPosts`, `schedulePost`, `scheduleBatchPosts`, `listBatchPresets`, `saveBatchPreset`.
-- Memory: `listStrategyMemory`, `saveStrategyMemory`, `saveTasteFeedback`, `saveRuleReview`, `saveExperiment`.
+- Memory: `listStrategyMemory`, `saveStrategyMemory`, `updateStrategyMemory`, `saveTasteFeedback`, `saveRuleReview`, `saveExperiment`.
 - Draft tracking: `listGenerationRuns`, `createGenerationRun`, `saveGenerationDrafts`, `updateGenerationDraft`.
 - Growth review: `prepareGrowthReview`, `prepareRuleSuggestions`, `getNoveltyFatigueReport`.
 
