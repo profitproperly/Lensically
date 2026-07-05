@@ -3,6 +3,7 @@
 ## Start Here
 
 - Read this file at the start of every new chat.
+- Read `C:\Users\brian\.codex\OPERATING_MEMORY.md` at the start of every new chat before project work. Global durable memory is mandatory, not optional.
 - Read `OPERATING_MEMORY.md` immediately after this file. Add concise entries there whenever you find a repeated slowdown, bad assumption, credential/deploy trap, or workflow fix that future agents should not rediscover.
 - Read the repository before editing code.
 - Prefer small, production-safe changes over broad rewrites.
