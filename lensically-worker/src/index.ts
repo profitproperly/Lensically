@@ -5436,26 +5436,38 @@ async function listGptRecentInsights(
   env: Env,
   brand: GptResolvedBrand,
   input: {
-    hours: number;
+    days: number | null;
     limit: number;
     offset: number;
     sort: GptRecentInsightsSort;
     timezone: string;
     includeDetail: boolean;
+    postIds?: string[];
   },
 ): Promise<{
   insights: Array<Record<string, unknown>>;
   totalCount: number;
-  hours: number;
+  days: number | null;
   timezone: string;
   sort: GptRecentInsightsSort;
 }> {
   await ensureThreadsPostsArchiveTable(env);
-  const hours = Math.min(Math.max(Math.trunc(input.hours), 1), 168);
+  const days = input.days === null ? null : Math.min(Math.max(Math.trunc(input.days), 1), 365);
   const limit = Math.min(Math.max(Math.trunc(input.limit), 1), 200);
   const offset = Math.max(Math.trunc(input.offset), 0);
   const timezone = isValidIanaTimezone(input.timezone) ? input.timezone : THREADS_INSIGHTS_TIME_ZONE;
-  const sinceIso = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const sinceIso = days === null ? null : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const normalizedPostIds = Array.from(new Set((input.postIds ?? []).map((postId) => postId.trim()).filter(Boolean))).slice(0, 2500);
+  const restrictToFetchedPostIds = input.postIds !== undefined;
+  const postIdPlaceholders = normalizedPostIds.map(() => "?").join(", ");
+  const postFilterClause = normalizedPostIds.length
+    ? `AND a.post_id IN (${postIdPlaceholders})`
+    : "";
+  const cachePostFilterClause = normalizedPostIds.length
+    ? `AND c.post_id IN (${postIdPlaceholders})`
+    : "";
+  const sinceFilterClause = sinceIso ? "AND datetime(a.post_timestamp) >= datetime(?)" : "";
+  const cacheSinceFilterClause = sinceIso ? "AND datetime(c.post_timestamp) >= datetime(?)" : "";
   const [scheduledExists, tagsExists] = await Promise.all([
     doesTableExist(env, "scheduled_posts"),
     doesTableExist(env, "gpt_post_strategy_tags"),
@@ -5534,34 +5546,38 @@ async function listGptRecentInsights(
          ON t.scheduled_post_id = s.id`
     : "";
 
-  const rows = await env.DB.prepare(
-    `SELECT
-       a.post_id,
-       a.post_text,
-       a.post_timestamp,
-       a.post_permalink,
-       a.post_username,
-       a.views,
-       a.likes,
-       a.replies,
-       a.reposts,
-       a.quotes,
-       a.shares,
-       a.engagement_total,
-       a.last_synced_at,
-       ${scheduledSelect},
-       ${tagSelect}
-     FROM threads_posts_archive a
-     ${scheduledJoin}
-     ${tagJoin}
-     WHERE a.threads_user_id = ?
-       AND datetime(a.post_timestamp) >= datetime(?)
-     ORDER BY datetime(a.post_timestamp) DESC, a.engagement_total DESC, a.likes DESC
-     LIMIT 2500`,
-  )
-    .bind(brand.profile.threads_user_id, sinceIso)
-    .all<GptRecentInsightsRow>();
-  let recentRows = rows.results ?? [];
+  let recentRows: GptRecentInsightsRow[] = [];
+  if (!restrictToFetchedPostIds || normalizedPostIds.length > 0) {
+    const rows = await env.DB.prepare(
+      `SELECT
+         a.post_id,
+         a.post_text,
+         a.post_timestamp,
+         a.post_permalink,
+         a.post_username,
+         a.views,
+         a.likes,
+         a.replies,
+         a.reposts,
+         a.quotes,
+         a.shares,
+         a.engagement_total,
+         a.last_synced_at,
+         ${scheduledSelect},
+         ${tagSelect}
+       FROM threads_posts_archive a
+       ${scheduledJoin}
+       ${tagJoin}
+       WHERE a.threads_user_id = ?
+         ${sinceFilterClause}
+         ${postFilterClause}
+       ORDER BY datetime(a.post_timestamp) DESC, a.engagement_total DESC, a.likes DESC
+       LIMIT 2500`,
+    )
+      .bind(...[brand.profile.threads_user_id, ...(sinceIso ? [sinceIso] : []), ...normalizedPostIds])
+      .all<GptRecentInsightsRow>();
+    recentRows = rows.results ?? [];
+  }
   if (recentRows.length === 0) {
     await ensureThreadsPostsCacheTable(env);
     const cachedRows = await env.DB.prepare(
@@ -5585,15 +5601,16 @@ async function listGptRecentInsights(
        ${scheduledCacheJoin}
        ${tagJoin}
        WHERE c.threads_user_id = ?
-         AND datetime(c.post_timestamp) >= datetime(?)
+         ${cacheSinceFilterClause}
+         ${cachePostFilterClause}
        ORDER BY datetime(c.post_timestamp) DESC, c.engagement_total DESC, c.likes DESC
        LIMIT 2500`,
     )
-      .bind(brand.profile.threads_user_id, sinceIso)
+      .bind(...[brand.profile.threads_user_id, ...(sinceIso ? [sinceIso] : []), ...normalizedPostIds])
       .all<GptRecentInsightsRow>();
     recentRows = cachedRows.results ?? [];
   }
-  const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, Math.max(Math.ceil(hours / 24) + 3, 7));
+  const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, Math.max((days ?? 1) + 3, 7));
   const dailyGrowth = followerSnapshots.map((snapshot, index) => {
     const previous = index > 0 ? followerSnapshots[index - 1] : null;
     const netChange = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
@@ -5669,33 +5686,56 @@ async function listGptRecentInsights(
   return {
     insights: sortedRecords.slice(offset, offset + limit).map((item) => serializeRecentInsightRecord(item, input.includeDetail)),
     totalCount: sortedRecords.length,
-    hours,
+    days,
     timezone,
     sort: input.sort,
   };
 }
 
-async function refreshGptRecentInsightsArchive(
+async function refreshGptInsightsFromThreads(
   env: Env,
   brand: GptResolvedBrand,
-  hours: number,
+  input: {
+    days: number | null;
+    maxPages: number;
+    cursor: string | null;
+    cursorDepth: number;
+  },
 ): Promise<{
   attempted: boolean;
   refreshed: boolean;
   pages_fetched: number;
   posts_seen: number;
   posts_upserted: number;
-  stopped_reason: "window_complete" | "no_more_pages" | "fetch_failed" | "page_cap_reached" | "not_attempted";
+  next_cursor: string | null;
+  has_more: boolean;
+  fetched_post_ids: string[];
+  stopped_reason: "window_complete" | "no_more_pages" | "fetch_failed" | "page_cap_reached" | "cursor_depth_cap" | "not_attempted";
 }> {
-  const normalizedHours = Math.min(Math.max(Math.trunc(hours), 1), 168);
-  const sinceMs = Date.now() - normalizedHours * 60 * 60 * 1000;
-  let cursor: string | null = null;
+  const days = input.days === null ? null : Math.min(Math.max(Math.trunc(input.days), 1), 365);
+  const sinceMs = days === null ? null : Date.now() - days * 24 * 60 * 60 * 1000;
+  let cursor: string | null = input.cursor;
+  let cursorDepth = Math.min(Math.max(Math.trunc(input.cursorDepth), 1), MAX_THREADS_POST_CURSOR_DEPTH);
   let pagesFetched = 0;
   let postsSeen = 0;
   let postsUpserted = 0;
-  const maxPages = Math.min(Math.max(Math.ceil(normalizedHours / 24) + 2, 3), 10);
+  const fetchedPostIds: string[] = [];
+  const maxPages = Math.min(Math.max(Math.trunc(input.maxPages), 1), MAX_THREADS_POST_CURSOR_DEPTH);
 
   for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+    if (cursorDepth > MAX_THREADS_POST_CURSOR_DEPTH) {
+      return {
+        attempted: true,
+        refreshed: postsUpserted > 0,
+        pages_fetched: pagesFetched,
+        posts_seen: postsSeen,
+        posts_upserted: postsUpserted,
+        next_cursor: cursor,
+        has_more: false,
+        fetched_post_ids: fetchedPostIds,
+        stopped_reason: "cursor_depth_cap",
+      };
+    }
     const page = await fetchThreadsPostsPageWithInsights(
       env,
       brand.configured_account.accessToken,
@@ -5709,13 +5749,24 @@ async function refreshGptRecentInsightsArchive(
         pages_fetched: pagesFetched,
         posts_seen: postsSeen,
         posts_upserted: postsUpserted,
+        next_cursor: cursor,
+        has_more: false,
+        fetched_post_ids: fetchedPostIds,
         stopped_reason: postsUpserted > 0 ? "window_complete" : "fetch_failed",
       };
     }
     pagesFetched += 1;
     postsSeen += page.posts.length;
     await upsertThreadsPostsArchive(env, brand.profile.threads_user_id, page.posts);
+    if (!input.cursor && pageIndex === 0 && page.posts.length > 0) {
+      await replaceThreadsPostsCache(env, brand.profile.threads_user_id, page.posts, {
+        threads_user_id: brand.profile.threads_user_id,
+        next_cursor: page.nextCursor,
+        has_more: page.hasMore && cursorDepth < MAX_THREADS_POST_CURSOR_DEPTH,
+      });
+    }
     postsUpserted += page.posts.length;
+    fetchedPostIds.push(...page.posts.map((post) => post.id).filter(Boolean));
 
     const timestamps = page.posts
       .map((post) => getPostTimestampMs(post))
@@ -5728,20 +5779,27 @@ async function refreshGptRecentInsightsArchive(
         pages_fetched: pagesFetched,
         posts_seen: postsSeen,
         posts_upserted: postsUpserted,
+        next_cursor: null,
+        has_more: false,
+        fetched_post_ids: fetchedPostIds,
         stopped_reason: "no_more_pages",
       };
     }
-    if (oldestPostMs !== null && oldestPostMs < sinceMs) {
+    if (sinceMs !== null && oldestPostMs !== null && oldestPostMs < sinceMs) {
       return {
         attempted: true,
         refreshed: true,
         pages_fetched: pagesFetched,
         posts_seen: postsSeen,
         posts_upserted: postsUpserted,
+        next_cursor: page.nextCursor,
+        has_more: true,
+        fetched_post_ids: fetchedPostIds,
         stopped_reason: "window_complete",
       };
     }
     cursor = page.nextCursor;
+    cursorDepth += 1;
   }
 
   return {
@@ -5750,6 +5808,9 @@ async function refreshGptRecentInsightsArchive(
     pages_fetched: pagesFetched,
     posts_seen: postsSeen,
     posts_upserted: postsUpserted,
+    next_cursor: cursor,
+    has_more: Boolean(cursor) && cursorDepth <= MAX_THREADS_POST_CURSOR_DEPTH,
+    fetched_post_ids: fetchedPostIds,
     stopped_reason: "page_cap_reached",
   };
 }
@@ -5792,7 +5853,12 @@ async function buildGptPreflightSnapshotSections(
   const pageSize = 100;
   const maxItems = 2000;
   const recentInsightsHours = Math.min(Math.max(Math.trunc(input.recentInsightsHours), 1), 168);
-  await refreshGptRecentInsightsArchive(env, brand, recentInsightsHours);
+  await refreshGptInsightsFromThreads(env, brand, {
+    days: Math.max(Math.ceil(recentInsightsHours / 24), 1),
+    maxPages: Math.min(Math.max(Math.ceil(recentInsightsHours / 24) + 2, 3), 10),
+    cursor: null,
+    cursorDepth: 1,
+  });
 
   const [
     strategyMemoryTotal,
@@ -5889,7 +5955,7 @@ async function buildGptPreflightSnapshotSections(
     listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 250)
       .then((items) => ({ items: items.map(serializePostedTaggedPostCompact), truncated: items.length >= 250 })),
     listGptRecentInsights(env, brand, {
-      hours: recentInsightsHours,
+      days: Math.max(Math.ceil(recentInsightsHours / 24), 1),
       limit: maxItems,
       offset: 0,
       sort: "published_at_desc",
@@ -8288,11 +8354,14 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/insights/recent": {
         get: {
           operationId: "getRecentInsights",
-          summary: "Refresh Threads post insights, then return a compact paginated recent insights pull for live 72-hour recon before generation, scheduling, or near-term strategy decisions.",
+          summary: "Fetch Threads insights the same way the Lensically Insights page does: 40-post pages, optional cursor pagination, and optional day-span stop based on each post's posted date.",
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
-            { name: "hours", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 168, default: 72 } },
-            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 100 } },
+            { name: "days", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 365, description: "Optional. When provided, keep fetching 40-post pages until the oldest fetched posted date is older than this many days, or max_pages is reached. Omit for latest page only." } },
+            { name: "max_pages", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: MAX_THREADS_POST_CURSOR_DEPTH, default: 1, description: "Maximum 40-post Threads pages to fetch in this call. Defaults to 1 unless days is provided." } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string", description: "Optional Threads paging cursor from the previous response. Use to fetch the next 40-post page." } },
+            { name: "cursor_depth", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: MAX_THREADS_POST_CURSOR_DEPTH, default: 1 } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 40 } },
             { name: "offset", in: "query", required: false, schema: { type: "integer", minimum: 0, default: 0 } },
             { name: "include_detail", in: "query", required: false, schema: { type: "boolean", default: false } },
             { name: "timezone", in: "query", required: false, schema: { type: "string", default: THREADS_INSIGHTS_TIME_ZONE } },
@@ -12386,20 +12455,33 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             headers: { "content-type": "application/json; charset=UTF-8" },
           });
         }
-        const hours = parseBoundedIntegerParam(url.searchParams.get("hours"), 72, 1, 168);
-        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 100, 1, 200);
+        const rawDays = url.searchParams.get("days");
+        const days = rawDays === null || rawDays.trim() === ""
+          ? null
+          : parseBoundedIntegerParam(rawDays, 1, 1, 365);
+        const defaultMaxPages = days === null ? 1 : Math.min(Math.max(days + 2, 3), MAX_THREADS_POST_CURSOR_DEPTH);
+        const maxPages = parseBoundedIntegerParam(url.searchParams.get("max_pages"), defaultMaxPages, 1, MAX_THREADS_POST_CURSOR_DEPTH);
+        const cursor = normalizeGptMemoryText(url.searchParams.get("cursor"), 500, true);
+        const cursorDepth = parseBoundedIntegerParam(url.searchParams.get("cursor_depth"), cursor ? 2 : 1, 1, MAX_THREADS_POST_CURSOR_DEPTH);
+        const limit = parseBoundedIntegerParam(url.searchParams.get("limit"), 40, 1, 200);
         const offset = parseBoundedIntegerParam(url.searchParams.get("offset"), 0, 0, 100000);
         const timezoneParam = url.searchParams.get("timezone")?.trim() || THREADS_INSIGHTS_TIME_ZONE;
         const timezone = isValidIanaTimezone(timezoneParam) ? timezoneParam : THREADS_INSIGHTS_TIME_ZONE;
         const sort = normalizeGptRecentInsightsSort(url.searchParams.get("sort"));
-        const refresh = await refreshGptRecentInsightsArchive(env, brand, hours);
+        const refresh = await refreshGptInsightsFromThreads(env, brand, {
+          days,
+          maxPages,
+          cursor,
+          cursorDepth,
+        });
         const page = await listGptRecentInsights(env, brand, {
-          hours,
+          days,
           limit,
           offset,
           sort,
           timezone,
           includeDetail: url.searchParams.get("include_detail") === "true",
+          postIds: days === null ? refresh.fetched_post_ids : undefined,
         });
         return new Response(JSON.stringify({
           success: true,
@@ -12407,7 +12489,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           account_id: brand.account_id,
           threads_user_id: brand.profile.threads_user_id,
           purpose: "fresh_recent_insights_pull",
-          hours: page.hours,
+          mode: days === null ? "latest_page" : "days_window",
+          days: page.days,
           timezone: page.timezone,
           sort: page.sort,
           refresh,
@@ -12417,6 +12500,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           limit,
           offset,
           has_more: page.totalCount > offset + page.insights.length,
+          next_cursor: refresh.next_cursor,
+          threads_has_more: refresh.has_more,
+          cursor_depth: cursorDepth + refresh.pages_fetched - 1,
+          page_size: 40,
         }), {
           status: 200,
           headers: { "content-type": "application/json; charset=UTF-8" },

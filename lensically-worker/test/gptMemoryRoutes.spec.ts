@@ -1425,7 +1425,7 @@ describe("GPT memory browser routes", () => {
       return new Response(JSON.stringify({}), { status: 500 });
     }));
 
-    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&hours=72&limit=1`, {
+    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&limit=1`, {
       headers: { Authorization: "Bearer test-gpt-key" },
     });
 
@@ -1434,13 +1434,16 @@ describe("GPT memory browser routes", () => {
       success: true,
       brand_key: TEST_BRAND_KEY,
       purpose: "fresh_recent_insights_pull",
-      hours: 72,
+      mode: "latest_page",
+      days: null,
+      page_size: 40,
       returned_count: 1,
       refresh: expect.objectContaining({
         attempted: true,
         refreshed: true,
         pages_fetched: 1,
         posts_upserted: 1,
+        fetched_post_ids: ["post-888"],
       }),
       insights: [
         expect.objectContaining({
@@ -1543,13 +1546,15 @@ describe("GPT memory browser routes", () => {
       return new Response(JSON.stringify({}), { status: 500 });
     }));
 
-    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&hours=72&limit=10`, {
+    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&limit=10`, {
       headers: { Authorization: "Bearer test-gpt-key" },
     });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
+      mode: "latest_page",
+      days: null,
       total_count: 1,
       returned_count: 1,
       insights: [
@@ -1566,6 +1571,93 @@ describe("GPT memory browser routes", () => {
         }),
       ],
     });
+  });
+
+  it("fetches Threads insights by page until the requested posted-day window is crossed", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const nowMs = Date.now();
+    const pageOneIso = new Date(nowMs - 6 * 60 * 60 * 1000).toISOString();
+    const pageTwoIso = new Date(nowMs - 30 * 60 * 60 * 1000).toISOString();
+    const pageThreeIso = new Date(nowMs - 80 * 60 * 60 * 1000).toISOString();
+
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const requestUrl = String(input);
+      if (requestUrl.includes("graph.threads.net/v1.0/me?")) {
+        return new Response(JSON.stringify({
+          id: TEST_THREADS_USER_ID,
+          username: "vectrixvoltmore",
+          threads_profile_picture_url: "https://cdn.example.com/avatar.jpg",
+        }), { status: 200 });
+      }
+      if (requestUrl.includes(`/${TEST_THREADS_USER_ID}/threads?`) && !requestUrl.includes("after=")) {
+        return new Response(JSON.stringify({
+          data: [
+            { id: "page-1-post", text: "Page one post", timestamp: pageOneIso, permalink: "https://threads.net/page-1-post", username: "vectrixvoltmore" },
+          ],
+          paging: { next: "https://graph.threads.net/next", cursors: { after: "cursor-page-2" } },
+        }), { status: 200 });
+      }
+      if (requestUrl.includes("after=cursor-page-2")) {
+        return new Response(JSON.stringify({
+          data: [
+            { id: "page-2-post", text: "Page two post", timestamp: pageTwoIso, permalink: "https://threads.net/page-2-post", username: "vectrixvoltmore" },
+          ],
+          paging: { next: "https://graph.threads.net/next", cursors: { after: "cursor-page-3" } },
+        }), { status: 200 });
+      }
+      if (requestUrl.includes("after=cursor-page-3")) {
+        return new Response(JSON.stringify({
+          data: [
+            { id: "page-3-old-post", text: "Old page three post", timestamp: pageThreeIso, permalink: "https://threads.net/page-3-old-post", username: "vectrixvoltmore" },
+          ],
+          paging: { next: "https://graph.threads.net/next", cursors: { after: "cursor-page-4" } },
+        }), { status: 200 });
+      }
+      if (requestUrl.includes("/insights?")) {
+        const postId = requestUrl.includes("page-1-post")
+          ? "page-1-post"
+          : requestUrl.includes("page-2-post")
+            ? "page-2-post"
+            : "page-3-old-post";
+        const base = postId === "page-1-post" ? 100 : postId === "page-2-post" ? 50 : 5;
+        return new Response(JSON.stringify({
+          data: [
+            { name: "views", total_value: { value: base } },
+            { name: "likes", total_value: { value: base / 10 } },
+            { name: "replies", total_value: { value: 1 } },
+            { name: "reposts", total_value: { value: 0 } },
+            { name: "quotes", total_value: { value: 0 } },
+            { name: "shares", total_value: { value: 0 } },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 500 });
+    }));
+
+    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&days=2&limit=10`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      mode?: string;
+      days?: number | null;
+      refresh?: { pages_fetched?: number; stopped_reason?: string; next_cursor?: string | null; fetched_post_ids?: string[] };
+      total_count?: number;
+      insights?: Array<{ post_id?: string }>;
+    };
+    expect(payload).toMatchObject({
+      mode: "days_window",
+      days: 2,
+      total_count: 2,
+      refresh: expect.objectContaining({
+        pages_fetched: 3,
+        stopped_reason: "window_complete",
+        next_cursor: "cursor-page-4",
+        fetched_post_ids: ["page-1-post", "page-2-post", "page-3-old-post"],
+      }),
+    });
+    expect(payload.insights?.map((post) => post.post_id)).toEqual(["page-1-post", "page-2-post"]);
   });
 
   it("hides rule proposals that have duplicate approved rules", async () => {
