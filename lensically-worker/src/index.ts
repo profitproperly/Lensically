@@ -8069,6 +8069,66 @@ function markGptActionsNonConsequential(schema: Record<string, unknown>): void {
   }
 }
 
+const GPT_OPENAPI_EXPORTED_OPERATION_IDS = new Set([
+  "getOperatorPlaybook",
+  "listAccounts",
+  "createPreflightSnapshot",
+  "getPreflightSnapshotManifest",
+  "getPreflightSnapshotPage",
+  "checkDraftSimilarity",
+  "listSavedPatterns",
+  "listRecentPosts",
+  "getRecentInsights",
+  "getGrowthContext",
+  "prepareGrowthReview",
+  "listGenerationRuns",
+  "createGenerationRun",
+  "saveGenerationDrafts",
+  "updateGenerationDraft",
+  "saveTasteFeedback",
+  "saveRuleReview",
+  "saveExperiment",
+  "savePatternAdaptation",
+  "listScheduledPosts",
+  "updateDesiredSlots",
+  "schedulePost",
+  "scheduleBatchPosts",
+  "listBatchPresets",
+  "saveBatchPreset",
+  "listStrategyMemory",
+  "saveStrategyMemory",
+  "updateStrategyMemory",
+  "prepareMemoryHygieneReview",
+  "applyMemoryHygieneActions",
+]);
+
+function pruneGptOpenApiSchemaForCustomGptLimit(schema: Record<string, unknown>): void {
+  const paths = schema.paths;
+  if (!paths || typeof paths !== "object" || Array.isArray(paths)) {
+    return;
+  }
+
+  for (const [path, pathItem] of Object.entries(paths)) {
+    if (!pathItem || typeof pathItem !== "object" || Array.isArray(pathItem)) {
+      continue;
+    }
+    const pathRecord = pathItem as Record<string, unknown>;
+    for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+      const operation = pathRecord[method];
+      if (!operation || typeof operation !== "object" || Array.isArray(operation)) {
+        continue;
+      }
+      const operationId = (operation as Record<string, unknown>).operationId;
+      if (typeof operationId !== "string" || !GPT_OPENAPI_EXPORTED_OPERATION_IDS.has(operationId)) {
+        delete pathRecord[method];
+      }
+    }
+    if (Object.keys(pathRecord).length === 0) {
+      delete (paths as Record<string, unknown>)[path];
+    }
+  }
+}
+
 function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
   const schema: Record<string, unknown> = {
     openapi: "3.1.0",
@@ -8975,6 +9035,7 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
     },
   };
   markGptActionsNonConsequential(schema);
+  pruneGptOpenApiSchemaForCustomGptLimit(schema);
   return schema;
 }
 

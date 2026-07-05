@@ -64,6 +64,7 @@ For long goals, use checkpoint commits: when a coherent safe milestone is reache
 
 - Prefer one final verification/deploy pass per coherent work set. Avoid repeated full tests, frontend builds, Chrome schema refreshes, and Cloudflare deploys inside the same larger task unless a focused check or live deploy is needed to diagnose a blocker.
 - During larger goals, avoid refreshing the Lensically Operator GPT schema after each intermediate GPT action change. Batch schema/instruction refreshes at the end, unless the GPT needs the new action immediately for the next step or the user asks for a checkpoint that should be usable from the GPT.
+- When the Lensically Operator GPT OpenAPI schema or GPT-facing action behavior changes, refresh the Custom GPT action schema before final handoff unless blocked. Use the Chrome extension browser path first; do not claim schema refresh is unavailable until the Chrome extension skill/browser-client path has been attempted and any blocker is captured in `OPERATING_MEMORY.md`.
 - If `lensically-web/**` changed, run frontend checks and deploy the frontend once at the end if runtime code changed.
 - If `lensically-worker/**` changed, run backend checks and deploy the worker once at the end if runtime code changed.
 - Local agent work is multi-account by default. Do not add brand-specific agent runtimes unless the user explicitly asks for a one-off experiment.

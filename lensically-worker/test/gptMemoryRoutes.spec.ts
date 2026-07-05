@@ -340,6 +340,14 @@ describe("GPT memory browser routes", () => {
       get?: { parameters?: Array<{ name?: string; schema?: { default?: unknown } }>; "x-openai-isConsequential"?: boolean };
       post?: { "x-openai-isConsequential"?: boolean };
     }> };
+    const operationIds = Object.values(schema.paths ?? {}).flatMap((pathItem) =>
+      [pathItem.get, pathItem.post]
+        .filter((operation): operation is NonNullable<typeof operation> => Boolean(operation))
+        .map((operation) => (operation as { operationId?: string }).operationId)
+    );
+    expect(operationIds.length).toBeLessThanOrEqual(30);
+    expect(operationIds).toContain("getRecentInsights");
+    expect(operationIds).not.toContain("getBrandContext");
     expect(schema.paths?.["/api/gpt/operator-playbook"]).toBeTruthy();
     for (const pathItem of Object.values(schema.paths ?? {})) {
       for (const operation of [pathItem.get, pathItem.post]) {
@@ -348,8 +356,9 @@ describe("GPT memory browser routes", () => {
         }
       }
     }
-    const generationParams = schema.paths?.["/api/gpt/generation-context"]?.get?.parameters ?? [];
-    expect(generationParams.find((param) => param.name === "compact")?.schema?.default).toBe(true);
+    const insightsParams = schema.paths?.["/api/gpt/insights/recent"]?.get?.parameters ?? [];
+    expect(insightsParams.find((param) => param.name === "limit")?.schema?.default).toBe(40);
+    expect(insightsParams.map((param) => param.name)).toEqual(expect.arrayContaining(["days", "max_pages", "cursor", "cursor_depth"]));
     const growthParams = schema.paths?.["/api/gpt/growth-context"]?.get?.parameters ?? [];
     expect(growthParams.find((param) => param.name === "include_detail")?.schema?.default).toBe(false);
 
