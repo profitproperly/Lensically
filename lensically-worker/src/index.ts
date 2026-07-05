@@ -9649,13 +9649,13 @@ async function upsertThreadsPostsArchive(
         post_permalink = excluded.post_permalink,
         post_username = excluded.post_username,
         profile_picture_url = excluded.profile_picture_url,
-        views = excluded.views,
-        likes = excluded.likes,
-        replies = excluded.replies,
-        reposts = excluded.reposts,
-        quotes = excluded.quotes,
-        shares = excluded.shares,
-        engagement_total = excluded.engagement_total,
+        views = max(threads_posts_archive.views, excluded.views),
+        likes = max(threads_posts_archive.likes, excluded.likes),
+        replies = max(threads_posts_archive.replies, excluded.replies),
+        reposts = max(threads_posts_archive.reposts, excluded.reposts),
+        quotes = max(threads_posts_archive.quotes, excluded.quotes),
+        shares = max(threads_posts_archive.shares, excluded.shares),
+        engagement_total = max(threads_posts_archive.engagement_total, excluded.engagement_total),
         source_rank = excluded.source_rank,
         last_seen_at = CURRENT_TIMESTAMP,
         last_synced_at = CURRENT_TIMESTAMP`,
@@ -11142,16 +11142,26 @@ async function fetchThreadsPostsPageWithInsights(
             const reposts = pickThreadsMetricValue(metricMap.reposts, basePost.reposts);
             const quotes = pickThreadsMetricValue(metricMap.quotes, basePost.quotes);
             const shares = metricMap.shares;
+            const protectedViews = Math.max(fallbackPost?.views ?? 0, views);
+            const protectedLikes = Math.max(fallbackPost?.likes ?? 0, likes);
+            const protectedReplies = Math.max(fallbackPost?.replies ?? 0, replies);
+            const protectedReposts = Math.max(fallbackPost?.reposts ?? 0, reposts);
+            const protectedQuotes = Math.max(fallbackPost?.quotes ?? 0, quotes);
+            const protectedShares = Math.max(fallbackPost?.shares ?? 0, shares);
+            const protectedEngagementTotal = Math.max(
+              fallbackPost?.engagement_total ?? 0,
+              protectedLikes + protectedReplies + protectedReposts + protectedQuotes + protectedShares,
+            );
 
             return {
               ...basePost,
-              views,
-              likes,
-              replies,
-              reposts,
-              quotes,
-              shares,
-              engagement_total: likes + replies + reposts + quotes + shares,
+              views: protectedViews,
+              likes: protectedLikes,
+              replies: protectedReplies,
+              reposts: protectedReposts,
+              quotes: protectedQuotes,
+              shares: protectedShares,
+              engagement_total: protectedEngagementTotal,
               metrics_loaded: true,
             };
           } catch {

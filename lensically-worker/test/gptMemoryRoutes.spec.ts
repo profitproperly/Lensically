@@ -1478,6 +1478,104 @@ describe("GPT memory browser routes", () => {
     });
   });
 
+  it("does not overwrite archived post metrics with zero live insight values", async () => {
+    await createPostedTaggedPostFixture();
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const nowIso = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const requestUrl = typeof input === "string" ? input : input.toString();
+      if (requestUrl.includes("/me?fields=")) {
+        return new Response(JSON.stringify({
+          id: TEST_THREADS_USER_ID,
+          username: "vectrixvoltmore",
+          name: "Vectrix",
+          threads_profile_picture_url: "https://cdn.example.com/profile.jpg",
+        }), { status: 200 });
+      }
+      if (requestUrl.includes(`/${TEST_THREADS_USER_ID}/threads?`)) {
+        return new Response(JSON.stringify({
+          data: [
+            {
+              id: "post-888",
+              text: "Fresh live text with zero metrics",
+              timestamp: nowIso,
+              permalink: "https://threads.net/post-888",
+              username: "vectrixvoltmore",
+              view_count: 0,
+              like_count: 0,
+              reply_count: 0,
+              repost_count: 0,
+              quote_count: 0,
+            },
+          ],
+          paging: { cursors: {} },
+        }), { status: 200 });
+      }
+      if (requestUrl.includes("/post-888/insights?")) {
+        return new Response(JSON.stringify({
+          data: [
+            { name: "views", total_value: { value: 0 } },
+            { name: "likes", total_value: { value: 0 } },
+            { name: "replies", total_value: { value: 0 } },
+            { name: "reposts", total_value: { value: 0 } },
+            { name: "quotes", total_value: { value: 0 } },
+            { name: "shares", total_value: { value: 0 } },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 500 });
+    }));
+
+    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&limit=1`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      returned_count: 1,
+      refresh: expect.objectContaining({
+        posts_upserted: 1,
+        fetched_post_ids: ["post-888"],
+      }),
+      insights: [
+        expect.objectContaining({
+          post_id: "post-888",
+          views: 1200,
+          likes: 90,
+          replies: 12,
+          reposts: 8,
+          quote_posts: 2,
+          shares: 1,
+          engagement_total: 113,
+        }),
+      ],
+    });
+
+    const archiveRow = await env.DB.prepare(
+      `SELECT views, likes, replies, reposts, quotes, shares, engagement_total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ? AND post_id = 'post-888'`,
+    ).bind(TEST_THREADS_USER_ID).first<{
+      views: number;
+      likes: number;
+      replies: number;
+      reposts: number;
+      quotes: number;
+      shares: number;
+      engagement_total: number;
+    }>();
+    expect(archiveRow).toEqual({
+      views: 1200,
+      likes: 90,
+      replies: 12,
+      reposts: 8,
+      quotes: 2,
+      shares: 1,
+      engagement_total: 113,
+    });
+  });
+
   it("falls back to the Lensically insights cache when the archive has no recent rows", async () => {
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
     const nowIso = new Date().toISOString();
