@@ -24,6 +24,8 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_generation_runs").run();
   await env.DB.prepare("DROP TABLE IF EXISTS gpt_preflight_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_posts_archive").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS threads_post_insights_cache").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS threads_posts_cache_state").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_follower_snapshots").run();
   await env.DB.prepare("DROP TABLE IF EXISTS threads_accounts").run();
   await env.DB.prepare("DROP TABLE IF EXISTS agent_account_controls").run();
@@ -1459,6 +1461,108 @@ describe("GPT memory browser routes", () => {
             hook_style: "direct",
           }),
           permalink: "https://threads.net/post-888",
+        }),
+      ],
+    });
+  });
+
+  it("falls back to the Lensically insights cache when the archive has no recent rows", async () => {
+    (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    const nowIso = new Date().toISOString();
+    await env.DB.prepare(
+      `CREATE TABLE threads_posts_archive (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT NOT NULL,
+        post_text TEXT,
+        post_timestamp TEXT,
+        post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        engagement_total INTEGER NOT NULL DEFAULT 0,
+        source_rank INTEGER NOT NULL DEFAULT 0,
+        first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (threads_user_id, post_id)
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `CREATE TABLE threads_post_insights_cache (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT PRIMARY KEY,
+        post_text TEXT,
+        post_timestamp TEXT,
+        post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        engagement_total INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink, post_username,
+        views, likes, replies, reposts, quotes, shares, engagement_total, source_rank
+      ) VALUES (?, 'old-archive-post', 'Old archive post', '2026-01-01T15:00:00.000Z', 'https://threads.net/old', 'vectrixvoltmore',
+        10, 1, 0, 0, 0, 0, 1, 0)`,
+    ).bind(TEST_THREADS_USER_ID).run();
+    await env.DB.prepare(
+      `INSERT INTO threads_post_insights_cache (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink, post_username,
+        views, likes, replies, reposts, quotes, shares, engagement_total, sort_order
+      ) VALUES (?, 'cache-recent-post', 'Cached recent insights post', ?, 'https://threads.net/cache-recent-post', 'vectrixvoltmore',
+        900, 45, 6, 3, 2, 1, 57, 0)`,
+    ).bind(TEST_THREADS_USER_ID, nowIso).run();
+
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const requestUrl = String(input);
+      if (requestUrl.includes("graph.threads.net/v1.0/me?")) {
+        return new Response(JSON.stringify({
+          id: TEST_THREADS_USER_ID,
+          username: "vectrixvoltmore",
+          threads_profile_picture_url: "https://cdn.example.com/avatar.jpg",
+        }), { status: 200 });
+      }
+      if (requestUrl.includes(`/${TEST_THREADS_USER_ID}/threads?`)) {
+        return new Response(JSON.stringify({ data: [], paging: { cursors: {} } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 500 });
+    }));
+
+    const response = await fetchFromWorker(`/api/gpt/insights/recent?brand_key=${TEST_BRAND_KEY}&hours=72&limit=10`, {
+      headers: { Authorization: "Bearer test-gpt-key" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      total_count: 1,
+      returned_count: 1,
+      insights: [
+        expect.objectContaining({
+          post_id: "cache-recent-post",
+          text: "Cached recent insights post",
+          views: 900,
+          likes: 45,
+          replies: 6,
+          reposts: 3,
+          quote_posts: 2,
+          shares: 1,
+          engagement_total: 57,
         }),
       ],
     });

@@ -5460,6 +5460,35 @@ async function listGptRecentInsights(
     doesTableExist(env, "scheduled_posts"),
     doesTableExist(env, "gpt_post_strategy_tags"),
   ]);
+  type GptRecentInsightsRow = {
+    post_id: string;
+    post_text: string | null;
+    post_timestamp: string | null;
+    post_permalink: string | null;
+    post_username: string | null;
+    views: number | string | null;
+    likes: number | string | null;
+    replies: number | string | null;
+    reposts: number | string | null;
+    quotes: number | string | null;
+    shares: number | string | null;
+    engagement_total: number | string | null;
+    last_synced_at: string | null;
+    scheduled_post_id: number | string | null;
+    scheduled_published_at: string | null;
+    scheduled_time: string | null;
+    tag_account_id: string | null;
+    tag_threads_user_id: string | null;
+    pillar: string | null;
+    hook_style: string | null;
+    format: string | null;
+    intent: string | null;
+    experiment: string | null;
+    novelty_level: string | null;
+    tag_metadata_json: string | null;
+    tag_created_at: string | null;
+    tag_updated_at: string | null;
+  };
   const scheduledSelect = scheduledExists
     ? `s.id AS scheduled_post_id,
        s.published_at AS scheduled_published_at,
@@ -5471,6 +5500,11 @@ async function listGptRecentInsights(
     ? `LEFT JOIN scheduled_posts s
          ON s.threads_user_id = a.threads_user_id
         AND s.published_post_id = a.post_id`
+    : "";
+  const scheduledCacheJoin = scheduledExists
+    ? `LEFT JOIN scheduled_posts s
+         ON s.threads_user_id = c.threads_user_id
+        AND s.published_post_id = c.post_id`
     : "";
   const tagSelect = tagsExists
     ? `t.account_id AS tag_account_id,
@@ -5526,35 +5560,39 @@ async function listGptRecentInsights(
      LIMIT 2500`,
   )
     .bind(brand.profile.threads_user_id, sinceIso)
-    .all<{
-      post_id: string;
-      post_text: string | null;
-      post_timestamp: string | null;
-      post_permalink: string | null;
-      post_username: string | null;
-      views: number | string | null;
-      likes: number | string | null;
-      replies: number | string | null;
-      reposts: number | string | null;
-      quotes: number | string | null;
-      shares: number | string | null;
-      engagement_total: number | string | null;
-      last_synced_at: string | null;
-      scheduled_post_id: number | string | null;
-      scheduled_published_at: string | null;
-      scheduled_time: string | null;
-      tag_account_id: string | null;
-      tag_threads_user_id: string | null;
-      pillar: string | null;
-      hook_style: string | null;
-      format: string | null;
-      intent: string | null;
-      experiment: string | null;
-      novelty_level: string | null;
-      tag_metadata_json: string | null;
-      tag_created_at: string | null;
-      tag_updated_at: string | null;
-    }>();
+    .all<GptRecentInsightsRow>();
+  let recentRows = rows.results ?? [];
+  if (recentRows.length === 0) {
+    await ensureThreadsPostsCacheTable(env);
+    const cachedRows = await env.DB.prepare(
+      `SELECT
+         c.post_id,
+         c.post_text,
+         c.post_timestamp,
+         c.post_permalink,
+         c.post_username,
+         c.views,
+         c.likes,
+         c.replies,
+         c.reposts,
+         c.quotes,
+         c.shares,
+         c.engagement_total,
+         c.last_refreshed_at AS last_synced_at,
+         ${scheduledSelect},
+         ${tagSelect}
+       FROM threads_post_insights_cache c
+       ${scheduledCacheJoin}
+       ${tagJoin}
+       WHERE c.threads_user_id = ?
+         AND datetime(c.post_timestamp) >= datetime(?)
+       ORDER BY datetime(c.post_timestamp) DESC, c.engagement_total DESC, c.likes DESC
+       LIMIT 2500`,
+    )
+      .bind(brand.profile.threads_user_id, sinceIso)
+      .all<GptRecentInsightsRow>();
+    recentRows = cachedRows.results ?? [];
+  }
   const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, Math.max(Math.ceil(hours / 24) + 3, 7));
   const dailyGrowth = followerSnapshots.map((snapshot, index) => {
     const previous = index > 0 ? followerSnapshots[index - 1] : null;
@@ -5565,7 +5603,7 @@ async function listGptRecentInsights(
   });
   const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day.net_change]));
   const nowMs = Date.now();
-  const records: GptRecentInsightRecord[] = (rows.results ?? []).map((row) => {
+  const records: GptRecentInsightRecord[] = recentRows.map((row) => {
     const publishedAt = row.post_timestamp ?? row.scheduled_published_at ?? row.scheduled_time ?? null;
     const publishedMs = publishedAt ? Date.parse(publishedAt) : Number.NaN;
     const ageHours = Number.isFinite(publishedMs)
