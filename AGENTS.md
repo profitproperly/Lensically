@@ -3,8 +3,9 @@
 ## Start Here
 
 - Read this file at the start of every new chat.
-- Read `C:\Users\brian\.codex\OPERATING_MEMORY.md` at the start of every new chat before project work. Global durable memory is mandatory, not optional.
-- Read `OPERATING_MEMORY.md` immediately after this file. Add concise entries there whenever you find a repeated slowdown, bad assumption, credential/deploy trap, or workflow fix that future agents should not rediscover.
+- Read `OPERATING_MEMORY.md` immediately after this file. Project durable memory is the default source and write target for project-specific facts.
+- Read `C:\Users\brian\.codex\OPERATING_MEMORY.md` before project work for cross-project rules only. Do not write project-specific Lensically facts there.
+- Add concise entries to project `OPERATING_MEMORY.md` whenever you find a repeated slowdown, bad assumption, credential/deploy trap, or workflow fix that future Lensically agents should not rediscover.
 - Read the repository before editing code.
 - Prefer small, production-safe changes over broad rewrites.
 - Preserve unrelated local changes. Do not reset or overwrite work you did not make.
