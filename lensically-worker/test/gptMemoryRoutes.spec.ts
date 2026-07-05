@@ -1585,7 +1585,7 @@ describe("GPT memory browser routes", () => {
   it("fetches Threads insights by page until the requested posted-day window is crossed", async () => {
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
     const nowMs = Date.now();
-    const pageOneIso = new Date(nowMs - 6 * 60 * 60 * 1000).toISOString();
+    const pageOneIso = new Date(nowMs - 6 * 60 * 60 * 1000).toUTCString();
     const pageTwoIso = new Date(nowMs - 30 * 60 * 60 * 1000).toISOString();
     const pageThreeIso = new Date(nowMs - 80 * 60 * 60 * 1000).toISOString();
 

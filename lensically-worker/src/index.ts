@@ -5457,6 +5457,7 @@ async function listGptRecentInsights(
   const offset = Math.max(Math.trunc(input.offset), 0);
   const timezone = isValidIanaTimezone(input.timezone) ? input.timezone : THREADS_INSIGHTS_TIME_ZONE;
   const sinceIso = days === null ? null : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const sinceMs = sinceIso ? Date.parse(sinceIso) : null;
   const normalizedPostIds = Array.from(new Set((input.postIds ?? []).map((postId) => postId.trim()).filter(Boolean))).slice(0, 2500);
   const restrictToFetchedPostIds = input.postIds !== undefined;
   const postIdPlaceholders = normalizedPostIds.map(() => "?").join(", ");
@@ -5466,8 +5467,8 @@ async function listGptRecentInsights(
   const cachePostFilterClause = normalizedPostIds.length
     ? `AND c.post_id IN (${postIdPlaceholders})`
     : "";
-  const sinceFilterClause = sinceIso ? "AND datetime(a.post_timestamp) >= datetime(?)" : "";
-  const cacheSinceFilterClause = sinceIso ? "AND datetime(c.post_timestamp) >= datetime(?)" : "";
+  const sinceFilterClause = "";
+  const cacheSinceFilterClause = "";
   const [scheduledExists, tagsExists] = await Promise.all([
     doesTableExist(env, "scheduled_posts"),
     doesTableExist(env, "gpt_post_strategy_tags"),
@@ -5574,7 +5575,7 @@ async function listGptRecentInsights(
        ORDER BY datetime(a.post_timestamp) DESC, a.engagement_total DESC, a.likes DESC
        LIMIT 2500`,
     )
-      .bind(...[brand.profile.threads_user_id, ...(sinceIso ? [sinceIso] : []), ...normalizedPostIds])
+      .bind(...[brand.profile.threads_user_id, ...normalizedPostIds])
       .all<GptRecentInsightsRow>();
     recentRows = rows.results ?? [];
   }
@@ -5606,7 +5607,7 @@ async function listGptRecentInsights(
        ORDER BY datetime(c.post_timestamp) DESC, c.engagement_total DESC, c.likes DESC
        LIMIT 2500`,
     )
-      .bind(...[brand.profile.threads_user_id, ...(sinceIso ? [sinceIso] : []), ...normalizedPostIds])
+      .bind(...[brand.profile.threads_user_id, ...normalizedPostIds])
       .all<GptRecentInsightsRow>();
     recentRows = cachedRows.results ?? [];
   }
@@ -5667,20 +5668,30 @@ async function listGptRecentInsights(
       account_username: row.post_username,
       last_synced_at: row.last_synced_at,
     };
+  }).filter((record) => {
+    if (sinceMs === null) {
+      return true;
+    }
+    const publishedMs = record.published_at ? Date.parse(record.published_at) : Number.NaN;
+    return Number.isFinite(publishedMs) && publishedMs >= sinceMs;
   });
   const sortedRecords = [...records].sort((left, right) => {
+    const leftPublishedMs = left.published_at ? Date.parse(left.published_at) : Number.NaN;
+    const rightPublishedMs = right.published_at ? Date.parse(right.published_at) : Number.NaN;
+    const publishedDesc = (Number.isFinite(rightPublishedMs) ? rightPublishedMs : -Infinity)
+      - (Number.isFinite(leftPublishedMs) ? leftPublishedMs : -Infinity);
     switch (input.sort) {
       case "engagement_total_desc":
-        return right.engagement_total - left.engagement_total || String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+        return right.engagement_total - left.engagement_total || publishedDesc;
       case "likes_desc":
-        return right.likes - left.likes || right.engagement_total - left.engagement_total || String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+        return right.likes - left.likes || right.engagement_total - left.engagement_total || publishedDesc;
       case "views_desc":
-        return right.views - left.views || right.engagement_total - left.engagement_total || String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+        return right.views - left.views || right.engagement_total - left.engagement_total || publishedDesc;
       case "follower_day_net_change_desc":
         return (right.follower_day_net_change ?? -999999) - (left.follower_day_net_change ?? -999999) || right.engagement_total - left.engagement_total;
       case "published_at_desc":
       default:
-        return String(right.published_at ?? "").localeCompare(String(left.published_at ?? "")) || right.engagement_total - left.engagement_total;
+        return publishedDesc || right.engagement_total - left.engagement_total;
     }
   });
   return {
@@ -12535,7 +12546,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           cursor,
           cursorDepth,
         });
-        const page = await listGptRecentInsights(env, brand, {
+        let page = await listGptRecentInsights(env, brand, {
           days,
           limit,
           offset,
@@ -12544,6 +12555,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           includeDetail: url.searchParams.get("include_detail") === "true",
           postIds: days === null ? refresh.fetched_post_ids : undefined,
         });
+        let readFallbackUsed = false;
+        if (days === null && refresh.posts_upserted > 0 && page.totalCount === 0 && refresh.fetched_post_ids.length > 0) {
+          page = await listGptRecentInsights(env, brand, {
+            days,
+            limit,
+            offset,
+            sort,
+            timezone,
+            includeDetail: url.searchParams.get("include_detail") === "true",
+          });
+          readFallbackUsed = true;
+        }
         return new Response(JSON.stringify({
           success: true,
           brand_key: brand.brand_key,
@@ -12561,6 +12584,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           limit,
           offset,
           has_more: page.totalCount > offset + page.insights.length,
+          read_fallback_used: readFallbackUsed,
+          read_filter: readFallbackUsed
+            ? "latest_account_rows_after_fetched_ids_empty"
+            : (days === null ? "fetched_post_ids" : "posted_day_window"),
           next_cursor: refresh.next_cursor,
           threads_has_more: refresh.has_more,
           cursor_depth: cursorDepth + refresh.pages_fetched - 1,
