@@ -8680,8 +8680,21 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     }
     const run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
     const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
-    const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
-      ? ((jobs.data as Record<string, unknown>).jobs as Array<Record<string, unknown>>).map((job) => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion }))
+        const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
+      ? ((jobs.data as Record<string, unknown>).jobs as Array<Record<string, unknown>>).map((job) => ({
+        id: job.id,
+        name: job.name,
+        status: job.status,
+        conclusion: job.conclusion,
+        steps: Array.isArray(job.steps)
+          ? (job.steps as Array<Record<string, unknown>>).map((step) => ({
+            name: step.name,
+            status: step.status,
+            conclusion: step.conclusion,
+            number: step.number,
+          }))
+          : [],
+      }))
       : [];
     const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
     return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList };
