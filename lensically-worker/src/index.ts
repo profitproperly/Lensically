@@ -504,7 +504,8 @@ async function resolveConfiguredThreadsAccount(
     };
   }
 
-    const bootstrapAccessToken = env[account.tokenEnv];
+    
+  const bootstrapAccessToken = env[account.tokenEnv];
   if (typeof bootstrapAccessToken === "string" && bootstrapAccessToken.trim()) {
     return {
       ...account,
