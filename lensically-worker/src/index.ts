@@ -8679,8 +8679,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       return { ok: false, error: "run_id_required" };
     }
     const run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
-    const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
-        const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
+        const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
+    const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
       ? ((jobs.data as Record<string, unknown>).jobs as Array<Record<string, unknown>>).map((job) => ({
         id: job.id,
         name: job.name,
@@ -8696,8 +8696,25 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
           : [],
       }))
       : [];
+    const failedJob = jobList.find((job) => job.conclusion === "failure");
+    const failedJobId = typeof failedJob?.id === "number" || typeof failedJob?.id === "string" ? String(failedJob.id) : null;
+    let failed_log_excerpt: string | null = null;
+    if (failedJobId) {
+      const config = githubRepoConfig(env);
+      const logResponse = await fetch(`https://api.github.com/repos/${config.owner}/${config.repo}/actions/jobs/${failedJobId}/logs`, {
+        headers: {
+          "accept": "text/plain",
+          "authorization": `Bearer ${config.token}`,
+          "user-agent": "lensically-engineering-mcp",
+          "x-github-api-version": "2022-11-28",
+        },
+      });
+      const logText = await logResponse.text().catch(() => "");
+      const compactLog = logText.replace(/\r/g, "").split("\n").filter((line) => line.trim()).slice(-140).join("\n");
+      failed_log_excerpt = compactLog.length > 10000 ? compactLog.slice(-10000) : compactLog;
+    }
     const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
-    return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList };
+    return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList, failed_log_excerpt };
   }
 
   if (toolName === "verifyDeployedMcpVersion") {
