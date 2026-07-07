@@ -360,6 +360,29 @@ describe("operator mode MCP endpoint", () => {
 
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
+    expect(toolNames.slice(0, 21)).toEqual([
+      "getMcpAdminState",
+      "inspectMcpFailure",
+      "listMcpTools",
+      "readMcpToolDefinition",
+      "updateMcpToolSchema",
+      "updateMcpToolBehavior",
+      "createMcpTool",
+      "disableMcpTool",
+      "runMcpTests",
+      "deployMcpChanges",
+      "rollbackMcpChanges",
+      "getWorkflowStatus",
+      "updateWorkflowRequirement",
+      "advanceWorkflowStage",
+      "prepareFullPreflight",
+      "updateGate",
+      "runGateSuite",
+      "submitAndGateDraft",
+      "createImplementationBacklogItem",
+      "listImplementationBacklogItems",
+      "markImplementationBacklogItemResolved",
+    ]);
     for (const name of [
       "list_accounts",
       "get_account_state",

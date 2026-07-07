@@ -7216,7 +7216,7 @@ async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, 
 
 async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
   await prepareOperatorMode(env);
-  const baseTools = [...OPERATOR_MCP_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS].map(cloneOperatorMcpTool);
+  const baseTools = [...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS].map(cloneOperatorMcpTool);
   const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
   const overrides = await listOperatorMcpOverrides(env);
   for (const override of overrides) {
@@ -7402,6 +7402,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
     status,
     headers: {
       "content-type": "application/json; charset=UTF-8",
+      "cache-control": "no-store",
       ...extraHeaders,
     },
   });
@@ -7664,12 +7665,12 @@ function operatorMcpInitializeResult(requestedVersion: unknown): Record<string, 
   return {
     protocolVersion,
     capabilities: {
-      tools: { listChanged: false },
+      tools: { listChanged: true },
     },
     serverInfo: {
       name: "lensically-operator-mode",
       title: "Lensically Operator Mode",
-      version: "1.0.0",
+      version: "1.1.0",
     },
     instructions: operatorMcpInstructions(),
   };
