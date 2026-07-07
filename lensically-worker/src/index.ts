@@ -73,6 +73,10 @@ interface Env {
   LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;
   LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;
   LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;
+  GITHUB_TOKEN?: string;
+  GITHUB_OWNER?: string;
+  GITHUB_REPO?: string;
+  GITHUB_BRANCH?: string;
   APP_URL?: string;
   ROOT_SITE_URL?: string;
   WORKER_ORIGIN?: string;
@@ -5475,6 +5479,50 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     )`,
   ).run();
 
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_ops_memory (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      problem TEXT,
+      fix TEXT NOT NULL,
+      applies_when TEXT,
+      tags_json TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_engineering_audit (
+      id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      files_changed_json TEXT,
+      diff_summary TEXT,
+      tests_run_json TEXT,
+      result TEXT NOT NULL,
+      deployment_id TEXT,
+      rollback_target TEXT,
+      owner_approval TEXT,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_repo_write_sessions (
+      id TEXT PRIMARY KEY,
+      path TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      message TEXT NOT NULL,
+      summary TEXT,
+      content TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
   for (const requirement of DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS) {
     const existing = await env.DB.prepare(
       `SELECT id FROM operator_workflow_requirements WHERE brand_key IS NULL AND stage = ? LIMIT 1`,
@@ -6797,6 +6845,65 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
 
 type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
+const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
+  "engineeringPrecheck",
+  "getEngineeringAccessState",
+  "listRepoFiles",
+  "readRepoFile",
+  "searchRepoFiles",
+  "getRepoStatus",
+  "applyRepoTextPatch",
+  "startRepoFileWrite",
+  "appendRepoFileChunk",
+  "commitRepoFileWrite",
+  "createRepoFile",
+  "deleteRepoFile",
+  "listGitHubWorkflowRuns",
+  "runGitHubWorkflow",
+  "getGitHubWorkflowRun",
+  "deployBackend",
+  "verifyDeployedMcpVersion",
+  "listEngineeringAudit",
+  "listOpsMemory",
+  "readOpsMemory",
+  "recordOpsMemory",
+  "updateOpsMemory",
+  "searchOpsMemory",
+] as const;
+
+type OperatorMcpEngineeringToolName = typeof OPERATOR_MCP_ENGINEERING_TOOL_NAMES[number];
+
+const REPO_PATH_SCHEMA = {
+  type: "string",
+  description: "Repository-relative path. Keep narrow, for example lensically-worker/src/index.ts.",
+};
+
+const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
+  { name: "engineeringPrecheck", title: "Engineering precheck", description: "Load compact source-control, MCP, ops-memory, failure-pattern, gate, requirement, and runtime state before engineering work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "getEngineeringAccessState", title: "Get engineering access state", description: "Report GitHub/Cloudflare engineering access status without exposing secret values.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "listRepoFiles", title: "List repo files", description: "List GitHub repository files from the default branch with optional prefix filtering.", inputSchema: { type: "object", properties: { prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "readRepoFile", title: "Read repo file", description: "Read one GitHub repository file from the default branch, with optional line bounds.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, start_line: { type: "integer", minimum: 1 }, max_lines: { type: "integer", minimum: 1, maximum: 400 } }, required: ["path"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "searchRepoFiles", title: "Search repo files", description: "Search repository files by path and optional text query. Returns compact matches.", inputSchema: { type: "object", properties: { query: { type: "string" }, prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "getRepoStatus", title: "Get repo status", description: "Read the configured GitHub repo, branch, latest commit SHA, and recent engineering audit state.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "applyRepoTextPatch", title: "Apply repo text patch", description: "Apply one exact find/replace patch to a GitHub repo file and commit directly to the configured branch.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "find", "replace", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "startRepoFileWrite", title: "Start repo file write", description: "Start a chunked file write session for a GitHub repo path.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, mode: { type: "string", enum: ["replace", "create"] }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "mode", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "appendRepoFileChunk", title: "Append repo file chunk", description: "Append a compact text chunk to a pending repo file write session.", inputSchema: { type: "object", properties: { session_id: { type: "string" }, chunk: { type: "string" } }, required: ["session_id", "chunk"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "commitRepoFileWrite", title: "Commit repo file write", description: "Commit a pending chunked file write to GitHub.", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
+  { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "runGitHubWorkflow", title: "Run GitHub workflow", description: "Dispatch a configured GitHub Actions workflow for test/build/deploy tasks.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, ref: { type: "string" }, task: { type: "string", enum: ["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"] } }, required: ["workflow_id", "task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "getGitHubWorkflowRun", title: "Get GitHub workflow run", description: "Read one GitHub Actions workflow run and its compact job status.", inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "deployBackend", title: "Deploy backend", description: "Trigger the Lensically backend deploy workflow from GitHub Actions.", inputSchema: { type: "object", properties: { workflow_id: { type: "string", default: "lensically-engineering.yml" }, ref: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "verifyDeployedMcpVersion", title: "Verify deployed MCP version", description: "Verify the live deployed Lensically MCP endpoint version and tool count.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "listEngineeringAudit", title: "List engineering audit", description: "List compact audit entries for source edits, workflow dispatches, deploys, and memory updates.", inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 }, action: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "listOpsMemory", title: "List ops memory", description: "List compact operational fix memory entries.", inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 }, tag: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "readOpsMemory", title: "Read ops memory", description: "Read one operational fix memory entry.", inputSchema: { type: "object", properties: { memory_id: { type: "string" } }, required: ["memory_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "recordOpsMemory", title: "Record ops memory", description: "Record a compact operational fix memory entry for future ChatGPT work.", inputSchema: { type: "object", properties: { title: { type: "string" }, problem: { type: "string" }, fix: { type: "string" }, applies_when: { type: "string" }, tags: { type: "array", items: { type: "string" } } }, required: ["title", "fix"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "updateOpsMemory", title: "Update ops memory", description: "Update a compact operational fix memory entry.", inputSchema: { type: "object", properties: { memory_id: { type: "string" }, title: { type: "string" }, problem: { type: "string" }, fix: { type: "string" }, applies_when: { type: "string" }, tags: { type: "array", items: { type: "string" } }, active: { type: "boolean" } }, required: ["memory_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "searchOpsMemory", title: "Search ops memory", description: "Search operational fix memory entries by compact text query.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+];
+
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "getMcpAdminState",
@@ -7180,6 +7287,10 @@ function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToo
   return (OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(value);
 }
 
+function isOperatorMcpEngineeringToolName(value: string): value is OperatorMcpEngineeringToolName {
+  return (OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]).includes(value);
+}
+
 function mergeOperatorPlainObjects(base: unknown, patch: unknown): unknown {
   if (!base || typeof base !== "object" || Array.isArray(base) || !patch || typeof patch !== "object" || Array.isArray(patch)) {
     return patch === undefined ? base : patch;
@@ -7216,7 +7327,7 @@ async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, 
 
 async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
   await prepareOperatorMode(env);
-  const baseTools = [...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS].map(cloneOperatorMcpTool);
+  const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS].map(cloneOperatorMcpTool);
   const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
   const overrides = await listOperatorMcpOverrides(env);
   for (const override of overrides) {
@@ -7267,7 +7378,7 @@ async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promis
     : [];
   return {
     ...tool,
-    handler: isOperatorMcpAdminToolName(tool.name) ? "operator_mcp_admin_runtime" : "operator_tool_backend",
+    handler: isOperatorMcpEngineeringToolName(tool.name) ? "operator_mcp_engineering_runtime" : isOperatorMcpAdminToolName(tool.name) ? "operator_mcp_admin_runtime" : "operator_tool_backend",
     required_fields: required,
   };
 }
@@ -7388,6 +7499,145 @@ async function evaluateOperatorWorkflowRequirements(
     }
   }
   return { allowed: blockers.length === 0, blockers, requirements };
+}
+
+function githubRepoConfig(env: Env): { owner: string; repo: string; branch: string; token: string | null } {
+  return {
+    owner: env.GITHUB_OWNER?.trim() || "profitproperly",
+    repo: env.GITHUB_REPO?.trim() || "Lensically",
+    branch: env.GITHUB_BRANCH?.trim() || "main",
+    token: env.GITHUB_TOKEN?.trim() || null,
+  };
+}
+
+function sanitizeRepoPath(path: unknown): string {
+  const normalized = normalizeOperatorText(path, 500)?.replace(/\\/g, "/").replace(/^\/+/, "") ?? "";
+  if (!normalized || normalized.includes("..") || normalized.startsWith(".git/") || normalized === ".git") {
+    return "";
+  }
+  return normalized;
+}
+
+function textToBase64Utf8(value: string): string {
+  let binary = "";
+  const bytes = new TextEncoder().encode(value);
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function base64ToTextUtf8(value: string): string {
+  const binary = atob(value.replace(/\s/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+async function githubApi(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
+  const config = githubRepoConfig(env);
+  if (!config.token) {
+    return { ok: false, status: 401, data: { error: "github_token_missing" } };
+  }
+  const response = await fetch(`https://api.github.com${path}`, {
+    ...init,
+    headers: {
+      "accept": "application/vnd.github+json",
+      "authorization": `Bearer ${config.token}`,
+      "user-agent": "lensically-engineering-mcp",
+      "x-github-api-version": "2022-11-28",
+      ...(init.headers ?? {}),
+    },
+  });
+  const data = await response.json().catch(() => null);
+  return { ok: response.ok, status: response.status, data };
+}
+
+async function githubRepoApi(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
+  const config = githubRepoConfig(env);
+  return githubApi(env, `/repos/${config.owner}/${config.repo}${path}`, init);
+}
+
+async function getGithubFile(env: Env, repoPath: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number }> {
+  const config = githubRepoConfig(env);
+  const result = await githubRepoApi(env, `/contents/${encodeURIComponent(repoPath).replace(/%2F/g, "/")}?ref=${encodeURIComponent(config.branch)}`);
+  if (!result.ok || !result.data || typeof result.data !== "object" || Array.isArray(result.data)) {
+    return { ok: false, status: result.status, sha: null, content: null, size: 0 };
+  }
+  const data = result.data as Record<string, unknown>;
+  return {
+    ok: true,
+    status: result.status,
+    sha: typeof data.sha === "string" ? data.sha : null,
+    content: typeof data.content === "string" ? base64ToTextUtf8(data.content) : "",
+    size: Number(data.size ?? 0),
+  };
+}
+
+async function putGithubFile(env: Env, input: { path: string; content: string; message: string; sha?: string | null }): Promise<{ ok: boolean; status: number; commit_sha: string | null; data: unknown }> {
+  const config = githubRepoConfig(env);
+  const body: Record<string, unknown> = {
+    message: input.message,
+    content: textToBase64Utf8(input.content),
+    branch: config.branch,
+  };
+  if (input.sha) {
+    body.sha = input.sha;
+  }
+  const result = await githubRepoApi(env, `/contents/${encodeURIComponent(input.path).replace(/%2F/g, "/")}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const commit = result.data && typeof result.data === "object" && !Array.isArray(result.data)
+    ? (result.data as Record<string, unknown>).commit as Record<string, unknown> | undefined
+    : undefined;
+  return { ok: result.ok, status: result.status, commit_sha: typeof commit?.sha === "string" ? commit.sha : null, data: result.data };
+}
+
+async function recordEngineeringAudit(env: Env, input: {
+  action: string;
+  filesChanged?: string[];
+  diffSummary?: string | null;
+  testsRun?: Array<Record<string, unknown>>;
+  result: string;
+  deploymentId?: string | null;
+  rollbackTarget?: string | null;
+  ownerApproval?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): Promise<void> {
+  await prepareOperatorMode(env);
+  await env.DB.prepare(
+    `INSERT INTO operator_engineering_audit (
+      id, action, files_changed_json, diff_summary, tests_run_json, result, deployment_id,
+      rollback_target, owner_approval, metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    input.action,
+    JSON.stringify(input.filesChanged ?? []),
+    normalizeOperatorText(input.diffSummary, 2000, true),
+    JSON.stringify(input.testsRun ?? []),
+    input.result,
+    input.deploymentId ?? null,
+    input.rollbackTarget ?? null,
+    input.ownerApproval ?? null,
+    normalizeOperatorJson(input.metadata ?? {}, {}),
+  ).run();
+}
+
+function compactTextMatches(content: string, query: string, limit: number): Array<Record<string, unknown>> {
+  const lines = content.split(/\r?\n/);
+  const normalized = query.toLowerCase();
+  const matches: Array<Record<string, unknown>> = [];
+  for (let index = 0; index < lines.length && matches.length < limit; index += 1) {
+    if (lines[index]?.toLowerCase().includes(normalized)) {
+      matches.push({ line: index + 1, text: lines[index].slice(0, 240) });
+    }
+  }
+  return matches;
 }
 
 type JsonRpcRequest = {
@@ -8093,6 +8343,364 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
   return { ok: false, error: "admin_tool_not_implemented" };
 }
 
+async function handleOperatorMcpEngineeringTool(request: Request, env: Env, toolName: OperatorMcpEngineeringToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await prepareOperatorMode(env);
+  const config = githubRepoConfig(env);
+
+  if (toolName === "getEngineeringAccessState") {
+    return {
+      ok: true,
+      github: { owner: config.owner, repo: config.repo, branch: config.branch, token_status: config.token ? "exists" : "missing" },
+      cloudflare: { deploy_secret_status: "managed_by_github_actions_or_codex", raw_values_returned: false },
+      capabilities: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
+    };
+  }
+
+  if (toolName === "engineeringPrecheck") {
+    const tools = await buildOperatorMcpTools(env, true);
+    const requirements = await listOperatorWorkflowRequirements(env, null);
+    const memories = await env.DB.prepare(
+      `SELECT id, title, fix, applies_when, tags_json, updated_at
+       FROM operator_ops_memory
+       WHERE active = 1
+       ORDER BY datetime(updated_at) DESC
+       LIMIT 10`,
+    ).all<Record<string, unknown>>();
+    const failures = await env.DB.prepare(
+      `SELECT id, tool_name, likely_cause, created_at
+       FROM operator_mcp_admin_errors
+       ORDER BY datetime(created_at) DESC
+       LIMIT 10`,
+    ).all<Record<string, unknown>>();
+    const audits = await env.DB.prepare(
+      `SELECT id, action, files_changed_json, diff_summary, result, created_at
+       FROM operator_engineering_audit
+       ORDER BY datetime(created_at) DESC
+       LIMIT 10`,
+    ).all<Record<string, unknown>>();
+    return {
+      ok: true,
+      access: { github_token_status: config.token ? "exists" : "missing", repo: `${config.owner}/${config.repo}`, branch: config.branch },
+      tool_surface: { total_tools: tools.length, engineering_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length, admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length },
+      tool_block_prevention: [
+        "Prefer readRepoFile with line bounds before edits.",
+        "Prefer applyRepoTextPatch exact find/replace for small changes.",
+        "Use chunked file writes for large content.",
+        "Keep workflow dispatch output compact; request full logs only outside this MCP.",
+      ],
+      active_workflow_requirements: requirements.slice(0, 20),
+      recent_ops_memory: memories.results ?? [],
+      recent_failures: failures.results ?? [],
+      recent_successful_fixes: (audits.results ?? []).filter((item) => item.result === "ok").slice(0, 5),
+    };
+  }
+
+  if (toolName === "listRepoFiles") {
+    const prefix = sanitizeRepoPath(args.prefix ?? "");
+    const limit = Math.min(Math.max(Number(args.limit ?? 200), 1), 500);
+    const branch = await githubRepoApi(env, `/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
+    if (!branch.ok || !branch.data || typeof branch.data !== "object" || Array.isArray(branch.data)) {
+      return { ok: false, error: "github_tree_failed", status: branch.status };
+    }
+    const tree = Array.isArray((branch.data as Record<string, unknown>).tree) ? (branch.data as Record<string, unknown>).tree as Array<Record<string, unknown>> : [];
+    const files = tree
+      .filter((item) => item.type === "blob" && typeof item.path === "string" && (!prefix || String(item.path).startsWith(prefix)))
+      .slice(0, limit)
+      .map((item) => ({ path: item.path, size: item.size ?? null }));
+    return { ok: true, files, returned_count: files.length, truncated: files.length === limit };
+  }
+
+  if (toolName === "readRepoFile") {
+    const path = sanitizeRepoPath(args.path);
+    const file = path ? await getGithubFile(env, path) : null;
+    if (!file?.ok || file.content === null) {
+      return { ok: false, error: "repo_file_read_failed", status: file?.status ?? 400 };
+    }
+    const startLine = Math.max(Number(args.start_line ?? 1), 1);
+    const maxLines = Math.min(Math.max(Number(args.max_lines ?? 200), 1), 400);
+    const lines = file.content.split(/\r?\n/);
+    const selected = lines.slice(startLine - 1, startLine - 1 + maxLines);
+    return { ok: true, path, sha: file.sha, size: file.size, start_line: startLine, returned_lines: selected.length, total_lines: lines.length, content: selected.join("\n"), truncated: startLine - 1 + maxLines < lines.length };
+  }
+
+  if (toolName === "searchRepoFiles") {
+    const query = normalizeOperatorText(args.query, 200) ?? "";
+    if (!query) {
+      return { ok: false, error: "query_required" };
+    }
+    const prefix = sanitizeRepoPath(args.prefix ?? "");
+    const limit = Math.min(Math.max(Number(args.limit ?? 30), 1), 100);
+    const listed = await handleOperatorMcpEngineeringTool(request, env, "listRepoFiles", { prefix, limit: 500 }) as { files?: Array<{ path?: string }> };
+    const files = Array.isArray(listed.files) ? listed.files : [];
+    const matches: Array<Record<string, unknown>> = [];
+    for (const item of files) {
+      if (matches.length >= limit) break;
+      const path = sanitizeRepoPath(item.path);
+      if (!path) continue;
+      if (path.toLowerCase().includes(query.toLowerCase())) {
+        matches.push({ path, line_matches: [] });
+        continue;
+      }
+      if (!/\.(ts|tsx|js|jsx|json|md|yml|yaml|sql|txt|css|html)$/.test(path)) continue;
+      const file = await getGithubFile(env, path);
+      if (file.ok && file.content) {
+        const lineMatches = compactTextMatches(file.content, query, 3);
+        if (lineMatches.length > 0) {
+          matches.push({ path, line_matches: lineMatches });
+        }
+      }
+    }
+    return { ok: true, query, matches, returned_count: matches.length, truncated: matches.length === limit };
+  }
+
+  if (toolName === "getRepoStatus") {
+    const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
+    const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
+      ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
+      : undefined;
+    const audits = await env.DB.prepare(
+      `SELECT action, result, diff_summary, created_at
+       FROM operator_engineering_audit
+       ORDER BY datetime(created_at) DESC
+       LIMIT 5`,
+    ).all<Record<string, unknown>>();
+    return { ok: branch.ok, repo: `${config.owner}/${config.repo}`, branch: config.branch, latest_sha: commit?.sha ?? null, recent_audit: audits.results ?? [] };
+  }
+
+  if (toolName === "applyRepoTextPatch") {
+    const path = sanitizeRepoPath(args.path);
+    const find = normalizeOperatorText(args.find, 20000);
+    const replace = typeof args.replace === "string" ? args.replace : "";
+    const message = normalizeOperatorText(args.message, 200);
+    if (!path || !find || !message) {
+      return { ok: false, error: "path_find_message_required" };
+    }
+    const file = await getGithubFile(env, path);
+    if (!file.ok || file.content === null) {
+      return { ok: false, error: "repo_file_read_failed", status: file.status };
+    }
+    const count = file.content.split(find).length - 1;
+    if (count !== 1) {
+      return { ok: false, error: "find_must_match_once", match_count: count };
+    }
+    const nextContent = file.content.replace(find, replace);
+    const put = await putGithubFile(env, { path, content: nextContent, message, sha: file.sha });
+    const diffSummary = normalizeOperatorText(args.summary, 1000, true) ?? `Updated ${path}: ${find.length} chars replaced with ${replace.length} chars.`;
+    await recordEngineeringAudit(env, { action: "applyRepoTextPatch", filesChanged: [path], diffSummary, result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
+    return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: diffSummary };
+  }
+
+  if (toolName === "startRepoFileWrite") {
+    const path = sanitizeRepoPath(args.path);
+    const mode = normalizeOperatorMachineKey(args.mode, "replace");
+    const message = normalizeOperatorText(args.message, 200);
+    if (!path || !message || !["replace", "create"].includes(mode)) {
+      return { ok: false, error: "path_mode_message_required" };
+    }
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_repo_write_sessions (id, path, mode, message, summary, content)
+       VALUES (?, ?, ?, ?, ?, '')`,
+    ).bind(id, path, mode, message, normalizeOperatorText(args.summary, 1000, true)).run();
+    return { ok: true, session_id: id, path, mode };
+  }
+
+  if (toolName === "appendRepoFileChunk") {
+    const sessionId = normalizeOperatorText(args.session_id, 120);
+    const chunk = typeof args.chunk === "string" ? args.chunk : "";
+    const existing = await env.DB.prepare(`SELECT id, content FROM operator_repo_write_sessions WHERE id = ? AND status = 'open' LIMIT 1`).bind(sessionId).first<Record<string, unknown>>();
+    if (!existing) {
+      return { ok: false, error: "write_session_not_found" };
+    }
+    const nextContent = String(existing.content ?? "") + chunk;
+    await env.DB.prepare(`UPDATE operator_repo_write_sessions SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(nextContent, sessionId).run();
+    return { ok: true, session_id: sessionId, bytes: new TextEncoder().encode(nextContent).length };
+  }
+
+  if (toolName === "commitRepoFileWrite") {
+    const sessionId = normalizeOperatorText(args.session_id, 120);
+    const session = await env.DB.prepare(`SELECT * FROM operator_repo_write_sessions WHERE id = ? AND status = 'open' LIMIT 1`).bind(sessionId).first<Record<string, unknown>>();
+    if (!session) {
+      return { ok: false, error: "write_session_not_found" };
+    }
+    const path = String(session.path);
+    const mode = String(session.mode);
+    const existing = await getGithubFile(env, path);
+    if (mode === "create" && existing.ok) {
+      return { ok: false, error: "file_already_exists" };
+    }
+    if (mode === "replace" && !existing.ok) {
+      return { ok: false, error: "file_missing_for_replace" };
+    }
+    const put = await putGithubFile(env, { path, content: String(session.content ?? ""), message: String(session.message), sha: existing.sha });
+    await env.DB.prepare(`UPDATE operator_repo_write_sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(put.ok ? "committed" : "failed", sessionId).run();
+    await recordEngineeringAudit(env, { action: "commitRepoFileWrite", filesChanged: [path], diffSummary: normalizeOperatorText(session.summary, 1000, true), result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
+    return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: session.summary ?? null };
+  }
+
+  if (toolName === "createRepoFile") {
+    const path = sanitizeRepoPath(args.path);
+    const content = typeof args.content === "string" ? args.content : "";
+    const message = normalizeOperatorText(args.message, 200);
+    if (!path || !message) {
+      return { ok: false, error: "path_message_required" };
+    }
+    const existing = await getGithubFile(env, path);
+    if (existing.ok) {
+      return { ok: false, error: "file_already_exists" };
+    }
+    const put = await putGithubFile(env, { path, content, message });
+    await recordEngineeringAudit(env, { action: "createRepoFile", filesChanged: [path], diffSummary: normalizeOperatorText(args.summary, 1000, true) ?? `Created ${path}.`, result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
+    return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha };
+  }
+
+  if (toolName === "deleteRepoFile") {
+    const path = sanitizeRepoPath(args.path);
+    const approval = normalizeOperatorText(args.owner_approval, 500);
+    const message = normalizeOperatorText(args.message, 200);
+    if (!path || !message || !approval) {
+      return { ok: false, error: "path_message_owner_approval_required" };
+    }
+    const existing = await getGithubFile(env, path);
+    if (!existing.ok || !existing.sha) {
+      return { ok: false, error: "file_not_found" };
+    }
+    const result = await githubRepoApi(env, `/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message, sha: existing.sha, branch: config.branch }),
+    });
+    await recordEngineeringAudit(env, { action: "deleteRepoFile", filesChanged: [path], diffSummary: `Deleted ${path}.`, result: result.ok ? "ok" : "failed", ownerApproval: approval, metadata: { status: result.status } });
+    return { ok: result.ok, status: result.status, path };
+  }
+
+  if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
+    const workflowId = normalizeOperatorText(args.workflow_id, 160, true) ?? "lensically-engineering.yml";
+    const task = toolName === "deployBackend" ? "worker-deploy" : normalizeOperatorMachineKey(args.task, "typecheck");
+    const ref = normalizeOperatorText(args.ref, 160, true) ?? config.branch;
+    const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ref, inputs: { task } }),
+    });
+    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched ${workflowId} task ${task}.`, testsRun: [{ workflow_id: workflowId, task }], result: result.ok ? "ok" : "failed", metadata: { status: result.status } });
+    return { ok: result.ok, status: result.status, workflow_id: workflowId, task, ref };
+  }
+
+  if (toolName === "listGitHubWorkflowRuns") {
+    const workflowId = normalizeOperatorText(args.workflow_id, 160, true);
+    const limit = Math.min(Math.max(Number(args.limit ?? 10), 1), 20);
+    const path = workflowId
+      ? `/actions/workflows/${encodeURIComponent(workflowId)}/runs?per_page=${limit}`
+      : `/actions/runs?per_page=${limit}`;
+    const result = await githubRepoApi(env, path);
+    const runs = result.data && typeof result.data === "object" && !Array.isArray(result.data) && Array.isArray((result.data as Record<string, unknown>).workflow_runs)
+      ? ((result.data as Record<string, unknown>).workflow_runs as Array<Record<string, unknown>>).map((run) => ({ id: run.id, name: run.name, status: run.status, conclusion: run.conclusion, head_sha: run.head_sha, created_at: run.created_at, html_url: run.html_url }))
+      : [];
+    return { ok: result.ok, status: result.status, runs };
+  }
+
+  if (toolName === "getGitHubWorkflowRun") {
+    const runId = Number(args.run_id);
+    if (!Number.isFinite(runId)) {
+      return { ok: false, error: "run_id_required" };
+    }
+    const run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
+    const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
+    const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
+      ? ((jobs.data as Record<string, unknown>).jobs as Array<Record<string, unknown>>).map((job) => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion }))
+      : [];
+    const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
+    return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList };
+  }
+
+  if (toolName === "verifyDeployedMcpVersion") {
+    const body = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "lensically-engineering-mcp", version: "1.0.0" } } };
+    const response = await fetch(`${DEFAULT_WORKER_ORIGIN}/api/operator/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "authorization": request.headers.get("authorization") ?? "" },
+      body: JSON.stringify(body),
+    });
+    const payload = await readJsonSafe(response) as Record<string, unknown> | null;
+    return { ok: response.ok, status: response.status, initialize: payload?.result ?? null };
+  }
+
+  if (toolName === "listEngineeringAudit") {
+    const limit = Math.min(Math.max(Number(args.limit ?? 25), 1), 100);
+    const action = normalizeOperatorText(args.action, 120, true);
+    const rows = action
+      ? await env.DB.prepare(`SELECT * FROM operator_engineering_audit WHERE action = ? ORDER BY datetime(created_at) DESC LIMIT ?`).bind(action, limit).all<Record<string, unknown>>()
+      : await env.DB.prepare(`SELECT * FROM operator_engineering_audit ORDER BY datetime(created_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
+    return { ok: true, entries: rows.results ?? [] };
+  }
+
+  if (toolName === "recordOpsMemory") {
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_ops_memory (id, title, problem, fix, applies_when, tags_json)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(id, normalizeOperatorText(args.title, 300), normalizeOperatorText(args.problem, 2000, true), normalizeOperatorText(args.fix, 4000), normalizeOperatorText(args.applies_when, 2000, true), normalizeOperatorJson(args.tags, [])).run();
+    await recordEngineeringAudit(env, { action: "recordOpsMemory", result: "ok", diffSummary: normalizeOperatorText(args.title, 300), metadata: { memory_id: id } });
+    return { ok: true, memory_id: id };
+  }
+
+  if (toolName === "listOpsMemory" || toolName === "searchOpsMemory") {
+    const limit = Math.min(Math.max(Number(args.limit ?? 25), 1), 100);
+    const query = toolName === "searchOpsMemory" ? (normalizeOperatorText(args.query, 200) ?? "").toLowerCase() : "";
+    const tag = normalizeOperatorText(args.tag, 100, true);
+    const rows = await env.DB.prepare(
+      `SELECT id, title, problem, fix, applies_when, tags_json, active, updated_at
+       FROM operator_ops_memory
+       WHERE active = 1
+       ORDER BY datetime(updated_at) DESC
+       LIMIT 200`,
+    ).all<Record<string, unknown>>();
+    const filtered = (rows.results ?? []).filter((row) => {
+      const haystack = `${row.title ?? ""} ${row.problem ?? ""} ${row.fix ?? ""} ${row.applies_when ?? ""}`.toLowerCase();
+      const tags = safeParseJsonString(String(row.tags_json ?? "[]"));
+      return (!query || haystack.includes(query)) && (!tag || (Array.isArray(tags) && tags.map(String).includes(tag)));
+    }).slice(0, limit);
+    return { ok: true, items: filtered, returned_count: filtered.length };
+  }
+
+  if (toolName === "readOpsMemory") {
+    const id = normalizeOperatorText(args.memory_id, 120);
+    const row = await env.DB.prepare(`SELECT * FROM operator_ops_memory WHERE id = ? LIMIT 1`).bind(id).first<Record<string, unknown>>();
+    return row ? { ok: true, memory: row } : { ok: false, error: "ops_memory_not_found" };
+  }
+
+  if (toolName === "updateOpsMemory") {
+    const id = normalizeOperatorText(args.memory_id, 120);
+    const row = await env.DB.prepare(`SELECT * FROM operator_ops_memory WHERE id = ? LIMIT 1`).bind(id).first<Record<string, unknown>>();
+    if (!row) {
+      return { ok: false, error: "ops_memory_not_found" };
+    }
+    await env.DB.prepare(
+      `UPDATE operator_ops_memory
+       SET title = COALESCE(?, title),
+           problem = COALESCE(?, problem),
+           fix = COALESCE(?, fix),
+           applies_when = COALESCE(?, applies_when),
+           tags_json = COALESCE(?, tags_json),
+           active = COALESCE(?, active),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(
+      normalizeOperatorText(args.title, 300, true),
+      normalizeOperatorText(args.problem, 2000, true),
+      normalizeOperatorText(args.fix, 4000, true),
+      normalizeOperatorText(args.applies_when, 2000, true),
+      args.tags === undefined ? null : normalizeOperatorJson(args.tags, []),
+      args.active === undefined ? null : args.active === false ? 0 : 1,
+      id,
+    ).run();
+    await recordEngineeringAudit(env, { action: "updateOpsMemory", result: "ok", metadata: { memory_id: id } });
+    return { ok: true, memory_id: id };
+  }
+
+  return { ok: false, error: "engineering_tool_not_implemented" };
+}
+
 async function callOperatorToolForMcp(request: Request, env: Env, toolName: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   const headers = new Headers();
   const authorization = request.headers.get("authorization");
@@ -8188,9 +8796,11 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
     const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
       ? message.params.arguments as Record<string, unknown>
       : {};
-    const resultPayload = isOperatorMcpAdminToolName(toolName)
-      ? await handleOperatorMcpAdminTool(request, env, toolName, args)
-      : await callOperatorToolForMcp(request, env, toolName, args);
+    const resultPayload = isOperatorMcpEngineeringToolName(toolName)
+      ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
+      : isOperatorMcpAdminToolName(toolName)
+        ? await handleOperatorMcpAdminTool(request, env, toolName, args)
+        : await callOperatorToolForMcp(request, env, toolName, args);
     const isError = resultPayload.ok === false;
     return mcpJsonResponse({
       jsonrpc: "2.0",

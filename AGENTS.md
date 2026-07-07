@@ -5,6 +5,7 @@
 - Read this file at the start of every new chat.
 - Read `OPERATING_MEMORY.md` immediately after this file. Project durable memory is the default source and write target for project-specific facts.
 - Read `C:\Users\brian\.codex\OPERATING_MEMORY.md` before project work for cross-project rules only. Do not write project-specific Lensically facts there.
+- Before project work, run `git status --short`, then `git pull --ff-only origin main` when the worktree is clean. ChatGPT may now edit Lensically through the cloud engineering MCP, so GitHub is the source of truth between Codex sessions. If the worktree is dirty, inspect the changes first and do not overwrite them.
 - Add detailed, replayable entries to project `OPERATING_MEMORY.md` whenever you find a repeated slowdown, bad assumption, credential/deploy trap, failed path, or workflow fix that future Lensically agents should not rediscover. Prefer `Failed: <exact failed path>. Use: <exact working path>. Applies when: <specific context>.` Include required setup, commands, URLs, paths, success signals, stale-state rules, and fallback paths when they matter.
 - Read the repository before editing code.
 - Prefer small, production-safe changes over broad rewrites.
@@ -39,6 +40,7 @@
 - Do not invent placeholder UI, fake navigation, or dead controls.
 - Do not hardcode secrets or environment-specific URLs.
 - Do not edit `PROJECT_CONTEXT.md` unless the user explicitly asks.
+- ChatGPT has private Lensically engineering MCP authority to edit the GitHub repo, dispatch GitHub Actions, and trigger backend deploys. Treat remote changes as expected; pull before judging current source state.
 
 ## Git Rules
 

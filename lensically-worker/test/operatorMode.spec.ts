@@ -66,6 +66,9 @@ async function resetTables(): Promise<void> {
     "operator_mcp_admin_errors",
     "operator_mcp_deployments",
     "operator_mcp_backlog_items",
+    "operator_repo_write_sessions",
+    "operator_engineering_audit",
+    "operator_ops_memory",
     "operator_workflow_requirements",
     "operator_mcp_tool_overrides",
     "operator_gate_results",
@@ -360,7 +363,32 @@ describe("operator mode MCP endpoint", () => {
 
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
-    expect(toolNames.slice(0, 21)).toEqual([
+    expect(toolNames.slice(0, 23)).toEqual([
+      "engineeringPrecheck",
+      "getEngineeringAccessState",
+      "listRepoFiles",
+      "readRepoFile",
+      "searchRepoFiles",
+      "getRepoStatus",
+      "applyRepoTextPatch",
+      "startRepoFileWrite",
+      "appendRepoFileChunk",
+      "commitRepoFileWrite",
+      "createRepoFile",
+      "deleteRepoFile",
+      "listGitHubWorkflowRuns",
+      "runGitHubWorkflow",
+      "getGitHubWorkflowRun",
+      "deployBackend",
+      "verifyDeployedMcpVersion",
+      "listEngineeringAudit",
+      "listOpsMemory",
+      "readOpsMemory",
+      "recordOpsMemory",
+      "updateOpsMemory",
+      "searchOpsMemory",
+    ]);
+    expect(toolNames.slice(23, 44)).toEqual([
       "getMcpAdminState",
       "inspectMcpFailure",
       "listMcpTools",
@@ -384,6 +412,29 @@ describe("operator mode MCP endpoint", () => {
       "markImplementationBacklogItemResolved",
     ]);
     for (const name of [
+      "engineeringPrecheck",
+      "getEngineeringAccessState",
+      "listRepoFiles",
+      "readRepoFile",
+      "searchRepoFiles",
+      "getRepoStatus",
+      "applyRepoTextPatch",
+      "startRepoFileWrite",
+      "appendRepoFileChunk",
+      "commitRepoFileWrite",
+      "createRepoFile",
+      "deleteRepoFile",
+      "listGitHubWorkflowRuns",
+      "runGitHubWorkflow",
+      "getGitHubWorkflowRun",
+      "deployBackend",
+      "verifyDeployedMcpVersion",
+      "listEngineeringAudit",
+      "listOpsMemory",
+      "readOpsMemory",
+      "recordOpsMemory",
+      "updateOpsMemory",
+      "searchOpsMemory",
       "list_accounts",
       "get_account_state",
       "start_workflow_session",
@@ -435,6 +486,31 @@ describe("operator mode MCP endpoint", () => {
 
     const accounts = await mcpTool<{ accounts: Array<{ brand_key: string }> }>("list_accounts");
     expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
+  }, 30000);
+
+  it("exposes engineering access status and ops memory without raw secrets", async () => {
+    const access = await mcpTool<{ github: { token_status: string; owner: string; repo: string }; capabilities: string[] }>("getEngineeringAccessState");
+    expect(access.github.token_status).toMatch(/exists|missing/);
+    expect(JSON.stringify(access)).not.toContain("test-gpt-key");
+    expect(access.capabilities).toContain("applyRepoTextPatch");
+
+    const memory = await mcpTool<{ memory_id: string }>("recordOpsMemory", {
+      title: "Vitest MCP engineering fixture",
+      problem: "Tool payloads can get too large.",
+      fix: "Use exact text patches or chunked writes.",
+      applies_when: "Editing source through MCP.",
+      tags: ["engineering", "mcp"],
+    });
+    expect(memory.memory_id).toBeTruthy();
+
+    const searched = await mcpTool<{ items: Array<{ id: string }> }>("searchOpsMemory", {
+      query: "chunked writes",
+    });
+    expect(searched.items.some((item) => item.id === memory.memory_id)).toBe(true);
+
+    const precheck = await mcpTool<{ tool_surface: { engineering_tools: number }; recent_ops_memory: Array<{ id: string }> }>("engineeringPrecheck");
+    expect(precheck.tool_surface.engineering_tools).toBeGreaterThanOrEqual(20);
+    expect(precheck.recent_ops_memory.some((item) => item.id === memory.memory_id)).toBe(true);
   }, 30000);
 
   it("runs the MCP happy path from session through scheduling", async () => {
