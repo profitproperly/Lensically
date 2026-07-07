@@ -195,6 +195,7 @@ type GptGenerationRunRow = {
   id: string;
   account_id: string;
   threads_user_id: string;
+  source_card_id?: string | null;
   objective: string | null;
   prompt_summary: string | null;
   status: string;
@@ -211,11 +212,16 @@ type GptGenerationDraftRow = {
   draft_index: number | string;
   text: string;
   status: string;
+  source_card_id?: string | null;
   rejection_reason: string | null;
+  owner_feedback?: string | null;
   score_json: string | null;
   strategy_json: string | null;
+  gate_summary_json?: string | null;
+  showable?: number | string | null;
   replacement_for_draft_id: string | null;
   scheduled_post_id: number | string | null;
+  published_post_id?: string | null;
   metadata_json: string | null;
   created_at: string;
   updated_at: string;
@@ -257,6 +263,33 @@ type GptPreflightSnapshotSection = {
 };
 
 type GptPreflightSnapshotSections = Record<GptPreflightSectionKey, GptPreflightSnapshotSection>;
+
+const OPERATOR_WORKFLOW_TEMPLATE_KEY = "content_operator_v1";
+const OPERATOR_WORKFLOW_STAGES = [
+  "account_selection",
+  "context_admission",
+  "growth_context_review",
+  "production_board",
+  "source_selection",
+  "source_card",
+  "generation_run_and_candidates",
+  "gate_evaluation",
+  "owner_review_and_decision",
+] as const;
+
+type OperatorWorkflowStage = typeof OPERATOR_WORKFLOW_STAGES[number] | "scheduling" | "post_publish_review";
+type OperatorGateResultValue = "pass" | "fail" | "pass_with_caution" | "not_applicable";
+
+const OPERATOR_DRAFT_STATUSES = new Set([
+  "candidate",
+  "self_rejected",
+  "shown",
+  "approved",
+  "rejected",
+  "revised",
+  "scheduled",
+  "published",
+]);
 
 type GptResolvedBrand = {
   brand_key: GptBrandKey;
@@ -1126,6 +1159,20 @@ async function doesColumnExist(env: Env, tableName: string, columnName: string):
     }
   }
   return false;
+}
+
+async function addColumnIfMissing(env: Env, tableName: string, columnName: string, definition: string): Promise<void> {
+  if (await doesColumnExist(env, tableName, columnName)) {
+    return;
+  }
+  try {
+    await env.DB.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`).run();
+  } catch (error) {
+    const message = getErrorMessage(error).toLowerCase();
+    if (!message.includes("duplicate column name")) {
+      throw error;
+    }
+  }
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -4827,6 +4874,8 @@ async function ensureGptGenerationRunsTable(env: Env): Promise<void> {
        WHERE id = NEW.id;
      END`,
   ).run();
+
+  await addColumnIfMissing(env, "gpt_generation_runs", "source_card_id", "TEXT");
 }
 
 async function ensureGptGenerationDraftsTable(env: Env): Promise<void> {
@@ -4873,6 +4922,17 @@ async function ensureGptGenerationDraftsTable(env: Env): Promise<void> {
        WHERE id = NEW.id;
      END`,
   ).run();
+
+  const operatorColumns: Array<{ name: string; definition: string }> = [
+    { name: "source_card_id", definition: "TEXT" },
+    { name: "owner_feedback", definition: "TEXT" },
+    { name: "gate_summary_json", definition: "TEXT" },
+    { name: "showable", definition: "INTEGER NOT NULL DEFAULT 0" },
+    { name: "published_post_id", definition: "TEXT" },
+  ];
+  for (const column of operatorColumns) {
+    await addColumnIfMissing(env, "gpt_generation_drafts", column.name, column.definition);
+  }
 }
 
 function normalizeGptGenerationStatus(value: unknown): string {
@@ -4952,14 +5012,19 @@ function serializeGptGenerationDraft(row: GptGenerationDraftRow): {
   run_id: string;
   account_id: string;
   threads_user_id: string;
+  source_card_id: string | null;
   draft_index: number;
   text: string;
   status: string;
   rejection_reason: string | null;
+  owner_feedback: string | null;
   score: unknown;
   strategy: unknown;
+  gate_summary: unknown;
+  showable: boolean;
   replacement_for_draft_id: string | null;
   scheduled_post_id: number | null;
+  published_post_id: string | null;
   metadata: unknown;
   created_at: string;
   updated_at: string;
@@ -4969,20 +5034,1572 @@ function serializeGptGenerationDraft(row: GptGenerationDraftRow): {
     run_id: row.run_id,
     account_id: row.account_id,
     threads_user_id: row.threads_user_id,
+    source_card_id: row.source_card_id ?? null,
     draft_index: Number(row.draft_index ?? 0),
     text: row.text,
     status: row.status,
     rejection_reason: row.rejection_reason,
+    owner_feedback: row.owner_feedback ?? null,
     score: row.score_json ? safeParseJsonString(row.score_json) ?? null : null,
     strategy: row.strategy_json ? safeParseJsonString(row.strategy_json) ?? null : null,
+    gate_summary: row.gate_summary_json ? safeParseJsonString(row.gate_summary_json) ?? null : null,
+    showable: Number(row.showable ?? 0) === 1,
     replacement_for_draft_id: row.replacement_for_draft_id,
     scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined
       ? null
       : Number(row.scheduled_post_id),
+    published_post_id: row.published_post_id ?? null,
     metadata: row.metadata_json ? safeParseJsonString(row.metadata_json) ?? null : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+function operatorJsonResponse(payload: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "content-type": "application/json; charset=UTF-8" },
+  });
+}
+
+function normalizeOperatorStage(value: unknown, fallback: OperatorWorkflowStage = "account_selection"): OperatorWorkflowStage {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (
+    OPERATOR_WORKFLOW_STAGES.includes(normalized as typeof OPERATOR_WORKFLOW_STAGES[number])
+    || normalized === "scheduling"
+    || normalized === "post_publish_review"
+  ) {
+    return normalized as OperatorWorkflowStage;
+  }
+  return fallback;
+}
+
+function normalizeOperatorJson(value: unknown, fallback: unknown = null): string {
+  if (value === undefined) {
+    return JSON.stringify(fallback);
+  }
+  try {
+    return JSON.stringify(value ?? fallback);
+  } catch {
+    return JSON.stringify(fallback);
+  }
+}
+
+function normalizeOperatorText(value: unknown, maxLength = 20000, allowNull = false): string | null {
+  if (typeof value !== "string") {
+    return allowNull ? null : "";
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return allowNull ? null : "";
+  }
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeOperatorMachineKey(value: unknown, fallback = ""): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  return value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
+}
+
+function normalizeComparableText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, "\"")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractOpeningPhrase(text: string): string | null {
+  const normalized = text.trim();
+  if (!normalized) {
+    return null;
+  }
+  const firstSentence = normalized.split(/[.!?\n]/)[0]?.trim() || normalized;
+  return firstSentence.split(/\s+/).slice(0, 8).join(" ").slice(0, 240) || null;
+}
+
+function inferRealmEntranceKey(openingPhrase: string | null): string | null {
+  const normalized = normalizeComparableText(openingPhrase ?? "");
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.startsWith("imagine")) return "imagine";
+  if (normalized.startsWith("picture")) return "picture";
+  if (normalized.startsWith("come closer")) return "come_closer";
+  if (normalized.startsWith("read this")) return "read_this";
+  if (normalized.includes("?")) return "question_prompt";
+  return normalized.split(" ").slice(0, 2).join("_") || null;
+}
+
+async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_workflow_sessions (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      workflow_template_key TEXT NOT NULL DEFAULT 'content_operator_v1',
+      objective TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      current_stage TEXT,
+      active_source_card_id TEXT,
+      active_generation_run_id TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_workflow_sessions_brand_status
+     ON operator_workflow_sessions (brand_key, status, updated_at DESC)`,
+  ).run();
+  if (!(await doesColumnExist(env, "operator_workflow_sessions", "objective"))) {
+    await env.DB.prepare("ALTER TABLE operator_workflow_sessions ADD COLUMN objective TEXT").run();
+  }
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_workflow_sessions_touch_updated_at
+     AFTER UPDATE ON operator_workflow_sessions
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_workflow_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_context_admissions (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT,
+      snapshot_id TEXT,
+      admission_scope TEXT NOT NULL,
+      sections_json TEXT NOT NULL,
+      freshness_started_at TEXT,
+      freshness_completed_at TEXT,
+      is_partial INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_context_admissions_brand_created
+     ON operator_context_admissions (brand_key, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_production_board_items (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT,
+      item_type TEXT NOT NULL,
+      lane_key TEXT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      evidence_json TEXT,
+      priority INTEGER,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_from TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_production_board_brand_status
+     ON operator_production_board_items (brand_key, status, priority ASC, updated_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_source_cards (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT,
+      sequence_label TEXT NOT NULL,
+      lane_key TEXT,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      primary_source_json TEXT NOT NULL,
+      secondary_sources_json TEXT,
+      anti_sources_json TEXT,
+      metrics_snapshot_json TEXT,
+      source_mechanism TEXT NOT NULL,
+      required_product TEXT NOT NULL,
+      forbidden_surfaces_json TEXT NOT NULL,
+      danger_surfaces_json TEXT,
+      current_inventory_constraints_json TEXT,
+      pass_conditions_json TEXT NOT NULL,
+      fail_conditions_json TEXT NOT NULL,
+      recommended_direction TEXT,
+      context_admission_id TEXT,
+      created_by TEXT,
+      locked_at TEXT,
+      invalidated_at TEXT,
+      invalidation_reason TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_cards_brand_status
+     ON operator_source_cards (brand_key, status, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_source_cards_touch_updated_at
+     AFTER UPDATE ON operator_source_cards
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_source_cards SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_gates (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT,
+      gate_key TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      stage_scope TEXT NOT NULL,
+      lane_scope TEXT,
+      content_type_scope TEXT,
+      gate_type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      evaluator TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      order_index INTEGER NOT NULL DEFAULT 100,
+      applies_when_json TEXT,
+      pass_examples_json TEXT,
+      fail_examples_json TEXT,
+      source_memory_ids_json TEXT,
+      created_from TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_gates_scope_unique
+     ON operator_gates (
+       COALESCE(brand_key, '__global__'),
+       gate_key,
+       COALESCE(lane_scope, '__all__'),
+       COALESCE(content_type_scope, '__all__')
+     )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_gates_lookup
+     ON operator_gates (active, stage_scope, brand_key, order_index ASC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_gate_results (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      draft_id TEXT,
+      source_card_id TEXT,
+      gate_id TEXT NOT NULL,
+      gate_key TEXT NOT NULL,
+      result TEXT NOT NULL,
+      blocking INTEGER NOT NULL DEFAULT 0,
+      rationale TEXT NOT NULL,
+      evaluated_by TEXT NOT NULL,
+      evidence_json TEXT,
+      repair_guidance TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_gate_results_draft
+     ON operator_gate_results (draft_id, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_content_inventory (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      text TEXT NOT NULL,
+      first_line TEXT,
+      opening_phrase TEXT,
+      realm_entrance_key TEXT,
+      hook_style TEXT,
+      lane_key TEXT,
+      source_card_id TEXT,
+      status TEXT NOT NULL,
+      used_at TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_content_inventory_brand_used
+     ON operator_content_inventory (brand_key, used_at DESC)`,
+  ).run();
+}
+
+const DEFAULT_OPERATOR_GATES: Array<{
+  gate_key: string;
+  display_name: string;
+  description: string;
+  stage_scope: OperatorWorkflowStage;
+  gate_type: string;
+  severity: string;
+  evaluator: string;
+  order_index: number;
+}> = [
+  { gate_key: "account_selected_gate", display_name: "Account Selected", description: "A valid account must be selected.", stage_scope: "account_selection", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
+  { gate_key: "context_admission_gate", display_name: "Context Admission", description: "Relevant data coverage must be recorded and partial data labeled.", stage_scope: "context_admission", gate_type: "hard", severity: "warn", evaluator: "backend", order_index: 20 },
+  { gate_key: "source_card_required_gate", display_name: "Source Card Required", description: "Serious generation requires a source card unless explicitly overridden.", stage_scope: "generation_run_and_candidates", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
+  { gate_key: "source_lock_gate", display_name: "Source Lock", description: "A source card must be locked before drafts can be shown.", stage_scope: "generation_run_and_candidates", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
+  { gate_key: "exact_duplicate_gate", display_name: "Exact Duplicate", description: "Draft text must not exactly match known account inventory.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
+  { gate_key: "source_surface_copy_gate", display_name: "Source Surface Copy", description: "Draft text must not copy forbidden source surfaces.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
+  { gate_key: "current_inventory_repeat_gate", display_name: "Current Inventory Repeat", description: "Draft must not repeat the latest account opening or realm entrance too closely.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 30 },
+  { gate_key: "scheduled_collision_gate", display_name: "Scheduled Collision", description: "Scheduled drafts must not collide with account scheduled posts.", stage_scope: "scheduling", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
+  { gate_key: "approved_before_schedule_gate", display_name: "Approved Before Schedule", description: "Only approved drafts can be scheduled unless an override is recorded.", stage_scope: "scheduling", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
+  { gate_key: "status_transition_gate", display_name: "Status Transition", description: "Draft status transitions must follow the operator workflow.", stage_scope: "owner_review_and_decision", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
+];
+
+async function seedDefaultOperatorGates(env: Env): Promise<void> {
+  await ensureOperatorWorkflowTables(env);
+  for (const gate of DEFAULT_OPERATOR_GATES) {
+    const gateId = `global_${gate.gate_key}`;
+    const existing = await env.DB.prepare(
+      `SELECT id FROM operator_gates
+       WHERE brand_key IS NULL
+         AND gate_key = ?
+         AND lane_scope IS NULL
+         AND content_type_scope IS NULL
+       LIMIT 1`,
+    ).bind(gate.gate_key).first<{ id: string }>();
+    if (existing?.id) {
+      await env.DB.prepare(
+        `UPDATE operator_gates
+         SET display_name = ?,
+             description = ?,
+             stage_scope = ?,
+             gate_type = ?,
+             severity = ?,
+             evaluator = ?,
+             active = 1,
+             order_index = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      )
+        .bind(
+          gate.display_name,
+          gate.description,
+          gate.stage_scope,
+          gate.gate_type,
+          gate.severity,
+          gate.evaluator,
+          gate.order_index,
+          existing.id,
+        )
+        .run();
+      continue;
+    }
+    await env.DB.prepare(
+      `INSERT INTO operator_gates (
+        id, brand_key, gate_key, display_name, description, stage_scope, gate_type, severity,
+        evaluator, active, order_index, created_from
+      ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, ?, 'system')`,
+    )
+      .bind(
+        gateId,
+        gate.gate_key,
+        gate.display_name,
+        gate.description,
+        gate.stage_scope,
+        gate.gate_type,
+        gate.severity,
+        gate.evaluator,
+        gate.order_index,
+      )
+      .run();
+  }
+}
+
+async function prepareOperatorMode(env: Env): Promise<void> {
+  await ensureGptStrategyMemoryTable(env);
+  await ensureGptGenerationDraftsTable(env);
+  await ensureScheduledPostsTable(env);
+  await ensureOperatorWorkflowTables(env);
+  await seedDefaultOperatorGates(env);
+}
+
+function workflowTemplatePayload(): Record<string, unknown> {
+  return {
+    key: OPERATOR_WORKFLOW_TEMPLATE_KEY,
+    stages: OPERATOR_WORKFLOW_STAGES.map((stage, index) => ({
+      key: stage,
+      label: stage.split("_").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" "),
+      objective: `Complete ${stage.replace(/_/g, " ")} for the selected account.`,
+      required_inputs: index === 0 ? ["brand_key"] : ["brand_key", "workflow_session_id"],
+      allowed_next_stages: OPERATOR_WORKFLOW_STAGES[index + 1] ? [OPERATOR_WORKFLOW_STAGES[index + 1]] : [],
+    })),
+  };
+}
+
+async function listOperatorAccounts(env: Env): Promise<Record<string, unknown>[]> {
+  const accounts = await Promise.all(
+    (Object.keys(GPT_BRAND_ACCOUNT_ALIASES) as GptBrandKey[]).map(async (brandKey) => {
+      const brand = await resolveGptBrand(env, brandKey);
+      if (!brand) {
+        return {
+          brand_key: brandKey,
+          label: brandKey,
+          platform: "threads",
+          configured_account_id: GPT_BRAND_ACCOUNT_ALIASES[brandKey],
+          threads_user_id: null,
+          available: false,
+        };
+      }
+      return {
+        brand_key: brand.brand_key,
+        label: brand.configured_account.label,
+        platform: "threads",
+        configured_account_id: brand.account_id,
+        threads_user_id: brand.profile.threads_user_id,
+        username: brand.profile.username ?? brand.configured_account.username,
+        available: true,
+      };
+    }),
+  );
+  return accounts;
+}
+
+async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCardId: string): Promise<Record<string, unknown> | null> {
+  await ensureOperatorWorkflowTables(env);
+  const row = await env.DB.prepare(
+    `SELECT *
+     FROM operator_source_cards
+     WHERE id = ?
+       AND brand_key = ?
+     LIMIT 1`,
+  ).bind(sourceCardId, brandKey).first<Record<string, unknown>>();
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    brand_key: row.brand_key,
+    workflow_session_id: row.workflow_session_id ?? null,
+    sequence_label: row.sequence_label,
+    lane_key: row.lane_key ?? null,
+    title: row.title,
+    status: row.status,
+    primary_source: safeParseJsonString(String(row.primary_source_json ?? "null")),
+    secondary_sources: safeParseJsonString(String(row.secondary_sources_json ?? "[]")) ?? [],
+    anti_sources: safeParseJsonString(String(row.anti_sources_json ?? "[]")) ?? [],
+    metrics_snapshot: safeParseJsonString(String(row.metrics_snapshot_json ?? "null")),
+    source_mechanism: row.source_mechanism,
+    required_product: row.required_product,
+    forbidden_surfaces: safeParseJsonString(String(row.forbidden_surfaces_json ?? "[]")) ?? [],
+    danger_surfaces: safeParseJsonString(String(row.danger_surfaces_json ?? "[]")) ?? [],
+    current_inventory_constraints: safeParseJsonString(String(row.current_inventory_constraints_json ?? "[]")) ?? [],
+    pass_conditions: safeParseJsonString(String(row.pass_conditions_json ?? "[]")) ?? [],
+    fail_conditions: safeParseJsonString(String(row.fail_conditions_json ?? "[]")) ?? [],
+    recommended_direction: row.recommended_direction ?? null,
+    context_admission_id: row.context_admission_id ?? null,
+    created_by: row.created_by ?? null,
+    locked_at: row.locked_at ?? null,
+    invalidated_at: row.invalidated_at ?? null,
+    invalidation_reason: row.invalidation_reason ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function validateSourceCardLockable(card: Record<string, unknown>): { can_lock: boolean; missing_fields: string[] } {
+  const missing: string[] = [];
+  for (const field of ["brand_key", "primary_source", "source_mechanism", "required_product", "forbidden_surfaces", "pass_conditions", "fail_conditions"]) {
+    const value = card[field];
+    if (Array.isArray(value) ? false : !value) {
+      missing.push(field);
+    }
+  }
+  return { can_lock: missing.length === 0, missing_fields: missing };
+}
+
+async function listOperatorGates(
+  env: Env,
+  brandKey: GptBrandKey,
+  stageScope: OperatorWorkflowStage | null,
+  laneKey: string | null,
+  contentType: string | null,
+): Promise<Array<Record<string, unknown>>> {
+  await seedDefaultOperatorGates(env);
+  const stageClause = stageScope ? "AND stage_scope = ?" : "";
+  const rows = await env.DB.prepare(
+    `SELECT *
+     FROM operator_gates
+     WHERE active = 1
+       AND (brand_key IS NULL OR brand_key = ?)
+       ${stageClause}
+       AND (lane_scope IS NULL OR lane_scope = ?)
+       AND (content_type_scope IS NULL OR content_type_scope = ?)
+     ORDER BY order_index ASC, gate_key ASC`,
+  )
+    .bind(
+      brandKey,
+      ...(stageScope ? [stageScope] : []),
+      laneKey,
+      contentType,
+    )
+    .all<Record<string, unknown>>();
+  return (rows.results ?? []).map((row) => ({
+    id: row.id,
+    brand_key: row.brand_key ?? null,
+    gate_key: row.gate_key,
+    display_name: row.display_name,
+    description: row.description,
+    stage_scope: row.stage_scope,
+    lane_scope: row.lane_scope ?? null,
+    content_type_scope: row.content_type_scope ?? null,
+    gate_type: row.gate_type,
+    severity: row.severity,
+    evaluator: row.evaluator,
+    active: Number(row.active ?? 0) === 1,
+    order_index: Number(row.order_index ?? 100),
+    pass_examples: safeParseJsonString(String(row.pass_examples_json ?? "[]")) ?? [],
+    fail_examples: safeParseJsonString(String(row.fail_examples_json ?? "[]")) ?? [],
+    source_memory_ids: safeParseJsonString(String(row.source_memory_ids_json ?? "[]")) ?? [],
+    created_from: row.created_from ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+}
+
+async function getOperatorDraft(env: Env, brand: GptResolvedBrand, draftId: string): Promise<(ReturnType<typeof serializeGptGenerationDraft>) | null> {
+  await ensureGptGenerationDraftsTable(env);
+  const row = await env.DB.prepare(
+    `SELECT id, run_id, account_id, threads_user_id, draft_index, text, status, source_card_id,
+            rejection_reason, owner_feedback, score_json, strategy_json, gate_summary_json, showable,
+            replacement_for_draft_id, scheduled_post_id, published_post_id, metadata_json, created_at, updated_at
+     FROM gpt_generation_drafts
+     WHERE id = ?
+       AND account_id = ?
+     LIMIT 1`,
+  ).bind(draftId, brand.account_id).first<GptGenerationDraftRow>();
+  return row ? serializeGptGenerationDraft(row) : null;
+}
+
+async function getLatestOperatorInventory(env: Env, brandKey: GptBrandKey): Promise<Record<string, unknown> | null> {
+  await ensureOperatorWorkflowTables(env);
+  return env.DB.prepare(
+    `SELECT *
+     FROM operator_content_inventory
+     WHERE brand_key = ?
+       AND status IN ('shown', 'approved', 'scheduled', 'published')
+     ORDER BY datetime(used_at) DESC, created_at DESC
+     LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+}
+
+async function insertOperatorInventory(
+  env: Env,
+  input: {
+    brandKey: GptBrandKey;
+    sourceType: string;
+    sourceId: string;
+    text: string;
+    sourceCardId?: string | null;
+    status: string;
+    strategy?: Record<string, unknown> | null;
+    analysis?: Record<string, unknown> | null;
+  },
+): Promise<void> {
+  await ensureOperatorWorkflowTables(env);
+  const firstLine = input.text.split(/\n/)[0]?.trim().slice(0, 500) ?? "";
+  const openingPhrase = normalizeOperatorText(input.analysis?.opening_phrase, 240, true)
+    ?? extractOpeningPhrase(input.text);
+  const realmEntranceKey = normalizeOperatorMachineKey(input.analysis?.realm_entrance_key, "")
+    || inferRealmEntranceKey(openingPhrase);
+  const hookStyle = normalizeOperatorText(input.analysis?.hook_style ?? input.strategy?.hook_style, 120, true);
+  const laneKey = normalizeOperatorMachineKey(input.analysis?.lane_key ?? input.strategy?.pillar, "");
+  await env.DB.prepare(
+    `INSERT INTO operator_content_inventory (
+      id, brand_key, source_type, source_id, text, first_line, opening_phrase, realm_entrance_key,
+      hook_style, lane_key, source_card_id, status, used_at, metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      input.brandKey,
+      input.sourceType,
+      input.sourceId,
+      input.text,
+      firstLine,
+      openingPhrase,
+      realmEntranceKey,
+      hookStyle,
+      laneKey || null,
+      input.sourceCardId ?? null,
+      input.status,
+      new Date().toISOString(),
+      normalizeOperatorJson({ strategy: input.strategy ?? null, analysis: input.analysis ?? null }, {}),
+    )
+    .run();
+}
+
+function buildGateResult(
+  gate: Record<string, unknown>,
+  result: OperatorGateResultValue,
+  rationale: string,
+  evidence: Record<string, unknown> | null = null,
+  repairGuidance: string | null = null,
+): Record<string, unknown> {
+  const blocking = result === "fail" && String(gate.severity) === "block";
+  return {
+    gate_id: gate.id,
+    gate_key: gate.gate_key,
+    result,
+    blocking,
+    rationale,
+    evaluated_by: gate.evaluator,
+    evidence,
+    repair_guidance: repairGuidance,
+  };
+}
+
+async function runOperatorGates(
+  env: Env,
+  input: {
+    brand: GptResolvedBrand;
+    sourceCardId?: string | null;
+    draftId?: string | null;
+    draftText?: string | null;
+    stageScope: OperatorWorkflowStage;
+    laneKey?: string | null;
+    contentType?: string | null;
+    draftAnalysis?: Record<string, unknown> | null;
+    modelGateResults?: Array<Record<string, unknown>> | null;
+    scheduling?: { date?: string | null; time?: string | null; timezone?: string | null } | null;
+  },
+): Promise<{ showable: boolean; gate_results: Record<string, unknown>[]; blocking_failures: Record<string, unknown>[]; warnings: string[] }> {
+  await prepareOperatorMode(env);
+  const gates = await listOperatorGates(env, input.brand.brand_key, input.stageScope, input.laneKey ?? null, input.contentType ?? null);
+  const sourceCard = input.sourceCardId ? await getOperatorSourceCard(env, input.brand.brand_key, input.sourceCardId) : null;
+  const draftText = normalizeOperatorText(input.draftText, 20000, true) ?? "";
+  const normalizedDraft = normalizeComparableText(draftText);
+  const results: Record<string, unknown>[] = [];
+  const warnings: string[] = [];
+
+  for (const gate of gates) {
+    const gateKey = String(gate.gate_key);
+    if (gateKey === "account_selected_gate") {
+      results.push(buildGateResult(gate, input.brand.brand_key ? "pass" : "fail", input.brand.brand_key ? "Account is selected." : "Missing account selection."));
+      continue;
+    }
+    if (gateKey === "source_card_required_gate") {
+      results.push(buildGateResult(gate, input.sourceCardId ? "pass" : "fail", input.sourceCardId ? "Source card id is present." : "Serious generation requires a source card.", null, "Create and lock a source card or record a narrow rewrite override."));
+      continue;
+    }
+    if (gateKey === "source_lock_gate") {
+      const locked = sourceCard?.status === "locked";
+      results.push(buildGateResult(gate, locked ? "pass" : "fail", locked ? "Source card is locked." : "Source card is not locked.", { source_card_status: sourceCard?.status ?? null }, "Lock the source card before showing drafts."));
+      continue;
+    }
+    if (gateKey === "source_surface_copy_gate") {
+      const forbidden = Array.isArray(sourceCard?.forbidden_surfaces) ? sourceCard?.forbidden_surfaces as unknown[] : [];
+      let copied: string | null = null;
+      let cautious: string | null = null;
+      for (const surface of forbidden) {
+        const phrase = typeof surface === "string" ? surface : String((surface as Record<string, unknown>)?.text ?? "");
+        const normalizedPhrase = normalizeComparableText(phrase);
+        if (!normalizedPhrase) {
+          continue;
+        }
+        const wordCount = normalizedPhrase.split(" ").filter(Boolean).length;
+        if (wordCount > 3 && normalizedDraft.includes(normalizedPhrase)) {
+          copied = phrase;
+          break;
+        }
+        if (wordCount <= 3 && normalizedDraft.includes(normalizedPhrase)) {
+          cautious = phrase;
+        }
+      }
+      if (copied) {
+        results.push(buildGateResult(gate, "fail", "Draft copies a forbidden source surface.", { copied_surface: copied }, "Rewrite away from the source surface while preserving the mechanism."));
+      } else if (cautious) {
+        results.push(buildGateResult(gate, "pass_with_caution", "Draft includes a short forbidden surface fragment.", { caution_surface: cautious }, "Check whether the short phrase is too close."));
+      } else {
+        results.push(buildGateResult(gate, "pass", "No forbidden source surface copied."));
+      }
+      continue;
+    }
+    if (gateKey === "current_inventory_repeat_gate") {
+      const latest = await getLatestOperatorInventory(env, input.brand.brand_key);
+      const candidateRealm = normalizeOperatorMachineKey(input.draftAnalysis?.realm_entrance_key, "")
+        || inferRealmEntranceKey(normalizeOperatorText(input.draftAnalysis?.opening_phrase, 240, true) ?? extractOpeningPhrase(draftText));
+      const latestRealm = normalizeOperatorMachineKey(latest?.realm_entrance_key, "");
+      const candidateOpening = normalizeComparableText(normalizeOperatorText(input.draftAnalysis?.opening_phrase, 240, true) ?? extractOpeningPhrase(draftText) ?? "");
+      const latestOpening = normalizeComparableText(String(latest?.opening_phrase ?? ""));
+      if (candidateRealm && latestRealm && candidateRealm === latestRealm) {
+        results.push(buildGateResult(gate, "fail", "Candidate repeats the latest realm entrance for this account.", { candidate_realm: candidateRealm, latest_inventory_id: latest?.id ?? null }, "Rotate the opener/realm entrance before showing."));
+      } else if (candidateOpening && latestOpening && candidateOpening === latestOpening) {
+        results.push(buildGateResult(gate, "fail", "Candidate repeats the latest opening phrase for this account.", { opening_phrase: candidateOpening, latest_inventory_id: latest?.id ?? null }, "Change the opening phrase."));
+      } else {
+        results.push(buildGateResult(gate, "pass", "No latest-inventory opening repeat detected."));
+      }
+      continue;
+    }
+    if (gateKey === "exact_duplicate_gate") {
+      const duplicateRows = await env.DB.prepare(
+        `SELECT text AS candidate_text, 'draft' AS source_type
+         FROM gpt_generation_drafts
+         WHERE account_id = ?
+           AND id != COALESCE(?, '')
+         ORDER BY updated_at DESC
+         LIMIT 200`,
+      ).bind(input.brand.account_id, input.draftId ?? "").all<{ candidate_text: string; source_type: string }>();
+      let duplicate = (duplicateRows.results ?? []).find((row) => normalizeComparableText(row.candidate_text) === normalizedDraft) ?? null;
+      if (!duplicate) {
+        const scheduledRows = await env.DB.prepare(
+          `SELECT post_text AS candidate_text, 'scheduled_post' AS source_type
+           FROM scheduled_posts
+           WHERE threads_user_id = ?
+           ORDER BY scheduled_time DESC
+           LIMIT 200`,
+        ).bind(input.brand.profile.threads_user_id).all<{ candidate_text: string; source_type: string }>();
+        duplicate = (scheduledRows.results ?? []).find((row) => normalizeComparableText(row.candidate_text) === normalizedDraft) ?? null;
+      }
+      if (!duplicate && await doesTableExist(env, "threads_posts_archive")) {
+        const archiveRows = await env.DB.prepare(
+          `SELECT post_text AS candidate_text, 'archive_post' AS source_type
+           FROM threads_posts_archive
+           WHERE threads_user_id = ?
+           ORDER BY datetime(last_seen_at) DESC
+           LIMIT 200`,
+        ).bind(input.brand.profile.threads_user_id).all<{ candidate_text: string; source_type: string }>();
+        duplicate = (archiveRows.results ?? []).find((row) => normalizeComparableText(row.candidate_text) === normalizedDraft) ?? null;
+      }
+      results.push(duplicate
+        ? buildGateResult(gate, "fail", "Draft exactly matches known account content.", { source_type: duplicate.source_type }, "Write a materially different draft.")
+        : buildGateResult(gate, "pass", "No exact duplicate found in checked inventory."));
+      continue;
+    }
+    if (gateKey === "approved_before_schedule_gate") {
+      const draft = input.draftId ? await getOperatorDraft(env, input.brand, input.draftId) : null;
+      const approved = draft?.status === "approved";
+      results.push(buildGateResult(gate, approved ? "pass" : "fail", approved ? "Draft is approved." : "Draft is not approved.", { draft_status: draft?.status ?? null }, "Approve the draft before scheduling."));
+      continue;
+    }
+    if (gateKey === "scheduled_collision_gate") {
+      const timezone = input.scheduling?.timezone || WORKSPACE_DEFAULT_TIMEZONE;
+      const date = input.scheduling?.date;
+      const scheduled = date && isValidIsoDate(date)
+        ? await listScheduledPostsForThreadsAccountOnLocalDate(env, input.brand.profile.threads_user_id, date, timezone)
+        : [];
+      const sameText = scheduled.find((post) => normalizeComparableText(post.post_text) === normalizedDraft);
+      const sameTime = scheduled.find((post) => input.scheduling?.time && post.local_time === input.scheduling.time);
+      if (sameText || sameTime) {
+        results.push(buildGateResult(gate, "fail", sameText ? "Draft text collides with scheduled inventory." : "Requested time already has a scheduled post.", { scheduled_post_id: sameText?.id ?? sameTime?.id ?? null }, "Choose a different draft or time."));
+      } else {
+        results.push(buildGateResult(gate, "pass", "No scheduled collision detected."));
+      }
+      continue;
+    }
+    if (String(gate.evaluator) === "model" || String(gate.evaluator) === "hybrid") {
+      const modelResult = input.modelGateResults?.find((item) => item.gate_key === gateKey);
+      if (modelResult?.result && modelResult?.rationale) {
+        results.push(buildGateResult(
+          gate,
+          modelResult.result as OperatorGateResultValue,
+          String(modelResult.rationale),
+          modelResult.evidence && typeof modelResult.evidence === "object" ? modelResult.evidence as Record<string, unknown> : null,
+          normalizeOperatorText(modelResult.repair_guidance, 1000, true),
+        ));
+      } else {
+        results.push(buildGateResult(gate, "fail", "Hybrid/model gate requires a recorded model or owner evaluation before showing.", null, "Submit the gate result rationale before marking this draft showable."));
+      }
+      continue;
+    }
+    results.push(buildGateResult(gate, "not_applicable", "Gate has no v1 backend evaluator for this context."));
+  }
+
+  if (input.draftId) {
+    for (const result of results) {
+      await env.DB.prepare(
+        `INSERT INTO operator_gate_results (
+          id, brand_key, draft_id, source_card_id, gate_id, gate_key, result, blocking,
+          rationale, evaluated_by, evidence_json, repair_guidance
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          crypto.randomUUID(),
+          input.brand.brand_key,
+          input.draftId,
+          input.sourceCardId ?? null,
+          String(result.gate_id ?? ""),
+          String(result.gate_key ?? ""),
+          String(result.result ?? "not_applicable"),
+          result.blocking === true ? 1 : 0,
+          String(result.rationale ?? ""),
+          String(result.evaluated_by ?? "backend"),
+          normalizeOperatorJson(result.evidence ?? null, null),
+          normalizeOperatorText(result.repair_guidance, 2000, true),
+        )
+        .run();
+    }
+  }
+
+  const blockingFailures = results.filter((result) => result.blocking === true && result.result === "fail");
+  return {
+    showable: blockingFailures.length === 0,
+    gate_results: results,
+    blocking_failures: blockingFailures,
+    warnings,
+  };
+}
+
+function isAllowedOperatorTransition(current: string, next: string): boolean {
+  if (current === next) {
+    return true;
+  }
+  const allowed: Record<string, string[]> = {
+    candidate: ["self_rejected", "shown"],
+    shown: ["approved", "rejected", "revised"],
+    approved: ["scheduled"],
+    scheduled: ["published"],
+    revised: ["approved", "rejected"],
+  };
+  return allowed[current]?.includes(next) === true;
+}
+
+async function readOperatorPayload(request: Request): Promise<Record<string, unknown>> {
+  if (request.method === "GET") {
+    const url = new URL(request.url);
+    const payload: Record<string, unknown> = {};
+    for (const [key, value] of url.searchParams.entries()) {
+      payload[key] = value;
+    }
+    return payload;
+  }
+  const parsed = await request.json().catch(() => null);
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+}
+
+async function resolveOperatorBrandFromPayload(env: Env, payload: Record<string, unknown>): Promise<GptResolvedBrand | null> {
+  return resolveGptBrand(env, payload.brand_key);
+}
+
+async function getActiveOperatorSession(env: Env, brandKey: GptBrandKey): Promise<Record<string, unknown> | null> {
+  await ensureOperatorWorkflowTables(env);
+  return env.DB.prepare(
+    `SELECT *
+     FROM operator_workflow_sessions
+     WHERE brand_key = ?
+       AND status = 'active'
+     ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
+     LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+}
+
+async function listSourceCandidatesForBrand(
+  env: Env,
+  brand: GptResolvedBrand,
+  sourceTypes: string[],
+  limit: number,
+  offset: number,
+): Promise<{ candidates: Record<string, unknown>[]; total_count: number }> {
+  const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const normalizedOffset = Math.max(Math.trunc(offset), 0);
+  const wantsArchive = sourceTypes.length === 0 || sourceTypes.includes("archive_post") || sourceTypes.includes("recent_insight");
+  const wantsPatterns = sourceTypes.length === 0 || sourceTypes.includes("saved_pattern");
+  const candidates: Record<string, unknown>[] = [];
+  let totalCount = 0;
+
+  if (wantsArchive && await doesTableExist(env, "threads_posts_archive")) {
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ?`,
+    ).bind(brand.profile.threads_user_id).first<{ total: number }>();
+    totalCount += Number(count?.total ?? 0);
+    const rows = await env.DB.prepare(
+      `SELECT post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ?
+       ORDER BY engagement_total DESC, views DESC, datetime(post_timestamp) DESC
+       LIMIT ? OFFSET ?`,
+    ).bind(brand.profile.threads_user_id, normalizedLimit, normalizedOffset).all<Record<string, unknown>>();
+    for (const row of rows.results ?? []) {
+      candidates.push({
+        source_candidate_id: `archive_post:${row.post_id}`,
+        brand_key: brand.brand_key,
+        source_type: "archive_post",
+        source_id: row.post_id,
+        text: row.post_text,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes: Number(row.likes ?? 0),
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          quotes: Number(row.quotes ?? 0),
+          shares: Number(row.shares ?? 0),
+          engagement_total: Number(row.engagement_total ?? 0),
+        },
+        posted_at: row.post_timestamp ?? null,
+        why_relevant: "Metric-bearing own-account archive post.",
+        evidence_role: "primary_candidate",
+        lane_key: null,
+        risk_notes: [],
+      });
+    }
+  }
+
+  if (candidates.length < normalizedLimit && wantsPatterns && await doesTableExist(env, "external_patterns")) {
+    const remaining = normalizedLimit - candidates.length;
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM external_patterns
+       WHERE app_user_id = ?
+         AND account_id = ?`,
+    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total: number }>();
+    totalCount += Number(count?.total ?? 0);
+    const rows = await env.DB.prepare(
+      `SELECT id, post_text, views, likes, replies, reposts, shares, source_url, posted_at
+       FROM external_patterns
+       WHERE app_user_id = ?
+         AND account_id = ?
+       ORDER BY (likes + replies + reposts + shares) DESC, views DESC, id DESC
+       LIMIT ? OFFSET ?`,
+    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, remaining, Math.max(0, normalizedOffset - candidates.length)).all<Record<string, unknown>>();
+    for (const row of rows.results ?? []) {
+      const engagementTotal = Number(row.likes ?? 0) + Number(row.replies ?? 0) + Number(row.reposts ?? 0) + Number(row.shares ?? 0);
+      candidates.push({
+        source_candidate_id: `saved_pattern:${row.id}`,
+        brand_key: brand.brand_key,
+        source_type: "saved_pattern",
+        source_id: row.id,
+        text: row.post_text,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes: Number(row.likes ?? 0),
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          quotes: 0,
+          shares: Number(row.shares ?? 0),
+          engagement_total: engagementTotal,
+        },
+        posted_at: row.posted_at ?? null,
+        source_url: row.source_url ?? null,
+        why_relevant: "Saved external/reference pattern with captured metrics.",
+        evidence_role: "market_signal",
+        lane_key: null,
+        risk_notes: [],
+      });
+    }
+  }
+
+  return { candidates, total_count: totalCount || candidates.length };
+}
+
+async function handleOperatorTool(request: Request, env: Env, toolName: string): Promise<Response> {
+  if (!isGptRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
+    return unauthorizedGptResponse();
+  }
+  await prepareOperatorMode(env);
+  const payload = await readOperatorPayload(request);
+
+  if (toolName === "list_accounts") {
+    return operatorJsonResponse({ accounts: await listOperatorAccounts(env), workflow_template: workflowTemplatePayload() });
+  }
+
+  const brand = await resolveOperatorBrandFromPayload(env, payload);
+  if (!brand) {
+    return operatorJsonResponse({ success: false, error: "brand_key is required or unavailable" }, 400);
+  }
+
+  if (toolName === "get_account_state") {
+    const activeSession = await getActiveOperatorSession(env, brand.brand_key);
+    const activeSourceCard = activeSession?.active_source_card_id
+      ? await getOperatorSourceCard(env, brand.brand_key, String(activeSession.active_source_card_id))
+      : null;
+    const approved = await listGptGenerationDraftsByStatus(env, brand.account_id, ["approved"], 5);
+    const rejected = await listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected"], 5);
+    const scheduledCountRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = ? AND status IN (?, ?)`,
+    ).bind(brand.profile.threads_user_id, SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING).first<{ total: number }>();
+    const gates = await listOperatorGates(env, brand.brand_key, null, null, null);
+    return operatorJsonResponse({
+      brand_key: brand.brand_key,
+      active_workflow_session: activeSession,
+      active_source_card: activeSourceCard,
+      latest_approved_drafts: approved,
+      latest_rejected_drafts: rejected,
+      scheduled_posts_count: Number(scheduledCountRow?.total ?? 0),
+      active_gates_count: gates.length,
+      warnings: [],
+    });
+  }
+
+  if (toolName === "start_workflow_session") {
+    const sessionId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_workflow_sessions (
+        id, brand_key, workflow_template_key, objective, status, current_stage, notes
+      ) VALUES (?, ?, ?, ?, 'active', 'account_selection', ?)`,
+    )
+      .bind(
+        sessionId,
+        brand.brand_key,
+        normalizeOperatorText(payload.workflow_template_key, 120, true) ?? OPERATOR_WORKFLOW_TEMPLATE_KEY,
+        normalizeOperatorText(payload.objective, 1000, true),
+        normalizeOperatorText(payload.notes, 2000, true),
+      )
+      .run();
+    return operatorJsonResponse({ workflow_session_id: sessionId, current_stage: "account_selection", next_required_stage: "context_admission", workflow_template: workflowTemplatePayload() });
+  }
+
+  if (toolName === "admit_context") {
+    const sectionsInput = Array.isArray(payload.sections) ? payload.sections as Array<Record<string, unknown>> : [];
+    const coverage = sectionsInput.map((section) => {
+      const returnedCount = Number(section.returned_count ?? section.limit ?? 0);
+      const totalCount = Number(section.total_count ?? returnedCount);
+      const hasMore = Boolean(section.has_more ?? (totalCount > returnedCount));
+      return {
+        section: normalizeOperatorMachineKey(section.section, "unknown"),
+        returned_count: returnedCount,
+        total_count: totalCount,
+        limit: Number(section.limit ?? returnedCount),
+        offset: Number(section.offset ?? 0),
+        offsets_read: Array.isArray(section.offsets_read) ? section.offsets_read : [Number(section.offset ?? 0)],
+        has_more: hasMore,
+        coverage_status: section.coverage_status ?? (hasMore ? "partial" : "complete"),
+        source: section.source ?? "existing_db",
+        snapshot_id: section.snapshot_id ?? payload.snapshot_id ?? null,
+      };
+    });
+    const isPartial = coverage.some((section) => section.coverage_status === "partial" || section.has_more === true);
+    const admissionId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_context_admissions (
+        id, brand_key, workflow_session_id, snapshot_id, admission_scope, sections_json,
+        freshness_started_at, freshness_completed_at, is_partial, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        admissionId,
+        brand.brand_key,
+        normalizeOperatorText(payload.workflow_session_id, 120, true),
+        normalizeOperatorText(payload.snapshot_id, 120, true),
+        normalizeOperatorMachineKey(payload.admission_scope, "source_card_selection"),
+        JSON.stringify(coverage),
+        normalizeOperatorText(payload.freshness_started_at, 80, true),
+        normalizeOperatorText(payload.freshness_completed_at, 80, true),
+        isPartial ? 1 : 0,
+        normalizeOperatorText(payload.notes, 2000, true),
+      )
+      .run();
+    return operatorJsonResponse({ context_admission_id: admissionId, coverage, is_partial: isPartial, warnings: isPartial ? ["Context admission is partial."] : [] });
+  }
+
+  if (toolName === "get_production_board") {
+    const rows = await env.DB.prepare(
+      `SELECT *
+       FROM operator_production_board_items
+       WHERE brand_key = ?
+         AND status = 'active'
+         AND (? IS NULL OR workflow_session_id = ?)
+       ORDER BY COALESCE(priority, 1000) ASC, datetime(updated_at) DESC`,
+    ).bind(brand.brand_key, normalizeOperatorText(payload.workflow_session_id, 120, true), normalizeOperatorText(payload.workflow_session_id, 120, true)).all<Record<string, unknown>>();
+    return operatorJsonResponse({
+      brand_key: brand.brand_key,
+      items: (rows.results ?? []).map((row) => ({
+        id: row.id,
+        item_type: row.item_type,
+        lane_key: row.lane_key ?? null,
+        title: row.title,
+        body: row.body,
+        priority: row.priority === null || row.priority === undefined ? null : Number(row.priority),
+        evidence: safeParseJsonString(String(row.evidence_json ?? "[]")) ?? [],
+        created_from: row.created_from ?? null,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      })),
+      warnings: [],
+    });
+  }
+
+  if (toolName === "list_source_candidates") {
+    const sourceTypes = Array.isArray(payload.source_types)
+      ? payload.source_types.map((value) => String(value))
+      : [];
+    const limit = Number(payload.limit ?? 50);
+    const offset = Number(payload.offset ?? 0);
+    const { candidates, total_count: totalCount } = await listSourceCandidatesForBrand(env, brand, sourceTypes, limit, offset);
+    return operatorJsonResponse({
+      candidates,
+      returned_count: candidates.length,
+      total_count: totalCount,
+      has_more: offset + candidates.length < totalCount,
+    });
+  }
+
+  if (toolName === "create_source_card") {
+    const sourceCardId = crypto.randomUUID();
+    const sourceMechanism = normalizeOperatorText(payload.source_mechanism, 4000);
+    const requiredProduct = normalizeOperatorText(payload.required_product, 4000);
+    await env.DB.prepare(
+      `INSERT INTO operator_source_cards (
+        id, brand_key, workflow_session_id, sequence_label, lane_key, title, status,
+        primary_source_json, secondary_sources_json, anti_sources_json, metrics_snapshot_json,
+        source_mechanism, required_product, forbidden_surfaces_json, danger_surfaces_json,
+        current_inventory_constraints_json, pass_conditions_json, fail_conditions_json,
+        recommended_direction, context_admission_id, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        sourceCardId,
+        brand.brand_key,
+        normalizeOperatorText(payload.workflow_session_id, 120, true),
+        normalizeOperatorText(payload.sequence_label, 120) || `source_card_${Date.now()}`,
+        normalizeOperatorMachineKey(payload.lane_key, "") || null,
+        normalizeOperatorText(payload.title, 500) || "Source card",
+        normalizeOperatorJson(payload.primary_source, {}),
+        normalizeOperatorJson(payload.secondary_sources, []),
+        normalizeOperatorJson(payload.anti_sources, []),
+        normalizeOperatorJson(payload.metrics_snapshot, null),
+        sourceMechanism,
+        requiredProduct,
+        normalizeOperatorJson(payload.forbidden_surfaces, []),
+        normalizeOperatorJson(payload.danger_surfaces, []),
+        normalizeOperatorJson(payload.current_inventory_constraints, []),
+        normalizeOperatorJson(payload.pass_conditions, []),
+        normalizeOperatorJson(payload.fail_conditions, []),
+        normalizeOperatorText(payload.recommended_direction, 4000, true),
+        normalizeOperatorText(payload.context_admission_id, 120, true),
+        normalizeOperatorMachineKey(payload.created_by, "gpt"),
+      )
+      .run();
+    const card = await getOperatorSourceCard(env, brand.brand_key, sourceCardId);
+    if (payload.workflow_session_id) {
+      await env.DB.prepare(
+        `UPDATE operator_workflow_sessions
+         SET active_source_card_id = ?, current_stage = 'source_card'
+         WHERE id = ?
+           AND brand_key = ?`,
+      ).bind(sourceCardId, String(payload.workflow_session_id), brand.brand_key).run();
+    }
+    return operatorJsonResponse({ source_card_id: sourceCardId, status: "draft", validation: validateSourceCardLockable(card ?? {}) });
+  }
+
+  if (toolName === "lock_source_card") {
+    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
+    const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
+    if (!card) {
+      return operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
+    }
+    const validation = validateSourceCardLockable(card);
+    if (!validation.can_lock) {
+      return operatorJsonResponse({ success: false, source_card_id: sourceCardId, status: card.status, validation }, 400);
+    }
+    const lockedAt = new Date().toISOString();
+    await env.DB.prepare(
+      `UPDATE operator_source_cards
+       SET status = 'locked', locked_at = ?
+       WHERE id = ?
+         AND brand_key = ?`,
+    ).bind(lockedAt, sourceCardId, brand.brand_key).run();
+    return operatorJsonResponse({ source_card_id: sourceCardId, status: "locked", locked_at: lockedAt, warnings: [] });
+  }
+
+  if (toolName === "get_source_card") {
+    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
+    const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
+    return card ? operatorJsonResponse({ source_card: card }) : operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
+  }
+
+  if (toolName === "create_generation_run") {
+    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
+    const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
+    if (!card || card.status !== "locked") {
+      return operatorJsonResponse({ success: false, error: "locked_source_card_required" }, 400);
+    }
+    const runId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO gpt_generation_runs (
+        id, account_id, threads_user_id, source_card_id, objective, prompt_summary, status, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, 'drafted', ?)`,
+    )
+      .bind(
+        runId,
+        brand.account_id,
+        brand.profile.threads_user_id,
+        sourceCardId,
+        normalizeOperatorText(payload.objective, 1000, true),
+        normalizeOperatorText(payload.prompt_summary, 4000, true),
+        normalizeOperatorJson({ source: "operator_mode_mcp" }, {}),
+      )
+      .run();
+    if (card.workflow_session_id) {
+      await env.DB.prepare(
+        `UPDATE operator_workflow_sessions
+         SET active_generation_run_id = ?, current_stage = 'generation_run_and_candidates'
+         WHERE id = ?
+           AND brand_key = ?`,
+      ).bind(runId, card.workflow_session_id, brand.brand_key).run();
+    }
+    return operatorJsonResponse({ run_id: runId, source_card_id: sourceCardId, status: "drafted" });
+  }
+
+  if (toolName === "run_gates") {
+    const result = await runOperatorGates(env, {
+      brand,
+      sourceCardId: normalizeOperatorText(payload.source_card_id, 120, true),
+      draftText: normalizeOperatorText(payload.draft_text, 20000, true),
+      stageScope: normalizeOperatorStage(payload.stage, "gate_evaluation"),
+      laneKey: normalizeOperatorMachineKey(payload.lane_key ?? (payload.draft_analysis as Record<string, unknown> | undefined)?.lane_key, "") || null,
+      contentType: normalizeOperatorMachineKey(payload.content_type, "") || null,
+      draftAnalysis: payload.draft_analysis && typeof payload.draft_analysis === "object" && !Array.isArray(payload.draft_analysis) ? payload.draft_analysis as Record<string, unknown> : null,
+      modelGateResults: Array.isArray(payload.model_gate_results) ? payload.model_gate_results as Array<Record<string, unknown>> : null,
+    });
+    return operatorJsonResponse(result);
+  }
+
+  if (toolName === "submit_candidate_draft" || toolName === "save_self_rejected_draft") {
+    const runId = normalizeOperatorText(payload.run_id, 120);
+    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
+    const text = normalizeOperatorText(payload.text, 20000);
+    if (!runId || !sourceCardId || !text) {
+      return operatorJsonResponse({ success: false, error: "run_id, source_card_id, and text are required" }, 400);
+    }
+    const draftId = crypto.randomUUID();
+    const status = toolName === "save_self_rejected_draft" ? "self_rejected" : "candidate";
+    const draftIndex = Number.isFinite(Number(payload.draft_index)) ? Math.max(0, Math.trunc(Number(payload.draft_index))) : 1;
+    const strategy = payload.strategy && typeof payload.strategy === "object" && !Array.isArray(payload.strategy) ? payload.strategy as Record<string, unknown> : {};
+    const analysis = payload.draft_analysis && typeof payload.draft_analysis === "object" && !Array.isArray(payload.draft_analysis) ? payload.draft_analysis as Record<string, unknown> : {};
+    let gateRun = { showable: false, gate_results: [] as Record<string, unknown>[], blocking_failures: [] as Record<string, unknown>[], warnings: [] as string[] };
+    if (status === "candidate") {
+      gateRun = await runOperatorGates(env, {
+        brand,
+        sourceCardId,
+        draftId,
+        draftText: text,
+        stageScope: "gate_evaluation",
+        laneKey: normalizeOperatorMachineKey(analysis.lane_key ?? strategy.pillar, "") || null,
+        draftAnalysis: analysis,
+        modelGateResults: Array.isArray(payload.model_gate_results) ? payload.model_gate_results as Array<Record<string, unknown>> : null,
+      });
+    }
+    await env.DB.prepare(
+      `INSERT INTO gpt_generation_drafts (
+        id, run_id, account_id, threads_user_id, source_card_id, draft_index, text, status,
+        rejection_reason, score_json, strategy_json, gate_summary_json, showable, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        draftId,
+        runId,
+        brand.account_id,
+        brand.profile.threads_user_id,
+        sourceCardId,
+        draftIndex,
+        text,
+        status,
+        normalizeOperatorText(payload.rejection_reason, 2000, true),
+        normalizeOperatorJson(payload.score ?? payload.scores, null),
+        normalizeOperatorJson({ ...strategy, analysis }, {}),
+        normalizeOperatorJson({ gate_results: gateRun.gate_results, blocking_failures: gateRun.blocking_failures }, {}),
+        gateRun.showable ? 1 : 0,
+        normalizeOperatorJson({ source: "operator_mode_mcp" }, {}),
+      )
+      .run();
+    return operatorJsonResponse({
+      draft_id: draftId,
+      status,
+      showable: gateRun.showable,
+      gate_results: gateRun.gate_results,
+      blocking_failures: gateRun.blocking_failures,
+      repair_guidance: gateRun.blocking_failures.map((failure) => failure.repair_guidance).filter(Boolean),
+    });
+  }
+
+  if (toolName === "mark_draft_shown") {
+    const draftId = normalizeOperatorText(payload.draft_id, 120);
+    if (!draftId) {
+      return operatorJsonResponse({ success: false, error: "draft_id is required" }, 400);
+    }
+    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
+    if (!draft) {
+      return operatorJsonResponse({ success: false, error: "draft_not_found" }, 404);
+    }
+    if (!draft.showable || !isAllowedOperatorTransition(draft.status, "shown")) {
+      return operatorJsonResponse({ success: false, error: "draft_not_showable", draft_id: draftId, status: draft.status, showable: draft.showable }, 400);
+    }
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts SET status = 'shown' WHERE id = ? AND account_id = ?`,
+    ).bind(draftId, brand.account_id).run();
+    await insertOperatorInventory(env, {
+      brandKey: brand.brand_key,
+      sourceType: "draft",
+      sourceId: draftId,
+      text: draft.text,
+      sourceCardId: draft.source_card_id,
+      status: "shown",
+      strategy: draft.strategy && typeof draft.strategy === "object" ? draft.strategy as Record<string, unknown> : null,
+      analysis: draft.strategy && typeof draft.strategy === "object" ? (draft.strategy as Record<string, unknown>).analysis as Record<string, unknown> ?? null : null,
+    });
+    return operatorJsonResponse({ draft_id: draftId, status: "shown" });
+  }
+
+  if (toolName === "approve_draft" || toolName === "reject_draft") {
+    const draftId = normalizeOperatorText(payload.draft_id, 120);
+    if (!draftId) {
+      return operatorJsonResponse({ success: false, error: "draft_id is required" }, 400);
+    }
+    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
+    if (!draft) {
+      return operatorJsonResponse({ success: false, error: "draft_not_found" }, 404);
+    }
+    const nextStatus = toolName === "approve_draft" ? "approved" : "rejected";
+    if (!isAllowedOperatorTransition(draft.status, nextStatus)) {
+      return operatorJsonResponse({ success: false, error: "invalid_status_transition", from: draft.status, to: nextStatus }, 400);
+    }
+    const feedback = normalizeOperatorText(payload.feedback_note, 4000, true);
+    const rejectionReason = toolName === "reject_draft"
+      ? normalizeOperatorText(payload.rejection_reason, 4000, true) ?? feedback ?? "Rejected from operator mode."
+      : null;
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = ?,
+           owner_feedback = COALESCE(?, owner_feedback),
+           rejection_reason = COALESCE(?, rejection_reason),
+           score_json = COALESCE(?, score_json),
+           strategy_json = COALESCE(?, strategy_json)
+       WHERE id = ?
+         AND account_id = ?`,
+    )
+      .bind(
+        nextStatus,
+        feedback,
+        rejectionReason,
+        normalizeOperatorJson(payload.score ?? payload.scores, null),
+        payload.strategy ? normalizeOperatorJson(payload.strategy, {}) : null,
+        draftId,
+        brand.account_id,
+      )
+      .run();
+    const memoryKind = toolName === "approve_draft" ? "approval_feedback" : "rejection_feedback";
+    const memory = await saveGptStrategyMemory(env, {
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      kind: memoryKind,
+      title: toolName === "approve_draft" ? "Draft approved from operator mode" : "Draft rejected from operator mode",
+      body: `Draft id: ${draftId}\nStatus: ${nextStatus}\n${feedback || rejectionReason || "No feedback note provided."}`,
+      metadataJson: normalizeOperatorJson({ source: "operator_mode_mcp", draft_id: draftId, source_card_id: draft.source_card_id }, {}),
+    });
+    await insertOperatorInventory(env, {
+      brandKey: brand.brand_key,
+      sourceType: "draft",
+      sourceId: draftId,
+      text: draft.text,
+      sourceCardId: draft.source_card_id,
+      status: nextStatus,
+      strategy: payload.strategy && typeof payload.strategy === "object" ? payload.strategy as Record<string, unknown> : (draft.strategy as Record<string, unknown> | null),
+    });
+    return operatorJsonResponse({ draft_id: draftId, status: nextStatus, memory_id: memory?.id ?? null });
+  }
+
+  if (toolName === "list_active_gates") {
+    const gates = await listOperatorGates(
+      env,
+      brand.brand_key,
+      payload.stage_scope ? normalizeOperatorStage(payload.stage_scope) : null,
+      normalizeOperatorMachineKey(payload.lane_key, "") || null,
+      normalizeOperatorMachineKey(payload.content_type, "") || null,
+    );
+    return operatorJsonResponse({ gates });
+  }
+
+  if (toolName === "create_or_update_gate" || toolName === "promote_memory_to_gate") {
+    let description = normalizeOperatorText(payload.description, 4000, true);
+    let displayName = normalizeOperatorText(payload.display_name, 240, true);
+    let sourceMemoryIds: unknown = payload.source_memory_ids ?? [];
+    let createdFrom = normalizeOperatorMachineKey(payload.created_from, "owner_feedback");
+    if (toolName === "promote_memory_to_gate") {
+      const memoryId = Number(payload.memory_id);
+      const memory = Number.isFinite(memoryId)
+        ? await env.DB.prepare(
+          `SELECT id, title, body FROM gpt_strategy_memory WHERE id = ? AND account_id = ? LIMIT 1`,
+        ).bind(memoryId, brand.account_id).first<{ id: number; title: string | null; body: string }>()
+        : null;
+      if (!memory) {
+        return operatorJsonResponse({ success: false, error: "memory_not_found" }, 404);
+      }
+      displayName = displayName ?? memory.title ?? normalizeOperatorText(payload.gate_key, 120) ?? "Promoted memory gate";
+      description = description ?? memory.body;
+      sourceMemoryIds = [memory.id];
+      createdFrom = "strategy_memory";
+    }
+    const gateKey = normalizeOperatorMachineKey(payload.gate_key);
+    if (!gateKey || !description) {
+      return operatorJsonResponse({ success: false, error: "gate_key and description are required" }, 400);
+    }
+    const brandScope = payload.brand_key === null || payload.brand_key === "global" ? null : brand.brand_key;
+    const laneScope = normalizeOperatorMachineKey(payload.lane_scope, "") || null;
+    const contentTypeScope = normalizeOperatorMachineKey(payload.content_type_scope ?? payload.content_type, "") || null;
+    const existing = await env.DB.prepare(
+      `SELECT id FROM operator_gates
+       WHERE COALESCE(brand_key, '__global__') = COALESCE(?, '__global__')
+         AND gate_key = ?
+         AND COALESCE(lane_scope, '__all__') = COALESCE(?, '__all__')
+         AND COALESCE(content_type_scope, '__all__') = COALESCE(?, '__all__')
+       LIMIT 1`,
+    ).bind(brandScope, gateKey, laneScope, contentTypeScope).first<{ id: string }>();
+    const gateId = existing?.id ?? crypto.randomUUID();
+    if (existing?.id) {
+      await env.DB.prepare(
+        `UPDATE operator_gates
+         SET display_name = ?, description = ?, stage_scope = ?, gate_type = ?, severity = ?,
+             evaluator = ?, active = ?, order_index = ?, pass_examples_json = ?, fail_examples_json = ?,
+             source_memory_ids_json = ?, created_from = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      )
+        .bind(
+          displayName ?? gateKey,
+          description,
+          normalizeOperatorStage(payload.stage_scope, "gate_evaluation"),
+          normalizeOperatorMachineKey(payload.gate_type, "hard"),
+          normalizeOperatorMachineKey(payload.severity, "block"),
+          normalizeOperatorMachineKey(payload.evaluator, "hybrid"),
+          payload.active === false ? 0 : 1,
+          Number(payload.order_index ?? 100),
+          normalizeOperatorJson(payload.pass_examples, []),
+          normalizeOperatorJson(payload.fail_examples, []),
+          normalizeOperatorJson(sourceMemoryIds, []),
+          createdFrom,
+          gateId,
+        )
+        .run();
+    } else {
+      await env.DB.prepare(
+        `INSERT INTO operator_gates (
+          id, brand_key, gate_key, display_name, description, stage_scope, lane_scope,
+          content_type_scope, gate_type, severity, evaluator, active, order_index,
+          pass_examples_json, fail_examples_json, source_memory_ids_json, created_from
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          gateId,
+          brandScope,
+          gateKey,
+          displayName ?? gateKey,
+          description,
+          normalizeOperatorStage(payload.stage_scope, "gate_evaluation"),
+          laneScope,
+          contentTypeScope,
+          normalizeOperatorMachineKey(payload.gate_type, "hard"),
+          normalizeOperatorMachineKey(payload.severity, "block"),
+          normalizeOperatorMachineKey(payload.evaluator, "hybrid"),
+          payload.active === false ? 0 : 1,
+          Number(payload.order_index ?? 100),
+          normalizeOperatorJson(payload.pass_examples, []),
+          normalizeOperatorJson(payload.fail_examples, []),
+          normalizeOperatorJson(sourceMemoryIds, []),
+          createdFrom,
+        )
+        .run();
+    }
+    return operatorJsonResponse({ gate_id: gateId, gate_key: gateKey, active: payload.active !== false, created_from_memory_id: toolName === "promote_memory_to_gate" ? payload.memory_id ?? null : null });
+  }
+
+  if (toolName === "list_strategy_memory") {
+    const kind = normalizeOperatorMachineKey(payload.kind, "");
+    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 50)), 1), 100);
+    const offset = Math.max(Math.trunc(Number(payload.offset ?? 0)), 0);
+    const kinds = kind ? [kind] : [];
+    const items = await listGptStrategyMemory(env, brand.account_id, kinds, limit, offset, "active");
+    const total = await countGptStrategyMemory(env, brand.account_id, kinds, "active");
+    return operatorJsonResponse({ items, returned_count: items.length, total_count: total, has_more: offset + items.length < total });
+  }
+
+  if (toolName === "save_strategy_memory") {
+    const kind = normalizeGptStrategyMemoryKind(payload.kind);
+    const body = normalizeOperatorText(payload.body, 20000);
+    if (!kind || !body) {
+      return operatorJsonResponse({ success: false, error: "valid kind and body are required" }, 400);
+    }
+    const memory = await saveGptStrategyMemory(env, {
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      kind,
+      title: normalizeOperatorText(payload.title, 500, true),
+      body,
+      metadataJson: normalizeOperatorJson({ ...(payload.metadata as Record<string, unknown> ?? {}), source: payload.source ?? "mcp_operator" }, {}),
+    });
+    return operatorJsonResponse({ memory_id: memory?.id ?? null });
+  }
+
+  if (toolName === "list_scheduled_posts") {
+    const date = normalizeOperatorText(payload.date, 20, true);
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    const items = date && isValidIsoDate(date)
+      ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, date, timezone)
+      : [];
+    return operatorJsonResponse({ items, returned_count: items.length, total_count: items.length, has_more: false });
+  }
+
+  if (toolName === "schedule_approved_draft") {
+    const draftId = normalizeOperatorText(payload.draft_id, 120);
+    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
+    const date = normalizeOperatorText(payload.date, 20);
+    const time = normalizeOperatorText(payload.time, 20);
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    if (!draft || !date || !time) {
+      return operatorJsonResponse({ success: false, error: "draft_id, date, and time are required" }, 400);
+    }
+    const gateRun = await runOperatorGates(env, {
+      brand,
+      draftId,
+      sourceCardId: draft.source_card_id,
+      draftText: draft.text,
+      stageScope: "scheduling",
+      scheduling: { date, time, timezone },
+    });
+    if (!gateRun.showable) {
+      return operatorJsonResponse({ success: false, error: "scheduling_gates_failed", ...gateRun }, 400);
+    }
+    const scheduled = await createScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id, draft.text, date, time, timezone);
+    if (!scheduled.success || !scheduled.scheduledPostId) {
+      return operatorJsonResponse({ success: false, error: scheduled.error ?? "schedule_failed" }, 400);
+    }
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'scheduled', scheduled_post_id = ?
+       WHERE id = ?
+         AND account_id = ?`,
+    ).bind(scheduled.scheduledPostId, draftId, brand.account_id).run();
+    await upsertGptPostStrategyTag(env, {
+      scheduledPostId: scheduled.scheduledPostId,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      strategy: normalizeGptPostStrategyInput(payload.strategy),
+    });
+    await insertOperatorInventory(env, {
+      brandKey: brand.brand_key,
+      sourceType: "scheduled_post",
+      sourceId: String(scheduled.scheduledPostId),
+      text: draft.text,
+      sourceCardId: draft.source_card_id,
+      status: "scheduled",
+      strategy: payload.strategy && typeof payload.strategy === "object" ? payload.strategy as Record<string, unknown> : null,
+    });
+    return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
+  }
+
+  if (toolName === "get_post_results") {
+    return operatorJsonResponse({ post: null, metrics: null, linked_draft_id: null, linked_source_card_id: null, warning: "post result linking is not implemented in v1" });
+  }
+
+  return operatorJsonResponse({ success: false, error: "unknown_operator_tool", tool_name: toolName }, 404);
 }
 
 async function createGptGenerationRun(
@@ -11926,6 +13543,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         },
       );
+    }
+
+    if (normalizedPath.startsWith("/api/operator/tools/")) {
+      const toolName = normalizedPath.slice("/api/operator/tools/".length).replace(/\/+$/, "");
+      if (!toolName) {
+        return operatorJsonResponse({ success: false, error: "operator tool name is required" }, 400);
+      }
+      if (request.method !== "GET" && request.method !== "POST") {
+        return operatorJsonResponse({ success: false, error: "Method not allowed" }, 405);
+      }
+      return handleOperatorTool(request, env, toolName);
     }
 
     if (normalizedPath.startsWith("/api/gpt/")) {
