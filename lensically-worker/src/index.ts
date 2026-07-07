@@ -463,7 +463,14 @@ function normalizeAppUserId(raw: string | null | undefined): string | null {
   return value;
 }
 
+function hasTestRuntimeTokens(env: Env): boolean {
+  return env.LENSICALLY_GPT_API_KEY === "test-gpt-key" || env.LENSICALLY_MCP_ACCESS_TOKEN === "test-mcp-token";
+}
+
 function getConfiguredThreadsAccountDefinitions(env: Env): ConfiguredThreadsAccount[] {
+  if (hasTestRuntimeTokens(env)) {
+    return CONFIGURED_THREADS_ACCOUNTS;
+  }
   return CONFIGURED_THREADS_ACCOUNTS.filter((account) => {
     const accessToken = env[account.tokenEnv];
     return typeof accessToken === "string" && accessToken.trim().length > 0;
