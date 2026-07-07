@@ -5555,6 +5555,7 @@ const DEFAULT_OPERATOR_GATES: Array<{
   order_index: number;
 }> = [
   { gate_key: "account_selected_gate", display_name: "Account Selected", description: "A valid account must be selected.", stage_scope: "account_selection", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
+  { gate_key: "operator_precheck_before_workflow", display_name: "Operator Precheck Before Workflow", description: "A full operator precheck must be loaded before workflow, admin, or engineering actions.", stage_scope: "account_selection", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 15 },
   { gate_key: "context_admission_gate", display_name: "Context Admission", description: "Relevant data coverage must be recorded and partial data labeled.", stage_scope: "context_admission", gate_type: "hard", severity: "warn", evaluator: "backend", order_index: 20 },
   { gate_key: "source_card_required_gate", display_name: "Source Card Required", description: "Serious generation requires a source card unless explicitly overridden.", stage_scope: "generation_run_and_candidates", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
   { gate_key: "source_lock_gate", display_name: "Source Lock", description: "A source card must be locked before drafts can be shown.", stage_scope: "generation_run_and_candidates", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
@@ -5897,6 +5898,31 @@ async function runOperatorGates(
     const gateKey = String(gate.gate_key);
     if (gateKey === "account_selected_gate") {
       results.push(buildGateResult(gate, input.brand.brand_key ? "pass" : "fail", input.brand.brand_key ? "Account is selected." : "Missing account selection."));
+      continue;
+    }
+    if (gateKey === "operator_precheck_before_workflow") {
+      const latestAdmission = await getLatestOperatorContextAdmission(env, input.brand.brand_key, null);
+      const sections = Array.isArray(latestAdmission?.sections) ? latestAdmission.sections as Array<Record<string, unknown>> : [];
+      const incompleteSections = sections
+        .filter((section) => section.coverage_status !== "complete" || section.has_more === true || section.error)
+        .map((section) => String(section.section ?? "unknown"));
+      const precheckComplete = latestAdmission?.admission_scope === "full_preflight"
+        && latestAdmission?.is_partial !== true
+        && sections.length > 0
+        && incompleteSections.length === 0;
+      results.push(buildGateResult(
+        gate,
+        precheckComplete ? "pass" : "fail",
+        precheckComplete ? "Full operator precheck is loaded." : "Full operator precheck is missing or partial.",
+        {
+          context_admission_id: latestAdmission?.id ?? null,
+          admission_scope: latestAdmission?.admission_scope ?? null,
+          is_partial: latestAdmission?.is_partial ?? null,
+          section_count: sections.length,
+          incomplete_sections: incompleteSections,
+        },
+        "Run prepareFullPreflight or engineeringPrecheck before workflow, admin, or engineering actions.",
+      ));
       continue;
     }
     if (gateKey === "source_card_required_gate") {
@@ -6254,7 +6280,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         sessionId,
         brand.brand_key,
         normalizeOperatorText(payload.workflow_template_key, 120, true) ?? OPERATOR_WORKFLOW_TEMPLATE_KEY,
-        normalizeOperatorText(payload.objective, 1000, true),
+        null,
         normalizeOperatorText(payload.notes, 2000, true),
       )
       .run();
@@ -6823,6 +6849,7 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
   "getMcpAdminState",
   "inspectMcpFailure",
   "listMcpTools",
+  "runEngineeringTool",
   "readMcpToolDefinition",
   "updateMcpToolSchema",
   "updateMcpToolBehavior",
@@ -6922,9 +6949,16 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "listMcpTools",
     title: "List MCP tools",
-    description: "List the active and configured Lensically MCP tools, including schema overrides, disabled state, and handler configuration.",
-    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" } }, additionalProperties: false },
+    description: "List active Lensically MCP tools. If direct engineering tools are not exposed by ChatGPT, pass execute_tool and arguments to bridge-call an engineering tool.",
+    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" }, execute_tool: { type: "string", description: "Optional engineering tool name to execute through this already-callable admin tool." }, arguments: { type: "object", additionalProperties: true, description: "Arguments for execute_tool." } }, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "runEngineeringTool",
+    title: "Run engineering tool",
+    description: "Bridge-call a Lensically engineering tool when ChatGPT advertises it but does not expose it as a direct callable tool.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string", description: "One of the Lensically engineering tool names." }, arguments: { type: "object", additionalProperties: true } }, required: ["tool_name"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "readMcpToolDefinition",
@@ -7007,7 +7041,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     name: "prepareFullPreflight",
     title: "Prepare full preflight",
     description: "Run server-side preflight collection for the selected account and record complete/partial context admission before serious workflow advancement.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" }, objective: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
@@ -7078,7 +7112,6 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         workflow_template_key: { type: "string", default: OPERATOR_WORKFLOW_TEMPLATE_KEY },
-        objective: { type: "string" },
         notes: { type: "string" },
       },
       required: ["brand_key"],
@@ -8072,8 +8105,41 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
   }
 
   if (toolName === "listMcpTools") {
+    const executeTool = normalizeOperatorText(args.execute_tool, 160, true);
+    if (executeTool) {
+      if (!isOperatorMcpEngineeringToolName(executeTool)) {
+        return {
+          ok: false,
+          error: "engineering_tool_required",
+          requested_tool: executeTool,
+          available_engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
+        };
+      }
+      const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+        ? args.arguments as Record<string, unknown>
+        : {};
+      const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
+      return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
+    }
     const tools = await buildOperatorMcpTools(env, args.include_disabled === true);
     return { ok: true, tools };
+  }
+
+  if (toolName === "runEngineeringTool") {
+    const executeTool = normalizeOperatorText(args.tool_name, 160);
+    if (!executeTool || !isOperatorMcpEngineeringToolName(executeTool)) {
+      return {
+        ok: false,
+        error: "engineering_tool_required",
+        requested_tool: executeTool,
+        available_engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
+      };
+    }
+    const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+      ? args.arguments as Record<string, unknown>
+      : {};
+    const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
+    return { ok: result.ok !== false, bridge_tool: "runEngineeringTool", executed_tool: executeTool, result };
   }
 
   if (toolName === "readMcpToolDefinition") {
@@ -8247,7 +8313,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
 
   if (toolName === "prepareFullPreflight") {
     if (!session) {
-      const created = await callOperatorToolForMcp(request, env, "start_workflow_session", { brand_key: brand.brand_key, objective: normalizeOperatorText(args.objective, 1000, true) ?? "MCP full preflight" });
+      const created = await callOperatorToolForMcp(request, env, "start_workflow_session", { brand_key: brand.brand_key, notes: "MCP full preflight." });
       session = created.workflow_session_id
         ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(String(created.workflow_session_id), brand.brand_key).first<Record<string, unknown>>()
         : null;

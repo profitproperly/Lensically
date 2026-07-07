@@ -118,7 +118,6 @@ async function resetTables(): Promise<void> {
 async function createLockedSourceCard(forbiddenSurfaces: string[] = []): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
   const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
     brand_key: BRAND_KEY,
-    objective: "operator mode test",
   });
   await operatorTool("admit_context", {
     brand_key: BRAND_KEY,
@@ -388,10 +387,11 @@ describe("operator mode MCP endpoint", () => {
       "updateOpsMemory",
       "searchOpsMemory",
     ]);
-    expect(toolNames.slice(23, 44)).toEqual([
+    expect(toolNames.slice(23, 45)).toEqual([
       "getMcpAdminState",
       "inspectMcpFailure",
       "listMcpTools",
+      "runEngineeringTool",
       "readMcpToolDefinition",
       "updateMcpToolSchema",
       "updateMcpToolBehavior",
@@ -462,6 +462,7 @@ describe("operator mode MCP endpoint", () => {
       "getMcpAdminState",
       "inspectMcpFailure",
       "listMcpTools",
+      "runEngineeringTool",
       "readMcpToolDefinition",
       "updateMcpToolSchema",
       "updateMcpToolBehavior",
@@ -511,12 +512,25 @@ describe("operator mode MCP endpoint", () => {
     const precheck = await mcpTool<{ tool_surface: { engineering_tools: number }; recent_ops_memory: Array<{ id: string }> }>("engineeringPrecheck");
     expect(precheck.tool_surface.engineering_tools).toBeGreaterThanOrEqual(20);
     expect(precheck.recent_ops_memory.some((item) => item.id === memory.memory_id)).toBe(true);
+
+    const bridged = await mcpTool<{ executed_tool: string; result: { github: { token_status: string } } }>("runEngineeringTool", {
+      tool_name: "getEngineeringAccessState",
+      arguments: {},
+    });
+    expect(bridged.executed_tool).toBe("getEngineeringAccessState");
+    expect(bridged.result.github.token_status).toMatch(/exists|missing/);
+
+    const listBridge = await mcpTool<{ executed_tool: string; result: { tool_surface: { engineering_tools: number } } }>("listMcpTools", {
+      execute_tool: "engineeringPrecheck",
+      arguments: {},
+    });
+    expect(listBridge.executed_tool).toBe("engineeringPrecheck");
+    expect(listBridge.result.tool_surface.engineering_tools).toBeGreaterThanOrEqual(20);
   }, 30000);
 
   it("runs the MCP happy path from session through scheduling", async () => {
     const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
       brand_key: BRAND_KEY,
-      objective: "mcp happy path",
     });
     const card = await mcpTool<{ source_card_id: string }>("create_source_card", {
       brand_key: BRAND_KEY,
@@ -663,6 +677,16 @@ describe("operator mode MCP endpoint", () => {
     expect(tests.ok).toBe(true);
     expect(tests.checks.every((check) => check.passed)).toBe(true);
 
+    const startDefinition = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", {
+      tool_name: "start_workflow_session",
+    });
+    expect(startDefinition.tool?.inputSchema?.properties?.objective).toBeUndefined();
+
+    const preflightDefinition = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", {
+      tool_name: "prepareFullPreflight",
+    });
+    expect(preflightDefinition.tool?.inputSchema?.properties?.objective).toBeUndefined();
+
     const patched = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("updateMcpToolSchema", {
       tool_name: "prepareFullPreflight",
       schema_patch: { properties: { operator_note: { type: "string" } } },
@@ -678,8 +702,14 @@ describe("operator mode MCP endpoint", () => {
   it("blocks workflow stage advancement until full preflight completes", async () => {
     const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
       brand_key: BRAND_KEY,
-      objective: "admin preflight fixture",
     });
+    const precheckGateBefore = await mcpTool<{ showable: boolean; blocking_failures: Array<{ gate_key: string; result: string }> }>("runGateSuite", {
+      brand_key: BRAND_KEY,
+      stage: "account_selection",
+    });
+    expect(precheckGateBefore.showable).toBe(false);
+    expect(precheckGateBefore.blocking_failures.some((failure) => failure.gate_key === "operator_precheck_before_workflow" && failure.result === "fail")).toBe(true);
+
     const blocked = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string; blockers?: Array<Record<string, unknown>> }; isError?: boolean }>("tools/call", {
       name: "advanceWorkflowStage",
       arguments: { brand_key: BRAND_KEY, workflow_session_id: session.workflow_session_id, target_stage: "context_admission" },
@@ -694,6 +724,13 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(preflight.complete).toBe(true);
     expect(preflight.context_admission_id).toBeTruthy();
+
+    const precheckGateAfter = await mcpTool<{ showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("runGateSuite", {
+      brand_key: BRAND_KEY,
+      stage: "account_selection",
+    });
+    expect(precheckGateAfter.showable).toBe(true);
+    expect(precheckGateAfter.gate_results.some((result) => result.gate_key === "operator_precheck_before_workflow" && result.result === "pass")).toBe(true);
 
     const advanced = await mcpTool<{ current_stage: string }>("advanceWorkflowStage", {
       brand_key: BRAND_KEY,
