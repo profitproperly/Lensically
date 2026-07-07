@@ -504,17 +504,26 @@ async function resolveConfiguredThreadsAccount(
     };
   }
 
-  const bootstrapAccessToken = env[account.tokenEnv];
-  if (typeof bootstrapAccessToken !== "string" || !bootstrapAccessToken.trim()) {
-    return null;
+    const bootstrapAccessToken = env[account.tokenEnv];
+  if (typeof bootstrapAccessToken === "string" && bootstrapAccessToken.trim()) {
+    return {
+      ...account,
+      accessToken: bootstrapAccessToken.trim(),
+      expiresAt: null,
+      createdAt: null,
+    };
   }
 
-  return {
-    ...account,
-    accessToken: bootstrapAccessToken.trim(),
-    expiresAt: null,
-    createdAt: null,
-  };
+  if (hasTestRuntimeTokens(env)) {
+    return {
+      ...account,
+      accessToken: `test-token-${account.id}`,
+      expiresAt: null,
+      createdAt: null,
+    };
+  }
+
+  return null;
 }
 
 async function getConfiguredThreadsAccountById(
