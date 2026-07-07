@@ -69,6 +69,10 @@ interface Env {
   THREADS_CLIENT_SECRET: string;
   INTERNAL_API_KEY: string;
   LENSICALLY_GPT_API_KEY?: string;
+  LENSICALLY_MCP_ACCESS_TOKEN?: string;
+  LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;
+  LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;
+  LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;
   APP_URL?: string;
   ROOT_SITE_URL?: string;
   WORKER_ORIGIN?: string;
@@ -1637,6 +1641,12 @@ function getBearerToken(request: Request): string | null {
 
 function isGptRequestAuthorized(request: Request, env: Env): boolean {
   const configuredKey = env.LENSICALLY_GPT_API_KEY?.trim() || "";
+  const providedKey = getBearerToken(request);
+  return Boolean(configuredKey && providedKey && providedKey === configuredKey);
+}
+
+function isOperatorMcpRequestAuthorized(request: Request, env: Env): boolean {
+  const configuredKey = env.LENSICALLY_MCP_ACCESS_TOKEN?.trim() || "";
   const providedKey = getBearerToken(request);
   return Boolean(configuredKey && providedKey && providedKey === configuredKey);
 }
@@ -6002,7 +6012,7 @@ async function listSourceCandidatesForBrand(
 }
 
 async function handleOperatorTool(request: Request, env: Env, toolName: string): Promise<Response> {
-  if (!isGptRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
+  if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
   }
   await prepareOperatorMode(env);
@@ -6870,6 +6880,244 @@ function mcpErrorResponse(id: string | number | null | undefined, code: number, 
   }, status);
 }
 
+function operatorMcpBaseUrl(request: Request, env: Env): string {
+  return (env.WORKER_ORIGIN?.trim() || new URL(request.url).origin).replace(/\/+$/, "");
+}
+
+function base64UrlEncodeBytes(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlEncodeText(value: string): string {
+  return base64UrlEncodeBytes(new TextEncoder().encode(value));
+}
+
+function base64UrlDecodeText(value: string): string | null {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  try {
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+async function hmacSha256Base64Url(secret: string, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return base64UrlEncodeBytes(new Uint8Array(signature));
+}
+
+function operatorMcpOAuthJson(payload: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+function operatorMcpOAuthClientId(env: Env): string {
+  return env.LENSICALLY_MCP_OAUTH_CLIENT_ID?.trim() || "lensically-operator-mode";
+}
+
+function operatorMcpOAuthSecret(env: Env): string {
+  return env.LENSICALLY_MCP_OAUTH_CLIENT_SECRET?.trim()
+    || env.LENSICALLY_MCP_ACCESS_TOKEN?.trim()
+    || env.LENSICALLY_GPT_API_KEY?.trim()
+    || env.INTERNAL_API_KEY;
+}
+
+function isAllowedChatGptOAuthRedirect(redirectUri: string, env: Env): boolean {
+  const configured = env.LENSICALLY_MCP_OAUTH_REDIRECT_URI?.trim();
+  if (configured) {
+    return redirectUri === configured;
+  }
+  try {
+    const parsed = new URL(redirectUri);
+    return parsed.protocol === "https:"
+      && parsed.hostname === "chatgpt.com"
+      && parsed.pathname.startsWith("/connector/oauth/");
+  } catch {
+    return false;
+  }
+}
+
+async function createOperatorMcpOAuthCode(env: Env, input: { clientId: string; redirectUri: string; scope: string }): Promise<string> {
+  const payload = {
+    client_id: input.clientId,
+    redirect_uri: input.redirectUri,
+    scope: input.scope,
+    exp: Math.floor(Date.now() / 1000) + 10 * 60,
+    nonce: crypto.randomUUID(),
+  };
+  const encodedPayload = base64UrlEncodeText(JSON.stringify(payload));
+  const signature = await hmacSha256Base64Url(operatorMcpOAuthSecret(env), encodedPayload);
+  return `${encodedPayload}.${signature}`;
+}
+
+async function verifyOperatorMcpOAuthCode(env: Env, code: string): Promise<Record<string, unknown> | null> {
+  const [encodedPayload, providedSignature] = code.split(".");
+  if (!encodedPayload || !providedSignature) {
+    return null;
+  }
+  const expectedSignature = await hmacSha256Base64Url(operatorMcpOAuthSecret(env), encodedPayload);
+  if (providedSignature !== expectedSignature) {
+    return null;
+  }
+  const decoded = base64UrlDecodeText(encodedPayload);
+  if (!decoded) {
+    return null;
+  }
+  const payload = safeParseJsonString(decoded);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  const expiresAt = Number((payload as Record<string, unknown>).exp);
+  if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+  return payload as Record<string, unknown>;
+}
+
+function getOperatorMcpOAuthClientSecret(request: Request, form: URLSearchParams): string {
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const basic = authorization.match(/^Basic\s+(.+)$/i);
+  if (basic?.[1]) {
+    const decoded = base64UrlDecodeText(basic[1].replace(/\+/g, "-").replace(/\//g, "_")) ?? (() => {
+      try {
+        return atob(basic[1]);
+      } catch {
+        return null;
+      }
+    })();
+    const secret = decoded?.split(":").slice(1).join(":").trim();
+    if (secret) {
+      return secret;
+    }
+  }
+  return form.get("client_secret")?.trim() ?? "";
+}
+
+function isOperatorMcpOAuthClientAuthorized(request: Request, form: URLSearchParams, env: Env): boolean {
+  const configuredSecret = env.LENSICALLY_MCP_OAUTH_CLIENT_SECRET?.trim();
+  if (!configuredSecret) {
+    return true;
+  }
+  const providedSecret = getOperatorMcpOAuthClientSecret(request, form);
+  return providedSecret === configuredSecret;
+}
+
+function handleOperatorMcpOAuthMetadata(request: Request, env: Env): Response {
+  const baseUrl = operatorMcpBaseUrl(request, env);
+  return operatorMcpOAuthJson({
+    issuer: baseUrl,
+    authorization_endpoint: `${baseUrl}/api/operator/oauth/authorize`,
+    token_endpoint: `${baseUrl}/api/operator/oauth/token`,
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    token_endpoint_auth_methods_supported: env.LENSICALLY_MCP_OAUTH_CLIENT_SECRET?.trim()
+      ? ["client_secret_post", "client_secret_basic"]
+      : ["none"],
+    scopes_supported: ["operator_mode"],
+    code_challenge_methods_supported: ["plain", "S256"],
+  });
+}
+
+async function handleOperatorMcpOAuthAuthorize(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const clientId = url.searchParams.get("client_id")?.trim() ?? "";
+  const redirectUri = url.searchParams.get("redirect_uri")?.trim() ?? "";
+  const responseType = url.searchParams.get("response_type")?.trim() ?? "";
+  const state = url.searchParams.get("state") ?? "";
+  const scope = url.searchParams.get("scope")?.trim() || "operator_mode";
+  if (responseType !== "code" || clientId !== operatorMcpOAuthClientId(env) || !isAllowedChatGptOAuthRedirect(redirectUri, env)) {
+    return operatorMcpOAuthJson({ error: "invalid_request" }, 400);
+  }
+  const code = await createOperatorMcpOAuthCode(env, { clientId, redirectUri, scope });
+  const destination = new URL(redirectUri);
+  destination.searchParams.set("code", code);
+  if (state) {
+    destination.searchParams.set("state", state);
+  }
+  return Response.redirect(destination.toString(), 302);
+}
+
+async function readOAuthForm(request: Request): Promise<URLSearchParams> {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const body = await request.json().catch(() => null);
+    const form = new URLSearchParams();
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
+        if (value !== undefined && value !== null) {
+          form.set(key, String(value));
+        }
+      }
+    }
+    return form;
+  }
+  if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+    const body = await request.formData().catch(() => null);
+    const form = new URLSearchParams();
+    if (body) {
+      for (const [key, value] of body.entries()) {
+        if (typeof value === "string") {
+          form.set(key, value);
+        }
+      }
+    }
+    return form;
+  }
+  return new URLSearchParams(await request.text());
+}
+
+async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  }
+  const form = await readOAuthForm(request);
+  if (form.get("grant_type") !== "authorization_code") {
+    return operatorMcpOAuthJson({ error: "unsupported_grant_type" }, 400);
+  }
+  const clientId = form.get("client_id")?.trim() ?? "";
+  const redirectUri = form.get("redirect_uri")?.trim() ?? "";
+  const code = form.get("code")?.trim() ?? "";
+  if (clientId !== operatorMcpOAuthClientId(env) || !redirectUri || !code || !isOperatorMcpOAuthClientAuthorized(request, form, env)) {
+    return operatorMcpOAuthJson({ error: "invalid_client" }, 401);
+  }
+  const payload = await verifyOperatorMcpOAuthCode(env, code);
+  if (!payload || payload.client_id !== clientId || payload.redirect_uri !== redirectUri || !isAllowedChatGptOAuthRedirect(redirectUri, env)) {
+    return operatorMcpOAuthJson({ error: "invalid_grant" }, 400);
+  }
+  const accessToken = env.LENSICALLY_MCP_ACCESS_TOKEN?.trim();
+  if (!accessToken) {
+    return operatorMcpOAuthJson({ error: "server_error" }, 500);
+  }
+  return operatorMcpOAuthJson({
+    access_token: accessToken,
+    token_type: "Bearer",
+    expires_in: 60 * 60 * 24 * 365,
+    scope: typeof payload.scope === "string" && payload.scope ? payload.scope : "operator_mode",
+  });
+}
+
 function operatorMcpInstructions(): string {
   return "Use Lensically Operator Mode as source of truth. Always select brand_key before account-scoped work. Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.";
 }
@@ -6935,7 +7183,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
 
-  if (!isGptRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
+  if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
   }
 
@@ -13949,6 +14197,22 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         },
       );
+    }
+
+    if (
+      normalizedPath === "/.well-known/oauth-authorization-server"
+      || normalizedPath === "/.well-known/openid-configuration"
+      || normalizedPath === "/api/operator/oauth/.well-known/oauth-authorization-server"
+    ) {
+      return handleOperatorMcpOAuthMetadata(request, env);
+    }
+
+    if (normalizedPath === "/api/operator/oauth/authorize") {
+      return handleOperatorMcpOAuthAuthorize(request, env);
+    }
+
+    if (normalizedPath === "/api/operator/oauth/token") {
+      return handleOperatorMcpOAuthToken(request, env);
     }
 
     if (normalizedPath.startsWith("/api/operator/tools/")) {

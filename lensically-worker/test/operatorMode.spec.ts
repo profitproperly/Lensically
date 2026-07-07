@@ -6,6 +6,10 @@ const AUTH_HEADERS = {
   Authorization: "Bearer test-gpt-key",
   "Content-Type": "application/json",
 };
+const MCP_AUTH_HEADERS = {
+  Authorization: "Bearer test-mcp-token",
+  "Content-Type": "application/json",
+};
 const BRAND_KEY = "vectrix";
 
 async function fetchFromWorker(path: string, init?: RequestInit): Promise<Response> {
@@ -49,7 +53,15 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
 }
 
 async function resetTables(): Promise<void> {
-  (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+  (env as unknown as {
+    LENSICALLY_GPT_API_KEY: string;
+    LENSICALLY_MCP_ACCESS_TOKEN: string;
+    LENSICALLY_MCP_OAUTH_CLIENT_ID: string;
+    LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;
+  }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+  (env as unknown as { LENSICALLY_MCP_ACCESS_TOKEN: string }).LENSICALLY_MCP_ACCESS_TOKEN = "test-mcp-token";
+  (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_ID: string }).LENSICALLY_MCP_OAUTH_CLIENT_ID = "lensically-operator-mode";
+  delete (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string }).LENSICALLY_MCP_OAUTH_CLIENT_SECRET;
   for (const table of [
     "operator_gate_results",
     "operator_content_inventory",
@@ -282,6 +294,55 @@ describe("operator mode backend spine", () => {
 describe("operator mode MCP endpoint", () => {
   beforeEach(async () => {
     await resetTables();
+  }, 30000);
+
+  it("supports ChatGPT app OAuth code exchange for the MCP token", async () => {
+    const metadataResponse = await fetchFromWorker("/.well-known/oauth-authorization-server", { method: "GET" });
+    const metadata = await metadataResponse.json() as { authorization_endpoint?: string; token_endpoint?: string; token_endpoint_auth_methods_supported?: string[] };
+    expect(metadataResponse.status).toBe(200);
+    expect(metadata.authorization_endpoint).toBe("https://api.lensically.com/api/operator/oauth/authorize");
+    expect(metadata.token_endpoint).toBe("https://api.lensically.com/api/operator/oauth/token");
+    expect(metadata.token_endpoint_auth_methods_supported).toContain("none");
+
+    const redirectUri = "https://chatgpt.com/connector/oauth/test-callback";
+    const authorizeUrl = `/api/operator/oauth/authorize?response_type=code&client_id=lensically-operator-mode&redirect_uri=${encodeURIComponent(redirectUri)}&state=state-fixture&scope=operator_mode`;
+    const authorizeResponse = await fetchFromWorker(authorizeUrl, { method: "GET", redirect: "manual" });
+    expect(authorizeResponse.status).toBe(302);
+    const location = authorizeResponse.headers.get("location") ?? "";
+    const callback = new URL(location);
+    expect(callback.origin + callback.pathname).toBe(redirectUri);
+    expect(callback.searchParams.get("state")).toBe("state-fixture");
+    const code = callback.searchParams.get("code");
+    expect(code).toBeTruthy();
+
+    const tokenResponse = await fetchFromWorker("/api/operator/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: "lensically-operator-mode",
+        redirect_uri: redirectUri,
+        code: code ?? "",
+      }).toString(),
+    });
+    const token = await tokenResponse.json() as { access_token?: string; token_type?: string };
+    expect(tokenResponse.status).toBe(200);
+    expect(token.access_token).toBe("test-mcp-token");
+    expect(token.token_type).toBe("Bearer");
+
+    const initialized = await fetchFromWorker("/api/operator/mcp", {
+      method: "POST",
+      headers: MCP_AUTH_HEADERS,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "vitest", version: "1.0.0" } },
+      }),
+    });
+    const initializedBody = await initialized.json() as { result?: { serverInfo?: { name?: string } } };
+    expect(initialized.status).toBe(200);
+    expect(initializedBody.result?.serverInfo?.name).toBe("lensically-operator-mode");
   }, 30000);
 
   it("lists required MCP tools and Lensically accounts", async () => {
