@@ -8703,7 +8703,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       const config = githubRepoConfig(env);
       const logResponse = await fetch(`https://api.github.com/repos/${config.owner}/${config.repo}/actions/jobs/${failedJobId}/logs`, {
         headers: {
-          "accept": "text/plain",
+                    "accept": "application/vnd.github+json",
           "authorization": `Bearer ${config.token}`,
           "user-agent": "lensically-engineering-mcp",
           "x-github-api-version": "2022-11-28",
