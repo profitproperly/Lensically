@@ -8642,7 +8642,14 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
 
   if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
     const workflowId = normalizeOperatorText(args.workflow_id, 160, true) ?? "lensically-engineering.yml";
-    const task = toolName === "deployBackend" ? "worker-deploy" : normalizeOperatorMachineKey(args.task, "typecheck");
+        const requestedTask = normalizeOperatorText(args.task, 160, true) ?? "typecheck";
+    const hyphenatedTask = requestedTask.replace(/_/g, "-");
+    const allowedWorkflowTasks = new Set(["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"]);
+    const task = toolName === "deployBackend"
+      ? "worker-deploy"
+      : allowedWorkflowTasks.has(hyphenatedTask)
+        ? hyphenatedTask
+        : "typecheck";
     const ref = normalizeOperatorText(args.ref, 160, true) ?? config.branch;
     const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
       method: "POST",
