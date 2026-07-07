@@ -27,6 +27,27 @@ async function operatorTool<T = Record<string, unknown>>(toolName: string, paylo
   return data;
 }
 
+async function mcpRequest<T = Record<string, unknown>>(method: string, params: Record<string, unknown> = {}, id = 1): Promise<T> {
+  const response = await fetchFromWorker("/api/operator/mcp", {
+    method: "POST",
+    headers: AUTH_HEADERS,
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+  });
+  const data = await response.json() as { result?: T; error?: { message?: string } };
+  expect(response.status, `${method}: ${data.error?.message ?? ""}`).toBeLessThan(400);
+  expect(data.error, `${method}: ${data.error?.message ?? ""}`).toBeUndefined();
+  return data.result as T;
+}
+
+async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
+  const result = await mcpRequest<{ structuredContent: T; isError?: boolean }>("tools/call", {
+    name: toolName,
+    arguments: args,
+  });
+  expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
+  return result.structuredContent;
+}
+
 async function resetTables(): Promise<void> {
   (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
   for (const table of [
@@ -255,5 +276,191 @@ describe("operator mode backend spine", () => {
       const manifestGates = await manifestResponse.json() as { gates: Array<{ gate_key: string }> };
       expect(manifestGates.gates.some((item) => item.gate_key === "offer_specificity_gate")).toBe(false);
     }
+  }, 30000);
+});
+
+describe("operator mode MCP endpoint", () => {
+  beforeEach(async () => {
+    await resetTables();
+  }, 30000);
+
+  it("lists required MCP tools and Lensically accounts", async () => {
+    const initialized = await mcpRequest<{ serverInfo: { name: string }; capabilities: Record<string, unknown> }>("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
+    expect(initialized.serverInfo.name).toBe("lensically-operator-mode");
+
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    const toolNames = listed.tools.map((tool) => tool.name);
+    for (const name of [
+      "list_accounts",
+      "get_account_state",
+      "start_workflow_session",
+      "admit_context",
+      "get_production_board",
+      "list_source_candidates",
+      "create_source_card",
+      "lock_source_card",
+      "get_source_card",
+      "create_generation_run",
+      "run_gates",
+      "submit_candidate_draft",
+      "mark_draft_shown",
+      "save_self_rejected_draft",
+      "approve_draft",
+      "reject_draft",
+      "list_active_gates",
+      "create_or_update_gate",
+      "promote_memory_to_gate",
+      "list_strategy_memory",
+      "save_strategy_memory",
+      "list_scheduled_posts",
+      "schedule_approved_draft",
+      "get_post_results",
+    ]) {
+      expect(toolNames).toContain(name);
+    }
+
+    const accounts = await mcpTool<{ accounts: Array<{ brand_key: string }> }>("list_accounts");
+    expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
+  }, 30000);
+
+  it("runs the MCP happy path from session through scheduling", async () => {
+    const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
+      brand_key: BRAND_KEY,
+      objective: "mcp happy path",
+    });
+    const card = await mcpTool<{ source_card_id: string }>("create_source_card", {
+      brand_key: BRAND_KEY,
+      workflow_session_id: session.workflow_session_id,
+      sequence_label: "mcp_source_card_001",
+      lane_key: "systems",
+      title: "MCP systems card",
+      primary_source: { source_type: "external_reference", source_id: "mcp-fixture", text: "Systems compound attention." },
+      source_mechanism: "Make systems feel like leverage.",
+      required_product: "A concrete operator advantage.",
+      forbidden_surfaces: [],
+      pass_conditions: ["Clear operator payoff."],
+      fail_conditions: ["Generic productivity claim."],
+    });
+    await mcpTool("lock_source_card", { brand_key: BRAND_KEY, source_card_id: card.source_card_id });
+    const run = await mcpTool<{ run_id: string }>("create_generation_run", {
+      brand_key: BRAND_KEY,
+      source_card_id: card.source_card_id,
+      objective: "Generate one MCP candidate",
+      prompt_summary: "MCP test prompt",
+    });
+    const draft = await mcpTool<{ draft_id: string; showable: boolean }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: run.run_id,
+      source_card_id: card.source_card_id,
+      text: "A clean system makes every good idea easier to use twice.",
+      draft_analysis: { opening_phrase: "A clean system makes", realm_entrance_key: "clean_system", lane_key: "systems" },
+    });
+    expect(draft.showable).toBe(true);
+    await mcpTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: draft.draft_id });
+    await mcpTool("approve_draft", { brand_key: BRAND_KEY, draft_id: draft.draft_id, feedback_note: "MCP fixture approval." });
+    const scheduled = await mcpTool<{ status: string; scheduled_post_id: number }>("schedule_approved_draft", {
+      brand_key: BRAND_KEY,
+      draft_id: draft.draft_id,
+      date: "2099-01-02",
+      time: "09:00",
+      timezone: "America/New_York",
+    });
+    expect(scheduled.status).toBe("scheduled");
+    expect(scheduled.scheduled_post_id).toBeTruthy();
+  }, 40000);
+
+  it("returns structured MCP gate failure and blocks mark_draft_shown", async () => {
+    const first = await createLockedSourceCard();
+    const shown = await mcpTool<{ draft_id: string }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: first.runId,
+      source_card_id: first.sourceCardId,
+      text: "Picture the system doing the repeat work for you.",
+      draft_analysis: { opening_phrase: "Picture the system", realm_entrance_key: "picture", lane_key: "systems" },
+    });
+    await mcpTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });
+
+    const second = await createLockedSourceCard();
+    const blocked = await mcpTool<{ draft_id: string; showable: boolean; blocking_failures: Array<{ gate_key: string }> }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: second.runId,
+      source_card_id: second.sourceCardId,
+      text: "Picture your calendar finally getting a cleaner operating system.",
+      draft_analysis: { opening_phrase: "Picture your calendar", realm_entrance_key: "picture", lane_key: "systems" },
+    });
+    expect(blocked.showable).toBe(false);
+    expect(blocked.blocking_failures.some((failure) => failure.gate_key === "current_inventory_repeat_gate")).toBe(true);
+
+    const call = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string }; isError?: boolean }>("tools/call", {
+      name: "mark_draft_shown",
+      arguments: { brand_key: BRAND_KEY, draft_id: blocked.draft_id },
+    });
+    expect(call.isError).toBe(true);
+    expect(call.structuredContent.error).toBe("draft_not_showable");
+  }, 40000);
+
+  it("keeps MCP-created account-specific gates scoped", async () => {
+    await mcpTool("create_or_update_gate", {
+      brand_key: BRAND_KEY,
+      gate_key: "mcp_vectrix_fixture_gate",
+      display_name: "MCP Vectrix Fixture Gate",
+      description: "Vectrix-only fixture gate for MCP scoping.",
+      stage_scope: "gate_evaluation",
+      lane_scope: "money",
+      gate_type: "hybrid",
+      severity: "block",
+      evaluator: "hybrid",
+    });
+    const vectrix = await mcpTool<{ gates: Array<{ gate_key: string }> }>("list_active_gates", {
+      brand_key: BRAND_KEY,
+      stage_scope: "gate_evaluation",
+      lane_key: "money",
+    });
+    expect(vectrix.gates.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(true);
+
+    const manifestResponse = await fetchFromWorker("/api/operator/mcp", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 99,
+        method: "tools/call",
+        params: {
+          name: "list_active_gates",
+          arguments: { brand_key: "manifest_mental", stage_scope: "gate_evaluation", lane_key: "money" },
+        },
+      }),
+    });
+    const manifestCall = await manifestResponse.json() as { result?: { structuredContent?: { gates?: Array<{ gate_key: string }> }; isError?: boolean } };
+    if (manifestResponse.status < 400 && manifestCall.result?.isError !== true) {
+      expect(manifestCall.result?.structuredContent?.gates?.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(false);
+    }
+    const opmgResponse = await fetchFromWorker("/api/operator/mcp", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 100,
+        method: "tools/call",
+        params: {
+          name: "list_active_gates",
+          arguments: { brand_key: "opmg_deadman", stage_scope: "gate_evaluation", lane_key: "money" },
+        },
+      }),
+    });
+    const opmgCall = await opmgResponse.json() as { result?: { structuredContent?: { gates?: Array<{ gate_key: string }> }; isError?: boolean } };
+    if (opmgResponse.status < 400 && opmgCall.result?.isError !== true) {
+      expect(opmgCall.result?.structuredContent?.gates?.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(false);
+    }
+    const ownAccount = await mcpTool<{ gates: Array<{ gate_key: string }> }>("list_active_gates", {
+      brand_key: BRAND_KEY,
+      stage_scope: "gate_evaluation",
+      lane_key: "money",
+    });
+    expect(ownAccount.gates.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(true);
   }, 30000);
 });

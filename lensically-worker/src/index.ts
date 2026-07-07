@@ -6602,6 +6602,412 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   return operatorJsonResponse({ success: false, error: "unknown_operator_tool", tool_name: toolName }, 404);
 }
 
+type OperatorMcpToolDefinition = {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
+};
+
+const BRAND_KEY_SCHEMA = {
+  type: "string",
+  enum: ["manifest_mental", "opmg_deadman", "vectrix"],
+  description: "Lensically account key. Required for account-scoped tools.",
+};
+
+const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
+  {
+    name: "list_accounts",
+    title: "List Lensically accounts",
+    description: "Use this when you need to discover the available Lensically accounts before choosing a brand_key.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "get_account_state",
+    title: "Get account state",
+    description: "Use this when you need the current workflow session, active source card, draft counts, scheduled count, and gate status for one Lensically account.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "start_workflow_session",
+    title: "Start workflow session",
+    description: "Use this when beginning the universal content_operator_v1 workflow for a selected Lensically account.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        workflow_template_key: { type: "string", default: OPERATOR_WORKFLOW_TEMPLATE_KEY },
+        objective: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["brand_key"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "admit_context",
+    title: "Admit context coverage",
+    description: "Use this to record which Lensically data sections were admitted for a workflow and whether the data is partial, complete, or sufficient for the objective.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        workflow_session_id: { type: "string" },
+        admission_scope: { type: "string", enum: ["full_preflight", "source_card_selection", "generation_context", "growth_review", "scheduling_check"] },
+        sections: { type: "array", items: { type: "object", additionalProperties: true } },
+        snapshot_id: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["brand_key", "admission_scope", "sections"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "get_production_board",
+    title: "Get production board",
+    description: "Use this to read account-scoped production board items such as lane priorities, cooldowns, warnings, source pools, and recommendations.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "list_source_candidates",
+    title: "List source candidates",
+    description: "Use this to find candidate sources for a source card from archive posts, saved patterns, recent insights, memory, drafts, or scheduled posts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        workflow_session_id: { type: "string" },
+        lane_key: { type: "string" },
+        source_types: { type: "array", items: { type: "string" } },
+        limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+        offset: { type: "integer", minimum: 0, default: 0 },
+      },
+      required: ["brand_key"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "create_source_card",
+    title: "Create source card",
+    description: "Use this to create a structured source card that preserves source mechanism, required product, forbidden surfaces, pass conditions, and fail conditions before serious generation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        workflow_session_id: { type: "string" },
+        sequence_label: { type: "string" },
+        lane_key: { type: "string" },
+        title: { type: "string" },
+        primary_source: { type: "object", additionalProperties: true },
+        secondary_sources: { type: "array", items: { type: "object", additionalProperties: true } },
+        anti_sources: { type: "array", items: { type: "object", additionalProperties: true } },
+        metrics_snapshot: { type: "object", additionalProperties: true },
+        source_mechanism: { type: "string" },
+        required_product: { type: "string" },
+        forbidden_surfaces: { type: "array", items: {} },
+        danger_surfaces: { type: "array", items: {} },
+        current_inventory_constraints: { type: "array", items: {} },
+        pass_conditions: { type: "array", items: {} },
+        fail_conditions: { type: "array", items: {} },
+        recommended_direction: { type: "string" },
+        context_admission_id: { type: "string" },
+      },
+      required: ["brand_key", "sequence_label", "title", "primary_source", "source_mechanism", "required_product", "forbidden_surfaces", "pass_conditions", "fail_conditions"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "lock_source_card",
+    title: "Lock source card",
+    description: "Use this to lock a complete source card before serious draft generation or showing candidates.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" } }, required: ["brand_key", "source_card_id"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "get_source_card",
+    title: "Get source card",
+    description: "Use this to retrieve a source card by id for review, generation, gates, or owner handoff.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" } }, required: ["brand_key", "source_card_id"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "create_generation_run",
+    title: "Create generation run",
+    description: "Use this to create a generation run tied to a locked source card before submitting candidate drafts.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, objective: { type: "string" }, prompt_summary: { type: "string" } }, required: ["brand_key", "source_card_id", "objective"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "run_gates",
+    title: "Run operator gates",
+    description: "Use this to evaluate source-card or draft gate results before showing, reviewing, or scheduling content.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "submit_candidate_draft",
+    title: "Submit candidate draft",
+    description: "Use this to save a candidate draft, run gates, persist gate results, and learn whether Lensically says the draft is showable.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id", "text"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "mark_draft_shown",
+    title: "Mark draft shown",
+    description: "Use this only after Lensically returned showable=true. It fails if blocking gates made the draft unshowable.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" } }, required: ["brand_key", "draft_id"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "save_self_rejected_draft",
+    title: "Save self-rejected draft",
+    description: "Use this to save a generated draft that the model rejected internally before showing it to the owner.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, rejection_reason: { type: "string" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true } }, required: ["brand_key", "run_id", "source_card_id", "text", "rejection_reason"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "approve_draft",
+    title: "Approve draft",
+    description: "Use this after owner approval to mark a shown draft approved and save approval feedback into Lensically memory.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" }, feedback_note: { type: "string" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true } }, required: ["brand_key", "draft_id"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "reject_draft",
+    title: "Reject draft",
+    description: "Use this after owner rejection to mark a shown draft rejected and save rejection feedback into Lensically memory.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" }, rejection_reason: { type: "string" }, feedback_note: { type: "string" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true } }, required: ["brand_key", "draft_id"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "list_active_gates",
+    title: "List active gates",
+    description: "Use this to inspect global and account-specific active gates for a stage, lane, or content type.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, stage_scope: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "create_or_update_gate",
+    title: "Create or update gate",
+    description: "Use this to create or update a scoped operator gate as data instead of hard-coding account-specific rules.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, gate_key: { type: "string" }, display_name: { type: "string" }, description: { type: "string" }, stage_scope: { type: "string" }, lane_scope: { type: "string" }, content_type_scope: { type: "string" }, gate_type: { type: "string" }, severity: { type: "string" }, evaluator: { type: "string" }, active: { type: "boolean" }, order_index: { type: "integer" }, pass_examples: { type: "array", items: {} }, fail_examples: { type: "array", items: {} }, source_memory_ids: { type: "array", items: {} } }, required: ["brand_key", "gate_key", "description", "stage_scope"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "promote_memory_to_gate",
+    title: "Promote memory to gate",
+    description: "Use this when a strategy memory or owner lesson should become an enforceable scoped operator gate.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, memory_id: { type: "integer" }, gate_key: { type: "string" }, stage_scope: { type: "string" }, lane_scope: { type: "string" }, severity: { type: "string" }, evaluator: { type: "string" } }, required: ["brand_key", "memory_id", "gate_key", "stage_scope"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "list_strategy_memory",
+    title: "List strategy memory",
+    description: "Use this to read active strategy memory for one Lensically account, optionally filtered by kind.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, kind: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 100 }, offset: { type: "integer", minimum: 0 } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "save_strategy_memory",
+    title: "Save strategy memory",
+    description: "Use this to save account-scoped approval, rejection, voice, rule, cooldown, or experiment memory in Lensically.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, source: { type: "string" }, metadata: { type: "object", additionalProperties: true } }, required: ["brand_key", "kind", "body"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "list_scheduled_posts",
+    title: "List scheduled posts",
+    description: "Use this to inspect scheduled posts for a selected Lensically account and date.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, date: { type: "string" }, timezone: { type: "string" }, limit: { type: "integer" }, offset: { type: "integer" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "schedule_approved_draft",
+    title: "Schedule approved draft",
+    description: "Use this to schedule a draft only after it has been approved. This fails for candidate, shown, rejected, or self-rejected drafts.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" }, date: { type: "string" }, time: { type: "string" }, timezone: { type: "string" }, strategy: { type: "object", additionalProperties: true } }, required: ["brand_key", "draft_id", "date", "time"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "get_post_results",
+    title: "Get post results",
+    description: "Use this to retrieve published post results linked to a Lensically draft and source card when available.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, published_post_id: { type: "string" }, include_history: { type: "boolean" } }, required: ["brand_key", "published_post_id"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+];
+
+type JsonRpcRequest = {
+  jsonrpc?: string;
+  id?: string | number | null;
+  method?: string;
+  params?: Record<string, unknown>;
+};
+
+function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHeaders: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      ...extraHeaders,
+    },
+  });
+}
+
+function mcpErrorResponse(id: string | number | null | undefined, code: number, message: string, status = 200): Response {
+  return mcpJsonResponse({
+    jsonrpc: "2.0",
+    id: id ?? null,
+    error: { code, message },
+  }, status);
+}
+
+function operatorMcpInstructions(): string {
+  return "Use Lensically Operator Mode as source of truth. Always select brand_key before account-scoped work. Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.";
+}
+
+function operatorMcpInitializeResult(requestedVersion: unknown): Record<string, unknown> {
+  const protocolVersion = typeof requestedVersion === "string" && requestedVersion.trim()
+    ? requestedVersion.trim()
+    : "2025-06-18";
+  return {
+    protocolVersion,
+    capabilities: {
+      tools: { listChanged: false },
+    },
+    serverInfo: {
+      name: "lensically-operator-mode",
+      title: "Lensically Operator Mode",
+      version: "1.0.0",
+    },
+    instructions: operatorMcpInstructions(),
+  };
+}
+
+async function callOperatorToolForMcp(request: Request, env: Env, toolName: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const headers = new Headers();
+  const authorization = request.headers.get("authorization");
+  const internalKey = request.headers.get("x-internal-key");
+  if (authorization) {
+    headers.set("authorization", authorization);
+  }
+  if (internalKey) {
+    headers.set("x-internal-key", internalKey);
+  }
+  headers.set("content-type", "application/json");
+  const toolRequest = new Request(new URL(`/api/operator/tools/${toolName}`, request.url), {
+    method: "POST",
+    headers,
+    body: JSON.stringify(args),
+  });
+  const response = await handleOperatorTool(toolRequest, env, toolName);
+  const payload = await readJsonSafe(response);
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return {
+      status: response.status,
+      ok: response.status < 400,
+      ...(payload as Record<string, unknown>),
+    };
+  }
+  return {
+    status: response.status,
+    ok: response.status < 400,
+    error: response.status < 400 ? null : "operator_tool_failed",
+  };
+}
+
+async function handleOperatorMcp(request: Request, env: Env): Promise<Response> {
+  if (request.method === "GET") {
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  }
+  if (request.method === "DELETE") {
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  }
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  }
+
+  if (!isGptRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
+    return unauthorizedGptResponse();
+  }
+
+  const message = await request.json().catch(() => null) as JsonRpcRequest | null;
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    return mcpErrorResponse(null, -32700, "Parse error", 400);
+  }
+
+  const id = message.id;
+  const method = typeof message.method === "string" ? message.method : "";
+  if (!method) {
+    return mcpErrorResponse(id, -32600, "Invalid Request");
+  }
+
+  if (method === "notifications/initialized") {
+    return new Response(null, { status: 202 });
+  }
+
+  if (method === "initialize") {
+    return mcpJsonResponse({
+      jsonrpc: "2.0",
+      id: id ?? null,
+      result: operatorMcpInitializeResult(message.params?.protocolVersion),
+    }, 200, { "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18") });
+  }
+
+  if (method === "ping") {
+    return mcpJsonResponse({ jsonrpc: "2.0", id: id ?? null, result: {} });
+  }
+
+  if (method === "tools/list") {
+    return mcpJsonResponse({
+      jsonrpc: "2.0",
+      id: id ?? null,
+      result: {
+        tools: OPERATOR_MCP_TOOLS,
+      },
+    });
+  }
+
+  if (method === "tools/call") {
+    const toolName = typeof message.params?.name === "string" ? message.params.name : "";
+    const tool = OPERATOR_MCP_TOOLS.find((item) => item.name === toolName);
+    if (!tool) {
+      return mcpErrorResponse(id, -32602, "Unknown tool");
+    }
+    const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
+      ? message.params.arguments as Record<string, unknown>
+      : {};
+    const resultPayload = await callOperatorToolForMcp(request, env, toolName, args);
+    const isError = resultPayload.ok === false;
+    return mcpJsonResponse({
+      jsonrpc: "2.0",
+      id: id ?? null,
+      result: {
+        structuredContent: resultPayload,
+        content: [
+          {
+            type: "text",
+            text: isError
+              ? `Lensically Operator Mode tool ${toolName} failed: ${String(resultPayload.error ?? resultPayload.status ?? "unknown_error")}`
+              : `Lensically Operator Mode tool ${toolName} completed.`,
+          },
+        ],
+        isError,
+      },
+    });
+  }
+
+  return mcpErrorResponse(id, -32601, "Method not found");
+}
+
 async function createGptGenerationRun(
   env: Env,
   input: {
@@ -13554,6 +13960,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return operatorJsonResponse({ success: false, error: "Method not allowed" }, 405);
       }
       return handleOperatorTool(request, env, toolName);
+    }
+
+    if (normalizedPath === "/api/operator/mcp") {
+      return handleOperatorMcp(request, env);
     }
 
     if (normalizedPath.startsWith("/api/gpt/")) {
