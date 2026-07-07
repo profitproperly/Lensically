@@ -5352,6 +5352,150 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
   ).run();
 }
 
+const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
+  stage: OperatorWorkflowStage;
+  required_sections: string[];
+  completion_rule: string;
+  enforcement_type: string;
+}> = [
+  {
+    stage: "context_admission",
+    required_sections: ["account_state", "production_board", "source_candidates", "strategy_memory", "scheduled_posts", "active_gates"],
+    completion_rule: "all_required_sections_complete",
+    enforcement_type: "block",
+  },
+  {
+    stage: "source_card",
+    required_sections: ["locked_source_card"],
+    completion_rule: "active_source_card_locked",
+    enforcement_type: "block",
+  },
+  {
+    stage: "generation_run_and_candidates",
+    required_sections: ["locked_source_card", "generation_run"],
+    completion_rule: "locked_source_card_and_run",
+    enforcement_type: "block",
+  },
+  {
+    stage: "owner_review_and_decision",
+    required_sections: ["showable_draft"],
+    completion_rule: "showable_draft_exists",
+    enforcement_type: "block",
+  },
+  {
+    stage: "scheduling",
+    required_sections: ["approved_draft"],
+    completion_rule: "approved_draft_required",
+    enforcement_type: "block",
+  },
+];
+
+async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_mcp_tool_overrides (
+      tool_name TEXT PRIMARY KEY,
+      disabled INTEGER NOT NULL DEFAULT 0,
+      schema_patch_json TEXT,
+      behavior_patch_json TEXT,
+      description_override TEXT,
+      handler_spec_json TEXT,
+      output_schema_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_reason TEXT
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_mcp_tool_overrides_touch_updated_at
+     AFTER UPDATE ON operator_mcp_tool_overrides
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_mcp_tool_overrides SET updated_at = CURRENT_TIMESTAMP WHERE tool_name = NEW.tool_name;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_workflow_requirements (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT,
+      stage TEXT NOT NULL,
+      required_sections_json TEXT NOT NULL,
+      completion_rule TEXT NOT NULL,
+      enforcement_type TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_workflow_requirements_scope
+     ON operator_workflow_requirements (COALESCE(brand_key, '__global__'), stage)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_mcp_backlog_items (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      observed_issue TEXT,
+      expected_behavior TEXT,
+      required_change TEXT,
+      acceptance_test TEXT,
+      priority TEXT NOT NULL DEFAULT 'normal',
+      related_stage TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      resolved_at TEXT
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_mcp_deployments (
+      id TEXT PRIMARY KEY,
+      version INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      change_summary TEXT,
+      snapshot_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      activated_at TEXT,
+      rolled_back_at TEXT
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_mcp_admin_errors (
+      id TEXT PRIMARY KEY,
+      tool_name TEXT,
+      payload_json TEXT,
+      error_response_json TEXT,
+      likely_cause TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  for (const requirement of DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS) {
+    const existing = await env.DB.prepare(
+      `SELECT id FROM operator_workflow_requirements WHERE brand_key IS NULL AND stage = ? LIMIT 1`,
+    ).bind(requirement.stage).first<{ id: string }>();
+    if (existing) {
+      continue;
+    }
+    await env.DB.prepare(
+      `INSERT INTO operator_workflow_requirements (
+        id, brand_key, stage, required_sections_json, completion_rule, enforcement_type, active, version
+      ) VALUES (?, NULL, ?, ?, ?, ?, 1, 1)`,
+    ).bind(
+      crypto.randomUUID(),
+      requirement.stage,
+      JSON.stringify(requirement.required_sections),
+      requirement.completion_rule,
+      requirement.enforcement_type,
+    ).run();
+  }
+}
+
 const DEFAULT_OPERATOR_GATES: Array<{
   gate_key: string;
   display_name: string;
@@ -5439,6 +5583,7 @@ async function prepareOperatorMode(env: Env): Promise<void> {
   await ensureGptGenerationDraftsTable(env);
   await ensureScheduledPostsTable(env);
   await ensureOperatorWorkflowTables(env);
+  await ensureOperatorMcpAdminTables(env);
   await seedDefaultOperatorGates(env);
 }
 
@@ -6626,6 +6771,182 @@ const BRAND_KEY_SCHEMA = {
   description: "Lensically account key. Required for account-scoped tools.",
 };
 
+const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
+  "getMcpAdminState",
+  "inspectMcpFailure",
+  "listMcpTools",
+  "readMcpToolDefinition",
+  "updateMcpToolSchema",
+  "updateMcpToolBehavior",
+  "createMcpTool",
+  "disableMcpTool",
+  "runMcpTests",
+  "deployMcpChanges",
+  "rollbackMcpChanges",
+  "getWorkflowStatus",
+  "updateWorkflowRequirement",
+  "advanceWorkflowStage",
+  "prepareFullPreflight",
+  "updateGate",
+  "runGateSuite",
+  "submitAndGateDraft",
+  "createImplementationBacklogItem",
+  "listImplementationBacklogItems",
+  "markImplementationBacklogItemResolved",
+] as const;
+
+type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
+
+const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
+  {
+    name: "getMcpAdminState",
+    title: "Get MCP admin state",
+    description: "Read the runtime MCP admin state, enforcement policies, workflow requirements, active gates, recent failures, and deployment snapshot status.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "inspectMcpFailure",
+    title: "Inspect MCP failure",
+    description: "Classify an MCP/tool failure, persist the inspection, and return the likely fix path through schema, behavior, workflow, or gate tools.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, payload: { type: "object", additionalProperties: true }, error_response: { type: "object", additionalProperties: true }, error_text: { type: "string" } }, additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "listMcpTools",
+    title: "List MCP tools",
+    description: "List the active and configured Lensically MCP tools, including schema overrides, disabled state, and handler configuration.",
+    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" } }, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "readMcpToolDefinition",
+    title: "Read MCP tool definition",
+    description: "Read one MCP tool definition with its active schema, behavior override, and handler notes.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" } }, required: ["tool_name"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "updateMcpToolSchema",
+    title: "Update MCP tool schema",
+    description: "Patch the advertised MCP input schema for a tool as runtime configuration.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, schema_patch: { type: "object", additionalProperties: true }, reason: { type: "string" } }, required: ["tool_name", "schema_patch"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "updateMcpToolBehavior",
+    title: "Update MCP tool behavior",
+    description: "Persist runtime behavior notes/policy for an MCP tool so regular ChatGPT can patch workflow instructions without code edits.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, behavior_patch: { type: "object", additionalProperties: true }, reason: { type: "string" } }, required: ["tool_name", "behavior_patch"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "createMcpTool",
+    title: "Create MCP tool config",
+    description: "Create a runtime MCP tool configuration entry. New code-backed behavior still requires a backend implementation, but schema/behavior can be tracked immediately.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, title: { type: "string" }, description: { type: "string" }, input_schema: { type: "object", additionalProperties: true }, behavior: { type: "object", additionalProperties: true }, handler_spec: { type: "object", additionalProperties: true }, reason: { type: "string" } }, required: ["tool_name", "description", "input_schema"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "disableMcpTool",
+    title: "Disable MCP tool",
+    description: "Disable or re-enable a runtime MCP tool advertisement.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, disabled: { type: "boolean" }, reason: { type: "string" } }, required: ["tool_name"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  },
+  {
+    name: "runMcpTests",
+    title: "Run MCP tests",
+    description: "Run built-in MCP configuration and workflow enforcement tests without needing Codex.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "deployMcpChanges",
+    title: "Deploy MCP runtime changes",
+    description: "Activate the current runtime MCP configuration as a versioned deployment snapshot.",
+    inputSchema: { type: "object", properties: { change_summary: { type: "string" } }, additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "rollbackMcpChanges",
+    title: "Rollback MCP runtime changes",
+    description: "Restore MCP runtime configuration from a previous deployment snapshot.",
+    inputSchema: { type: "object", properties: { version: { type: "integer" }, deployment_id: { type: "string" }, reason: { type: "string" } }, additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  },
+  {
+    name: "getWorkflowStatus",
+    title: "Get workflow status",
+    description: "Inspect the selected account's active operator workflow, context admission, source card, generation, draft, scheduling, and blocker status.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "updateWorkflowRequirement",
+    title: "Update workflow requirement",
+    description: "Create or update a DB-backed workflow requirement that blocks stage advancement until its completion rule passes.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, stage: { type: "string" }, required_sections: { type: "array", items: { type: "string" } }, completion_rule: { type: "string" }, enforcement_type: { type: "string", enum: ["block", "warn"] }, active: { type: "boolean" } }, required: ["stage", "required_sections", "completion_rule"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "advanceWorkflowStage",
+    title: "Advance workflow stage",
+    description: "Advance an operator workflow only if DB-backed requirements for the target stage pass.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" }, target_stage: { type: "string" } }, required: ["brand_key", "target_stage"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "prepareFullPreflight",
+    title: "Prepare full preflight",
+    description: "Run server-side preflight collection for the selected account and record complete/partial context admission before serious workflow advancement.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" }, objective: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "updateGate",
+    title: "Update gate",
+    description: "Create or update an account-scoped operator gate through the admin MCP surface.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, gate_key: { type: "string" }, display_name: { type: "string" }, description: { type: "string" }, stage_scope: { type: "string" }, lane_scope: { type: "string" }, content_type_scope: { type: "string" }, gate_type: { type: "string" }, severity: { type: "string" }, evaluator: { type: "string" }, active: { type: "boolean" }, order_index: { type: "integer" }, pass_examples: { type: "array", items: {} }, fail_examples: { type: "array", items: {} }, source_memory_ids: { type: "array", items: {} } }, required: ["brand_key", "gate_key", "description", "stage_scope"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "runGateSuite",
+    title: "Run gate suite",
+    description: "Run active operator gates for source cards or drafts and return blocking status.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "submitAndGateDraft",
+    title: "Submit and gate draft",
+    description: "Submit a candidate draft, run Lensically gates, and return showable/blocking status in one admin MCP call.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "createImplementationBacklogItem",
+    title: "Create implementation backlog item",
+    description: "Record a concrete engineering backlog item from MCP/operator observations without using free-text strategy memory as the backlog.",
+    inputSchema: { type: "object", properties: { title: { type: "string" }, observed_issue: { type: "string" }, expected_behavior: { type: "string" }, required_change: { type: "string" }, acceptance_test: { type: "string" }, priority: { type: "string" }, related_stage: { type: "string" } }, required: ["title", "required_change"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "listImplementationBacklogItems",
+    title: "List implementation backlog items",
+    description: "List open/resolved MCP implementation backlog items.",
+    inputSchema: { type: "object", properties: { status: { type: "string" }, limit: { type: "integer" }, offset: { type: "integer" } }, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "markImplementationBacklogItemResolved",
+    title: "Resolve implementation backlog item",
+    description: "Mark an MCP implementation backlog item resolved with audit state.",
+    inputSchema: { type: "object", properties: { item_id: { type: "string" }, resolution_note: { type: "string" } }, required: ["item_id"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+];
+
 const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "list_accounts",
@@ -6854,6 +7175,220 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
 ];
+
+function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
+  return (OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(value);
+}
+
+function mergeOperatorPlainObjects(base: unknown, patch: unknown): unknown {
+  if (!base || typeof base !== "object" || Array.isArray(base) || !patch || typeof patch !== "object" || Array.isArray(patch)) {
+    return patch === undefined ? base : patch;
+  }
+  const merged: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+  for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
+    if (
+      value
+      && typeof value === "object"
+      && !Array.isArray(value)
+      && merged[key]
+      && typeof merged[key] === "object"
+      && !Array.isArray(merged[key])
+    ) {
+      merged[key] = mergeOperatorPlainObjects(merged[key], value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function cloneOperatorMcpTool(tool: OperatorMcpToolDefinition): OperatorMcpToolDefinition {
+  return JSON.parse(JSON.stringify(tool)) as OperatorMcpToolDefinition;
+}
+
+async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, unknown>>> {
+  await ensureOperatorMcpAdminTables(env);
+  const rows = await env.DB.prepare(
+    `SELECT * FROM operator_mcp_tool_overrides ORDER BY tool_name ASC`,
+  ).all<Record<string, unknown>>();
+  return rows.results ?? [];
+}
+
+async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
+  await prepareOperatorMode(env);
+  const baseTools = [...OPERATOR_MCP_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS].map(cloneOperatorMcpTool);
+  const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
+  const overrides = await listOperatorMcpOverrides(env);
+  for (const override of overrides) {
+    const toolName = String(override.tool_name ?? "");
+    if (!toolName) {
+      continue;
+    }
+    const schemaPatch = safeParseJsonString(String(override.schema_patch_json ?? "null"));
+    const behaviorPatch = safeParseJsonString(String(override.behavior_patch_json ?? "null"));
+    const handlerSpec = safeParseJsonString(String(override.handler_spec_json ?? "null"));
+    const existing = baseByName.get(toolName);
+    const configured = existing ?? {
+      name: toolName,
+      title: toolName,
+      description: String(override.description_override ?? `Runtime configured tool ${toolName}.`),
+      inputSchema: { type: "object", properties: {}, additionalProperties: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    };
+    if (override.description_override) {
+      configured.description = String(override.description_override);
+    }
+    if (schemaPatch && typeof schemaPatch === "object" && !Array.isArray(schemaPatch)) {
+      configured.inputSchema = mergeOperatorPlainObjects(configured.inputSchema, schemaPatch) as OperatorMcpToolDefinition["inputSchema"];
+    }
+    (configured as unknown as Record<string, unknown>).runtime_config = {
+      disabled: Number(override.disabled ?? 0) === 1,
+      behavior_patch: behaviorPatch,
+      handler_spec: handlerSpec,
+      last_reason: override.last_reason ?? null,
+      updated_at: override.updated_at ?? null,
+    };
+    baseByName.set(toolName, configured);
+  }
+  return [...baseByName.values()].filter((tool) => {
+    const runtimeConfig = (tool as unknown as Record<string, unknown>).runtime_config as Record<string, unknown> | undefined;
+    return includeDisabled || runtimeConfig?.disabled !== true;
+  });
+}
+
+async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<Record<string, unknown> | null> {
+  const tools = await buildOperatorMcpTools(env, true);
+  const tool = tools.find((item) => item.name === toolName);
+  if (!tool) {
+    return null;
+  }
+  const required = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
+    ? (tool.inputSchema as Record<string, unknown>).required
+    : [];
+  return {
+    ...tool,
+    handler: isOperatorMcpAdminToolName(tool.name) ? "operator_mcp_admin_runtime" : "operator_tool_backend",
+    required_fields: required,
+  };
+}
+
+async function listOperatorWorkflowRequirements(env: Env, brandKey: GptBrandKey | null = null): Promise<Array<Record<string, unknown>>> {
+  await ensureOperatorMcpAdminTables(env);
+  const rows = brandKey
+    ? await env.DB.prepare(
+      `SELECT * FROM operator_workflow_requirements
+       WHERE active = 1 AND (brand_key IS NULL OR brand_key = ?)
+       ORDER BY stage ASC, brand_key DESC`,
+    ).bind(brandKey).all<Record<string, unknown>>()
+    : await env.DB.prepare(
+      `SELECT * FROM operator_workflow_requirements
+       WHERE active = 1
+       ORDER BY stage ASC, brand_key DESC`,
+    ).all<Record<string, unknown>>();
+  return (rows.results ?? []).map((row) => ({
+    id: row.id,
+    brand_key: row.brand_key ?? null,
+    stage: row.stage,
+    required_sections: safeParseJsonString(String(row.required_sections_json ?? "[]")) ?? [],
+    completion_rule: row.completion_rule,
+    enforcement_type: row.enforcement_type,
+    active: Number(row.active ?? 0) === 1,
+    version: Number(row.version ?? 1),
+    updated_at: row.updated_at,
+  }));
+}
+
+async function getLatestOperatorContextAdmission(env: Env, brandKey: GptBrandKey, sessionId: string | null): Promise<Record<string, unknown> | null> {
+  await ensureOperatorWorkflowTables(env);
+  const row = sessionId
+    ? await env.DB.prepare(
+      `SELECT * FROM operator_context_admissions
+       WHERE brand_key = ? AND workflow_session_id = ?
+       ORDER BY datetime(created_at) DESC
+       LIMIT 1`,
+    ).bind(brandKey, sessionId).first<Record<string, unknown>>()
+    : await env.DB.prepare(
+      `SELECT * FROM operator_context_admissions
+       WHERE brand_key = ?
+       ORDER BY datetime(created_at) DESC
+       LIMIT 1`,
+    ).bind(brandKey).first<Record<string, unknown>>();
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    brand_key: row.brand_key,
+    workflow_session_id: row.workflow_session_id ?? null,
+    admission_scope: row.admission_scope,
+    sections: safeParseJsonString(String(row.sections_json ?? "[]")) ?? [],
+    is_partial: Number(row.is_partial ?? 0) === 1,
+    created_at: row.created_at,
+  };
+}
+
+async function evaluateOperatorWorkflowRequirements(
+  env: Env,
+  brand: GptResolvedBrand,
+  stage: OperatorWorkflowStage,
+  session: Record<string, unknown> | null,
+): Promise<{ allowed: boolean; blockers: Array<Record<string, unknown>>; requirements: Array<Record<string, unknown>> }> {
+  const requirements = (await listOperatorWorkflowRequirements(env, brand.brand_key)).filter((item) => item.stage === stage);
+  const sessionId = session?.id ? String(session.id) : null;
+  const latestAdmission = await getLatestOperatorContextAdmission(env, brand.brand_key, sessionId);
+  const sections = Array.isArray(latestAdmission?.sections) ? latestAdmission.sections as Array<Record<string, unknown>> : [];
+  const completeSections = new Set(sections
+    .filter((section) => section.coverage_status === "complete" && section.has_more !== true)
+    .map((section) => String(section.section)));
+  const blockers: Array<Record<string, unknown>> = [];
+
+  for (const requirement of requirements) {
+    const rule = String(requirement.completion_rule ?? "");
+    const requiredSections = Array.isArray(requirement.required_sections) ? requirement.required_sections.map(String) : [];
+    let passed = true;
+    let missingSections: string[] = [];
+    if (rule === "all_required_sections_complete") {
+      missingSections = requiredSections.filter((section) => !completeSections.has(section));
+      passed = latestAdmission !== null && latestAdmission.is_partial !== true && missingSections.length === 0;
+    } else if (rule === "active_source_card_locked") {
+      const sourceCardId = session?.active_source_card_id ? String(session.active_source_card_id) : null;
+      const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
+      passed = card?.status === "locked";
+      missingSections = passed ? [] : ["locked_source_card"];
+    } else if (rule === "locked_source_card_and_run") {
+      const sourceCardId = session?.active_source_card_id ? String(session.active_source_card_id) : null;
+      const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
+      passed = card?.status === "locked" && Boolean(session?.active_generation_run_id);
+      missingSections = passed ? [] : requiredSections;
+    } else if (rule === "showable_draft_exists") {
+      const row = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM gpt_generation_drafts
+         WHERE account_id = ? AND showable = 1 AND status IN ('candidate', 'shown')`,
+      ).bind(brand.account_id).first<{ total: number }>();
+      passed = Number(row?.total ?? 0) > 0;
+      missingSections = passed ? [] : ["showable_draft"];
+    } else if (rule === "approved_draft_required") {
+      const row = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM gpt_generation_drafts
+         WHERE account_id = ? AND status = 'approved'`,
+      ).bind(brand.account_id).first<{ total: number }>();
+      passed = Number(row?.total ?? 0) > 0;
+      missingSections = passed ? [] : ["approved_draft"];
+    }
+    if (!passed && requirement.enforcement_type === "block") {
+      blockers.push({
+        requirement_id: requirement.id,
+        stage,
+        completion_rule: rule,
+        missing_sections: missingSections,
+        message: `${stage} is blocked until ${missingSections.join(", ") || rule} is complete.`,
+      });
+    }
+  }
+  return { allowed: blockers.length === 0, blockers, requirements };
+}
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -7140,6 +7675,423 @@ function operatorMcpInitializeResult(requestedVersion: unknown): Record<string, 
   };
 }
 
+async function collectOperatorPreflightSection(
+  request: Request,
+  env: Env,
+  brandKey: GptBrandKey,
+  toolName: string,
+  sectionName: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const headers = new Headers();
+  const authorization = request.headers.get("authorization");
+  const internalKey = request.headers.get("x-internal-key");
+  if (authorization) {
+    headers.set("authorization", authorization);
+  }
+  if (internalKey) {
+    headers.set("x-internal-key", internalKey);
+  }
+  headers.set("content-type", "application/json");
+  const toolRequest = new Request(new URL(`/api/operator/tools/${toolName}`, request.url), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ brand_key: brandKey, ...args }),
+  });
+  const response = await handleOperatorTool(toolRequest, env, toolName);
+  const payload = await readJsonSafe(response);
+  const result: Record<string, unknown> = payload && typeof payload === "object" && !Array.isArray(payload)
+    ? { status: response.status, ok: response.status < 400, ...(payload as Record<string, unknown>) }
+    : { status: response.status, ok: response.status < 400 };
+  const returnedCount = Number(
+    result.returned_count
+    ?? (Array.isArray(result.items) ? result.items.length : undefined)
+    ?? (Array.isArray(result.candidates) ? result.candidates.length : undefined)
+    ?? (Array.isArray(result.memory) ? result.memory.length : undefined)
+    ?? (Array.isArray(result.gates) ? result.gates.length : undefined)
+    ?? 1,
+  );
+  const totalCount = Number(result.total_count ?? result.total ?? returnedCount);
+  const hasMore = Boolean(result.has_more ?? totalCount > returnedCount);
+  return {
+    section: sectionName,
+    returned_count: Number.isFinite(returnedCount) ? returnedCount : 0,
+    total_count: Number.isFinite(totalCount) ? totalCount : 0,
+    limit: Number(args.limit ?? returnedCount ?? 0),
+    offset: Number(args.offset ?? 0),
+    offsets_read: [Number(args.offset ?? 0)],
+    has_more: hasMore,
+    coverage_status: result.ok === false || hasMore ? "partial" : "complete",
+    source: toolName,
+  };
+}
+
+async function createOperatorMcpSnapshot(env: Env): Promise<Record<string, unknown>> {
+  await prepareOperatorMode(env);
+  const overrides = await listOperatorMcpOverrides(env);
+  const requirements = await env.DB.prepare(
+    `SELECT * FROM operator_workflow_requirements ORDER BY stage ASC, brand_key ASC`,
+  ).all<Record<string, unknown>>();
+  const gates = await env.DB.prepare(
+    `SELECT * FROM operator_gates ORDER BY stage_scope ASC, gate_key ASC`,
+  ).all<Record<string, unknown>>();
+  return {
+    captured_at: new Date().toISOString(),
+    tool_overrides: overrides,
+    workflow_requirements: requirements.results ?? [],
+    gates: gates.results ?? [],
+  };
+}
+
+async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: OperatorMcpAdminToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await prepareOperatorMode(env);
+
+  if (toolName === "getMcpAdminState") {
+    const brand = args.brand_key ? await resolveOperatorBrandFromPayload(env, args) : null;
+    const tools = await buildOperatorMcpTools(env, true);
+    const gates = brand ? await listOperatorGates(env, brand.brand_key, null, null, null) : [];
+    const requirements = await listOperatorWorkflowRequirements(env, brand?.brand_key ?? null);
+    const lastDeployment = await env.DB.prepare(
+      `SELECT id, version, status, change_summary, created_at, activated_at, rolled_back_at
+       FROM operator_mcp_deployments
+       ORDER BY version DESC
+       LIMIT 1`,
+    ).first<Record<string, unknown>>();
+    const errors = await env.DB.prepare(
+      `SELECT id, tool_name, likely_cause, created_at
+       FROM operator_mcp_admin_errors
+       ORDER BY datetime(created_at) DESC
+       LIMIT 10`,
+    ).all<Record<string, unknown>>();
+    return {
+      ok: true,
+      version: "operator-mcp-admin-v1",
+      tool_count: tools.length,
+      admin_tools: [...OPERATOR_MCP_ADMIN_TOOL_NAMES],
+      policies: {
+        full_preflight_before_serious_advancement: true,
+        show_only_drafts_with_showable_true: true,
+        schedule_only_approved_drafts: true,
+        workflow_requirements_db_backed: true,
+        gates_db_backed: true,
+      },
+      workflow_requirements: requirements,
+      active_gates_count: gates.length,
+      last_deployment: lastDeployment ?? null,
+      recent_failures: errors.results ?? [],
+    };
+  }
+
+  if (toolName === "inspectMcpFailure") {
+    const errorText = JSON.stringify(args.error_response ?? {}) + " " + String(args.error_text ?? "");
+    const lower = errorText.toLowerCase();
+    let likelyCause = "unknown_runtime_failure";
+    let recommendedFix = ["Read the tool definition with readMcpToolDefinition, then update schema or behavior if the failure is reproducible."];
+    if (lower.includes("unauthorized") || lower.includes("invalid_client")) {
+      likelyCause = "auth_or_oauth_configuration";
+      recommendedFix = ["Verify OAuth app configuration and MCP bearer token environment binding."];
+    } else if (lower.includes("draft_not_showable") || lower.includes("gate")) {
+      likelyCause = "draft_gate_blocker";
+      recommendedFix = ["Use runGateSuite to inspect blockers, updateGate if the gate itself is wrong, otherwise regenerate the draft."];
+    } else if (lower.includes("approved_before_schedule") || lower.includes("approved")) {
+      likelyCause = "scheduling_requires_approved_draft";
+      recommendedFix = ["Do not schedule candidates. Use mark_draft_shown then approve_draft before schedule_approved_draft."];
+    } else if (lower.includes("source_card") || lower.includes("locked_source_card")) {
+      likelyCause = "source_card_or_generation_order";
+      recommendedFix = ["Create and lock a source card before serious generation, then create_generation_run."];
+    } else if (lower.includes("preflight") || lower.includes("partial") || lower.includes("missing_sections")) {
+      likelyCause = "workflow_requirement_blocker";
+      recommendedFix = ["Run prepareFullPreflight, inspect getWorkflowStatus, then updateWorkflowRequirement only if the rule is wrong."];
+    } else if (lower.includes("required") || lower.includes("schema") || lower.includes("unknown tool")) {
+      likelyCause = "tool_schema_or_advertisement";
+      recommendedFix = ["Use readMcpToolDefinition and updateMcpToolSchema to patch required fields or descriptions."];
+    }
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_mcp_admin_errors (id, tool_name, payload_json, error_response_json, likely_cause)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).bind(
+      id,
+      normalizeOperatorText(args.tool_name, 160, true),
+      normalizeOperatorJson(args.payload, {}),
+      normalizeOperatorJson(args.error_response ?? args.error_text, {}),
+      likelyCause,
+    ).run();
+    return { ok: true, inspection_id: id, likely_cause: likelyCause, recommended_fix_path: recommendedFix };
+  }
+
+  if (toolName === "listMcpTools") {
+    const tools = await buildOperatorMcpTools(env, args.include_disabled === true);
+    return { ok: true, tools };
+  }
+
+  if (toolName === "readMcpToolDefinition") {
+    const definition = await readOperatorMcpToolDefinition(env, normalizeOperatorText(args.tool_name, 160) ?? "");
+    return definition ? { ok: true, tool: definition } : { ok: false, error: "tool_not_found" };
+  }
+
+  if (toolName === "updateMcpToolSchema" || toolName === "updateMcpToolBehavior") {
+    const targetTool = normalizeOperatorText(args.tool_name, 160);
+    if (!targetTool) {
+      return { ok: false, error: "tool_name_required" };
+    }
+    const schemaPatch = toolName === "updateMcpToolSchema" ? normalizeOperatorJson(args.schema_patch, {}) : null;
+    const behaviorPatch = toolName === "updateMcpToolBehavior" ? normalizeOperatorJson(args.behavior_patch, {}) : null;
+    await env.DB.prepare(
+      `INSERT INTO operator_mcp_tool_overrides (
+        tool_name, schema_patch_json, behavior_patch_json, last_reason
+      ) VALUES (?, ?, ?, ?)
+      ON CONFLICT(tool_name) DO UPDATE SET
+        schema_patch_json = COALESCE(excluded.schema_patch_json, operator_mcp_tool_overrides.schema_patch_json),
+        behavior_patch_json = COALESCE(excluded.behavior_patch_json, operator_mcp_tool_overrides.behavior_patch_json),
+        last_reason = excluded.last_reason`,
+    ).bind(targetTool, schemaPatch, behaviorPatch, normalizeOperatorText(args.reason, 1000, true)).run();
+    return { ok: true, tool_name: targetTool, tool: await readOperatorMcpToolDefinition(env, targetTool) };
+  }
+
+  if (toolName === "createMcpTool") {
+    const targetTool = normalizeOperatorMachineKey(args.tool_name, "");
+    if (!targetTool) {
+      return { ok: false, error: "tool_name_required" };
+    }
+    await env.DB.prepare(
+      `INSERT INTO operator_mcp_tool_overrides (
+        tool_name, disabled, schema_patch_json, behavior_patch_json, description_override, handler_spec_json, last_reason
+      ) VALUES (?, 0, ?, ?, ?, ?, ?)
+      ON CONFLICT(tool_name) DO UPDATE SET
+        disabled = 0,
+        schema_patch_json = excluded.schema_patch_json,
+        behavior_patch_json = excluded.behavior_patch_json,
+        description_override = excluded.description_override,
+        handler_spec_json = excluded.handler_spec_json,
+        last_reason = excluded.last_reason`,
+    ).bind(
+      targetTool,
+      normalizeOperatorJson(args.input_schema, { type: "object", properties: {}, additionalProperties: true }),
+      normalizeOperatorJson(args.behavior, {}),
+      normalizeOperatorText(args.description, 2000),
+      normalizeOperatorJson(args.handler_spec, { requires_backend_handler: true }),
+      normalizeOperatorText(args.reason, 1000, true),
+    ).run();
+    return { ok: true, tool_name: targetTool, requires_backend_handler: true, tool: await readOperatorMcpToolDefinition(env, targetTool) };
+  }
+
+  if (toolName === "disableMcpTool") {
+    const targetTool = normalizeOperatorText(args.tool_name, 160);
+    await env.DB.prepare(
+      `INSERT INTO operator_mcp_tool_overrides (tool_name, disabled, last_reason)
+       VALUES (?, ?, ?)
+       ON CONFLICT(tool_name) DO UPDATE SET disabled = excluded.disabled, last_reason = excluded.last_reason`,
+    ).bind(targetTool, args.disabled === false ? 0 : 1, normalizeOperatorText(args.reason, 1000, true)).run();
+    return { ok: true, tool_name: targetTool, disabled: args.disabled === false ? false : true };
+  }
+
+  if (toolName === "runMcpTests") {
+    const tools = await buildOperatorMcpTools(env, true);
+    const names = new Set(tools.map((tool) => tool.name));
+    const requirements = await listOperatorWorkflowRequirements(env, null);
+    const checks = [
+      { name: "all_admin_tools_advertised", passed: OPERATOR_MCP_ADMIN_TOOL_NAMES.every((name) => names.has(name)) },
+      { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
+      { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
+      { name: "schedule_requires_approved", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
+      { name: "runtime_deploy_available", passed: names.has("deployMcpChanges") && names.has("rollbackMcpChanges") },
+    ];
+    return { ok: checks.every((check) => check.passed), checks };
+  }
+
+  if (toolName === "deployMcpChanges") {
+    const snapshot = await createOperatorMcpSnapshot(env);
+    const previous = await env.DB.prepare(`SELECT MAX(version) AS version FROM operator_mcp_deployments`).first<{ version: number }>();
+    const version = Number(previous?.version ?? 0) + 1;
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_mcp_deployments (id, version, status, change_summary, snapshot_json, activated_at)
+       VALUES (?, ?, 'active', ?, ?, ?)`,
+    ).bind(id, version, normalizeOperatorText(args.change_summary, 2000, true), JSON.stringify(snapshot), new Date().toISOString()).run();
+    return { ok: true, deployment_id: id, version, status: "active", note: "Runtime MCP configuration snapshot activated. Source-code deploy remains outside the Worker runtime." };
+  }
+
+  if (toolName === "rollbackMcpChanges") {
+    const deployment = args.deployment_id
+      ? await env.DB.prepare(`SELECT * FROM operator_mcp_deployments WHERE id = ? LIMIT 1`).bind(String(args.deployment_id)).first<Record<string, unknown>>()
+      : await env.DB.prepare(`SELECT * FROM operator_mcp_deployments WHERE version = ? LIMIT 1`).bind(Number(args.version ?? 0)).first<Record<string, unknown>>();
+    if (!deployment) {
+      return { ok: false, error: "deployment_snapshot_not_found" };
+    }
+    const snapshot = safeParseJsonString(String(deployment.snapshot_json ?? "{}")) as Record<string, unknown> | null;
+    const overrides = Array.isArray(snapshot?.tool_overrides) ? snapshot.tool_overrides as Array<Record<string, unknown>> : [];
+    const requirements = Array.isArray(snapshot?.workflow_requirements) ? snapshot.workflow_requirements as Array<Record<string, unknown>> : [];
+    await env.DB.prepare(`DELETE FROM operator_mcp_tool_overrides`).run();
+    for (const row of overrides) {
+      await env.DB.prepare(
+        `INSERT INTO operator_mcp_tool_overrides (
+          tool_name, disabled, schema_patch_json, behavior_patch_json, description_override, handler_spec_json, output_schema_json, last_reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(row.tool_name, Number(row.disabled ?? 0), row.schema_patch_json ?? null, row.behavior_patch_json ?? null, row.description_override ?? null, row.handler_spec_json ?? null, row.output_schema_json ?? null, row.last_reason ?? null).run();
+    }
+    await env.DB.prepare(`DELETE FROM operator_workflow_requirements`).run();
+    for (const row of requirements) {
+      await env.DB.prepare(
+        `INSERT INTO operator_workflow_requirements (
+          id, brand_key, stage, required_sections_json, completion_rule, enforcement_type, active, version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(row.id ?? crypto.randomUUID(), row.brand_key ?? null, row.stage, row.required_sections_json, row.completion_rule, row.enforcement_type, Number(row.active ?? 1), Number(row.version ?? 1)).run();
+    }
+    await env.DB.prepare(`UPDATE operator_mcp_deployments SET status = 'rolled_back', rolled_back_at = ? WHERE id = ?`).bind(new Date().toISOString(), deployment.id).run();
+    return { ok: true, rolled_back_to: { id: deployment.id, version: deployment.version }, restored: { tool_overrides: overrides.length, workflow_requirements: requirements.length } };
+  }
+
+  if (toolName === "createImplementationBacklogItem") {
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_mcp_backlog_items (
+        id, title, observed_issue, expected_behavior, required_change, acceptance_test, priority, related_stage
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      id,
+      normalizeOperatorText(args.title, 500),
+      normalizeOperatorText(args.observed_issue, 4000, true),
+      normalizeOperatorText(args.expected_behavior, 4000, true),
+      normalizeOperatorText(args.required_change, 4000),
+      normalizeOperatorText(args.acceptance_test, 4000, true),
+      normalizeOperatorMachineKey(args.priority, "normal"),
+      normalizeOperatorMachineKey(args.related_stage, "") || null,
+    ).run();
+    return { ok: true, item_id: id, status: "open" };
+  }
+
+  if (toolName === "listImplementationBacklogItems") {
+    const status = normalizeOperatorMachineKey(args.status, "open");
+    const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100);
+    const offset = Math.max(Number(args.offset ?? 0), 0);
+    const rows = await env.DB.prepare(
+      `SELECT * FROM operator_mcp_backlog_items
+       WHERE (? = 'all' OR status = ?)
+       ORDER BY datetime(created_at) DESC
+       LIMIT ? OFFSET ?`,
+    ).bind(status, status, limit, offset).all<Record<string, unknown>>();
+    return { ok: true, items: rows.results ?? [], returned_count: rows.results?.length ?? 0 };
+  }
+
+  if (toolName === "markImplementationBacklogItemResolved") {
+    const itemId = normalizeOperatorText(args.item_id, 120);
+    await env.DB.prepare(
+      `UPDATE operator_mcp_backlog_items
+       SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
+           acceptance_test = COALESCE(?, acceptance_test)
+       WHERE id = ?`,
+    ).bind(normalizeOperatorText(args.resolution_note, 4000, true), itemId).run();
+    return { ok: true, item_id: itemId, status: "resolved" };
+  }
+
+  const brand = await resolveOperatorBrandFromPayload(env, args);
+  if (!brand) {
+    return { ok: false, error: "brand_key is required or unavailable" };
+  }
+  const sessionId = normalizeOperatorText(args.workflow_session_id, 120, true);
+  let session = sessionId
+    ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sessionId, brand.brand_key).first<Record<string, unknown>>()
+    : await getActiveOperatorSession(env, brand.brand_key);
+
+  if (toolName === "prepareFullPreflight") {
+    if (!session) {
+      const created = await callOperatorToolForMcp(request, env, "start_workflow_session", { brand_key: brand.brand_key, objective: normalizeOperatorText(args.objective, 1000, true) ?? "MCP full preflight" });
+      session = created.workflow_session_id
+        ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(String(created.workflow_session_id), brand.brand_key).first<Record<string, unknown>>()
+        : null;
+    }
+    const activeSessionId = session?.id ? String(session.id) : null;
+    const sections = [
+      await collectOperatorPreflightSection(request, env, brand.brand_key, "get_account_state", "account_state", {}),
+      await collectOperatorPreflightSection(request, env, brand.brand_key, "get_production_board", "production_board", { workflow_session_id: activeSessionId ?? undefined }),
+      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_source_candidates", "source_candidates", { limit: 100, offset: 0 }),
+      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_strategy_memory", "strategy_memory", { limit: 100, offset: 0 }),
+      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_scheduled_posts", "scheduled_posts", { limit: 100, offset: 0 }),
+      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_active_gates", "active_gates", {}),
+    ];
+    const admission = await callOperatorToolForMcp(request, env, "admit_context", {
+      brand_key: brand.brand_key,
+      workflow_session_id: activeSessionId,
+      admission_scope: "full_preflight",
+      sections,
+      notes: "Server-side MCP full preflight.",
+    });
+    await env.DB.prepare(
+      `UPDATE operator_workflow_sessions SET current_stage = 'context_admission' WHERE id = ? AND brand_key = ?`,
+    ).bind(activeSessionId, brand.brand_key).run();
+    const evaluation = await evaluateOperatorWorkflowRequirements(env, brand, "context_admission", session);
+    return { ok: evaluation.allowed, workflow_session_id: activeSessionId, context_admission_id: admission.context_admission_id, complete: evaluation.allowed, sections, blockers: evaluation.blockers };
+  }
+
+  if (toolName === "getWorkflowStatus") {
+    const activeSession = session;
+    const stage = normalizeOperatorStage(activeSession?.current_stage, "context_admission");
+    const latestAdmission = await getLatestOperatorContextAdmission(env, brand.brand_key, activeSession?.id ? String(activeSession.id) : null);
+    const draftCounts = await env.DB.prepare(
+      `SELECT status, COUNT(*) AS total FROM gpt_generation_drafts WHERE account_id = ? GROUP BY status`,
+    ).bind(brand.account_id).all<Record<string, unknown>>();
+    const scheduledCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = ?`,
+    ).bind(brand.profile.threads_user_id).first<{ total: number }>();
+    const evaluation = await evaluateOperatorWorkflowRequirements(env, brand, stage, activeSession);
+    return { ok: true, brand_key: brand.brand_key, workflow_session: activeSession, current_stage: stage, latest_context_admission: latestAdmission, draft_counts: draftCounts.results ?? [], scheduled_posts_count: Number(scheduledCount?.total ?? 0), may_advance_current_stage: evaluation.allowed, blockers: evaluation.blockers };
+  }
+
+  if (toolName === "updateWorkflowRequirement") {
+    const stage = normalizeOperatorStage(args.stage, "context_admission");
+    const requiredSections = Array.isArray(args.required_sections) ? args.required_sections.map(String) : [];
+    const brandScope = args.brand_key ? brand.brand_key : null;
+    const existing = await env.DB.prepare(
+      `SELECT id, version FROM operator_workflow_requirements
+       WHERE COALESCE(brand_key, '__global__') = COALESCE(?, '__global__') AND stage = ?
+       LIMIT 1`,
+    ).bind(brandScope, stage).first<{ id: string; version: number }>();
+    const id = existing?.id ?? crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_workflow_requirements (
+        id, brand_key, stage, required_sections_json, completion_rule, enforcement_type, active, version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        required_sections_json = excluded.required_sections_json,
+        completion_rule = excluded.completion_rule,
+        enforcement_type = excluded.enforcement_type,
+        active = excluded.active,
+        version = excluded.version`,
+    ).bind(id, brandScope, stage, JSON.stringify(requiredSections), normalizeOperatorMachineKey(args.completion_rule, "all_required_sections_complete"), normalizeOperatorMachineKey(args.enforcement_type, "block"), args.active === false ? 0 : 1, Number(existing?.version ?? 0) + 1).run();
+    return { ok: true, requirement_id: id, stage, required_sections: requiredSections };
+  }
+
+  if (toolName === "advanceWorkflowStage") {
+    const targetStage = normalizeOperatorStage(args.target_stage, "context_admission");
+    const evaluation = await evaluateOperatorWorkflowRequirements(env, brand, targetStage, session);
+    if (!evaluation.allowed) {
+      return { ok: false, error: "workflow_stage_blocked", target_stage: targetStage, blockers: evaluation.blockers };
+    }
+    const targetSessionId = session?.id ? String(session.id) : null;
+    if (!targetSessionId) {
+      return { ok: false, error: "workflow_session_required" };
+    }
+    await env.DB.prepare(
+      `UPDATE operator_workflow_sessions SET current_stage = ? WHERE id = ? AND brand_key = ?`,
+    ).bind(targetStage, targetSessionId, brand.brand_key).run();
+    return { ok: true, workflow_session_id: targetSessionId, current_stage: targetStage };
+  }
+
+  if (toolName === "updateGate") {
+    return callOperatorToolForMcp(request, env, "create_or_update_gate", args);
+  }
+  if (toolName === "runGateSuite") {
+    return callOperatorToolForMcp(request, env, "run_gates", args);
+  }
+  if (toolName === "submitAndGateDraft") {
+    const payload = { ...args, text: args.text ?? args.draft_text };
+    return callOperatorToolForMcp(request, env, "submit_candidate_draft", payload);
+  }
+
+  return { ok: false, error: "admin_tool_not_implemented" };
+}
+
 async function callOperatorToolForMcp(request: Request, env: Env, toolName: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   const headers = new Headers();
   const authorization = request.headers.get("authorization");
@@ -7215,25 +8167,29 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
   }
 
   if (method === "tools/list") {
+    const tools = await buildOperatorMcpTools(env, false);
     return mcpJsonResponse({
       jsonrpc: "2.0",
       id: id ?? null,
       result: {
-        tools: OPERATOR_MCP_TOOLS,
+        tools,
       },
     });
   }
 
   if (method === "tools/call") {
     const toolName = typeof message.params?.name === "string" ? message.params.name : "";
-    const tool = OPERATOR_MCP_TOOLS.find((item) => item.name === toolName);
+    const tools = await buildOperatorMcpTools(env, false);
+    const tool = tools.find((item) => item.name === toolName);
     if (!tool) {
       return mcpErrorResponse(id, -32602, "Unknown tool");
     }
     const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
       ? message.params.arguments as Record<string, unknown>
       : {};
-    const resultPayload = await callOperatorToolForMcp(request, env, toolName, args);
+    const resultPayload = isOperatorMcpAdminToolName(toolName)
+      ? await handleOperatorMcpAdminTool(request, env, toolName, args)
+      : await callOperatorToolForMcp(request, env, toolName, args);
     const isError = resultPayload.ok === false;
     return mcpJsonResponse({
       jsonrpc: "2.0",

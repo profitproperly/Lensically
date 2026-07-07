@@ -63,6 +63,11 @@ async function resetTables(): Promise<void> {
   (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_ID: string }).LENSICALLY_MCP_OAUTH_CLIENT_ID = "lensically-operator-mode";
   delete (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string }).LENSICALLY_MCP_OAUTH_CLIENT_SECRET;
   for (const table of [
+    "operator_mcp_admin_errors",
+    "operator_mcp_deployments",
+    "operator_mcp_backlog_items",
+    "operator_workflow_requirements",
+    "operator_mcp_tool_overrides",
     "operator_gate_results",
     "operator_content_inventory",
     "operator_gates",
@@ -380,6 +385,27 @@ describe("operator mode MCP endpoint", () => {
       "list_scheduled_posts",
       "schedule_approved_draft",
       "get_post_results",
+      "getMcpAdminState",
+      "inspectMcpFailure",
+      "listMcpTools",
+      "readMcpToolDefinition",
+      "updateMcpToolSchema",
+      "updateMcpToolBehavior",
+      "createMcpTool",
+      "disableMcpTool",
+      "runMcpTests",
+      "deployMcpChanges",
+      "rollbackMcpChanges",
+      "getWorkflowStatus",
+      "updateWorkflowRequirement",
+      "advanceWorkflowStage",
+      "prepareFullPreflight",
+      "updateGate",
+      "runGateSuite",
+      "submitAndGateDraft",
+      "createImplementationBacklogItem",
+      "listImplementationBacklogItems",
+      "markImplementationBacklogItemResolved",
     ]) {
       expect(toolNames).toContain(name);
     }
@@ -523,5 +549,106 @@ describe("operator mode MCP endpoint", () => {
       lane_key: "money",
     });
     expect(ownAccount.gates.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(true);
+  }, 30000);
+
+  it("runs MCP admin state checks and runtime tool schema controls", async () => {
+    const adminState = await mcpTool<{ tool_count: number; admin_tools: string[]; policies: Record<string, boolean> }>("getMcpAdminState", {
+      brand_key: BRAND_KEY,
+    });
+    expect(adminState.admin_tools).toContain("prepareFullPreflight");
+    expect(adminState.policies.workflow_requirements_db_backed).toBe(true);
+
+    const tests = await mcpTool<{ ok: boolean; checks: Array<{ name: string; passed: boolean }> }>("runMcpTests", {
+      brand_key: BRAND_KEY,
+    });
+    expect(tests.ok).toBe(true);
+    expect(tests.checks.every((check) => check.passed)).toBe(true);
+
+    const patched = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("updateMcpToolSchema", {
+      tool_name: "prepareFullPreflight",
+      schema_patch: { properties: { operator_note: { type: "string" } } },
+      reason: "vitest schema patch",
+    });
+    expect(patched.tool?.inputSchema?.properties?.operator_note).toBeTruthy();
+
+    await mcpTool("disableMcpTool", { tool_name: "get_post_results", reason: "vitest hide" });
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(listed.tools.some((tool) => tool.name === "get_post_results")).toBe(false);
+  }, 30000);
+
+  it("blocks workflow stage advancement until full preflight completes", async () => {
+    const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
+      brand_key: BRAND_KEY,
+      objective: "admin preflight fixture",
+    });
+    const blocked = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string; blockers?: Array<Record<string, unknown>> }; isError?: boolean }>("tools/call", {
+      name: "advanceWorkflowStage",
+      arguments: { brand_key: BRAND_KEY, workflow_session_id: session.workflow_session_id, target_stage: "context_admission" },
+    });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent.error).toBe("workflow_stage_blocked");
+    expect(blocked.structuredContent.blockers?.length).toBeGreaterThan(0);
+
+    const preflight = await mcpTool<{ complete: boolean; context_admission_id: string }>("prepareFullPreflight", {
+      brand_key: BRAND_KEY,
+      workflow_session_id: session.workflow_session_id,
+    });
+    expect(preflight.complete).toBe(true);
+    expect(preflight.context_admission_id).toBeTruthy();
+
+    const advanced = await mcpTool<{ current_stage: string }>("advanceWorkflowStage", {
+      brand_key: BRAND_KEY,
+      workflow_session_id: session.workflow_session_id,
+      target_stage: "context_admission",
+    });
+    expect(advanced.current_stage).toBe("context_admission");
+  }, 40000);
+
+  it("inspects failures and stores MCP implementation backlog", async () => {
+    const inspected = await mcpTool<{ likely_cause: string; inspection_id: string }>("inspectMcpFailure", {
+      tool_name: "mark_draft_shown",
+      error_response: { error: "draft_not_showable" },
+    });
+    expect(inspected.likely_cause).toBe("draft_gate_blocker");
+    expect(inspected.inspection_id).toBeTruthy();
+
+    const item = await mcpTool<{ item_id: string }>("createImplementationBacklogItem", {
+      title: "Make preflight blocker clearer",
+      observed_issue: "User could miss a partial context admission.",
+      required_change: "Return exact missing sections.",
+      acceptance_test: "advanceWorkflowStage returns missing_sections.",
+      related_stage: "context_admission",
+    });
+    expect(item.item_id).toBeTruthy();
+
+    const listed = await mcpTool<{ items: Array<{ id: string; status: string }> }>("listImplementationBacklogItems", { status: "open" });
+    expect(listed.items.some((row) => row.id === item.item_id)).toBe(true);
+
+    await mcpTool("markImplementationBacklogItemResolved", {
+      item_id: item.item_id,
+      resolution_note: "Vitest fixture resolved.",
+    });
+    const resolved = await mcpTool<{ items: Array<{ id: string; status: string }> }>("listImplementationBacklogItems", { status: "resolved" });
+    expect(resolved.items.some((row) => row.id === item.item_id && row.status === "resolved")).toBe(true);
+  }, 30000);
+
+  it("deploys and rolls back runtime MCP config snapshots", async () => {
+    const deployment = await mcpTool<{ deployment_id: string; version: number }>("deployMcpChanges", {
+      change_summary: "vitest runtime snapshot",
+    });
+    expect(deployment.deployment_id).toBeTruthy();
+    expect(deployment.version).toBeGreaterThan(0);
+
+    await mcpTool("updateMcpToolBehavior", {
+      tool_name: "prepareFullPreflight",
+      behavior_patch: { note: "temporary vitest patch" },
+      reason: "vitest behavior patch",
+    });
+
+    const rollback = await mcpTool<{ restored: { workflow_requirements: number } }>("rollbackMcpChanges", {
+      deployment_id: deployment.deployment_id,
+      reason: "vitest rollback",
+    });
+    expect(rollback.restored.workflow_requirements).toBeGreaterThan(0);
   }, 30000);
 });
