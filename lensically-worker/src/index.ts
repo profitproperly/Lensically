@@ -6147,6 +6147,48 @@ async function getActiveOperatorSession(env: Env, brandKey: GptBrandKey): Promis
   ).bind(brandKey).first<Record<string, unknown>>();
 }
 
+function getManifestSavedWorkflowConflict(payload: Record<string, unknown>): string | null {
+  const joined = [
+    payload.title,
+    payload.sequence_label,
+    payload.source_mechanism,
+    payload.required_product,
+    payload.recommended_direction,
+    payload.objective,
+    payload.prompt_summary,
+  ]
+    .filter((value) => typeof value === "string")
+    .map((value) => String(value).toLowerCase())
+    .join("\n");
+  if (!joined) {
+    return null;
+  }
+  const conflicts = [
+    "24 post",
+    "24-post",
+    "twenty-four",
+    "twenty four",
+    "batch",
+    "multiple posts",
+    "posts at once",
+    "candidate posts",
+    "generate 24",
+  ];
+  const matched = conflicts.find((term) => joined.includes(term));
+  return matched ? `manifest_saved_workflow_conflict:${matched}` : null;
+}
+
+async function countGenerationDraftsForRun(env: Env, accountId: string, runId: string, sourceCardId: string): Promise<number> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total
+     FROM gpt_generation_drafts
+     WHERE account_id = ?
+       AND run_id = ?
+       AND source_card_id = ?`,
+  ).bind(accountId, runId, sourceCardId).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
 async function listSourceCandidatesForBrand(
   env: Env,
   brand: GptResolvedBrand,
