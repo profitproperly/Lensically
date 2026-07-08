@@ -7042,11 +7042,11 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { tool_name: { type: "string" }, payload: { type: "object", additionalProperties: true }, error_response: { type: "object", additionalProperties: true }, error_text: { type: "string" } }, additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
+    {
     name: "listMcpTools",
     title: "List MCP tools",
-    description: "List active Lensically MCP tools. If direct engineering tools are not exposed by ChatGPT, pass execute_tool and arguments to bridge-call an engineering tool.",
-    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" }, execute_tool: { type: "string", description: "Optional engineering tool name to execute through this already-callable admin tool." }, arguments: { type: "object", additionalProperties: true, description: "Arguments for execute_tool." } }, additionalProperties: false },
+    description: "List active Lensically MCP tools. If direct tools are not exposed by ChatGPT, pass execute_tool and arguments to bridge-call engineering tools or safe operator wrapper tools.",
+    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" }, execute_tool: { type: "string", description: "Optional tool name to execute through this already-callable admin tool." }, arguments: { type: "object", additionalProperties: true, description: "Arguments for execute_tool." } }, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
