@@ -6858,8 +6858,8 @@ type OperatorMcpToolDefinition = {
 
 const BRAND_KEY_SCHEMA = {
   type: "string",
-  enum: ["manifest_mental", "opmg_deadman", "vectrix"],
-  description: "Lensically account key. Required for account-scoped tools.",
+  enum: ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"],
+  description: "Lensically account key. Required for account-scoped tools. Safe aliases are accepted for accounts whose canonical keys may be blocked by client preflight.",
 };
 
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
