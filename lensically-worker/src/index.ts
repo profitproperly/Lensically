@@ -6581,16 +6581,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!runId || !sourceCardId || !text) {
       return operatorJsonResponse({ success: false, error: "run_id, source_card_id, and text are required" }, 400);
     }
-    if (brand.brand_key === "manifest_mental") {
-      const existingDraftCount = await countGenerationDraftsForRun(env, brand.account_id, runId, sourceCardId);
-      if (existingDraftCount >= 2) {
-        return operatorJsonResponse({
-          success: false,
-          error: "manifest_one_post_workflow_required",
-          existing_draft_count: existingDraftCount,
-          required_workflow: "Manifest saved workflow permits one post from one source card with at most one repair candidate. Start the next 8.n source card instead of adding more drafts to the same run.",
-        }, 400);
-      }
+        const existingDraftCount = await countGenerationDraftsForRun(env, brand.account_id, runId, sourceCardId);
+    if (existingDraftCount >= 2) {
+      return operatorJsonResponse({
+        success: false,
+        error: "lensically_saved_workflow_required",
+        existing_draft_count: existingDraftCount,
+        required_workflow: "Lensically account workflows are source-card controlled. A single source-card run may create one candidate plus one repair candidate unless an account has a backend-supported override. Start the next source-card loop instead of adding more drafts to the same run.",
+      }, 400);
     }
     const draftId = crypto.randomUUID();
     const status = toolName === "save_self_rejected_draft" ? "self_rejected" : "candidate";
