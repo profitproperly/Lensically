@@ -33,6 +33,8 @@
 
 ## Working Rules
 
+- Lensically is multi-account by default. Before making an account-specific rule, gate, workflow requirement, wrapper, tool bridge, schema change, or generation-policy change, explicitly decide whether the rule should be universal across accounts or scoped to one account. If the answer is not obvious, ask the owner before patching. After patching, verify whether the change is universal or scoped and state that in the handoff.
+- At tool-call/workflow inception, read the active repo startup rules and durable Lensically memory before claiming capability or generating. For ChatGPT MCP work, use the Lensically tool surface and strategy memory as source of truth, then record reusable failures/fixes in repo memory and/or ops memory during the same turn.
 - Find the existing integration point before adding new code.
 - Reuse existing helpers and patterns where they still reflect the current product.
 - Keep changes narrow.
