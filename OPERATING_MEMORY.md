@@ -47,6 +47,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Account Separation
 
+- 2026-07-08 universal-default rule: Lensically is multi-account by default. Before changing account behavior, gates, workflow requirements, wrappers, tool bridges, schemas, or generation policy, decide whether the fix should be universal or scoped. If not obvious, ask the owner. After patching, verify and state whether the change landed universally or only for one account. Do not let Manifest beta-testing create hidden Manifest-only fixes that later break Vectrix or OPMG.
+- 2026-07-08 accountability rule: memory-only fixes are not enough when a backend/tool path can enforce the behavior. If an error path is repeatable, patch the code, gate, workflow requirement, or bridge so the same mistake becomes backend-rejected or test-covered. Then record the reusable fix here or in ops memory.
 - Batch Schedule presets are account-specific, not user-global. Always pass `threads_user_id` when listing, saving, favoriting, deleting, or internally selecting batch presets.
 - Legacy unscoped batch presets can be carryovers from another Threads account and should not appear in account-specific Batch Schedule views.
 
