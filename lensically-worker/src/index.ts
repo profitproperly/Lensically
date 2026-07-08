@@ -6175,7 +6175,7 @@ function getLensicallySavedWorkflowConflict(payload: Record<string, unknown>): s
     "generate 24",
   ];
   const matched = conflicts.find((term) => joined.includes(term));
-  return matched ? `manifest_saved_workflow_conflict:${matched}` : null;
+          return matched ? `lensically_saved_workflow_conflict:${matched}` : null;
 }
 
 async function countGenerationDraftsForRun(env: Env, accountId: string, runId: string, sourceCardId: string): Promise<number> {
