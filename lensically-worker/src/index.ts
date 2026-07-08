@@ -6147,7 +6147,7 @@ async function getActiveOperatorSession(env: Env, brandKey: GptBrandKey): Promis
   ).bind(brandKey).first<Record<string, unknown>>();
 }
 
-function getManifestSavedWorkflowConflict(payload: Record<string, unknown>): string | null {
+function getLensicallySavedWorkflowConflict(payload: Record<string, unknown>): string | null {
   const joined = [
     payload.title,
     payload.sequence_label,
