@@ -6519,16 +6519,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
     if (toolName === "create_generation_run") {
-    if (brand.brand_key === "manifest_mental") {
-      const workflowConflict = getManifestSavedWorkflowConflict(payload);
-      if (workflowConflict) {
-        return operatorJsonResponse({
-          success: false,
-          error: "manifest_one_post_workflow_required",
-          reason: workflowConflict,
-          required_workflow: "Create one generation run for one source-card post only. Do not create a Manifest generation run for a batch or 24-post output.",
-        }, 400);
-      }
+        const workflowConflict = getLensicallySavedWorkflowConflict(payload);
+    if (workflowConflict) {
+      return operatorJsonResponse({
+        success: false,
+        error: "lensically_saved_workflow_required",
+        reason: workflowConflict,
+        required_workflow: "Create generation runs according to the selected account's saved workflow. Do not create batch or multi-post generation runs unless a backend-supported override exists for that account.",
+      }, 400);
     }
     const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
     const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
