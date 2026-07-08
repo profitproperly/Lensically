@@ -6436,16 +6436,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
     if (toolName === "create_source_card") {
-    if (brand.brand_key === "manifest_mental") {
-      const workflowConflict = getManifestSavedWorkflowConflict(payload);
-      if (workflowConflict) {
-        return operatorJsonResponse({
-          success: false,
-          error: "manifest_one_post_workflow_required",
-          reason: workflowConflict,
-          required_workflow: "Use the saved Manifest one-post workflow: Step 8.n source card for one post, then Step 9.n generate/gate one post. Do not create batch or multi-post source cards without an explicit backend-supported override.",
-        }, 400);
-      }
+        const workflowConflict = getLensicallySavedWorkflowConflict(payload);
+    if (workflowConflict) {
+      return operatorJsonResponse({
+        success: false,
+        error: "lensically_saved_workflow_required",
+        reason: workflowConflict,
+        required_workflow: "Use the selected account's saved workflow before creating source cards. Do not create batch or multi-post source cards unless a backend-supported override exists for that account.",
+      }, 400);
     }
     const sourceCardId = crypto.randomUUID();
     const sourceMechanism = normalizeOperatorText(payload.source_mechanism, 4000);
