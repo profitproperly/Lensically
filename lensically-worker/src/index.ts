@@ -6252,7 +6252,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return unauthorizedGptResponse();
   }
   await prepareOperatorMode(env);
-  const payload = await readOperatorPayload(request);
+    const payload = await readOperatorPayload(request);
+  if (toolName.startsWith("mm_")) {
+    toolName = toolName.slice(3);
+    payload.brand_key = "manifestmental";
+  }
 
   if (toolName === "list_accounts") {
     return operatorJsonResponse({ accounts: await listOperatorAccounts(env), workflow_template: workflowTemplatePayload() });
