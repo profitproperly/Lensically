@@ -6520,7 +6520,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return card ? operatorJsonResponse({ source_card: card }) : operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
   }
 
-  if (toolName === "create_generation_run") {
+    if (toolName === "create_generation_run") {
+    if (brand.brand_key === "manifest_mental") {
+      const workflowConflict = getManifestSavedWorkflowConflict(payload);
+      if (workflowConflict) {
+        return operatorJsonResponse({
+          success: false,
+          error: "manifest_one_post_workflow_required",
+          reason: workflowConflict,
+          required_workflow: "Create one generation run for one source-card post only. Do not create a Manifest generation run for a batch or 24-post output.",
+        }, 400);
+      }
+    }
     const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
     const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
     if (!card || card.status !== "locked") {
