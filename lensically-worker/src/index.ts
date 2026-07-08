@@ -7379,9 +7379,41 @@ async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, 
   return rows.results ?? [];
 }
 
+function createManifestOperatorWrapperTool(tool: OperatorMcpToolDefinition): OperatorMcpToolDefinition {
+  const cloned = cloneOperatorMcpTool(tool);
+  const schema = cloned.inputSchema as Record<string, unknown>;
+  const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+    ? { ...(schema.properties as Record<string, unknown>) }
+    : {};
+  delete properties.brand_key;
+  const required = Array.isArray(schema.required)
+    ? (schema.required as unknown[]).filter((value) => value !== "brand_key")
+    : [];
+  const inputSchema: Record<string, unknown> = {
+    ...schema,
+    properties,
+    additionalProperties: false,
+  };
+  if (required.length) {
+    inputSchema.required = required;
+  } else {
+    delete inputSchema.required;
+  }
+  return {
+    ...cloned,
+    name: `mm_${tool.name}`,
+    title: `Manifest ${tool.title}`,
+    description: `${tool.description} This wrapper automatically scopes the call to Manifest Mental and does not accept brand_key.`,
+    inputSchema,
+  };
+}
+
 async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
   await prepareOperatorMode(env);
-  const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS].map(cloneOperatorMcpTool);
+  const manifestWrapperTools = OPERATOR_MCP_TOOLS
+    .filter((tool) => tool.name !== "list_accounts")
+    .map(createManifestOperatorWrapperTool);
+  const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS, ...manifestWrapperTools].map(cloneOperatorMcpTool);
   const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
   const overrides = await listOperatorMcpOverrides(env);
   for (const override of overrides) {
