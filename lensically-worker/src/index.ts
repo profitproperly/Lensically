@@ -8232,22 +8232,38 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     return { ok: true, inspection_id: id, likely_cause: likelyCause, recommended_fix_path: recommendedFix };
   }
 
-  if (toolName === "listMcpTools") {
+    if (toolName === "listMcpTools") {
     const executeTool = normalizeOperatorText(args.execute_tool, 160, true);
     if (executeTool) {
-      if (!isOperatorMcpEngineeringToolName(executeTool)) {
-        return {
-          ok: false,
-          error: "engineering_tool_required",
-          requested_tool: executeTool,
-          available_engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
-        };
-      }
       const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
         ? args.arguments as Record<string, unknown>
         : {};
-      const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
-      return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
+      if (isOperatorMcpEngineeringToolName(executeTool)) {
+        const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
+        return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
+      }
+      const availableTools = await buildOperatorMcpTools(env, true);
+      const requestedTool = availableTools.find((tool) => tool.name === executeTool);
+      const canBridgeOperatorTool = requestedTool
+        && !isOperatorMcpAdminToolName(executeTool)
+        && !isOperatorMcpEngineeringToolName(executeTool);
+      if (!canBridgeOperatorTool) {
+        return {
+          ok: false,
+          error: "unsupported_bridge_tool",
+          requested_tool: executeTool,
+          available_engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
+          available_operator_wrappers: availableTools.filter((tool) => tool.name.startsWith("mm_")).map((tool) => tool.name),
+        };
+      }
+      const bridgeRequest = new Request(request.url, {
+        method: "POST",
+        headers: request.headers,
+        body: JSON.stringify(bridgeArgs),
+      });
+      const response = await handleOperatorTool(bridgeRequest, env, executeTool);
+      const result = await response.json().catch(() => ({ ok: false, error: "bridge_response_parse_failed" }));
+      return { ok: response.ok && (result as Record<string, unknown>).ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
     }
     const tools = await buildOperatorMcpTools(env, args.include_disabled === true);
     return { ok: true, tools };
