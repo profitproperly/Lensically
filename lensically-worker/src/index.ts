@@ -6295,10 +6295,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
   await prepareOperatorMode(env);
     const payload = await readOperatorPayload(request);
-  if (toolName.startsWith("mm_")) {
+    if (toolName.startsWith("mm_")) {
     toolName = toolName.slice(3);
     payload.brand_key = "manifestmental";
+  } else if (toolName.startsWith("om_")) {
+    toolName = toolName.slice(3);
+    payload.brand_key = "opmgdeadman";
+  } else if (toolName.startsWith("vx_")) {
+    toolName = toolName.slice(3);
+    payload.brand_key = "vectrix";
   }
+
 
   if (toolName === "list_accounts") {
     return operatorJsonResponse({ accounts: await listOperatorAccounts(env), workflow_template: workflowTemplatePayload() });
