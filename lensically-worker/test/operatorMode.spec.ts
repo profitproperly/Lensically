@@ -816,12 +816,14 @@ describe("operator mode MCP endpoint", () => {
     expect(blocked.structuredContent.error).toBe("workflow_stage_blocked");
     expect(blocked.structuredContent.blockers?.length).toBeGreaterThan(0);
 
-    const preflight = await mcpTool<{ complete: boolean; context_admission_id: string }>("prepareFullPreflight", {
+        const preflight = await mcpTool<{ complete: boolean; context_admission_id: string; sections: Array<{ section: string; coverage_status: string }> }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
       workflow_session_id: session.workflow_session_id,
     });
     expect(preflight.complete).toBe(true);
     expect(preflight.context_admission_id).toBeTruthy();
+    expect(preflight.sections[0]).toMatchObject({ section: "operator_precheck", coverage_status: "complete" });
+
 
     const precheckGateAfter = await mcpTool<{ showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("runGateSuite", {
       brand_key: BRAND_KEY,
