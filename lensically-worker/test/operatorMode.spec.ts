@@ -11,6 +11,8 @@ const MCP_AUTH_HEADERS = {
   "Content-Type": "application/json",
 };
 const BRAND_KEY = "vectrix";
+const ALL_BRAND_KEYS = ["manifest_mental", "opmg_deadman", "vectrix"] as const;
+
 
 async function fetchFromWorker(path: string, init?: RequestInit): Promise<Response> {
   const request = new Request(`https://example.com${path}`, init);
