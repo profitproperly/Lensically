@@ -5381,7 +5381,8 @@ const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
 }> = [
   {
     stage: "context_admission",
-    required_sections: ["account_state", "production_board", "source_candidates", "strategy_memory", "scheduled_posts", "active_gates"],
+        required_sections: ["operator_precheck", "account_state", "production_board", "source_candidates", "strategy_memory", "scheduled_posts", "active_gates"],
+
     completion_rule: "all_required_sections_complete",
     enforcement_type: "block",
   },
