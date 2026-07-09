@@ -7448,7 +7448,12 @@ async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, 
   return rows.results ?? [];
 }
 
-function createManifestOperatorWrapperTool(tool: OperatorMcpToolDefinition): OperatorMcpToolDefinition {
+function createScopedOperatorWrapperTool(
+  tool: OperatorMcpToolDefinition,
+  prefix: string,
+  titlePrefix: string,
+  accountLabel: string,
+): OperatorMcpToolDefinition {
   const cloned = cloneOperatorMcpTool(tool);
   const schema = cloned.inputSchema as Record<string, unknown>;
   const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
@@ -7470,12 +7475,13 @@ function createManifestOperatorWrapperTool(tool: OperatorMcpToolDefinition): Ope
   }
   return {
     ...cloned,
-    name: `mm_${tool.name}`,
-    title: `Manifest ${tool.title}`,
-    description: `${tool.description} This wrapper automatically scopes the call to Manifest Mental and does not accept brand_key.`,
+    name: `${prefix}_${tool.name}`,
+    title: `${titlePrefix} ${tool.title}`,
+    description: `${tool.description} This wrapper automatically scopes the call to ${accountLabel} and does not accept brand_key.`,
     inputSchema,
   };
 }
+
 
 async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
   await prepareOperatorMode(env);
