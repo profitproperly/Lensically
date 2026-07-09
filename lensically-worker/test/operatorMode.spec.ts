@@ -146,9 +146,10 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
     fail_conditions: ["Generic motivation."],
     recommended_direction: "Write one concise systems post.",
   });
-  await operatorTool("lock_source_card", { brand_key: BRAND_KEY, source_card_id: card.source_card_id });
+    await operatorTool("lock_source_card", { brand_key: brandKey, source_card_id: card.source_card_id });
   const run = await operatorTool<{ run_id: string }>("create_generation_run", {
-    brand_key: BRAND_KEY,
+    brand_key: brandKey,
+
     source_card_id: card.source_card_id,
     objective: "Generate one candidate",
     prompt_summary: "Use the locked source card.",
