@@ -568,9 +568,24 @@ describe("operator mode MCP endpoint", () => {
       expect(toolNames).toContain(name);
     }
 
-    const accounts = await mcpTool<{ accounts: Array<{ brand_key: string }> }>("list_accounts");
+        const accounts = await mcpTool<{ accounts: Array<{ brand_key: string }> }>("list_accounts");
     expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
   }, 30000);
+
+  it("bridges scoped account wrappers without brand-key payloads", async () => {
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    const toolNames = listed.tools.map((tool) => tool.name);
+    for (const name of ["mm_get_account_state", "om_get_account_state", "vx_get_account_state"]) {
+      expect(toolNames).toContain(name);
+    }
+    const manifest = await mcpTool<{ brand_key: string }>("mm_get_account_state");
+    expect(manifest.brand_key).toBe("manifest_mental");
+    const opmg = await mcpTool<{ brand_key: string }>("om_get_account_state");
+    expect(opmg.brand_key).toBe("opmg_deadman");
+    const vectrix = await mcpTool<{ brand_key: string }>("vx_get_account_state");
+    expect(vectrix.brand_key).toBe("vectrix");
+  }, 30000);
+
 
   it("exposes engineering access status and ops memory without raw secrets", async () => {
     const access = await mcpTool<{ github: { token_status: string; owner: string; repo: string }; capabilities: string[] }>("getEngineeringAccessState");
