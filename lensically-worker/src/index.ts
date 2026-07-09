@@ -8237,7 +8237,36 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
       }
       const availableTools = await buildOperatorMcpTools(env, true);
-      const requestedTool = availableTools.find((tool) => tool.name === executeTool);
+            const requestedTool = availableTools.find((tool) => tool.name === executeTool);
+      const runtimeConfig = requestedTool
+        ? (requestedTool as unknown as Record<string, unknown>).runtime_config as Record<string, unknown> | undefined
+        : undefined;
+      const handlerSpec = runtimeConfig?.handler_spec && typeof runtimeConfig.handler_spec === "object" && !Array.isArray(runtimeConfig.handler_spec)
+        ? runtimeConfig.handler_spec as Record<string, unknown>
+        : null;
+      const proxyTool = normalizeOperatorText(handlerSpec?.proxy_tool, 160, true);
+      if (proxyTool) {
+        const fixedArgs = handlerSpec?.fixed_arguments && typeof handlerSpec.fixed_arguments === "object" && !Array.isArray(handlerSpec.fixed_arguments)
+          ? handlerSpec.fixed_arguments as Record<string, unknown>
+          : {};
+        const mergedArgs = { ...bridgeArgs, ...fixedArgs };
+        if (isOperatorMcpAdminToolName(proxyTool)) {
+          const result = await handleOperatorMcpAdminTool(request, env, proxyTool, mergedArgs);
+          return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, proxy_tool: proxyTool, result };
+        }
+        if (isOperatorMcpEngineeringToolName(proxyTool)) {
+          const result = await handleOperatorMcpEngineeringTool(request, env, proxyTool, mergedArgs);
+          return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, proxy_tool: proxyTool, result };
+        }
+        const bridgeRequest = new Request(request.url, {
+          method: "POST",
+          headers: request.headers,
+          body: JSON.stringify(mergedArgs),
+        });
+        const response = await handleOperatorTool(bridgeRequest, env, proxyTool);
+        const result = await response.json().catch(() => ({ ok: false, error: "bridge_response_parse_failed" }));
+        return { ok: response.ok && (result as Record<string, unknown>).ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, proxy_tool: proxyTool, result };
+      }
       const canBridgeOperatorTool = requestedTool
         && !isOperatorMcpAdminToolName(executeTool)
         && !isOperatorMcpEngineeringToolName(executeTool);
