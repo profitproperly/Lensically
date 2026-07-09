@@ -268,7 +268,85 @@ describe("operator mode backend spine", () => {
     expect(data.blocking_failures?.some((failure) => failure.gate_key === "approved_before_schedule_gate")).toBe(true);
   }, 30000);
 
+    it("rejects unsupported saved-workflow batch shapes for every brand", async () => {
+    for (const brandKey of ALL_BRAND_KEYS) {
+      const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
+        brand_key: brandKey,
+      });
+      const sourceResponse = await fetchFromWorker("/api/operator/tools/create_source_card", {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          brand_key: brandKey,
+          workflow_session_id: session.workflow_session_id,
+          sequence_label: "universal_batch_guard_001",
+          title: "Twenty-four post batch fixture",
+          primary_source: { source_type: "archive_post", source_id: "archive-1", text: "A system makes the work easier." },
+          source_mechanism: "Generate 24 post batch from one source card.",
+          required_product: "Twenty four candidate posts for review.",
+          forbidden_surfaces: [],
+          pass_conditions: ["Specific operational payoff."],
+          fail_conditions: ["Generic motivation."],
+          recommended_direction: "Generate 24 candidates at once.",
+        }),
+      });
+      const sourceData = await sourceResponse.json() as { error?: string };
+      expect(sourceResponse.status, brandKey).toBe(400);
+      expect(sourceData.error).toBe("lensically_saved_workflow_required");
+
+      const { sourceCardId } = await createLockedSourceCard([], brandKey);
+      const runResponse = await fetchFromWorker("/api/operator/tools/create_generation_run", {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          brand_key: brandKey,
+          source_card_id: sourceCardId,
+          objective: "Generate 24 candidate posts",
+          prompt_summary: "Batch generation fixture.",
+        }),
+      });
+      const runData = await runResponse.json() as { error?: string };
+      expect(runResponse.status, brandKey).toBe(400);
+      expect(runData.error).toBe("lensically_saved_workflow_required");
+    }
+  }, 40000);
+
+  it("caps each source-card generation run for every brand", async () => {
+    for (const brandKey of ALL_BRAND_KEYS) {
+      const { sourceCardId, runId } = await createLockedSourceCard([], brandKey);
+      for (const text of [
+        "A clean system gives the first good idea somewhere useful to land.",
+        "A better workflow makes the second useful idea easier to repeat.",
+      ]) {
+        const draft = await operatorTool<{ draft_id: string }>("submit_candidate_draft", {
+          brand_key: brandKey,
+          run_id: runId,
+          source_card_id: sourceCardId,
+          text,
+          draft_analysis: { opening_phrase: text.split(" ").slice(0, 4).join(" "), realm_entrance_key: text.slice(0, 12), lane_key: "systems" },
+        });
+        expect(draft.draft_id).toBeTruthy();
+      }
+      const blocked = await fetchFromWorker("/api/operator/tools/submit_candidate_draft", {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          brand_key: brandKey,
+          run_id: runId,
+          source_card_id: sourceCardId,
+          text: "A third draft should require the next source-card loop.",
+          draft_analysis: { opening_phrase: "A third draft", realm_entrance_key: "third_draft", lane_key: "systems" },
+        }),
+      });
+      const blockedData = await blocked.json() as { error?: string; existing_draft_count?: number };
+      expect(blocked.status, brandKey).toBe(400);
+      expect(blockedData.error).toBe("lensically_saved_workflow_required");
+      expect(blockedData.existing_draft_count).toBe(2);
+    }
+  }, 40000);
+
   it("keeps account-specific gates scoped to their brand", async () => {
+
     const gate = await operatorTool<{ gate_id: string }>("create_or_update_gate", {
       brand_key: BRAND_KEY,
       gate_key: "offer_specificity_gate",
