@@ -115,10 +115,11 @@ async function resetTables(): Promise<void> {
   ).run();
 }
 
-async function createLockedSourceCard(forbiddenSurfaces: string[] = []): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
+async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey = BRAND_KEY): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
   const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
-    brand_key: BRAND_KEY,
+    brand_key: brandKey,
   });
+
   await operatorTool("admit_context", {
     brand_key: BRAND_KEY,
     workflow_session_id: session.workflow_session_id,
