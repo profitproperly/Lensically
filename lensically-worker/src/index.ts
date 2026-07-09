@@ -7492,10 +7492,19 @@ function createScopedOperatorWrapperTool(
 
 async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
   await prepareOperatorMode(env);
-  const manifestWrapperTools = OPERATOR_MCP_TOOLS
-    .filter((tool) => tool.name !== "list_accounts")
-    .map(createManifestOperatorWrapperTool);
-  const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS, ...manifestWrapperTools].map(cloneOperatorMcpTool);
+    const scopedWrapperTools = [
+    ...OPERATOR_MCP_TOOLS
+      .filter((tool) => tool.name !== "list_accounts")
+      .map((tool) => createScopedOperatorWrapperTool(tool, "mm", "Manifest", "Manifest Mental")),
+    ...OPERATOR_MCP_TOOLS
+      .filter((tool) => tool.name !== "list_accounts")
+      .map((tool) => createScopedOperatorWrapperTool(tool, "om", "OPMG", "OPMG Deadman")),
+    ...OPERATOR_MCP_TOOLS
+      .filter((tool) => tool.name !== "list_accounts")
+      .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
+  ];
+  const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS, ...scopedWrapperTools].map(cloneOperatorMcpTool);
+
   const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
   const overrides = await listOperatorMcpOverrides(env);
   for (const override of overrides) {
