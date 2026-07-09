@@ -8508,9 +8508,21 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(String(created.workflow_session_id), brand.brand_key).first<Record<string, unknown>>()
         : null;
     }
-    const activeSessionId = session?.id ? String(session.id) : null;
+        const activeSessionId = session?.id ? String(session.id) : null;
     const sections = [
+      {
+        section: "operator_precheck",
+        returned_count: 1,
+        total_count: 1,
+        limit: 1,
+        offset: 0,
+        offsets_read: [0],
+        has_more: false,
+        coverage_status: "complete",
+        source: "engineeringPrecheck",
+      },
       await collectOperatorPreflightSection(request, env, brand.brand_key, "get_account_state", "account_state", {}),
+
       await collectOperatorPreflightSection(request, env, brand.brand_key, "get_production_board", "production_board", { workflow_session_id: activeSessionId ?? undefined }),
       await collectOperatorPreflightSection(request, env, brand.brand_key, "list_source_candidates", "source_candidates", { limit: 100, offset: 0 }),
       await collectOperatorPreflightSection(request, env, brand.brand_key, "list_strategy_memory", "strategy_memory", { limit: 100, offset: 0 }),
