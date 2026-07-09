@@ -121,13 +121,14 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
   });
 
   await operatorTool("admit_context", {
-    brand_key: BRAND_KEY,
+        brand_key: brandKey,
     workflow_session_id: session.workflow_session_id,
     admission_scope: "source_card_selection",
     sections: [{ section: "archive_top", returned_count: 1, total_count: 1, limit: 1, offset: 0, source: "existing_db" }],
   });
   const card = await operatorTool<{ source_card_id: string }>("create_source_card", {
-    brand_key: BRAND_KEY,
+    brand_key: brandKey,
+
     workflow_session_id: session.workflow_session_id,
     sequence_label: "source_card_test_001",
     lane_key: "systems",
