@@ -9288,14 +9288,12 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       headers: { "content-type": "application/json", "authorization": authorization },
       body: JSON.stringify(body),
     });
-    const payload = await readJsonSafe(response) as Record<string, unknown> | null;
-    const sessionId = response.headers.get("mcp-session-id");
-    if (!response.ok || !sessionId) {
+        const payload = await readJsonSafe(response) as Record<string, unknown> | null;
+    if (!response.ok) {
       return {
         ok: false,
         status: response.status,
         initialize: payload?.result ?? null,
-        session_id_present: Boolean(sessionId),
         boundary_test: null,
       };
     }
@@ -9303,7 +9301,6 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       "content-type": "application/json",
       "authorization": authorization,
       "MCP-Protocol-Version": "2025-06-18",
-      "Mcp-Session-Id": sessionId,
     };
     const callLiveMcp = async (id: number, method: string, params: Record<string, unknown>): Promise<{ status: number; payload: Record<string, unknown> | null }> => {
       const liveResponse = await fetch(endpoint, {
