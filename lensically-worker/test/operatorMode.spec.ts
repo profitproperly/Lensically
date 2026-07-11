@@ -76,13 +76,6 @@ function testRequestedBrandKey(toolName: string, args: Record<string, unknown>):
 }
 
 async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> {
-  if (!mcpSessionId) {
-    await mcpRequest("initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "vitest", version: "1.0.0" },
-    });
-  }
   if (mcpSelectedKey !== brandKey) {
     const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey }>("selectOperatorKey", { brand_key: brandKey });
     expect(selected.isError).not.toBe(true);
@@ -91,7 +84,7 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     mcpProceedConfirmed = false;
   }
   if (!mcpProceedConfirmed) {
-    const proceeded = await mcpToolRaw<{ proceeded: boolean }>("confirmOperatorProceed");
+    const proceeded = await mcpToolRaw<{ proceeded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.proceeded).toBe(true);
     mcpProceedConfirmed = true;
@@ -100,10 +93,12 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
 
 async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
   const requestedBrand = testRequestedBrandKey(toolName, args);
+  let callArgs = args;
   if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") {
     await ensureMcpAccountOpen(requestedBrand);
+    callArgs = { ...args, proceed_confirmed: true };
   }
-  const result = await mcpToolRaw<T>(toolName, args);
+  const result = await mcpToolRaw<T>(toolName, callArgs);
   expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
   return result.structuredContent;
 }
