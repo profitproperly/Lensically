@@ -9530,9 +9530,26 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       if (!tool) {
         return mcpErrorResponse(id, -32602, "Unknown tool");
       }
-      const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
+            const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
         ? message.params.arguments as Record<string, unknown>
         : {};
+      const boundaryBlock = await getOperatorMcpBoundaryBlock(request, env, toolName, args);
+      if (boundaryBlock) {
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: boundaryBlock,
+            content: [
+              {
+                type: "text",
+                text: `Lensically Operator Mode blocked ${toolName}: ${String(boundaryBlock.error ?? "account_boundary_block")}`,
+              },
+            ],
+            isError: true,
+          },
+        });
+      }
       const resultPayload = isOperatorMcpEngineeringToolName(toolName)
         ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
         : isOperatorMcpAdminToolName(toolName)
