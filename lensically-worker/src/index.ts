@@ -8959,7 +8959,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       ).bind(activeSessionId, brand.brand_key).run();
             preflightPhase = "requirement_evaluation";
       const evaluation = await evaluateOperatorWorkflowRequirements(env, brand, "context_admission", session);
-      return { ok: evaluation.allowed, workflow_session_id: activeSessionId, context_admission_id: admission.context_admission_id, complete: evaluation.allowed, sections, blockers: evaluation.blockers };
+            return { ok: evaluation.allowed, workflow_session_id: activeSessionId, context_admission_id: admissionId, complete: evaluation.allowed, sections, blockers: evaluation.blockers };
         } catch {
       return { ok: false, error: "preflight_internal_failure", failure_phase: preflightPhase, complete: false, sections: [], blockers: ["preflight_internal_failure"] };
     }
