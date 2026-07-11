@@ -133,7 +133,8 @@ async function resetTables(): Promise<void> {
   (env as unknown as { LENSICALLY_MCP_ACCESS_TOKEN: string }).LENSICALLY_MCP_ACCESS_TOKEN = "test-mcp-token";
   (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_ID: string }).LENSICALLY_MCP_OAUTH_CLIENT_ID = "lensically-operator-mode";
   delete (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string }).LENSICALLY_MCP_OAUTH_CLIENT_SECRET;
-  for (const table of [
+    for (const table of [
+    "operator_mcp_sessions",
     "operator_mcp_admin_errors",
     "operator_mcp_deployments",
     "operator_mcp_backlog_items",
