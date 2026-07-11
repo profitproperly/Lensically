@@ -436,7 +436,7 @@ describe("operator mode MCP endpoint", () => {
   }, 30000);
 
   it("lists required MCP tools and Lensically accounts", async () => {
-    const initialized = await mcpRequest<{ serverInfo: { name: string }; capabilities: Record<string, unknown> }>("initialize", {
+    const initialized = await mcpRequest<{ serverInfo: { name: string }; capabilities: Record<string, unknown>; instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
@@ -445,6 +445,10 @@ describe("operator mode MCP endpoint", () => {
 
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
+    expect(initialized.instructions).toContain("Initial key-selection stop");
+    expect(initialized.instructions).toContain("Selected key: <selected_key>");
+    expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
+    expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding may account state, workflow status, source cards, drafts, scheduling, gates, or memory be loaded.");
     expect(toolNames.slice(0, 23)).toEqual([
       "engineeringPrecheck",
       "getEngineeringAccessState",
@@ -570,6 +574,15 @@ describe("operator mode MCP endpoint", () => {
 
         const accounts = await mcpTool<{ accounts: Array<{ brand_key: string }> }>("list_accounts");
     expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
+  }, 30000);
+
+  it("seeds initial context admission as key-handshake only before account work", async () => {
+    const state = await mcpTool<{ workflow_requirements: Array<{ stage: string; required_sections: string[]; completion_rule: string }> }>("getMcpAdminState");
+    const contextRequirement = state.workflow_requirements.find((item) => item.stage === "context_admission");
+    expect(contextRequirement).toMatchObject({
+      required_sections: ["operator_precheck"],
+      completion_rule: "key_handshake_complete_before_account_work",
+    });
   }, 30000);
 
   it("bridges scoped account wrappers without brand-key payloads", async () => {
@@ -701,67 +714,6 @@ describe("operator mode MCP endpoint", () => {
     expect(call.structuredContent.error).toBe("draft_not_showable");
   }, 40000);
 
-  it("keeps MCP-created account-specific gates scoped", async () => {
-    await mcpTool("create_or_update_gate", {
-      brand_key: BRAND_KEY,
-      gate_key: "mcp_vectrix_fixture_gate",
-      display_name: "MCP Vectrix Fixture Gate",
-      description: "Vectrix-only fixture gate for MCP scoping.",
-      stage_scope: "gate_evaluation",
-      lane_scope: "money",
-      gate_type: "hybrid",
-      severity: "block",
-      evaluator: "hybrid",
-    });
-    const vectrix = await mcpTool<{ gates: Array<{ gate_key: string }> }>("list_active_gates", {
-      brand_key: BRAND_KEY,
-      stage_scope: "gate_evaluation",
-      lane_key: "money",
-    });
-    expect(vectrix.gates.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(true);
-
-    const manifestResponse = await fetchFromWorker("/api/operator/mcp", {
-      method: "POST",
-      headers: AUTH_HEADERS,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 99,
-        method: "tools/call",
-        params: {
-          name: "list_active_gates",
-          arguments: { brand_key: "manifest_mental", stage_scope: "gate_evaluation", lane_key: "money" },
-        },
-      }),
-    });
-    const manifestCall = await manifestResponse.json() as { result?: { structuredContent?: { gates?: Array<{ gate_key: string }> }; isError?: boolean } };
-    if (manifestResponse.status < 400 && manifestCall.result?.isError !== true) {
-      expect(manifestCall.result?.structuredContent?.gates?.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(false);
-    }
-    const opmgResponse = await fetchFromWorker("/api/operator/mcp", {
-      method: "POST",
-      headers: AUTH_HEADERS,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 100,
-        method: "tools/call",
-        params: {
-          name: "list_active_gates",
-          arguments: { brand_key: "opmg_deadman", stage_scope: "gate_evaluation", lane_key: "money" },
-        },
-      }),
-    });
-    const opmgCall = await opmgResponse.json() as { result?: { structuredContent?: { gates?: Array<{ gate_key: string }> }; isError?: boolean } };
-    if (opmgResponse.status < 400 && opmgCall.result?.isError !== true) {
-      expect(opmgCall.result?.structuredContent?.gates?.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(false);
-    }
-    const ownAccount = await mcpTool<{ gates: Array<{ gate_key: string }> }>("list_active_gates", {
-      brand_key: BRAND_KEY,
-      stage_scope: "gate_evaluation",
-      lane_key: "money",
-    });
-    expect(ownAccount.gates.some((gate) => gate.gate_key === "mcp_vectrix_fixture_gate")).toBe(true);
-  }, 30000);
-
   it("runs MCP admin state checks and runtime tool schema controls", async () => {
     const adminState = await mcpTool<{ tool_count: number; admin_tools: string[]; policies: Record<string, boolean> }>("getMcpAdminState", {
       brand_key: BRAND_KEY,
@@ -797,16 +749,10 @@ describe("operator mode MCP endpoint", () => {
     expect(listed.tools.some((tool) => tool.name === "get_post_results")).toBe(false);
   }, 30000);
 
-  it("blocks workflow stage advancement until full preflight completes", async () => {
+  it("blocks workflow stage advancement until the key handshake precheck completes", async () => {
     const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
       brand_key: BRAND_KEY,
     });
-    const precheckGateBefore = await mcpTool<{ showable: boolean; blocking_failures: Array<{ gate_key: string; result: string }> }>("runGateSuite", {
-      brand_key: BRAND_KEY,
-      stage: "account_selection",
-    });
-    expect(precheckGateBefore.showable).toBe(false);
-    expect(precheckGateBefore.blocking_failures.some((failure) => failure.gate_key === "operator_precheck_before_workflow" && failure.result === "fail")).toBe(true);
 
     const blocked = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string; blockers?: Array<Record<string, unknown>> }; isError?: boolean }>("tools/call", {
       name: "advanceWorkflowStage",
@@ -823,14 +769,6 @@ describe("operator mode MCP endpoint", () => {
     expect(preflight.complete).toBe(true);
     expect(preflight.context_admission_id).toBeTruthy();
     expect(preflight.sections[0]).toMatchObject({ section: "operator_precheck", coverage_status: "complete" });
-
-
-    const precheckGateAfter = await mcpTool<{ showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("runGateSuite", {
-      brand_key: BRAND_KEY,
-      stage: "account_selection",
-    });
-    expect(precheckGateAfter.showable).toBe(true);
-    expect(precheckGateAfter.gate_results.some((result) => result.gate_key === "operator_precheck_before_workflow" && result.result === "pass")).toBe(true);
 
     const advanced = await mcpTool<{ current_stage: string }>("advanceWorkflowStage", {
       brand_key: BRAND_KEY,

@@ -5381,9 +5381,8 @@ const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
 }> = [
   {
     stage: "context_admission",
-        required_sections: ["operator_precheck", "account_state", "production_board", "source_candidates", "strategy_memory", "scheduled_posts", "active_gates"],
-
-    completion_rule: "all_required_sections_complete",
+    required_sections: ["operator_precheck"],
+    completion_rule: "key_handshake_complete_before_account_work",
     enforcement_type: "block",
   },
   {
@@ -5921,25 +5920,24 @@ async function runOperatorGates(
     if (gateKey === "operator_precheck_before_workflow") {
       const latestAdmission = await getLatestOperatorContextAdmission(env, input.brand.brand_key, null);
       const sections = Array.isArray(latestAdmission?.sections) ? latestAdmission.sections as Array<Record<string, unknown>> : [];
-      const incompleteSections = sections
-        .filter((section) => section.coverage_status !== "complete" || section.has_more === true || section.error)
-        .map((section) => String(section.section ?? "unknown"));
+      const operatorPrecheck = sections.find((section) => section.section === "operator_precheck");
       const precheckComplete = latestAdmission?.admission_scope === "full_preflight"
         && latestAdmission?.is_partial !== true
-        && sections.length > 0
-        && incompleteSections.length === 0;
+        && operatorPrecheck?.coverage_status === "complete"
+        && operatorPrecheck?.has_more !== true
+        && !operatorPrecheck.error;
       results.push(buildGateResult(
         gate,
         precheckComplete ? "pass" : "fail",
-        precheckComplete ? "Full operator precheck is loaded." : "Full operator precheck is missing or partial.",
+        precheckComplete ? "Operator precheck is loaded." : "Operator precheck is missing or partial.",
         {
           context_admission_id: latestAdmission?.id ?? null,
           admission_scope: latestAdmission?.admission_scope ?? null,
           is_partial: latestAdmission?.is_partial ?? null,
           section_count: sections.length,
-          incomplete_sections: incompleteSections,
+          operator_precheck_status: operatorPrecheck?.coverage_status ?? null,
         },
-        "Run prepareFullPreflight or engineeringPrecheck before workflow, admin, or engineering actions.",
+        "Complete the initial key-selection handshake before workflow, admin, or engineering actions.",
       ));
       continue;
     }
@@ -7636,7 +7634,7 @@ async function evaluateOperatorWorkflowRequirements(
     const requiredSections = Array.isArray(requirement.required_sections) ? requirement.required_sections.map(String) : [];
     let passed = true;
     let missingSections: string[] = [];
-    if (rule === "all_required_sections_complete") {
+    if (rule === "all_required_sections_complete" || rule === "key_handshake_complete_before_account_work") {
       missingSections = requiredSections.filter((section) => !completeSections.has(section));
       passed = latestAdmission !== null && latestAdmission.is_partial !== true && missingSections.length === 0;
     } else if (rule === "active_source_card_locked") {
@@ -8082,14 +8080,25 @@ async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<
   });
 }
 
-function operatorMcpInstructions(): string {
-  return "Use Lensically Operator Mode as source of truth. Always select brand_key before account-scoped work. Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.";
+function operatorMcpInstructions(toolCount: number): string {
+  return [
+    "Use Lensically Operator Mode as source of truth.",
+    "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
+    "After the user selects a key, do not call account, workflow, source-card, draft, scheduling, gate, or memory tools yet. Reply with exactly this four-line handshake, using the selected canonical key:",
+    "Lensically Operator Mode MCP is active.",
+    "Selected key: <selected_key>",
+    `Full tool surface loaded: ${toolCount} tools available and usable.`,
+    "Proceed to the next step?",
+    "Only after the user explicitly approves proceeding may account state, workflow status, source cards, drafts, scheduling, gates, or memory be loaded.",
+    "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.",
+  ].join("\n");
 }
 
-function operatorMcpInitializeResult(requestedVersion: unknown): Record<string, unknown> {
+async function operatorMcpInitializeResult(env: Env, requestedVersion: unknown): Promise<Record<string, unknown>> {
   const protocolVersion = typeof requestedVersion === "string" && requestedVersion.trim()
     ? requestedVersion.trim()
     : "2025-06-18";
+  const toolCount = (await buildOperatorMcpTools(env, false)).length;
   return {
     protocolVersion,
     capabilities: {
@@ -8100,7 +8109,7 @@ function operatorMcpInitializeResult(requestedVersion: unknown): Record<string, 
       title: "Lensically Operator Mode",
       version: "1.1.0",
     },
-    instructions: operatorMcpInstructions(),
+    instructions: operatorMcpInstructions(toolCount),
   };
 }
 
@@ -9064,68 +9073,73 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
     return mcpErrorResponse(id, -32600, "Invalid Request");
   }
 
-  if (method === "notifications/initialized") {
-    return new Response(null, { status: 202 });
-  }
-
-  if (method === "initialize") {
-    return mcpJsonResponse({
-      jsonrpc: "2.0",
-      id: id ?? null,
-      result: operatorMcpInitializeResult(message.params?.protocolVersion),
-    }, 200, { "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18") });
-  }
-
-  if (method === "ping") {
-    return mcpJsonResponse({ jsonrpc: "2.0", id: id ?? null, result: {} });
-  }
-
-  if (method === "tools/list") {
-    const tools = await buildOperatorMcpTools(env, false);
-    return mcpJsonResponse({
-      jsonrpc: "2.0",
-      id: id ?? null,
-      result: {
-        tools,
-      },
-    });
-  }
-
-  if (method === "tools/call") {
-    const toolName = typeof message.params?.name === "string" ? message.params.name : "";
-    const tools = await buildOperatorMcpTools(env, false);
-    const tool = tools.find((item) => item.name === toolName);
-    if (!tool) {
-      return mcpErrorResponse(id, -32602, "Unknown tool");
+  try {
+    if (method === "notifications/initialized") {
+      return new Response(null, { status: 202 });
     }
-    const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
-      ? message.params.arguments as Record<string, unknown>
-      : {};
-    const resultPayload = isOperatorMcpEngineeringToolName(toolName)
-      ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
-      : isOperatorMcpAdminToolName(toolName)
-        ? await handleOperatorMcpAdminTool(request, env, toolName, args)
-        : await callOperatorToolForMcp(request, env, toolName, args);
-    const isError = resultPayload.ok === false;
-    return mcpJsonResponse({
-      jsonrpc: "2.0",
-      id: id ?? null,
-      result: {
-        structuredContent: resultPayload,
-        content: [
-          {
-            type: "text",
-            text: isError
-              ? `Lensically Operator Mode tool ${toolName} failed: ${String(resultPayload.error ?? resultPayload.status ?? "unknown_error")}`
-              : `Lensically Operator Mode tool ${toolName} completed.`,
-          },
-        ],
-        isError,
-      },
-    });
-  }
 
-  return mcpErrorResponse(id, -32601, "Method not found");
+    if (method === "initialize") {
+      return mcpJsonResponse({
+        jsonrpc: "2.0",
+        id: id ?? null,
+        result: await operatorMcpInitializeResult(env, message.params?.protocolVersion),
+      }, 200, { "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18") });
+    }
+
+    if (method === "ping") {
+      return mcpJsonResponse({ jsonrpc: "2.0", id: id ?? null, result: {} });
+    }
+
+    if (method === "tools/list") {
+      const tools = await buildOperatorMcpTools(env, false);
+      return mcpJsonResponse({
+        jsonrpc: "2.0",
+        id: id ?? null,
+        result: {
+          tools,
+        },
+      });
+    }
+
+    if (method === "tools/call") {
+      const toolName = typeof message.params?.name === "string" ? message.params.name : "";
+      const tools = await buildOperatorMcpTools(env, false);
+      const tool = tools.find((item) => item.name === toolName);
+      if (!tool) {
+        return mcpErrorResponse(id, -32602, "Unknown tool");
+      }
+      const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
+        ? message.params.arguments as Record<string, unknown>
+        : {};
+      const resultPayload = isOperatorMcpEngineeringToolName(toolName)
+        ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
+        : isOperatorMcpAdminToolName(toolName)
+          ? await handleOperatorMcpAdminTool(request, env, toolName, args)
+          : await callOperatorToolForMcp(request, env, toolName, args);
+      const isError = resultPayload.ok === false;
+      return mcpJsonResponse({
+        jsonrpc: "2.0",
+        id: id ?? null,
+        result: {
+          structuredContent: resultPayload,
+          content: [
+            {
+              type: "text",
+              text: isError
+                ? `Lensically Operator Mode tool ${toolName} failed: ${String(resultPayload.error ?? resultPayload.status ?? "unknown_error")}`
+                : `Lensically Operator Mode tool ${toolName} completed.`,
+            },
+          ],
+          isError,
+        },
+      });
+    }
+
+    return mcpErrorResponse(id, -32601, "Method not found");
+  } catch (error) {
+    const messageText = error instanceof Error ? error.message : String(error);
+    return mcpErrorResponse(id, -32603, `Internal MCP error: ${messageText || "unknown_error"}`, 500);
+  }
 }
 
 async function createGptGenerationRun(
