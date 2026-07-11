@@ -732,9 +732,9 @@ describe("operator mode MCP endpoint", () => {
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent).toMatchObject({ error: "explicit_proceed_required", account_data_loaded: false });
 
-    const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean } }>("listMcpTools", {
+        const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean } }>("listMcpTools", {
       execute_tool: "confirmOperatorProceed",
-      arguments: {},
+      arguments: { brand_key: "manifest_mental" },
     });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.executed_tool).toBe("confirmOperatorProceed");
