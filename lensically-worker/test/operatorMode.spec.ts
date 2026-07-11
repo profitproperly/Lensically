@@ -12,6 +12,13 @@ const MCP_AUTH_HEADERS = {
 };
 const BRAND_KEY = "vectrix";
 const ALL_BRAND_KEYS = ["manifest_mental", "opmg_deadman", "vectrix"] as const;
+type CanonicalBrandKey = typeof ALL_BRAND_KEYS[number];
+
+let mcpSessionId: string | null = null;
+let mcpSelectedKey: CanonicalBrandKey | null = null;
+let mcpProceedConfirmed = false;
+
+
 
 
 async function fetchFromWorker(path: string, init?: RequestInit): Promise<Response> {
