@@ -705,15 +705,25 @@ describe("operator mode MCP endpoint", () => {
     expect(listBridge.result.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
   }, 30000);
 
-  it("preserves the exact initial key handshake for all canonical keys", async () => {
+    it("preserves the exact initial key handshake for all canonical keys", async () => {
+    await mcpRequest("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
     const startup = await mcpTool<{ boundary: { first_key_response_template: string[] }; tool_surface: { total_tools: number } }>("getOperatorStartupContext");
     for (const key of ALL_BRAND_KEYS) {
-      expect([
+      const selected = await mcpToolRaw<{ handshake: string[]; tool_count: number; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: key });
+      expect(selected.isError).not.toBe(true);
+      expect(selected.structuredContent.account_data_loaded).toBe(false);
+      expect(selected.structuredContent.tool_count).toBe(startup.tool_surface.total_tools);
+      expect(selected.structuredContent.handshake).toEqual([
         "Lensically Operator Mode MCP is active.",
         `Selected key: ${key}`,
         `Full tool surface loaded: ${startup.tool_surface.total_tools} tools available and usable.`,
         "Proceed to the next step?",
-      ]).toEqual(startup.boundary.first_key_response_template.map((line) => line.replace("<canonical_brand_key>", key)));
+      ]);
+      expect(selected.structuredContent.handshake).toEqual(startup.boundary.first_key_response_template.map((line) => line.replace("<canonical_brand_key>", key)));
     }
   }, 30000);
 
