@@ -8900,6 +8900,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       if (!activeSessionId) {
         return { ok: false, error: "workflow_session_unavailable", complete: false, sections: [], blockers: ["workflow_session_unavailable"] };
       }
+            preflightPhase = "section_collection";
       const collectedSections = await Promise.all([
         collectOperatorPreflightSection(request, env, brand.brand_key, "get_production_board", "production_board", { workflow_session_id: activeSessionId }),
         collectOperatorPreflightSection(request, env, brand.brand_key, "list_source_candidates", "source_candidates", { limit: 1, offset: 0 }),
