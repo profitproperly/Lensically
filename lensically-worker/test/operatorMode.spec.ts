@@ -501,7 +501,7 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Initial key-selection stop");
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
-            expect(initialized.instructions).toContain("Only after explicit approval, call confirmOperatorProceed with brand_key.");
+                expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
     expect(initialized.instructions).toContain("include proceed_confirmed=true on account-scoped calls");
     expect(toolNames.slice(0, 24)).toEqual([
       "getOperatorStartupContext",
