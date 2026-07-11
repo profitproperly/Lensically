@@ -5559,6 +5559,25 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       requirement.enforcement_type,
     ).run();
   }
+
+  await env.DB.prepare(
+    `UPDATE operator_workflow_requirements
+     SET required_sections_json = ?,
+         completion_rule = ?,
+         enforcement_type = 'block',
+         active = 1,
+         version = version + 1
+     WHERE stage = 'context_admission'
+       AND (
+         completion_rule <> ?
+         OR required_sections_json <> ?
+       )`,
+  ).bind(
+    JSON.stringify(["operator_precheck"]),
+    "key_handshake_complete_before_account_work",
+    "key_handshake_complete_before_account_work",
+    JSON.stringify(["operator_precheck"]),
+  ).run();
 }
 
 const DEFAULT_OPERATOR_GATES: Array<{

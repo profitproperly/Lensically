@@ -585,6 +585,23 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
+  it("repairs stale context admission requirements without loading account work first", async () => {
+    await mcpTool("getMcpAdminState");
+    await env.DB.prepare(
+      `UPDATE operator_workflow_requirements
+       SET required_sections_json = ?,
+           completion_rule = 'all_required_sections_complete'
+       WHERE stage = 'context_admission'`,
+    ).bind(JSON.stringify(["operator_precheck", "account_state", "workflow_status_if_needed"])).run();
+
+    const state = await mcpTool<{ workflow_requirements: Array<{ stage: string; required_sections: string[]; completion_rule: string }> }>("getMcpAdminState");
+    const contextRequirement = state.workflow_requirements.find((item) => item.stage === "context_admission");
+    expect(contextRequirement).toMatchObject({
+      required_sections: ["operator_precheck"],
+      completion_rule: "key_handshake_complete_before_account_work",
+    });
+  }, 30000);
+
   it("bridges scoped account wrappers without brand-key payloads", async () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
