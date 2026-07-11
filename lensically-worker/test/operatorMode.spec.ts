@@ -41,25 +41,84 @@ async function operatorTool<T = Record<string, unknown>>(toolName: string, paylo
 }
 
 async function mcpRequest<T = Record<string, unknown>>(method: string, params: Record<string, unknown> = {}, id = 1): Promise<T> {
+  const headers = new Headers(AUTH_HEADERS);
+  if (mcpSessionId) {
+    headers.set("Mcp-Session-Id", mcpSessionId);
+  }
   const response = await fetchFromWorker("/api/operator/mcp", {
     method: "POST",
-    headers: AUTH_HEADERS,
+    headers,
     body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
   });
+  const assignedSessionId = response.headers.get("Mcp-Session-Id");
+  if (assignedSessionId) {
+    mcpSessionId = assignedSessionId;
+    mcpSelectedKey = null;
+    mcpProceedConfirmed = false;
+  }
   const data = await response.json() as { result?: T; error?: { message?: string } };
   expect(response.status, `${method}: ${data.error?.message ?? ""}`).toBeLessThan(400);
   expect(data.error, `${method}: ${data.error?.message ?? ""}`).toBeUndefined();
   return data.result as T;
 }
 
-async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
-  const result = await mcpRequest<{ structuredContent: T; isError?: boolean }>("tools/call", {
+async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
+  return mcpRequest<{ structuredContent: T; isError?: boolean }>("tools/call", {
     name: toolName,
     arguments: args,
   });
+}
+
+function testRequestedBrandKey(toolName: string, args: Record<string, unknown>): CanonicalBrandKey | null {
+  if (toolName.startsWith("mm_")) {
+    return "manifest_mental";
+  }
+  if (toolName.startsWith("om_")) {
+    return "opmg_deadman";
+  }
+  if (toolName.startsWith("vx_")) {
+    return "vectrix";
+  }
+  const raw = typeof args.brand_key === "string" ? args.brand_key.trim().toLowerCase().replace(/-/g, "_") : "";
+  if (raw === "manifest_mental" || raw === "opmg_deadman" || raw === "vectrix") {
+    return raw;
+  }
+  return null;
+}
+
+async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> {
+  if (!mcpSessionId) {
+    await mcpRequest("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
+  }
+  if (mcpSelectedKey !== brandKey) {
+    const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey }>("selectOperatorKey", { brand_key: brandKey });
+    expect(selected.isError).not.toBe(true);
+    expect(selected.structuredContent.selected_key).toBe(brandKey);
+    mcpSelectedKey = brandKey;
+    mcpProceedConfirmed = false;
+  }
+  if (!mcpProceedConfirmed) {
+    const proceeded = await mcpToolRaw<{ proceeded: boolean }>("confirmOperatorProceed");
+    expect(proceeded.isError).not.toBe(true);
+    expect(proceeded.structuredContent.proceeded).toBe(true);
+    mcpProceedConfirmed = true;
+  }
+}
+
+async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
+  const requestedBrand = testRequestedBrandKey(toolName, args);
+  if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") {
+    await ensureMcpAccountOpen(requestedBrand);
+  }
+  const result = await mcpToolRaw<T>(toolName, args);
   expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
   return result.structuredContent;
 }
+
 
 async function resetTables(): Promise<void> {
   (env as unknown as {
