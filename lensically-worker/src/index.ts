@@ -8933,6 +8933,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         },
         ...collectedSections,
       ];
+            preflightPhase = "context_admission";
       const admission = await callOperatorToolForMcp(request, env, "admit_context", {
         brand_key: brand.brand_key,
         workflow_session_id: activeSessionId,
