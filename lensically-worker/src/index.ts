@@ -9352,8 +9352,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         && boundaryTest.proceed_confirmed
         && boundaryTest.allowed_after_proceed,
       status: response.status,
-      initialize: payload?.result ?? null,
-      session_id_present: true,
+            initialize: payload?.result ?? null,
+      transport_mode: "stateless_proceed_flag",
       live_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
       boundary_test: boundaryTest,
     };
