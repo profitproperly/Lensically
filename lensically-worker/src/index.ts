@@ -7554,7 +7554,21 @@ async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise
       .filter((tool) => tool.name !== "list_accounts")
       .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
   ];
-  const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS, ...scopedWrapperTools].map(cloneOperatorMcpTool);
+    const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS, ...scopedWrapperTools].map(cloneOperatorMcpTool);
+  for (const tool of baseTools) {
+    if (!operatorMcpToolNameRequiresProceed(tool.name) && tool.name !== "getMcpAdminState" && tool.name !== "updateWorkflowRequirement") {
+      continue;
+    }
+    const schema = tool.inputSchema as Record<string, unknown>;
+    const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+      ? { ...(schema.properties as Record<string, unknown>) }
+      : {};
+    properties.proceed_confirmed = {
+      type: "boolean",
+      description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
+    };
+    tool.inputSchema = { ...schema, properties };
+  }
 
   const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
   const overrides = await listOperatorMcpOverrides(env);
