@@ -8490,21 +8490,11 @@ async function getOperatorMcpBoundaryBlock(
 async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: OperatorMcpAdminToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await prepareOperatorMode(env);
 
-  if (toolName === "selectOperatorKey") {
-    const sessionId = operatorMcpSessionIdFromRequest(request);
-    const session = await getOperatorMcpSession(env, sessionId);
-    if (!sessionId || !session) {
-      return { ok: false, error: "mcp_session_required", account_data_loaded: false, message: "Reinitialize the MCP connection before selecting a key." };
-    }
+    if (toolName === "selectOperatorKey") {
     const brandKey = normalizeGptBrandKey(args.brand_key);
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-    await env.DB.prepare(
-      `UPDATE operator_mcp_sessions
-       SET selected_brand_key = ?, proceeded_at = NULL, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    ).bind(brandKey, sessionId).run();
     const toolCount = (await buildOperatorMcpTools(env, false)).length;
     const handshake = operatorKeyHandshakeLines(toolCount, brandKey);
     return {
@@ -8519,26 +8509,17 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
   }
 
   if (toolName === "confirmOperatorProceed") {
-    const sessionId = operatorMcpSessionIdFromRequest(request);
-    const session = await getOperatorMcpSession(env, sessionId);
-    if (!sessionId || !session) {
-      return { ok: false, error: "mcp_session_required", account_data_loaded: false, message: "Reinitialize the MCP connection before proceeding." };
+    const brandKey = normalizeGptBrandKey(args.brand_key);
+    if (!brandKey) {
+      return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-    if (!session.selected_brand_key) {
-      return { ok: false, error: "key_selection_required", account_data_loaded: false, required_next_tool: "selectOperatorKey" };
-    }
-    const proceededAt = new Date().toISOString();
-    await env.DB.prepare(
-      `UPDATE operator_mcp_sessions
-       SET proceeded_at = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    ).bind(proceededAt, sessionId).run();
     return {
       ok: true,
-      selected_key: session.selected_brand_key,
+      selected_key: brandKey,
       proceeded: true,
-      proceeded_at: proceededAt,
+      proceed_confirmed: true,
       account_data_loaded: false,
+      next_call_requirement: { proceed_confirmed: true },
     };
   }
 
