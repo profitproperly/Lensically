@@ -7958,11 +7958,12 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     bootstrap_version: "operator-startup-v1",
     captured_at: new Date().toISOString(),
     account_data_loaded: false,
-        boundary: {
+            boundary: {
       initial_key_selection_preserved: true,
-      backend_session_enforced: true,
+      backend_proceed_flag_enforced: true,
       key_selection_tool: "selectOperatorKey",
       proceed_confirmation_tool: "confirmOperatorProceed",
+      account_call_requirement: { proceed_confirmed: true },
       before_proceed_forbidden: ["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"],
       first_key_response_template: [
         "Lensically Operator Mode MCP is active.",
