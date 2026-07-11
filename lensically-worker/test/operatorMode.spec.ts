@@ -40,21 +40,11 @@ async function operatorTool<T = Record<string, unknown>>(toolName: string, paylo
 }
 
 async function mcpRequest<T = Record<string, unknown>>(method: string, params: Record<string, unknown> = {}, id = 1): Promise<T> {
-  const headers = new Headers(AUTH_HEADERS);
-  if (mcpSessionId) {
-    headers.set("Mcp-Session-Id", mcpSessionId);
-  }
   const response = await fetchFromWorker("/api/operator/mcp", {
     method: "POST",
-    headers,
+    headers: AUTH_HEADERS,
     body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
   });
-  const assignedSessionId = response.headers.get("Mcp-Session-Id");
-  if (assignedSessionId) {
-    mcpSessionId = assignedSessionId;
-    mcpSelectedKey = null;
-    mcpProceedConfirmed = false;
-  }
   const data = await response.json() as { result?: T; error?: { message?: string } };
   expect(response.status, `${method}: ${data.error?.message ?? ""}`).toBeLessThan(400);
   expect(data.error, `${method}: ${data.error?.message ?? ""}`).toBeUndefined();
