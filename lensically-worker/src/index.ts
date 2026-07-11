@@ -8933,17 +8933,26 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         },
         ...collectedSections,
       ];
-            preflightPhase = "context_admission";
-      const admission = await callOperatorToolForMcp(request, env, "admit_context", {
-        brand_key: brand.brand_key,
-        workflow_session_id: activeSessionId,
-        admission_scope: "full_preflight",
-        sections,
-        notes: "Server-side MCP full preflight.",
-      });
-      if (!admission.context_admission_id) {
-        return { ok: false, error: "context_admission_failed", workflow_session_id: activeSessionId, complete: false, sections, blockers: ["context_admission_failed"] };
-      }
+                  preflightPhase = "context_admission";
+      const admissionId = crypto.randomUUID();
+      const isPartial = sections.some((section) => section.coverage_status === "partial" || section.has_more === true);
+      await env.DB.prepare(
+        `INSERT INTO operator_context_admissions (
+          id, brand_key, workflow_session_id, snapshot_id, admission_scope, sections_json,
+          freshness_started_at, freshness_completed_at, is_partial, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        admissionId,
+        brand.brand_key,
+        activeSessionId,
+        null,
+        "full_preflight",
+        JSON.stringify(sections),
+        null,
+        null,
+        isPartial ? 1 : 0,
+        "Server-side MCP full preflight.",
+      ).run();
             preflightPhase = "workflow_stage_update";
       await env.DB.prepare(
         `UPDATE operator_workflow_sessions SET current_stage = 'context_admission' WHERE id = ? AND brand_key = ?`,
