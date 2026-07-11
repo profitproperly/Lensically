@@ -6,6 +6,28 @@ const TEST_THREADS_USER_ID = "vectrix";
 const TEST_BRAND_KEY = "vectrix";
 const TEST_ACCOUNT_ID = "vectrix";
 
+function recentPostedFixtureTimes(): { scheduledAt: string; publishedAt: string; localDate: string; capturedAt: string } {
+  const base = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  base.setUTCHours(15, 1, 0, 0);
+  const localDate = base.toISOString().slice(0, 10);
+  const scheduled = new Date(base);
+  scheduled.setUTCMinutes(0, 0, 0);
+  const captured = new Date(base);
+  captured.setUTCHours(23, 0, 0, 0);
+  return {
+    scheduledAt: scheduled.toISOString(),
+    publishedAt: base.toISOString(),
+    localDate,
+    capturedAt: captured.toISOString(),
+  };
+}
+
+function recentFixtureIso(daysAgo: number, hourUtc: number): string {
+  const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  date.setUTCHours(hourUtc, 0, 0, 0);
+  return date.toISOString();
+}
+
 async function fetchFromWorker(path: string, init?: RequestInit): Promise<Response> {
   const request = new Request(`https://example.com${path}`, init);
   const ctx = createExecutionContext();
@@ -110,6 +132,7 @@ async function createCompactPaginationFixture(): Promise<void> {
   ).run();
 
   for (let index = 1; index <= 5; index += 1) {
+    const daysAgo = 6 - index;
     await env.DB.prepare(
       `INSERT INTO gpt_strategy_memory (account_id, threads_user_id, kind, title, body, metadata_json)
        VALUES (?, ?, 'current_belief', ?, ?, ?)`,
@@ -132,7 +155,7 @@ async function createCompactPaginationFixture(): Promise<void> {
         TEST_THREADS_USER_ID,
         `archive-${index}`,
         `Archive post ${index}`,
-        `2026-07-0${index}T15:00:00.000Z`,
+        recentFixtureIso(daysAgo, 15),
         `https://threads.net/@vectrix/post/archive-${index}`,
         "vectrixvoltmore",
         `https://cdn.example.com/avatar-${index}.jpg`,
@@ -162,7 +185,7 @@ async function createCompactPaginationFixture(): Promise<void> {
         index + 2,
         index + 3,
         index * 200,
-        `2026-07-0${index}T16:00:00.000Z`,
+        recentFixtureIso(daysAgo, 16),
         JSON.stringify({ raw: "x".repeat(1000) }),
       )
       .run();
@@ -239,6 +262,7 @@ async function createScheduledPostFixture(): Promise<void> {
 }
 
 async function createPostedTaggedPostFixture(): Promise<void> {
+  const fixtureTimes = recentPostedFixtureTimes();
   await env.DB.prepare(
     `CREATE TABLE scheduled_posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -297,19 +321,19 @@ async function createPostedTaggedPostFixture(): Promise<void> {
   ).run();
   await env.DB.prepare(
     `INSERT INTO scheduled_posts (id, user_id, threads_user_id, post_text, status, scheduled_time, published_post_id, published_at)
-     VALUES (888, 'workspace-owner', ?, 'Posted strategy fixture', 'posted', '2026-07-01T15:00:00.000Z', 'post-888', '2026-07-01T15:01:00.000Z')`,
-  ).bind(TEST_THREADS_USER_ID).run();
+     VALUES (888, 'workspace-owner', ?, 'Posted strategy fixture', 'posted', ?, 'post-888', ?)`,
+  ).bind(TEST_THREADS_USER_ID, fixtureTimes.scheduledAt, fixtureTimes.publishedAt).run();
   await env.DB.prepare(
     `INSERT INTO threads_posts_archive (
       threads_user_id, post_id, post_text, post_timestamp, post_permalink, post_username,
       views, likes, replies, reposts, quotes, shares, engagement_total, source_rank
-    ) VALUES (?, 'post-888', 'Posted strategy fixture', '2026-07-01T15:01:00.000Z', 'https://threads.net/post-888', 'vectrixvoltmore',
+    ) VALUES (?, 'post-888', 'Posted strategy fixture', ?, 'https://threads.net/post-888', 'vectrixvoltmore',
       1200, 90, 12, 8, 2, 1, 113, 0)`,
-  ).bind(TEST_THREADS_USER_ID).run();
+  ).bind(TEST_THREADS_USER_ID, fixtureTimes.publishedAt).run();
   await env.DB.prepare(
     `INSERT INTO threads_follower_snapshots (threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at)
-     VALUES (?, '2026-07-01', 1050, 1042, '2026-07-01T23:00:00.000Z')`,
-  ).bind(TEST_THREADS_USER_ID).run();
+     VALUES (?, ?, 1050, 1042, ?)`,
+  ).bind(TEST_THREADS_USER_ID, fixtureTimes.localDate, fixtureTimes.capturedAt).run();
   await fetchFromWorker("/api/threads/schedule/strategy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1249,6 +1273,7 @@ describe("GPT memory browser routes", () => {
   });
 
   it("includes posted strategy-tag performance in GPT growth context", async () => {
+    const fixtureTimes = recentPostedFixtureTimes();
     await createPostedTaggedPostFixture();
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
 
@@ -1271,7 +1296,7 @@ describe("GPT memory browser routes", () => {
         expect.objectContaining({
           scheduled_post_id: 888,
           published_post_id: "post-888",
-          local_date: "2026-07-01",
+          local_date: fixtureTimes.localDate,
           follower_day_net_change: 8,
           strategy: expect.objectContaining({
             pillar: "offer",
