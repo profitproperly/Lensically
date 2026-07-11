@@ -5450,9 +5450,24 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_workflow_requirements_scope
      ON operator_workflow_requirements (COALESCE(brand_key, '__global__'), stage)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_mcp_sessions (
+      id TEXT PRIMARY KEY,
+      selected_brand_key TEXT,
+      proceeded_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at TEXT NOT NULL
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_mcp_sessions_expires
+     ON operator_mcp_sessions (expires_at)`,
   ).run();
 
   await env.DB.prepare(
