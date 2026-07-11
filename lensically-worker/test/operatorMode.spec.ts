@@ -740,7 +740,7 @@ describe("operator mode MCP endpoint", () => {
     expect(proceeded.structuredContent.executed_tool).toBe("confirmOperatorProceed");
     expect(proceeded.structuredContent.result.proceeded).toBe(true);
 
-    const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", { brand_key: "manifest_mental" });
+        const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", { brand_key: "manifest_mental", proceed_confirmed: true });
     expect(allowed.isError).not.toBe(true);
     expect(allowed.structuredContent.ok).toBe(true);
   }, 30000);
