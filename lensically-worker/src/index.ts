@@ -9354,15 +9354,87 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList, failed_log_excerpt };
   }
 
-  if (toolName === "verifyDeployedMcpVersion") {
+    if (toolName === "verifyDeployedMcpVersion") {
+    const authorization = request.headers.get("authorization") ?? "";
+    const endpoint = `${DEFAULT_WORKER_ORIGIN}/api/operator/mcp`;
     const body = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "lensically-engineering-mcp", version: "1.0.0" } } };
-    const response = await fetch(`${DEFAULT_WORKER_ORIGIN}/api/operator/mcp`, {
+    const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json", "authorization": request.headers.get("authorization") ?? "" },
+      headers: { "content-type": "application/json", "authorization": authorization },
       body: JSON.stringify(body),
     });
     const payload = await readJsonSafe(response) as Record<string, unknown> | null;
-    return { ok: response.ok, status: response.status, initialize: payload?.result ?? null };
+    const sessionId = response.headers.get("mcp-session-id");
+    if (!response.ok || !sessionId) {
+      return {
+        ok: false,
+        status: response.status,
+        initialize: payload?.result ?? null,
+        session_id_present: Boolean(sessionId),
+        boundary_test: null,
+      };
+    }
+    const sessionHeaders = {
+      "content-type": "application/json",
+      "authorization": authorization,
+      "MCP-Protocol-Version": "2025-06-18",
+      "Mcp-Session-Id": sessionId,
+    };
+    const callLiveMcp = async (id: number, method: string, params: Record<string, unknown>): Promise<{ status: number; payload: Record<string, unknown> | null }> => {
+      const liveResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: sessionHeaders,
+        body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+      });
+      return {
+        status: liveResponse.status,
+        payload: await readJsonSafe(liveResponse) as Record<string, unknown> | null,
+      };
+    };
+    const listed = await callLiveMcp(2, "tools/list", {});
+    const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
+      ? (listed.payload.result as Record<string, unknown>).tools
+      : [];
+    const select = await callLiveMcp(3, "tools/call", { name: "selectOperatorKey", arguments: { brand_key: "manifest_mental" } });
+    const blocked = await callLiveMcp(4, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental" } });
+    const proceed = await callLiveMcp(5, "tools/call", { name: "confirmOperatorProceed", arguments: {} });
+    const allowed = await callLiveMcp(6, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental" } });
+    const structured = (result: Record<string, unknown> | null): Record<string, unknown> => {
+      const rpcResult = result?.result && typeof result.result === "object" && !Array.isArray(result.result)
+        ? result.result as Record<string, unknown>
+        : {};
+      return rpcResult.structuredContent && typeof rpcResult.structuredContent === "object" && !Array.isArray(rpcResult.structuredContent)
+        ? rpcResult.structuredContent as Record<string, unknown>
+        : {};
+    };
+    const selectContent = structured(select.payload);
+    const blockedContent = structured(blocked.payload);
+    const proceedContent = structured(proceed.payload);
+    const allowedContent = structured(allowed.payload);
+    const boundaryTest = {
+      selected_key: selectContent.selected_key ?? null,
+      handshake: selectContent.handshake ?? null,
+      blocked_before_proceed: blockedContent.error === "explicit_proceed_required" && blockedContent.account_data_loaded === false,
+      blocked_error: blockedContent.error ?? null,
+      proceed_confirmed: proceedContent.proceeded === true,
+      allowed_after_proceed: allowedContent.ok === true,
+    };
+    return {
+      ok: response.ok
+        && listed.status < 400
+        && select.status < 400
+        && blocked.status < 400
+        && proceed.status < 400
+        && allowed.status < 400
+        && boundaryTest.blocked_before_proceed
+        && boundaryTest.proceed_confirmed
+        && boundaryTest.allowed_after_proceed,
+      status: response.status,
+      initialize: payload?.result ?? null,
+      session_id_present: true,
+      live_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
+      boundary_test: boundaryTest,
+    };
   }
 
   if (toolName === "listEngineeringAudit") {
