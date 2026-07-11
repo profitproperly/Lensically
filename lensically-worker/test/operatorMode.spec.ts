@@ -769,7 +769,7 @@ describe("operator mode MCP endpoint", () => {
       required_next_tool: "confirmOperatorProceed",
     });
 
-    const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean }>("confirmOperatorProceed");
+        const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: false });
 
