@@ -9496,12 +9496,16 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       return new Response(null, { status: 202 });
     }
 
-    if (method === "initialize") {
+        if (method === "initialize") {
+      const sessionId = await createOperatorMcpSession(env);
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
         result: await operatorMcpInitializeResult(env, message.params?.protocolVersion),
-      }, 200, { "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18") });
+      }, 200, {
+        "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18"),
+        "Mcp-Session-Id": sessionId,
+      });
     }
 
     if (method === "ping") {
