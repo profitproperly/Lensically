@@ -9317,10 +9317,10 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
-    const select = await callLiveMcp(3, "tools/call", { name: "selectOperatorKey", arguments: { brand_key: "manifest_mental" } });
+        const select = await callLiveMcp(3, "tools/call", { name: "selectOperatorKey", arguments: { brand_key: "manifest_mental" } });
     const blocked = await callLiveMcp(4, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental" } });
-    const proceed = await callLiveMcp(5, "tools/call", { name: "confirmOperatorProceed", arguments: {} });
-    const allowed = await callLiveMcp(6, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental" } });
+    const proceed = await callLiveMcp(5, "tools/call", { name: "confirmOperatorProceed", arguments: { brand_key: "manifest_mental" } });
+    const allowed = await callLiveMcp(6, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental", proceed_confirmed: true } });
     const structured = (result: Record<string, unknown> | null): Record<string, unknown> => {
       const rpcResult = result?.result && typeof result.result === "object" && !Array.isArray(result.result)
         ? result.result as Record<string, unknown>
