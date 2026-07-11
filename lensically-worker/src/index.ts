@@ -8944,6 +8944,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       if (!admission.context_admission_id) {
         return { ok: false, error: "context_admission_failed", workflow_session_id: activeSessionId, complete: false, sections, blockers: ["context_admission_failed"] };
       }
+            preflightPhase = "workflow_stage_update";
       await env.DB.prepare(
         `UPDATE operator_workflow_sessions SET current_stage = 'context_admission' WHERE id = ? AND brand_key = ?`,
       ).bind(activeSessionId, brand.brand_key).run();
