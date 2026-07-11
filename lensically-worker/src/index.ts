@@ -8384,51 +8384,6 @@ async function createOperatorMcpSnapshot(env: Env): Promise<Record<string, unkno
   };
 }
 
-type OperatorMcpSessionState = {
-  id: string;
-  selected_brand_key: GptBrandKey | null;
-  proceeded_at: string | null;
-  expires_at: string;
-};
-
-function operatorMcpSessionIdFromRequest(request: Request): string | null {
-  const sessionId = request.headers.get("mcp-session-id")?.trim() ?? "";
-  return sessionId ? sessionId.slice(0, 200) : null;
-}
-
-async function createOperatorMcpSession(env: Env): Promise<string> {
-  await ensureOperatorMcpAdminTables(env);
-  const id = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  await env.DB.prepare(
-    `INSERT INTO operator_mcp_sessions (id, selected_brand_key, proceeded_at, expires_at)
-     VALUES (?, NULL, NULL, ?)`,
-  ).bind(id, expiresAt).run();
-  return id;
-}
-
-async function getOperatorMcpSession(env: Env, sessionId: string | null): Promise<OperatorMcpSessionState | null> {
-  if (!sessionId) {
-    return null;
-  }
-  await ensureOperatorMcpAdminTables(env);
-  const row = await env.DB.prepare(
-    `SELECT id, selected_brand_key, proceeded_at, expires_at
-     FROM operator_mcp_sessions
-     WHERE id = ? AND datetime(expires_at) > CURRENT_TIMESTAMP
-     LIMIT 1`,
-  ).bind(sessionId).first<Record<string, unknown>>();
-  if (!row) {
-    return null;
-  }
-  return {
-    id: String(row.id),
-    selected_brand_key: normalizeGptBrandKey(row.selected_brand_key),
-    proceeded_at: row.proceeded_at ? String(row.proceeded_at) : null,
-    expires_at: String(row.expires_at),
-  };
-}
-
 function operatorKeyHandshakeLines(toolCount: number, brandKey: GptBrandKey): string[] {
   return [
     "Lensically Operator Mode MCP is active.",
@@ -8471,6 +8426,16 @@ function requestedMcpBrandKey(toolName: string, args: Record<string, unknown>): 
   return null;
 }
 
+function operatorMcpToolNameRequiresProceed(toolName: string): boolean {
+  if (toolName.startsWith("mm_") || toolName.startsWith("om_") || toolName.startsWith("vx_")) {
+    return true;
+  }
+  if (OPERATOR_MCP_TOOLS.some((tool) => tool.name === toolName && toolName !== "list_accounts")) {
+    return true;
+  }
+  return ACCOUNT_SCOPED_MCP_ADMIN_TOOLS.has(toolName);
+}
+
 function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, unknown>): boolean {
   if (toolName === "listMcpTools") {
     const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
@@ -8479,13 +8444,7 @@ function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, u
       : {};
     return nestedTool ? operatorMcpCallRequiresProceed(nestedTool, nestedArgs) : false;
   }
-  if (toolName.startsWith("mm_") || toolName.startsWith("om_") || toolName.startsWith("vx_")) {
-    return true;
-  }
-  if (OPERATOR_MCP_TOOLS.some((tool) => tool.name === toolName && toolName !== "list_accounts")) {
-    return true;
-  }
-  if (ACCOUNT_SCOPED_MCP_ADMIN_TOOLS.has(toolName)) {
+  if (operatorMcpToolNameRequiresProceed(toolName)) {
     return true;
   }
   if (toolName === "getMcpAdminState" || toolName === "updateWorkflowRequirement") {
@@ -8494,68 +8453,38 @@ function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, u
   return false;
 }
 
+function operatorMcpProceedConfirmed(toolName: string, args: Record<string, unknown>): boolean {
+  if (toolName === "listMcpTools") {
+    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
+    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+      ? args.arguments as Record<string, unknown>
+      : {};
+    return nestedTool ? operatorMcpProceedConfirmed(nestedTool, nestedArgs) : false;
+  }
+  return args.proceed_confirmed === true;
+}
+
 async function getOperatorMcpBoundaryBlock(
-  request: Request,
+  _request: Request,
   env: Env,
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  if (!operatorMcpCallRequiresProceed(toolName, args)) {
+  if (!operatorMcpCallRequiresProceed(toolName, args) || operatorMcpProceedConfirmed(toolName, args)) {
     return null;
   }
-  const sessionId = operatorMcpSessionIdFromRequest(request);
-  if (!sessionId) {
-    return {
-      ok: false,
-      error: "mcp_session_required",
-      message: "Initialize a fresh MCP session, then call selectOperatorKey. Account data was not loaded.",
-      account_data_loaded: false,
-      required_next_tool: "selectOperatorKey",
-    };
-  }
-  const session = await getOperatorMcpSession(env, sessionId);
-  if (!session) {
-    return {
-      ok: false,
-      error: "mcp_session_not_found",
-      message: "The MCP session is missing or expired. Reinitialize, then select the key again. Account data was not loaded.",
-      account_data_loaded: false,
-      required_next_tool: "selectOperatorKey",
-    };
-  }
-  if (!session.selected_brand_key) {
-    return {
-      ok: false,
-      error: "key_selection_required",
-      message: "Call selectOperatorKey and show its exact four-line handshake before account work. Account data was not loaded.",
-      account_data_loaded: false,
-      required_next_tool: "selectOperatorKey",
-    };
-  }
   const requestedBrand = requestedMcpBrandKey(toolName, args);
-  if (requestedBrand && requestedBrand !== session.selected_brand_key) {
-    return {
-      ok: false,
-      error: "selected_key_mismatch",
-      selected_key: session.selected_brand_key,
-      requested_key: requestedBrand,
-      account_data_loaded: false,
-      message: "The requested account does not match the key selected for this MCP session.",
-    };
-  }
-  if (!session.proceeded_at) {
-    const toolCount = (await buildOperatorMcpTools(env, false)).length;
-    return {
-      ok: false,
-      error: "explicit_proceed_required",
-      selected_key: session.selected_brand_key,
-      account_data_loaded: false,
-      handshake: operatorKeyHandshakeLines(toolCount, session.selected_brand_key),
-      required_next_tool: "confirmOperatorProceed",
-      message: "Wait for explicit user approval, then call confirmOperatorProceed before account work.",
-    };
-  }
-  return null;
+  const toolCount = (await buildOperatorMcpTools(env, false)).length;
+  return {
+    ok: false,
+    error: "explicit_proceed_required",
+    selected_key: requestedBrand,
+    account_data_loaded: false,
+    handshake: requestedBrand ? operatorKeyHandshakeLines(toolCount, requestedBrand) : null,
+    required_next_tool: "confirmOperatorProceed",
+    required_argument: { proceed_confirmed: true },
+    message: "Wait for explicit user approval, call confirmOperatorProceed for the selected key, then retry the account-scoped call with proceed_confirmed=true. Account data was not loaded.",
+  };
 }
 
 async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: OperatorMcpAdminToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
