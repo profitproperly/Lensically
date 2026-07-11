@@ -727,14 +727,40 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
-  it("loads selected account context only after proceed", async () => {
+    it("server-blocks selected account context until explicit proceed", async () => {
+    await mcpRequest("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
     const startup = await mcpTool<{ account_data_loaded: boolean }>("getOperatorStartupContext");
     expect(startup.account_data_loaded).toBe(false);
-    const preflight = await mcpTool<{ complete: boolean; sections: Array<{ section: string }> }>("prepareFullPreflight", {
+
+    const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: BRAND_KEY });
+    expect(selected.isError).not.toBe(true);
+    expect(selected.structuredContent.selected_key).toBe(BRAND_KEY);
+    expect(selected.structuredContent.account_data_loaded).toBe(false);
+
+    const blocked = await mcpToolRaw<{ error: string; account_data_loaded: boolean; required_next_tool: string }>("getWorkflowStatus", {
       brand_key: BRAND_KEY,
     });
-    expect(preflight.complete).toBe(true);
-    expect(preflight.sections.map((section) => section.section)).toEqual(expect.arrayContaining(["account_state", "source_candidates", "scheduled_posts", "active_gates"]));
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent).toMatchObject({
+      error: "explicit_proceed_required",
+      account_data_loaded: false,
+      required_next_tool: "confirmOperatorProceed",
+    });
+
+    const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean }>("confirmOperatorProceed");
+    expect(proceeded.isError).not.toBe(true);
+    expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: false });
+
+    const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string }> }>("prepareFullPreflight", {
+      brand_key: BRAND_KEY,
+    });
+    expect(preflight.isError).not.toBe(true);
+    expect(preflight.structuredContent.complete).toBe(true);
+    expect(preflight.structuredContent.sections.map((section) => section.section)).toEqual(expect.arrayContaining(["account_state", "source_candidates", "scheduled_posts", "active_gates"]));
   }, 30000);
 
   it("returns structured JSON-RPC errors for handler exceptions", async () => {
