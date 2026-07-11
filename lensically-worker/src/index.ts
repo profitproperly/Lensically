@@ -8887,7 +8887,8 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sessionId, brand.brand_key).first<Record<string, unknown>>()
     : await getActiveOperatorSession(env, brand.brand_key);
 
-    if (toolName === "prepareFullPreflight") {
+      if (toolName === "prepareFullPreflight") {
+    let preflightPhase = "session";
     try {
       if (!session) {
         const created = await callOperatorToolForMcp(request, env, "start_workflow_session", { brand_key: brand.brand_key, notes: "MCP full preflight." });
