@@ -518,7 +518,8 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Initial key-selection stop");
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
-    expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding may account state, workflow status, source cards, drafts, scheduling, gates, or memory be loaded.");
+        expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
+    expect(initialized.instructions).toContain("remain server-blocked until that tool succeeds for the current MCP session.");
     expect(toolNames.slice(0, 24)).toEqual([
       "getOperatorStartupContext",
       "engineeringPrecheck",
