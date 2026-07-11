@@ -7066,19 +7066,19 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
 ];
 
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
-  {
+    {
     name: "selectOperatorKey",
     title: "Select operator key",
-    description: "Select one canonical Lensically account key for the current MCP session and return the exact four-line handshake without loading account data. Account-scoped tools remain blocked until confirmOperatorProceed is called after explicit user approval.",
+    description: "Return the exact dynamic four-line Lensically key handshake without loading account data. This tool is stateless because ChatGPT app calls do not preserve MCP session headers.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "confirmOperatorProceed",
     title: "Confirm operator proceed",
-    description: "Open the selected Lensically account for the current MCP session only after the user explicitly approves proceeding. Does not load account data itself.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: "Acknowledge explicit user approval for one canonical key without loading account data. Subsequent account-scoped calls must include proceed_confirmed=true.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "getMcpAdminState",
