@@ -9,6 +9,7 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 - Project memory is the default write target for Lensically work. Use global memory only for rules that should apply across unrelated projects and chats.
 - Workspace-root startup copies also exist at `C:\Auto-Threads\AGENTS.md` and `C:\Auto-Threads\OPERATING_MEMORY.md` because Codex often starts in `C:\Auto-Threads` before entering `lensically`. Keep root startup guidance aligned when startup/memory rules change.
 - Failed: trusting the workspace-root startup copies after ChatGPT-side repo changes. Use: after entering `C:\Auto-Threads\lensically`, read repo `AGENTS.md`/`OPERATING_MEMORY.md`, pull clean `origin/main`, then sync root `C:\Auto-Threads\AGENTS.md` and `C:\Auto-Threads\OPERATING_MEMORY.md` from the repo copies when startup guidance changed. Applies when: ChatGPT/GPT may have edited Lensically through the engineering MCP while Codex was away.
+- Failed: making regular ChatGPT rediscover Lensically MCP capabilities, repo docs, OpsMemory, fallback routes, and universal/account scope rules by conversation. Use: call `getOperatorStartupContext` once at fresh ChatGPT MCP startup; fallback order is direct tool, `runEngineeringTool` with `tool_name: "getOperatorStartupContext"`, then `listMcpTools` with `execute_tool: "getOperatorStartupContext"`. Applies when: ChatGPT is about to do Lensically engineering, admin, workflow, or account work before the selected-account proceed step.
 
 ## Deployment Credentials
 

@@ -6988,6 +6988,7 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
 type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
 const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
+  "getOperatorStartupContext",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
@@ -7021,6 +7022,7 @@ const REPO_PATH_SCHEMA = {
 };
 
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
+  { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "engineeringPrecheck", title: "Engineering precheck", description: "Load compact source-control, MCP, ops-memory, failure-pattern, gate, requirement, and runtime state before engineering work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "getEngineeringAccessState", title: "Get engineering access state", description: "Report GitHub/Cloudflare engineering access status without exposing secret values.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "listRepoFiles", title: "List repo files", description: "List GitHub repository files from the default branch with optional prefix filtering.", inputSchema: { type: "object", properties: { prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
@@ -7823,6 +7825,151 @@ async function recordEngineeringAudit(env: Env, input: {
   ).run();
 }
 
+function compactStartupDocument(path: string, file: { ok: boolean; status: number; content: string | null; size: number }): Record<string, unknown> {
+  const content = file.content ?? "";
+  const excerpt = content
+    .split(/\r?\n/)
+    .filter((line) => line.trim())
+    .slice(0, 80)
+    .join("\n")
+    .slice(0, 6000);
+  return {
+    path,
+    ok: file.ok,
+    status: file.status,
+    size: file.size,
+    excerpt,
+    truncated: content.length > excerpt.length,
+  };
+}
+
+function operatorStartupFallbackRoutes(): string[] {
+  return [
+    "Try the direct MCP tool first.",
+    "If a direct engineering tool is not callable, use runEngineeringTool with { tool_name, arguments }.",
+    "If runEngineeringTool is unavailable or fails, use listMcpTools with { execute_tool, arguments }.",
+    "For account-scoped operator reads after explicit proceed, prefer the account-specific wrapper when applicable.",
+    "Do not treat one failed route as a full Lensically outage; inspect structured errors and try the next route.",
+  ];
+}
+
+async function buildOperatorStartupContext(request: Request, env: Env): Promise<Record<string, unknown>> {
+  await prepareOperatorMode(env);
+  const config = githubRepoConfig(env);
+  const tools = await buildOperatorMcpTools(env, true);
+  const toolNames = tools.map((tool) => tool.name);
+  const adminNames = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES);
+  const engineeringNames = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES);
+  const accountWrapperTools = toolNames.filter((name) => /^(mm|om|vx)_/.test(name)).slice(0, 80);
+  const operatorTools = toolNames
+    .filter((name) => !adminNames.has(name) && !engineeringNames.has(name) && !accountWrapperTools.includes(name))
+    .slice(0, 80);
+  const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
+  const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
+    ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
+    : undefined;
+  const docFiles = await Promise.all([
+    getGithubFile(env, "AGENTS.md"),
+    getGithubFile(env, "CURRENT_STATE.md"),
+    getGithubFile(env, "OPERATING_MEMORY.md"),
+  ]);
+  const requirements = (await listOperatorWorkflowRequirements(env, null)).filter((item) => item.brand_key === null).slice(0, 20);
+  const memories = await env.DB.prepare(
+    `SELECT id, title, fix, applies_when, tags_json, updated_at
+     FROM operator_ops_memory
+     WHERE active = 1
+     ORDER BY datetime(updated_at) DESC
+     LIMIT 12`,
+  ).all<Record<string, unknown>>();
+  const failures = await env.DB.prepare(
+    `SELECT id, tool_name, likely_cause, created_at
+     FROM operator_mcp_admin_errors
+     ORDER BY datetime(created_at) DESC
+     LIMIT 10`,
+  ).all<Record<string, unknown>>();
+  const audits = await env.DB.prepare(
+    `SELECT id, action, files_changed_json, diff_summary, result, created_at
+     FROM operator_engineering_audit
+     ORDER BY datetime(created_at) DESC
+     LIMIT 12`,
+  ).all<Record<string, unknown>>();
+  const backlog = await env.DB.prepare(
+    `SELECT id, title, required_change, acceptance_test, priority, related_stage, created_at
+     FROM operator_mcp_backlog_items
+     WHERE status = 'open'
+     ORDER BY datetime(created_at) DESC
+     LIMIT 20`,
+  ).all<Record<string, unknown>>();
+  const lastDeployment = await env.DB.prepare(
+    `SELECT id, version, status, change_summary, created_at, activated_at, rolled_back_at
+     FROM operator_mcp_deployments
+     ORDER BY version DESC
+     LIMIT 1`,
+  ).first<Record<string, unknown>>();
+  const initialize = await operatorMcpInitializeResult(env, "2025-06-18");
+  const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
+  return {
+    ok: true,
+    bootstrap_version: "operator-startup-v1",
+    captured_at: new Date().toISOString(),
+    account_data_loaded: false,
+    boundary: {
+      initial_key_selection_preserved: true,
+      before_proceed_forbidden: ["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"],
+      first_key_response_template: [
+        "Lensically Operator Mode MCP is active.",
+        "Selected key: <canonical_brand_key>",
+        `Full tool surface loaded: ${tools.length} tools available and usable.`,
+        "Proceed to the next step?",
+      ],
+      after_explicit_proceed: "Load selected account context with prepareFullPreflight or the appropriate account-scoped tools.",
+    },
+    tool_surface: {
+      total_tools: tools.length,
+      engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
+      admin_tools: [...OPERATOR_MCP_ADMIN_TOOL_NAMES],
+      operator_tools: operatorTools,
+      account_wrapper_tools: accountWrapperTools,
+      categories: {
+        engineering: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
+        admin: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
+        operator: operatorTools.length,
+        account_wrappers: accountWrapperTools.length,
+      },
+    },
+    repository: {
+      owner: config.owner,
+      repo: config.repo,
+      branch: config.branch,
+      latest_sha: commit?.sha ?? null,
+      github_status: branch.status,
+      github_available: branch.ok,
+    },
+    runtime: {
+      mcp_version: (initialize.serverInfo as Record<string, unknown> | undefined)?.version ?? null,
+      active_runtime_deployment: lastDeployment ?? null,
+    },
+    source_documents: sourceDocuments,
+    ops_memory: memories.results ?? [],
+    recent_failures: failures.results ?? [],
+    recent_successful_fixes: (audits.results ?? []).filter((item) => item.result === "ok").slice(0, 8),
+    open_implementation_backlog: backlog.results ?? [],
+    universal_workflow_requirements: requirements,
+    mandatory_fallback_execution_routes: operatorStartupFallbackRoutes(),
+    implementation_scope_rule: "Evaluate every Lensically change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless a valid account-specific reason exists.",
+    completion_recording_rule: "Completed fixes must be written into source-controlled operating documentation, OpsMemory, engineering audit history, and tests.",
+    payload_limits: {
+      source_documents: "3 docs, first 80 nonblank lines each, 6000 chars max per doc",
+      ops_memory_limit: 12,
+      recent_failures_limit: 10,
+      recent_successful_fixes_limit: 8,
+      backlog_limit: 20,
+    },
+    no_account_sections_present: true,
+    request_url_origin: new URL(request.url).origin,
+  };
+}
+
 function compactTextMatches(content: string, query: string, limit: number): Array<Record<string, unknown>> {
   const lines = content.split(/\r?\n/);
   const normalized = query.toLowerCase();
@@ -8102,6 +8249,9 @@ async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<
 function operatorMcpInstructions(toolCount: number): string {
   return [
     "Use Lensically Operator Mode as source of truth.",
+    "Before engineering, admin, workflow, or account work in a fresh session, call getOperatorStartupContext once and use that compact non-account bootstrap as the startup source of truth.",
+    "If getOperatorStartupContext is not directly callable, use runEngineeringTool with tool_name=getOperatorStartupContext; if that fails, use listMcpTools with execute_tool=getOperatorStartupContext. Do not treat one failed route as a full Lensically outage.",
+    "Classify every change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless there is a valid account-specific reason.",
     "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
     "After the user selects a key, do not call account, workflow, source-card, draft, scheduling, gate, or memory tools yet. Reply with exactly this four-line handshake, using the selected canonical key:",
     "Lensically Operator Mode MCP is active.",
@@ -8427,6 +8577,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     const requirements = await listOperatorWorkflowRequirements(env, null);
     const checks = [
       { name: "all_admin_tools_advertised", passed: OPERATOR_MCP_ADMIN_TOOL_NAMES.every((name) => names.has(name)) },
+      { name: "startup_bootstrap_advertised", passed: names.has("getOperatorStartupContext") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
       { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
       { name: "schedule_requires_approved", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
@@ -8652,42 +8803,33 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     };
   }
 
+  if (toolName === "getOperatorStartupContext") {
+    return buildOperatorStartupContext(request, env);
+  }
+
   if (toolName === "engineeringPrecheck") {
-    const tools = await buildOperatorMcpTools(env, true);
-    const requirements = await listOperatorWorkflowRequirements(env, null);
-    const memories = await env.DB.prepare(
-      `SELECT id, title, fix, applies_when, tags_json, updated_at
-       FROM operator_ops_memory
-       WHERE active = 1
-       ORDER BY datetime(updated_at) DESC
-       LIMIT 10`,
-    ).all<Record<string, unknown>>();
-    const failures = await env.DB.prepare(
-      `SELECT id, tool_name, likely_cause, created_at
-       FROM operator_mcp_admin_errors
-       ORDER BY datetime(created_at) DESC
-       LIMIT 10`,
-    ).all<Record<string, unknown>>();
-    const audits = await env.DB.prepare(
-      `SELECT id, action, files_changed_json, diff_summary, result, created_at
-       FROM operator_engineering_audit
-       ORDER BY datetime(created_at) DESC
-       LIMIT 10`,
-    ).all<Record<string, unknown>>();
+    const startup = await buildOperatorStartupContext(request, env);
     return {
       ok: true,
+      startup_context: startup,
       access: { github_token_status: config.token ? "exists" : "missing", repo: `${config.owner}/${config.repo}`, branch: config.branch },
-      tool_surface: { total_tools: tools.length, engineering_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length, admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length },
+      tool_surface: {
+        total_tools: (startup.tool_surface as Record<string, unknown> | undefined)?.total_tools,
+        engineering_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
+        admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
+      },
       tool_block_prevention: [
+        "Call getOperatorStartupContext once at fresh-session startup before engineering/admin/workflow/account work.",
         "Prefer readRepoFile with line bounds before edits.",
         "Prefer applyRepoTextPatch exact find/replace for small changes.",
         "Use chunked file writes for large content.",
+        ...operatorStartupFallbackRoutes(),
         "Keep workflow dispatch output compact; request full logs only outside this MCP.",
       ],
-      active_workflow_requirements: requirements.slice(0, 20),
-      recent_ops_memory: memories.results ?? [],
-      recent_failures: failures.results ?? [],
-      recent_successful_fixes: (audits.results ?? []).filter((item) => item.result === "ok").slice(0, 5),
+      active_workflow_requirements: startup.universal_workflow_requirements,
+      recent_ops_memory: startup.ops_memory,
+      recent_failures: startup.recent_failures,
+      recent_successful_fixes: startup.recent_successful_fixes,
     };
   }
 

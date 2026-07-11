@@ -449,7 +449,8 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
     expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding may account state, workflow status, source cards, drafts, scheduling, gates, or memory be loaded.");
-    expect(toolNames.slice(0, 23)).toEqual([
+    expect(toolNames.slice(0, 24)).toEqual([
+      "getOperatorStartupContext",
       "engineeringPrecheck",
       "getEngineeringAccessState",
       "listRepoFiles",
@@ -474,7 +475,7 @@ describe("operator mode MCP endpoint", () => {
       "updateOpsMemory",
       "searchOpsMemory",
     ]);
-    expect(toolNames.slice(23, 45)).toEqual([
+    expect(toolNames.slice(24, 46)).toEqual([
       "getMcpAdminState",
       "inspectMcpFailure",
       "listMcpTools",
@@ -499,6 +500,7 @@ describe("operator mode MCP endpoint", () => {
       "markImplementationBacklogItemResolved",
     ]);
     for (const name of [
+      "getOperatorStartupContext",
       "engineeringPrecheck",
       "getEngineeringAccessState",
       "listRepoFiles",
@@ -574,6 +576,95 @@ describe("operator mode MCP endpoint", () => {
 
         const accounts = await mcpTool<{ accounts: Array<{ brand_key: string }> }>("list_accounts");
     expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
+  }, 30000);
+
+  it("loads compact non-account startup bootstrap in a fresh session", async () => {
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    const direct = await mcpTool<{
+      bootstrap_version: string;
+      account_data_loaded: boolean;
+      no_account_sections_present: boolean;
+      tool_surface: { total_tools: number; engineering_tools: string[]; admin_tools: string[]; account_wrapper_tools: string[] };
+      repository: { repo: string; branch: string };
+      runtime: { mcp_version: string };
+      source_documents: Array<{ path: string; excerpt: string; truncated: boolean }>;
+      ops_memory: Array<Record<string, unknown>>;
+      mandatory_fallback_execution_routes: string[];
+      universal_workflow_requirements: Array<{ stage: string; required_sections: string[] }>;
+      boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
+      open_implementation_backlog: Array<Record<string, unknown>>;
+    }>("getOperatorStartupContext");
+    expect(direct.bootstrap_version).toBe("operator-startup-v1");
+    expect(direct.tool_surface.total_tools).toBe(listed.tools.length);
+    expect(direct.account_data_loaded).toBe(false);
+    expect(direct.no_account_sections_present).toBe(true);
+    expect(direct.repository.repo).toBe("Lensically");
+    expect(direct.repository.branch).toBe("main");
+    expect(direct.runtime.mcp_version).toBe("1.1.0");
+    expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
+    expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("runEngineeringTool");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("listMcpTools");
+    expect(direct.boundary.before_proceed_forbidden).toEqual(expect.arrayContaining(["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"]));
+    expect(JSON.stringify(direct)).not.toContain("scheduled_posts_count");
+    expect(JSON.stringify(direct)).not.toContain("latest_context_admission");
+    expect(direct.universal_workflow_requirements.some((item) => item.stage === "context_admission" && item.required_sections.includes("operator_precheck"))).toBe(true);
+  }, 30000);
+
+  it("reuses startup bootstrap through engineeringPrecheck and fallback bridges", async () => {
+    const direct = await mcpTool<{ tool_surface: { total_tools: number } }>("getOperatorStartupContext");
+    const precheck = await mcpTool<{ startup_context: { tool_surface: { total_tools: number } }; recent_ops_memory: Array<Record<string, unknown>> }>("engineeringPrecheck");
+    expect(precheck.startup_context.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
+
+    const runBridge = await mcpTool<{ executed_tool: string; result: { tool_surface: { total_tools: number } } }>("runEngineeringTool", {
+      tool_name: "getOperatorStartupContext",
+      arguments: {},
+    });
+    expect(runBridge.executed_tool).toBe("getOperatorStartupContext");
+    expect(runBridge.result.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
+
+    const listBridge = await mcpTool<{ executed_tool: string; result: { tool_surface: { total_tools: number } } }>("listMcpTools", {
+      execute_tool: "getOperatorStartupContext",
+      arguments: {},
+    });
+    expect(listBridge.executed_tool).toBe("getOperatorStartupContext");
+    expect(listBridge.result.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
+  }, 30000);
+
+  it("preserves the exact initial key handshake for all canonical keys", async () => {
+    const startup = await mcpTool<{ boundary: { first_key_response_template: string[] }; tool_surface: { total_tools: number } }>("getOperatorStartupContext");
+    for (const key of ALL_BRAND_KEYS) {
+      expect([
+        "Lensically Operator Mode MCP is active.",
+        `Selected key: ${key}`,
+        `Full tool surface loaded: ${startup.tool_surface.total_tools} tools available and usable.`,
+        "Proceed to the next step?",
+      ]).toEqual(startup.boundary.first_key_response_template.map((line) => line.replace("<canonical_brand_key>", key)));
+    }
+  }, 30000);
+
+  it("loads selected account context only after proceed", async () => {
+    const startup = await mcpTool<{ account_data_loaded: boolean }>("getOperatorStartupContext");
+    expect(startup.account_data_loaded).toBe(false);
+    const preflight = await mcpTool<{ complete: boolean; sections: Array<{ section: string }> }>("prepareFullPreflight", {
+      brand_key: BRAND_KEY,
+    });
+    expect(preflight.complete).toBe(true);
+    expect(preflight.sections.map((section) => section.section)).toEqual(expect.arrayContaining(["account_state", "source_candidates", "scheduled_posts", "active_gates"]));
+  }, 30000);
+
+  it("returns structured JSON-RPC errors for handler exceptions", async () => {
+    await env.DB.prepare(`DROP TABLE IF EXISTS operator_workflow_requirements`).run();
+    await env.DB.prepare(`CREATE TABLE operator_workflow_requirements (bad_column TEXT)`).run();
+    const response = await fetchFromWorker("/api/operator/mcp", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 501, method: "tools/call", params: { name: "getOperatorStartupContext", arguments: {} } }),
+    });
+    const payload = await response.json() as { error?: { code: number; message: string } };
+    expect(response.status).toBe(500);
+    expect(payload.error).toMatchObject({ code: -32603 });
+    expect(payload.error?.message).toContain("Internal MCP error");
   }, 30000);
 
   it("seeds initial context admission as key-handshake only before account work", async () => {
