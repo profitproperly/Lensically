@@ -8287,7 +8287,7 @@ function operatorMcpInstructions(toolCount: number): string {
     "If getOperatorStartupContext is not directly callable, use runEngineeringTool with tool_name=getOperatorStartupContext; if that fails, use listMcpTools with execute_tool=getOperatorStartupContext. Do not treat one failed route as a full Lensically outage.",
     "Classify every change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless there is a valid account-specific reason.",
         "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
-    "After the user selects a key, call selectOperatorKey with that canonical key. Reply using only the exact four-line handshake returned by the tool. The backend blocks account-scoped reads until this session is opened.",
+        "After the user selects a key, call selectOperatorKey with that canonical key. If it is not directly callable because the app tool cache is stale, call listMcpTools with execute_tool=selectOperatorKey and arguments containing brand_key. Reply using only the exact four-line handshake returned by the tool. The backend blocks account-scoped reads until this session is opened.",
     "Lensically Operator Mode MCP is active.",
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
