@@ -6961,6 +6961,8 @@ const BRAND_KEY_SCHEMA = {
 };
 
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
+  "selectOperatorKey",
+  "confirmOperatorProceed",
   "getMcpAdminState",
   "inspectMcpFailure",
   "listMcpTools",
