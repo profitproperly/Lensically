@@ -8693,8 +8693,12 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
         ? args.arguments as Record<string, unknown>
         : {};
-      if (isOperatorMcpEngineeringToolName(executeTool)) {
+            if (isOperatorMcpEngineeringToolName(executeTool)) {
         const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
+        return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
+      }
+      if (isOperatorMcpAdminToolName(executeTool) && executeTool !== "listMcpTools") {
+        const result = await handleOperatorMcpAdminTool(request, env, executeTool, bridgeArgs);
         return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
       }
       const availableTools = await buildOperatorMcpTools(env, true);
