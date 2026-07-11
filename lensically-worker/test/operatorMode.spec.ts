@@ -121,6 +121,9 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
 
 
 async function resetTables(): Promise<void> {
+  mcpSessionId = null;
+  mcpSelectedKey = null;
+  mcpProceedConfirmed = false;
   (env as unknown as {
     LENSICALLY_GPT_API_KEY: string;
     LENSICALLY_MCP_ACCESS_TOKEN: string;
