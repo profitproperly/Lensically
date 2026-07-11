@@ -8339,47 +8339,64 @@ async function collectOperatorPreflightSection(
   sectionName: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const headers = new Headers();
-  const authorization = request.headers.get("authorization");
-  const internalKey = request.headers.get("x-internal-key");
-  if (authorization) {
-    headers.set("authorization", authorization);
+  const requestedLimit = Number(args.limit ?? 0);
+  const requestedOffset = Number(args.offset ?? 0);
+  try {
+    const headers = new Headers();
+    const authorization = request.headers.get("authorization");
+    const internalKey = request.headers.get("x-internal-key");
+    if (authorization) {
+      headers.set("authorization", authorization);
+    }
+    if (internalKey) {
+      headers.set("x-internal-key", internalKey);
+    }
+    headers.set("content-type", "application/json");
+    const toolRequest = new Request(new URL(`/api/operator/tools/${toolName}`, request.url), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ brand_key: brandKey, ...args }),
+    });
+    const response = await handleOperatorTool(toolRequest, env, toolName);
+    const payload = await readJsonSafe(response);
+    const result: Record<string, unknown> = payload && typeof payload === "object" && !Array.isArray(payload)
+      ? { status: response.status, ok: response.status < 400, ...(payload as Record<string, unknown>) }
+      : { status: response.status, ok: response.status < 400 };
+    const returnedCount = Number(
+      result.returned_count
+      ?? (Array.isArray(result.items) ? result.items.length : undefined)
+      ?? (Array.isArray(result.candidates) ? result.candidates.length : undefined)
+      ?? (Array.isArray(result.memory) ? result.memory.length : undefined)
+      ?? (Array.isArray(result.gates) ? result.gates.length : undefined)
+      ?? 1,
+    );
+    const totalCount = Number(result.total_count ?? result.total ?? returnedCount);
+    const hasMore = Boolean(result.has_more ?? totalCount > returnedCount);
+    return {
+      section: sectionName,
+      returned_count: Number.isFinite(returnedCount) ? returnedCount : 0,
+      total_count: Number.isFinite(totalCount) ? totalCount : 0,
+      limit: Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : returnedCount,
+      offset: Number.isFinite(requestedOffset) ? requestedOffset : 0,
+      offsets_read: [Number.isFinite(requestedOffset) ? requestedOffset : 0],
+      has_more: hasMore,
+      coverage_status: result.ok === false || hasMore ? "partial" : "complete",
+      source: toolName,
+    };
+  } catch {
+    return {
+      section: sectionName,
+      returned_count: 0,
+      total_count: 0,
+      limit: Number.isFinite(requestedLimit) ? requestedLimit : 0,
+      offset: Number.isFinite(requestedOffset) ? requestedOffset : 0,
+      offsets_read: [Number.isFinite(requestedOffset) ? requestedOffset : 0],
+      has_more: true,
+      coverage_status: "partial",
+      source: toolName,
+      error: "section_collection_failed",
+    };
   }
-  if (internalKey) {
-    headers.set("x-internal-key", internalKey);
-  }
-  headers.set("content-type", "application/json");
-  const toolRequest = new Request(new URL(`/api/operator/tools/${toolName}`, request.url), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ brand_key: brandKey, ...args }),
-  });
-  const response = await handleOperatorTool(toolRequest, env, toolName);
-  const payload = await readJsonSafe(response);
-  const result: Record<string, unknown> = payload && typeof payload === "object" && !Array.isArray(payload)
-    ? { status: response.status, ok: response.status < 400, ...(payload as Record<string, unknown>) }
-    : { status: response.status, ok: response.status < 400 };
-  const returnedCount = Number(
-    result.returned_count
-    ?? (Array.isArray(result.items) ? result.items.length : undefined)
-    ?? (Array.isArray(result.candidates) ? result.candidates.length : undefined)
-    ?? (Array.isArray(result.memory) ? result.memory.length : undefined)
-    ?? (Array.isArray(result.gates) ? result.gates.length : undefined)
-    ?? 1,
-  );
-  const totalCount = Number(result.total_count ?? result.total ?? returnedCount);
-  const hasMore = Boolean(result.has_more ?? totalCount > returnedCount);
-  return {
-    section: sectionName,
-    returned_count: Number.isFinite(returnedCount) ? returnedCount : 0,
-    total_count: Number.isFinite(totalCount) ? totalCount : 0,
-    limit: Number(args.limit ?? returnedCount ?? 0),
-    offset: Number(args.offset ?? 0),
-    offsets_read: [Number(args.offset ?? 0)],
-    has_more: hasMore,
-    coverage_status: result.ok === false || hasMore ? "partial" : "complete",
-    source: toolName,
-  };
 }
 
 async function createOperatorMcpSnapshot(env: Env): Promise<Record<string, unknown>> {
