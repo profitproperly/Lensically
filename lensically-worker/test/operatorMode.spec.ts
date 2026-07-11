@@ -728,7 +728,41 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
-    it("server-blocks selected account context until explicit proceed", async () => {
+      it("bridges handshake tools through listMcpTools when the app cache is stale", async () => {
+    await mcpRequest("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
+    const selected = await mcpToolRaw<{ executed_tool: string; result: { selected_key: CanonicalBrandKey; handshake: string[] } }>("listMcpTools", {
+      execute_tool: "selectOperatorKey",
+      arguments: { brand_key: "manifest_mental" },
+    });
+    expect(selected.isError).not.toBe(true);
+    expect(selected.structuredContent.executed_tool).toBe("selectOperatorKey");
+    expect(selected.structuredContent.result.selected_key).toBe("manifest_mental");
+    expect(selected.structuredContent.result.handshake).toHaveLength(4);
+
+    const blocked = await mcpToolRaw<{ error: string; account_data_loaded: boolean }>("getWorkflowStatus", {
+      brand_key: "manifest_mental",
+    });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent).toMatchObject({ error: "explicit_proceed_required", account_data_loaded: false });
+
+    const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean } }>("listMcpTools", {
+      execute_tool: "confirmOperatorProceed",
+      arguments: {},
+    });
+    expect(proceeded.isError).not.toBe(true);
+    expect(proceeded.structuredContent.executed_tool).toBe("confirmOperatorProceed");
+    expect(proceeded.structuredContent.result.proceeded).toBe(true);
+
+    const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", { brand_key: "manifest_mental" });
+    expect(allowed.isError).not.toBe(true);
+    expect(allowed.structuredContent.ok).toBe(true);
+  }, 30000);
+
+  it("server-blocks selected account context until explicit proceed", async () => {
     await mcpRequest("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
