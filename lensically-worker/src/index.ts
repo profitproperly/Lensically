@@ -8289,7 +8289,7 @@ function operatorMcpInstructions(toolCount: number): string {
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
     "Proceed to the next step?",
-    "Only after the user explicitly approves proceeding may account state, workflow status, source cards, drafts, scheduling, gates, or memory be loaded.",
+        "Only after the user explicitly approves proceeding, call confirmOperatorProceed. Account state, workflow status, source cards, drafts, scheduling, gates, and memory remain server-blocked until that tool succeeds for the current MCP session.",
     "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.",
   ].join("\n");
 }
