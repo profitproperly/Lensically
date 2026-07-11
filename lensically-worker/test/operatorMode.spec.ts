@@ -773,8 +773,9 @@ describe("operator mode MCP endpoint", () => {
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: false });
 
-    const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string }> }>("prepareFullPreflight", {
+        const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string }> }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
+      proceed_confirmed: true,
     });
     expect(preflight.isError).not.toBe(true);
     expect(preflight.structuredContent.complete).toBe(true);
