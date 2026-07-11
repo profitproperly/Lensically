@@ -8887,46 +8887,68 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sessionId, brand.brand_key).first<Record<string, unknown>>()
     : await getActiveOperatorSession(env, brand.brand_key);
 
-  if (toolName === "prepareFullPreflight") {
-    if (!session) {
-      const created = await callOperatorToolForMcp(request, env, "start_workflow_session", { brand_key: brand.brand_key, notes: "MCP full preflight." });
-      session = created.workflow_session_id
-        ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(String(created.workflow_session_id), brand.brand_key).first<Record<string, unknown>>()
-        : null;
+    if (toolName === "prepareFullPreflight") {
+    try {
+      if (!session) {
+        const created = await callOperatorToolForMcp(request, env, "start_workflow_session", { brand_key: brand.brand_key, notes: "MCP full preflight." });
+        session = created.workflow_session_id
+          ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(String(created.workflow_session_id), brand.brand_key).first<Record<string, unknown>>()
+          : null;
+      }
+      const activeSessionId = session?.id ? String(session.id) : null;
+      if (!activeSessionId) {
+        return { ok: false, error: "workflow_session_unavailable", complete: false, sections: [], blockers: ["workflow_session_unavailable"] };
+      }
+      const collectedSections = await Promise.all([
+        collectOperatorPreflightSection(request, env, brand.brand_key, "get_production_board", "production_board", { workflow_session_id: activeSessionId }),
+        collectOperatorPreflightSection(request, env, brand.brand_key, "list_source_candidates", "source_candidates", { limit: 1, offset: 0 }),
+        collectOperatorPreflightSection(request, env, brand.brand_key, "list_strategy_memory", "strategy_memory", { limit: 1, offset: 0 }),
+        collectOperatorPreflightSection(request, env, brand.brand_key, "list_scheduled_posts", "scheduled_posts", { limit: 1, offset: 0 }),
+        collectOperatorPreflightSection(request, env, brand.brand_key, "list_active_gates", "active_gates", {}),
+      ]);
+      const sections = [
+        {
+          section: "operator_precheck",
+          returned_count: 1,
+          total_count: 1,
+          limit: 1,
+          offset: 0,
+          offsets_read: [0],
+          has_more: false,
+          coverage_status: "complete",
+          source: "engineeringPrecheck",
+        },
+        {
+          section: "account_state",
+          returned_count: 1,
+          total_count: 1,
+          limit: 1,
+          offset: 0,
+          offsets_read: [0],
+          has_more: false,
+          coverage_status: "complete",
+          source: "active_operator_session",
+        },
+        ...collectedSections,
+      ];
+      const admission = await callOperatorToolForMcp(request, env, "admit_context", {
+        brand_key: brand.brand_key,
+        workflow_session_id: activeSessionId,
+        admission_scope: "full_preflight",
+        sections,
+        notes: "Server-side MCP full preflight.",
+      });
+      if (!admission.context_admission_id) {
+        return { ok: false, error: "context_admission_failed", workflow_session_id: activeSessionId, complete: false, sections, blockers: ["context_admission_failed"] };
+      }
+      await env.DB.prepare(
+        `UPDATE operator_workflow_sessions SET current_stage = 'context_admission' WHERE id = ? AND brand_key = ?`,
+      ).bind(activeSessionId, brand.brand_key).run();
+      const evaluation = await evaluateOperatorWorkflowRequirements(env, brand, "context_admission", session);
+      return { ok: evaluation.allowed, workflow_session_id: activeSessionId, context_admission_id: admission.context_admission_id, complete: evaluation.allowed, sections, blockers: evaluation.blockers };
+    } catch {
+      return { ok: false, error: "preflight_internal_failure", complete: false, sections: [], blockers: ["preflight_internal_failure"] };
     }
-        const activeSessionId = session?.id ? String(session.id) : null;
-    const sections = [
-      {
-        section: "operator_precheck",
-        returned_count: 1,
-        total_count: 1,
-        limit: 1,
-        offset: 0,
-        offsets_read: [0],
-        has_more: false,
-        coverage_status: "complete",
-        source: "engineeringPrecheck",
-      },
-      await collectOperatorPreflightSection(request, env, brand.brand_key, "get_account_state", "account_state", {}),
-
-      await collectOperatorPreflightSection(request, env, brand.brand_key, "get_production_board", "production_board", { workflow_session_id: activeSessionId ?? undefined }),
-      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_source_candidates", "source_candidates", { limit: 100, offset: 0 }),
-      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_strategy_memory", "strategy_memory", { limit: 100, offset: 0 }),
-      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_scheduled_posts", "scheduled_posts", { limit: 100, offset: 0 }),
-      await collectOperatorPreflightSection(request, env, brand.brand_key, "list_active_gates", "active_gates", {}),
-    ];
-    const admission = await callOperatorToolForMcp(request, env, "admit_context", {
-      brand_key: brand.brand_key,
-      workflow_session_id: activeSessionId,
-      admission_scope: "full_preflight",
-      sections,
-      notes: "Server-side MCP full preflight.",
-    });
-    await env.DB.prepare(
-      `UPDATE operator_workflow_sessions SET current_stage = 'context_admission' WHERE id = ? AND brand_key = ?`,
-    ).bind(activeSessionId, brand.brand_key).run();
-    const evaluation = await evaluateOperatorWorkflowRequirements(env, brand, "context_admission", session);
-    return { ok: evaluation.allowed, workflow_session_id: activeSessionId, context_admission_id: admission.context_admission_id, complete: evaluation.allowed, sections, blockers: evaluation.blockers };
   }
 
   if (toolName === "getWorkflowStatus") {
