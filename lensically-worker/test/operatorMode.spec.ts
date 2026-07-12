@@ -130,11 +130,13 @@ async function resetTables(): Promise<void> {
     "operator_content_inventory",
     "operator_post_metric_snapshots",
     "operator_source_selections",
-    "operator_source_selection_batches",
+        "operator_source_selection_batches",
     "operator_gates",
     "operator_source_cards",
+    "operator_source_card_families",
 
     "operator_production_board_items",
+
     "operator_context_admissions",
     "operator_workflow_sessions",
     "gpt_generation_drafts",
