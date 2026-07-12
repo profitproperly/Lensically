@@ -7517,8 +7517,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
   }
 
-    if (toolName === "get_post_results") {
+      if (toolName === "get_post_results") {
+    await ensureThreadsPostsArchiveTable(env);
     const publishedPostId = normalizeOperatorText(payload.published_post_id, 255);
+
     if (!publishedPostId) {
       return operatorJsonResponse({ success: false, error: "published_post_id is required" }, 400);
     }
