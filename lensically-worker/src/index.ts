@@ -8864,10 +8864,11 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
-    name: "submit_candidate_draft",
+        name: "submit_candidate_draft",
     title: "Submit candidate draft",
-    description: "Use this to save a candidate draft, run gates, persist gate results, and learn whether Lensically says the draft is showable.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id", "text"], additionalProperties: false },
+    description: "Save a candidate draft, record source-contract evidence, run role-aware gates, persist results, and learn whether the draft is showable.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id", "text", "draft_analysis"], additionalProperties: false },
+
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
