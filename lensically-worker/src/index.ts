@@ -6967,9 +6967,61 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         required_workflow: "Use the selected account's saved workflow before creating source cards. Do not create batch or multi-post source cards unless a backend-supported override exists for that account.",
       }, 400);
     }
-    const sourceCardId = crypto.randomUUID();
+        const sourceCardId = crypto.randomUUID();
     const sourceMechanism = normalizeOperatorText(payload.source_mechanism, 4000);
     const requiredProduct = normalizeOperatorText(payload.required_product, 4000);
+    let workflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true);
+    let sequenceLabel = normalizeOperatorText(payload.sequence_label, 120) || `source_card_${Date.now()}`;
+    let primarySource: unknown = payload.primary_source ?? {};
+    let metricsSnapshot: unknown = payload.metrics_snapshot ?? null;
+    let sourceSelectionId: string | null = null;
+
+    if (brand.brand_key === "manifest_mental") {
+      sourceSelectionId = normalizeOperatorText(payload.source_selection_id, 120);
+      if (!sourceSelectionId) {
+        return operatorJsonResponse({ success: false, error: "manifest_source_selection_id_required" }, 400);
+      }
+      const selection = await env.DB.prepare(
+        `SELECT *
+         FROM operator_source_selections
+         WHERE id = ?
+           AND brand_key = ?
+         LIMIT 1`,
+      ).bind(sourceSelectionId, brand.brand_key).first<Record<string, unknown>>();
+      if (!selection) {
+        return operatorJsonResponse({ success: false, error: "source_selection_not_found" }, 404);
+      }
+      if (selection.source_card_id) {
+        return operatorJsonResponse({
+          success: false,
+          error: "source_selection_already_has_source_card",
+          source_card_id: selection.source_card_id,
+        }, 400);
+      }
+      const selectionWorkflowSessionId = String(selection.workflow_session_id ?? "");
+      if (workflowSessionId && workflowSessionId !== selectionWorkflowSessionId) {
+        return operatorJsonResponse({ success: false, error: "source_selection_workflow_mismatch" }, 400);
+      }
+      workflowSessionId = selectionWorkflowSessionId;
+      const sourceSnapshot = safeParseJsonString(String(selection.source_snapshot_json ?? "{}")) ?? {};
+      primarySource = {
+        ...(sourceSnapshot && typeof sourceSnapshot === "object" && !Array.isArray(sourceSnapshot)
+          ? sourceSnapshot as Record<string, unknown>
+          : {}),
+        source_selection_id: sourceSelectionId,
+        source_batch_id: selection.batch_id,
+        draw_order: Number(selection.draw_order ?? 0),
+        source_identity_key: selection.source_identity_key,
+        threads_post_id: selection.threads_post_id ?? null,
+        canonical_source_url: selection.canonical_source_url ?? null,
+      };
+      metricsSnapshot = safeParseJsonString(String(selection.metrics_snapshot_json ?? "{}")) ?? {};
+      sequenceLabel = normalizeOperatorText(payload.sequence_label, 120)
+        || `daily_draw_${String(selection.batch_id ?? "batch")}_slot_${String(selection.draw_order ?? "")}`;
+    } else if (!payload.primary_source || typeof payload.primary_source !== "object" || Array.isArray(payload.primary_source)) {
+      return operatorJsonResponse({ success: false, error: "primary_source is required" }, 400);
+    }
+
     await env.DB.prepare(
       `INSERT INTO operator_source_cards (
         id, brand_key, workflow_session_id, sequence_label, lane_key, title, status,
@@ -6982,14 +7034,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       .bind(
         sourceCardId,
         brand.brand_key,
-        normalizeOperatorText(payload.workflow_session_id, 120, true),
-        normalizeOperatorText(payload.sequence_label, 120) || `source_card_${Date.now()}`,
+        workflowSessionId,
+        sequenceLabel,
         normalizeOperatorMachineKey(payload.lane_key, "") || null,
         normalizeOperatorText(payload.title, 500) || "Source card",
-        normalizeOperatorJson(payload.primary_source, {}),
+        normalizeOperatorJson(primarySource, {}),
         normalizeOperatorJson(payload.secondary_sources, []),
         normalizeOperatorJson(payload.anti_sources, []),
-        normalizeOperatorJson(payload.metrics_snapshot, null),
+        normalizeOperatorJson(metricsSnapshot, null),
         sourceMechanism,
         requiredProduct,
         normalizeOperatorJson(payload.forbidden_surfaces, []),
@@ -7002,16 +7054,31 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         normalizeOperatorMachineKey(payload.created_by, "gpt"),
       )
       .run();
+    if (sourceSelectionId) {
+      await env.DB.prepare(
+        `UPDATE operator_source_selections
+         SET source_card_id = ?
+         WHERE id = ?
+           AND brand_key = ?
+           AND source_card_id IS NULL`,
+      ).bind(sourceCardId, sourceSelectionId, brand.brand_key).run();
+    }
     const card = await getOperatorSourceCard(env, brand.brand_key, sourceCardId);
-    if (payload.workflow_session_id) {
+    if (workflowSessionId) {
       await env.DB.prepare(
         `UPDATE operator_workflow_sessions
          SET active_source_card_id = ?, current_stage = 'source_card'
          WHERE id = ?
            AND brand_key = ?`,
-      ).bind(sourceCardId, String(payload.workflow_session_id), brand.brand_key).run();
+      ).bind(sourceCardId, workflowSessionId, brand.brand_key).run();
     }
-    return operatorJsonResponse({ source_card_id: sourceCardId, status: "draft", validation: validateSourceCardLockable(card ?? {}) });
+    return operatorJsonResponse({
+      source_card_id: sourceCardId,
+      source_selection_id: sourceSelectionId,
+      status: "draft",
+      validation: validateSourceCardLockable(card ?? {}),
+    });
+
   }
 
   if (toolName === "lock_source_card") {
