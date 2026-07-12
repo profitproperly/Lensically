@@ -7216,6 +7216,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     let metricsSnapshot: unknown = payload.metrics_snapshot ?? null;
     let sourceSelectionId: string | null = null;
 
+        let familyId: string | null = null;
+    let versionNumber = 1;
+    let supersedesSourceCardId: string | null = null;
+    let versionReason = normalizeOperatorText(payload.version_reason, 2000, true);
+    const createNewVersion = payload.create_new_version === true;
+    const transformationContract = normalizeSourceTransformationContract(payload.transformation_contract);
+
     if (brand.brand_key === "manifest_mental") {
       sourceSelectionId = normalizeOperatorText(payload.source_selection_id, 120);
       if (!sourceSelectionId) {
@@ -7232,11 +7239,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         return operatorJsonResponse({ success: false, error: "source_selection_not_found" }, 404);
       }
       if (selection.source_card_id) {
+        const linkedCard = await getOperatorSourceCard(env, brand.brand_key, String(selection.source_card_id));
         return operatorJsonResponse({
-          success: false,
-          error: "source_selection_already_has_source_card",
           source_card_id: selection.source_card_id,
-        }, 400);
+          source_selection_id: sourceSelectionId,
+          family_id: linkedCard?.family_id ?? null,
+          version_number: linkedCard?.version_number ?? 1,
+          status: linkedCard?.status ?? "unknown",
+          reused_existing: true,
+          reason: "selection_already_resolved",
+          validation: linkedCard ? validateSourceCardLockable(linkedCard) : null,
+        });
       }
       const selectionWorkflowSessionId = String(selection.workflow_session_id ?? "");
       if (workflowSessionId && workflowSessionId !== selectionWorkflowSessionId) {
@@ -7258,7 +7271,74 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       metricsSnapshot = safeParseJsonString(String(selection.metrics_snapshot_json ?? "{}")) ?? {};
       sequenceLabel = normalizeOperatorText(payload.sequence_label, 120)
         || `daily_draw_${String(selection.batch_id ?? "batch")}_slot_${String(selection.draw_order ?? "")}`;
+
+      const sourceIdentityKey = String(selection.source_identity_key ?? "");
+      let family = await env.DB.prepare(
+        `SELECT *
+         FROM operator_source_card_families
+         WHERE brand_key = ?
+           AND source_identity_key = ?
+         LIMIT 1`,
+      ).bind(brand.brand_key, sourceIdentityKey).first<Record<string, unknown>>();
+      if (!family) {
+        familyId = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO operator_source_card_families (
+            id, brand_key, source_identity_key, source_type, internal_source_id,
+            threads_post_id, canonical_source_url, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
+        ).bind(
+          familyId,
+          brand.brand_key,
+          sourceIdentityKey,
+          String(selection.source_type ?? ""),
+          String(selection.internal_source_id ?? ""),
+          selection.threads_post_id ?? null,
+          selection.canonical_source_url ?? null,
+        ).run();
+        family = { id: familyId, current_source_card_id: null };
+      } else {
+        familyId = String(family.id);
+      }
+
+      const currentCardId = family.current_source_card_id ? String(family.current_source_card_id) : null;
+      const currentCard = currentCardId ? await getOperatorSourceCard(env, brand.brand_key, currentCardId) : null;
+      if (currentCard && !createNewVersion) {
+        await env.DB.prepare(
+          `UPDATE operator_source_selections
+           SET source_card_id = ?
+           WHERE id = ?
+             AND brand_key = ?
+             AND source_card_id IS NULL`,
+        ).bind(currentCard.id, sourceSelectionId, brand.brand_key).run();
+        if (workflowSessionId) {
+          await env.DB.prepare(
+            `UPDATE operator_workflow_sessions
+             SET active_source_card_id = ?, current_stage = 'source_card'
+             WHERE id = ?
+               AND brand_key = ?`,
+          ).bind(currentCard.id, workflowSessionId, brand.brand_key).run();
+        }
+        return operatorJsonResponse({
+          source_card_id: currentCard.id,
+          source_selection_id: sourceSelectionId,
+          family_id: familyId,
+          version_number: currentCard.version_number ?? 1,
+          status: currentCard.status,
+          reused_existing: true,
+          reason: "canonical_source_card_reused",
+          validation: validateSourceCardLockable(currentCard),
+        });
+      }
+      if (currentCard && createNewVersion) {
+        if (!versionReason) {
+          return operatorJsonResponse({ success: false, error: "version_reason_required" }, 400);
+        }
+        supersedesSourceCardId = String(currentCard.id);
+        versionNumber = Number(currentCard.version_number ?? 1) + 1;
+      }
     } else if (!payload.primary_source || typeof payload.primary_source !== "object" || Array.isArray(payload.primary_source)) {
+
       return operatorJsonResponse({ success: false, error: "primary_source is required" }, 400);
     }
 
