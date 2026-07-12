@@ -5489,12 +5489,20 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
       pass_conditions_json TEXT NOT NULL,
       fail_conditions_json TEXT NOT NULL,
       recommended_direction TEXT,
-      context_admission_id TEXT,
+            context_admission_id TEXT,
       created_by TEXT,
+      family_id TEXT,
+      source_selection_id TEXT,
+      version_number INTEGER NOT NULL DEFAULT 1,
+      is_current INTEGER NOT NULL DEFAULT 1,
+      supersedes_source_card_id TEXT,
+      version_reason TEXT,
+      transformation_contract_json TEXT,
       locked_at TEXT,
       invalidated_at TEXT,
       invalidation_reason TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
