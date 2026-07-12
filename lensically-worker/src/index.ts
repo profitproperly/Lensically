@@ -6672,14 +6672,20 @@ async function runOperatorGates(
         || inferRealmEntranceKey(normalizeOperatorText(input.draftAnalysis?.opening_phrase, 240, true) ?? extractOpeningPhrase(draftText));
       const latestRealm = normalizeOperatorMachineKey(latest?.realm_entrance_key, "");
       const candidateOpening = normalizeComparableText(normalizeOperatorText(input.draftAnalysis?.opening_phrase, 240, true) ?? extractOpeningPhrase(draftText) ?? "");
-      const latestOpening = normalizeComparableText(String(latest?.opening_phrase ?? ""));
-      if (candidateRealm && latestRealm && candidateRealm === latestRealm) {
+            const latestOpening = normalizeComparableText(String(latest?.opening_phrase ?? ""));
+      const reusableOpening = Array.from(approvedReusableSurfaces).find((surface) =>
+        Boolean(surface) && (candidateOpening.includes(surface) || normalizedDraft.startsWith(surface)),
+      ) ?? null;
+      if (candidateRealm && latestRealm && candidateRealm === latestRealm && !reusableOpening) {
         results.push(buildGateResult(gate, "fail", "Candidate repeats the latest realm entrance for this account.", { candidate_realm: candidateRealm, latest_inventory_id: latest?.id ?? null }, "Rotate the opener/realm entrance before showing."));
-      } else if (candidateOpening && latestOpening && candidateOpening === latestOpening) {
+      } else if (candidateOpening && latestOpening && candidateOpening === latestOpening && !reusableOpening) {
         results.push(buildGateResult(gate, "fail", "Candidate repeats the latest opening phrase for this account.", { opening_phrase: candidateOpening, latest_inventory_id: latest?.id ?? null }, "Change the opening phrase."));
+      } else if (reusableOpening) {
+        results.push(buildGateResult(gate, "pass", "Opening repetition is explicitly authorized by the active source transformation contract.", { reusable_surface: reusableOpening, latest_inventory_id: latest?.id ?? null }));
       } else {
         results.push(buildGateResult(gate, "pass", "No latest-inventory opening repeat detected."));
       }
+
       continue;
     }
     if (gateKey === "exact_duplicate_gate") {
