@@ -8787,10 +8787,14 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         sequence_label: { type: "string" },
         lane_key: { type: "string" },
                 title: { type: "string" },
-        source_selection_id: { type: "string", description: "Required for Manifest Mental. Links the source card to one persisted random-draw selection and its immutable metric snapshot." },
+                source_selection_id: { type: "string", description: "Required for Manifest Mental. Links the source card to one persisted random-draw selection and its immutable metric snapshot." },
+        create_new_version: { type: "boolean", description: "Default false. Use only when evidence changes the durable interpretation of the source itself; ordinary new payoffs or experiments belong in a new generation run." },
+        version_reason: { type: "string", description: "Required when create_new_version=true. Explains why the canonical source interpretation changed." },
+        transformation_contract: SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
         primary_source: { type: "object", additionalProperties: true },
 
         secondary_sources: { type: "array", items: { type: "object", additionalProperties: true } },
+
         anti_sources: { type: "array", items: { type: "object", additionalProperties: true } },
         metrics_snapshot: { type: "object", additionalProperties: true },
         source_mechanism: { type: "string" },
