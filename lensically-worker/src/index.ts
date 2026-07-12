@@ -6140,8 +6140,25 @@ function validateSourceCardLockable(card: Record<string, unknown>): { can_lock: 
       missing.push(field);
     }
   }
-  return { can_lock: missing.length === 0, missing_fields: missing };
+  if (card.brand_key === "manifest_mental") {
+    const contract = normalizeSourceTransformationContract(card.transformation_contract);
+    const preserveExact = contract.must_preserve_exact as string[];
+    const preserveFunction = contract.must_preserve_function as string[];
+    const mayReuse = contract.may_reuse as string[];
+    const shouldTransform = contract.should_transform as unknown[];
+    const mustTransform = contract.must_transform as unknown[];
+    const audienceReward = normalizeOperatorText(contract.audience_reward, 2000, true);
+    if (!audienceReward) missing.push("transformation_contract.audience_reward");
+    if (preserveExact.length + preserveFunction.length + mayReuse.length === 0) {
+      missing.push("transformation_contract.preservation_rules");
+    }
+    if (shouldTransform.length + mustTransform.length === 0) {
+      missing.push("transformation_contract.transformation_rules");
+    }
+  }
+  return { can_lock: missing.length === 0, missing_fields: Array.from(new Set(missing)) };
 }
+
 
 async function listOperatorGates(
   env: Env,
