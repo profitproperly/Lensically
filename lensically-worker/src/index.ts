@@ -7446,13 +7446,26 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!batch) {
       return operatorJsonResponse({ success: false, error: "source_batch_not_found" }, 404);
     }
-    const rows = await env.DB.prepare(
-      `SELECT *
-       FROM operator_source_selections
-       WHERE batch_id = ?
-         AND brand_key = ?
-       ORDER BY draw_order ASC`,
+        const rows = await env.DB.prepare(
+      `SELECT
+         s.*,
+         f.id AS canonical_family_id,
+         f.current_source_card_id AS canonical_source_card_id,
+         c.version_number AS canonical_source_card_version,
+         c.status AS canonical_source_card_status
+       FROM operator_source_selections s
+       LEFT JOIN operator_source_card_families f
+         ON f.brand_key = s.brand_key
+        AND f.source_identity_key = s.source_identity_key
+        AND f.status = 'active'
+       LEFT JOIN operator_source_cards c
+         ON c.id = f.current_source_card_id
+        AND c.brand_key = s.brand_key
+       WHERE s.batch_id = ?
+         AND s.brand_key = ?
+       ORDER BY s.draw_order ASC`,
     ).bind(batchId, brand.brand_key).all<Record<string, unknown>>();
+
     return operatorJsonResponse({
       source_batch: {
         ...batch,
