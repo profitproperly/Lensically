@@ -7484,8 +7484,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         original_posted_at: row.original_posted_at ?? null,
         metrics_snapshot: safeParseJsonString(String(row.metrics_snapshot_json ?? "{}")) ?? {},
         source_snapshot: safeParseJsonString(String(row.source_snapshot_json ?? "{}")) ?? {},
-        source_card_id: row.source_card_id ?? null,
+                source_card_id: row.source_card_id ?? null,
+        canonical_family_id: row.canonical_family_id ?? null,
+        canonical_source_card_id: row.canonical_source_card_id ?? null,
+        canonical_source_card_version: row.canonical_source_card_version === null || row.canonical_source_card_version === undefined
+          ? null
+          : Number(row.canonical_source_card_version),
+        canonical_source_card_status: row.canonical_source_card_status ?? null,
         selected_at: row.selected_at,
+
       })),
     });
   }
