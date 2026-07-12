@@ -8776,7 +8776,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "create_source_card",
     title: "Create source card",
-    description: "Use this to create a structured source card that preserves source mechanism, required product, forbidden surfaces, pass conditions, and fail conditions before serious generation. Manifest source cards must use a persisted source_selection_id from the daily random draw.",
+        description: "Create or resolve a canonical structured source card. Manifest selections automatically reuse the current card for the same stable Threads source. Set create_new_version=true with version_reason only when the source interpretation itself changes. Manifest cards require a role-aware transformation_contract before lock.",
+
 
     inputSchema: {
       type: "object",
