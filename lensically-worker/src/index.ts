@@ -6537,7 +6537,107 @@ async function runOperatorGates(
       results.push(buildGateResult(gate, locked ? "pass" : "fail", locked ? "Source card is locked." : "Source card is not locked.", { source_card_status: sourceCard?.status ?? null }, "Lock the source card before showing drafts."));
       continue;
     }
+        if (gateKey === "source_transformation_contract_gate") {
+      const preservedFunctions = new Set(
+        normalizeSourceContractStringList(input.draftAnalysis?.preserved_functions)
+          .map((item) => normalizeComparableText(item)),
+      );
+      const transformedElements = new Set(
+        normalizeSourceContractStringList(input.draftAnalysis?.transformed_elements)
+          .map((item) => normalizeComparableText(item)),
+      );
+      const satisfiedTimeRequirements = new Set(
+        normalizeSourceContractStringList(input.draftAnalysis?.satisfied_time_or_context_requirements)
+          .map((item) => normalizeComparableText(item)),
+      );
+      const missingExact = mustPreserveExact.filter((surface) => {
+        const normalizedSurface = normalizeComparableText(surface);
+        return normalizedSurface && !normalizedDraft.includes(normalizedSurface);
+      });
+      const requiredFunctions = sourceContract.must_preserve_function as string[];
+      const missingFunctions = requiredFunctions.filter((requirement) => !preservedFunctions.has(normalizeComparableText(requirement)));
+      const requiredTime = sourceContract.time_or_context_requirements as string[];
+      const missingTime = requiredTime.filter((requirement) => !satisfiedTimeRequirements.has(normalizeComparableText(requirement)));
+      const copiedTransformTargets: string[] = [];
+      const undeclaredTransformRoles: string[] = [];
+      for (const item of sourceContract.must_transform as unknown[]) {
+        const sourceText = sourceContractItemText(item);
+        if (sourceText) {
+          const normalizedSourceText = normalizeComparableText(sourceText);
+          if (normalizedSourceText && normalizedDraft.includes(normalizedSourceText)) {
+            copiedTransformTargets.push(sourceText);
+          }
+        }
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          const record = item as Record<string, unknown>;
+          const role = normalizeOperatorText(record.role, 240, true);
+          if (role && !transformedElements.has(normalizeComparableText(role))) {
+            undeclaredTransformRoles.push(role);
+          }
+        }
+      }
+      const prohibitedPackages: Array<Record<string, unknown>> = [];
+      for (const combination of sourceContract.forbidden_complete_combinations as Array<Record<string, unknown>>) {
+        const surfaces = Array.isArray(combination.surfaces) ? combination.surfaces as unknown[] : [];
+        const matched = surfaces
+          .map((surface) => typeof surface === "string" ? surface : "")
+          .filter((surface) => {
+            const normalizedSurface = normalizeComparableText(surface);
+            return normalizedSurface && normalizedDraft.includes(normalizedSurface);
+          });
+        const minMatches = Math.max(2, Number(combination.min_matches ?? surfaces.length));
+        if (matched.length >= minMatches) {
+          prohibitedPackages.push({ matched_surfaces: matched, min_matches: minMatches, rationale: combination.rationale ?? null });
+        }
+      }
+      const copiedShouldTransform = (sourceContract.should_transform as unknown[])
+        .map((item) => sourceContractItemText(item))
+        .filter((item): item is string => Boolean(item))
+        .filter((surface) => {
+          const normalizedSurface = normalizeComparableText(surface);
+          return normalizedSurface && normalizedDraft.includes(normalizedSurface);
+        });
+      const audienceRewardRequired = Boolean(normalizeOperatorText(sourceContract.audience_reward, 2000, true));
+      const audienceRewardDelivered = input.draftAnalysis?.audience_reward_delivered === true;
+      const failures = {
+        missing_exact_surfaces: missingExact,
+        missing_preserved_functions: missingFunctions,
+        missing_time_or_context_requirements: missingTime,
+        copied_must_transform_surfaces: copiedTransformTargets,
+        undeclared_transformed_roles: undeclaredTransformRoles,
+        prohibited_complete_packages: prohibitedPackages,
+        audience_reward_missing: audienceRewardRequired && !audienceRewardDelivered,
+      };
+      const hasFailure = missingExact.length > 0
+        || missingFunctions.length > 0
+        || missingTime.length > 0
+        || copiedTransformTargets.length > 0
+        || undeclaredTransformRoles.length > 0
+        || prohibitedPackages.length > 0
+        || (audienceRewardRequired && !audienceRewardDelivered);
+      if (hasFailure) {
+        results.push(buildGateResult(
+          gate,
+          "fail",
+          "Draft does not satisfy the active source transformation contract.",
+          failures,
+          "Preserve approved exact hooks/functions, declare satisfied semantic requirements, transform designated elements, deliver the audience reward, and avoid the prohibited full source package.",
+        ));
+      } else if (copiedShouldTransform.length) {
+        results.push(buildGateResult(
+          gate,
+          "pass_with_caution",
+          "Required transformation rules pass, but a should-transform surface remains close to the source.",
+          { copied_should_transform_surfaces: copiedShouldTransform },
+          "Consider changing the optional source surface unless retaining it is deliberate.",
+        ));
+      } else {
+        results.push(buildGateResult(gate, "pass", "Draft satisfies the active source transformation contract."));
+      }
+      continue;
+    }
     if (gateKey === "source_surface_copy_gate") {
+
       const forbidden = Array.isArray(sourceCard?.forbidden_surfaces) ? sourceCard?.forbidden_surfaces as unknown[] : [];
       let copied: string | null = null;
       let cautious: string | null = null;
