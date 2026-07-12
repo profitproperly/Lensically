@@ -7433,12 +7433,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            AND brand_key = ?`,
       ).bind(sourceCardId, workflowSessionId, brand.brand_key).run();
     }
-    return operatorJsonResponse({
+        return operatorJsonResponse({
       source_card_id: sourceCardId,
       source_selection_id: sourceSelectionId,
+      family_id: familyId,
+      version_number: versionNumber,
+      supersedes_source_card_id: supersedesSourceCardId,
       status: "draft",
+      reused_existing: false,
       validation: validateSourceCardLockable(card ?? {}),
     });
+
 
   }
 
