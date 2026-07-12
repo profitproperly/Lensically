@@ -8370,7 +8370,42 @@ const BRAND_KEY_SCHEMA = {
   description: "Lensically account key. Required for account-scoped tools. Safe aliases are accepted for accounts whose canonical keys may be blocked by client preflight.",
 };
 
+const SOURCE_TRANSFORMATION_CONTRACT_SCHEMA = {
+  type: "object",
+  description: "Role-aware source adaptation contract. Manifest cards must define the audience reward, preservation/reuse rules, and transformation rules before lock.",
+  properties: {
+    must_preserve_exact: { type: "array", items: { type: "string" }, description: "Exact hook or surface text that must remain in generated drafts." },
+    must_preserve_function: { type: "array", items: { type: "string" }, description: "Semantic functions that must survive even when wording changes." },
+    may_reuse: { type: "array", items: { type: "string" }, description: "Recognizable source surfaces explicitly allowed to recur." },
+    should_transform: { type: "array", items: {}, description: "Source elements that should usually change but may pass with caution when deliberately retained." },
+    must_transform: { type: "array", items: {}, description: "Source phrases or role objects that must change. Objects may use source_text, role, and instruction." },
+    forbidden_complete_combinations: { type: "array", items: {}, description: "Surface combinations that may be individually reusable but cannot be reproduced together as the complete source package." },
+    audience_reward: { type: "string", description: "The emotional or practical product the adapted post must deliver to the reader." },
+    time_or_context_requirements: { type: "array", items: { type: "string" }, description: "Timing, month, context, or situational requirements that must remain functionally present." },
+    notes: { type: "string" },
+  },
+  additionalProperties: false,
+};
+
+const GENERATION_ADAPTATION_PLAN_SCHEMA = {
+  type: "object",
+  description: "Structured plan for one new use of a canonical source card. Manifest runs require adaptation_goal.",
+  properties: {
+    adaptation_goal: { type: "string" },
+    retained_exact_surfaces: { type: "array", items: { type: "string" } },
+    preserved_functions: { type: "array", items: { type: "string" } },
+    transformed_elements: { type: "array", items: { type: "string" } },
+    payoff_choice: { type: "string" },
+    time_or_context_choice: { type: "string" },
+    closing_choice: { type: "string" },
+    experiment_notes: { type: "string" },
+    intentionally_different_from_prior: { type: "string" },
+  },
+  additionalProperties: false,
+};
+
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
+
   "selectOperatorKey",
   "confirmOperatorProceed",
   "getMcpAdminState",
