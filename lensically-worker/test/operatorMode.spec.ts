@@ -179,20 +179,62 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
     brand_key: brandKey,
   });
 
-  await operatorTool("admit_context", {
+    await operatorTool("admit_context", {
         brand_key: brandKey,
     workflow_session_id: session.workflow_session_id,
     admission_scope: "source_card_selection",
     sections: [{ section: "archive_top", returned_count: 1, total_count: 1, limit: 1, offset: 0, source: "existing_db" }],
   });
+  let sourceSelectionId: string | undefined;
+  if (brandKey === "manifest_mental") {
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS external_patterns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        app_user_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'threads',
+        source_url TEXT NOT NULL,
+        post_id TEXT,
+        post_text TEXT NOT NULL,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        views INTEGER,
+        posted_at TEXT,
+        capture_confidence TEXT NOT NULL DEFAULT 'high',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    for (let index = 1; index <= 24; index += 1) {
+      await env.DB.prepare(
+        `INSERT INTO external_patterns (
+          app_user_id, account_id, platform, source_url, post_id, post_text,
+          likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+        ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, ?, 1, 1, 0, 10000, '2026-07-11T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+      ).bind(
+        `https://www.threads.com/@fixture/post/helper-${index}`,
+        `helper-${index}`,
+        `Manifest helper source ${index}`,
+        1000 + index,
+      ).run();
+    }
+    const draw = await operatorTool<{ selections: Array<{ source_selection_id: string }> }>("draw_source_candidate_batch", {
+      brand_key: brandKey,
+      workflow_session_id: session.workflow_session_id,
+    });
+    sourceSelectionId = draw.selections[0]?.source_selection_id;
+  }
   const card = await operatorTool<{ source_card_id: string }>("create_source_card", {
     brand_key: brandKey,
 
     workflow_session_id: session.workflow_session_id,
+    source_selection_id: sourceSelectionId,
     sequence_label: "source_card_test_001",
     lane_key: "systems",
     title: "Systems source card",
     primary_source: { source_type: "archive_post", source_id: "archive-1", text: "A system makes the work easier." },
+
     secondary_sources: [],
     anti_sources: [],
     metrics_snapshot: { views: 100, likes: 10 },
