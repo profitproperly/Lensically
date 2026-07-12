@@ -7517,9 +7517,164 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
   }
 
-  if (toolName === "get_post_results") {
-    return operatorJsonResponse({ post: null, metrics: null, linked_draft_id: null, linked_source_card_id: null, warning: "post result linking is not implemented in v1" });
+    if (toolName === "get_post_results") {
+    const publishedPostId = normalizeOperatorText(payload.published_post_id, 255);
+    if (!publishedPostId) {
+      return operatorJsonResponse({ success: false, error: "published_post_id is required" }, 400);
+    }
+    const scheduled = await env.DB.prepare(
+      `SELECT
+         s.id AS scheduled_post_id,
+         s.post_text,
+         s.status AS scheduled_status,
+         s.scheduled_time,
+         s.published_at,
+         s.published_post_id,
+         d.id AS draft_id,
+         d.run_id,
+         d.source_card_id,
+         d.status AS draft_status
+       FROM scheduled_posts s
+       LEFT JOIN gpt_generation_drafts d
+         ON d.scheduled_post_id = s.id
+        AND d.account_id = ?
+       WHERE s.threads_user_id = ?
+         AND s.published_post_id = ?
+       ORDER BY s.id DESC
+       LIMIT 1`,
+    ).bind(brand.account_id, brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>();
+
+    const draftFallback = scheduled ? null : await env.DB.prepare(
+      `SELECT id AS draft_id, run_id, source_card_id, status AS draft_status, scheduled_post_id, published_post_id
+       FROM gpt_generation_drafts
+       WHERE account_id = ?
+         AND threads_user_id = ?
+         AND published_post_id = ?
+       ORDER BY datetime(updated_at) DESC
+       LIMIT 1`,
+    ).bind(brand.account_id, brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>();
+    const lineageRow = scheduled ?? draftFallback;
+
+    const archivePost = await env.DB.prepare(
+      `SELECT post_id, post_text, post_timestamp, post_permalink, post_username,
+              views, likes, replies, reposts, quotes, shares, engagement_total,
+              first_seen_at, last_seen_at, last_synced_at
+       FROM threads_posts_archive
+       WHERE threads_user_id = ?
+         AND post_id = ?
+       LIMIT 1`,
+    ).bind(brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>();
+
+    const sourceCardId = lineageRow?.source_card_id ? String(lineageRow.source_card_id) : null;
+    const sourceCard = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
+    const sourceSelection = sourceCardId
+      ? await env.DB.prepare(
+        `SELECT *
+         FROM operator_source_selections
+         WHERE brand_key = ?
+           AND source_card_id = ?
+         LIMIT 1`,
+      ).bind(brand.brand_key, sourceCardId).first<Record<string, unknown>>()
+      : null;
+
+    const metrics = archivePost ? {
+      views: Number(archivePost.views ?? 0),
+      likes: Number(archivePost.likes ?? 0),
+      replies: Number(archivePost.replies ?? 0),
+      reposts: Number(archivePost.reposts ?? 0),
+      quotes: Number(archivePost.quotes ?? 0),
+      shares: Number(archivePost.shares ?? 0),
+      engagement_total: Number(archivePost.engagement_total ?? 0),
+      captured_at: archivePost.last_synced_at ?? new Date().toISOString(),
+    } : null;
+
+    if (metrics) {
+      const serializedMetrics = normalizeOperatorJson(metrics, {});
+      const latestSnapshot = await env.DB.prepare(
+        `SELECT metrics_json
+         FROM operator_post_metric_snapshots
+         WHERE brand_key = ?
+           AND published_post_id = ?
+         ORDER BY datetime(captured_at) DESC, datetime(created_at) DESC
+         LIMIT 1`,
+      ).bind(brand.brand_key, publishedPostId).first<{ metrics_json: string }>();
+      if (latestSnapshot?.metrics_json !== serializedMetrics) {
+        await env.DB.prepare(
+          `INSERT INTO operator_post_metric_snapshots (
+            id, brand_key, published_post_id, scheduled_post_id, draft_id,
+            source_card_id, source_selection_id, metrics_json, captured_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(),
+          brand.brand_key,
+          publishedPostId,
+          lineageRow?.scheduled_post_id === null || lineageRow?.scheduled_post_id === undefined
+            ? null
+            : Number(lineageRow.scheduled_post_id),
+          lineageRow?.draft_id ? String(lineageRow.draft_id) : null,
+          sourceCardId,
+          sourceSelection?.id ? String(sourceSelection.id) : null,
+          serializedMetrics,
+          String(metrics.captured_at),
+        ).run();
+      }
+    }
+
+    const includeHistory = payload.include_history === true;
+    const history = includeHistory
+      ? await env.DB.prepare(
+        `SELECT metrics_json, captured_at
+         FROM operator_post_metric_snapshots
+         WHERE brand_key = ?
+           AND published_post_id = ?
+         ORDER BY datetime(captured_at) ASC, datetime(created_at) ASC`,
+      ).bind(brand.brand_key, publishedPostId).all<Record<string, unknown>>()
+      : { results: [] as Record<string, unknown>[] };
+
+    return operatorJsonResponse({
+      post: archivePost ? {
+        published_post_id: publishedPostId,
+        text: archivePost.post_text ?? lineageRow?.post_text ?? null,
+        posted_at: archivePost.post_timestamp ?? lineageRow?.published_at ?? null,
+        permalink: archivePost.post_permalink ?? null,
+        username: archivePost.post_username ?? null,
+      } : scheduled ? {
+        published_post_id: publishedPostId,
+        text: scheduled.post_text ?? null,
+        posted_at: scheduled.published_at ?? null,
+        permalink: null,
+        username: null,
+      } : null,
+      metrics,
+      lineage: {
+        source_selection_id: sourceSelection?.id ?? null,
+        source_batch_id: sourceSelection?.batch_id ?? null,
+        source_identity_key: sourceSelection?.source_identity_key ?? null,
+        source_card_id: sourceCardId,
+        generation_run_id: lineageRow?.run_id ?? null,
+        draft_id: lineageRow?.draft_id ?? null,
+        scheduled_post_id: lineageRow?.scheduled_post_id ?? null,
+        published_post_id: publishedPostId,
+      },
+      source_selection: sourceSelection ? {
+        id: sourceSelection.id,
+        batch_id: sourceSelection.batch_id,
+        draw_order: Number(sourceSelection.draw_order ?? 0),
+        source_identity_key: sourceSelection.source_identity_key,
+        threads_post_id: sourceSelection.threads_post_id ?? null,
+        canonical_source_url: sourceSelection.canonical_source_url ?? null,
+        metrics_snapshot: safeParseJsonString(String(sourceSelection.metrics_snapshot_json ?? "{}")) ?? {},
+        selected_at: sourceSelection.selected_at,
+      } : null,
+      source_card: sourceCard,
+      metric_history: (history.results ?? []).map((row) => ({
+        metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
+        captured_at: row.captured_at,
+      })),
+      warning: archivePost ? null : "Published post lineage was found, but synced Threads metrics are not available yet.",
+    });
   }
+
 
   return operatorJsonResponse({ success: false, error: "unknown_operator_tool", tool_name: toolName }, 404);
 }
