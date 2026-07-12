@@ -5243,13 +5243,86 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_production_board_brand_status
      ON operator_production_board_items (brand_key, status, priority ASC, updated_at DESC)`,
   ).run();
 
   await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_source_selection_batches (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT NOT NULL,
+      selection_method TEXT NOT NULL,
+      eligibility_min_likes INTEGER NOT NULL,
+      qualified_pool_count INTEGER NOT NULL,
+      requested_count INTEGER NOT NULL,
+      selected_count INTEGER NOT NULL,
+      selected_at TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_selection_batches_brand_created
+     ON operator_source_selection_batches (brand_key, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_source_selections (
+      id TEXT PRIMARY KEY,
+      batch_id TEXT NOT NULL,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT NOT NULL,
+      draw_order INTEGER NOT NULL,
+      source_identity_key TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      internal_source_id TEXT NOT NULL,
+      threads_post_id TEXT,
+      canonical_source_url TEXT,
+      post_text TEXT NOT NULL,
+      original_posted_at TEXT,
+      metrics_snapshot_json TEXT NOT NULL,
+      source_snapshot_json TEXT NOT NULL,
+      source_card_id TEXT,
+      selected_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (batch_id) REFERENCES operator_source_selection_batches(id) ON DELETE CASCADE,
+      UNIQUE(batch_id, draw_order),
+      UNIQUE(batch_id, source_identity_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_selections_batch_order
+     ON operator_source_selections (batch_id, draw_order ASC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_selections_source_card
+     ON operator_source_selections (source_card_id)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_post_metric_snapshots (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      published_post_id TEXT NOT NULL,
+      scheduled_post_id INTEGER,
+      draft_id TEXT,
+      source_card_id TEXT,
+      source_selection_id TEXT,
+      metrics_json TEXT NOT NULL,
+      captured_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_post_metric_snapshots_post_captured
+     ON operator_post_metric_snapshots (brand_key, published_post_id, captured_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_source_cards (
+
       id TEXT PRIMARY KEY,
       brand_key TEXT NOT NULL,
       workflow_session_id TEXT,
