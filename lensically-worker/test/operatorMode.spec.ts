@@ -239,8 +239,14 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
 
     secondary_sources: [],
     anti_sources: [],
-    metrics_snapshot: { views: 100, likes: 10 },
+        metrics_snapshot: { views: 100, likes: 10 },
+    transformation_contract: brandKey === "manifest_mental" ? {
+      may_reuse: ["A system"],
+      must_transform: ["A system makes the work easier."],
+      audience_reward: "A concrete operator benefit.",
+    } : undefined,
     source_mechanism: "Turn operational complexity into a clean system advantage.",
+
     required_product: "A clear operator benefit that feels concrete.",
     forbidden_surfaces: forbiddenSurfaces,
     danger_surfaces: [],
