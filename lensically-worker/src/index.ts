@@ -10054,9 +10054,12 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       selected_key: brandKey,
       tool_count: toolCount,
       account_data_loaded: false,
-      proceed_required: true,
+            proceed_required: true,
+      collaboration_contract_version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
+      startup_contract_required: true,
       handshake,
       response_text: handshake.join("\n"),
+
     };
   }
 
