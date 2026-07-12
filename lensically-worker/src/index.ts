@@ -4165,11 +4165,18 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
      ON external_patterns (app_user_id, account_id, likes DESC, views DESC, updated_at DESC, id DESC)`,
   ).run();
 
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_external_patterns_user_account_source
      ON external_patterns (app_user_id, account_id, source_url)`,
   ).run();
+
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_external_patterns_user_account_post
+     ON external_patterns (app_user_id, account_id, platform, post_id)
+     WHERE post_id IS NOT NULL AND trim(post_id) <> ''`,
+  ).run();
 }
+
 
 async function ensureGptStrategyMemoryTable(env: Env): Promise<void> {
   await env.DB.prepare(
