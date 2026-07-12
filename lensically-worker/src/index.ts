@@ -4091,7 +4091,7 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
     )`,
   ).run();
 
-  const tableInfo = await env.DB.prepare("PRAGMA table_info(external_patterns)").all<{ name: string }>();
+    const tableInfo = await env.DB.prepare("PRAGMA table_info(external_patterns)").all<{ name: string }>();
   const hasAccountId = (tableInfo.results ?? []).some((column) => column.name === "account_id");
   if (!hasAccountId) {
     await env.DB.prepare(
@@ -4099,9 +4099,64 @@ async function ensureExternalPatternsTable(env: Env): Promise<void> {
        ADD COLUMN account_id TEXT NOT NULL DEFAULT 'manifest-mental'`,
     ).run();
   }
+  await addColumnIfMissing(env, "external_patterns", "post_id", "TEXT");
+
+  const duplicatePostIds = await env.DB.prepare(
+    `SELECT app_user_id, account_id, platform, post_id, MIN(id) AS stable_id, MAX(id) AS latest_id, COUNT(*) AS total
+     FROM external_patterns
+     WHERE post_id IS NOT NULL
+       AND trim(post_id) <> ''
+     GROUP BY app_user_id, account_id, platform, post_id
+     HAVING COUNT(*) > 1`,
+  ).all<Record<string, unknown>>();
+  for (const duplicate of duplicatePostIds.results ?? []) {
+    const stableId = Number(duplicate.stable_id ?? 0);
+    const latestId = Number(duplicate.latest_id ?? 0);
+    if (!stableId || !latestId) {
+      continue;
+    }
+    if (stableId !== latestId) {
+      await env.DB.prepare(
+        `UPDATE external_patterns
+         SET platform = latest.platform,
+             source_url = latest.source_url,
+             post_id = latest.post_id,
+             author_handle = latest.author_handle,
+             author_display_name = latest.author_display_name,
+             post_text = latest.post_text,
+             likes = latest.likes,
+             replies = latest.replies,
+             reposts = latest.reposts,
+             shares = latest.shares,
+             views = latest.views,
+             posted_at = latest.posted_at,
+             capture_confidence = latest.capture_confidence,
+             raw_payload = latest.raw_payload,
+             updated_at = latest.updated_at
+         FROM external_patterns AS latest
+         WHERE external_patterns.id = ?
+           AND latest.id = ?`,
+      ).bind(stableId, latestId).run();
+    }
+    await env.DB.prepare(
+      `DELETE FROM external_patterns
+       WHERE app_user_id = ?
+         AND account_id = ?
+         AND platform = ?
+         AND post_id = ?
+         AND id <> ?`,
+    ).bind(
+      String(duplicate.app_user_id ?? ""),
+      String(duplicate.account_id ?? ""),
+      String(duplicate.platform ?? "threads"),
+      String(duplicate.post_id ?? ""),
+      stableId,
+    ).run();
+  }
 
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_updated
+
      ON external_patterns (app_user_id, account_id, updated_at DESC, id DESC)`,
   ).run();
 
