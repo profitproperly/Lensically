@@ -311,6 +311,10 @@ const VECTRIX_AGENT_SCHEDULE_SLOTS = Array.from(
   (_, hour) => `${hour.toString().padStart(2, "0")}:00`,
 );
 
+const MANIFEST_SOURCE_MIN_VERIFIED_LIKES = 1000;
+const MANIFEST_DAILY_SOURCE_DRAW_SIZE = 24;
+
+
 const VECTRIX_AGENT_CONTENT_BRIEF = [
   "Create posts for Vectrix about making money online, building wealth, becoming financially free,",
   "digital leverage, online business systems, monetizable skills, disciplined investing, and long-term cash-flow thinking.",
