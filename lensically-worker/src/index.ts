@@ -313,9 +313,49 @@ const VECTRIX_AGENT_SCHEDULE_SLOTS = Array.from(
 
 const MANIFEST_SOURCE_MIN_VERIFIED_LIKES = 1000;
 const MANIFEST_DAILY_SOURCE_DRAW_SIZE = 24;
+const OPERATOR_COLLABORATION_CONTRACT_VERSION = "operator-collaboration-v1";
+const SOURCE_TRANSFORMATION_CONTRACT_VERSION = "source-transformation-v1";
 
+const OPERATOR_SYSTEM_LAYER_GLOSSARY = [
+  { key: "backend_behavior", label: "Backend behavior", purpose: "Server-enforced acceptance, rejection, creation, linking, and mutation rules." },
+  { key: "workflow_requirement", label: "Workflow requirement", purpose: "Required stages, ordering, completion rules, and advancement blockers." },
+  { key: "mcp_contract", label: "MCP contract", purpose: "Tool schemas, descriptions, required inputs, and model-facing operation instructions." },
+  { key: "data_model", label: "Data model", purpose: "Durable records, identities, versions, relationships, and immutable snapshots." },
+  { key: "gate_evaluator", label: "Gate/evaluator", purpose: "Automated checks that pass, warn, or block workflow output." },
+  { key: "regression_test", label: "Regression test", purpose: "Executable evidence that a durable rule cannot casually disappear." },
+  { key: "startup_contract", label: "Startup/collaboration contract", purpose: "Fresh-chat operating behavior, context-loading, independent judgment, and owner reporting." },
+  { key: "supporting_memory", label: "Supporting memory", purpose: "Secondary explanation, rationale, and operational history; never the sole enforcement layer." },
+] as const;
+
+const OPERATOR_COLLABORATION_CONTRACT = {
+  version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
+  working_relationship: "Owner-directed, independent technical and strategic partnership.",
+  principles: [
+    "Load canonical startup context before Lensically engineering, admin, workflow, or account work.",
+    "Inspect existing architecture, history, and evidence before proposing or changing behavior.",
+    "Give independent judgment, risks, edge cases, and better alternatives instead of agreeing automatically.",
+    "The owner makes final decisions; stop before implementation whenever the owner asks to discuss design first.",
+    "Prefer backend, workflow, schema, gate, data-model, and test enforcement over memory-only instructions.",
+    "Reuse and extend completed work instead of rebuilding or silently overwriting it.",
+    "Separate verified facts, recommendations, assumptions, unresolved decisions, and completed implementation.",
+    "Reduce wasted motion and rediscovery without reducing the care or depth of the reasoning.",
+  ],
+  durable_change_reporting: {
+    required_fields: [
+      "change_name",
+      "primary_system_layer",
+      "additional_system_layers",
+      "scope_universal_or_account_scoped",
+      "survives_new_chats_because",
+      "secondary_records",
+    ],
+    instruction: "Periodically name durable changes in owner-facing language so the owner can understand, reference, and resume the architecture without ambiguity.",
+  },
+  system_layers: OPERATOR_SYSTEM_LAYER_GLOSSARY,
+};
 
 const VECTRIX_AGENT_CONTENT_BRIEF = [
+
   "Create posts for Vectrix about making money online, building wealth, becoming financially free,",
   "digital leverage, online business systems, monetizable skills, disciplined investing, and long-term cash-flow thinking.",
   "Keep the angle practical, specific, and operator-minded. Avoid fake income claims, guaranteed results, scams,",
