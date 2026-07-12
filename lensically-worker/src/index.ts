@@ -5355,7 +5355,24 @@ function sourceContractItemText(item: unknown): string | null {
   return normalizeOperatorText(record.source_text ?? record.text, 1000, true);
 }
 
+function normalizeGenerationAdaptationPlan(value: unknown): Record<string, unknown> {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  return {
+    retained_exact_surfaces: normalizeSourceContractStringList(record.retained_exact_surfaces),
+    preserved_functions: normalizeSourceContractStringList(record.preserved_functions),
+    transformed_elements: normalizeSourceContractStringList(record.transformed_elements),
+    payoff_choice: normalizeOperatorText(record.payoff_choice, 1500, true),
+    time_or_context_choice: normalizeOperatorText(record.time_or_context_choice, 1000, true),
+    closing_choice: normalizeOperatorText(record.closing_choice, 1000, true),
+    experiment_notes: normalizeOperatorText(record.experiment_notes, 2000, true),
+    intentionally_different_from_prior: normalizeOperatorText(record.intentionally_different_from_prior, 2000, true),
+  };
+}
+
 function normalizeComparableText(value: string): string {
+
 
   return value
     .toLowerCase()
