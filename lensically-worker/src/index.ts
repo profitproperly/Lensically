@@ -7708,7 +7708,16 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            AND brand_key = ?`,
       ).bind(runId, card.workflow_session_id, brand.brand_key).run();
     }
-    return operatorJsonResponse({ run_id: runId, source_card_id: sourceCardId, status: "drafted" });
+        return operatorJsonResponse({
+      run_id: runId,
+      source_card_id: sourceCardId,
+      source_card_family_id: card.family_id ?? null,
+      source_card_version_number: Number(card.version_number ?? 1),
+      adaptation_plan: adaptationPlan,
+      prior_adaptation_context: priorAdaptationContext,
+      status: "drafted",
+    });
+
   }
 
   if (toolName === "run_gates") {
