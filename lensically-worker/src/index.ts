@@ -7661,22 +7661,45 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!card || card.status !== "locked") {
       return operatorJsonResponse({ success: false, error: "locked_source_card_required" }, 400);
     }
+        const adaptationPlan = normalizeGenerationAdaptationPlan(payload.adaptation_plan);
+    if (brand.brand_key === "manifest_mental" && !normalizeOperatorText(adaptationPlan.adaptation_goal, 1500, true)) {
+      return operatorJsonResponse({ success: false, error: "manifest_adaptation_goal_required" }, 400);
+    }
+    const canonicalContext = await getOperatorSourceCardHistory(env, brand, card);
+    const priorAdaptationContext = {
+      family: canonicalContext.family ?? null,
+      versions: canonicalContext.versions ?? [],
+      prior_runs: Array.isArray(canonicalContext.adaptation_history)
+        ? (canonicalContext.adaptation_history as unknown[]).slice(-24)
+        : [],
+    };
     const runId = crypto.randomUUID();
     await env.DB.prepare(
       `INSERT INTO gpt_generation_runs (
-        id, account_id, threads_user_id, source_card_id, objective, prompt_summary, status, metadata_json
-      ) VALUES (?, ?, ?, ?, ?, ?, 'drafted', ?)`,
+        id, account_id, threads_user_id, source_card_id, source_card_family_id,
+        source_card_version_number, adaptation_plan_json, prior_adaptation_context_json,
+        objective, prompt_summary, status, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'drafted', ?)`,
     )
       .bind(
         runId,
         brand.account_id,
         brand.profile.threads_user_id,
         sourceCardId,
+        card.family_id ?? null,
+        Number(card.version_number ?? 1),
+        normalizeOperatorJson(adaptationPlan, {}),
+        normalizeOperatorJson(priorAdaptationContext, {}),
         normalizeOperatorText(payload.objective, 1000, true),
         normalizeOperatorText(payload.prompt_summary, 4000, true),
-        normalizeOperatorJson({ source: "operator_mode_mcp" }, {}),
+        normalizeOperatorJson({
+          source: "operator_mode_mcp",
+          canonical_source_card_reuse: Boolean(card.family_id),
+          transformation_contract_version: SOURCE_TRANSFORMATION_CONTRACT_VERSION,
+        }, {}),
       )
       .run();
+
     if (card.workflow_session_id) {
       await env.DB.prepare(
         `UPDATE operator_workflow_sessions
