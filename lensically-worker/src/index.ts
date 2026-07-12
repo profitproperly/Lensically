@@ -6643,11 +6643,12 @@ async function runOperatorGates(
       let cautious: string | null = null;
       for (const surface of forbidden) {
         const phrase = typeof surface === "string" ? surface : String((surface as Record<string, unknown>)?.text ?? "");
-        const normalizedPhrase = normalizeComparableText(phrase);
-        if (!normalizedPhrase) {
+                const normalizedPhrase = normalizeComparableText(phrase);
+        if (!normalizedPhrase || approvedReusableSurfaces.has(normalizedPhrase)) {
           continue;
         }
         const wordCount = normalizedPhrase.split(" ").filter(Boolean).length;
+
         if (wordCount > 3 && normalizedDraft.includes(normalizedPhrase)) {
           copied = phrase;
           break;
