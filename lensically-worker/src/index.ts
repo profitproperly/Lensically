@@ -14057,7 +14057,42 @@ function derivePatternAuthorHandleFromSourceUrl(sourceUrl: string | null): strin
   }
 }
 
+function extractThreadsPostIdFromUrl(sourceUrl: string | null): string | null {
+  if (!sourceUrl) {
+    return null;
+  }
+  try {
+    const parsed = new URL(sourceUrl);
+    const match = parsed.pathname.match(/\/post\/([^/?#]+)/i);
+    return match?.[1]?.trim() || null;
+  } catch {
+    const match = sourceUrl.match(/\/post\/([^/?#]+)/i);
+    return match?.[1]?.trim() || null;
+  }
+}
+
+function canonicalizeThreadsSourceUrl(sourceUrl: string | null): string | null {
+  if (!sourceUrl) {
+    return null;
+  }
+  try {
+    const parsed = new URL(sourceUrl);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (hostname === "threads.com" || hostname === "threads.net") {
+      parsed.protocol = "https:";
+      parsed.hostname = "www.threads.com";
+    }
+    parsed.hash = "";
+    parsed.search = "";
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return sourceUrl.trim().replace(/[?#].*$/, "").replace(/\/+$/, "") || null;
+  }
+}
+
 function escapeRegExp(value: string): string {
+
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
