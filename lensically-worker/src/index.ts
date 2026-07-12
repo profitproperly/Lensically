@@ -6233,6 +6233,125 @@ async function listSourceCandidatesForBrand(
   const normalizedOffset = Math.max(Math.trunc(offset), 0);
   const wantsArchive = sourceTypes.length === 0 || sourceTypes.includes("archive_post") || sourceTypes.includes("recent_insight");
   const wantsPatterns = sourceTypes.length === 0 || sourceTypes.includes("saved_pattern");
+
+  if (brand.brand_key === "manifest_mental") {
+    const rankedCandidates: Record<string, unknown>[] = [];
+    let totalCount = 0;
+    const fetchLimit = normalizedOffset + normalizedLimit;
+
+    if (wantsArchive && await doesTableExist(env, "threads_posts_archive")) {
+      const count = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM threads_posts_archive
+         WHERE threads_user_id = ?`,
+      ).bind(brand.profile.threads_user_id).first<{ total: number }>();
+      totalCount += Number(count?.total ?? 0);
+      const rows = await env.DB.prepare(
+        `SELECT post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total
+         FROM threads_posts_archive
+         WHERE threads_user_id = ?
+         ORDER BY likes DESC, engagement_total DESC, views DESC, datetime(post_timestamp) DESC
+         LIMIT ?`,
+      ).bind(brand.profile.threads_user_id, fetchLimit).all<Record<string, unknown>>();
+      for (const row of rows.results ?? []) {
+        const likes = Number(row.likes ?? 0);
+        rankedCandidates.push({
+          source_candidate_id: `archive_post:${row.post_id}`,
+          brand_key: brand.brand_key,
+          source_type: "archive_post",
+          source_id: row.post_id,
+          text: row.post_text,
+          metrics: {
+            views: Number(row.views ?? 0),
+            likes,
+            replies: Number(row.replies ?? 0),
+            reposts: Number(row.reposts ?? 0),
+            quotes: Number(row.quotes ?? 0),
+            shares: Number(row.shares ?? 0),
+            engagement_total: Number(row.engagement_total ?? 0),
+          },
+          factor_1: {
+            name: "absolute_verified_like_count",
+            market_demand_score: likes,
+          },
+          posted_at: row.post_timestamp ?? null,
+          why_relevant: "Metric-bearing own-account archive post ranked by absolute verified likes.",
+          evidence_role: "primary_candidate",
+          lane_key: null,
+          risk_notes: [],
+        });
+      }
+    }
+
+    if (wantsPatterns && await doesTableExist(env, "external_patterns")) {
+      const count = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM external_patterns
+         WHERE app_user_id = ?
+           AND account_id = ?`,
+      ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total: number }>();
+      totalCount += Number(count?.total ?? 0);
+      const rows = await env.DB.prepare(
+        `SELECT id, post_text, views, likes, replies, reposts, shares, source_url, posted_at
+         FROM external_patterns
+         WHERE app_user_id = ?
+           AND account_id = ?
+         ORDER BY likes DESC, (likes + replies + reposts + shares) DESC, views DESC, id DESC
+         LIMIT ?`,
+      ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, fetchLimit).all<Record<string, unknown>>();
+      for (const row of rows.results ?? []) {
+        const likes = Number(row.likes ?? 0);
+        const engagementTotal = likes + Number(row.replies ?? 0) + Number(row.reposts ?? 0) + Number(row.shares ?? 0);
+        rankedCandidates.push({
+          source_candidate_id: `saved_pattern:${row.id}`,
+          brand_key: brand.brand_key,
+          source_type: "saved_pattern",
+          source_id: row.id,
+          text: row.post_text,
+          metrics: {
+            views: Number(row.views ?? 0),
+            likes,
+            replies: Number(row.replies ?? 0),
+            reposts: Number(row.reposts ?? 0),
+            quotes: 0,
+            shares: Number(row.shares ?? 0),
+            engagement_total: engagementTotal,
+          },
+          factor_1: {
+            name: "absolute_verified_like_count",
+            market_demand_score: likes,
+          },
+          posted_at: row.posted_at ?? null,
+          source_url: row.source_url ?? null,
+          why_relevant: "Saved external/reference pattern ranked by absolute verified likes.",
+          evidence_role: "market_signal",
+          lane_key: null,
+          risk_notes: [],
+        });
+      }
+    }
+
+    rankedCandidates.sort((left, right) => {
+      const leftMetrics = left.metrics as Record<string, unknown>;
+      const rightMetrics = right.metrics as Record<string, unknown>;
+      const likesDifference = Number(rightMetrics.likes ?? 0) - Number(leftMetrics.likes ?? 0);
+      if (likesDifference !== 0) return likesDifference;
+      const engagementDifference = Number(rightMetrics.engagement_total ?? 0) - Number(leftMetrics.engagement_total ?? 0);
+      if (engagementDifference !== 0) return engagementDifference;
+      const viewsDifference = Number(rightMetrics.views ?? 0) - Number(leftMetrics.views ?? 0);
+      if (viewsDifference !== 0) return viewsDifference;
+      return String(left.source_candidate_id ?? "").localeCompare(String(right.source_candidate_id ?? ""));
+    });
+
+    const candidates = rankedCandidates
+      .slice(normalizedOffset, normalizedOffset + normalizedLimit)
+      .map((candidate, index) => ({
+        ...candidate,
+        factor_1_rank: normalizedOffset + index + 1,
+      }));
+    return { candidates, total_count: totalCount || candidates.length };
+  }
+
   const candidates: Record<string, unknown>[] = [];
   let totalCount = 0;
 
