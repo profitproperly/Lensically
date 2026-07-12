@@ -5506,10 +5506,31 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
+    for (const column of [
+    { name: "family_id", definition: "TEXT" },
+    { name: "source_selection_id", definition: "TEXT" },
+    { name: "version_number", definition: "INTEGER NOT NULL DEFAULT 1" },
+    { name: "is_current", definition: "INTEGER NOT NULL DEFAULT 1" },
+    { name: "supersedes_source_card_id", definition: "TEXT" },
+    { name: "version_reason", definition: "TEXT" },
+    { name: "transformation_contract_json", definition: "TEXT" },
+  ]) {
+    await addColumnIfMissing(env, "operator_source_cards", column.name, column.definition);
+  }
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_source_cards_brand_status
      ON operator_source_cards (brand_key, status, updated_at DESC)`,
   ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_cards_family_version
+     ON operator_source_cards (family_id, version_number DESC, created_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_source_cards_family_current
+     ON operator_source_cards (family_id)
+     WHERE family_id IS NOT NULL AND is_current = 1`,
+  ).run();
+
   await env.DB.prepare(
     `CREATE TRIGGER IF NOT EXISTS trg_operator_source_cards_touch_updated_at
      AFTER UPDATE ON operator_source_cards
