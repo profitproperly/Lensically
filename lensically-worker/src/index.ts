@@ -6361,7 +6361,164 @@ async function countGenerationDraftsForRun(env: Env, accountId: string, runId: s
   return Number(row?.total ?? 0);
 }
 
+function shuffleOperatorSources<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const random = new Uint32Array(1);
+    crypto.getRandomValues(random);
+    const swapIndex = random[0] % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+async function buildManifestQualifiedSourcePool(
+  env: Env,
+  brand: GptResolvedBrand,
+  sourceTypes: string[],
+): Promise<Record<string, unknown>[]> {
+  const wantsArchive = sourceTypes.length === 0 || sourceTypes.includes("archive_post") || sourceTypes.includes("recent_insight");
+  const wantsPatterns = sourceTypes.length === 0 || sourceTypes.includes("saved_pattern");
+  const candidatesByIdentity = new Map<string, Record<string, unknown>>();
+
+  const admitCandidate = (candidate: Record<string, unknown>): void => {
+    const identityKey = String(candidate.source_identity_key ?? "");
+    if (!identityKey) {
+      return;
+    }
+    const existing = candidatesByIdentity.get(identityKey);
+    if (!existing) {
+      candidatesByIdentity.set(identityKey, candidate);
+      return;
+    }
+    const existingLikes = Number((existing.metrics as Record<string, unknown> | undefined)?.likes ?? 0);
+    const candidateLikes = Number((candidate.metrics as Record<string, unknown> | undefined)?.likes ?? 0);
+    const candidateOwnsSource = candidate.source_type === "archive_post";
+    const existingOwnsSource = existing.source_type === "archive_post";
+    if (candidateLikes > existingLikes || (candidateLikes === existingLikes && candidateOwnsSource && !existingOwnsSource)) {
+      candidatesByIdentity.set(identityKey, candidate);
+    }
+  };
+
+  if (wantsArchive && await doesTableExist(env, "threads_posts_archive")) {
+    const rows = await env.DB.prepare(
+      `SELECT post_id, post_text, post_timestamp, post_permalink, views, likes, replies, reposts, quotes, shares, engagement_total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ?
+         AND likes >= ?`,
+    ).bind(brand.profile.threads_user_id, MANIFEST_SOURCE_MIN_VERIFIED_LIKES).all<Record<string, unknown>>();
+    for (const row of rows.results ?? []) {
+      const threadsPostId = String(row.post_id ?? "").trim();
+      if (!threadsPostId) {
+        continue;
+      }
+      const likes = Number(row.likes ?? 0);
+      const canonicalSourceUrl = canonicalizeThreadsSourceUrl(
+        typeof row.post_permalink === "string" ? row.post_permalink : null,
+      );
+      admitCandidate({
+        source_candidate_id: `archive_post:${threadsPostId}`,
+        source_identity_key: `threads:${threadsPostId}`,
+        brand_key: brand.brand_key,
+        source_type: "archive_post",
+        source_id: threadsPostId,
+        internal_source_id: threadsPostId,
+        threads_post_id: threadsPostId,
+        canonical_source_url: canonicalSourceUrl,
+        text: row.post_text,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes,
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          quotes: Number(row.quotes ?? 0),
+          shares: Number(row.shares ?? 0),
+          engagement_total: Number(row.engagement_total ?? 0),
+        },
+        eligibility: {
+          name: "verified_like_floor",
+          threshold: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+          verified_likes: likes,
+          qualified: true,
+        },
+        posted_at: row.post_timestamp ?? null,
+        why_relevant: "Own-account post qualified by the verified 1,000-like source gate.",
+        evidence_role: "primary_candidate",
+        lane_key: null,
+        risk_notes: [],
+      });
+    }
+  }
+
+  if (wantsPatterns && await doesTableExist(env, "external_patterns")) {
+    const rows = await env.DB.prepare(
+      `SELECT id, post_id, post_text, views, likes, replies, reposts, shares, source_url, posted_at, capture_confidence, updated_at
+       FROM external_patterns
+       WHERE app_user_id = ?
+         AND account_id = ?
+         AND likes >= ?`,
+    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, MANIFEST_SOURCE_MIN_VERIFIED_LIKES).all<Record<string, unknown>>();
+    for (const row of rows.results ?? []) {
+      const canonicalSourceUrl = canonicalizeThreadsSourceUrl(
+        typeof row.source_url === "string" ? row.source_url : null,
+      );
+      const threadsPostId = String(row.post_id ?? extractThreadsPostIdFromUrl(canonicalSourceUrl) ?? "").trim() || null;
+      const identityKey = threadsPostId
+        ? `threads:${threadsPostId}`
+        : canonicalSourceUrl
+          ? `url:${canonicalSourceUrl}`
+          : "";
+      if (!identityKey) {
+        continue;
+      }
+      const likes = Number(row.likes ?? 0);
+      const engagementTotal = likes + Number(row.replies ?? 0) + Number(row.reposts ?? 0) + Number(row.shares ?? 0);
+      admitCandidate({
+        source_candidate_id: `saved_pattern:${row.id}`,
+        source_identity_key: identityKey,
+        brand_key: brand.brand_key,
+        source_type: "saved_pattern",
+        source_id: Number(row.id),
+        internal_source_id: String(row.id),
+        threads_post_id: threadsPostId,
+        canonical_source_url: canonicalSourceUrl,
+        text: row.post_text,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes,
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          quotes: 0,
+          shares: Number(row.shares ?? 0),
+          engagement_total: engagementTotal,
+        },
+        eligibility: {
+          name: "verified_like_floor",
+          threshold: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+          verified_likes: likes,
+          qualified: true,
+        },
+        posted_at: row.posted_at ?? null,
+        source_url: canonicalSourceUrl,
+        capture_confidence: row.capture_confidence ?? null,
+        source_updated_at: row.updated_at ?? null,
+        why_relevant: "Saved Pattern qualified by the verified 1,000-like source gate.",
+        evidence_role: "market_signal",
+        lane_key: null,
+        risk_notes: [],
+      });
+    }
+  }
+
+  return Array.from(candidatesByIdentity.values()).sort((left, right) => {
+    const leftLikes = Number((left.metrics as Record<string, unknown> | undefined)?.likes ?? 0);
+    const rightLikes = Number((right.metrics as Record<string, unknown> | undefined)?.likes ?? 0);
+    return rightLikes - leftLikes || String(left.source_identity_key ?? "").localeCompare(String(right.source_identity_key ?? ""));
+  });
+}
+
 async function listSourceCandidatesForBrand(
+
   env: Env,
   brand: GptResolvedBrand,
   sourceTypes: string[],
