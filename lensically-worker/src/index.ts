@@ -9468,9 +9468,11 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
   return {
     ok: true,
-    bootstrap_version: "operator-startup-v1",
+        bootstrap_version: "operator-startup-v2",
+    collaboration_contract: OPERATOR_COLLABORATION_CONTRACT,
     captured_at: new Date().toISOString(),
     account_data_loaded: false,
+
             boundary: {
       initial_key_selection_preserved: true,
       backend_proceed_flag_enforced: true,
