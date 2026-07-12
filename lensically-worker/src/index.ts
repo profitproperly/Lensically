@@ -14249,10 +14249,12 @@ async function importExternalPattern(
 ): Promise<ExternalPatternRow> {
   await ensureExternalPatternsTable(env);
 
-  const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
-  const sourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
-  const postId = normalizePatternString(payload.post_id, { maxLength: 255 });
-  const authorHandle = derivePatternAuthorHandleFromSourceUrl(sourceUrl)
+    const platform = normalizePatternString(payload.platform, { maxLength: 40 }) ?? "threads";
+  const rawSourceUrl = normalizePatternString(payload.source_url, { maxLength: 2000 });
+  const suppliedPostId = normalizePatternString(payload.post_id, { maxLength: 255 });
+  const postId = suppliedPostId ?? extractThreadsPostIdFromUrl(rawSourceUrl);
+  const sourceUrl = canonicalizeThreadsSourceUrl(rawSourceUrl);
+  const authorHandle = derivePatternAuthorHandleFromSourceUrl(rawSourceUrl)
     ?? normalizePatternString(payload.author_handle, { maxLength: 255 });
   const authorDisplayName = normalizePatternString(payload.author_display_name, { maxLength: 255 });
   const rawPostText = normalizePatternString(payload.post_text, { maxLength: 20000 });
@@ -14278,30 +14280,76 @@ async function importExternalPattern(
     throw new Error("source_url and post_text are required");
   }
 
+  const existing = postId
+    ? await env.DB.prepare(
+      `SELECT id
+       FROM external_patterns
+       WHERE app_user_id = ?
+         AND account_id = ?
+         AND platform = ?
+         AND post_id = ?
+       LIMIT 1`,
+    ).bind(appUserId, accountId, platform, postId).first<{ id: number }>()
+    : await env.DB.prepare(
+      `SELECT id
+       FROM external_patterns
+       WHERE app_user_id = ?
+         AND account_id = ?
+         AND source_url = ?
+       LIMIT 1`,
+    ).bind(appUserId, accountId, sourceUrl).first<{ id: number }>();
+
   const nowIso = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO external_patterns (
-      app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
-      post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
-      raw_payload, saved_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(app_user_id, account_id, source_url) DO UPDATE SET
-      platform = excluded.platform,
-      post_id = excluded.post_id,
-      author_handle = excluded.author_handle,
-      author_display_name = excluded.author_display_name,
-      post_text = excluded.post_text,
-      likes = excluded.likes,
-      replies = excluded.replies,
-      reposts = excluded.reposts,
-      shares = excluded.shares,
-      views = excluded.views,
-      posted_at = excluded.posted_at,
-      capture_confidence = excluded.capture_confidence,
-      raw_payload = excluded.raw_payload,
-      updated_at = excluded.updated_at`,
-  )
-    .bind(
+  let patternId = Number(existing?.id ?? 0);
+  if (patternId) {
+    await env.DB.prepare(
+      `UPDATE external_patterns
+       SET platform = ?,
+           source_url = ?,
+           post_id = ?,
+           author_handle = ?,
+           author_display_name = ?,
+           post_text = ?,
+           likes = ?,
+           replies = ?,
+           reposts = ?,
+           shares = ?,
+           views = ?,
+           posted_at = ?,
+           capture_confidence = ?,
+           raw_payload = ?,
+           updated_at = ?
+       WHERE id = ?
+         AND app_user_id = ?
+         AND account_id = ?`,
+    ).bind(
+      platform,
+      sourceUrl,
+      postId,
+      authorHandle,
+      authorDisplayName,
+      postText,
+      likes,
+      replies,
+      reposts,
+      shares,
+      views,
+      postedAt,
+      captureConfidence,
+      rawPayload,
+      nowIso,
+      patternId,
+      appUserId,
+      accountId,
+    ).run();
+  } else {
+    const inserted = await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, platform, source_url, post_id, author_handle, author_display_name,
+        post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+        raw_payload, saved_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
       appUserId,
       accountId,
       platform,
@@ -14320,19 +14368,23 @@ async function importExternalPattern(
       rawPayload,
       nowIso,
       nowIso,
-    )
-    .run();
+    ).run();
+    patternId = Number(inserted.meta?.last_row_id ?? 0);
+  }
 
   const row = await env.DB.prepare(
     `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
             account_id, post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
             raw_payload, saved_at, updated_at
      FROM external_patterns
-     WHERE app_user_id = ? AND account_id = ? AND source_url = ?
+     WHERE id = ?
+       AND app_user_id = ?
+       AND account_id = ?
      LIMIT 1`,
   )
-    .bind(appUserId, accountId, sourceUrl)
+    .bind(patternId, appUserId, accountId)
     .first<ExternalPatternRow>();
+
 
   if (!row) {
     throw new Error("pattern_import_failed");
