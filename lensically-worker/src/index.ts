@@ -7904,8 +7904,10 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         workflow_session_id: { type: "string" },
         sequence_label: { type: "string" },
         lane_key: { type: "string" },
-        title: { type: "string" },
+                title: { type: "string" },
+        source_selection_id: { type: "string", description: "Required for Manifest Mental. Links the source card to one persisted random-draw selection and its immutable metric snapshot." },
         primary_source: { type: "object", additionalProperties: true },
+
         secondary_sources: { type: "array", items: { type: "object", additionalProperties: true } },
         anti_sources: { type: "array", items: { type: "object", additionalProperties: true } },
         metrics_snapshot: { type: "object", additionalProperties: true },
