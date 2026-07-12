@@ -217,6 +217,50 @@ describe("operator mode backend spine", () => {
     await resetTables();
   }, 30000);
 
+  it("ranks Manifest source candidates by absolute verified likes across archive and Saved Patterns", async () => {
+    await operatorTool("list_accounts");
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total
+      ) VALUES
+        ('manifest-mental', 'archive-1500', 'Archive winner by likes', '2026-07-10T12:00:00Z', 10000, 1500, 5, 2, 0, 1, 1508),
+        ('manifest-mental', 'archive-900', 'Archive post with larger non-like engagement', '2026-07-11T12:00:00Z', 50000, 900, 2000, 100, 0, 50, 3050)`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, source_url, post_text, likes, replies, reposts, shares, views, posted_at
+      ) VALUES
+        ('lensically', 'manifest-mental', 'https://threads.net/top-pattern', 'Top Saved Pattern', 5000, 2, 1, 0, 20000, '2026-01-01T12:00:00Z'),
+        ('lensically', 'manifest-mental', 'https://threads.net/high-engagement-pattern', 'Saved Pattern with more replies than likes', 1200, 5000, 500, 100, 60000, '2026-07-11T12:00:00Z')`,
+    ).run();
+
+    const result = await mcpTool<{
+      candidates: Array<{
+        source_candidate_id: string;
+        metrics: { likes: number };
+        factor_1: { name: string; market_demand_score: number };
+        factor_1_rank: number;
+      }>;
+      total_count: number;
+    }>("list_source_candidates", {
+      brand_key: "manifest_mental",
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(result.total_count).toBe(4);
+    expect(result.candidates.map((candidate) => candidate.source_candidate_id)).toEqual([
+      "saved_pattern:1",
+      "archive_post:archive-1500",
+      "saved_pattern:2",
+      "archive_post:archive-900",
+    ]);
+    expect(result.candidates.map((candidate) => candidate.metrics.likes)).toEqual([5000, 1500, 1200, 900]);
+    expect(result.candidates.map((candidate) => candidate.factor_1.market_demand_score)).toEqual([5000, 1500, 1200, 900]);
+    expect(result.candidates.map((candidate) => candidate.factor_1_rank)).toEqual([1, 2, 3, 4]);
+    expect(result.candidates.every((candidate) => candidate.factor_1.name === "absolute_verified_like_count")).toBe(true);
+  }, 30000);
+
   it("runs the source-card to approved schedule path", async () => {
     const { sourceCardId, runId } = await createLockedSourceCard();
     const draft = await operatorTool<{ draft_id: string; showable: boolean }>("submit_candidate_draft", {
