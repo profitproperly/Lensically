@@ -217,8 +217,39 @@ describe("operator mode backend spine", () => {
     await resetTables();
   }, 30000);
 
-  it("ranks Manifest source candidates by absolute verified likes across archive and Saved Patterns", async () => {
+    it("ranks Manifest source candidates by absolute verified likes across archive and Saved Patterns", async () => {
     await operatorTool("list_accounts");
+    await env.DB.prepare(
+      `CREATE TABLE threads_posts_archive (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT NOT NULL,
+        post_text TEXT,
+        post_timestamp TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        engagement_total INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (threads_user_id, post_id)
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `CREATE TABLE external_patterns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        app_user_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        post_text TEXT NOT NULL,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        views INTEGER,
+        posted_at TEXT
+      )`,
+    ).run();
     await env.DB.prepare(
       `INSERT INTO threads_posts_archive (
         threads_user_id, post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total
