@@ -6132,7 +6132,151 @@ async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCard
   };
 }
 
+async function getOperatorSourceCardHistory(
+  env: Env,
+  brand: GptResolvedBrand,
+  card: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const familyId = normalizeOperatorText(card.family_id, 120, true);
+  const family = familyId
+    ? await env.DB.prepare(
+      `SELECT id, brand_key, source_identity_key, source_type, internal_source_id,
+              threads_post_id, canonical_source_url, current_source_card_id, status,
+              created_at, updated_at
+       FROM operator_source_card_families
+       WHERE id = ?
+         AND brand_key = ?
+       LIMIT 1`,
+    ).bind(familyId, brand.brand_key).first<Record<string, unknown>>()
+    : null;
+  const versions = familyId
+    ? await env.DB.prepare(
+      `SELECT id, version_number, is_current, status, supersedes_source_card_id,
+              version_reason, locked_at, invalidated_at, invalidation_reason,
+              created_at, updated_at
+       FROM operator_source_cards
+       WHERE family_id = ?
+         AND brand_key = ?
+       ORDER BY version_number ASC, datetime(created_at) ASC`,
+    ).bind(familyId, brand.brand_key).all<Record<string, unknown>>()
+    : { results: [{
+      id: card.id,
+      version_number: card.version_number ?? 1,
+      is_current: card.is_current === true ? 1 : 0,
+      status: card.status,
+      supersedes_source_card_id: card.supersedes_source_card_id ?? null,
+      version_reason: card.version_reason ?? null,
+      locked_at: card.locked_at ?? null,
+      invalidated_at: card.invalidated_at ?? null,
+      invalidation_reason: card.invalidation_reason ?? null,
+      created_at: card.created_at,
+      updated_at: card.updated_at,
+    }] };
+  const runRows = await env.DB.prepare(
+    `SELECT
+       r.id AS run_id,
+       r.source_card_id,
+       r.source_card_family_id,
+       r.source_card_version_number,
+       r.adaptation_plan_json,
+       r.status AS run_status,
+       r.created_at AS run_created_at,
+       d.id AS draft_id,
+       d.draft_index,
+       d.text AS draft_text,
+       d.status AS draft_status,
+       d.strategy_json,
+       d.score_json,
+       d.scheduled_post_id,
+       d.published_post_id,
+       d.created_at AS draft_created_at
+     FROM gpt_generation_runs r
+     LEFT JOIN gpt_generation_drafts d
+       ON d.run_id = r.id
+      AND d.account_id = r.account_id
+     WHERE r.account_id = ?
+       AND (
+         (? IS NOT NULL AND r.source_card_family_id = ?)
+         OR r.source_card_id = ?
+       )
+     ORDER BY datetime(r.created_at) ASC, d.draft_index ASC, datetime(d.created_at) ASC
+     LIMIT 250`,
+  ).bind(
+    brand.account_id,
+    familyId,
+    familyId,
+    String(card.id ?? ""),
+  ).all<Record<string, unknown>>();
+  const publishedIds = Array.from(new Set((runRows.results ?? [])
+    .map((row) => normalizeOperatorText(row.published_post_id, 255, true))
+    .filter((value): value is string => Boolean(value))));
+  const metricRows = publishedIds.length
+    ? await env.DB.prepare(
+      `SELECT published_post_id, metrics_json, captured_at
+       FROM operator_post_metric_snapshots
+       WHERE brand_key = ?
+         AND published_post_id IN (${publishedIds.map(() => "?").join(", ")})
+       ORDER BY datetime(captured_at) ASC, datetime(created_at) ASC`,
+    ).bind(brand.brand_key, ...publishedIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  const metricsByPost = new Map<string, Array<Record<string, unknown>>>();
+  for (const row of metricRows.results ?? []) {
+    const postId = String(row.published_post_id ?? "");
+    const items = metricsByPost.get(postId) ?? [];
+    items.push({
+      metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
+      captured_at: row.captured_at,
+    });
+    metricsByPost.set(postId, items);
+  }
+  const runMap = new Map<string, Record<string, unknown>>();
+  for (const row of runRows.results ?? []) {
+    const runId = String(row.run_id ?? "");
+    if (!runMap.has(runId)) {
+      runMap.set(runId, {
+        run_id: runId,
+        source_card_id: row.source_card_id,
+        source_card_family_id: row.source_card_family_id ?? null,
+        source_card_version_number: Number(row.source_card_version_number ?? 1),
+        adaptation_plan: safeParseJsonString(String(row.adaptation_plan_json ?? "{}")) ?? {},
+        status: row.run_status,
+        created_at: row.run_created_at,
+        drafts: [],
+      });
+    }
+    if (row.draft_id) {
+      const publishedPostId = normalizeOperatorText(row.published_post_id, 255, true);
+      (runMap.get(runId)?.drafts as Array<Record<string, unknown>>).push({
+        draft_id: row.draft_id,
+        draft_index: Number(row.draft_index ?? 0),
+        text: row.draft_text,
+        status: row.draft_status,
+        strategy: safeParseJsonString(String(row.strategy_json ?? "{}")) ?? {},
+        score: safeParseJsonString(String(row.score_json ?? "{}")) ?? {},
+        scheduled_post_id: row.scheduled_post_id ?? null,
+        published_post_id: publishedPostId,
+        metric_history: publishedPostId ? metricsByPost.get(publishedPostId) ?? [] : [],
+        created_at: row.draft_created_at,
+      });
+    }
+  }
+  return {
+    family: family ? {
+      ...family,
+      current_source_card_id: family.current_source_card_id ?? null,
+    } : null,
+    versions: (versions.results ?? []).map((version) => ({
+      ...version,
+      version_number: Number(version.version_number ?? 1),
+      is_current: Number(version.is_current ?? 0) === 1,
+    })),
+    adaptation_history: Array.from(runMap.values()),
+    completed_generation_runs: runMap.size,
+  };
+}
+
 function validateSourceCardLockable(card: Record<string, unknown>): { can_lock: boolean; missing_fields: string[] } {
+
   const missing: string[] = [];
   for (const field of ["brand_key", "primary_source", "source_mechanism", "required_product", "forbidden_surfaces", "pass_conditions", "fail_conditions"]) {
     const value = card[field];
