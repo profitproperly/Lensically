@@ -8647,10 +8647,11 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
-    name: "runGateSuite",
+        name: "runGateSuite",
     title: "Run gate suite",
-    description: "Run active operator gates for source cards or drafts and return blocking status.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
+    description: "Run active operator gates for source cards or drafts and return blocking status, including role-aware source transformation checks.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
+
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
