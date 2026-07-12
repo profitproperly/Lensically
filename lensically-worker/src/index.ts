@@ -5359,8 +5359,10 @@ function normalizeGenerationAdaptationPlan(value: unknown): Record<string, unkno
   const record = value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-  return {
+    return {
+    adaptation_goal: normalizeOperatorText(record.adaptation_goal, 1500, true),
     retained_exact_surfaces: normalizeSourceContractStringList(record.retained_exact_surfaces),
+
     preserved_functions: normalizeSourceContractStringList(record.preserved_functions),
     transformed_elements: normalizeSourceContractStringList(record.transformed_elements),
     payoff_choice: normalizeOperatorText(record.payoff_choice, 1500, true),
