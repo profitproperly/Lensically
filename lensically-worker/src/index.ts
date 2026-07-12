@@ -8900,38 +8900,56 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       if (!activeSessionId) {
         return { ok: false, error: "workflow_session_unavailable", complete: false, sections: [], blockers: ["workflow_session_unavailable"] };
       }
-            preflightPhase = "section_collection";
-      const collectedSections = await Promise.all([
-        collectOperatorPreflightSection(request, env, brand.brand_key, "get_production_board", "production_board", { workflow_session_id: activeSessionId }),
-        collectOperatorPreflightSection(request, env, brand.brand_key, "list_source_candidates", "source_candidates", { limit: 1, offset: 0 }),
-        collectOperatorPreflightSection(request, env, brand.brand_key, "list_strategy_memory", "strategy_memory", { limit: 1, offset: 0 }),
-        collectOperatorPreflightSection(request, env, brand.brand_key, "list_scheduled_posts", "scheduled_posts", { limit: 1, offset: 0 }),
-        collectOperatorPreflightSection(request, env, brand.brand_key, "list_active_gates", "active_gates", {}),
-      ]);
+                  preflightPhase = "section_collection";
+      const productionBoardCount = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM operator_production_board_items
+         WHERE brand_key = ?
+           AND status = 'active'
+           AND workflow_session_id = ?`,
+      ).bind(brand.brand_key, activeSessionId).first<{ total: number }>();
+      let sourceCandidatesTotal = 0;
+      if (await doesTableExist(env, "threads_posts_archive")) {
+        const archiveCount = await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM threads_posts_archive WHERE threads_user_id = ?`,
+        ).bind(brand.profile.threads_user_id).first<{ total: number }>();
+        sourceCandidatesTotal += Number(archiveCount?.total ?? 0);
+      }
+      if (await doesTableExist(env, "external_patterns")) {
+        const patternCount = await env.DB.prepare(
+          `SELECT COUNT(*) AS total
+           FROM external_patterns
+           WHERE app_user_id = ? AND account_id = ?`,
+        ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total: number }>();
+        sourceCandidatesTotal += Number(patternCount?.total ?? 0);
+      }
+      const strategyMemoryTotal = await countGptStrategyMemory(env, brand.account_id, [], "active");
+      const scheduledCount = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM scheduled_posts
+         WHERE threads_user_id = ? AND status IN (?, ?)`,
+      ).bind(brand.profile.threads_user_id, SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING).first<{ total: number }>();
+      const activeGates = await listOperatorGates(env, brand.brand_key, null, null, null);
+      const completeCountSection = (section: string, total: number, source: string): Record<string, unknown> => ({
+        section,
+        returned_count: total,
+        total_count: total,
+        limit: total,
+        offset: 0,
+        offsets_read: [0],
+        has_more: false,
+        coverage_status: "complete",
+        coverage_mode: "count_summary",
+        source,
+      });
       const sections = [
-        {
-          section: "operator_precheck",
-          returned_count: 1,
-          total_count: 1,
-          limit: 1,
-          offset: 0,
-          offsets_read: [0],
-          has_more: false,
-          coverage_status: "complete",
-          source: "engineeringPrecheck",
-        },
-        {
-          section: "account_state",
-          returned_count: 1,
-          total_count: 1,
-          limit: 1,
-          offset: 0,
-          offsets_read: [0],
-          has_more: false,
-          coverage_status: "complete",
-          source: "active_operator_session",
-        },
-        ...collectedSections,
+        completeCountSection("operator_precheck", 1, "engineeringPrecheck"),
+        completeCountSection("account_state", 1, "active_operator_session"),
+        completeCountSection("production_board", Number(productionBoardCount?.total ?? 0), "direct_db_count"),
+        completeCountSection("source_candidates", sourceCandidatesTotal, "direct_db_count"),
+        completeCountSection("strategy_memory", Number(strategyMemoryTotal ?? 0), "direct_db_count"),
+        completeCountSection("scheduled_posts", Number(scheduledCount?.total ?? 0), "direct_db_count"),
+        completeCountSection("active_gates", activeGates.length, "direct_db_count"),
       ];
                   preflightPhase = "context_admission";
       const admissionId = crypto.randomUUID();
