@@ -8404,7 +8404,24 @@ const GENERATION_ADAPTATION_PLAN_SCHEMA = {
   additionalProperties: false,
 };
 
+const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
+  type: "object",
+  description: "Gate evidence for the active source transformation contract. Copy contract wording exactly into preserved_functions, transformed_elements roles, and satisfied_time_or_context_requirements so backend checks are auditable.",
+  properties: {
+    opening_phrase: { type: "string" },
+    realm_entrance_key: { type: "string" },
+    hook_style: { type: "string" },
+    lane_key: { type: "string" },
+    preserved_functions: { type: "array", items: { type: "string" } },
+    transformed_elements: { type: "array", items: { type: "string" } },
+    satisfied_time_or_context_requirements: { type: "array", items: { type: "string" } },
+    audience_reward_delivered: { type: "boolean" },
+  },
+  additionalProperties: true,
+};
+
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
+
 
   "selectOperatorKey",
   "confirmOperatorProceed",
