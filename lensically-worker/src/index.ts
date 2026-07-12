@@ -7861,10 +7861,42 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+    {
+    name: "draw_source_candidate_batch",
+    title: "Draw Manifest source candidate batch",
+    description: "Draw and persist the 24 unique Manifest sources for one production day from all sources with at least 1,000 verified likes. Uses uniform random selection without replacement, preserves draw order as posting order, and applies no cross-day cooldown or performance weighting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        workflow_session_id: { type: "string" },
+        source_types: { type: "array", items: { type: "string" } },
+      },
+      required: ["brand_key", "workflow_session_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "get_source_candidate_batch",
+    title: "Get source candidate batch",
+    description: "Retrieve one persisted source draw and its immutable source snapshots in posting order.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        source_batch_id: { type: "string" },
+      },
+      required: ["brand_key", "source_batch_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
   {
     name: "create_source_card",
     title: "Create source card",
-    description: "Use this to create a structured source card that preserves source mechanism, required product, forbidden surfaces, pass conditions, and fail conditions before serious generation.",
+    description: "Use this to create a structured source card that preserves source mechanism, required product, forbidden surfaces, pass conditions, and fail conditions before serious generation. Manifest source cards must use a persisted source_selection_id from the daily random draw.",
+
     inputSchema: {
       type: "object",
       properties: {
