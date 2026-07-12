@@ -7611,11 +7611,21 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ source_card_id: sourceCardId, status: "locked", locked_at: lockedAt, warnings: [] });
   }
 
-  if (toolName === "get_source_card") {
+    if (toolName === "get_source_card") {
     const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
     const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
-    return card ? operatorJsonResponse({ source_card: card }) : operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
+    if (!card) {
+      return operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
+    }
+    const history = payload.include_history === false
+      ? null
+      : await getOperatorSourceCardHistory(env, brand, card);
+    return operatorJsonResponse({
+      source_card: card,
+      canonical_context: history,
+    });
   }
+
 
     if (toolName === "create_generation_run") {
         const workflowConflict = getLensicallySavedWorkflowConflict(payload);
