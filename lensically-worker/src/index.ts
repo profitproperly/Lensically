@@ -8856,10 +8856,11 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
-    name: "run_gates",
+        name: "run_gates",
     title: "Run operator gates",
-    description: "Use this to evaluate source-card or draft gate results before showing, reviewing, or scheduling content.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: { type: "object", additionalProperties: true }, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
+    description: "Evaluate source-card or draft gates, including role-aware source preservation, transformation, full-package copying, and reusable-hook exemptions.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
+
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
