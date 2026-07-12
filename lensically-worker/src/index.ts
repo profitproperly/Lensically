@@ -6485,11 +6485,20 @@ async function runOperatorGates(
   const gates = await listOperatorGates(env, input.brand.brand_key, input.stageScope, input.laneKey ?? null, input.contentType ?? null);
   const sourceCard = input.sourceCardId ? await getOperatorSourceCard(env, input.brand.brand_key, input.sourceCardId) : null;
   const draftText = normalizeOperatorText(input.draftText, 20000, true) ?? "";
-  const normalizedDraft = normalizeComparableText(draftText);
+    const normalizedDraft = normalizeComparableText(draftText);
+  const sourceContract = normalizeSourceTransformationContract(sourceCard?.transformation_contract);
+  const mustPreserveExact = sourceContract.must_preserve_exact as string[];
+  const mayReuse = sourceContract.may_reuse as string[];
+  const approvedReusableSurfaces = new Set(
+    [...mustPreserveExact, ...mayReuse]
+      .map((surface) => normalizeComparableText(surface))
+      .filter(Boolean),
+  );
   const results: Record<string, unknown>[] = [];
   const warnings: string[] = [];
 
   for (const gate of gates) {
+
     const gateKey = String(gate.gate_key);
     if (gateKey === "account_selected_gate") {
       results.push(buildGateResult(gate, input.brand.brand_key ? "pass" : "fail", input.brand.brand_key ? "Account is selected." : "Missing account selection."));
