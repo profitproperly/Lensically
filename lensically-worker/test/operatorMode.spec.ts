@@ -410,8 +410,14 @@ describe("operator mode backend spine", () => {
       source_selection_id: first.source_selection_id,
       title: "Random draw source card",
       source_mechanism: "Extract and rebuild the audience reward.",
-      required_product: "One original Manifest Mental post.",
+            required_product: "One original Manifest Mental post.",
+      transformation_contract: {
+        must_preserve_exact: ["Qualified pattern"],
+        must_transform: ["Qualified pattern source payoff"],
+        audience_reward: "A personally relevant Manifest Mental outcome.",
+      },
       forbidden_surfaces: [],
+
       pass_conditions: ["Preserves the audience payoff."],
       fail_conditions: ["Copies the source wording."],
     });
