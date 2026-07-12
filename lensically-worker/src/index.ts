@@ -5431,15 +5431,46 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_post_metric_snapshots_post_captured
      ON operator_post_metric_snapshots (brand_key, published_post_id, captured_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_source_card_families (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      source_identity_key TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      internal_source_id TEXT NOT NULL,
+      threads_post_id TEXT,
+      canonical_source_url TEXT,
+      current_source_card_id TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, source_identity_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_card_families_brand_current
+     ON operator_source_card_families (brand_key, status, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_source_card_families_touch_updated_at
+     AFTER UPDATE ON operator_source_card_families
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_source_card_families SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
   ).run();
 
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_source_cards (
 
       id TEXT PRIMARY KEY,
+
       brand_key TEXT NOT NULL,
       workflow_session_id TEXT,
       sequence_label TEXT NOT NULL,
