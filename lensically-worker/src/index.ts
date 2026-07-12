@@ -6766,7 +6766,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-  if (toolName === "list_source_candidates") {
+    if (toolName === "list_source_candidates") {
     const sourceTypes = Array.isArray(payload.source_types)
       ? payload.source_types.map((value) => String(value))
       : [];
@@ -6778,10 +6778,186 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       returned_count: candidates.length,
       total_count: totalCount,
       has_more: offset + candidates.length < totalCount,
+      eligibility_min_likes: brand.brand_key === "manifest_mental" ? MANIFEST_SOURCE_MIN_VERIFIED_LIKES : null,
+    });
+  }
+
+  if (toolName === "draw_source_candidate_batch") {
+    if (brand.brand_key !== "manifest_mental") {
+      return operatorJsonResponse({ success: false, error: "source_draw_not_configured_for_brand" }, 400);
+    }
+    const workflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120);
+    if (!workflowSessionId) {
+      return operatorJsonResponse({ success: false, error: "workflow_session_id is required" }, 400);
+    }
+    const session = await env.DB.prepare(
+      `SELECT id
+       FROM operator_workflow_sessions
+       WHERE id = ?
+         AND brand_key = ?
+         AND status = 'active'
+       LIMIT 1`,
+    ).bind(workflowSessionId, brand.brand_key).first<{ id: string }>();
+    if (!session) {
+      return operatorJsonResponse({ success: false, error: "active_workflow_session_required" }, 400);
+    }
+
+    const sourceTypes = Array.isArray(payload.source_types)
+      ? payload.source_types.map((value) => String(value))
+      : [];
+    const qualifiedPool = await buildManifestQualifiedSourcePool(env, brand, sourceTypes);
+    if (qualifiedPool.length < MANIFEST_DAILY_SOURCE_DRAW_SIZE) {
+      return operatorJsonResponse({
+        success: false,
+        error: "insufficient_qualified_sources",
+        eligibility_min_likes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+        qualified_pool_count: qualifiedPool.length,
+        required_count: MANIFEST_DAILY_SOURCE_DRAW_SIZE,
+      }, 400);
+    }
+
+    const selectedAt = new Date().toISOString();
+    const batchId = crypto.randomUUID();
+    const selectedCandidates = shuffleOperatorSources(qualifiedPool).slice(0, MANIFEST_DAILY_SOURCE_DRAW_SIZE);
+    const statements = [
+      env.DB.prepare(
+        `INSERT INTO operator_source_selection_batches (
+          id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+          qualified_pool_count, requested_count, selected_count, selected_at, metadata_json
+        ) VALUES (?, ?, ?, 'uniform_random_without_replacement', ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        batchId,
+        brand.brand_key,
+        workflowSessionId,
+        MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+        qualifiedPool.length,
+        MANIFEST_DAILY_SOURCE_DRAW_SIZE,
+        selectedCandidates.length,
+        selectedAt,
+        normalizeOperatorJson({
+          cross_day_cooldown_applied: false,
+          cross_day_repetition_allowed: true,
+          posting_order_source: "draw_order",
+          performance_weighting_applied: false,
+          dynamic_rank_recorded: false,
+        }, {}),
+      ),
+    ];
+
+    const selections = selectedCandidates.map((candidate, index) => {
+      const selectionId = crypto.randomUUID();
+      const metrics = candidate.metrics && typeof candidate.metrics === "object"
+        ? candidate.metrics as Record<string, unknown>
+        : {};
+      const metricsSnapshot = {
+        ...metrics,
+        captured_at: selectedAt,
+        eligibility_min_likes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      };
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO operator_source_selections (
+            id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+            source_type, internal_source_id, threads_post_id, canonical_source_url,
+            post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          selectionId,
+          batchId,
+          brand.brand_key,
+          workflowSessionId,
+          index + 1,
+          String(candidate.source_identity_key ?? ""),
+          String(candidate.source_type ?? ""),
+          String(candidate.internal_source_id ?? candidate.source_id ?? ""),
+          candidate.threads_post_id ? String(candidate.threads_post_id) : null,
+          candidate.canonical_source_url ? String(candidate.canonical_source_url) : null,
+          String(candidate.text ?? ""),
+          candidate.posted_at ? String(candidate.posted_at) : null,
+          normalizeOperatorJson(metricsSnapshot, {}),
+          normalizeOperatorJson(candidate, {}),
+          selectedAt,
+        ),
+      );
+      return {
+        source_selection_id: selectionId,
+        source_batch_id: batchId,
+        draw_order: index + 1,
+        ...candidate,
+        metrics_snapshot: metricsSnapshot,
+      };
+    });
+
+    await env.DB.batch(statements);
+    await env.DB.prepare(
+      `UPDATE operator_workflow_sessions
+       SET current_stage = 'source_selection'
+       WHERE id = ?
+         AND brand_key = ?`,
+    ).bind(workflowSessionId, brand.brand_key).run();
+
+    return operatorJsonResponse({
+      source_batch_id: batchId,
+      workflow_session_id: workflowSessionId,
+      selection_method: "uniform_random_without_replacement",
+      eligibility_min_likes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      qualified_pool_count: qualifiedPool.length,
+      selected_count: selections.length,
+      cross_day_repetition_allowed: true,
+      cross_day_cooldown_applied: false,
+      posting_order_source: "draw_order",
+      selections,
+    });
+  }
+
+  if (toolName === "get_source_candidate_batch") {
+    const batchId = normalizeOperatorText(payload.source_batch_id, 120);
+    if (!batchId) {
+      return operatorJsonResponse({ success: false, error: "source_batch_id is required" }, 400);
+    }
+    const batch = await env.DB.prepare(
+      `SELECT *
+       FROM operator_source_selection_batches
+       WHERE id = ?
+         AND brand_key = ?
+       LIMIT 1`,
+    ).bind(batchId, brand.brand_key).first<Record<string, unknown>>();
+    if (!batch) {
+      return operatorJsonResponse({ success: false, error: "source_batch_not_found" }, 404);
+    }
+    const rows = await env.DB.prepare(
+      `SELECT *
+       FROM operator_source_selections
+       WHERE batch_id = ?
+         AND brand_key = ?
+       ORDER BY draw_order ASC`,
+    ).bind(batchId, brand.brand_key).all<Record<string, unknown>>();
+    return operatorJsonResponse({
+      source_batch: {
+        ...batch,
+        metadata: safeParseJsonString(String(batch.metadata_json ?? "{}")) ?? {},
+      },
+      selections: (rows.results ?? []).map((row) => ({
+        source_selection_id: row.id,
+        source_batch_id: row.batch_id,
+        draw_order: Number(row.draw_order ?? 0),
+        source_identity_key: row.source_identity_key,
+        source_type: row.source_type,
+        internal_source_id: row.internal_source_id,
+        threads_post_id: row.threads_post_id ?? null,
+        canonical_source_url: row.canonical_source_url ?? null,
+        post_text: row.post_text,
+        original_posted_at: row.original_posted_at ?? null,
+        metrics_snapshot: safeParseJsonString(String(row.metrics_snapshot_json ?? "{}")) ?? {},
+        source_snapshot: safeParseJsonString(String(row.source_snapshot_json ?? "{}")) ?? {},
+        source_card_id: row.source_card_id ?? null,
+        selected_at: row.selected_at,
+      })),
     });
   }
 
     if (toolName === "create_source_card") {
+
         const workflowConflict = getLensicallySavedWorkflowConflict(payload);
     if (workflowConflict) {
       return operatorJsonResponse({
