@@ -508,9 +508,67 @@ describe("operator mode backend spine", () => {
       timezone: "America/New_York",
       strategy: { pillar: "systems" },
     });
-    expect(scheduled.status).toBe("scheduled");
+        expect(scheduled.status).toBe("scheduled");
     expect(scheduled.scheduled_post_id).toBeTruthy();
+
+    const publishedPostId = "published-lineage-1";
+    await env.DB.prepare(
+      `UPDATE scheduled_posts
+       SET status = 'posted', published_post_id = ?, published_at = '2099-01-01T14:00:00Z'
+       WHERE id = ?`,
+    ).bind(publishedPostId, scheduled.scheduled_post_id).run();
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'published', published_post_id = ?
+       WHERE id = ?`,
+    ).bind(publishedPostId, draft.draft_id).run();
+
+    const beforeSync = await operatorTool<{ warning: string | null }>("get_post_results", {
+      brand_key: BRAND_KEY,
+      published_post_id: publishedPostId,
+      include_history: true,
+    });
+    expect(beforeSync.warning).toContain("synced Threads metrics");
+
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink, post_username,
+        views, likes, replies, reposts, quotes, shares, engagement_total,
+        first_seen_at, last_seen_at, last_synced_at
+      ) VALUES (?, ?, ?, '2099-01-01T14:00:00Z', ?, 'vectrixvoltmore', 12000, 1400, 20, 10, 2, 4, 1436,
+                '2099-01-01T14:00:00Z', '2099-01-02T14:00:00Z', '2099-01-02T14:00:00Z')`,
+    ).bind(
+      BRAND_KEY,
+      publishedPostId,
+      "Your systems are about to make the busy work feel optional.",
+      `https://www.threads.com/@vectrixvoltmore/post/${publishedPostId}`,
+    ).run();
+
+    const results = await operatorTool<{
+      metrics: { likes: number; views: number };
+      lineage: {
+        source_card_id: string;
+        generation_run_id: string;
+        draft_id: string;
+        scheduled_post_id: number;
+        published_post_id: string;
+      };
+      metric_history: Array<{ metrics: { likes: number } }>;
+    }>("get_post_results", {
+      brand_key: BRAND_KEY,
+      published_post_id: publishedPostId,
+      include_history: true,
+    });
+    expect(results.metrics.likes).toBe(1400);
+    expect(results.metrics.views).toBe(12000);
+    expect(results.lineage.source_card_id).toBe(sourceCardId);
+    expect(results.lineage.generation_run_id).toBe(runId);
+    expect(results.lineage.draft_id).toBe(draft.draft_id);
+    expect(results.lineage.scheduled_post_id).toBe(scheduled.scheduled_post_id);
+    expect(results.lineage.published_post_id).toBe(publishedPostId);
+    expect(results.metric_history.at(-1)?.metrics.likes).toBe(1400);
   }, 30000);
+
 
   it("blocks showing a draft that repeats the latest realm entrance", async () => {
     const first = await createLockedSourceCard();
