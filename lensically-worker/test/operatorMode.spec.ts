@@ -981,8 +981,10 @@ describe("operator mode MCP endpoint", () => {
   it("loads compact non-account startup bootstrap in a fresh session", async () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const direct = await mcpTool<{
-      bootstrap_version: string;
+            bootstrap_version: string;
+      collaboration_contract: { version: string; principles: string[]; durable_change_reporting: { required_fields: string[] }; system_layers: Array<{ key: string }> };
       account_data_loaded: boolean;
+
       no_account_sections_present: boolean;
       tool_surface: { total_tools: number; engineering_tools: string[]; admin_tools: string[]; account_wrapper_tools: string[] };
       repository: { repo: string; branch: string };
