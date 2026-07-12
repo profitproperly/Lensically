@@ -5262,7 +5262,101 @@ function normalizeOperatorMachineKey(value: unknown, fallback = ""): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
 }
 
+function normalizeSourceContractStringList(value: unknown, maxItems = 50): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(new Set(value
+    .map((item) => normalizeOperatorText(item, 1000, true))
+    .filter((item): item is string => Boolean(item))))
+    .slice(0, maxItems);
+}
+
+function normalizeSourceContractTransformItems(value: unknown, maxItems = 50): Array<string | Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const items: Array<string | Record<string, unknown>> = [];
+  for (const item of value.slice(0, maxItems)) {
+    if (typeof item === "string") {
+      const normalized = normalizeOperatorText(item, 1000, true);
+      if (normalized) items.push(normalized);
+      continue;
+    }
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const sourceText = normalizeOperatorText(record.source_text ?? record.text, 1000, true);
+    const role = normalizeOperatorText(record.role, 240, true);
+    const instruction = normalizeOperatorText(record.instruction, 1500, true);
+    const normalized: Record<string, unknown> = {};
+    if (sourceText) normalized.source_text = sourceText;
+    if (role) normalized.role = role;
+    if (instruction) normalized.instruction = instruction;
+    if (Object.keys(normalized).length) items.push(normalized);
+  }
+  return items;
+}
+
+function normalizeForbiddenSourceCombinations(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const combinations: Array<Record<string, unknown>> = [];
+  for (const item of value.slice(0, 30)) {
+    if (Array.isArray(item)) {
+      const surfaces = normalizeSourceContractStringList(item, 20);
+      if (surfaces.length > 1) combinations.push({ surfaces, min_matches: surfaces.length });
+      continue;
+    }
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const surfaces = normalizeSourceContractStringList(record.surfaces, 20);
+    if (surfaces.length < 2) continue;
+    const requested = Number(record.min_matches ?? surfaces.length);
+    combinations.push({
+      surfaces,
+      min_matches: Math.min(Math.max(Number.isFinite(requested) ? Math.trunc(requested) : surfaces.length, 2), surfaces.length),
+      rationale: normalizeOperatorText(record.rationale, 1000, true),
+    });
+  }
+  return combinations;
+}
+
+function normalizeSourceTransformationContract(value: unknown): Record<string, unknown> {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  return {
+    version: SOURCE_TRANSFORMATION_CONTRACT_VERSION,
+    must_preserve_exact: normalizeSourceContractStringList(record.must_preserve_exact),
+    must_preserve_function: normalizeSourceContractStringList(record.must_preserve_function),
+    may_reuse: normalizeSourceContractStringList(record.may_reuse),
+    should_transform: normalizeSourceContractTransformItems(record.should_transform),
+    must_transform: normalizeSourceContractTransformItems(record.must_transform),
+    forbidden_complete_combinations: normalizeForbiddenSourceCombinations(record.forbidden_complete_combinations),
+    audience_reward: normalizeOperatorText(record.audience_reward, 2000, true),
+    time_or_context_requirements: normalizeSourceContractStringList(record.time_or_context_requirements),
+    notes: normalizeOperatorText(record.notes, 3000, true),
+  };
+}
+
+function sourceContractItemText(item: unknown): string | null {
+  if (typeof item === "string") {
+    return normalizeOperatorText(item, 1000, true);
+  }
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+  const record = item as Record<string, unknown>;
+  return normalizeOperatorText(record.source_text ?? record.text, 1000, true);
+}
+
 function normalizeComparableText(value: string): string {
+
   return value
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
