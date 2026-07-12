@@ -5026,8 +5026,13 @@ async function ensureGptGenerationRunsTable(env: Env): Promise<void> {
      END`,
   ).run();
 
-  await addColumnIfMissing(env, "gpt_generation_runs", "source_card_id", "TEXT");
+    await addColumnIfMissing(env, "gpt_generation_runs", "source_card_id", "TEXT");
+  await addColumnIfMissing(env, "gpt_generation_runs", "source_card_family_id", "TEXT");
+  await addColumnIfMissing(env, "gpt_generation_runs", "source_card_version_number", "INTEGER");
+  await addColumnIfMissing(env, "gpt_generation_runs", "adaptation_plan_json", "TEXT");
+  await addColumnIfMissing(env, "gpt_generation_runs", "prior_adaptation_context_json", "TEXT");
 }
+
 
 async function ensureGptGenerationDraftsTable(env: Env): Promise<void> {
   await ensureGptGenerationRunsTable(env);
