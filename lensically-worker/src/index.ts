@@ -8823,8 +8823,9 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "get_source_card",
     title: "Get source card",
-    description: "Use this to retrieve a source card by id for review, generation, gates, or owner handoff.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" } }, required: ["brand_key", "source_card_id"], additionalProperties: false },
+        description: "Retrieve a source card plus its canonical family, immutable version history, prior generation plans, drafts, published posts, and metric snapshots. Set include_history=false only when a compact card-only read is necessary.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, include_history: { type: "boolean", default: true } }, required: ["brand_key", "source_card_id"], additionalProperties: false },
+
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
