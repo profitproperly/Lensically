@@ -996,8 +996,27 @@ describe("operator mode MCP endpoint", () => {
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
       open_implementation_backlog: Array<Record<string, unknown>>;
     }>("getOperatorStartupContext");
-    expect(direct.bootstrap_version).toBe("operator-startup-v1");
+        expect(direct.bootstrap_version).toBe("operator-startup-v2");
+    expect(direct.collaboration_contract.version).toBe("operator-collaboration-v1");
+    expect(direct.collaboration_contract.principles.join(" ")).toContain("independent judgment");
+    expect(direct.collaboration_contract.durable_change_reporting.required_fields).toEqual(expect.arrayContaining([
+      "change_name",
+      "primary_system_layer",
+      "scope_universal_or_account_scoped",
+      "survives_new_chats_because",
+    ]));
+    expect(direct.collaboration_contract.system_layers.map((layer) => layer.key)).toEqual(expect.arrayContaining([
+      "backend_behavior",
+      "workflow_requirement",
+      "mcp_contract",
+      "data_model",
+      "gate_evaluator",
+      "regression_test",
+      "startup_contract",
+      "supporting_memory",
+    ]));
     expect(direct.tool_surface.total_tools).toBe(listed.tools.length);
+
     expect(direct.account_data_loaded).toBe(false);
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
