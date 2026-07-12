@@ -455,7 +455,79 @@ describe("operator mode backend spine", () => {
 
   }, 30000);
 
+    it("allows a reusable exact hook while blocking the copied complete source package", async () => {
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
+    const batchId = crypto.randomUUID();
+    const selectionId = crypto.randomUUID();
+    const sourceText = "IF YOUR FINGER TOUCHED THIS, Something is shifting in your favour across JULY.\nLET IT HAPPEN.";
+    await env.DB.prepare(
+      `INSERT INTO operator_source_selection_batches (id, brand_key, workflow_session_id, selection_method, eligibility_min_likes, qualified_pool_count, requested_count, selected_count, selected_at, metadata_json)
+       VALUES (?, 'manifest_mental', ?, 'test_fixture', 1000, 1, 1, 1, CURRENT_TIMESTAMP, '{}')`,
+    ).bind(batchId, session.workflow_session_id).run();
+    await env.DB.prepare(
+      `INSERT INTO operator_source_selections (id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key, source_type, internal_source_id, threads_post_id, canonical_source_url, post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at)
+       VALUES (?, ?, 'manifest_mental', ?, 1, 'threads:contract-1', 'saved_pattern', 'contract-1', 'contract-1', 'https://www.threads.com/@fixture/post/contract-1', ?, NULL, '{"likes":1700}', ?, CURRENT_TIMESTAMP)`,
+    ).bind(selectionId, batchId, session.workflow_session_id, sourceText, JSON.stringify({ source_identity_key: "threads:contract-1", source_type: "saved_pattern", internal_source_id: "contract-1", threads_post_id: "contract-1", text: sourceText, metrics: { likes: 1700 } })).run();
+    const card = await operatorTool<{ source_card_id: string }>("create_source_card", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      source_selection_id: selectionId,
+      title: "Finger-touch source",
+      source_mechanism: "Touch becomes personal selection for an imminent outcome.",
+      required_product: "Personal confirmation of a desirable near-term outcome.",
+      transformation_contract: {
+        must_preserve_exact: ["If your finger touched this"],
+        must_preserve_function: ["Physical contact with the post acts as personal selection."],
+        may_reuse: ["If your finger touched this"],
+        must_transform: [
+          { source_text: "Something is shifting in your favour", role: "payoff" },
+          { source_text: "LET IT HAPPEN", role: "closing" },
+        ],
+        forbidden_complete_combinations: [{ surfaces: ["If your finger touched this", "Something is shifting in your favour", "JULY", "LET IT HAPPEN"], min_matches: 4 }],
+        audience_reward: "Personal confirmation that a desired outcome is approaching.",
+        time_or_context_requirements: ["A named month or near-term time boundary is present."],
+      },
+      forbidden_surfaces: ["If your finger touched this", "Something is shifting in your favour", "LET IT HAPPEN"],
+      pass_conditions: ["Reusable hook remains and payoff changes."],
+      fail_conditions: ["Complete original package is copied."],
+    });
+    await operatorTool("lock_source_card", { brand_key: "manifest_mental", source_card_id: card.source_card_id });
+    const run = await operatorTool<{ run_id: string }>("create_generation_run", {
+      brand_key: "manifest_mental",
+      source_card_id: card.source_card_id,
+      adaptation_plan: { adaptation_goal: "Create a money adaptation.", retained_exact_surfaces: ["If your finger touched this"], transformed_elements: ["payoff", "closing"] },
+    });
+    const analysis = {
+      opening_phrase: "If your finger touched this",
+      realm_entrance_key: "finger_touch",
+      preserved_functions: ["Physical contact with the post acts as personal selection."],
+      transformed_elements: ["payoff", "closing"],
+      satisfied_time_or_context_requirements: ["A named month or near-term time boundary is present."],
+      audience_reward_delivered: true,
+    };
+    const passing = await operatorTool<{ showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("submit_candidate_draft", {
+      brand_key: "manifest_mental",
+      run_id: run.run_id,
+      source_card_id: card.source_card_id,
+      text: "If your finger touched this, a money breakthrough is finding you before July ends. Receive it.",
+      draft_analysis: analysis,
+    });
+    expect(passing.showable).toBe(true);
+    expect(passing.gate_results.find((result) => result.gate_key === "source_surface_copy_gate")?.result).toBe("pass");
+    const copied = await operatorTool<{ showable: boolean; blocking_failures: Array<{ gate_key: string }> }>("submit_candidate_draft", {
+      brand_key: "manifest_mental",
+      run_id: run.run_id,
+      source_card_id: card.source_card_id,
+      text: sourceText,
+      draft_index: 2,
+      draft_analysis: analysis,
+    });
+    expect(copied.showable).toBe(false);
+    expect(copied.blocking_failures.some((failure) => failure.gate_key === "source_transformation_contract_gate")).toBe(true);
+  }, 30000);
+
   it("preserves a Saved Pattern ID across Threads URL and username changes", async () => {
+
     const firstResponse = await fetchFromWorker("/api/patterns/import", {
       method: "POST",
       headers: AUTH_HEADERS,
