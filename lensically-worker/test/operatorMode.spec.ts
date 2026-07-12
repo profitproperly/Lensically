@@ -221,7 +221,7 @@ describe("operator mode backend spine", () => {
     await resetTables();
   }, 30000);
 
-    it("ranks Manifest source candidates by absolute verified likes across archive and Saved Patterns", async () => {
+      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
     await operatorTool("list_accounts");
     await env.DB.prepare(
       `CREATE TABLE threads_posts_archive (
@@ -229,6 +229,7 @@ describe("operator mode backend spine", () => {
         post_id TEXT NOT NULL,
         post_text TEXT,
         post_timestamp TEXT,
+        post_permalink TEXT,
         views INTEGER NOT NULL DEFAULT 0,
         likes INTEGER NOT NULL DEFAULT 0,
         replies INTEGER NOT NULL DEFAULT 0,
@@ -244,57 +245,195 @@ describe("operator mode backend spine", () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         app_user_id TEXT NOT NULL,
         account_id TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'threads',
         source_url TEXT NOT NULL,
+        post_id TEXT,
         post_text TEXT NOT NULL,
         likes INTEGER NOT NULL DEFAULT 0,
         replies INTEGER NOT NULL DEFAULT 0,
         reposts INTEGER NOT NULL DEFAULT 0,
         shares INTEGER NOT NULL DEFAULT 0,
         views INTEGER,
-        posted_at TEXT
+        posted_at TEXT,
+        capture_confidence TEXT NOT NULL DEFAULT 'high',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     ).run();
     await env.DB.prepare(
       `INSERT INTO threads_posts_archive (
-        threads_user_id, post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink,
+        views, likes, replies, reposts, quotes, shares, engagement_total
       ) VALUES
-        ('manifest-mental', 'archive-1500', 'Archive winner by likes', '2026-07-10T12:00:00Z', 10000, 1500, 5, 2, 0, 1, 1508),
-        ('manifest-mental', 'archive-900', 'Archive post with larger non-like engagement', '2026-07-11T12:00:00Z', 50000, 900, 2000, 100, 0, 50, 3050)`,
+        ('manifest-mental', 'archive-1500', 'Archive winner', '2026-07-10T12:00:00Z', 'https://www.threads.com/@manifestmental/post/archive-1500', 10000, 1500, 5, 2, 0, 1, 1508),
+        ('manifest-mental', 'archive-900', 'Archive below threshold', '2026-07-11T12:00:00Z', 'https://www.threads.com/@manifestmental/post/archive-900', 50000, 900, 2000, 100, 0, 50, 3050)`,
     ).run();
+    for (let index = 1; index <= 26; index += 1) {
+      await env.DB.prepare(
+        `INSERT INTO external_patterns (
+          app_user_id, account_id, platform, source_url, post_id, post_text,
+          likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+        ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, ?, 2, 1, 0, 20000, '2026-07-11T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+      ).bind(
+        `https://www.threads.com/@creator/post/pattern-${index}`,
+        `pattern-${index}`,
+        `Qualified pattern ${index}`,
+        1000 + index,
+      ).run();
+    }
     await env.DB.prepare(
       `INSERT INTO external_patterns (
-        app_user_id, account_id, source_url, post_text, likes, replies, reposts, shares, views, posted_at
-      ) VALUES
-        ('lensically', 'manifest-mental', 'https://threads.net/top-pattern', 'Top Saved Pattern', 5000, 2, 1, 0, 20000, '2026-01-01T12:00:00Z'),
-        ('lensically', 'manifest-mental', 'https://threads.net/high-engagement-pattern', 'Saved Pattern with more replies than likes', 1200, 5000, 500, 100, 60000, '2026-07-11T12:00:00Z')`,
+        app_user_id, account_id, platform, source_url, post_id, post_text,
+        likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+      ) VALUES ('lensically', 'manifest-mental', 'threads', 'https://www.threads.com/@creator/post/below', 'below', 'Below threshold pattern', 999, 5000, 500, 100, 60000, '2026-07-11T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
     ).run();
 
-    const result = await mcpTool<{
+    const listed = await mcpTool<{
       candidates: Array<{
         source_candidate_id: string;
+        source_identity_key: string;
         metrics: { likes: number };
-        factor_1: { name: string; market_demand_score: number };
-        factor_1_rank: number;
+        eligibility: { threshold: number; qualified: boolean };
+        factor_1_rank?: number;
       }>;
       total_count: number;
+      eligibility_min_likes: number;
     }>("list_source_candidates", {
       brand_key: "manifest_mental",
-      limit: 10,
+      limit: 100,
       offset: 0,
     });
 
-    expect(result.total_count).toBe(4);
-    expect(result.candidates.map((candidate) => candidate.source_candidate_id)).toEqual([
-      "saved_pattern:1",
-      "archive_post:archive-1500",
-      "saved_pattern:2",
-      "archive_post:archive-900",
-    ]);
-    expect(result.candidates.map((candidate) => candidate.metrics.likes)).toEqual([5000, 1500, 1200, 900]);
-    expect(result.candidates.map((candidate) => candidate.factor_1.market_demand_score)).toEqual([5000, 1500, 1200, 900]);
-    expect(result.candidates.map((candidate) => candidate.factor_1_rank)).toEqual([1, 2, 3, 4]);
-    expect(result.candidates.every((candidate) => candidate.factor_1.name === "absolute_verified_like_count")).toBe(true);
+    expect(listed.total_count).toBe(27);
+    expect(listed.eligibility_min_likes).toBe(1000);
+    expect(listed.candidates.every((candidate) => candidate.metrics.likes >= 1000)).toBe(true);
+    expect(listed.candidates.every((candidate) => candidate.eligibility.qualified)).toBe(true);
+    expect(listed.candidates.every((candidate) => candidate.factor_1_rank === undefined)).toBe(true);
+
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
+      brand_key: "manifest_mental",
+    });
+    const draw = await operatorTool<{
+      source_batch_id: string;
+      selected_count: number;
+      qualified_pool_count: number;
+      posting_order_source: string;
+      cross_day_cooldown_applied: boolean;
+      selections: Array<{
+        source_selection_id: string;
+        draw_order: number;
+        source_identity_key: string;
+        metrics_snapshot: { likes: number; captured_at: string };
+      }>;
+    }>("draw_source_candidate_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+    });
+
+    expect(draw.selected_count).toBe(24);
+    expect(draw.qualified_pool_count).toBe(27);
+    expect(draw.posting_order_source).toBe("draw_order");
+    expect(draw.cross_day_cooldown_applied).toBe(false);
+    expect(draw.selections.map((selection) => selection.draw_order)).toEqual(Array.from({ length: 24 }, (_, index) => index + 1));
+    expect(new Set(draw.selections.map((selection) => selection.source_identity_key)).size).toBe(24);
+    expect(draw.selections.every((selection) => selection.metrics_snapshot.likes >= 1000)).toBe(true);
+
+    const persisted = await operatorTool<{
+      selections: Array<{ source_selection_id: string; draw_order: number }>;
+    }>("get_source_candidate_batch", {
+      brand_key: "manifest_mental",
+      source_batch_id: draw.source_batch_id,
+    });
+    expect(persisted.selections.map((selection) => selection.source_selection_id)).toEqual(
+      draw.selections.map((selection) => selection.source_selection_id),
+    );
+    expect(persisted.selections.map((selection) => selection.draw_order)).toEqual(Array.from({ length: 24 }, (_, index) => index + 1));
+
+    const first = draw.selections[0];
+    const card = await operatorTool<{ source_card_id: string; source_selection_id: string }>("create_source_card", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      source_selection_id: first.source_selection_id,
+      title: "Random draw source card",
+      source_mechanism: "Extract and rebuild the audience reward.",
+      required_product: "One original Manifest Mental post.",
+      forbidden_surfaces: [],
+      pass_conditions: ["Preserves the audience payoff."],
+      fail_conditions: ["Copies the source wording."],
+    });
+    expect(card.source_selection_id).toBe(first.source_selection_id);
+
+    const storedCard = await operatorTool<{
+      source_card: { primary_source: Record<string, unknown>; metrics_snapshot: { likes: number } };
+    }>("get_source_card", {
+      brand_key: "manifest_mental",
+      source_card_id: card.source_card_id,
+    });
+    expect(storedCard.source_card.primary_source.source_selection_id).toBe(first.source_selection_id);
+    expect(storedCard.source_card.metrics_snapshot.likes).toBe(first.metrics_snapshot.likes);
+
+    const duplicateResponse = await fetchFromWorker("/api/operator/tools/create_source_card", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        brand_key: "manifest_mental",
+        workflow_session_id: session.workflow_session_id,
+        source_selection_id: first.source_selection_id,
+        title: "Duplicate card",
+        source_mechanism: "Duplicate",
+        required_product: "Duplicate",
+        forbidden_surfaces: [],
+        pass_conditions: [],
+        fail_conditions: [],
+      }),
+    });
+    expect(duplicateResponse.status).toBe(400);
   }, 30000);
+
+  it("preserves a Saved Pattern ID across Threads URL and username changes", async () => {
+    const firstResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        app_user_id: "lensically",
+        account_id: "manifest-mental",
+        source_url: "https://www.threads.net/@oldname/post/ABC123?xmt=example",
+        post_text: "The same source post.",
+        likes: 1200,
+        views: 10000,
+        posted_at: "2026-07-10T12:00:00Z",
+        capture_confidence: "high",
+      }),
+    });
+    expect(firstResponse.status).toBe(200);
+    const first = await firstResponse.json() as { pattern: { id: number; post_id: string; source_url: string; likes: number } };
+
+    const secondResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        app_user_id: "lensically",
+        account_id: "manifest-mental",
+        source_url: "https://threads.com/@newname/post/ABC123/",
+        post_text: "The same source post refreshed.",
+        likes: 2500,
+        views: 20000,
+        posted_at: "2026-07-10T12:00:00Z",
+        capture_confidence: "high",
+      }),
+    });
+    expect(secondResponse.status).toBe(200);
+    const second = await secondResponse.json() as { pattern: { id: number; post_id: string; source_url: string; likes: number } };
+
+    expect(second.pattern.id).toBe(first.pattern.id);
+    expect(second.pattern.post_id).toBe("ABC123");
+    expect(second.pattern.likes).toBe(2500);
+    expect(second.pattern.source_url).toBe("https://www.threads.com/@newname/post/ABC123");
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM external_patterns WHERE app_user_id = 'lensically' AND account_id = 'manifest-mental'`,
+    ).first<{ total: number }>();
+    expect(Number(count?.total ?? 0)).toBe(1);
+  }, 30000);
+
 
   it("runs the source-card to approved schedule path", async () => {
     const { sourceCardId, runId } = await createLockedSourceCard();
