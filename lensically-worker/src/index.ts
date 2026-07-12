@@ -7921,7 +7921,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         recommended_direction: { type: "string" },
         context_admission_id: { type: "string" },
       },
-      required: ["brand_key", "sequence_label", "title", "primary_source", "source_mechanism", "required_product", "forbidden_surfaces", "pass_conditions", "fail_conditions"],
+            required: ["brand_key", "title", "source_mechanism", "required_product", "forbidden_surfaces", "pass_conditions", "fail_conditions"],
+
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
