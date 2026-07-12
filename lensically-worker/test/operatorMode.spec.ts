@@ -259,9 +259,14 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
   const run = await operatorTool<{ run_id: string }>("create_generation_run", {
     brand_key: brandKey,
 
-    source_card_id: card.source_card_id,
-    objective: "Generate one candidate",
+        source_card_id: card.source_card_id,
+    adaptation_plan: {
+      adaptation_goal: "Generate one distinct candidate from the locked source card.",
+      transformed_elements: ["payoff"],
+      intentionally_different_from_prior: "Fixture run has no prior use or creates a new payoff.",
+    },
     prompt_summary: "Use the locked source card.",
+
   });
   return { sessionId: session.workflow_session_id, sourceCardId: card.source_card_id, runId: run.run_id };
 }
