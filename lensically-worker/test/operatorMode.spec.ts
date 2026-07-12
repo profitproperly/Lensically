@@ -447,7 +447,12 @@ describe("operator mode backend spine", () => {
         fail_conditions: [],
       }),
     });
-    expect(duplicateResponse.status).toBe(400);
+        expect(duplicateResponse.status).toBe(200);
+    const duplicateData = await duplicateResponse.json() as { source_card_id: string; reused_existing: boolean; reason: string };
+    expect(duplicateData.source_card_id).toBe(card.source_card_id);
+    expect(duplicateData.reused_existing).toBe(true);
+    expect(duplicateData.reason).toBe("selection_already_resolved");
+
   }, 30000);
 
   it("preserves a Saved Pattern ID across Threads URL and username changes", async () => {
