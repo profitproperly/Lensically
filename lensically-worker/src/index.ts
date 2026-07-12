@@ -7342,16 +7342,28 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       return operatorJsonResponse({ success: false, error: "primary_source is required" }, 400);
     }
 
-    await env.DB.prepare(
-      `INSERT INTO operator_source_cards (
-        id, brand_key, workflow_session_id, sequence_label, lane_key, title, status,
-        primary_source_json, secondary_sources_json, anti_sources_json, metrics_snapshot_json,
-        source_mechanism, required_product, forbidden_surfaces_json, danger_surfaces_json,
-        current_inventory_constraints_json, pass_conditions_json, fail_conditions_json,
-        recommended_direction, context_admission_id, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
+        const sourceCardStatements = [];
+    if (supersedesSourceCardId) {
+      sourceCardStatements.push(
+        env.DB.prepare(
+          `UPDATE operator_source_cards
+           SET is_current = 0
+           WHERE id = ?
+             AND brand_key = ?`,
+        ).bind(supersedesSourceCardId, brand.brand_key),
+      );
+    }
+    sourceCardStatements.push(
+      env.DB.prepare(
+        `INSERT INTO operator_source_cards (
+          id, brand_key, workflow_session_id, sequence_label, lane_key, title, status,
+          primary_source_json, secondary_sources_json, anti_sources_json, metrics_snapshot_json,
+          source_mechanism, required_product, forbidden_surfaces_json, danger_surfaces_json,
+          current_inventory_constraints_json, pass_conditions_json, fail_conditions_json,
+          recommended_direction, context_admission_id, created_by, family_id, source_selection_id,
+          version_number, is_current, supersedes_source_card_id, version_reason, transformation_contract_json
+        ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      ).bind(
         sourceCardId,
         brand.brand_key,
         workflowSessionId,
@@ -7372,17 +7384,46 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         normalizeOperatorText(payload.recommended_direction, 4000, true),
         normalizeOperatorText(payload.context_admission_id, 120, true),
         normalizeOperatorMachineKey(payload.created_by, "gpt"),
-      )
-      .run();
-    if (sourceSelectionId) {
-      await env.DB.prepare(
-        `UPDATE operator_source_selections
-         SET source_card_id = ?
-         WHERE id = ?
-           AND brand_key = ?
-           AND source_card_id IS NULL`,
-      ).bind(sourceCardId, sourceSelectionId, brand.brand_key).run();
+        familyId,
+        sourceSelectionId,
+        versionNumber,
+        supersedesSourceCardId,
+        versionReason,
+        normalizeOperatorJson(transformationContract, {}),
+      ),
+    );
+    if (familyId) {
+      sourceCardStatements.push(
+        env.DB.prepare(
+          `UPDATE operator_source_card_families
+           SET current_source_card_id = ?,
+               threads_post_id = COALESCE(threads_post_id, ?),
+               canonical_source_url = COALESCE(?, canonical_source_url),
+               status = 'active'
+           WHERE id = ?
+             AND brand_key = ?`,
+        ).bind(
+          sourceCardId,
+          (primarySource as Record<string, unknown>)?.threads_post_id ?? null,
+          (primarySource as Record<string, unknown>)?.canonical_source_url ?? null,
+          familyId,
+          brand.brand_key,
+        ),
+      );
     }
+    if (sourceSelectionId) {
+      sourceCardStatements.push(
+        env.DB.prepare(
+          `UPDATE operator_source_selections
+           SET source_card_id = ?
+           WHERE id = ?
+             AND brand_key = ?
+             AND source_card_id IS NULL`,
+        ).bind(sourceCardId, sourceSelectionId, brand.brand_key),
+      );
+    }
+    await env.DB.batch(sourceCardStatements);
+
     const card = await getOperatorSourceCard(env, brand.brand_key, sourceCardId);
     if (workflowSessionId) {
       await env.DB.prepare(
