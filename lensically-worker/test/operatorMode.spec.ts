@@ -784,8 +784,14 @@ describe("operator mode MCP endpoint", () => {
       source: "active_operator_session",
       coverage_status: "complete",
     });
-    expect(preflight.structuredContent.sections.find((section) => section.section === "source_candidates")).toMatchObject({ limit: 1 });
-    expect(preflight.structuredContent.sections.find((section) => section.section === "strategy_memory")).toMatchObject({ limit: 1 });
+        expect(preflight.structuredContent.sections.find((section) => section.section === "source_candidates")).toMatchObject({
+      source: "direct_db_count",
+      coverage_status: "complete",
+    });
+    expect(preflight.structuredContent.sections.find((section) => section.section === "strategy_memory")).toMatchObject({
+      source: "direct_db_count",
+      coverage_status: "complete",
+    });
   }, 30000);
 
   it("returns structured JSON-RPC errors for handler exceptions", async () => {
