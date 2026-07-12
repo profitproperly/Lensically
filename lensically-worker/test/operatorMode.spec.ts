@@ -718,7 +718,13 @@ describe("operator mode backend spine", () => {
           run_id: runId,
           source_card_id: sourceCardId,
           text,
-          draft_analysis: { opening_phrase: text.split(" ").slice(0, 4).join(" "), realm_entrance_key: text.slice(0, 12), lane_key: "systems" },
+                    draft_analysis: {
+            opening_phrase: text.split(" ").slice(0, 4).join(" "),
+            realm_entrance_key: text.slice(0, 12),
+            lane_key: "systems",
+            audience_reward_delivered: brandKey === "manifest_mental" ? true : undefined,
+          },
+
         });
         expect(draft.draft_id).toBeTruthy();
       }
