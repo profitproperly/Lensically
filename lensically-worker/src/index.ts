@@ -1147,9 +1147,23 @@ async function transitionScheduledPostStatus(
     bindings.push(toStatus, context.publishErrorMessage ?? null, postId, fromStatus);
   }
 
-  const result = await env.DB.prepare(query).bind(...bindings).run();
-  return Number(result.meta?.changes ?? 0) > 0;
+    const result = await env.DB.prepare(query).bind(...bindings).run();
+  const changed = Number(result.meta?.changes ?? 0) > 0;
+  if (
+    changed
+    && toStatus === SCHEDULED_POST_STATUS_POSTED
+    && context.publishedPostId
+    && await doesTableExist(env, "gpt_generation_drafts")
+  ) {
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'published', published_post_id = ?
+       WHERE scheduled_post_id = ?`,
+    ).bind(context.publishedPostId, postId).run();
+  }
+  return changed;
 }
+
 
 async function recoverStalePostingScheduledPosts(env: Env): Promise<void> {
   const staleCutoffIso = new Date(Date.now() - SCHEDULED_POST_STALE_POSTING_WINDOW_MS).toISOString();
