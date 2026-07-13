@@ -10271,9 +10271,10 @@ async function operatorMcpInitializeResult(env: Env, requestedVersion: unknown):
   const protocolVersion = typeof requestedVersion === "string" && requestedVersion.trim()
     ? requestedVersion.trim()
     : "2025-06-18";
-  const toolCount = buildOperatorMcpBaseTools(false).length;
+    const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
   return {
     protocolVersion,
+
     capabilities: {
       tools: { listChanged: true },
     },
