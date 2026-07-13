@@ -925,7 +925,10 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
                 expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
-    expect(initialized.instructions).toContain("include proceed_confirmed=true on account-scoped calls");
+        expect(initialized.instructions).toContain("include proceed_confirmed=true on account-scoped calls");
+    expect(initialized.instructions).toContain("generation_run_and_candidates and gate_evaluation are silent internal stages");
+    expect(initialized.instructions).toContain("The next owner approval question must occur only after a draft passed all blocking gates");
+    expect(initialized.instructions).toContain("If no candidate becomes showable, report the blocker or generation failure instead of asking for approval");
     expect(toolNames.slice(0, 24)).toEqual([
       "getOperatorStartupContext",
       "engineeringPrecheck",
