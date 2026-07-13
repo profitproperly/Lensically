@@ -317,6 +317,9 @@ const MANIFEST_SOURCE_MIN_VERIFIED_LIKES = 1000;
 const MANIFEST_DAILY_SOURCE_DRAW_SIZE = 24;
 const OPERATOR_COLLABORATION_CONTRACT_VERSION = "operator-collaboration-v1";
 const SOURCE_TRANSFORMATION_CONTRACT_VERSION = "source-transformation-v1";
+const OPERATOR_REJECTION_CONTEXT_VERSION = "operator-rejection-context-v1";
+const OPERATOR_REJECTION_CONTEXT_LIMIT = 200;
+
 
 const OPERATOR_SYSTEM_LAYER_GLOSSARY = [
   { key: "backend_behavior", label: "Backend behavior", purpose: "Server-enforced acceptance, rejection, creation, linking, and mutation rules." },
