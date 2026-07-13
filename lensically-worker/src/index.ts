@@ -9419,14 +9419,14 @@ function operatorStartupFallbackRoutes(): string[] {
 }
 
 async function buildOperatorStartupContext(request: Request, env: Env): Promise<Record<string, unknown>> {
-  await prepareOperatorMode(env);
   const config = githubRepoConfig(env);
   const tools = await buildOperatorMcpTools(env, true, false);
-  const allTools = await buildOperatorMcpTools(env, true, true);
   const toolNames = tools.map((tool) => tool.name);
   const adminNames = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES);
   const engineeringNames = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES);
-  const accountWrapperTools = allTools.map((tool) => tool.name).filter((name) => /^(mm|om|vx)_/.test(name)).slice(0, 80);
+  const accountWrapperTools = ["mm", "om", "vx"].flatMap((prefix) =>
+    OPERATOR_MCP_TOOLS.filter((tool) => tool.name !== "list_accounts").map((tool) => `${prefix}_${tool.name}`)
+  ).slice(0, 80);
   const operatorTools = toolNames
     .filter((name) => !adminNames.has(name) && !engineeringNames.has(name) && !accountWrapperTools.includes(name))
     .slice(0, 80);
@@ -9472,7 +9472,6 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
      ORDER BY version DESC
      LIMIT 1`,
   ).first<Record<string, unknown>>();
-  const initialize = await operatorMcpInitializeResult(env, "2025-06-18");
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
   return {
     ok: true,
@@ -9518,7 +9517,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       github_available: branch.ok,
     },
     runtime: {
-      mcp_version: (initialize.serverInfo as Record<string, unknown> | undefined)?.version ?? null,
+      mcp_version: OPERATOR_MCP_VERSION,
       active_runtime_deployment: lastDeployment ?? null,
     },
     source_documents: sourceDocuments,
