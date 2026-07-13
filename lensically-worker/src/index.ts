@@ -10461,9 +10461,10 @@ async function getOperatorMcpBoundaryBlock(
   if (!operatorMcpCallRequiresProceed(toolName, args) || operatorMcpProceedConfirmed(toolName, args)) {
     return null;
   }
-  const requestedBrand = requestedMcpBrandKey(toolName, args);
-  const toolCount = buildOperatorMcpBaseTools(false).length;
+    const requestedBrand = requestedMcpBrandKey(toolName, args);
+  const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
   return {
+
     ok: false,
     error: "explicit_proceed_required",
     selected_key: requestedBrand,
