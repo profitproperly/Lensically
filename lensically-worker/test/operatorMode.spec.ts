@@ -1063,7 +1063,8 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const direct = await mcpTool<{
             bootstrap_version: string;
-      collaboration_contract: { version: string; principles: string[]; durable_change_reporting: { required_fields: string[] }; system_layers: Array<{ key: string }> };
+            collaboration_contract: { version: string; principles: string[]; durable_change_reporting: { required_fields: string[] }; system_layers: Array<{ key: string }> };
+      owner_interaction_contract: { version: string; silent_stages: string[]; owner_visible_checkpoints: string[]; rules: string[]; next_owner_decision_after_source_card: string };
       account_data_loaded: boolean;
 
       no_account_sections_present: boolean;
