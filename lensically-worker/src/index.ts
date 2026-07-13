@@ -10256,8 +10256,12 @@ function operatorMcpInstructions(toolCount: number): string {
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
     "Proceed to the next step?",
             "Only after the user explicitly approves proceeding, call confirmOperatorProceed. If the direct tool is not exposed, call listMcpTools with execute_tool=confirmOperatorProceed and brand_key. Then include proceed_confirmed=true on account-scoped calls; use the bridge when a cached direct schema does not expose that field.",
-        "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.",
+                "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.",
+    "Rejection-memory rule: every generation run must load and persist the selected account's complete owner-rejection context. Review that context before drafting and use it during silent self-rejection so the owner never has to repeat an existing rejection lesson in a new chat.",
+    "For historical_owner_rejection_gate, submit auditable model evidence containing the exact context_fingerprint and reviewed_rejection_count returned in account_rejection_context. Explicit banned surfaces, close matches to rejected drafts, partial review, a missing required gate, or a claimed gate that did not actually execute must keep showable=false.",
+    "Never claim that a gate passed unless that exact gate_key appears in the backend gate_results response with a passing result.",
     "Owner-interaction rule: after the owner approves and locks a source card, generation_run_and_candidates and gate_evaluation are silent internal stages. Create the generation run, generate and self-reject candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
+
     "Do not present generation-run creation, adaptation-plan persistence, candidate-pool creation, self-rejection, draft submission, or gate execution as separate owner-facing steps. The next owner approval question must occur only after a draft passed all blocking gates, returned showable=true, and was marked shown.",
     "If no candidate becomes showable, report the blocker or generation failure instead of asking for approval. Ask separately for scheduling confirmation only after the owner approves the shown draft.",
   ].join("\n");
