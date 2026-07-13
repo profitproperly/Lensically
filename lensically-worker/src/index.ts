@@ -6263,9 +6263,11 @@ async function getOperatorSourceCardHistory(
        r.id AS run_id,
        r.source_card_id,
        r.source_card_family_id,
-       r.source_card_version_number,
+              r.source_card_version_number,
        r.adaptation_plan_json,
+       r.prior_adaptation_context_json,
        r.status AS run_status,
+
        r.created_at AS run_created_at,
        d.id AS draft_id,
        d.draft_index,
