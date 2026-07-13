@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:live": "node scripts/live-smoke.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260713.1",

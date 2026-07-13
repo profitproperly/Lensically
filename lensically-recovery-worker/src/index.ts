@@ -1,6 +1,9 @@
 interface Env {
   GITHUB_TOKEN: string;
   RECOVERY_MCP_ACCESS_TOKEN: string;
+  CLOUDFLARE_API_TOKEN: string;
+  CLOUDFLARE_ACCOUNT_ID: string;
+  RECOVERY_SESSIONS: KVNamespace;
   RECOVERY_MCP_OAUTH_CLIENT_ID?: string;
   GITHUB_OWNER?: string;
   GITHUB_REPO?: string;
@@ -18,7 +21,7 @@ type Tool = {
   annotations: Record<string, unknown>;
 };
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const JSON_HEADERS = { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store" };
 const TOOLS: Tool[] = [
   { name: "recoveryHealth", title: "Recovery health", description: "Verify the independent recovery plane and the main Lensically health endpoint.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
@@ -30,6 +33,13 @@ const TOOLS: Tool[] = [
   { name: "runGitHubWorkflow", title: "Run GitHub workflow", description: "Dispatch a typecheck, operator-tests, gpt-memory-tests, or worker-deploy recovery task.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"] }, ref: { type: "string" } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
   { name: "getGitHubWorkflowRun", title: "Get workflow run", description: "Read one workflow run and its jobs.", inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
   { name: "verifyMainMcp", title: "Verify main MCP", description: "Probe main Lensically health, OAuth metadata, initialize, and unauthenticated transport behavior without enumerating account data.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
+  { name: "getCloudflareWorkerState", title: "Get Cloudflare Worker state", description: "Inspect main Worker deployments, versions, settings/bindings, and account custom domains.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
+  { name: "queryCloudflareTelemetry", title: "Query Cloudflare telemetry", description: "Run a bounded raw Workers Observability telemetry query for logs, invocations, errors, or traces. Pass the Cloudflare telemetry query body directly.", inputSchema: { type: "object", properties: { query: { type: "object", additionalProperties: true } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
+  { name: "rollbackMainWorker", title: "Rollback main Worker", description: "Promote one existing main Worker version to 100% traffic. Requires an exact version ID, reason, and owner_approval=true.", inputSchema: { type: "object", properties: { version_id: { type: "string" }, reason: { type: "string" }, owner_approval: { type: "boolean" } }, required: ["version_id", "reason", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true } },
+  { name: "startRepoFileWrite", title: "Start repository file write", description: "Start a KV-backed chunked create/replace session for a repository file.", inputSchema: { type: "object", properties: { path: { type: "string" }, mode: { type: "string", enum: ["create", "replace"] }, message: { type: "string" } }, required: ["path", "mode", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
+  { name: "appendRepoFileChunk", title: "Append repository file chunk", description: "Append a text chunk to an open recovery write session.", inputSchema: { type: "object", properties: { session_id: { type: "string" }, chunk: { type: "string" } }, required: ["session_id", "chunk"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
+  { name: "commitRepoFileWrite", title: "Commit repository file write", description: "Commit a completed recovery write session to GitHub and delete the temporary KV session.", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
+  { name: "runMainMcpSmoke", title: "Run main MCP smoke", description: "Run the complete live main-MCP path: health, OAuth discovery, authorization code exchange, initialize, tools/list, and getOperatorStartupContext.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
 ];
 
 function json(payload: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -56,6 +66,27 @@ function safePath(value: unknown): string {
 async function github(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
   const response = await fetch(`https://api.github.com${path}`, { ...init, headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_TOKEN}`, "user-agent": "lensically-recovery", "x-github-api-version": "2022-11-28", ...(init.headers || {}) } });
   return { ok: response.ok, status: response.status, data: await response.json().catch(() => null) };
+}
+
+async function cloudflare(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; result: unknown; errors: unknown }> {
+  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, { ...init, headers: { authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`, "content-type": "application/json", ...(init.headers || {}) } });
+  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  return { ok: response.ok && payload?.success !== false, status: response.status, result: payload?.result ?? null, errors: payload?.errors ?? [] };
+}
+
+type RecoveryWriteSession = { id: string; path: string; mode: "create" | "replace"; message: string; content: string; created_at: string; updated_at: string };
+
+async function readRecoverySession(env: Env, id: string): Promise<RecoveryWriteSession | null> {
+  return env.RECOVERY_SESSIONS.get(`write:${id}`, "json");
+}
+
+async function writeRecoverySession(env: Env, session: RecoveryWriteSession): Promise<void> {
+  await env.RECOVERY_SESSIONS.put(`write:${session.id}`, JSON.stringify(session), { expirationTtl: 24 * 60 * 60 });
+}
+
+async function mainMcpRequest(origin: string, token: string, id: number, method: string, params: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> | null }> {
+  const response = await fetch(`${origin}/api/operator/mcp`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id, method, params }) });
+  return { status: response.status, body: await response.json().catch(() => null) as Record<string, unknown> | null };
 }
 
 function base64ToText(value: string): string {
@@ -156,6 +187,89 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       fetch(`${origin}/api/operator/mcp`),
     ]);
     return { ok: health.ok && oauth.ok && mcpGet.status === 405, health: { status: health.status, body: await health.json().catch(() => null) }, oauth: { status: oauth.status, body: await oauth.json().catch(() => null) }, mcp_get_status: mcpGet.status };
+  }
+  if (name === "getCloudflareWorkerState") {
+    const account = encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID);
+    const [deployments, versions, settings, domains] = await Promise.all([
+      cloudflare(env, `/accounts/${account}/workers/scripts/lensically-worker/deployments`),
+      cloudflare(env, `/accounts/${account}/workers/workers/lensically-worker/versions?per_page=20`),
+      cloudflare(env, `/accounts/${account}/workers/scripts/lensically-worker/settings`),
+      cloudflare(env, `/accounts/${account}/workers/domains`),
+    ]);
+    const deploymentRows = Array.isArray(deployments.result) ? deployments.result : [];
+    const versionPayload = versions.result && typeof versions.result === "object" ? versions.result as Record<string, unknown> : {};
+    const versionRows = Array.isArray(versionPayload.items) ? versionPayload.items : Array.isArray(versions.result) ? versions.result : [];
+    const domainRows = Array.isArray(domains.result) ? domains.result : [];
+    const settingsPayload = settings.result && typeof settings.result === "object" ? settings.result as Record<string, unknown> : {};
+    return {
+      ok: deployments.ok && settings.ok,
+      deployments: deploymentRows.slice(0, 20),
+      versions: versionRows.slice(0, 20),
+      bindings: Array.isArray(settingsPayload.bindings) ? settingsPayload.bindings : [],
+      compatibility_date: settingsPayload.compatibility_date ?? null,
+      compatibility_flags: settingsPayload.compatibility_flags ?? [],
+      custom_domains: domainRows.filter((row) => row && typeof row === "object" && String((row as Record<string, unknown>).service || "") === "lensically-worker"),
+      errors: { deployments: deployments.errors, versions: versions.errors, settings: settings.errors, domains: domains.errors },
+    };
+  }
+  if (name === "queryCloudflareTelemetry") {
+    const query = args.query && typeof args.query === "object" && !Array.isArray(args.query) ? args.query as Record<string, unknown> : null;
+    if (!query) return { ok: false, error: "telemetry_query_required" };
+    const result = await cloudflare(env, `/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID)}/workers/observability/telemetry/query`, { method: "POST", body: JSON.stringify(query) });
+    return { ok: result.ok, status: result.status, result: result.result, errors: result.errors };
+  }
+  if (name === "rollbackMainWorker") {
+    const versionId = String(args.version_id || "").trim(); const reason = String(args.reason || "").trim();
+    if (!versionId || !reason || args.owner_approval !== true) return { ok: false, error: "version_reason_and_owner_approval_required" };
+    const result = await cloudflare(env, `/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID)}/workers/scripts/lensically-worker/deployments`, { method: "POST", body: JSON.stringify({ strategy: "percentage", versions: [{ version_id: versionId, percentage: 100 }], annotations: { "workers/message": `Recovery rollback: ${reason}` } }) });
+    return { ok: result.ok, status: result.status, deployment: result.result, errors: result.errors };
+  }
+  if (name === "startRepoFileWrite") {
+    const path = safePath(args.path); const mode = String(args.mode || "") as "create" | "replace"; const message = String(args.message || "").trim();
+    if (!path || !["create", "replace"].includes(mode) || !message) return { ok: false, error: "path_mode_and_message_required" };
+    const existing = await repoFile(env, path);
+    if (mode === "create" && existing.ok) return { ok: false, error: "repo_file_already_exists" };
+    if (mode === "replace" && !existing.ok) return { ok: false, error: "repo_file_not_found" };
+    const id = crypto.randomUUID(); const now = new Date().toISOString();
+    await writeRecoverySession(env, { id, path, mode, message, content: "", created_at: now, updated_at: now });
+    return { ok: true, session_id: id, path, mode, expires_in_seconds: 86400 };
+  }
+  if (name === "appendRepoFileChunk") {
+    const id = String(args.session_id || ""); const chunk = typeof args.chunk === "string" ? args.chunk : ""; const session = await readRecoverySession(env, id);
+    if (!session) return { ok: false, error: "write_session_not_found_or_expired" };
+    if (!chunk) return { ok: false, error: "chunk_required" };
+    if (session.content.length + chunk.length > 750000) return { ok: false, error: "write_session_too_large", maximum_characters: 750000 };
+    session.content += chunk; session.updated_at = new Date().toISOString(); await writeRecoverySession(env, session);
+    return { ok: true, session_id: id, total_characters: session.content.length };
+  }
+  if (name === "commitRepoFileWrite") {
+    const id = String(args.session_id || ""); const session = await readRecoverySession(env, id); if (!session) return { ok: false, error: "write_session_not_found_or_expired" };
+    const existing = await repoFile(env, session.path);
+    if (session.mode === "create" && existing.ok) return { ok: false, error: "repo_file_now_exists" };
+    if (session.mode === "replace" && (!existing.ok || !existing.sha)) return { ok: false, error: "repo_file_no_longer_available" };
+    const body: Record<string, unknown> = { message: session.message, content: textToBase64(session.content), branch: config.branch };
+    if (session.mode === "replace") body.sha = existing.sha;
+    const result = await github(env, `/repos/${config.owner}/${config.repo}/contents/${session.path.split("/").map(encodeURIComponent).join("/")}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    if (result.ok) await env.RECOVERY_SESSIONS.delete(`write:${id}`);
+    const data = result.data as Record<string, unknown> | null;
+    return { ok: result.ok, status: result.status, path: session.path, commit_sha: (data?.commit as Record<string, unknown> | undefined)?.sha ?? null };
+  }
+  if (name === "runMainMcpSmoke") {
+    const origin = env.MAIN_MCP_ORIGIN || "https://api.lensically.com";
+    const redirect = "https://chatgpt.com/connector/oauth/lensically-recovery-smoke";
+    const clientId = "lensically-operator-mode";
+    const authorize = await fetch(`${origin}/api/operator/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirect)}&scope=operator_mode`, { redirect: "manual" });
+    const location = authorize.headers.get("location"); const code = location ? new URL(location).searchParams.get("code") : null;
+    if (authorize.status !== 302 || !code) return { ok: false, phase: "oauth_authorize", status: authorize.status };
+    const tokenResponse = await fetch(`${origin}/api/operator/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, redirect_uri: redirect, code }) });
+    const tokenBody = await tokenResponse.json().catch(() => null) as Record<string, unknown> | null; const token = typeof tokenBody?.access_token === "string" ? tokenBody.access_token : "";
+    if (!tokenResponse.ok || !token) return { ok: false, phase: "oauth_token", status: tokenResponse.status };
+    const initialize = await mainMcpRequest(origin, token, 1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "lensically-recovery", version: VERSION } });
+    const listed = await mainMcpRequest(origin, token, 2, "tools/list", {});
+    const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "getOperatorStartupContext", arguments: {} });
+    const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
+    const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    return { ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true, oauth: { authorize: authorize.status, token: tokenResponse.status }, initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null }, tools_list: { status: listed.status, count: tools.length, unique_count: new Set(tools.map((tool) => String(tool.name || ""))).size }, startup: { status: startup.status, ok: startupContent?.ok === true } };
   }
   return { ok: false, error: "unknown_recovery_tool" };
 }
