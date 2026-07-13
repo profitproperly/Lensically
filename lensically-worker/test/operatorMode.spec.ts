@@ -1160,8 +1160,10 @@ describe("operator mode MCP endpoint", () => {
     const direct = await mcpTool<{
             bootstrap_version: string;
             collaboration_contract: { version: string; principles: string[]; durable_change_reporting: { required_fields: string[] }; system_layers: Array<{ key: string }> };
-      owner_interaction_contract: { version: string; silent_stages: string[]; owner_visible_checkpoints: string[]; rules: string[]; next_owner_decision_after_source_card: string };
+            owner_interaction_contract: { version: string; silent_stages: string[]; owner_visible_checkpoints: string[]; rules: string[]; next_owner_decision_after_source_card: string };
+      rejection_memory_contract: { version: string; infrastructure_scope: string; evidence_scope: string; required_generation_behavior: string[]; required_gate_keys: string[]; showability_rule: string };
       account_data_loaded: boolean;
+
 
       no_account_sections_present: boolean;
       tool_surface: { total_tools: number; engineering_tools: string[]; admin_tools: string[]; account_wrapper_tools: string[] };
