@@ -6411,7 +6411,10 @@ async function listOperatorGates(
        ${stageClause}
        AND (lane_scope IS NULL OR lane_scope = ?)
        AND (content_type_scope IS NULL OR content_type_scope = ?)
-     ORDER BY order_index ASC, gate_key ASC`,
+          ORDER BY CASE WHEN gate_key = 'required_gate_execution_gate' THEN 1 ELSE 0 END ASC,
+              order_index ASC,
+              gate_key ASC`,
+
   )
     .bind(
       brandKey,
