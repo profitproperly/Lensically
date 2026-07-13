@@ -9851,9 +9851,11 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   return {
     ok: true,
         bootstrap_version: "operator-startup-v2",
-        collaboration_contract: OPERATOR_COLLABORATION_CONTRACT,
+                collaboration_contract: OPERATOR_COLLABORATION_CONTRACT,
     owner_interaction_contract: OPERATOR_OWNER_INTERACTION_CONTRACT,
+    rejection_memory_contract: OPERATOR_REJECTION_MEMORY_CONTRACT,
     captured_at: new Date().toISOString(),
+
     account_data_loaded: false,
 
             boundary: {
