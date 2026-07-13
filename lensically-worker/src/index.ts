@@ -6053,13 +6053,37 @@ async function seedDefaultOperatorGates(env: Env): Promise<void> {
   }
 }
 
+const operatorModePreparationByEnv = new WeakMap<object, Promise<void>>();
+
 async function prepareOperatorMode(env: Env): Promise<void> {
-  await ensureGptStrategyMemoryTable(env);
-  await ensureGptGenerationDraftsTable(env);
-  await ensureScheduledPostsTable(env);
-  await ensureOperatorWorkflowTables(env);
-  await ensureOperatorMcpAdminTables(env);
-  await seedDefaultOperatorGates(env);
+  if (hasTestRuntimeTokens(env)) {
+    await ensureGptStrategyMemoryTable(env);
+    await ensureGptGenerationDraftsTable(env);
+    await ensureScheduledPostsTable(env);
+    await ensureOperatorWorkflowTables(env);
+    await ensureOperatorMcpAdminTables(env);
+    await seedDefaultOperatorGates(env);
+    return;
+  }
+  const cached = operatorModePreparationByEnv.get(env as object);
+  if (cached) {
+    return cached;
+  }
+  const preparation = (async () => {
+    await ensureGptStrategyMemoryTable(env);
+    await ensureGptGenerationDraftsTable(env);
+    await ensureScheduledPostsTable(env);
+    await ensureOperatorWorkflowTables(env);
+    await ensureOperatorMcpAdminTables(env);
+    await seedDefaultOperatorGates(env);
+  })();
+  operatorModePreparationByEnv.set(env as object, preparation);
+  try {
+    await preparation;
+  } catch (error) {
+    operatorModePreparationByEnv.delete(env as object);
+    throw error;
+  }
 }
 
 function workflowTemplatePayload(): Record<string, unknown> {
@@ -9014,11 +9038,45 @@ function cloneOperatorMcpTool(tool: OperatorMcpToolDefinition): OperatorMcpToolD
 }
 
 async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, unknown>>> {
-  await ensureOperatorMcpAdminTables(env);
   const rows = await env.DB.prepare(
     `SELECT * FROM operator_mcp_tool_overrides ORDER BY tool_name ASC`,
   ).all<Record<string, unknown>>();
   return rows.results ?? [];
+}
+
+function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
+  const scopedWrapperTools = includeScopedWrappers ? [
+    ...OPERATOR_MCP_TOOLS
+      .filter((tool) => tool.name !== "list_accounts")
+      .map((tool) => createScopedOperatorWrapperTool(tool, "mm", "Manifest", "Manifest Mental")),
+    ...OPERATOR_MCP_TOOLS
+      .filter((tool) => tool.name !== "list_accounts")
+      .map((tool) => createScopedOperatorWrapperTool(tool, "om", "OPMG", "OPMG Deadman")),
+    ...OPERATOR_MCP_TOOLS
+      .filter((tool) => tool.name !== "list_accounts")
+      .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
+  ] : [];
+  const tools = [
+    ...OPERATOR_MCP_ENGINEERING_TOOLS,
+    ...OPERATOR_MCP_ADMIN_TOOLS,
+    ...OPERATOR_MCP_TOOLS,
+    ...scopedWrapperTools,
+  ].map(cloneOperatorMcpTool);
+  for (const tool of tools) {
+    if (!operatorMcpToolNameRequiresProceed(tool.name) && tool.name !== "getMcpAdminState" && tool.name !== "updateWorkflowRequirement") {
+      continue;
+    }
+    const schema = tool.inputSchema as Record<string, unknown>;
+    const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+      ? { ...(schema.properties as Record<string, unknown>) }
+      : {};
+    properties.proceed_confirmed = {
+      type: "boolean",
+      description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
+    };
+    tool.inputSchema = { ...schema, properties };
+  }
+  return tools;
 }
 
 function createScopedOperatorWrapperTool(
@@ -9057,41 +9115,15 @@ function createScopedOperatorWrapperTool(
 
 
 async function buildOperatorMcpTools(env: Env, includeDisabled = false, includeScopedWrappers = true): Promise<OperatorMcpToolDefinition[]> {
-  await prepareOperatorMode(env);
-    const scopedWrapperTools = [
-    ...OPERATOR_MCP_TOOLS
-      .filter((tool) => tool.name !== "list_accounts")
-      .map((tool) => createScopedOperatorWrapperTool(tool, "mm", "Manifest", "Manifest Mental")),
-    ...OPERATOR_MCP_TOOLS
-      .filter((tool) => tool.name !== "list_accounts")
-      .map((tool) => createScopedOperatorWrapperTool(tool, "om", "OPMG", "OPMG Deadman")),
-    ...OPERATOR_MCP_TOOLS
-      .filter((tool) => tool.name !== "list_accounts")
-      .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
-  ];
-    const baseTools = [
-      ...OPERATOR_MCP_ENGINEERING_TOOLS,
-      ...OPERATOR_MCP_ADMIN_TOOLS,
-      ...OPERATOR_MCP_TOOLS,
-      ...(includeScopedWrappers ? scopedWrapperTools : []),
-    ].map(cloneOperatorMcpTool);
-  for (const tool of baseTools) {
-    if (!operatorMcpToolNameRequiresProceed(tool.name) && tool.name !== "getMcpAdminState" && tool.name !== "updateWorkflowRequirement") {
-      continue;
-    }
-    const schema = tool.inputSchema as Record<string, unknown>;
-    const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
-      ? { ...(schema.properties as Record<string, unknown>) }
-      : {};
-    properties.proceed_confirmed = {
-      type: "boolean",
-      description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
-    };
-    tool.inputSchema = { ...schema, properties };
-  }
+  const baseTools = buildOperatorMcpBaseTools(includeScopedWrappers);
 
   const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
-  const overrides = await listOperatorMcpOverrides(env);
+  let overrides: Array<Record<string, unknown>> = [];
+  try {
+    overrides = await listOperatorMcpOverrides(env);
+  } catch {
+    return baseTools;
+  }
   for (const override of overrides) {
     const toolName = String(override.tool_name ?? "");
     if (!toolName) {
@@ -9571,8 +9603,8 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.2.0";
-const OPERATOR_REGISTRY_GENERATION = "canonical-v1";
+const OPERATOR_MCP_VERSION = "1.3.0";
+const OPERATOR_REGISTRY_GENERATION = "resilient-canonical-v2";
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   return {
@@ -9602,12 +9634,19 @@ function operatorTransportFailure(env: Env, requestId: string, phase: string, er
   });
 }
 
-function mcpErrorResponse(id: string | number | null | undefined, code: number, message: string, status = 200): Response {
+function mcpErrorResponse(
+  id: string | number | null | undefined,
+  code: number,
+  message: string,
+  status = 200,
+  data?: Record<string, unknown>,
+  requestId?: string,
+): Response {
   return mcpJsonResponse({
     jsonrpc: "2.0",
     id: id ?? null,
-    error: { code, message },
-  }, status);
+    error: { code, message, ...(data ? { data } : {}) },
+  }, status, requestId ? { "x-request-id": requestId } : {});
 }
 
 function operatorMcpBaseUrl(request: Request, env: Env): string {
@@ -9874,7 +9913,7 @@ async function operatorMcpInitializeResult(env: Env, requestedVersion: unknown):
   const protocolVersion = typeof requestedVersion === "string" && requestedVersion.trim()
     ? requestedVersion.trim()
     : "2025-06-18";
-  const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
+  const toolCount = buildOperatorMcpBaseTools(false).length;
   return {
     protocolVersion,
     capabilities: {
@@ -10064,7 +10103,7 @@ async function getOperatorMcpBoundaryBlock(
     return null;
   }
   const requestedBrand = requestedMcpBrandKey(toolName, args);
-  const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
+  const toolCount = buildOperatorMcpBaseTools(false).length;
   return {
     ok: false,
     error: "explicit_proceed_required",
@@ -10085,7 +10124,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-    const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
+    const toolCount = buildOperatorMcpBaseTools(false).length;
     const handshake = operatorKeyHandshakeLines(toolCount, brandKey);
     return {
       ok: true,
@@ -11100,6 +11139,7 @@ async function callOperatorToolForMcp(request: Request, env: Env, toolName: stri
 }
 
 async function handleOperatorMcp(request: Request, env: Env): Promise<Response> {
+  const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
   if (request.method === "GET") {
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
@@ -11157,8 +11197,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
 
     if (method === "tools/call") {
       const toolName = typeof message.params?.name === "string" ? message.params.name : "";
-      const tools = await buildOperatorMcpTools(env, false, false);
-      const tool = tools.find((item) => item.name === toolName);
+      const canonicalTool = buildOperatorMcpBaseTools(false).find((item) => item.name === toolName);
+      const tool = canonicalTool ?? (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === toolName);
       if (!tool) {
         return mcpErrorResponse(id, -32602, "Unknown tool");
       }
@@ -11209,7 +11249,25 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
     return mcpErrorResponse(id, -32601, "Method not found");
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
-    return mcpErrorResponse(id, -32603, `Internal MCP error: ${messageText || "unknown_error"}`, 500);
+    return mcpErrorResponse(
+      id,
+      -32603,
+      `Internal MCP error: ${messageText || "unknown_error"}`,
+      200,
+      {
+        ok: false,
+        error_code: "operator_mcp_method_failed",
+        phase: method === "tools/call"
+          ? `tools_call:${String(message.params?.name ?? "unknown")}`
+          : method.replace("/", "_"),
+        request_id: requestId,
+        ...operatorRuntimeMetadata(env),
+        safe_message: (messageText || "unknown_error").slice(0, 500),
+        retryable: true,
+        surface_available: true,
+      },
+      requestId,
+    );
   }
 }
 

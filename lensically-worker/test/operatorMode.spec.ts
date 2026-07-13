@@ -1102,7 +1102,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-    expect(direct.runtime.mcp_version).toBe("1.2.0");
+    expect(direct.runtime.mcp_version).toBe("1.3.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("runEngineeringTool");
@@ -1246,11 +1246,38 @@ describe("operator mode MCP endpoint", () => {
       headers: AUTH_HEADERS,
       body: JSON.stringify({ jsonrpc: "2.0", id: 501, method: "tools/call", params: { name: "getOperatorStartupContext", arguments: {} } }),
     });
-    const payload = await response.json() as { error?: { code: number; message: string } };
-    expect(response.status).toBe(500);
+    const payload = await response.json() as { error?: { code: number; message: string; data?: Record<string, unknown> } };
+    expect(response.status).toBe(200);
     expect(payload.error).toMatchObject({ code: -32603 });
     expect(payload.error?.message).toContain("Internal MCP error");
+    expect(payload.error?.data).toMatchObject({
+      ok: false,
+      error_code: "operator_mcp_method_failed",
+      phase: "tools_call:getOperatorStartupContext",
+      retryable: true,
+      surface_available: true,
+    });
   }, 30000);
+
+  it("keeps initialize and canonical discovery available when runtime override storage is unavailable", async () => {
+    await env.DB.prepare(`DROP TABLE IF EXISTS operator_mcp_tool_overrides`).run();
+    const initialized = await mcpRequest<{ serverInfo: { version: string } }>("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(initialized.serverInfo.version).toBe("1.3.0");
+    expect(listed.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "getOperatorStartupContext",
+      "engineeringPrecheck",
+      "searchRepoFiles",
+      "applyRepoTextPatch",
+      "create_source_card",
+      "create_generation_run",
+    ]));
+    expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
+  });
 
   it("seeds initial context admission as key-handshake only before account work", async () => {
     const state = await mcpTool<{ workflow_requirements: Array<{ stage: string; required_sections: string[]; completion_rule: string }> }>("getMcpAdminState");
@@ -1300,8 +1327,8 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
     expect(payload.status).toBe("ok");
-    expect(payload.mcp_version).toBe("1.2.0");
-    expect(payload.registry_generation).toBe("canonical-v1");
+    expect(payload.mcp_version).toBe("1.3.0");
+    expect(payload.registry_generation).toBe("resilient-canonical-v2");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
     expect(payload.tools).toBeUndefined();
