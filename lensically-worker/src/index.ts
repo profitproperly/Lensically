@@ -9038,7 +9038,8 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "runGateSuite",
     title: "Run gate suite",
-        description: "Run active operator gates for source cards or drafts and return blocking status, including role-aware source transformation checks. This is a silent internal workflow stage after source-card approval; do not insert an owner proceed question around this call.",
+                description: "Run all active operator gates for source cards or drafts, including source transformation, account-wide historical owner rejection review, and required-gate execution. For historical_owner_rejection_gate, include the exact rejection-context fingerprint and reviewed count from the generation run. Missing historical review or any missing blocking gate must keep showable=false. This remains a silent internal workflow stage.",
+
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
 
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
