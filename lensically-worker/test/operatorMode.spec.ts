@@ -1202,9 +1202,19 @@ describe("operator mode MCP endpoint", () => {
       "draft_review_and_decision",
       "scheduling_confirmation",
     ]));
-    expect(direct.owner_interaction_contract.rules.join(" ")).toContain("without asking the owner to proceed");
+        expect(direct.owner_interaction_contract.rules.join(" ")).toContain("without asking the owner to proceed");
     expect(direct.owner_interaction_contract.next_owner_decision_after_source_card).toContain("passing showable draft");
+    expect(direct.rejection_memory_contract.version).toBe("operator-rejection-context-v1");
+    expect(direct.rejection_memory_contract.infrastructure_scope).toBe("universal");
+    expect(direct.rejection_memory_contract.evidence_scope).toBe("selected_account");
+    expect(direct.rejection_memory_contract.required_generation_behavior.join(" ")).toContain("Persist the rejection context");
+    expect(direct.rejection_memory_contract.required_gate_keys).toEqual(expect.arrayContaining([
+      "historical_owner_rejection_gate",
+      "required_gate_execution_gate",
+    ]));
+    expect(direct.rejection_memory_contract.showability_rule).toContain("cannot become showable");
     expect(direct.tool_surface.total_tools).toBe(listed.tools.length);
+
 
     expect(direct.account_data_loaded).toBe(false);
     expect(direct.no_account_sections_present).toBe(true);
