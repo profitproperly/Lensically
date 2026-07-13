@@ -6928,9 +6928,130 @@ async function runOperatorGates(
         results.push(buildGateResult(gate, "pass", "No latest-inventory opening repeat detected."));
       }
 
+      
+      continue;
+    }
+    if (gateKey === "historical_owner_rejection_gate") {
+      const coverageComplete = rejectionContext?.coverage_complete === true;
+      const requiredReviewCount = Number(rejectionContext?.required_review_count ?? 0);
+      const expectedFingerprint = String(rejectionContext?.context_fingerprint ?? "");
+      const explicitBannedSurfaces = Array.isArray(rejectionContext?.explicit_banned_surfaces)
+        ? rejectionContext.explicit_banned_surfaces.map(String)
+        : [];
+      const matchedBannedSurfaces = explicitBannedSurfaces.filter((surface) =>
+        draftContainsOperatorRejectedSurface(normalizedDraft, surface),
+      );
+      const rejectedDrafts = Array.isArray(rejectionContext?.rejected_drafts)
+        ? rejectionContext.rejected_drafts as Array<Record<string, unknown>>
+        : [];
+      const similarRejectedDrafts = rejectedDrafts
+        .map((record) => ({
+          context_id: record.context_id,
+          draft_id: record.draft_id,
+          similarity: operatorRejectionSimilarity(draftText, String(record.text ?? "")),
+          rejected_text: compactOperatorRejectionText(record.text, 300),
+          rejection_reason: compactOperatorRejectionText(record.rejection_reason, 600),
+        }))
+        .filter((record) => record.similarity >= 0.72)
+        .sort((left, right) => right.similarity - left.similarity)
+        .slice(0, 5);
+      if (!coverageComplete) {
+        results.push(buildGateResult(
+          gate,
+          "fail",
+          "Account rejection context is partial, so historical owner feedback cannot be safely enforced.",
+          {
+            context_fingerprint: expectedFingerprint,
+            required_review_count: requiredReviewCount,
+            coverage_status: rejectionContext?.coverage_status ?? "partial",
+          },
+          "Load the complete account rejection context before generating or showing another draft.",
+        ));
+      } else if (matchedBannedSurfaces.length || similarRejectedDrafts.length) {
+        results.push(buildGateResult(
+          gate,
+          "fail",
+          matchedBannedSurfaces.length
+            ? "Draft repeats language explicitly banned in prior owner rejection feedback."
+            : "Draft is too similar to a previously owner-rejected draft.",
+          {
+            context_fingerprint: expectedFingerprint,
+            matched_banned_surfaces: matchedBannedSurfaces,
+            similar_rejected_drafts: similarRejectedDrafts,
+          },
+          "Remove the matched rejected language or structure and regenerate from the source card using the account rejection context.",
+        ));
+      } else if (requiredReviewCount === 0) {
+        results.push(buildGateResult(gate, "pass", "No account owner-rejection records exist yet."));
+      } else {
+        const modelResult = input.modelGateResults?.find((item) => item.gate_key === gateKey);
+        const evidence = modelResult?.evidence && typeof modelResult.evidence === "object" && !Array.isArray(modelResult.evidence)
+          ? modelResult.evidence as Record<string, unknown>
+          : {};
+        const reviewedFingerprint = String(evidence.context_fingerprint ?? evidence.reviewed_rejection_context_fingerprint ?? "");
+        const reviewedCount = Number(evidence.reviewed_rejection_count ?? 0);
+        if (!modelResult?.result || !modelResult?.rationale) {
+          results.push(buildGateResult(
+            gate,
+            "fail",
+            "Historical owner rejection review was not recorded.",
+            { context_fingerprint: expectedFingerprint, required_review_count: requiredReviewCount },
+            "Review the complete account rejection context and submit an auditable historical_owner_rejection_gate result.",
+          ));
+        } else if (reviewedFingerprint !== expectedFingerprint || reviewedCount < requiredReviewCount) {
+          results.push(buildGateResult(
+            gate,
+            "fail",
+            "Historical owner rejection review did not cover the complete current context.",
+            {
+              expected_context_fingerprint: expectedFingerprint,
+              reviewed_context_fingerprint: reviewedFingerprint || null,
+              required_review_count: requiredReviewCount,
+              reviewed_rejection_count: reviewedCount,
+            },
+            "Review every rejection record in the current context pack and resubmit the gate with the exact fingerprint and count.",
+          ));
+        } else {
+          results.push(buildGateResult(
+            gate,
+            modelResult.result as OperatorGateResultValue,
+            String(modelResult.rationale),
+            { ...evidence, context_fingerprint: expectedFingerprint, reviewed_rejection_count: reviewedCount },
+            normalizeOperatorText(modelResult.repair_guidance, 1000, true),
+          ));
+        }
+      }
+      continue;
+    }
+    if (gateKey === "required_gate_execution_gate") {
+      const requiredGateKeys = gates
+        .filter((candidate) => String(candidate.severity) === "block" && String(candidate.gate_key) !== gateKey)
+        .map((candidate) => String(candidate.gate_key));
+      const resultByGate = new Map(results.map((result) => [String(result.gate_key), result]));
+      const missingGateKeys = requiredGateKeys.filter((requiredKey) => !resultByGate.has(requiredKey));
+      const unauditableGateKeys = requiredGateKeys.filter((requiredKey) => {
+        const result = resultByGate.get(requiredKey);
+        return result?.result === "not_applicable" || !normalizeOperatorText(result?.rationale, 2000, true);
+      });
+      const complete = missingGateKeys.length === 0 && unauditableGateKeys.length === 0;
+      results.push(buildGateResult(
+        gate,
+        complete ? "pass" : "fail",
+        complete
+          ? "Every active blocking gate executed with an auditable result."
+          : "One or more active blocking gates did not execute with an auditable result.",
+        {
+          required_gate_keys: requiredGateKeys,
+          executed_gate_keys: Array.from(resultByGate.keys()),
+          missing_gate_keys: missingGateKeys,
+          unauditable_gate_keys: unauditableGateKeys,
+        },
+        complete ? null : "Run every active blocking gate and include required model evidence before showing the draft.",
+      ));
       continue;
     }
     if (gateKey === "exact_duplicate_gate") {
+
       const duplicateRows = await env.DB.prepare(
         `SELECT text AS candidate_text, 'draft' AS source_type
          FROM gpt_generation_drafts
