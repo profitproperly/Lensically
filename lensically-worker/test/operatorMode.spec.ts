@@ -524,9 +524,102 @@ describe("operator mode backend spine", () => {
     });
     expect(copied.showable).toBe(false);
     expect(copied.blocking_failures.some((failure) => failure.gate_key === "source_transformation_contract_gate")).toBe(true);
+    }, 30000);
+
+  it("loads account rejection context and blocks repeated owner-rejected language before showing", async () => {
+    const first = await createLockedSourceCard();
+    const shown = await operatorTool<{ draft_id: string; showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: first.runId,
+      source_card_id: first.sourceCardId,
+      text: "The whole room changes when the right person is finally recognized.",
+      draft_analysis: { opening_phrase: "The whole room changes", realm_entrance_key: "room_changes", lane_key: "systems" },
+    });
+    expect(shown.showable).toBe(true);
+    expect(shown.gate_results.find((result) => result.gate_key === "required_gate_execution_gate")?.result).toBe("pass");
+    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });
+    await operatorTool("reject_draft", {
+      brand_key: BRAND_KEY,
+      draft_id: shown.draft_id,
+      rejection_reason: "Owner rejected this direction. Avoid banned 'rooms' in future drafts; room language was already explicitly rejected.",
+      strategy: { ban_phrases: ["rooms"], rejection_type: "banned_setting_language" },
+    });
+
+    const second = await createLockedSourceCard();
+    const persistedRun = await env.DB.prepare(
+      `SELECT prior_adaptation_context_json FROM gpt_generation_runs WHERE id = ? LIMIT 1`,
+    ).bind(second.runId).first<{ prior_adaptation_context_json: string }>();
+    const persistedContext = JSON.parse(String(persistedRun?.prior_adaptation_context_json ?? "{}")) as {
+      account_rejection_context?: {
+        context_fingerprint?: string;
+        required_review_count?: number;
+        coverage_complete?: boolean;
+        explicit_banned_surfaces?: string[];
+      };
+    };
+    const rejectionContext = persistedContext.account_rejection_context;
+    expect(rejectionContext?.coverage_complete).toBe(true);
+    expect(Number(rejectionContext?.required_review_count ?? 0)).toBeGreaterThanOrEqual(1);
+    expect(rejectionContext?.explicit_banned_surfaces?.map((item) => item.toLowerCase())).toContain("rooms");
+
+    const blockedSurface = await operatorTool<{
+      showable: boolean;
+      blocking_failures: Array<{ gate_key: string; evidence?: { matched_banned_surfaces?: string[] } }>;
+      gate_results: Array<{ gate_key: string; result: string }>;
+    }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: second.runId,
+      source_card_id: second.sourceCardId,
+      text: "Your work deserves to be the reason the room starts paying attention.",
+      draft_analysis: { opening_phrase: "Your work deserves", realm_entrance_key: "work_deserves", lane_key: "systems" },
+    });
+    expect(blockedSurface.showable).toBe(false);
+    expect(blockedSurface.blocking_failures.some((failure) => failure.gate_key === "historical_owner_rejection_gate")).toBe(true);
+    expect(blockedSurface.gate_results.find((result) => result.gate_key === "required_gate_execution_gate")?.result).toBe("pass");
+
+    const missingReview = await operatorTool<{ showable: boolean; blocking_failures: Array<{ gate_key: string; rationale: string }> }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: second.runId,
+      source_card_id: second.sourceCardId,
+      draft_index: 2,
+      text: "A clean system earns trust because the work becomes easier to verify.",
+      draft_analysis: { opening_phrase: "A clean system earns trust", realm_entrance_key: "clean_system_trust", lane_key: "systems" },
+    });
+    expect(missingReview.showable).toBe(false);
+    expect(missingReview.blocking_failures.some((failure) =>
+      failure.gate_key === "historical_owner_rejection_gate" && failure.rationale.includes("not recorded"),
+    )).toBe(true);
+
+    const third = await createLockedSourceCard();
+    const thirdRun = await env.DB.prepare(
+      `SELECT prior_adaptation_context_json FROM gpt_generation_runs WHERE id = ? LIMIT 1`,
+    ).bind(third.runId).first<{ prior_adaptation_context_json: string }>();
+    const thirdContext = (JSON.parse(String(thirdRun?.prior_adaptation_context_json ?? "{}")) as {
+      account_rejection_context?: { context_fingerprint?: string; required_review_count?: number };
+    }).account_rejection_context;
+    const passing = await operatorTool<{ showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: third.runId,
+      source_card_id: third.sourceCardId,
+      text: "A clean system earns trust because anyone can verify the work.",
+      draft_analysis: { opening_phrase: "A clean system earns trust", realm_entrance_key: "clean_system_verification", lane_key: "systems" },
+      model_gate_results: [{
+        gate_key: "historical_owner_rejection_gate",
+        result: "pass",
+        rationale: "Reviewed the complete account rejection context and found no repeated banned language, rejected concept, failed structure, or close rejected-draft match.",
+        evidence: {
+          context_fingerprint: thirdContext?.context_fingerprint,
+          reviewed_rejection_count: thirdContext?.required_review_count,
+        },
+      }],
+    });
+    expect(passing.showable).toBe(true);
+    expect(passing.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
+    expect(passing.gate_results.find((result) => result.gate_key === "required_gate_execution_gate")?.result).toBe("pass");
   }, 30000);
 
   it("preserves a Saved Pattern ID across Threads URL and username changes", async () => {
+
 
     const firstResponse = await fetchFromWorker("/api/patterns/import", {
       method: "POST",
