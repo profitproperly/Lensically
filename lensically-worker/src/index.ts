@@ -9239,7 +9239,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "create_generation_run",
     title: "Create generation run",
-        description: "Create one new adaptation from a locked canonical source-card version. The tool returns prior uses/results and stores a structured adaptation plan so repeated source use is deliberate rather than repetitive. After source-card approval, this is a silent internal operation: do not ask the owner to approve or proceed after this tool; continue through candidate generation and gate evaluation until a showable draft is ready.",
+                description: "Create one new adaptation from a locked canonical source-card version. The tool returns prior uses/results plus the selected account's complete owner-rejection context, and persists both with the run so fresh chats can resume safely. Review account_rejection_context before drafting and use it during silent self-rejection. After source-card approval, this is a silent internal operation: do not ask the owner to approve or proceed after this tool; continue through candidate generation and mandatory gate evaluation until a showable draft is ready.",
+
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, adaptation_plan: GENERATION_ADAPTATION_PLAN_SCHEMA, objective: { type: "string", description: "Legacy optional field. Keep omitted or neutral; it must not steer the saved workflow." }, prompt_summary: { type: "string" } }, required: ["brand_key", "source_card_id", "adaptation_plan"], additionalProperties: false },
 
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
