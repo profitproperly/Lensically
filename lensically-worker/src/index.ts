@@ -356,6 +356,25 @@ const OPERATOR_COLLABORATION_CONTRACT = {
   system_layers: OPERATOR_SYSTEM_LAYER_GLOSSARY,
 };
 
+const OPERATOR_OWNER_INTERACTION_CONTRACT = {
+  version: "operator-owner-interaction-v1",
+  owner_visible_checkpoints: [
+    "initial_key_proceed",
+    "source_card_review",
+    "draft_review_and_decision",
+    "scheduling_confirmation",
+  ],
+  silent_stages: ["generation_run_and_candidates", "gate_evaluation"],
+  rules: [
+    "After a source card is approved and locked, create the generation run, generate candidates, self-reject weak candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
+    "Do not present generation-run creation, adaptation-plan persistence, candidate-pool creation, self-rejection, draft submission, or gate execution as separate owner-facing steps.",
+    "The next owner approval question after source-card approval occurs only after at least one draft passed all blocking gates, returned showable=true, and was marked shown.",
+    "If no draft passes, report the blocker or generation failure; do not ask the owner to approve an unshowable draft.",
+    "Scheduling requires an approved shown draft and a separate owner confirmation of the scheduling details.",
+  ],
+  next_owner_decision_after_source_card: "Review a passing showable draft for approve, reject, or revise.",
+} as const;
+
 const VECTRIX_AGENT_CONTENT_BRIEF = [
 
   "Create posts for Vectrix about making money online, building wealth, becoming financially free,",
