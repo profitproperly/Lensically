@@ -8037,14 +8037,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (brand.brand_key === "manifest_mental" && !normalizeOperatorText(adaptationPlan.adaptation_goal, 1500, true)) {
       return operatorJsonResponse({ success: false, error: "manifest_adaptation_goal_required" }, 400);
     }
-    const canonicalContext = await getOperatorSourceCardHistory(env, brand, card);
+        const canonicalContext = await getOperatorSourceCardHistory(env, brand, card);
+    const accountRejectionContext = await buildOperatorRejectionContext(env, brand);
     const priorAdaptationContext = {
       family: canonicalContext.family ?? null,
       versions: canonicalContext.versions ?? [],
       prior_runs: Array.isArray(canonicalContext.adaptation_history)
         ? (canonicalContext.adaptation_history as unknown[]).slice(-24)
         : [],
+      account_rejection_context: accountRejectionContext,
     };
+
     const runId = crypto.randomUUID();
     await env.DB.prepare(
       `INSERT INTO gpt_generation_runs (
