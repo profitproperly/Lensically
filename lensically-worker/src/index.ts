@@ -73,6 +73,8 @@ interface Env {
   LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;
   LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;
   LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;
+  LENSICALLY_COMMIT_SHA?: string;
+  CF_VERSION_METADATA?: { id?: string; tag?: string; timestamp?: string };
   GITHUB_TOKEN?: string;
   GITHUB_OWNER?: string;
   GITHUB_REPO?: string;
@@ -9054,7 +9056,7 @@ function createScopedOperatorWrapperTool(
 }
 
 
-async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise<OperatorMcpToolDefinition[]> {
+async function buildOperatorMcpTools(env: Env, includeDisabled = false, includeScopedWrappers = true): Promise<OperatorMcpToolDefinition[]> {
   await prepareOperatorMode(env);
     const scopedWrapperTools = [
     ...OPERATOR_MCP_TOOLS
@@ -9067,7 +9069,12 @@ async function buildOperatorMcpTools(env: Env, includeDisabled = false): Promise
       .filter((tool) => tool.name !== "list_accounts")
       .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
   ];
-    const baseTools = [...OPERATOR_MCP_ENGINEERING_TOOLS, ...OPERATOR_MCP_ADMIN_TOOLS, ...OPERATOR_MCP_TOOLS, ...scopedWrapperTools].map(cloneOperatorMcpTool);
+    const baseTools = [
+      ...OPERATOR_MCP_ENGINEERING_TOOLS,
+      ...OPERATOR_MCP_ADMIN_TOOLS,
+      ...OPERATOR_MCP_TOOLS,
+      ...(includeScopedWrappers ? scopedWrapperTools : []),
+    ].map(cloneOperatorMcpTool);
   for (const tool of baseTools) {
     if (!operatorMcpToolNameRequiresProceed(tool.name) && tool.name !== "getMcpAdminState" && tool.name !== "updateWorkflowRequirement") {
       continue;
@@ -9414,11 +9421,12 @@ function operatorStartupFallbackRoutes(): string[] {
 async function buildOperatorStartupContext(request: Request, env: Env): Promise<Record<string, unknown>> {
   await prepareOperatorMode(env);
   const config = githubRepoConfig(env);
-  const tools = await buildOperatorMcpTools(env, true);
+  const tools = await buildOperatorMcpTools(env, true, false);
+  const allTools = await buildOperatorMcpTools(env, true, true);
   const toolNames = tools.map((tool) => tool.name);
   const adminNames = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES);
   const engineeringNames = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES);
-  const accountWrapperTools = toolNames.filter((name) => /^(mm|om|vx)_/.test(name)).slice(0, 80);
+  const accountWrapperTools = allTools.map((tool) => tool.name).filter((name) => /^(mm|om|vx)_/.test(name)).slice(0, 80);
   const operatorTools = toolNames
     .filter((name) => !adminNames.has(name) && !engineeringNames.has(name) && !accountWrapperTools.includes(name))
     .slice(0, 80);
@@ -9560,6 +9568,37 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
       "content-type": "application/json; charset=UTF-8",
       "cache-control": "no-store",
       ...extraHeaders,
+    },
+  });
+}
+
+const OPERATOR_MCP_VERSION = "1.2.0";
+const OPERATOR_REGISTRY_GENERATION = "canonical-v1";
+
+function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
+  return {
+    deployment_id: env.CF_VERSION_METADATA?.id ?? null,
+    commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+    mcp_version: OPERATOR_MCP_VERSION,
+    registry_generation: OPERATOR_REGISTRY_GENERATION,
+  };
+}
+
+function operatorTransportFailure(env: Env, requestId: string, phase: string, error: unknown, status = 500): Response {
+  const safeMessage = error instanceof Error ? error.message : String(error || "unknown_error");
+  return new Response(JSON.stringify({
+    ok: false,
+    error_code: "operator_transport_failure",
+    phase,
+    request_id: requestId,
+    ...operatorRuntimeMetadata(env),
+    message: safeMessage.slice(0, 500),
+  }), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      "cache-control": "no-store",
+      "x-request-id": requestId,
     },
   });
 }
@@ -9836,7 +9875,7 @@ async function operatorMcpInitializeResult(env: Env, requestedVersion: unknown):
   const protocolVersion = typeof requestedVersion === "string" && requestedVersion.trim()
     ? requestedVersion.trim()
     : "2025-06-18";
-  const toolCount = (await buildOperatorMcpTools(env, false)).length;
+  const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
   return {
     protocolVersion,
     capabilities: {
@@ -9845,7 +9884,7 @@ async function operatorMcpInitializeResult(env: Env, requestedVersion: unknown):
     serverInfo: {
       name: "lensically-operator-mode",
       title: "Lensically Operator Mode",
-      version: "1.1.0",
+      version: OPERATOR_MCP_VERSION,
     },
     instructions: operatorMcpInstructions(toolCount),
   };
@@ -10026,7 +10065,7 @@ async function getOperatorMcpBoundaryBlock(
     return null;
   }
   const requestedBrand = requestedMcpBrandKey(toolName, args);
-  const toolCount = (await buildOperatorMcpTools(env, false)).length;
+  const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
   return {
     ok: false,
     error: "explicit_proceed_required",
@@ -10047,7 +10086,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-    const toolCount = (await buildOperatorMcpTools(env, false)).length;
+    const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
     const handshake = operatorKeyHandshakeLines(toolCount, brandKey);
     return {
       ok: true,
@@ -11107,7 +11146,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
     }
 
     if (method === "tools/list") {
-      const tools = await buildOperatorMcpTools(env, false);
+      const tools = await buildOperatorMcpTools(env, false, false);
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
@@ -11119,7 +11158,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
 
     if (method === "tools/call") {
       const toolName = typeof message.params?.name === "string" ? message.params.name : "";
-      const tools = await buildOperatorMcpTools(env, false);
+      const tools = await buildOperatorMcpTools(env, false, false);
       const tool = tools.find((item) => item.name === toolName);
       if (!tool) {
         return mcpErrorResponse(id, -32602, "Unknown tool");
@@ -18210,15 +18249,36 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       || normalizedPath === "/.well-known/openid-configuration"
       || normalizedPath === "/api/operator/oauth/.well-known/oauth-authorization-server"
     ) {
-      return handleOperatorMcpOAuthMetadata(request, env);
+      try {
+        return handleOperatorMcpOAuthMetadata(request, env);
+      } catch (error) {
+        return operatorTransportFailure(env, request.headers.get("cf-ray") || crypto.randomUUID(), "oauth_metadata", error);
+      }
     }
 
     if (normalizedPath === "/api/operator/oauth/authorize") {
-      return handleOperatorMcpOAuthAuthorize(request, env);
+      try {
+        return await handleOperatorMcpOAuthAuthorize(request, env);
+      } catch (error) {
+        return operatorTransportFailure(env, request.headers.get("cf-ray") || crypto.randomUUID(), "oauth_authorize", error);
+      }
     }
 
     if (normalizedPath === "/api/operator/oauth/token") {
-      return handleOperatorMcpOAuthToken(request, env);
+      try {
+        return await handleOperatorMcpOAuthToken(request, env);
+      } catch (error) {
+        return operatorTransportFailure(env, request.headers.get("cf-ray") || crypto.randomUUID(), "oauth_token", error);
+      }
+    }
+
+    if (normalizedPath === "/api/operator/health" && request.method === "GET") {
+      return operatorMcpOAuthJson({
+        status: "ok",
+        ...operatorRuntimeMetadata(env),
+        live_tool_count: (await buildOperatorMcpTools(env, false, false)).length,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     if (normalizedPath.startsWith("/api/operator/tools/")) {
@@ -18233,7 +18293,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (normalizedPath === "/api/operator/mcp") {
-      return handleOperatorMcp(request, env);
+      const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
+      try {
+        return await handleOperatorMcp(request, env);
+      } catch (error) {
+        return operatorTransportFailure(env, requestId, "mcp_transport", error);
+      }
     }
 
     if (normalizedPath.startsWith("/api/gpt/")) {
@@ -24194,6 +24259,15 @@ export default {
       return withApiCors(request, env, path, response);
     } catch (error) {
       logUnhandledWorkerError(error, request, path);
+      if (path.startsWith("/api/operator/") || path.startsWith("/.well-known/")) {
+        const errorResponse = operatorTransportFailure(
+          env,
+          request.headers.get("cf-ray") || crypto.randomUUID(),
+          "worker_fetch",
+          error,
+        );
+        return withApiCors(request, env, path, errorResponse);
+      }
       const errorResponse = buildUnhandledErrorResponse(request, env, path);
       return withApiCors(request, env, path, errorResponse);
     }

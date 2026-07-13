@@ -918,6 +918,9 @@ describe("operator mode MCP endpoint", () => {
 
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
+    expect(new Set(toolNames).size).toBe(toolNames.length);
+    expect(() => JSON.stringify(listed.tools)).not.toThrow();
+    expect(toolNames.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(initialized.instructions).toContain("Initial key-selection stop");
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
@@ -1099,7 +1102,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-    expect(direct.runtime.mcp_version).toBe("1.1.0");
+    expect(direct.runtime.mcp_version).toBe("1.2.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("runEngineeringTool");
@@ -1279,15 +1282,30 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
     for (const name of ["mm_get_account_state", "om_get_account_state", "vx_get_account_state"]) {
-      expect(toolNames).toContain(name);
+      expect(toolNames).not.toContain(name);
     }
-    const manifest = await mcpTool<{ brand_key: string }>("mm_get_account_state");
+    const manifestBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "mm_get_account_state", arguments: { proceed_confirmed: true } });
+    const manifest = manifestBridge.result;
     expect(manifest.brand_key).toBe("manifest_mental");
-    const opmg = await mcpTool<{ brand_key: string }>("om_get_account_state");
+    const opmgBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "om_get_account_state", arguments: { proceed_confirmed: true } });
+    const opmg = opmgBridge.result;
     expect(opmg.brand_key).toBe("opmg_deadman");
-    const vectrix = await mcpTool<{ brand_key: string }>("vx_get_account_state");
+    const vectrixBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "vx_get_account_state", arguments: { proceed_confirmed: true } });
+    const vectrix = vectrixBridge.result;
     expect(vectrix.brand_key).toBe("vectrix");
   }, 30000);
+
+  it("returns non-enumerating operator health metadata", async () => {
+    const response = await fetchFromWorker("/api/operator/health");
+    const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
+    expect(response.status).toBe(200);
+    expect(payload.status).toBe("ok");
+    expect(payload.mcp_version).toBe("1.2.0");
+    expect(payload.registry_generation).toBe("canonical-v1");
+    expect(payload.live_tool_count).toBeGreaterThan(0);
+    expect(payload.timestamp).toBeTruthy();
+    expect(payload.tools).toBeUndefined();
+  });
 
 
   it("exposes engineering access status and ops memory without raw secrets", async () => {

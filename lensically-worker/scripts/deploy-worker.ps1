@@ -21,7 +21,8 @@ if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {
 
 Push-Location $workerRoot
 try {
-  npx wrangler deploy
+  $commitSha = (git rev-parse HEAD).Trim()
+  npx wrangler deploy --var "LENSICALLY_COMMIT_SHA:$commitSha"
 } finally {
   Pop-Location
 }
