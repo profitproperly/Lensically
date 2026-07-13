@@ -6325,9 +6325,11 @@ async function getOperatorSourceCardHistory(
         run_id: runId,
         source_card_id: row.source_card_id,
         source_card_family_id: row.source_card_family_id ?? null,
-        source_card_version_number: Number(row.source_card_version_number ?? 1),
+                source_card_version_number: Number(row.source_card_version_number ?? 1),
         adaptation_plan: safeParseJsonString(String(row.adaptation_plan_json ?? "{}")) ?? {},
+        prior_adaptation_context: safeParseJsonString(String(row.prior_adaptation_context_json ?? "{}")) ?? {},
         status: row.run_status,
+
         created_at: row.run_created_at,
         drafts: [],
       });
