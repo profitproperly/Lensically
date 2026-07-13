@@ -6462,7 +6462,176 @@ async function getLatestOperatorInventory(env: Env, brandKey: GptBrandKey): Prom
   ).bind(brandKey).first<Record<string, unknown>>();
 }
 
+function compactOperatorRejectionText(value: unknown, maxLength: number): string | null {
+  return normalizeOperatorText(value, maxLength, true);
+}
+
+function collectOperatorBanPhrases(value: unknown, output: Set<string>, depth = 0): void {
+  if (!value || depth > 3) {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectOperatorBanPhrases(item, output, depth + 1);
+    return;
+  }
+  if (typeof value !== "object") {
+    return;
+  }
+  const banKeys = new Set([
+    "ban_phrases",
+    "banned_phrases",
+    "banned_surfaces",
+    "avoid_phrases",
+    "forbidden_phrases",
+    "forbidden_surfaces",
+  ]);
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (banKeys.has(key) && Array.isArray(nested)) {
+      for (const item of nested) {
+        const phrase = compactOperatorRejectionText(item, 120);
+        if (phrase) output.add(phrase);
+      }
+    } else if (nested && typeof nested === "object") {
+      collectOperatorBanPhrases(nested, output, depth + 1);
+    }
+  }
+}
+
+function extractOperatorBannedSurfacesFromFeedback(value: unknown): string[] {
+  const text = compactOperatorRejectionText(value, 12000);
+  if (!text) return [];
+  const surfaces = new Set<string>();
+  const patterns = [
+    /\b(?:banned?|avoid(?:ed|ing)?|do not use|don't use|without using)\b[^"'“”‘’]{0,48}["“‘']([^"”’']{1,80})["”’']/gi,
+    /\b(?:ban|avoid)\s+(?:the\s+)?(?:word|term|phrase|surface)\s+([a-z0-9][a-z0-9 _-]{1,60})/gi,
+  ];
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      const phrase = compactOperatorRejectionText(match[1], 120);
+      if (phrase && phrase.split(/\s+/).length <= 8) surfaces.add(phrase.replace(/[.,;:!?]+$/g, ""));
+    }
+  }
+  return Array.from(surfaces);
+}
+
+function operatorRejectedSurfaceVariants(surface: string): string[] {
+  const normalized = normalizeComparableText(surface);
+  if (!normalized) return [];
+  const variants = new Set([normalized]);
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length === 1) {
+    if (normalized.endsWith("s") && normalized.length > 3) variants.add(normalized.slice(0, -1));
+    else variants.add(`${normalized}s`);
+  }
+  return Array.from(variants);
+}
+
+function draftContainsOperatorRejectedSurface(normalizedDraft: string, surface: string): boolean {
+  const draftWords = normalizedDraft.split(" ").filter(Boolean);
+  const draftWordSet = new Set(draftWords);
+  return operatorRejectedSurfaceVariants(surface).some((variant) =>
+    variant.includes(" ") ? normalizedDraft.includes(variant) : draftWordSet.has(variant),
+  );
+}
+
+function operatorRejectionSimilarity(left: string, right: string): number {
+  const leftTokens = new Set(normalizeComparableText(left).split(" ").filter((token) => token.length > 2));
+  const rightTokens = new Set(normalizeComparableText(right).split(" ").filter((token) => token.length > 2));
+  if (leftTokens.size < 5 || rightTokens.size < 5) return 0;
+  let intersection = 0;
+  for (const token of leftTokens) if (rightTokens.has(token)) intersection += 1;
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return union ? intersection / union : 0;
+}
+
+function operatorRejectionContextFingerprint(ids: string[]): string {
+  let hash = 2166136261;
+  const input = `${OPERATOR_REJECTION_CONTEXT_VERSION}|${ids.join("|")}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${OPERATOR_REJECTION_CONTEXT_VERSION}:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+async function buildOperatorRejectionContext(env: Env, brand: GptResolvedBrand): Promise<Record<string, unknown>> {
+  await ensureGptStrategyMemoryTable(env);
+  await ensureGptGenerationDraftsTable(env);
+  const rowLimit = OPERATOR_REJECTION_CONTEXT_LIMIT + 1;
+  const rejectedRows = await env.DB.prepare(
+    `SELECT id, text, rejection_reason, owner_feedback, strategy_json, created_at, updated_at
+     FROM gpt_generation_drafts
+     WHERE account_id = ?
+       AND status = 'rejected'
+     ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
+     LIMIT ?`,
+  ).bind(brand.account_id, rowLimit).all<Record<string, unknown>>();
+  const memoryRows = await env.DB.prepare(
+    `SELECT id, title, body, metadata_json, created_at, updated_at
+     FROM gpt_strategy_memory
+     WHERE account_id = ?
+       AND kind = 'rejection_feedback'
+     ORDER BY datetime(updated_at) DESC, id DESC
+     LIMIT ?`,
+  ).bind(brand.account_id, rowLimit).all<Record<string, unknown>>();
+
+  const rejectedDrafts = (rejectedRows.results ?? []).slice(0, OPERATOR_REJECTION_CONTEXT_LIMIT).map((row) => {
+    const strategy = safeParseJsonString(String(row.strategy_json ?? "{}")) ?? {};
+    const explicit = new Set<string>();
+    collectOperatorBanPhrases(strategy, explicit);
+    for (const phrase of extractOperatorBannedSurfacesFromFeedback(row.rejection_reason)) explicit.add(phrase);
+    for (const phrase of extractOperatorBannedSurfacesFromFeedback(row.owner_feedback)) explicit.add(phrase);
+    return {
+      context_id: `draft:${String(row.id)}`,
+      draft_id: row.id,
+      text: compactOperatorRejectionText(row.text, 600),
+      rejection_reason: compactOperatorRejectionText(row.rejection_reason, 1800),
+      owner_feedback: compactOperatorRejectionText(row.owner_feedback, 1000),
+      explicit_banned_surfaces: Array.from(explicit),
+      strategy,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  });
+  const rejectionMemories = (memoryRows.results ?? []).slice(0, OPERATOR_REJECTION_CONTEXT_LIMIT).map((row) => ({
+    context_id: `memory:${String(row.id)}`,
+    memory_id: Number(row.id),
+    title: compactOperatorRejectionText(row.title, 240),
+    body: compactOperatorRejectionText(row.body, 1800),
+    metadata: safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {},
+    explicit_banned_surfaces: extractOperatorBannedSurfacesFromFeedback(row.body),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+  const records = [...rejectedDrafts, ...rejectionMemories];
+  const recordIds = records.map((record) => String(record.context_id));
+  const explicitBannedSurfaces = Array.from(new Set(records.flatMap((record) =>
+    Array.isArray(record.explicit_banned_surfaces) ? record.explicit_banned_surfaces.map(String) : [],
+  )));
+  const coverageComplete = (rejectedRows.results ?? []).length <= OPERATOR_REJECTION_CONTEXT_LIMIT
+    && (memoryRows.results ?? []).length <= OPERATOR_REJECTION_CONTEXT_LIMIT;
+  return {
+    version: OPERATOR_REJECTION_CONTEXT_VERSION,
+    brand_key: brand.brand_key,
+    evidence_scope: "selected_account",
+    coverage_status: coverageComplete ? "complete" : "partial",
+    coverage_complete: coverageComplete,
+    rejected_draft_count: rejectedDrafts.length,
+    rejection_memory_count: rejectionMemories.length,
+    required_review_count: records.length,
+    required_review_ids: recordIds,
+    context_fingerprint: operatorRejectionContextFingerprint(recordIds),
+    explicit_banned_surfaces: explicitBannedSurfaces,
+    rejected_drafts: rejectedDrafts,
+    rejection_memories: rejectionMemories,
+    generation_instruction: "Review this complete account rejection context before drafting and use it during silent self-rejection. Do not repeat banned words, rejected concepts, weak payoff patterns, stock AI phrasing, or failed structures.",
+    gate_instruction: "Submit historical_owner_rejection_gate with evidence containing the exact context_fingerprint and reviewed_rejection_count. Missing or partial review blocks showable=true.",
+  };
+}
+
 async function insertOperatorInventory(
+
   env: Env,
   input: {
     brandKey: GptBrandKey;
