@@ -9257,7 +9257,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "submit_candidate_draft",
     title: "Submit candidate draft",
-        description: "Save a candidate draft, record source-contract evidence, run role-aware gates, persist results, and learn whether the draft is showable. This submission and evaluation are silent internal work; only present the draft to the owner when showable=true, then mark it shown and ask for approve, reject, or revise.",
+                description: "Save a candidate draft, record source-contract evidence, run all mandatory gates, persist results, and learn whether the draft is showable. Submit historical_owner_rejection_gate evidence with the exact account rejection-context fingerprint and reviewed count. The backend blocks banned rejection surfaces, close matches to rejected drafts, incomplete historical review, and missing blocking gate execution. Only present the draft when showable=true, then mark it shown and ask for approve, reject, or revise.",
+
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id", "text", "draft_analysis"], additionalProperties: false },
 
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
