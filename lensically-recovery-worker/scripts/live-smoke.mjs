@@ -38,5 +38,6 @@ assert.equal(mainSmoke.structuredContent.ok, true, JSON.stringify(mainSmoke.stru
 const cloudflare = await mcp(4, "tools/call", { name: "getCloudflareWorkerState", arguments: {} });
 assert.equal(cloudflare.isError, false, JSON.stringify(cloudflare.structuredContent));
 assert.equal(cloudflare.structuredContent.ok, true, JSON.stringify(cloudflare.structuredContent));
+assert.ok((cloudflare.structuredContent.deployments?.length ?? 0) > 0, "Cloudflare deployments were not returned");
 
 console.log(JSON.stringify({ ok: true, recovery_version: initialize.serverInfo.version, tool_count: names.length, main_smoke: mainSmoke.structuredContent, cloudflare_deployments: cloudflare.structuredContent.deployments?.length ?? 0 }));

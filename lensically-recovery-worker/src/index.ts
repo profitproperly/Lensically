@@ -196,8 +196,9 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       cloudflare(env, `/accounts/${account}/workers/scripts/lensically-worker/settings`),
       cloudflare(env, `/accounts/${account}/workers/domains`),
     ]);
-    const deploymentRows = Array.isArray(deployments.result) ? deployments.result : [];
-    const versionPayload = versions.result && typeof versions.result === "object" ? versions.result as Record<string, unknown> : {};
+    const deploymentPayload = deployments.result && typeof deployments.result === "object" ? deployments.result as Record<string, unknown> : {};
+    const deploymentRows = Array.isArray(deploymentPayload.deployments) ? deploymentPayload.deployments : Array.isArray(deployments.result) ? deployments.result : [];
+    const versionPayload = versions.result && typeof versions.result === "object" && !Array.isArray(versions.result) ? versions.result as Record<string, unknown> : {};
     const versionRows = Array.isArray(versionPayload.items) ? versionPayload.items : Array.isArray(versions.result) ? versions.result : [];
     const domainRows = Array.isArray(domains.result) ? domains.result : [];
     const settingsPayload = settings.result && typeof settings.result === "object" ? settings.result as Record<string, unknown> : {};
@@ -205,7 +206,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       ok: deployments.ok && settings.ok,
       deployments: deploymentRows.slice(0, 20),
       versions: versionRows.slice(0, 20),
-      bindings: Array.isArray(settingsPayload.bindings) ? settingsPayload.bindings : [],
+      bindings: Array.isArray(settingsPayload.bindings) ? settingsPayload.bindings : ((versionRows[0] as Record<string, unknown> | undefined)?.bindings ?? []),
       compatibility_date: settingsPayload.compatibility_date ?? null,
       compatibility_flags: settingsPayload.compatibility_flags ?? [],
       custom_domains: domainRows.filter((row) => row && typeof row === "object" && String((row as Record<string, unknown>).service || "") === "lensically-worker"),
