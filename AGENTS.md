@@ -28,6 +28,7 @@
 
 - `lensically-web/` is the frontend.
 - `lensically-worker/` is the backend.
+- `lensically-recovery-worker/` is the independent break-glass MCP control plane used by GPT to repair the main backend when the primary Lensically MCP is unavailable. Keep it small, stateless, source-defined, and separately deployed; never add account, generation, or customer data access to it.
 - Frontend work belongs in `lensically-web/**`.
 - Backend, persistence, and API work belongs in `lensically-worker/**`.
 

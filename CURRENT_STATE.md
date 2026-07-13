@@ -3,6 +3,7 @@
 ## Product Shape
 
 - Lensically is operating as a private workspace build with `lensically-web/` as the frontend and `lensically-worker/` as the backend.
+- Lensically has an independent recovery MCP Worker as a break-glass control plane. Its frozen minimal surface can inspect and patch the GitHub repository, dispatch CI/deploy workflows, and verify the main MCP without reading Lensically account or generation data. It is deployed separately so GPT can repair the primary MCP without Codex or a desktop session.
 - Main active user workflows currently center on the password gate, Create Post, Scheduled Posts, GPT Memory, saved patterns, dashboard, insights, followers, and post archive flows.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
 - `/dashboard` now targets an operator-dashboard role rather than a simple profile/stats card.
