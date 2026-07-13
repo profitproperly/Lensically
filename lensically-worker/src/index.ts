@@ -6721,9 +6721,13 @@ async function runOperatorGates(
 ): Promise<{ showable: boolean; gate_results: Record<string, unknown>[]; blocking_failures: Record<string, unknown>[]; warnings: string[] }> {
   await prepareOperatorMode(env);
   const gates = await listOperatorGates(env, input.brand.brand_key, input.stageScope, input.laneKey ?? null, input.contentType ?? null);
-  const sourceCard = input.sourceCardId ? await getOperatorSourceCard(env, input.brand.brand_key, input.sourceCardId) : null;
+    const sourceCard = input.sourceCardId ? await getOperatorSourceCard(env, input.brand.brand_key, input.sourceCardId) : null;
+  const rejectionContext = input.stageScope === "gate_evaluation"
+    ? await buildOperatorRejectionContext(env, input.brand)
+    : null;
   const draftText = normalizeOperatorText(input.draftText, 20000, true) ?? "";
     const normalizedDraft = normalizeComparableText(draftText);
+
   const sourceContract = normalizeSourceTransformationContract(sourceCard?.transformation_contract);
   const mustPreserveExact = sourceContract.must_preserve_exact as string[];
   const mayReuse = sourceContract.may_reuse as string[];
