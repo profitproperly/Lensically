@@ -8923,7 +8923,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "run_gates",
     title: "Run operator gates",
-    description: "Evaluate source-card or draft gates, including role-aware source preservation, transformation, full-package copying, and reusable-hook exemptions.",
+        description: "Evaluate source-card or draft gates, including role-aware source preservation, transformation, full-package copying, and reusable-hook exemptions. Gate evaluation is a silent internal stage after source-card approval; do not ask the owner to proceed before or after this call. Continue until a passing showable draft can be presented, or report that no draft passed.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
 
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
