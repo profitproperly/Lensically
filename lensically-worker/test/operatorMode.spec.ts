@@ -1087,7 +1087,7 @@ describe("operator mode MCP endpoint", () => {
       "scope_universal_or_account_scoped",
       "survives_new_chats_because",
     ]));
-    expect(direct.collaboration_contract.system_layers.map((layer) => layer.key)).toEqual(expect.arrayContaining([
+        expect(direct.collaboration_contract.system_layers.map((layer) => layer.key)).toEqual(expect.arrayContaining([
       "backend_behavior",
       "workflow_requirement",
       "mcp_contract",
@@ -1097,6 +1097,15 @@ describe("operator mode MCP endpoint", () => {
       "startup_contract",
       "supporting_memory",
     ]));
+    expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v1");
+    expect(direct.owner_interaction_contract.silent_stages).toEqual(["generation_run_and_candidates", "gate_evaluation"]);
+    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toEqual(expect.arrayContaining([
+      "source_card_review",
+      "draft_review_and_decision",
+      "scheduling_confirmation",
+    ]));
+    expect(direct.owner_interaction_contract.rules.join(" ")).toContain("without asking the owner to proceed");
+    expect(direct.owner_interaction_contract.next_owner_decision_after_source_card).toContain("passing showable draft");
     expect(direct.tool_surface.total_tools).toBe(listed.tools.length);
 
     expect(direct.account_data_loaded).toBe(false);
