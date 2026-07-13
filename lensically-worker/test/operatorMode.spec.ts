@@ -1021,7 +1021,11 @@ describe("operator mode MCP endpoint", () => {
         expect(initialized.instructions).toContain("include proceed_confirmed=true on account-scoped calls");
     expect(initialized.instructions).toContain("generation_run_and_candidates and gate_evaluation are silent internal stages");
     expect(initialized.instructions).toContain("The next owner approval question must occur only after a draft passed all blocking gates");
-    expect(initialized.instructions).toContain("If no candidate becomes showable, report the blocker or generation failure instead of asking for approval");
+        expect(initialized.instructions).toContain("If no candidate becomes showable, report the blocker or generation failure instead of asking for approval");
+    expect(initialized.instructions).toContain("every generation run must load and persist the selected account's complete owner-rejection context");
+    expect(initialized.instructions).toContain("historical_owner_rejection_gate");
+    expect(initialized.instructions).toContain("Never claim that a gate passed unless that exact gate_key appears");
+
     expect(toolNames.slice(0, 24)).toEqual([
       "getOperatorStartupContext",
       "engineeringPrecheck",
