@@ -8939,7 +8939,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "mark_draft_shown",
     title: "Mark draft shown",
-    description: "Use this only after Lensically returned showable=true. It fails if blocking gates made the draft unshowable.",
+        description: "Use this only after Lensically returned showable=true. It fails if blocking gates made the draft unshowable. Mark the passing draft shown immediately before presenting it to the owner and asking for approve, reject, or revise.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" } }, required: ["brand_key", "draft_id"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
