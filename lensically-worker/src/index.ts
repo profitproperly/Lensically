@@ -378,6 +378,20 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
   next_owner_decision_after_source_card: "Review a passing showable draft for approve, reject, or revise.",
 } as const;
 
+const OPERATOR_REJECTION_MEMORY_CONTRACT = {
+  version: OPERATOR_REJECTION_CONTEXT_VERSION,
+  infrastructure_scope: "universal",
+  evidence_scope: "selected_account",
+  required_generation_behavior: [
+    "Load the selected account's owner-rejected drafts and rejection-feedback memory before candidate generation.",
+    "Use the rejection context during silent self-rejection; do not wait for the owner to repeat an existing lesson.",
+    "Persist the rejection context with the generation run so a fresh chat can resume with the same evidence.",
+  ],
+  required_gate_keys: ["historical_owner_rejection_gate", "required_gate_execution_gate"],
+  showability_rule: "A draft cannot become showable unless all account rejection records in the run context were reviewed, no historical rejection is repeated, and every active blocking gate executed with an auditable result.",
+} as const;
+
+
 const VECTRIX_AGENT_CONTENT_BRIEF = [
 
   "Create posts for Vectrix about making money online, building wealth, becoming financially free,",
