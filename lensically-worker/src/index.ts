@@ -9047,7 +9047,8 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "submitAndGateDraft",
     title: "Submit and gate draft",
-        description: "Submit a candidate draft, record source-contract evidence, run Lensically gates, and return showable/blocking status in one admin MCP call. Treat this as silent internal work after source-card approval; present and request an owner decision only when the returned draft is showable.",
+                description: "Submit a candidate draft, record source-contract evidence, run every mandatory Lensically gate, and return showable/blocking status in one admin MCP call. Include historical_owner_rejection_gate evidence using the exact persisted account rejection-context fingerprint and reviewed count. The backend blocks explicit banned surfaces, rejected-draft near-matches, incomplete historical review, and missing gate execution. Present the draft only when showable=true.",
+
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id"], additionalProperties: false },
 
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
