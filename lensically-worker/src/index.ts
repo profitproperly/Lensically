@@ -8789,7 +8789,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const batch = reviewBatchId
       ? await env.DB.prepare(`SELECT * FROM operator_review_batches WHERE id = ? AND brand_key = ? LIMIT 1`).bind(reviewBatchId, brand.brand_key).first<Record<string, unknown>>()
       : null;
-    if (!batch) return operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
+        if (!batch) return operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
+    const resolvedReviewBatchId = String(batch.id);
     const productionDate = String(batch.production_date);
     const timezone = String(batch.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
     const requestedNumbers = Array.isArray(payload.item_numbers)
