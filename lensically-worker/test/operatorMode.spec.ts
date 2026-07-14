@@ -1903,7 +1903,7 @@ describe("operator mode MCP endpoint", () => {
     const opmg = opmgBridge.result;
     expect(opmg.brand_key).toBe("opmg_deadman");
     await ensureMcpAccountOpen("vectrix");
-        const vectrixBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "vx_get_account_state", arguments: { proceed_confirmed: true, continuity_ref: mcpContinuityRef } });
+            const vectrixBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "vx_get_account_state", arguments: { proceed_confirmed: true, continuity_loaded: true } });
     const vectrix = vectrixBridge.result;
     expect(vectrix.brand_key).toBe("vectrix");
   }, 30000);
