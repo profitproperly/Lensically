@@ -1899,7 +1899,7 @@ describe("operator mode MCP endpoint", () => {
     const manifest = manifestBridge.result;
     expect(manifest.brand_key).toBe("manifest_mental");
     await ensureMcpAccountOpen("opmg_deadman");
-        const opmgBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "om_get_account_state", arguments: { proceed_confirmed: true, continuity_ref: mcpContinuityRef } });
+            const opmgBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "om_get_account_state", arguments: { proceed_confirmed: true, continuity_loaded: true } });
     const opmg = opmgBridge.result;
     expect(opmg.brand_key).toBe("opmg_deadman");
     await ensureMcpAccountOpen("vectrix");
