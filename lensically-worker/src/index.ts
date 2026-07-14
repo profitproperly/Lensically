@@ -9918,8 +9918,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         payload.strategy ? normalizeOperatorJson(payload.strategy, {}) : null,
         draftId,
         brand.account_id,
-      )
+            )
       .run();
+    await env.DB.prepare(
+      `UPDATE operator_daily_source_claims
+       SET status = ?, disposition_reason = COALESCE(?, disposition_reason)
+       WHERE brand_key = ? AND draft_id = ?`,
+    ).bind(
+      toolName === "approve_draft" ? "approved" : "revision_required",
+      toolName === "reject_draft" ? rejectionReason : feedback,
+      brand.brand_key,
+      draftId,
+    ).run();
     const memoryKind = toolName === "approve_draft" ? "approval_feedback" : "rejection_feedback";
     const memory = await saveGptStrategyMemory(env, {
       accountId: brand.account_id,
