@@ -297,12 +297,9 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const existing = await repoFile(env, session.path);
     if (session.mode === "create" && existing.ok) return { ok: false, error: "repo_file_now_exists" };
     if (session.mode === "replace" && (!existing.ok || !existing.sha)) return { ok: false, error: "repo_file_no_longer_available" };
-    const body: Record<string, unknown> = { message: session.message, content: textToBase64(session.content), branch: config.branch };
-    if (session.mode === "replace") body.sha = existing.sha;
-    const result = await github(env, `/repos/${config.owner}/${config.repo}/contents/${session.path.split("/").map(encodeURIComponent).join("/")}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const result = await commitRepoFileViaGitData(env, session.path, session.content, session.message);
     if (result.ok) await env.RECOVERY_SESSIONS.delete(`write:${id}`);
-    const data = result.data as Record<string, unknown> | null;
-    return { ok: result.ok, status: result.status, path: session.path, commit_sha: (data?.commit as Record<string, unknown> | undefined)?.sha ?? null };
+    return { ok: result.ok, status: result.status, path: session.path, commit_sha: result.commit_sha, phase: result.phase ?? null, write_mode: "git_data_api" };
   }
   if (name === "runMainMcpSmoke") {
     const origin = env.MAIN_MCP_ORIGIN || "https://api.lensically.com";
