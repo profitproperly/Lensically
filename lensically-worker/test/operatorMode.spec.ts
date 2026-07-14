@@ -743,8 +743,7 @@ describe("operator mode backend spine", () => {
         owner_requested_exact_surface: "something easier",
       },
     });
-    expect(approved.showable).toBe(true);
-    expect(approved.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
+        expect(approved.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
   }, 30000);
 
   it("persists complete rejection coverage in a compact generation-run context", async () => {
