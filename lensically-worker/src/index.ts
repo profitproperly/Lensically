@@ -10369,7 +10369,7 @@ const BRAND_KEY_SCHEMA = {
 
 const SOURCE_TRANSFORMATION_CONTRACT_SCHEMA = {
   type: "object",
-  description: "Internal source-fidelity persistence and gate contract. Never expose these property names as owner-facing source-card headings. For Manifest, preserve the original hook, structure, meaning, tone, and payoff; close mimicry is preferred and transformation lists are optional.",
+    description: "Internal source-fidelity persistence and gate contract. Never expose these property names owner-facing. For Manifest, preserve the source mechanism, strongest structural choices, meaning, tone, and payoff while materially rewriting distinctive language; near-verbatim rearrangement is not acceptable.",
   properties: {
     must_preserve_exact: { type: "array", items: { type: "string" }, description: "Exact hook or high-performing source wording that should remain when useful. Manifest hooks may be preserved heavily." },
     must_preserve_function: { type: "array", items: { type: "string" }, description: "Meaning, emotional sequence, structure, tone, or payoff that must remain." },
