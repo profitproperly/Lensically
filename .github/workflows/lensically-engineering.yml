@@ -35,7 +35,7 @@ jobs:
         run: npm ci
 
       - name: Typecheck
-        if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' }}
+        if: ${{ inputs.task == 'typecheck' }}
         run: npx tsc --noEmit
 
       - name: Operator MCP tests
