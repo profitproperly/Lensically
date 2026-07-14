@@ -9003,18 +9003,56 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       return operatorJsonResponse({ success: false, error: "pattern_id and explicit owner_approval containing delete are required" }, 400);
     }
 
-    const pattern = await env.DB.prepare(
-      `SELECT id
+        const pattern = await env.DB.prepare(
+      `SELECT id, post_id, source_url
        FROM external_patterns
        WHERE id = ?
          AND app_user_id = ?
          AND account_id = ?
        LIMIT 1`,
-    ).bind(patternId, SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ id: number }>();
+    ).bind(patternId, SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ id: number; post_id: string | null; source_url: string | null }>();
 
     if (!pattern) {
-      return operatorJsonResponse({ deleted_pattern_count: 0, deleted_source_card_count: 0, unlinked_selection_count: 0, status: "not_found" });
+      return operatorJsonResponse({ excluded_source_count: 0, preserved_pattern_count: 0, status: "not_found" });
     }
+
+    const canonicalUrl = canonicalizeThreadsSourceUrl(pattern.source_url);
+    const threadsPostId = String(pattern.post_id ?? extractThreadsPostIdFromUrl(canonicalUrl) ?? "").trim();
+    const sourceIdentityKey = threadsPostId ? `threads:${threadsPostId}` : canonicalUrl ? `url:${canonicalUrl}` : `saved_pattern:${patternId}`;
+    await env.DB.prepare(
+      `INSERT INTO operator_source_exclusions (
+        id, brand_key, source_identity_key, source_type, internal_source_id, reason, active
+      ) VALUES (?, ?, ?, 'saved_pattern', ?, ?, 1)
+      ON CONFLICT(brand_key, source_identity_key) DO UPDATE SET
+        active = 1, reason = excluded.reason, updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      crypto.randomUUID(),
+      brand.brand_key,
+      sourceIdentityKey,
+      String(patternId),
+      ownerApproval,
+    ).run();
+    const skipped = await env.DB.prepare(
+      `UPDATE operator_source_selections
+       SET disposition = 'skipped', disposition_reason = 'owner_deleted_saved_pattern_as_source', disposition_at = CURRENT_TIMESTAMP
+       WHERE brand_key = ? AND source_type = 'saved_pattern' AND internal_source_id = ?
+         AND COALESCE(disposition, 'pending') NOT IN ('scheduled', 'published')`,
+    ).bind(brand.brand_key, String(patternId)).run();
+    await env.DB.prepare(
+      `UPDATE operator_daily_source_claims
+       SET status = 'source_deleted', disposition_reason = 'owner_deleted_saved_pattern_as_source'
+       WHERE brand_key = ? AND source_type = 'saved_pattern' AND internal_source_id = ?
+         AND status NOT IN ('scheduled', 'published')`,
+    ).bind(brand.brand_key, String(patternId)).run();
+    return operatorJsonResponse({
+      status: "excluded_from_future_sources",
+      pattern_id: patternId,
+      source_identity_key: sourceIdentityKey,
+      excluded_source_count: 1,
+      preserved_pattern_count: 1,
+      preserved_historical_data: true,
+      skipped_active_selection_count: Number(skipped.meta.changes ?? 0),
+    });
 
     const selectionRows = await env.DB.prepare(
       `SELECT id, source_card_id
