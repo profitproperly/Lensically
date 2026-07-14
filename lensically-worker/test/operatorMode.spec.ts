@@ -1311,7 +1311,7 @@ describe("operator mode MCP endpoint", () => {
       "historical_owner_rejection_gate",
       "required_gate_execution_gate",
     ]));
-    expect(direct.rejection_memory_contract.showability_rule).toContain("cannot become showable");
+        expect(direct.rejection_memory_contract.showability_rule).toContain("Close source mimicry is allowed and preferred");
     expect(direct.tool_surface.total_tools).toBe(listed.tools.length);
 
 
