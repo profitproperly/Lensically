@@ -1378,10 +1378,31 @@ describe("operator mode MCP endpoint", () => {
       "startup_contract",
       "supporting_memory",
     ]));
-        expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v2");
+                expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v3");
     expect(direct.owner_interaction_contract.silent_stages).toEqual(["generation_run_and_candidates", "gate_evaluation"]);
     expect(direct.owner_interaction_contract.transition_label_contract.required_labels).toEqual(["Completed:", "Showing now:", "Next decision:"]);
     expect(direct.owner_interaction_contract.transition_label_contract.instruction).toContain("Never make the owner infer");
+    expect(direct.owner_interaction_contract.source_card_presentation_contract.version).toBe("source-card-owner-presentation-v1");
+    expect(direct.owner_interaction_contract.source_card_presentation_contract.raw_contract_fields_are_internal_only).toBe(true);
+    expect(direct.owner_interaction_contract.source_card_presentation_contract.prohibited_owner_headings).toEqual(expect.arrayContaining([
+      "Must preserve",
+      "May reuse",
+      "Must change",
+      "Cannot repeat",
+      "Pass conditions",
+      "Fail conditions",
+    ]));
+    expect(direct.owner_interaction_contract.source_card_presentation_contract.manifest_mental_sections).toEqual(expect.arrayContaining([
+      "Original source",
+      "Source performance",
+      "Why the source works",
+      "Audience reward",
+      "Adaptation approach",
+      "Generation freedom",
+      "Recommended direction",
+    ]));
+    expect(direct.owner_interaction_contract.source_card_presentation_contract.instruction).toContain("Never dump the raw transformation matrix");
+    expect(direct.owner_interaction_contract.source_card_presentation_contract.no_finished_draft_rule).toContain("must not preselect");
     expect(direct.owner_interaction_contract.owner_visible_checkpoints).toEqual(expect.arrayContaining([
       "source_card_review",
       "draft_review_and_decision",
