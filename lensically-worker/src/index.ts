@@ -405,7 +405,7 @@ const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
 const OPERATOR_CONTINUITY_CONTRACT = {
   version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
   scope: "universal",
-    source_of_truth: "canonical database state plus opaque continuity reference",
+      source_of_truth: "canonical database state plus server-side continuity state",
   required_sequence: [
     "getOperatorStartupContext",
     "selectOperatorKey",
