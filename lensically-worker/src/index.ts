@@ -7913,35 +7913,11 @@ async function buildOperatorContinuityCapsule(
   };
 }
 
-function getLensicallySavedWorkflowConflict(payload: Record<string, unknown>): string | null {
-  const joined = [
-    payload.title,
-    payload.sequence_label,
-    payload.source_mechanism,
-    payload.required_product,
-    payload.recommended_direction,
-    payload.objective,
-    payload.prompt_summary,
-  ]
-    .filter((value) => typeof value === "string")
-    .map((value) => String(value).toLowerCase())
-    .join("\n");
-  if (!joined) {
-    return null;
-  }
-  const conflicts = [
-    "24 post",
-    "24-post",
-    "twenty-four",
-    "twenty four",
-    "batch",
-    "multiple posts",
-    "posts at once",
-    "candidate posts",
-    "generate 24",
-  ];
-  const matched = conflicts.find((term) => joined.includes(term));
-          return matched ? `lensically_saved_workflow_conflict:${matched}` : null;
+function getLensicallySavedWorkflowConflict(_payload: Record<string, unknown>): string | null {
+  // Source cards and generation runs remain one-source/one-draft artifacts. The new
+  // four-post owner review batch is a durable grouping layer, so batch language no
+  // longer conflicts with the saved workflow.
+  return null;
 }
 
 async function countGenerationDraftsForRun(env: Env, accountId: string, runId: string, sourceCardId: string): Promise<number> {
