@@ -1626,22 +1626,22 @@ describe("operator mode MCP endpoint", () => {
     expect(stillBlocked.isError).toBe(true);
     expect(stillBlocked.structuredContent.error).toBe("continuity_context_required");
 
-    const continued = await mcpToolRaw<{ executed_tool: string; result: { continuity_token: string } }>("listMcpTools", {
+        const continued = await mcpToolRaw<{ executed_tool: string; result: { continuity_ref: string } }>("listMcpTools", {
       execute_tool: "resolveContinuationContext",
       arguments: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
         continuation_choice: "resume_existing_workflow",
-        continuation_nonce: proceeded.structuredContent.result.continuation_nonce,
+        continuation_ref: proceeded.structuredContent.result.continuation_ref,
       },
     });
     expect(continued.isError).not.toBe(true);
-    expect(continued.structuredContent.result.continuity_token).toBeTruthy();
+    expect(continued.structuredContent.result.continuity_ref).toBeTruthy();
 
         const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
-      continuity_token: continued.structuredContent.result.continuity_token,
+      continuity_ref: continued.structuredContent.result.continuity_ref,
     });
     expect(allowed.isError).not.toBe(true);
     expect(allowed.structuredContent.ok).toBe(true);
