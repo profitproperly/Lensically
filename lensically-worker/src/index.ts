@@ -9036,6 +9036,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       return operatorJsonResponse({ success: false, error: "draft_not_found" }, 404);
     }
     const nextStatus = toolName === "approve_draft" ? "approved" : "rejected";
+    if (draft.status === nextStatus || (toolName === "approve_draft" && ["scheduled", "published"].includes(draft.status))) {
+      return operatorJsonResponse({ draft_id: draftId, status: draft.status, reused_existing: true, idempotency_reason: "draft_decision_already_applied" });
+    }
     if (!isAllowedOperatorTransition(draft.status, nextStatus)) {
       return operatorJsonResponse({ success: false, error: "invalid_status_transition", from: draft.status, to: nextStatus }, 400);
     }
