@@ -11249,6 +11249,7 @@ async function sha256OperatorText(value: string): Promise<string> {
 }
 
 async function operatorIdempotencyKey(toolName: string, args: Record<string, unknown>): Promise<string | null> {
+  if (toolName === "resolveContinuationContext") return null;
   if (!operatorToolMutatesState(toolName)) return null;
   const identity = operatorSemanticOperationIdentity(toolName, args);
   if (!identity) return null;
