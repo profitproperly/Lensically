@@ -11054,6 +11054,27 @@ async function readOperatorContinuityReference(
   };
 }
 
+async function readLatestOperatorContinuityState(
+  env: Env,
+  kind: "continuation_nonce" | "continuity_context",
+  brandKey: GptBrandKey,
+): Promise<Record<string, unknown> | null> {
+  await ensureOperatorWorkflowTables(env);
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_continuity_refs
+     WHERE kind = ? AND brand_key = ? AND expires_at >= ?
+     ORDER BY datetime(created_at) DESC, rowid DESC
+     LIMIT 1`,
+  ).bind(kind, brandKey, Math.floor(Date.now() / 1000)).first<Record<string, unknown>>();
+  if (!row) return null;
+  const payload = safeParseJsonString(String(row.payload_json ?? "{}"));
+  return {
+    ...row,
+    ...(payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {}),
+  };
+}
+
+
 
 function operatorChangeScope(changeDescription: unknown, intendedTool: string): { scope: "universal" | "account_scoped"; reason: string } {
   const text = `${typeof changeDescription === "string" ? changeDescription : ""} ${intendedTool}`.toLowerCase();
