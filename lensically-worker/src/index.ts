@@ -8827,17 +8827,17 @@ const BRAND_KEY_SCHEMA = {
 
 const SOURCE_TRANSFORMATION_CONTRACT_SCHEMA = {
   type: "object",
-  description: "Role-aware source adaptation contract. Manifest cards must define the audience reward, preservation/reuse rules, and transformation rules before lock.",
+  description: "Source-fidelity contract. For Manifest, preserve the original hook, structure, meaning, tone, and payoff; close mimicry is preferred and transformation lists are optional.",
   properties: {
-    must_preserve_exact: { type: "array", items: { type: "string" }, description: "Exact hook or surface text that must remain in generated drafts." },
-    must_preserve_function: { type: "array", items: { type: "string" }, description: "Semantic functions that must survive even when wording changes." },
-    may_reuse: { type: "array", items: { type: "string" }, description: "Recognizable source surfaces explicitly allowed to recur." },
-    should_transform: { type: "array", items: {}, description: "Source elements that should usually change but may pass with caution when deliberately retained." },
-    must_transform: { type: "array", items: {}, description: "Source phrases or role objects that must change. Objects may use source_text, role, and instruction." },
-    forbidden_complete_combinations: { type: "array", items: {}, description: "Surface combinations that may be individually reusable but cannot be reproduced together as the complete source package." },
-    audience_reward: { type: "string", description: "The emotional or practical product the adapted post must deliver to the reader." },
-    time_or_context_requirements: { type: "array", items: { type: "string" }, description: "Timing, month, context, or situational requirements that must remain functionally present." },
-    notes: { type: "string" },
+    must_preserve_exact: { type: "array", items: { type: "string" }, description: "Exact hook or high-performing source wording that should remain when useful. Manifest hooks may be preserved heavily." },
+    must_preserve_function: { type: "array", items: { type: "string" }, description: "Meaning, emotional sequence, structure, tone, or payoff that must remain." },
+    may_reuse: { type: "array", items: { type: "string" }, description: "Recognizable source wording explicitly allowed to recur." },
+    should_transform: { type: "array", items: {}, description: "Optional for Manifest. Use only when a specific source element truly needs changing." },
+    must_transform: { type: "array", items: {}, description: "Optional for Manifest. Do not populate merely to create distance from the source." },
+    forbidden_complete_combinations: { type: "array", items: {}, description: "Optional source packages that cannot be reproduced together. Manifest already blocks an exact full-source copy." },
+    audience_reward: { type: "string", description: "The same emotional or practical product the source delivers." },
+    time_or_context_requirements: { type: "array", items: { type: "string" }, description: "Only timing or context already present in the source; do not invent new scenes or events." },
+    notes: { type: "string", description: "For Manifest, state that only slight wording changes are needed and no scenes, characters, activities, settings, events, metaphors, or premises may be invented." },
   },
   additionalProperties: false,
 };
