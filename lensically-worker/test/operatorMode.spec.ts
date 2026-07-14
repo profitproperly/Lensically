@@ -1843,7 +1843,16 @@ describe("operator mode MCP endpoint", () => {
       continuity_capsule: {
         workflow_checkpoint: { workflow_session_id: string; next_pending_action: string; canonical_next_tool: string };
         active_artifact_ids: { source_batch_id: string; source_selection_id: string };
-        source_batch_progress: { next_draw_order: number; redraw_forbidden_on_resume: boolean };
+                source_batch_progress: {
+          completed_count: number;
+          skipped_count: number;
+          remaining_count: number;
+          workflow_sequence_completed: number;
+          next_workflow_sequence: number;
+          continuation_anchor_draw_order: number;
+          next_draw_order: number;
+          redraw_forbidden_on_resume: boolean;
+        };
         next_artifact: { draw_order: number; source_selection_id: string };
       };
     }>("resolveContinuationContext", {
