@@ -1245,7 +1245,8 @@ describe("operator mode MCP endpoint", () => {
                 expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
         expect(initialized.instructions).toContain("resume or start fresh");
         expect(initialized.instructions).toContain("resolveContinuationContext");
-                expect(initialized.instructions).toContain("continuity_ref");
+                        expect(initialized.instructions).toContain("continuity_loaded=true");
+        expect(initialized.instructions).toContain("server-side confirmation");
         expect(initialized.instructions).toContain("Pre-execution policy is mandatory");
         expect(initialized.instructions).toContain("aliases are not independent recovery routes");
         expect(initialized.instructions).toContain("generation_run_and_candidates and gate_evaluation are silent internal stages");
