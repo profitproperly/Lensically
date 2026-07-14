@@ -1714,6 +1714,115 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
+  it("classifies universal hardening separately from account creative changes", async () => {
+    const universal = await mcpTool<{ policy: { execution_plane: string; scope_classification: { scope: string }; hard_bounds: Record<string, unknown>; forbidden_routes: string[] } }>("planOperatorExecution", {
+      intended_tool: "searchRepoFiles",
+      operation: "Prevent repository search limits and 502 retries across every fresh chat.",
+    });
+    expect(universal.policy.execution_plane).toBe("engineering_control");
+    expect(universal.policy.scope_classification.scope).toBe("universal");
+    expect(universal.policy.hard_bounds).toMatchObject({ external_requests_max: 2, file_content_fanout_max: 0, result_limit_max: 20 });
+    expect(universal.policy.forbidden_routes.join(" ")).toContain("recursive tree plus per-file content reads");
+
+    const accountScoped = await mcpTool<{ policy: { scope_classification: { scope: string } } }>("planOperatorExecution", {
+      intended_tool: "create_source_card",
+      operation: "Change Manifest brand voice and source interpretation for one content lane.",
+    });
+    expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
+  }, 30000);
+
+  it("replays interrupted workflow-session creation without duplicates", async () => {
+    await ensureMcpAccountOpen(BRAND_KEY);
+    const operationId = "vitest-session-create-001";
+    const first = await mcpTool<{ workflow_session_id: string; idempotency: { replayed: boolean } }>("start_workflow_session", {
+      brand_key: BRAND_KEY,
+      operation_id: operationId,
+    });
+    const replay = await mcpTool<{ workflow_session_id: string; idempotency: { replayed: boolean } }>("start_workflow_session", {
+      brand_key: BRAND_KEY,
+      operation_id: operationId,
+    });
+    expect(replay.workflow_session_id).toBe(first.workflow_session_id);
+    expect(first.idempotency.replayed).toBe(false);
+    expect(replay.idempotency.replayed).toBe(true);
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_workflow_sessions WHERE brand_key = ? AND status = 'active'`,
+    ).bind(BRAND_KEY).first<{ total: number }>();
+    expect(Number(count?.total ?? 0)).toBe(1);
+  }, 30000);
+
+  it("start-fresh continuity preserves the previous session and creates one new active session", async () => {
+    const prior = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: BRAND_KEY });
+    const proceeded = await mcpToolRaw<{ continuation_nonce: string }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+    const continued = await mcpToolRaw<{
+      continuity_token: string;
+      continuity_capsule: { workflow_checkpoint: { workflow_session_id: string }; choice: string };
+    }>("resolveContinuationContext", {
+      brand_key: BRAND_KEY,
+      proceed_confirmed: true,
+      continuation_choice: "start_fresh_workflow",
+      continuation_nonce: proceeded.structuredContent.continuation_nonce,
+    });
+    expect(continued.isError).not.toBe(true);
+    expect(continued.structuredContent.continuity_capsule.choice).toBe("start_fresh_workflow");
+    expect(continued.structuredContent.continuity_capsule.workflow_checkpoint.workflow_session_id).not.toBe(prior.workflow_session_id);
+    const priorRow = await env.DB.prepare(`SELECT status FROM operator_workflow_sessions WHERE id = ?`).bind(prior.workflow_session_id).first<{ status: string }>();
+    expect(priorRow?.status).toBe("preserved");
+    const active = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_workflow_sessions WHERE brand_key = ? AND status = 'active'`).bind(BRAND_KEY).first<{ total: number }>();
+    expect(Number(active?.total ?? 0)).toBe(1);
+  }, 30000);
+
+  it("resume continuity returns the exact next unresolved source without redrawing", async () => {
+    const fixture = await createLockedSourceCard([], "manifest_mental");
+    await env.DB.prepare(
+      `INSERT INTO gpt_generation_drafts (
+        id, run_id, account_id, threads_user_id, source_card_id, draft_index, text, status, showable
+      ) VALUES (?, ?, 'manifest-mental', 'manifest-mental', ?, 1, ?, 'scheduled', 1)`,
+    ).bind("scheduled-continuity-fixture", fixture.runId, fixture.sourceCardId, "Scheduled fixture post.").run();
+    const originalBatch = await env.DB.prepare(
+      `SELECT id FROM operator_source_selection_batches WHERE workflow_session_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(fixture.sessionId).first<{ id: string }>();
+    const proceeded = await mcpToolRaw<{ continuation_nonce: string }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    const continued = await mcpToolRaw<{
+      continuity_capsule: {
+        workflow_checkpoint: { workflow_session_id: string; next_pending_action: string; canonical_next_tool: string };
+        active_artifact_ids: { source_batch_id: string; source_selection_id: string };
+        source_batch_progress: { next_draw_order: number; redraw_forbidden_on_resume: boolean };
+        next_artifact: { draw_order: number; source_selection_id: string };
+      };
+    }>("resolveContinuationContext", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+      continuation_choice: "resume_existing_workflow",
+      continuation_nonce: proceeded.structuredContent.continuation_nonce,
+      workflow_session_id: fixture.sessionId,
+    });
+    expect(continued.isError).not.toBe(true);
+    const capsule = continued.structuredContent.continuity_capsule;
+    expect(capsule.workflow_checkpoint.workflow_session_id).toBe(fixture.sessionId);
+    expect(capsule.workflow_checkpoint.next_pending_action).toBe("build_next_source_card");
+    expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("create_source_card");
+    expect(capsule.active_artifact_ids.source_batch_id).toBe(originalBatch?.id);
+    expect(capsule.source_batch_progress.next_draw_order).toBe(2);
+    expect(capsule.source_batch_progress.redraw_forbidden_on_resume).toBe(true);
+    expect(capsule.next_artifact.draw_order).toBe(2);
+    const batchCount = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE workflow_session_id = ?`).bind(fixture.sessionId).first<{ total: number }>();
+    expect(Number(batchCount?.total ?? 0)).toBe(1);
+  }, 40000);
+
+  it("blocks wrapper hopping after a same-backend deterministic failure", async () => {
+    const direct = await mcpToolRaw<{ error: string }>("readRepoFile", { path: "missing-vitest-file.md" });
+    expect(direct.isError).toBe(true);
+    expect(direct.structuredContent.error).toBe("repo_file_read_failed");
+    const alias = await mcpToolRaw<{ error: string; prior_failed_route: string }>("runEngineeringTool", {
+      tool_name: "readRepoFile",
+      arguments: { path: "missing-vitest-file.md" },
+    });
+    expect(alias.isError).toBe(true);
+    expect(alias.structuredContent.error).toBe("same_backend_route_retry_forbidden");
+    expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
+  }, 30000);
+
   it("returns structured JSON-RPC errors for handler exceptions", async () => {
     await env.DB.prepare(`DROP TABLE IF EXISTS operator_workflow_requirements`).run();
     await env.DB.prepare(`CREATE TABLE operator_workflow_requirements (bad_column TEXT)`).run();
