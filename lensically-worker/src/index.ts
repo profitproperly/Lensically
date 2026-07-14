@@ -8856,9 +8856,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         accountId: brand.account_id,
         threadsUserId: brand.profile.threads_user_id,
         scheduledPostId: scheduled.scheduledPostId,
-        strategy: draft.strategy && typeof draft.strategy === "object"
-          ? draft.strategy as Record<string, unknown>
-          : {},
+                strategy: draft.strategy && typeof draft.strategy === "object"
+          ? draft.strategy as GptPostStrategyInput
+          : normalizeGptPostStrategyInput({}),
       });
       await insertOperatorInventory(env, {
         brandKey: brand.brand_key,
