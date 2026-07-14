@@ -564,9 +564,41 @@ describe("operator mode backend spine", () => {
       draft_index: 2,
       draft_analysis: analysis,
     });
-    expect(copied.showable).toBe(false);
+        expect(copied.showable).toBe(false);
     expect(copied.blocking_failures.some((failure) => failure.gate_key === "source_transformation_contract_gate")).toBe(true);
     }, 30000);
+
+  it("ignores rejected drafts in exact duplicate inventory but still blocks approved drafts", async () => {
+    const fixture = await createLockedSourceCard();
+    const text = "THE PERSON READING THIS\nis making this their first six-figure year.\nCLAIM IT";
+    const rejected = await operatorTool<{ draft_id: string }>("save_self_rejected_draft", {
+      brand_key: BRAND_KEY,
+      run_id: fixture.runId,
+      source_card_id: fixture.sourceCardId,
+      text,
+      rejection_reason: "Post-specific repair fixture.",
+    });
+
+    const afterRejected = await operatorTool<{ gate_results: Array<{ gate_key: string; result: string }> }>("run_gates", {
+      brand_key: BRAND_KEY,
+      source_card_id: fixture.sourceCardId,
+      draft_text: text,
+      stage: "gate_evaluation",
+    });
+    expect(afterRejected.gate_results.find((result) => result.gate_key === "exact_duplicate_gate")?.result).toBe("pass");
+
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts SET status = 'approved' WHERE id = ?`,
+    ).bind(rejected.draft_id).run();
+
+    const afterApproved = await operatorTool<{ gate_results: Array<{ gate_key: string; result: string }> }>("run_gates", {
+      brand_key: BRAND_KEY,
+      source_card_id: fixture.sourceCardId,
+      draft_text: text,
+      stage: "gate_evaluation",
+    });
+    expect(afterApproved.gate_results.find((result) => result.gate_key === "exact_duplicate_gate")?.result).toBe("fail");
+  }, 30000);
 
   it("loads account rejection context and blocks repeated owner-rejected language before showing", async () => {
     const first = await createLockedSourceCard();
