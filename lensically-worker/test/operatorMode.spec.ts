@@ -1671,13 +1671,31 @@ describe("operator mode MCP endpoint", () => {
       required_next_tool: "confirmOperatorProceed",
     });
 
-        const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+        const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuation_nonce: string }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: false });
+    expect(proceeded.structuredContent.continuation_nonce).toBeTruthy();
+
+    const continuityBlocked = await mcpToolRaw<{ error: string; required_next_tool: string }>("prepareFullPreflight", {
+      brand_key: BRAND_KEY,
+      proceed_confirmed: true,
+    });
+    expect(continuityBlocked.isError).toBe(true);
+    expect(continuityBlocked.structuredContent).toMatchObject({ error: "continuity_context_required", required_next_tool: "resolveContinuationContext" });
+
+    const continued = await mcpToolRaw<{ continuity_token: string; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
+      brand_key: BRAND_KEY,
+      proceed_confirmed: true,
+      continuation_choice: "resume_existing_workflow",
+      continuation_nonce: proceeded.structuredContent.continuation_nonce,
+    });
+    expect(continued.isError).not.toBe(true);
+    expect(continued.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
 
                 const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string; limit: number; source: string; coverage_status: string }> }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
+      continuity_token: continued.structuredContent.continuity_token,
     });
     expect(preflight.isError).not.toBe(true);
     expect(preflight.structuredContent.complete).toBe(true);
