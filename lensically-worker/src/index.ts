@@ -9652,7 +9652,8 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         continuation_choice: { type: "string", enum: ["resume_existing_workflow", "start_fresh_workflow"] },
-        continuation_nonce: { type: "string", description: "Signed nonce returned by confirmOperatorProceed. Reuse the same nonce if the call is retried." },
+                continuation_ref: { type: "string", description: "Opaque UUID returned by confirmOperatorProceed. Reuse the same reference if the call is retried." },
+        continuation_nonce: { type: "string", description: "Legacy signed nonce accepted only for compatibility." },
         workflow_session_id: { type: "string", description: "Optional explicit persisted session to resume." },
       },
       required: ["brand_key", "continuation_choice", "continuation_nonce"],
