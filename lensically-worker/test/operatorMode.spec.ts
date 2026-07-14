@@ -85,26 +85,15 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     mcpProceedConfirmed = false;
     mcpContinuityLoaded = false;
   }
-  if (!mcpProceedConfirmed) {
-    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuation_confirmation_recorded: boolean; continuation_choice_required: boolean; continuation_choices: string[]; next_owner_prompt: string; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
+    if (!mcpProceedConfirmed) {
+    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuity_loaded: boolean; continuation_choice_required: boolean; continuity_capsule: { brand_key: string }; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.proceeded).toBe(true);
-    expect(proceeded.structuredContent.account_data_loaded).toBe(false);
-    expect(proceeded.structuredContent.continuation_confirmation_recorded).toBe(true);
-    expect(proceeded.structuredContent.continuation_choice_required).toBe(true);
-    expect(proceeded.structuredContent.continuation_choices).toEqual(["resume_existing_workflow", "start_fresh_workflow"]);
-    expect(proceeded.structuredContent.next_owner_prompt).toContain("pick up where the existing workflow left off");
+    expect(proceeded.structuredContent.account_data_loaded).toBe(true);
+    expect(proceeded.structuredContent.continuity_loaded).toBe(true);
+    expect(proceeded.structuredContent.continuation_choice_required).toBe(false);
+    expect(proceeded.structuredContent.continuity_capsule.brand_key).toBe(brandKey);
     mcpProceedConfirmed = true;
-  }
-  if (!mcpContinuityLoaded) {
-    const continued = await mcpToolRaw<{ continuity_loaded: boolean; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
-      brand_key: brandKey,
-      proceed_confirmed: true,
-      continuation_choice: "resume_existing_workflow",
-    });
-    expect(continued.isError).not.toBe(true);
-    expect(continued.structuredContent.continuity_loaded).toBe(true);
-    expect(continued.structuredContent.continuity_capsule.brand_key).toBe(brandKey);
     mcpContinuityLoaded = true;
   }
 }
