@@ -11031,7 +11031,9 @@ function operatorKeyHandshakeLines(toolCount: number, brandKey: GptBrandKey): st
 }
 
 const ACCOUNT_SCOPED_MCP_ADMIN_TOOLS = new Set<string>([
+  "resolveContinuationContext",
   "getWorkflowStatus",
+
   "advanceWorkflowStage",
   "prepareFullPreflight",
   "updateGate",
