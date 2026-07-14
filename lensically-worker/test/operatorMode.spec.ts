@@ -616,6 +616,62 @@ describe("operator mode backend spine", () => {
     expect(passing.showable).toBe(true);
     expect(passing.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
     expect(passing.gate_results.find((result) => result.gate_key === "required_gate_execution_gate")?.result).toBe("pass");
+    }, 30000);
+
+  it("persists complete rejection coverage in a compact generation-run context", async () => {
+    const first = await createLockedSourceCard();
+    const runOwner = await env.DB.prepare(
+      `SELECT account_id, threads_user_id FROM gpt_generation_runs WHERE id = ? LIMIT 1`,
+    ).bind(first.runId).first<{ account_id: string; threads_user_id: string }>();
+    expect(runOwner).toBeTruthy();
+
+    const oversizedStrategy = JSON.stringify({
+      ban_phrases: ["oversized_token"],
+      unused_payload: "x".repeat(20000),
+    });
+    await env.DB.prepare(
+      `WITH RECURSIVE sequence(value) AS (
+         SELECT 1
+         UNION ALL
+         SELECT value + 1 FROM sequence WHERE value < 120
+       )
+       INSERT INTO gpt_generation_drafts (
+         id, run_id, account_id, threads_user_id, draft_index, text, status,
+         rejection_reason, owner_feedback, strategy_json
+       )
+       SELECT
+         'bulk-rejection-' || value,
+         ?,
+         ?,
+         ?,
+         value,
+         'Previously rejected draft number ' || value || ' with a distinct failed structure.',
+         'rejected',
+         'Owner rejected this wording. Avoid banned "oversized_token" in future drafts.',
+         'Keep the lesson, but do not persist unrelated raw strategy payloads.',
+         ?
+       FROM sequence`,
+    ).bind(first.runId, runOwner?.account_id, runOwner?.threads_user_id, oversizedStrategy).run();
+
+    const second = await createLockedSourceCard();
+    const persistedRun = await env.DB.prepare(
+      `SELECT prior_adaptation_context_json FROM gpt_generation_runs WHERE id = ? LIMIT 1`,
+    ).bind(second.runId).first<{ prior_adaptation_context_json: string }>();
+    const serialized = String(persistedRun?.prior_adaptation_context_json ?? "{}");
+    const persistedContext = JSON.parse(serialized) as {
+      account_rejection_context?: {
+        coverage_complete?: boolean;
+        required_review_count?: number;
+        explicit_banned_surfaces?: string[];
+        rejected_drafts?: Array<Record<string, unknown>>;
+      };
+    };
+    const rejectionContext = persistedContext.account_rejection_context;
+    expect(rejectionContext?.coverage_complete).toBe(true);
+    expect(rejectionContext?.required_review_count).toBe(120);
+    expect(rejectionContext?.explicit_banned_surfaces).toContain("oversized_token");
+    expect(rejectionContext?.rejected_drafts?.[0]).not.toHaveProperty("strategy");
+    expect(serialized.length).toBeLessThan(500000);
   }, 30000);
 
   it("preserves a Saved Pattern ID across Threads URL and username changes", async () => {
