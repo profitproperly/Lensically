@@ -9310,7 +9310,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-  {
+    {
     name: "list_source_candidates",
     title: "List source candidates",
     description: "Use this to find candidate sources for a source card from archive posts, saved patterns, recent insights, memory, drafts, or scheduled posts.",
@@ -9328,6 +9328,23 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "delete_saved_pattern_source",
+    title: "Delete saved pattern source",
+    description: "Delete one owner-selected saved pattern so it cannot enter future source draws. If it has an unused draft source card, unlink and delete that draft card too. Requires explicit owner approval.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        pattern_id: { type: "integer", minimum: 1 },
+        source_card_id: { type: "string" },
+        owner_approval: { type: "string" },
+      },
+      required: ["brand_key", "pattern_id", "owner_approval"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   },
     {
     name: "draw_source_candidate_batch",
