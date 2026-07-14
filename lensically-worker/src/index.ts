@@ -10448,7 +10448,250 @@ async function hmacSha256Base64Url(secret: string, value: string): Promise<strin
   return base64UrlEncodeBytes(new Uint8Array(signature));
 }
 
+type OperatorContinuationChoice = "resume_existing_workflow" | "start_fresh_workflow";
+
+function normalizeOperatorContinuationChoice(value: unknown): OperatorContinuationChoice | null {
+  return value === "resume_existing_workflow" || value === "start_fresh_workflow" ? value : null;
+}
+
+async function createSignedOperatorEnvelope(env: Env, payload: Record<string, unknown>): Promise<string> {
+  const encodedPayload = base64UrlEncodeText(JSON.stringify(payload));
+  const signature = await hmacSha256Base64Url(operatorMcpOAuthSecret(env), encodedPayload);
+  return `${encodedPayload}.${signature}`;
+}
+
+async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<Record<string, unknown> | null> {
+  if (typeof token !== "string" || !token.trim()) {
+    return null;
+  }
+  const [encodedPayload, providedSignature] = token.trim().split(".");
+  if (!encodedPayload || !providedSignature) {
+    return null;
+  }
+  const expectedSignature = await hmacSha256Base64Url(operatorMcpOAuthSecret(env), encodedPayload);
+  if (providedSignature !== expectedSignature) {
+    return null;
+  }
+  const decoded = base64UrlDecodeText(encodedPayload);
+  const payload = decoded ? safeParseJsonString(decoded) : null;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  const expiresAt = Number((payload as Record<string, unknown>).exp ?? 0);
+  if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+  return payload as Record<string, unknown>;
+}
+
+async function createOperatorContinuationNonce(env: Env, brandKey: GptBrandKey): Promise<string> {
+  return createSignedOperatorEnvelope(env, {
+    kind: "operator_continuation_nonce",
+    brand_key: brandKey,
+    nonce: crypto.randomUUID(),
+    exp: Math.floor(Date.now() / 1000) + OPERATOR_CONTINUATION_NONCE_TTL_SECONDS,
+  });
+}
+
+async function verifyOperatorContinuationNonce(env: Env, token: unknown, brandKey: GptBrandKey): Promise<Record<string, unknown> | null> {
+  const payload = await verifySignedOperatorEnvelope(env, token);
+  return payload?.kind === "operator_continuation_nonce" && payload.brand_key === brandKey ? payload : null;
+}
+
+async function createOperatorContinuityToken(
+  env: Env,
+  brandKey: GptBrandKey,
+  choice: OperatorContinuationChoice,
+  workflowSessionId: string | null,
+): Promise<string> {
+  return createSignedOperatorEnvelope(env, {
+    kind: "operator_continuity_token",
+    brand_key: brandKey,
+    continuation_choice: choice,
+    workflow_session_id: workflowSessionId,
+    continuity_version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+    execution_policy_version: OPERATOR_EXECUTION_POLICY_VERSION,
+    exp: Math.floor(Date.now() / 1000) + OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+  });
+}
+
+async function verifyOperatorContinuityToken(
+  env: Env,
+  token: unknown,
+  brandKey: GptBrandKey | null,
+): Promise<Record<string, unknown> | null> {
+  const payload = await verifySignedOperatorEnvelope(env, token);
+  if (payload?.kind !== "operator_continuity_token") {
+    return null;
+  }
+  if (brandKey && payload.brand_key !== brandKey) {
+    return null;
+  }
+  if (payload.continuity_version !== OPERATOR_CONTINUITY_CONTRACT_VERSION) {
+    return null;
+  }
+  return payload;
+}
+
+function operatorChangeScope(changeDescription: unknown, intendedTool: string): { scope: "universal" | "account_scoped"; reason: string } {
+  const text = `${typeof changeDescription === "string" ? changeDescription : ""} ${intendedTool}`.toLowerCase();
+  const universalSignals = [
+    "fresh chat", "continuity", "startup", "routing", "route", "retry", "limit", "502", "transport",
+    "idempot", "workflow engine", "mcp", "schema", "regression", "deployment", "tool surface", "backend",
+    "infrastructure", "execution policy", "source of truth", "cross-chat", "all accounts", "universal",
+  ];
+  const accountSignals = [
+    "brand voice", "creative style", "hook style", "manifest", "opmg", "vectrix", "posting cadence",
+    "source interpretation", "account strategy", "content lane", "audience reward",
+  ];
+  const universal = universalSignals.some((signal) => text.includes(signal));
+  const accountSpecific = accountSignals.some((signal) => text.includes(signal));
+  if (universal || (isOperatorMcpEngineeringToolName(intendedTool) && !accountSpecific)) {
+    return { scope: "universal", reason: "Infrastructure, transport, continuity, routing, workflow, schema, or regression behavior must be consistent across every Lensically key." };
+  }
+  return { scope: "account_scoped", reason: "The operation changes selected-account content, creative interpretation, strategy, artifacts, or metrics rather than shared system behavior." };
+}
+
+function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+  const nestedTool = toolName === "listMcpTools"
+    ? normalizeOperatorText(args.execute_tool, 160, true)
+    : toolName === "runEngineeringTool"
+      ? normalizeOperatorText(args.tool_name, 160, true)
+      : null;
+  const canonicalTool = nestedTool || toolName;
+  const engineering = isOperatorMcpEngineeringToolName(canonicalTool);
+  const admin = isOperatorMcpAdminToolName(canonicalTool);
+  const accountScoped = operatorMcpToolNameRequiresProceed(canonicalTool);
+  const search = canonicalTool === "searchRepoFiles";
+  const workflowPoll = canonicalTool === "getGitHubWorkflowRun";
+  const scope = operatorChangeScope(args.change_description ?? args.operation, canonicalTool);
+  return {
+    version: OPERATOR_EXECUTION_POLICY_VERSION,
+    canonical_tool: canonicalTool,
+    requested_route: toolName,
+    route_is_alias: Boolean(nestedTool),
+    execution_plane: engineering ? "engineering_control" : accountScoped ? "operator_account" : admin ? "operator_control" : "operator_account",
+    operation_class: search ? "bounded_repository_search" : workflowPoll ? "bounded_workflow_poll" : engineering ? "engineering" : accountScoped ? "account_workflow" : "control",
+    scope_classification: scope,
+    allowed: true,
+    hard_bounds: search
+      ? { external_requests_max: 2, file_content_fanout_max: 0, result_limit_max: 20, prefix_recommended: true }
+      : workflowPoll
+        ? { external_requests_max: 2, poll_same_run_min_seconds: 5, full_logs_only_on_completed_failure: true }
+        : { identical_retry_max: 0, deterministic_failure_retryable: false },
+    forbidden_routes: search
+      ? ["recursive tree plus per-file content reads", "retrying the same search through runEngineeringTool", "retrying the same search through listMcpTools"]
+      : ["treating same-backend wrappers as independent recovery planes", "repeating a deterministic failed call without changing inputs or route"],
+    known_failure_prevented: search,
+    canonical_route: search ? "single GitHub code-search request with bounded fallback" : engineering ? "engineering control handler" : "operator backend handler",
+    idempotency_version: OPERATOR_IDEMPOTENCY_VERSION,
+  };
+}
+
+async function recordOperatorExecutionDecision(
+  env: Env,
+  toolName: string,
+  args: Record<string, unknown>,
+  policy: Record<string, unknown>,
+  decision = "allowed",
+): Promise<void> {
+  const brandKey = requestedMcpBrandKey(toolName, args);
+  await env.DB.prepare(
+    `INSERT INTO operator_execution_events (
+      id, brand_key, workflow_session_id, tool_name, operation_class, execution_plane,
+      policy_version, decision, known_failure_prevented, evidence_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    brandKey,
+    normalizeOperatorText(args.workflow_session_id, 120, true),
+    toolName,
+    String(policy.operation_class ?? "unknown"),
+    String(policy.execution_plane ?? "unknown"),
+    OPERATOR_EXECUTION_POLICY_VERSION,
+    decision,
+    policy.known_failure_prevented === true ? 1 : 0,
+    normalizeOperatorJson(policy, {}),
+  ).run();
+}
+
+function operatorToolMutatesState(toolName: string): boolean {
+  const readOnly = new Set([
+    "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "listRepoFiles", "readRepoFile",
+    "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
+    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "selectOperatorKey", "confirmOperatorProceed",
+    "planOperatorExecution", "getMcpAdminState", "readMcpToolDefinition", "listImplementationBacklogItems", "getWorkflowStatus",
+    "list_accounts", "get_account_state", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
+    "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results",
+  ]);
+  return !readOnly.has(toolName);
+}
+
+function operatorSemanticOperationIdentity(toolName: string, args: Record<string, unknown>): string | null {
+  const explicit = normalizeOperatorText(args.operation_id, 240, true);
+  if (explicit) return explicit;
+  const brand = requestedMcpBrandKey(toolName, args) ?? "unscoped";
+  const session = normalizeOperatorText(args.workflow_session_id, 120, true) ?? "no-session";
+  if (toolName === "resolveContinuationContext") return normalizeOperatorText(args.continuation_nonce, 2000, true);
+  if (toolName === "start_workflow_session") return `${brand}:active:${String(args.workflow_template_key ?? OPERATOR_WORKFLOW_TEMPLATE_KEY)}`;
+  if (toolName === "draw_source_candidate_batch") return `${brand}:${session}:daily-source-batch`;
+  if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? `${session}:${String(args.sequence_label ?? "unlabeled")}`)}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
+  if (toolName === "lock_source_card") return `${brand}:lock:${String(args.source_card_id ?? "")}`;
+  if (toolName === "submit_candidate_draft" || toolName === "submitAndGateDraft") return `${brand}:${String(args.run_id ?? "")}:${String(args.source_card_id ?? "")}:${String(args.text ?? args.draft_text ?? "")}`;
+  if (["mark_draft_shown", "approve_draft", "reject_draft", "schedule_approved_draft"].includes(toolName)) return `${brand}:${toolName}:${String(args.draft_id ?? "")}`;
+  return null;
+}
+
+async function sha256OperatorText(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function operatorIdempotencyKey(toolName: string, args: Record<string, unknown>): Promise<string | null> {
+  if (!operatorToolMutatesState(toolName)) return null;
+  const identity = operatorSemanticOperationIdentity(toolName, args);
+  if (!identity) return null;
+  return sha256OperatorText(`${OPERATOR_IDEMPOTENCY_VERSION}|${toolName}|${identity}`);
+}
+
+async function readOperatorOperationReceipt(env: Env, key: string): Promise<Record<string, unknown> | null> {
+  return env.DB.prepare(`SELECT * FROM operator_operation_receipts WHERE idempotency_key = ? LIMIT 1`).bind(key).first<Record<string, unknown>>();
+}
+
+async function beginOperatorOperationReceipt(
+  env: Env,
+  key: string,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<{ existing: Record<string, unknown> | null; fingerprint: string }> {
+  const fingerprint = await sha256OperatorText(JSON.stringify(args));
+  const existing = await readOperatorOperationReceipt(env, key);
+  if (existing) return { existing, fingerprint };
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO operator_operation_receipts (
+      idempotency_key, brand_key, workflow_session_id, operation_type, tool_name, request_fingerprint, status
+    ) VALUES (?, ?, ?, ?, ?, ?, 'started')`,
+  ).bind(
+    key,
+    requestedMcpBrandKey(toolName, args),
+    normalizeOperatorText(args.workflow_session_id, 120, true),
+    toolName,
+    toolName,
+    fingerprint,
+  ).run();
+  return { existing: await readOperatorOperationReceipt(env, key), fingerprint };
+}
+
+async function completeOperatorOperationReceipt(env: Env, key: string, result: Record<string, unknown>): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE operator_operation_receipts
+     SET status = 'completed', result_json = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE idempotency_key = ?`,
+  ).bind(JSON.stringify(result).slice(0, 120000), key).run();
+}
+
 function operatorMcpOAuthJson(payload: Record<string, unknown>, status = 200): Response {
+
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
