@@ -10960,6 +10960,60 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
   };
 }
 
+function canonicalOperatorExecutionArgs(toolName: string, args: Record<string, unknown>): { tool_name: string; args: Record<string, unknown> } {
+  if (toolName === "listMcpTools") {
+    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true) ?? toolName;
+    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+      ? args.arguments as Record<string, unknown>
+      : {};
+    return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
+  }
+  if (toolName === "runEngineeringTool") {
+    const nestedTool = normalizeOperatorText(args.tool_name, 160, true) ?? toolName;
+    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+      ? args.arguments as Record<string, unknown>
+      : {};
+    return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
+  }
+  const canonicalArgs = { ...args };
+  delete canonicalArgs.proceed_confirmed;
+  delete canonicalArgs.continuity_token;
+  return { tool_name: toolName, args: canonicalArgs };
+}
+
+async function operatorExecutionFingerprint(toolName: string, args: Record<string, unknown>): Promise<string> {
+  const canonical = canonicalOperatorExecutionArgs(toolName, args);
+  return sha256OperatorText(JSON.stringify({ tool_name: canonical.tool_name, args: canonical.args }));
+}
+
+async function getKnownAliasRetryBlock(
+  env: Env,
+  toolName: string,
+  args: Record<string, unknown>,
+  policy: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  if (policy.route_is_alias !== true) return null;
+  const fingerprint = await operatorExecutionFingerprint(toolName, args);
+  const prior = await env.DB.prepare(
+    `SELECT tool_name, decision, evidence_json, created_at
+     FROM operator_execution_events
+     WHERE json_extract(evidence_json, '$.canonical_fingerprint') = ?
+       AND decision = 'failed'
+       AND datetime(created_at) >= datetime('now', '-15 minutes')
+     ORDER BY datetime(created_at) DESC LIMIT 1`,
+  ).bind(fingerprint).first<Record<string, unknown>>();
+  if (!prior) return null;
+  return {
+    ok: false,
+    error: "same_backend_route_retry_forbidden",
+    canonical_tool: policy.canonical_tool,
+    requested_route: toolName,
+    prior_failed_route: prior.tool_name,
+    canonical_fingerprint: fingerprint,
+    message: "This alias reaches the same backend as a recently failed route. Use a genuinely independent execution plane or change the input; do not wrapper-hop.",
+  };
+}
+
 async function recordOperatorExecutionDecision(
   env: Env,
   toolName: string,
