@@ -1443,8 +1443,18 @@ describe("operator mode MCP endpoint", () => {
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[]; after_explicit_proceed: string };
       open_implementation_backlog: Array<Record<string, unknown>>;
     }>("getOperatorStartupContext");
-        expect(direct.bootstrap_version).toBe("operator-startup-v2");
+        expect(direct.bootstrap_version).toBe("operator-startup-v3");
     expect(direct.collaboration_contract.version).toBe("operator-collaboration-v1");
+    expect(direct.continuity_contract.version).toBe("operator-continuity-v1");
+    expect(direct.continuity_contract.scope).toBe("universal");
+    expect(direct.continuity_contract.source_of_truth).toContain("canonical database state");
+    expect(direct.continuity_contract.required_sequence).toContain("resolveContinuationContext");
+    expect(direct.execution_policy_contract.version).toBe("operator-execution-policy-v1");
+    expect(direct.execution_policy_contract.scope).toBe("universal");
+    expect(direct.execution_policy_contract.authority_order[0]).toBe("backend enforcement");
+    expect(direct.execution_policy_contract.alias_rule).toContain("not fallback routes");
+    expect(direct.execution_policy_contract.scope_rule).toContain("default universal");
+    expect(direct.execution_policy_contract.memory_rule).toContain("cannot authorize or enforce");
     expect(direct.collaboration_contract.principles.join(" ")).toContain("independent judgment");
     expect(direct.collaboration_contract.durable_change_reporting.required_fields).toEqual(expect.arrayContaining([
       "change_name",
