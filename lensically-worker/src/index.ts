@@ -8620,7 +8620,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       requestedSize,
     ).run();
 
-    const available = await env.DB.prepare(
+        const loadAvailableSelections = (batchId: string) => env.DB.prepare(
       `SELECT s.*
        FROM operator_source_selections s
        LEFT JOIN operator_daily_source_claims c
@@ -8631,7 +8631,29 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          AND c.id IS NULL
          AND COALESCE(s.disposition, 'pending') NOT IN ('skipped', 'invalidated', 'claimed')
        ORDER BY s.draw_order ASC`,
-    ).bind(productionDate, String(sourceBatch.batch.id), brand.brand_key).all<Record<string, unknown>>();
+    ).bind(productionDate, batchId, brand.brand_key).all<Record<string, unknown>>();
+    let available = await loadAvailableSelections(String(sourceBatch.batch.id));
+    let sourceBatchRollover = false;
+    if (!(available.results ?? []).length) {
+      try {
+        sourceBatch = await ensureManifestSourceBatchForDate(
+          env,
+          brand,
+          workflowSessionId,
+          productionDate,
+          sourceTypes,
+          true,
+        );
+        sourceBatchRollover = true;
+        await env.DB.prepare(
+          `UPDATE operator_review_batches SET source_batch_id = ? WHERE id = ?`,
+        ).bind(String(sourceBatch.batch.id), reviewBatchId).run();
+        available = await loadAvailableSelections(String(sourceBatch.batch.id));
+      } catch (error) {
+        await env.DB.prepare(`UPDATE operator_review_batches SET status = 'empty' WHERE id = ?`).bind(reviewBatchId).run();
+        return operatorJsonResponse({ success: false, error: error instanceof Error ? error.message : "source_batch_rollover_failed", production_date: productionDate }, 409);
+      }
+    }
 
     let itemNumber = 1;
     for (const selection of available.results ?? []) {
