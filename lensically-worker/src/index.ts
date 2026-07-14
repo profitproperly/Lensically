@@ -7428,6 +7428,239 @@ async function getActiveOperatorSession(env: Env, brandKey: GptBrandKey): Promis
   ).bind(brandKey).first<Record<string, unknown>>();
 }
 
+async function resolveOperatorContinuationSession(
+  env: Env,
+  brandKey: GptBrandKey,
+  choice: OperatorContinuationChoice,
+  requestedSessionId: string | null,
+): Promise<Record<string, unknown> | null> {
+  await ensureOperatorWorkflowTables(env);
+  if (choice === "start_fresh_workflow") {
+    await env.DB.prepare(
+      `UPDATE operator_workflow_sessions
+       SET status = 'preserved', updated_at = CURRENT_TIMESTAMP
+       WHERE brand_key = ? AND status = 'active'`,
+    ).bind(brandKey).run();
+    const sessionId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_workflow_sessions (
+        id, brand_key, workflow_template_key, objective, status, current_stage, notes
+      ) VALUES (?, ?, ?, NULL, 'active', 'account_selection', ?)`,
+    ).bind(
+      sessionId,
+      brandKey,
+      OPERATOR_WORKFLOW_TEMPLATE_KEY,
+      "Created through universal signed continuation flow. Previous sessions preserved.",
+    ).run();
+    return env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? LIMIT 1`).bind(sessionId).first<Record<string, unknown>>();
+  }
+  if (requestedSessionId) {
+    const requested = await env.DB.prepare(
+      `SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`,
+    ).bind(requestedSessionId, brandKey).first<Record<string, unknown>>();
+    if (requested) return requested;
+  }
+  return env.DB.prepare(
+    `SELECT *
+     FROM operator_workflow_sessions
+     WHERE brand_key = ?
+     ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'preserved' THEN 1 ELSE 2 END,
+              datetime(updated_at) DESC, datetime(created_at) DESC
+     LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+}
+
+function operatorContinuationNextAction(input: {
+  session: Record<string, unknown> | null;
+  sourceBatch: Record<string, unknown> | null;
+  nextSelection: Record<string, unknown> | null;
+  sourceCard: Record<string, unknown> | null;
+  draft: Record<string, unknown> | null;
+  scheduledPost: Record<string, unknown> | null;
+}): { action: string; owner_checkpoint: string; canonical_tool: string; last_completed_action: string } {
+  if (!input.session) {
+    return { action: "start_workflow_session", owner_checkpoint: "workflow_start", canonical_tool: "start_workflow_session", last_completed_action: "key_and_continuation_choice_confirmed" };
+  }
+  const draftStatus = String(input.draft?.status ?? "");
+  if (draftStatus === "shown") {
+    return { action: "owner_draft_decision", owner_checkpoint: "draft_review_and_decision", canonical_tool: "approve_draft_or_reject_draft", last_completed_action: "passing_draft_marked_shown" };
+  }
+  if (draftStatus === "approved") {
+    return { action: "owner_scheduling_confirmation", owner_checkpoint: "scheduling_confirmation", canonical_tool: "list_scheduled_posts", last_completed_action: "shown_draft_approved" };
+  }
+  if (input.scheduledPost || draftStatus === "scheduled" || draftStatus === "published") {
+    if (input.nextSelection) {
+      return { action: "build_next_source_card", owner_checkpoint: "source_card_review", canonical_tool: "create_source_card", last_completed_action: "approved_draft_scheduled" };
+    }
+    return { action: "workflow_complete", owner_checkpoint: "completion_report", canonical_tool: "getWorkflowStatus", last_completed_action: "all_selected_sources_completed" };
+  }
+  if (input.sourceCard?.status === "draft") {
+    return { action: "owner_source_card_review", owner_checkpoint: "source_card_review", canonical_tool: "get_source_card", last_completed_action: "source_card_created" };
+  }
+  if (input.sourceCard?.status === "locked") {
+    return { action: "generate_until_showable", owner_checkpoint: "draft_review_and_decision", canonical_tool: "create_generation_run", last_completed_action: "source_card_approved_and_locked" };
+  }
+  if (input.nextSelection) {
+    return { action: "build_next_source_card", owner_checkpoint: "source_card_review", canonical_tool: "create_source_card", last_completed_action: input.sourceBatch ? "previous_source_completed" : "source_batch_ready" };
+  }
+  if (!input.sourceBatch) {
+    return { action: "prepare_source_selection", owner_checkpoint: "source_card_review", canonical_tool: "draw_source_candidate_batch", last_completed_action: "workflow_session_resolved" };
+  }
+  return { action: "inspect_workflow_state", owner_checkpoint: "workflow_status", canonical_tool: "getWorkflowStatus", last_completed_action: "continuity_state_resolved" };
+}
+
+async function buildOperatorContinuityCapsule(
+  request: Request,
+  env: Env,
+  brand: GptResolvedBrand,
+  session: Record<string, unknown> | null,
+  choice: OperatorContinuationChoice,
+): Promise<Record<string, unknown>> {
+  const sessionId = normalizeOperatorText(session?.id, 120, true);
+  const sourceBatch = sessionId
+    ? await env.DB.prepare(
+      `SELECT * FROM operator_source_selection_batches
+       WHERE brand_key = ? AND workflow_session_id = ?
+       ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(brand.brand_key, sessionId).first<Record<string, unknown>>()
+    : null;
+  const selections = sourceBatch?.id
+    ? await env.DB.prepare(
+      `SELECT id, draw_order, source_identity_key, source_type, internal_source_id, threads_post_id,
+              canonical_source_url, post_text, metrics_snapshot_json, source_card_id, selected_at
+       FROM operator_source_selections
+       WHERE batch_id = ? ORDER BY draw_order ASC`,
+    ).bind(String(sourceBatch.id)).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  const selectionRows = selections.results ?? [];
+  const nextSelection = selectionRows.find((row) => !row.source_card_id) ?? null;
+  const activeSourceCardId = normalizeOperatorText(session?.active_source_card_id, 120, true);
+  let sourceCard: Record<string, unknown> | null = activeSourceCardId
+    ? await getOperatorSourceCard(env, brand.brand_key, activeSourceCardId)
+    : null;
+  if (!sourceCard && sessionId) {
+    const latestCard = await env.DB.prepare(
+      `SELECT id FROM operator_source_cards
+       WHERE brand_key = ? AND workflow_session_id = ? AND is_current = 1
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).bind(brand.brand_key, sessionId).first<{ id: string }>();
+    sourceCard = latestCard?.id ? await getOperatorSourceCard(env, brand.brand_key, latestCard.id) : null;
+  }
+  const activeRunId = normalizeOperatorText(session?.active_generation_run_id, 120, true);
+  const generationRun = activeRunId
+    ? await env.DB.prepare(`SELECT * FROM gpt_generation_runs WHERE id = ? AND account_id = ? LIMIT 1`).bind(activeRunId, brand.account_id).first<Record<string, unknown>>()
+    : sourceCard?.id
+      ? await env.DB.prepare(
+        `SELECT * FROM gpt_generation_runs
+         WHERE account_id = ? AND source_card_id = ?
+         ORDER BY datetime(updated_at) DESC LIMIT 1`,
+      ).bind(brand.account_id, String(sourceCard.id)).first<Record<string, unknown>>()
+      : null;
+  const draft = generationRun?.id || sourceCard?.id
+    ? await env.DB.prepare(
+      `SELECT * FROM gpt_generation_drafts
+       WHERE account_id = ?
+         AND (? IS NULL OR run_id = ?)
+         AND (? IS NULL OR source_card_id = ?)
+       ORDER BY datetime(updated_at) DESC, draft_index DESC LIMIT 1`,
+    ).bind(
+      brand.account_id,
+      generationRun?.id ?? null,
+      generationRun?.id ?? null,
+      sourceCard?.id ?? null,
+      sourceCard?.id ?? null,
+    ).first<Record<string, unknown>>()
+    : null;
+  const scheduledPost = draft?.scheduled_post_id
+    ? await env.DB.prepare(
+      `SELECT id, post_text, status, scheduled_time, published_post_id, created_at, updated_at
+       FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+    ).bind(Number(draft.scheduled_post_id), brand.profile.threads_user_id).first<Record<string, unknown>>()
+    : null;
+  const completedSources = sessionId
+    ? await env.DB.prepare(
+      `SELECT COUNT(DISTINCT d.source_card_id) AS total
+       FROM gpt_generation_drafts d
+       JOIN operator_source_cards c ON c.id = d.source_card_id
+       WHERE c.brand_key = ? AND c.workflow_session_id = ?
+         AND d.status IN ('scheduled', 'published')`,
+    ).bind(brand.brand_key, sessionId).first<{ total: number }>()
+    : null;
+  const next = operatorContinuationNextAction({ session, sourceBatch, nextSelection, sourceCard, draft, scheduledPost });
+  const nextArtifactId = String(nextSelection?.id ?? draft?.id ?? sourceCard?.id ?? sourceBatch?.id ?? sessionId ?? "none");
+  const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${nextArtifactId}`;
+  const policy = buildOperatorExecutionPolicy(next.canonical_tool, {
+    brand_key: brand.brand_key,
+    workflow_session_id: sessionId,
+    operation: next.action,
+  });
+  const tools = await buildOperatorMcpTools(env, false, false);
+  return {
+    version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+    choice,
+    brand_key: brand.brand_key,
+    account_data_loaded: true,
+    canonical_state_source: "database",
+    workflow_checkpoint: {
+      workflow_session_id: sessionId,
+      workflow_status: session?.status ?? null,
+      current_stage: session?.current_stage ?? null,
+      last_completed_action: next.last_completed_action,
+      next_pending_action: next.action,
+      next_owner_checkpoint: next.owner_checkpoint,
+      canonical_next_tool: next.canonical_tool,
+      next_operation_id: operationId,
+    },
+    active_artifact_ids: {
+      source_batch_id: sourceBatch?.id ?? null,
+      source_selection_id: nextSelection?.id ?? null,
+      source_card_id: sourceCard?.id ?? null,
+      generation_run_id: generationRun?.id ?? null,
+      draft_id: draft?.id ?? null,
+      scheduled_post_id: scheduledPost?.id ?? draft?.scheduled_post_id ?? null,
+      published_post_id: scheduledPost?.published_post_id ?? draft?.published_post_id ?? null,
+    },
+    source_batch_progress: sourceBatch ? {
+      selected_count: Number(sourceBatch.selected_count ?? selectionRows.length),
+      completed_count: Number(completedSources?.total ?? 0),
+      remaining_count: Math.max(Number(sourceBatch.selected_count ?? selectionRows.length) - Number(completedSources?.total ?? 0), 0),
+      next_draw_order: nextSelection ? Number(nextSelection.draw_order ?? 0) : null,
+      draw_order_preserved: true,
+      redraw_forbidden_on_resume: choice === "resume_existing_workflow",
+    } : null,
+    next_artifact: nextSelection ? {
+      source_selection_id: nextSelection.id,
+      draw_order: Number(nextSelection.draw_order ?? 0),
+      source_type: nextSelection.source_type,
+      internal_source_id: nextSelection.internal_source_id,
+      threads_post_id: nextSelection.threads_post_id ?? null,
+      canonical_source_url: nextSelection.canonical_source_url ?? null,
+      post_text: nextSelection.post_text,
+      metrics_snapshot: safeParseJsonString(String(nextSelection.metrics_snapshot_json ?? "{}")) ?? {},
+    } : null,
+    current_source_card: sourceCard,
+    current_draft: draft ? {
+      id: draft.id,
+      status: draft.status,
+      text: draft.text,
+      showable: Number(draft.showable ?? 0) === 1,
+      owner_feedback: draft.owner_feedback ?? null,
+    } : null,
+    current_scheduled_post: scheduledPost,
+    execution_policy: policy,
+    idempotency: {
+      version: OPERATOR_IDEMPOTENCY_VERSION,
+      next_operation_id: operationId,
+      replay_same_operation_id_after_interruption: true,
+    },
+    runtime_identity: {
+      ...operatorRuntimeMetadata(env),
+      live_tool_count: tools.length,
+      request_origin: new URL(request.url).origin,
+    },
+  };
+}
+
 function getLensicallySavedWorkflowConflict(payload: Record<string, unknown>): string | null {
   const joined = [
     payload.title,
