@@ -11729,7 +11729,10 @@ async function getOperatorMcpBoundaryBlock(
   if (effectiveToolName === "resolveContinuationContext") {
     return null;
   }
-  const continuity = await verifyOperatorContinuityToken(env, operatorMcpContinuityToken(toolName, args), requestedBrand);
+    const continuityCredential = operatorMcpContinuityToken(toolName, args);
+  const continuityReference = await readOperatorContinuityReference(env, continuityCredential, "continuity_context", requestedBrand);
+  const legacyContinuity = continuityReference ? null : await verifyOperatorContinuityToken(env, continuityCredential, requestedBrand);
+  const continuity = continuityReference ?? legacyContinuity;
   if (!continuity) {
     return {
       ok: false,
