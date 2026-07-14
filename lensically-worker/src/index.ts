@@ -9136,9 +9136,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       status: "deleted",
       pattern_id: patternId,
       deleted_pattern_count: deletedPatternCount,
-      deleted_source_card_count: deletedSourceCardCount,
+            deleted_source_card_count: deletedSourceCardCount,
       unlinked_selection_count: unlinkedSelectionCount,
     });
+    */
   }
 
   if (toolName === "draw_source_candidate_batch") {
