@@ -11752,8 +11752,8 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.4.3";
-const OPERATOR_REGISTRY_GENERATION = "continuity-source-anchor-v6";
+const OPERATOR_MCP_VERSION = "1.5.0";
+const OPERATOR_REGISTRY_GENERATION = "calendar-review-batch-v1";
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   return {
