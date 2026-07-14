@@ -9217,9 +9217,45 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
+    {
+    name: "resolveContinuationContext",
+    title: "Resolve continuation context",
+    description: "After the owner chooses resume or start fresh, load one canonical continuity capsule, return the exact persisted checkpoint, and issue a signed continuity token required by later account-scoped calls. This is the only valid post-handshake entry into account work.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        continuation_choice: { type: "string", enum: ["resume_existing_workflow", "start_fresh_workflow"] },
+        continuation_nonce: { type: "string", description: "Signed nonce returned by confirmOperatorProceed. Reuse the same nonce if the call is retried." },
+        workflow_session_id: { type: "string", description: "Optional explicit persisted session to resume." },
+      },
+      required: ["brand_key", "continuation_choice", "continuation_nonce"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "planOperatorExecution",
+    title: "Plan operator execution",
+    description: "Classify an intended Lensically action before execution. Returns universal-versus-account scope, the canonical execution plane, safe route, hard bounds, known-forbidden routes, and idempotency guidance. The same policy is enforced automatically by the MCP dispatcher.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        intended_tool: { type: "string" },
+        operation: { type: "string" },
+        change_description: { type: "string" },
+        workflow_session_id: { type: "string" },
+      },
+      required: ["operation"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
   {
     name: "getMcpAdminState",
     title: "Get MCP admin state",
+
     description: "Read the runtime MCP admin state, enforcement policies, workflow requirements, active gates, recent failures, and deployment snapshot status.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
