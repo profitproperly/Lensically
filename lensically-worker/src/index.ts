@@ -9646,7 +9646,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "resolveContinuationContext",
     title: "Resolve continuation context",
-    description: "After the owner chooses resume or start fresh, load one canonical continuity capsule, return the exact persisted checkpoint, and issue a signed continuity token required by later account-scoped calls. This is the only valid post-handshake entry into account work.",
+        description: "After the owner chooses resume or start fresh, load one canonical continuity capsule and return the exact persisted checkpoint. The backend stores continuity state in D1; later account calls pass continuity_loaded=true and never forward a generated handle. This is the only valid post-handshake entry into account work.",
     inputSchema: {
       type: "object",
       properties: {
