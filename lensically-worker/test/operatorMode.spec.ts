@@ -1640,29 +1640,15 @@ describe("operator mode MCP endpoint", () => {
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent).toMatchObject({ error: "explicit_proceed_required", account_data_loaded: false });
 
-                    const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean; continuation_confirmation_recorded: boolean } }>("listMcpTools", {
+                        const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean; continuity_loaded: boolean; continuation_choice_required: boolean } }>("listMcpTools", {
       execute_tool: "confirmOperatorProceed",
       arguments: { brand_key: "manifest_mental" },
     });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.executed_tool).toBe("confirmOperatorProceed");
     expect(proceeded.structuredContent.result.proceeded).toBe(true);
-    expect(proceeded.structuredContent.result.continuation_confirmation_recorded).toBe(true);
-
-    const stillBlocked = await mcpToolRaw<{ error: string }>("getWorkflowStatus", { brand_key: "manifest_mental", proceed_confirmed: true });
-    expect(stillBlocked.isError).toBe(true);
-    expect(stillBlocked.structuredContent.error).toBe("continuity_context_required");
-
-            const continued = await mcpToolRaw<{ executed_tool: string; result: { continuity_loaded: boolean } }>("listMcpTools", {
-      execute_tool: "resolveContinuationContext",
-      arguments: {
-        brand_key: "manifest_mental",
-        proceed_confirmed: true,
-        continuation_choice: "resume_existing_workflow",
-      },
-    });
-    expect(continued.isError).not.toBe(true);
-    expect(continued.structuredContent.result.continuity_loaded).toBe(true);
+    expect(proceeded.structuredContent.result.continuity_loaded).toBe(true);
+    expect(proceeded.structuredContent.result.continuation_choice_required).toBe(false);
 
     const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
       brand_key: "manifest_mental",
