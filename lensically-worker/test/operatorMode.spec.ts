@@ -1683,25 +1683,10 @@ describe("operator mode MCP endpoint", () => {
       required_next_tool: "confirmOperatorProceed",
     });
 
-                    const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuation_confirmation_recorded: boolean }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+                        const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuity_loaded: boolean; continuation_choice_required: boolean; continuity_capsule: { brand_key: string } }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
     expect(proceeded.isError).not.toBe(true);
-    expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: false, continuation_confirmation_recorded: true });
-
-    const continuityBlocked = await mcpToolRaw<{ error: string; required_next_tool: string }>("prepareFullPreflight", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-    });
-    expect(continuityBlocked.isError).toBe(true);
-    expect(continuityBlocked.structuredContent).toMatchObject({ error: "continuity_context_required", required_next_tool: "resolveContinuationContext" });
-
-            const continued = await mcpToolRaw<{ continuity_loaded: boolean; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-      continuation_choice: "resume_existing_workflow",
-    });
-    expect(continued.isError).not.toBe(true);
-    expect(continued.structuredContent.continuity_loaded).toBe(true);
-    expect(continued.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
+    expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: true, continuity_loaded: true, continuation_choice_required: false });
+    expect(proceeded.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
 
     const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string; limit: number; source: string; coverage_status: string }> }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
