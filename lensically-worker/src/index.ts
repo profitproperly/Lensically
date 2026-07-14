@@ -9252,7 +9252,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "create_source_card",
     title: "Create source card",
-        description: "Create or resolve a canonical structured source card. Manifest selections automatically reuse the current card for the same stable Threads source. Set create_new_version=true with version_reason only when the source interpretation itself changes. Manifest cards require a role-aware transformation_contract before lock.",
+                description: "Create or resolve a canonical structured source card. Manifest selections automatically reuse the current card for the same stable Threads source. Set create_new_version=true with version_reason only when the source interpretation itself changes. For Manifest, build a close-mimicry source contract: preserve the original hook, structure, meaning, tone, and payoff; require only slight wording changes; do not invent scenes, characters, activities, settings, events, metaphors, or premises. Transformation lists are optional.",
 
 
     inputSchema: {
