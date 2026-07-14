@@ -13804,16 +13804,14 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         && listed.status < 400
         && select.status < 400
         && blocked.status < 400
-        && proceed.status < 400
-        && beforeContinuity.status < 400
-        && continuation.status < 400
+                && proceed.status < 400
         && allowed.status < 400
+        && coverage.status < 400
         && boundaryTest.blocked_before_proceed
         && boundaryTest.proceed_confirmed
-                        && boundaryTest.proceed_confirmation_recorded
-        && boundaryTest.continuity_required_after_proceed
-        && boundaryTest.continuity_resolved
-        && boundaryTest.allowed_after_continuity,
+        && boundaryTest.continuity_auto_resolved
+        && boundaryTest.calendar_coverage_loaded
+        && boundaryTest.allowed_after_proceed,
       status: response.status,
       initialize: payload?.result ?? null,
                   transport_mode: "server_side_continuity_state",
