@@ -11793,7 +11793,7 @@ async function getOperatorMcpBoundaryBlock(
       account_data_loaded: false,
       continuity_workflow_session_id: tokenSession,
       requested_workflow_session_id: requestedSession,
-      message: "The call targets a different workflow than the signed continuity capsule.",
+            message: "The call targets a different workflow than the current server-side continuity capsule.",
     };
   }
   return null;
