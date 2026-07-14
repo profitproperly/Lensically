@@ -1503,15 +1503,16 @@ describe("operator mode MCP endpoint", () => {
       "startup_contract",
       "supporting_memory",
     ]));
-                expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v5");
-    expect(direct.owner_interaction_contract.silent_stages).toEqual(["generation_run_and_candidates", "gate_evaluation"]);
-    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("post_handshake_continuation_choice");
-    expect(direct.owner_interaction_contract.continuation_choice_contract.required_after_confirm_operator_proceed).toBe(true);
-    expect(direct.owner_interaction_contract.continuation_choice_contract.owner_prompt).toContain("pick up where the existing workflow left off");
-    expect(direct.owner_interaction_contract.continuation_choice_contract.allowed_choices).toEqual(["resume_existing_workflow", "start_fresh_workflow"]);
-    expect(direct.owner_interaction_contract.continuation_choice_contract.before_choice_forbidden).toEqual(expect.arrayContaining(["getWorkflowStatus", "get_account_state", "prepareFullPreflight", "start_workflow_session"]));
-    expect(direct.owner_interaction_contract.continuation_choice_contract.resume_behavior).toContain("exact checkpoint");
-    expect(direct.owner_interaction_contract.continuation_choice_contract.fresh_behavior).toContain("preserving the previous session");
+                    expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v6");
+    expect(direct.owner_interaction_contract.silent_stages).toEqual(expect.arrayContaining(["context_admission", "source_selection", "source_card", "review_batch_generation", "generation_run_and_candidates", "gate_evaluation"]));
+    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("calendar_coverage_confirmation");
+    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("four_post_review_batch");
+    expect(direct.owner_interaction_contract.continuity_contract.auto_resolve_after_confirm_operator_proceed).toBe(true);
+    expect(direct.owner_interaction_contract.continuity_contract.owner_prompt_removed).toBe(true);
+    expect(direct.owner_interaction_contract.calendar_coverage_contract.controller).toBe("earliest_incomplete_future_day");
+    expect(direct.owner_interaction_contract.review_batch_contract.visible_batch_size).toBe(4);
+    expect(direct.owner_interaction_contract.review_batch_contract.provisional_times_forbidden).toBe(true);
+    expect(direct.owner_interaction_contract.review_batch_contract.visible_fields).toEqual(["Post number", "Source", "Generated post"]);
     expect(direct.owner_interaction_contract.transition_label_contract.required_labels).toEqual(["Completed:", "Showing now:", "Next decision:"]);
     expect(direct.owner_interaction_contract.transition_label_contract.instruction).toContain("Never make the owner infer");
     expect(direct.owner_interaction_contract.source_card_presentation_contract.version).toBe("source-card-owner-presentation-v1");
