@@ -9656,7 +9656,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
         continuation_nonce: { type: "string", description: "Legacy signed nonce accepted only for compatibility." },
         workflow_session_id: { type: "string", description: "Optional explicit persisted session to resume." },
       },
-            required: ["brand_key", "continuation_choice", "continuation_ref"],
+                  required: ["brand_key", "continuation_choice"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
