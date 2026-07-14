@@ -701,29 +701,13 @@ describe("operator mode backend spine", () => {
     expect(passing.gate_results.find((result) => result.gate_key === "required_gate_execution_gate")?.result).toBe("pass");
         }, 30000);
 
-  it("allows a current owner-approved exact surface without removing the older Manifest hard ban globally", async () => {
-    const first = await createLockedSourceCard([], "manifest_mental");
-    const shown = await operatorTool<{ draft_id: string; showable: boolean }>("submit_candidate_draft", {
+    it("allows a current owner-approved exact surface without removing the older Manifest hard ban globally", async () => {
+    await operatorTool("save_strategy_memory", {
       brand_key: "manifest_mental",
-      run_id: first.runId,
-      source_card_id: first.sourceCardId,
-      text: "A system makes something easier to manage.",
-      draft_analysis: {
-        opening_phrase: "A system makes",
-        realm_entrance_key: "system_makes",
-        lane_key: "systems",
-      },
-    });
-    expect(shown.showable).toBe(true);
-    await operatorTool("mark_draft_shown", {
-      brand_key: "manifest_mental",
-      draft_id: shown.draft_id,
-    });
-    await operatorTool("reject_draft", {
-      brand_key: "manifest_mental",
-      draft_id: shown.draft_id,
-      rejection_reason: "Avoid banned 'something' in future drafts.",
-      strategy: { ban_phrases: ["something"] },
+      kind: "rejection_feedback",
+      title: "Explicit hard ban fixture",
+      body: "Avoid banned 'something' in future drafts.",
+      source: "owner_feedback",
     });
 
     const blockedRun = await createLockedSourceCard([], "manifest_mental");
