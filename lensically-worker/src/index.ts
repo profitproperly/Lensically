@@ -11041,7 +11041,7 @@ async function recordOperatorExecutionDecision(
     OPERATOR_EXECUTION_POLICY_VERSION,
     decision,
     policy.known_failure_prevented === true ? 1 : 0,
-    normalizeOperatorJson(policy, {}),
+    normalizeOperatorJson(evidence, {}),
   ).run();
 }
 
