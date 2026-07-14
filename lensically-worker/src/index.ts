@@ -412,7 +412,7 @@ const OPERATOR_CONTINUITY_CONTRACT = {
     "confirmOperatorProceed",
     "explicit resume-or-start-fresh owner choice",
     "resolveContinuationContext",
-    "signed continuity token on every later account-scoped call",
+        "opaque continuity reference on every later account-scoped call",
   ],
   capsule_sections: [
     "workflow_checkpoint",
