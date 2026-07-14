@@ -10946,8 +10946,8 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.4.2";
-const OPERATOR_REGISTRY_GENERATION = "continuity-server-state-v5";
+const OPERATOR_MCP_VERSION = "1.4.3";
+const OPERATOR_REGISTRY_GENERATION = "continuity-source-anchor-v6";
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   return {
