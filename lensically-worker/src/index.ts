@@ -7520,6 +7520,15 @@ async function resolveOperatorContinuationSession(
   ).bind(brandKey).first<Record<string, unknown>>();
 }
 
+function parseOperatorWorkflowSequence(value: unknown): number | null {
+  const normalized = normalizeOperatorText(value, 120, true);
+  if (!normalized) return null;
+  const match = normalized.match(/^(\d+)\s*(?:of|\/)\s*\d+/i) ?? normalized.match(/^(\d+)\b/);
+  if (!match?.[1]) return null;
+  const sequence = Number(match[1]);
+  return Number.isInteger(sequence) && sequence > 0 ? sequence : null;
+}
+
 function operatorContinuationNextAction(input: {
   session: Record<string, unknown> | null;
   sourceBatch: Record<string, unknown> | null;
