@@ -699,7 +699,66 @@ describe("operator mode backend spine", () => {
     expect(passing.showable).toBe(true);
     expect(passing.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
     expect(passing.gate_results.find((result) => result.gate_key === "required_gate_execution_gate")?.result).toBe("pass");
-    }, 30000);
+        }, 30000);
+
+  it("allows a current owner-approved exact surface without removing the older Manifest hard ban globally", async () => {
+    const first = await createLockedSourceCard([], "manifest_mental");
+    const shown = await operatorTool<{ draft_id: string; showable: boolean }>("submit_candidate_draft", {
+      brand_key: "manifest_mental",
+      run_id: first.runId,
+      source_card_id: first.sourceCardId,
+      text: "A system makes something easier to manage.",
+      draft_analysis: {
+        opening_phrase: "A system makes",
+        realm_entrance_key: "system_makes",
+        lane_key: "systems",
+      },
+    });
+    expect(shown.showable).toBe(true);
+    await operatorTool("mark_draft_shown", {
+      brand_key: "manifest_mental",
+      draft_id: shown.draft_id,
+    });
+    await operatorTool("reject_draft", {
+      brand_key: "manifest_mental",
+      draft_id: shown.draft_id,
+      rejection_reason: "Avoid banned 'something' in future drafts.",
+      strategy: { ban_phrases: ["something"] },
+    });
+
+    const blockedRun = await createLockedSourceCard([], "manifest_mental");
+    const blocked = await operatorTool<{ showable: boolean }>("submit_candidate_draft", {
+      brand_key: "manifest_mental",
+      run_id: blockedRun.runId,
+      source_card_id: blockedRun.sourceCardId,
+      text: "A system makes something easier to verify.",
+      draft_analysis: {
+        opening_phrase: "A system makes",
+        realm_entrance_key: "system_verify_blocked",
+        lane_key: "systems",
+      },
+    });
+    expect(blocked.showable).toBe(false);
+
+    const approvedRun = await createLockedSourceCard([], "manifest_mental");
+    const approved = await operatorTool<{
+      showable: boolean;
+      gate_results: Array<{ gate_key: string; result: string }>;
+    }>("submit_candidate_draft", {
+      brand_key: "manifest_mental",
+      run_id: approvedRun.runId,
+      source_card_id: approvedRun.sourceCardId,
+      text: "A system makes something easier to verify.",
+      draft_analysis: {
+        opening_phrase: "A system makes",
+        realm_entrance_key: "system_verify_approved",
+        lane_key: "systems",
+        owner_requested_exact_surface: "something easier",
+      },
+    });
+    expect(approved.showable).toBe(true);
+    expect(approved.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
+  }, 30000);
 
   it("persists complete rejection coverage in a compact generation-run context", async () => {
     const first = await createLockedSourceCard();
