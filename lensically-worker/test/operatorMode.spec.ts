@@ -504,7 +504,7 @@ describe("operator mode backend spine", () => {
       brand_key: "manifest_mental",
       run_id: run.run_id,
       source_card_id: card.source_card_id,
-      text: "If your finger touched this, a money breakthrough is finding you before July ends. Receive it.",
+            text: "If your finger touched this, something is shifting in your favor this week. Let it unfold.",
       draft_analysis: analysis,
     });
     expect(passing.showable).toBe(true);
