@@ -8326,9 +8326,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       family_id: familyId,
       version_number: versionNumber,
       supersedes_source_card_id: supersedesSourceCardId,
-      status: "draft",
+            status: "draft",
       reused_existing: false,
       validation: validateSourceCardLockable(card ?? {}),
+      owner_presentation: {
+        ...SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
+        account_scope: brand.brand_key,
+      },
     });
 
 
