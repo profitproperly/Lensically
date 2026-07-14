@@ -1747,49 +1747,21 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(count?.total ?? 0)).toBe(1);
   }, 30000);
 
-    it("invalidates stale continuity on a new handshake and replays only the same resolved choice", async () => {
+      it("reconfirming Proceed refreshes canonical continuity without a second owner choice", async () => {
     await ensureMcpAccountOpen(BRAND_KEY);
-    const initiallyAllowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
+    const reconfirmed = await mcpToolRaw<{ continuity_loaded: boolean; continuation_choice_required: boolean; continuity_capsule: { brand_key: string } }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+    expect(reconfirmed.isError).not.toBe(true);
+    expect(reconfirmed.structuredContent.continuity_loaded).toBe(true);
+    expect(reconfirmed.structuredContent.continuation_choice_required).toBe(false);
+    expect(reconfirmed.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
+
+    const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
       continuity_loaded: true,
     });
-    expect(initiallyAllowed.isError).not.toBe(true);
-
-    const reconfirmed = await mcpToolRaw<{ continuation_confirmation_recorded: boolean }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
-    expect(reconfirmed.structuredContent.continuation_confirmation_recorded).toBe(true);
-
-    const staleBlocked = await mcpToolRaw<{ error: string }>("getWorkflowStatus", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-      continuity_loaded: true,
-    });
-    expect(staleBlocked.isError).toBe(true);
-    expect(staleBlocked.structuredContent.error).toBe("continuity_context_required");
-
-    const resolved = await mcpToolRaw<{ continuity_loaded: boolean }>("resolveContinuationContext", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-      continuation_choice: "resume_existing_workflow",
-    });
-    expect(resolved.isError).not.toBe(true);
-    expect(resolved.structuredContent.continuity_loaded).toBe(true);
-
-    const replay = await mcpToolRaw<{ continuity_loaded: boolean; reused_existing: boolean }>("resolveContinuationContext", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-      continuation_choice: "resume_existing_workflow",
-    });
-    expect(replay.isError).not.toBe(true);
-    expect(replay.structuredContent).toMatchObject({ continuity_loaded: true, reused_existing: true });
-
-    const conflicting = await mcpToolRaw<{ error: string }>("resolveContinuationContext", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-      continuation_choice: "start_fresh_workflow",
-    });
-    expect(conflicting.isError).toBe(true);
-    expect(conflicting.structuredContent.error).toBe("proceed_confirmation_missing_or_expired");
+    expect(allowed.isError).not.toBe(true);
+    expect(allowed.structuredContent.ok).toBe(true);
   }, 30000);
 
   it("start-fresh continuity preserves the previous session and creates one new active session", async () => {
