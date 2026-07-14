@@ -7627,7 +7627,17 @@ async function buildOperatorContinuityCapsule(
     ).bind(workflowSequence, selectionId, brand.brand_key).run();
   }
 
-  if (sourceBatch?.id) {
+    if (sourceBatch?.id) {
+    await env.DB.prepare(
+      `UPDATE operator_source_selections
+       SET disposition = 'pending',
+           disposition_reason = 'orphaned_link_reconciled',
+           disposition_at = CURRENT_TIMESTAMP,
+           workflow_sequence = NULL
+       WHERE batch_id = ?
+         AND source_card_id IS NULL
+         AND disposition = 'linked'`,
+    ).bind(String(sourceBatch.id)).run();
     const refreshed = await env.DB.prepare(
       `SELECT id, draw_order, source_identity_key, source_type, internal_source_id, threads_post_id,
               canonical_source_url, post_text, metrics_snapshot_json, source_card_id, selected_at,
@@ -7637,6 +7647,7 @@ async function buildOperatorContinuityCapsule(
     ).bind(String(sourceBatch.id)).all<Record<string, unknown>>();
     selectionRows = refreshed.results ?? [];
   }
+
   const linkedDrawOrders = selectionRows
     .filter((row) => Boolean(row.source_card_id))
     .map((row) => Number(row.draw_order ?? 0))
