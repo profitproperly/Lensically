@@ -6911,7 +6911,13 @@ async function runOperatorGates(
       }
       continue;
     }
-    if (gateKey === "source_surface_copy_gate") {
+        if (gateKey === "source_surface_copy_gate") {
+      if (manifestCloseMimicry) {
+        results.push(exactSourceCopy
+          ? buildGateResult(gate, "fail", "Manifest draft exactly copies the source post.", { source_text: primarySourceText }, "Change a small amount of wording while preserving the hook, structure, meaning, tone, and payoff.")
+          : buildGateResult(gate, "pass", "Manifest draft is not an exact source copy; close source mimicry is allowed."));
+        continue;
+      }
 
       const forbidden = Array.isArray(sourceCard?.forbidden_surfaces) ? sourceCard?.forbidden_surfaces as unknown[] : [];
       let copied: string | null = null;
