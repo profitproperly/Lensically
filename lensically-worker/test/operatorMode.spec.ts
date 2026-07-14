@@ -1779,8 +1779,10 @@ describe("operator mode MCP endpoint", () => {
     const originalBatch = await env.DB.prepare(
       `SELECT id FROM operator_source_selection_batches WHERE workflow_session_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
     ).bind(fixture.sessionId).first<{ id: string }>();
-        const proceeded = await mcpToolRaw<{ continuation_ref: string }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+            const proceeded = await mcpToolRaw<{ continuation_confirmation_recorded: boolean }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(proceeded.structuredContent.continuation_confirmation_recorded).toBe(true);
     const continued = await mcpToolRaw<{
+      continuity_loaded: boolean;
       continuity_capsule: {
         workflow_checkpoint: { workflow_session_id: string; next_pending_action: string; canonical_next_tool: string };
         active_artifact_ids: { source_batch_id: string; source_selection_id: string };
@@ -1791,7 +1793,6 @@ describe("operator mode MCP endpoint", () => {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
       continuation_choice: "resume_existing_workflow",
-      continuation_ref: proceeded.structuredContent.continuation_ref,
       workflow_session_id: fixture.sessionId,
     });
     expect(continued.isError).not.toBe(true);
