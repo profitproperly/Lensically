@@ -7828,8 +7828,24 @@ async function buildOperatorContinuityCapsule(
          )`,
     ).bind(String(sourceBatch.id), brand.brand_key, sessionId).first<{ total: number }>()
     : null;
-  const next = operatorContinuationNextAction({ session, sourceBatch, nextSelection, sourceCard, draft, scheduledPost });
-  const nextArtifactId = String(nextSelection?.id ?? draft?.id ?? sourceCard?.id ?? sourceBatch?.id ?? sessionId ?? "none");
+    const legacyNext = operatorContinuationNextAction({ session, sourceBatch, nextSelection, sourceCard, draft, scheduledPost });
+  const calendarCoverage = await getOperatorHourlyCoverage(env, brand, WORKSPACE_DEFAULT_TIMEZONE, 14, null);
+  const activeReviewRow = brand.brand_key === "manifest_mental"
+    ? await env.DB.prepare(
+      `SELECT id FROM operator_review_batches
+       WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).bind(brand.brand_key).first<{ id: string }>()
+    : null;
+  const activeReviewBatch = activeReviewRow?.id
+    ? await serializeManifestReviewBatch(env, brand, activeReviewRow.id)
+    : null;
+  const next = brand.brand_key === "manifest_mental"
+    ? activeReviewBatch
+      ? { action: "resume_review_batch", owner_checkpoint: "four_post_review_batch", canonical_tool: "get_manifest_review_batch", last_completed_action: "canonical_review_batch_restored" }
+      : { action: "confirm_fill_calendar_day", owner_checkpoint: "calendar_coverage_confirmation", canonical_tool: "get_hourly_coverage", last_completed_action: "calendar_coverage_inspected" }
+    : legacyNext;
+  const nextArtifactId = String(activeReviewRow?.id ?? (calendarCoverage.earliest_incomplete_date as string | null) ?? nextSelection?.id ?? draft?.id ?? sourceCard?.id ?? sourceBatch?.id ?? sessionId ?? "none");
   const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${nextArtifactId}`;
   const policy = buildOperatorExecutionPolicy(next.canonical_tool, {
     brand_key: brand.brand_key,
