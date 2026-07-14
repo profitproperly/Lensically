@@ -1753,15 +1753,15 @@ describe("operator mode MCP endpoint", () => {
 
   it("start-fresh continuity preserves the previous session and creates one new active session", async () => {
     const prior = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: BRAND_KEY });
-    const proceeded = await mcpToolRaw<{ continuation_nonce: string }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+        const proceeded = await mcpToolRaw<{ continuation_ref: string }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
     const continued = await mcpToolRaw<{
-      continuity_token: string;
+      continuity_ref: string;
       continuity_capsule: { workflow_checkpoint: { workflow_session_id: string }; choice: string };
     }>("resolveContinuationContext", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
       continuation_choice: "start_fresh_workflow",
-      continuation_nonce: proceeded.structuredContent.continuation_nonce,
+      continuation_ref: proceeded.structuredContent.continuation_ref,
     });
     expect(continued.isError).not.toBe(true);
     expect(continued.structuredContent.continuity_capsule.choice).toBe("start_fresh_workflow");
