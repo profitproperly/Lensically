@@ -8367,9 +8367,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const history = payload.include_history === false
       ? null
       : await getOperatorSourceCardHistory(env, brand, card);
-    return operatorJsonResponse({
+        return operatorJsonResponse({
       source_card: card,
       canonical_context: history,
+      owner_presentation: {
+        ...SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
+        account_scope: brand.brand_key,
+      },
     });
   }
 
