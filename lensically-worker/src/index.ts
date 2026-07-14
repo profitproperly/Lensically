@@ -6592,14 +6592,13 @@ async function buildOperatorRejectionContext(env: Env, brand: GptResolvedBrand):
     collectOperatorBanPhrases(strategy, explicit);
     for (const phrase of extractOperatorBannedSurfacesFromFeedback(row.rejection_reason)) explicit.add(phrase);
     for (const phrase of extractOperatorBannedSurfacesFromFeedback(row.owner_feedback)) explicit.add(phrase);
-    return {
+        return {
       context_id: `draft:${String(row.id)}`,
       draft_id: row.id,
-      text: compactOperatorRejectionText(row.text, 600),
-      rejection_reason: compactOperatorRejectionText(row.rejection_reason, 1800),
-      owner_feedback: compactOperatorRejectionText(row.owner_feedback, 1000),
+      text: compactOperatorRejectionText(row.text, 320),
+      rejection_reason: compactOperatorRejectionText(row.rejection_reason, 700),
+      owner_feedback: compactOperatorRejectionText(row.owner_feedback, 500),
       explicit_banned_surfaces: Array.from(explicit),
-      strategy,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
