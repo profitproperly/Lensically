@@ -9772,11 +9772,22 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
       ? { ...(schema.properties as Record<string, unknown>) }
       : {};
-    properties.proceed_confirmed = {
+        properties.proceed_confirmed = {
       type: "boolean",
       description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
     };
+    if (tool.name !== "resolveContinuationContext") {
+      properties.continuity_token = {
+        type: "string",
+        description: "Signed token returned by resolveContinuationContext. Required on every later account-scoped call so a fresh chat cannot skip canonical continuity loading.",
+      };
+    }
+    properties.operation_id = {
+      type: "string",
+      description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
+    };
     tool.inputSchema = { ...schema, properties };
+
   }
   return tools;
 }
