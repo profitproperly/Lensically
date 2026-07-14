@@ -12740,10 +12740,10 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
   }
 
   if (toolName === "resolveContinuationContext") {
-    const brandKey = normalizeGptBrandKey(args.brand_key);
-    const choice = normalizeOperatorContinuationChoice(args.continuation_choice);
-    if (!brandKey || !choice) {
-      return { ok: false, error: "brand_key_and_continuation_choice_required", account_data_loaded: false };
+        const brandKey = normalizeGptBrandKey(args.brand_key);
+    const choice = normalizeOperatorContinuationChoice(args.continuation_choice) ?? "resume_existing_workflow";
+    if (!brandKey) {
+      return { ok: false, error: "brand_key_required", account_data_loaded: false };
     }
                 const brand = await resolveGptBrand(env, brandKey);
     if (!brand) {
