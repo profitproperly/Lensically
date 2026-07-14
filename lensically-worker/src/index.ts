@@ -12816,6 +12816,19 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
       await prepareOperatorMode(env);
       const executionPolicy = buildOperatorExecutionPolicy(toolName, args);
+      const aliasRetryBlock = await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
+      if (aliasRetryBlock) {
+        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_known_regression");
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: { ...aliasRetryBlock, execution_policy: executionPolicy },
+            content: [{ type: "text", text: `Lensically Operator Mode blocked same-backend wrapper retry for ${String(executionPolicy.canonical_tool ?? toolName)}.` }],
+            isError: true,
+          },
+        });
+      }
       await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
       const idempotencyKey = await operatorIdempotencyKey(toolName, args);
       let receiptFingerprint: string | null = null;
