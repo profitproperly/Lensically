@@ -1866,10 +1866,27 @@ describe("operator mode MCP endpoint", () => {
     expect(capsule.workflow_checkpoint.workflow_session_id).toBe(fixture.sessionId);
     expect(capsule.workflow_checkpoint.next_pending_action).toBe("build_next_source_card");
     expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("create_source_card");
-    expect(capsule.active_artifact_ids.source_batch_id).toBe(originalBatch?.id);
-    expect(capsule.source_batch_progress.next_draw_order).toBe(2);
+        expect(capsule.active_artifact_ids.source_batch_id).toBe(originalBatch?.id);
+    expect(capsule.source_batch_progress.completed_count).toBe(1);
+    expect(capsule.source_batch_progress.skipped_count).toBe(9);
+    expect(capsule.source_batch_progress.remaining_count).toBe(14);
+    expect(capsule.source_batch_progress.workflow_sequence_completed).toBe(7);
+    expect(capsule.source_batch_progress.next_workflow_sequence).toBe(8);
+    expect(capsule.source_batch_progress.continuation_anchor_draw_order).toBe(10);
+    expect(capsule.source_batch_progress.next_draw_order).toBe(11);
     expect(capsule.source_batch_progress.redraw_forbidden_on_resume).toBe(true);
-    expect(capsule.next_artifact.draw_order).toBe(2);
+    expect(capsule.next_artifact.draw_order).toBe(11);
+    const skipped = await env.DB.prepare(
+      `SELECT draw_order, disposition, disposition_reason
+       FROM operator_source_selections
+       WHERE batch_id = ? AND draw_order IN (5, 6, 9)
+       ORDER BY draw_order ASC`,
+    ).bind(originalBatch?.id).all<{ draw_order: number; disposition: string; disposition_reason: string }>();
+    expect(skipped.results).toEqual([
+      expect.objectContaining({ draw_order: 5, disposition: "skipped", disposition_reason: "historical_gap_before_continuity_anchor" }),
+      expect.objectContaining({ draw_order: 6, disposition: "skipped", disposition_reason: "historical_gap_before_continuity_anchor" }),
+      expect.objectContaining({ draw_order: 9, disposition: "skipped", disposition_reason: "historical_gap_before_continuity_anchor" }),
+    ]);
     const batchCount = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE workflow_session_id = ?`).bind(fixture.sessionId).first<{ total: number }>();
     expect(Number(batchCount?.total ?? 0)).toBe(1);
   }, 40000);
