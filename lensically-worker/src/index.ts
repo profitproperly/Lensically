@@ -11022,6 +11022,10 @@ async function recordOperatorExecutionDecision(
   decision = "allowed",
 ): Promise<void> {
   const brandKey = requestedMcpBrandKey(toolName, args);
+  const evidence = {
+    ...policy,
+    canonical_fingerprint: await operatorExecutionFingerprint(toolName, args),
+  };
   await env.DB.prepare(
     `INSERT INTO operator_execution_events (
       id, brand_key, workflow_session_id, tool_name, operation_class, execution_plane,
