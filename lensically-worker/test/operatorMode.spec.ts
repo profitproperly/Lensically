@@ -1613,15 +1613,36 @@ describe("operator mode MCP endpoint", () => {
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent).toMatchObject({ error: "explicit_proceed_required", account_data_loaded: false });
 
-        const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean } }>("listMcpTools", {
+        const proceeded = await mcpToolRaw<{ executed_tool: string; result: { proceeded: boolean; continuation_nonce: string } }>("listMcpTools", {
       execute_tool: "confirmOperatorProceed",
       arguments: { brand_key: "manifest_mental" },
     });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.executed_tool).toBe("confirmOperatorProceed");
     expect(proceeded.structuredContent.result.proceeded).toBe(true);
+    expect(proceeded.structuredContent.result.continuation_nonce).toBeTruthy();
 
-        const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", { brand_key: "manifest_mental", proceed_confirmed: true });
+    const stillBlocked = await mcpToolRaw<{ error: string }>("getWorkflowStatus", { brand_key: "manifest_mental", proceed_confirmed: true });
+    expect(stillBlocked.isError).toBe(true);
+    expect(stillBlocked.structuredContent.error).toBe("continuity_context_required");
+
+    const continued = await mcpToolRaw<{ executed_tool: string; result: { continuity_token: string } }>("listMcpTools", {
+      execute_tool: "resolveContinuationContext",
+      arguments: {
+        brand_key: "manifest_mental",
+        proceed_confirmed: true,
+        continuation_choice: "resume_existing_workflow",
+        continuation_nonce: proceeded.structuredContent.result.continuation_nonce,
+      },
+    });
+    expect(continued.isError).not.toBe(true);
+    expect(continued.structuredContent.result.continuity_token).toBeTruthy();
+
+        const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+      continuity_token: continued.structuredContent.result.continuity_token,
+    });
     expect(allowed.isError).not.toBe(true);
     expect(allowed.structuredContent.ok).toBe(true);
   }, 30000);
