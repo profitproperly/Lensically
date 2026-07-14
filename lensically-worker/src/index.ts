@@ -5701,9 +5701,108 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
   await addColumnIfMissing(env, "operator_source_selections", "disposition_reason", "TEXT");
   await addColumnIfMissing(env, "operator_source_selections", "disposition_at", "TEXT");
   await addColumnIfMissing(env, "operator_source_selections", "workflow_sequence", "INTEGER");
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_source_selections_batch_disposition
      ON operator_source_selections (batch_id, disposition, draw_order ASC)`,
+  ).run();
+  await addColumnIfMissing(env, "operator_source_selection_batches", "production_date", "TEXT");
+  await addColumnIfMissing(env, "operator_source_selection_batches", "status", "TEXT NOT NULL DEFAULT 'active'");
+  await addColumnIfMissing(env, "operator_source_selection_batches", "retired_at", "TEXT");
+  await addColumnIfMissing(env, "operator_source_selection_batches", "retirement_reason", "TEXT");
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_batches_production_date
+     ON operator_source_selection_batches (brand_key, production_date, status, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_review_batches (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT,
+      source_batch_id TEXT,
+      production_date TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      batch_size INTEGER NOT NULL DEFAULT 4,
+      status TEXT NOT NULL DEFAULT 'building',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_review_batches_active
+     ON operator_review_batches (brand_key, production_date, status, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_review_batches_touch_updated_at
+     AFTER UPDATE ON operator_review_batches
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_review_batches SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_daily_source_claims (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      production_date TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      source_identity_key TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      internal_source_id TEXT NOT NULL,
+      source_batch_id TEXT,
+      source_selection_id TEXT,
+      workflow_session_id TEXT,
+      review_batch_id TEXT,
+      review_item_number INTEGER,
+      source_card_id TEXT,
+      generation_run_id TEXT,
+      draft_id TEXT,
+      scheduled_post_id INTEGER,
+      status TEXT NOT NULL DEFAULT 'claimed',
+      disposition_reason TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, production_date, source_identity_key),
+      UNIQUE(review_batch_id, review_item_number)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_daily_source_claims_batch
+     ON operator_daily_source_claims (review_batch_id, review_item_number ASC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_daily_source_claims_day
+     ON operator_daily_source_claims (brand_key, production_date, status, created_at ASC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_daily_source_claims_touch_updated_at
+     AFTER UPDATE ON operator_daily_source_claims
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_daily_source_claims SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_source_exclusions (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      source_identity_key TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      internal_source_id TEXT NOT NULL,
+      reason TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, source_identity_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_exclusions_active
+     ON operator_source_exclusions (brand_key, active, source_type)`,
   ).run();
 
   await env.DB.prepare(
