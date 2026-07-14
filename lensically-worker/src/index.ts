@@ -8863,17 +8863,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       });
       results.push({ item_number: Number(claim.review_item_number), success: true, scheduled_post_id: scheduled.scheduledPostId, date: productionDate, time, timezone });
     }
-    const unresolved = await env.DB.prepare(
+        const unresolved = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM operator_daily_source_claims
        WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
-    ).bind(reviewBatchId).first<{ total: number }>();
+    ).bind(resolvedReviewBatchId).first<{ total: number }>();
     await env.DB.prepare(`UPDATE operator_review_batches SET status = ? WHERE id = ?`)
-      .bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", reviewBatchId).run();
+      .bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", resolvedReviewBatchId).run();
     return operatorJsonResponse({
-      review_batch_id: reviewBatchId,
+      review_batch_id: resolvedReviewBatchId,
       production_date: productionDate,
       results,
-      review_batch: await serializeManifestReviewBatch(env, brand, reviewBatchId),
+      review_batch: await serializeManifestReviewBatch(env, brand, resolvedReviewBatchId),
     });
   }
 
