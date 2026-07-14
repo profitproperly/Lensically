@@ -6864,31 +6864,35 @@ async function runOperatorGates(
         });
       const audienceRewardRequired = Boolean(normalizeOperatorText(sourceContract.audience_reward, 2000, true));
       const audienceRewardDelivered = input.draftAnalysis?.audience_reward_delivered === true;
-      const failures = {
+            const failures = {
         missing_exact_surfaces: missingExact,
         missing_preserved_functions: missingFunctions,
         missing_time_or_context_requirements: missingTime,
-        copied_must_transform_surfaces: copiedTransformTargets,
-        undeclared_transformed_roles: undeclaredTransformRoles,
-        prohibited_complete_packages: prohibitedPackages,
+        exact_source_copy: manifestCloseMimicry && exactSourceCopy,
+        copied_must_transform_surfaces: manifestCloseMimicry ? [] : copiedTransformTargets,
+        undeclared_transformed_roles: manifestCloseMimicry ? [] : undeclaredTransformRoles,
+        prohibited_complete_packages: manifestCloseMimicry ? [] : prohibitedPackages,
         audience_reward_missing: audienceRewardRequired && !audienceRewardDelivered,
       };
       const hasFailure = missingExact.length > 0
         || missingFunctions.length > 0
         || missingTime.length > 0
-        || copiedTransformTargets.length > 0
-        || undeclaredTransformRoles.length > 0
-        || prohibitedPackages.length > 0
+        || (manifestCloseMimicry && exactSourceCopy)
+        || (!manifestCloseMimicry && copiedTransformTargets.length > 0)
+        || (!manifestCloseMimicry && undeclaredTransformRoles.length > 0)
+        || (!manifestCloseMimicry && prohibitedPackages.length > 0)
         || (audienceRewardRequired && !audienceRewardDelivered);
       if (hasFailure) {
         results.push(buildGateResult(
           gate,
           "fail",
-          "Draft does not satisfy the active source transformation contract.",
+          manifestCloseMimicry ? "Manifest draft failed the source-fidelity boundary." : "Draft does not satisfy the active source transformation contract.",
           failures,
-          "Preserve approved exact hooks/functions, declare satisfied semantic requirements, transform designated elements, deliver the audience reward, and avoid the prohibited full source package.",
+          manifestCloseMimicry
+            ? "Keep the source hook, structure, meaning, tone, and payoff; change only enough wording to avoid reproducing the source exactly. Do not add a new scene or premise."
+            : "Preserve approved exact hooks/functions, declare satisfied semantic requirements, transform designated elements, deliver the audience reward, and avoid the prohibited full source package.",
         ));
-      } else if (copiedShouldTransform.length) {
+      } else if (!manifestCloseMimicry && copiedShouldTransform.length) {
         results.push(buildGateResult(
           gate,
           "pass_with_caution",
@@ -6897,7 +6901,13 @@ async function runOperatorGates(
           "Consider changing the optional source surface unless retaining it is deliberate.",
         ));
       } else {
-        results.push(buildGateResult(gate, "pass", "Draft satisfies the active source transformation contract."));
+        results.push(buildGateResult(
+          gate,
+          "pass",
+          manifestCloseMimicry
+            ? "Manifest draft preserves the source contract and is not an exact source copy."
+            : "Draft satisfies the active source transformation contract.",
+        ));
       }
       continue;
     }
