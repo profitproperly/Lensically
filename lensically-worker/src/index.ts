@@ -12640,13 +12640,10 @@ async function getOperatorMcpBoundaryBlock(
       error: "continuity_context_required",
       selected_key: requestedBrand,
       account_data_loaded: false,
-      required_next_tool: "resolveContinuationContext",
-      required_arguments: {
-        proceed_confirmed: true,
-        continuation_choice: ["resume_existing_workflow", "start_fresh_workflow"],
-      },
+            required_next_tool: "confirmOperatorProceed",
+      required_arguments: { proceed_confirmed: true },
       later_call_requirement: { continuity_loaded: true },
-      message: "Canonical continuity must be resolved before account-scoped work. The backend stores continuity state; no generated handle is passed between tools.",
+      message: "Explicit Proceed must be confirmed first. confirmOperatorProceed automatically restores canonical continuity; no resume/start-fresh choice or generated handle is required.",
     };
   }
   const tokenSession = normalizeOperatorText(continuity.workflow_session_id, 120, true);
