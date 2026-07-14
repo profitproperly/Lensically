@@ -12772,8 +12772,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       arguments: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
-        continuation_choice: "resume_existing_workflow",
-        continuation_nonce: proceedContent.continuation_nonce,
+                continuation_choice: "resume_existing_workflow",
+        continuation_ref: proceedContent.continuation_ref,
       },
     });
     const continuationContent = structured(continuation.payload);
