@@ -11103,7 +11103,22 @@ function operatorMcpProceedConfirmed(toolName: string, args: Record<string, unkn
   return args.proceed_confirmed === true;
 }
 
+function operatorMcpContinuityToken(toolName: string, args: Record<string, unknown>): unknown {
+  if (toolName === "listMcpTools") {
+    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
+    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+      ? args.arguments as Record<string, unknown>
+      : {};
+    return nestedTool ? operatorMcpContinuityToken(nestedTool, nestedArgs) : null;
+  }
+  if (toolName === "runEngineeringTool") {
+    return null;
+  }
+  return args.continuity_token;
+}
+
 async function getOperatorMcpBoundaryBlock(
+
   _request: Request,
   env: Env,
   toolName: string,
