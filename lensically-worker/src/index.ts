@@ -8824,6 +8824,28 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       account_rejection_context: accountRejectionContext,
     };
 
+    const operationId = normalizeOperatorText(payload.operation_id, 240, true);
+    if (operationId) {
+      const existingRun = await env.DB.prepare(
+        `SELECT * FROM gpt_generation_runs
+         WHERE account_id = ? AND source_card_id = ?
+           AND json_extract(metadata_json, '$.operation_id') = ?
+         ORDER BY datetime(updated_at) DESC LIMIT 1`,
+      ).bind(brand.account_id, sourceCardId, operationId).first<Record<string, unknown>>();
+      if (existingRun?.id) {
+        return operatorJsonResponse({
+          run_id: existingRun.id,
+          source_card_id: sourceCardId,
+          source_card_family_id: existingRun.source_card_family_id ?? card.family_id ?? null,
+          source_card_version_number: Number(existingRun.source_card_version_number ?? card.version_number ?? 1),
+          adaptation_plan: safeParseJsonString(String(existingRun.adaptation_plan_json ?? "{}")) ?? adaptationPlan,
+          prior_adaptation_context: safeParseJsonString(String(existingRun.prior_adaptation_context_json ?? "{}")) ?? priorAdaptationContext,
+          status: existingRun.status ?? "drafted",
+          reused_existing: true,
+          idempotency_reason: "generation_operation_already_completed",
+        });
+      }
+    }
     const runId = crypto.randomUUID();
     await env.DB.prepare(
       `INSERT INTO gpt_generation_runs (
