@@ -1302,10 +1302,11 @@ describe("operator mode MCP endpoint", () => {
     ]));
         expect(direct.owner_interaction_contract.rules.join(" ")).toContain("without asking the owner to proceed");
     expect(direct.owner_interaction_contract.next_owner_decision_after_source_card).toContain("passing showable draft");
-    expect(direct.rejection_memory_contract.version).toBe("operator-rejection-context-v1");
+        expect(direct.rejection_memory_contract.version).toBe("operator-rejection-context-v2");
     expect(direct.rejection_memory_contract.infrastructure_scope).toBe("universal");
     expect(direct.rejection_memory_contract.evidence_scope).toBe("selected_account");
-    expect(direct.rejection_memory_contract.required_generation_behavior.join(" ")).toContain("Persist the rejection context");
+    expect(direct.rejection_memory_contract.required_generation_behavior.join(" ")).toContain("compact selected-account rejection context");
+    expect(direct.rejection_memory_contract.required_generation_behavior.join(" ")).toContain("explicit hard bans");
     expect(direct.rejection_memory_contract.required_gate_keys).toEqual(expect.arrayContaining([
       "historical_owner_rejection_gate",
       "required_gate_execution_gate",
