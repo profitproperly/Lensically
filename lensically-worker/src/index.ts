@@ -8209,9 +8209,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           family_id: familyId,
           version_number: currentCard.version_number ?? 1,
           status: currentCard.status,
-          reused_existing: true,
+                    reused_existing: true,
           reason: "canonical_source_card_reused",
           validation: validateSourceCardLockable(currentCard),
+          owner_presentation: {
+            ...SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
+            account_scope: brand.brand_key,
+          },
         });
       }
       if (currentCard && createNewVersion) {
