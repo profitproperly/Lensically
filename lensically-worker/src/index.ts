@@ -8815,7 +8815,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
        WHERE c.review_batch_id = ? AND c.brand_key = ?
          AND c.status = 'approved' AND d.status = 'approved'
        ORDER BY c.review_item_number ASC`,
-    ).bind(brand.account_id, reviewBatchId, brand.brand_key).all<Record<string, unknown>>();
+        ).bind(brand.account_id, resolvedReviewBatchId, brand.brand_key).all<Record<string, unknown>>();
     const eligibleClaims = (claims.results ?? []).filter((claim) => !requestedNumbers || requestedNumbers.has(Number(claim.review_item_number)));
     if (openSlots.length < eligibleClaims.length) {
       return operatorJsonResponse({ success: false, error: "insufficient_open_hourly_slots", open_slots: openSlots, approved_items: eligibleClaims.length }, 409);
