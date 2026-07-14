@@ -9004,6 +9004,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!draft) {
       return operatorJsonResponse({ success: false, error: "draft_not_found" }, 404);
     }
+    if (draft.status === "shown" || draft.status === "approved" || draft.status === "scheduled" || draft.status === "published") {
+      return operatorJsonResponse({ draft_id: draftId, status: draft.status, reused_existing: true, idempotency_reason: "draft_already_shown_or_advanced" });
+    }
     if (!draft.showable || !isAllowedOperatorTransition(draft.status, "shown")) {
       return operatorJsonResponse({ success: false, error: "draft_not_showable", draft_id: draftId, status: draft.status, showable: draft.showable }, 400);
     }
