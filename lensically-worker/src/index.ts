@@ -9047,9 +9047,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       excluded_source_count: 1,
       preserved_pattern_count: 1,
       preserved_historical_data: true,
-      skipped_active_selection_count: Number(skipped.meta.changes ?? 0),
+            skipped_active_selection_count: Number(skipped.meta.changes ?? 0),
     });
 
+    /* Legacy destructive deletion path intentionally retired. Historical pattern,
+       card, generation, and analytics data must remain intact.
     const selectionRows = await env.DB.prepare(
       `SELECT id, source_card_id
        FROM operator_source_selections
