@@ -11871,7 +11871,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     const session = await resolveOperatorContinuationSession(env, brandKey, choice, requestedSessionId);
     const capsule = await buildOperatorContinuityCapsule(request, env, brand, session, choice);
     const workflowSessionId = normalizeOperatorText((capsule.workflow_checkpoint as Record<string, unknown> | undefined)?.workflow_session_id, 120, true);
-        const continuityRef = await createOperatorContinuityReference(env, {
+            await createOperatorContinuityReference(env, {
       kind: "continuity_context",
       brandKey,
       workflowSessionId,
@@ -11886,8 +11886,8 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       ok: true,
       selected_key: brandKey,
       continuation_choice: choice,
-      continuity_ref: continuityRef,
-      continuity_ref_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+      continuity_loaded: true,
+      continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
       account_data_loaded: true,
       next_call_requirement: {
