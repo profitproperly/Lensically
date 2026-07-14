@@ -488,20 +488,19 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     scheduling_rule: "Schedule approved posts into the earliest open hourly slots in approved order and report times only after persistence succeeds.",
   },
   source_card_presentation_contract: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
-  rules: [
-    "After confirmOperatorProceed succeeds, ask whether to resume the persisted workflow or start fresh before loading account/workflow state or creating a session.",
-    "Do not infer the continuation choice from the key, handshake approval, prior chat, or presence of an existing workflow.",
-    "Resume continues from the exact persisted checkpoint without redrawing, restarting, or duplicating work; start fresh creates a new session while preserving prior work unless deletion is separately requested.",
-    "After a source card is approved and locked, create the generation run, generate candidates, self-reject weak candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
-    "Do not present generation-run creation, adaptation-plan persistence, candidate-pool creation, self-rejection, draft submission, or gate execution as separate owner-facing steps.",
-    "At source-card review, keep raw schema, transformation, gate, pass/fail, and forbidden-surface fields internal. Present a natural build specification instead of a Must preserve / May reuse / Must change / Cannot repeat matrix.",
+    rules: [
+    "After confirmOperatorProceed succeeds, automatically load canonical continuity and inspect hourly calendar coverage. Never ask resume or start fresh.",
+    "Find the earliest incomplete future publishing day and ask whether the owner wants to fill that day before generating content.",
+    "For Manifest, create or reuse source cards silently, generate and gate four posts internally, then show four numbered Source / Generated post pairs.",
+    "Do not expose source-card, source-selection, generation-run, draft, claim, or review-batch identifiers to the owner.",
+    "Do not attach provisional time slots to drafts. Schedule approvals into the earliest open hourly slots only after the owner decides, then report persisted times.",
+    "A generated-post rejection keeps the source claimed for revision. A current-day source rejection excludes it for that production date. An explicit delete-source command permanently excludes a saved pattern from future draws without deleting its historical data.",
+    "The same stable source identity cannot be claimed twice for one production date across chats, drafts, approvals, schedules, or published posts. Cross-day reuse remains allowed.",
     "At every owner-visible transition, use brief explicit labels for the completed action, the artifact being shown now, and the next owner decision.",
-    "After performing an owner-approved action, report that completion before presenting the next owner-visible artifact.",
-    "The next owner approval question after source-card approval occurs only after at least one draft passed all blocking gates, returned showable=true, and was marked shown.",
-    "If no draft passes, report the blocker or generation failure; do not ask the owner to approve an unshowable draft.",
-    "Scheduling requires an approved shown draft and a separate owner confirmation of the scheduling details.",
+    "If no draft passes, replace it internally or report the blocker; never show an unshowable draft.",
+    "When a target day becomes fully covered, report completion and ask whether to continue to the next incomplete day.",
   ],
-  next_owner_decision_after_source_card: "Review a passing showable draft for approve, reject, or revise.",
+  next_owner_decision_after_review_batch: "Approve, reject, or revise Posts 1 through 4 by number.",
 } as const;
 
 const OPERATOR_REJECTION_MEMORY_CONTRACT = {
