@@ -9110,9 +9110,12 @@ const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
 
 
-  "selectOperatorKey",
+    "selectOperatorKey",
   "confirmOperatorProceed",
+  "resolveContinuationContext",
+  "planOperatorExecution",
   "getMcpAdminState",
+
   "inspectMcpFailure",
   "listMcpTools",
   "runEngineeringTool",
