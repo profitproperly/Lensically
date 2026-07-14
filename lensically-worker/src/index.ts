@@ -11876,16 +11876,44 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     if (!brandKey || !choice) {
       return { ok: false, error: "brand_key_and_continuation_choice_required", account_data_loaded: false };
     }
-            const serverConfirmation = await readLatestOperatorContinuityState(env, "continuation_nonce", brandKey);
-    const legacyNonce = serverConfirmation ? null : await verifyOperatorContinuationNonce(env, args.continuation_nonce, brandKey);
-    if (!serverConfirmation && !legacyNonce) {
-      return { ok: false, error: "proceed_confirmation_missing_or_expired", account_data_loaded: false, required_next_tool: "confirmOperatorProceed" };
-    }
-    const brand = await resolveGptBrand(env, brandKey);
+                const brand = await resolveGptBrand(env, brandKey);
     if (!brand) {
       return { ok: false, error: "brand_unavailable", account_data_loaded: false };
     }
     const requestedSessionId = normalizeOperatorText(args.workflow_session_id, 120, true);
+    const serverConfirmation = await readLatestOperatorContinuityState(env, "continuation_nonce", brandKey);
+    const legacyNonce = serverConfirmation ? null : await verifyOperatorContinuationNonce(env, args.continuation_nonce, brandKey);
+    if (!serverConfirmation && !legacyNonce) {
+      const existingContext = await readLatestOperatorContinuityState(env, "continuity_context", brandKey);
+      const existingChoice = normalizeOperatorContinuationChoice(existingContext?.continuation_choice);
+      const existingSessionId = normalizeOperatorText(existingContext?.workflow_session_id, 120, true);
+      const sameResolution = existingContext
+        && existingChoice === choice
+        && (!requestedSessionId || requestedSessionId === existingSessionId);
+      if (!sameResolution) {
+        return { ok: false, error: "proceed_confirmation_missing_or_expired", account_data_loaded: false, required_next_tool: "confirmOperatorProceed" };
+      }
+      const existingSession = existingSessionId
+        ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(existingSessionId, brandKey).first<Record<string, unknown>>()
+        : null;
+      const replayCapsule = await buildOperatorContinuityCapsule(request, env, brand, existingSession, choice);
+      return {
+        ok: true,
+        selected_key: brandKey,
+        continuation_choice: choice,
+        continuity_loaded: true,
+        continuity_state_expires_in_seconds: Math.max(Number(existingContext?.expires_at ?? 0) - Math.floor(Date.now() / 1000), 0),
+        continuity_capsule: replayCapsule,
+        account_data_loaded: true,
+        reused_existing: true,
+        idempotency_reason: "current_server_continuity_already_resolved",
+        next_call_requirement: {
+          proceed_confirmed: true,
+          continuity_loaded: true,
+          operation_id: (replayCapsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
+        },
+      };
+    }
     const session = await resolveOperatorContinuationSession(env, brandKey, choice, requestedSessionId);
     const capsule = await buildOperatorContinuityCapsule(request, env, brand, session, choice);
     const workflowSessionId = normalizeOperatorText((capsule.workflow_checkpoint as Record<string, unknown> | undefined)?.workflow_session_id, 120, true);
