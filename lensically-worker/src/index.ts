@@ -6610,8 +6610,31 @@ async function buildOperatorRejectionContext(env: Env, brand: GptResolvedBrand):
   const explicitBannedSurfaces = Array.from(new Set(records.flatMap((record) =>
     Array.isArray(record.explicit_banned_surfaces) ? record.explicit_banned_surfaces.map(String) : [],
   )));
-  const coverageComplete = (rejectedRows.results ?? []).length <= OPERATOR_REJECTION_CONTEXT_LIMIT
+    const coverageComplete = (rejectedRows.results ?? []).length <= OPERATOR_REJECTION_CONTEXT_LIMIT
     && (memoryRows.results ?? []).length <= OPERATOR_REJECTION_CONTEXT_LIMIT;
+  if (brand.brand_key === "manifest_mental") {
+    const hardBanIds = explicitBannedSurfaces
+      .map((surface) => normalizeComparableText(surface))
+      .filter(Boolean)
+      .sort();
+    return {
+      version: OPERATOR_REJECTION_CONTEXT_VERSION,
+      brand_key: brand.brand_key,
+      evidence_scope: "selected_account",
+      enforcement_mode: "explicit_hard_bans_only",
+      coverage_status: coverageComplete ? "complete" : "partial",
+      coverage_complete: coverageComplete,
+      source_rejection_record_count: records.length,
+      rejected_draft_count: rejectedDrafts.length,
+      rejection_memory_count: rejectionMemories.length,
+      required_review_count: hardBanIds.length,
+      required_review_ids: hardBanIds,
+      context_fingerprint: operatorRejectionContextFingerprint(hardBanIds),
+      explicit_banned_surfaces: explicitBannedSurfaces,
+      generation_instruction: "Stay close to the source. Preserve its hook, structure, meaning, tone, and payoff; make only slight wording changes. Do not invent scenes, characters, activities, settings, events, metaphors, or premises. Avoid only the explicit hard-ban surfaces listed here.",
+      gate_instruction: "The backend checks explicit hard bans automatically. No full rejected-draft semantic review or model fingerprint evidence is required for Manifest.",
+    };
+  }
   return {
     version: OPERATOR_REJECTION_CONTEXT_VERSION,
     brand_key: brand.brand_key,
