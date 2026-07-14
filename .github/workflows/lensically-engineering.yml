@@ -1,8 +1,5 @@
 name: Lensically Engineering
 
-permissions:
-  contents: write
-
 on:
   workflow_dispatch:
     inputs:
