@@ -5695,9 +5695,17 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_operator_source_selections_batch_order
      ON operator_source_selections (batch_id, draw_order ASC)`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_source_selections_source_card
      ON operator_source_selections (source_card_id)`,
+  ).run();
+  await addColumnIfMissing(env, "operator_source_selections", "disposition", "TEXT NOT NULL DEFAULT 'pending'");
+  await addColumnIfMissing(env, "operator_source_selections", "disposition_reason", "TEXT");
+  await addColumnIfMissing(env, "operator_source_selections", "disposition_at", "TEXT");
+  await addColumnIfMissing(env, "operator_source_selections", "workflow_sequence", "INTEGER");
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_source_selections_batch_disposition
+     ON operator_source_selections (batch_id, disposition, draw_order ASC)`,
   ).run();
 
   await env.DB.prepare(
