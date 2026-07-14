@@ -84,16 +84,32 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     expect(selected.structuredContent.selected_key).toBe(brandKey);
     mcpSelectedKey = brandKey;
     mcpProceedConfirmed = false;
+    mcpContinuationNonce = null;
+    mcpContinuityToken = null;
   }
   if (!mcpProceedConfirmed) {
-    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuation_choice_required: boolean; continuation_choices: string[]; next_owner_prompt: string; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
+    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuation_nonce: string; continuation_choice_required: boolean; continuation_choices: string[]; next_owner_prompt: string; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.proceeded).toBe(true);
     expect(proceeded.structuredContent.account_data_loaded).toBe(false);
+    expect(proceeded.structuredContent.continuation_nonce).toBeTruthy();
     expect(proceeded.structuredContent.continuation_choice_required).toBe(true);
     expect(proceeded.structuredContent.continuation_choices).toEqual(["resume_existing_workflow", "start_fresh_workflow"]);
     expect(proceeded.structuredContent.next_owner_prompt).toContain("pick up where the existing workflow left off");
+    mcpContinuationNonce = proceeded.structuredContent.continuation_nonce;
     mcpProceedConfirmed = true;
+  }
+  if (!mcpContinuityToken) {
+    const continued = await mcpToolRaw<{ continuity_token: string; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
+      brand_key: brandKey,
+      proceed_confirmed: true,
+      continuation_choice: "resume_existing_workflow",
+      continuation_nonce: mcpContinuationNonce,
+    });
+    expect(continued.isError).not.toBe(true);
+    expect(continued.structuredContent.continuity_token).toBeTruthy();
+    expect(continued.structuredContent.continuity_capsule.brand_key).toBe(brandKey);
+    mcpContinuityToken = continued.structuredContent.continuity_token;
   }
 }
 
