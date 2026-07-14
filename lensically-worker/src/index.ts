@@ -10202,12 +10202,13 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       type: "boolean",
       description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
     };
-    if (tool.name !== "resolveContinuationContext") {
-      properties.continuity_token = {
+        if (tool.name !== "resolveContinuationContext") {
+      properties.continuity_ref = {
         type: "string",
-        description: "Signed token returned by resolveContinuationContext. Required on every later account-scoped call so a fresh chat cannot skip canonical continuity loading.",
+        description: "Opaque UUID returned by resolveContinuationContext. Required on every later account-scoped call so a fresh chat cannot skip canonical continuity loading.",
       };
     }
+
     properties.operation_id = {
       type: "string",
       description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
