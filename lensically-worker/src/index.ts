@@ -7971,7 +7971,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       if (!selection) {
         return operatorJsonResponse({ success: false, error: "source_selection_not_found" }, 404);
       }
-      if (selection.source_card_id) {
+            if (selection.source_card_id && !createNewVersion) {
         const linkedCard = await getOperatorSourceCard(env, brand.brand_key, String(selection.source_card_id));
         return operatorJsonResponse({
           source_card_id: selection.source_card_id,
