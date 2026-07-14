@@ -8336,8 +8336,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       }
 
       const unlinked = await env.DB.prepare(
-        `UPDATE operator_source_selections
-         SET source_card_id = NULL
+                `UPDATE operator_source_selections
+         SET source_card_id = NULL,
+             disposition = 'skipped',
+             disposition_reason = 'owner_deleted_source',
+             disposition_at = CURRENT_TIMESTAMP,
+             workflow_sequence = NULL
          WHERE brand_key = ?
            AND source_card_id = ?`,
       ).bind(brand.brand_key, sourceCardId).run();
