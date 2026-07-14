@@ -13764,45 +13764,40 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       : [];
     const select = await callLiveMcp(3, "tools/call", { name: "selectOperatorKey", arguments: { brand_key: "manifest_mental" } });
     const blocked = await callLiveMcp(4, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental" } });
-    const proceed = await callLiveMcp(5, "tools/call", { name: "confirmOperatorProceed", arguments: { brand_key: "manifest_mental" } });
+        const proceed = await callLiveMcp(5, "tools/call", { name: "confirmOperatorProceed", arguments: { brand_key: "manifest_mental" } });
     const proceedContent = structured(proceed.payload);
-    const beforeContinuity = await callLiveMcp(6, "tools/call", {
+    const allowed = await callLiveMcp(6, "tools/call", {
       name: "getWorkflowStatus",
-      arguments: { brand_key: "manifest_mental", proceed_confirmed: true },
-    });
-    const continuation = await callLiveMcp(7, "tools/call", {
-      name: "resolveContinuationContext",
       arguments: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
-                        continuation_choice: "resume_existing_workflow",
+        continuity_loaded: true,
       },
     });
-    const continuationContent = structured(continuation.payload);
-    const allowed = await callLiveMcp(8, "tools/call", {
-      name: "getWorkflowStatus",
+    const coverage = await callLiveMcp(7, "tools/call", {
+      name: "get_hourly_coverage",
       arguments: {
         brand_key: "manifest_mental",
-                        proceed_confirmed: true,
+        proceed_confirmed: true,
         continuity_loaded: true,
+        timezone: "America/New_York",
       },
     });
 
     const selectContent = structured(select.payload);
     const blockedContent = structured(blocked.payload);
-    const beforeContinuityContent = structured(beforeContinuity.payload);
     const allowedContent = structured(allowed.payload);
+    const coverageContent = structured(coverage.payload);
     const boundaryTest = {
       selected_key: selectContent.selected_key ?? null,
       handshake: selectContent.handshake ?? null,
       blocked_before_proceed: blockedContent.error === "explicit_proceed_required" && blockedContent.account_data_loaded === false,
       blocked_error: blockedContent.error ?? null,
       proceed_confirmed: proceedContent.proceeded === true,
-                  proceed_confirmation_recorded: proceedContent.continuation_confirmation_recorded === true,
-      continuity_required_after_proceed: beforeContinuityContent.error === "continuity_context_required",
-      continuity_resolved: continuationContent.continuity_loaded === true,
-      continuity_capsule_version: (continuationContent.continuity_capsule as Record<string, unknown> | undefined)?.version ?? null,
-      allowed_after_continuity: allowedContent.ok === true,
+      continuity_auto_resolved: proceedContent.continuity_loaded === true && proceedContent.continuation_choice_required === false,
+      continuity_capsule_version: (proceedContent.continuity_capsule as Record<string, unknown> | undefined)?.version ?? null,
+      calendar_coverage_loaded: Array.isArray(coverageContent.open_slots),
+      allowed_after_proceed: allowedContent.ok === true,
     };
     return {
       ok: response.ok
