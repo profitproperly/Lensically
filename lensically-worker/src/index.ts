@@ -433,6 +433,9 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
   },
   source_card_presentation_contract: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
   rules: [
+    "After confirmOperatorProceed succeeds, ask whether to resume the persisted workflow or start fresh before loading account/workflow state or creating a session.",
+    "Do not infer the continuation choice from the key, handshake approval, prior chat, or presence of an existing workflow.",
+    "Resume continues from the exact persisted checkpoint without redrawing, restarting, or duplicating work; start fresh creates a new session while preserving prior work unless deletion is separately requested.",
     "After a source card is approved and locked, create the generation run, generate candidates, self-reject weak candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
     "Do not present generation-run creation, adaptation-plan persistence, candidate-pool creation, self-rejection, draft submission, or gate execution as separate owner-facing steps.",
     "At source-card review, keep raw schema, transformation, gate, pass/fail, and forbidden-surface fields internal. Present a natural build specification instead of a Must preserve / May reuse / Must change / Cannot repeat matrix.",
