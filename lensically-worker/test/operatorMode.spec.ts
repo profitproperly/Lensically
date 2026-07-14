@@ -1897,7 +1897,7 @@ describe("operator mode MCP endpoint", () => {
       expect(toolNames).not.toContain(name);
     }
     await ensureMcpAccountOpen("manifest_mental");
-    const manifestBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "mm_get_account_state", arguments: { proceed_confirmed: true, continuity_token: mcpContinuityToken } });
+        const manifestBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "mm_get_account_state", arguments: { proceed_confirmed: true, continuity_ref: mcpContinuityRef } });
     const manifest = manifestBridge.result;
     expect(manifest.brand_key).toBe("manifest_mental");
     await ensureMcpAccountOpen("opmg_deadman");
