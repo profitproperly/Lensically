@@ -7857,8 +7857,10 @@ async function buildOperatorContinuityCapsule(
     version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
     choice,
     brand_key: brand.brand_key,
-    account_data_loaded: true,
+        account_data_loaded: true,
     canonical_state_source: "database",
+    calendar_coverage: calendarCoverage,
+    active_review_batch: activeReviewBatch,
     workflow_checkpoint: {
       workflow_session_id: sessionId,
       workflow_status: session?.status ?? null,
