@@ -1412,7 +1412,7 @@ describe("operator mode MCP endpoint", () => {
       ops_memory: Array<Record<string, unknown>>;
       mandatory_fallback_execution_routes: string[];
       universal_workflow_requirements: Array<{ stage: string; required_sections: string[] }>;
-      boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
+      boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[]; after_explicit_proceed: string };
       open_implementation_backlog: Array<Record<string, unknown>>;
     }>("getOperatorStartupContext");
         expect(direct.bootstrap_version).toBe("operator-startup-v2");
