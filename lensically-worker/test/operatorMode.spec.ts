@@ -455,7 +455,7 @@ describe("operator mode backend spine", () => {
 
   }, 30000);
 
-    it("allows a reusable exact hook while blocking the copied complete source package", async () => {
+        it("allows close Manifest hook mimicry with slight wording changes while blocking an exact source copy", async () => {
     const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
     const batchId = crypto.randomUUID();
     const selectionId = crypto.randomUUID();
