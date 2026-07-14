@@ -6603,12 +6603,11 @@ async function buildOperatorRejectionContext(env: Env, brand: GptResolvedBrand):
       updated_at: row.updated_at,
     };
   });
-  const rejectionMemories = (memoryRows.results ?? []).slice(0, OPERATOR_REJECTION_CONTEXT_LIMIT).map((row) => ({
+    const rejectionMemories = (memoryRows.results ?? []).slice(0, OPERATOR_REJECTION_CONTEXT_LIMIT).map((row) => ({
     context_id: `memory:${String(row.id)}`,
     memory_id: Number(row.id),
-    title: compactOperatorRejectionText(row.title, 240),
-    body: compactOperatorRejectionText(row.body, 1800),
-    metadata: safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {},
+    title: compactOperatorRejectionText(row.title, 180),
+    body: compactOperatorRejectionText(row.body, 900),
     explicit_banned_surfaces: extractOperatorBannedSurfacesFromFeedback(row.body),
     created_at: row.created_at,
     updated_at: row.updated_at,
