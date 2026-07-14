@@ -12086,28 +12086,59 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       return { ok: false, error: "query_required" };
     }
     const prefix = sanitizeRepoPath(args.prefix ?? "");
-    const limit = Math.min(Math.max(Number(args.limit ?? 30), 1), 100);
-    const listed = await handleOperatorMcpEngineeringTool(request, env, "listRepoFiles", { prefix, limit: 500 }) as { files?: Array<{ path?: string }> };
-    const files = Array.isArray(listed.files) ? listed.files : [];
-    const matches: Array<Record<string, unknown>> = [];
-    for (const item of files) {
-      if (matches.length >= limit) break;
-      const path = sanitizeRepoPath(item.path);
-      if (!path) continue;
-      if (path.toLowerCase().includes(query.toLowerCase())) {
-        matches.push({ path, line_matches: [] });
-        continue;
-      }
-      if (!/\.(ts|tsx|js|jsx|json|md|yml|yaml|sql|txt|css|html)$/.test(path)) continue;
-      const file = await getGithubFile(env, path);
-      if (file.ok && file.content) {
-        const lineMatches = compactTextMatches(file.content, query, 3);
-        if (lineMatches.length > 0) {
-          matches.push({ path, line_matches: lineMatches });
-        }
-      }
+    const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 20);
+    const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
+    if (prefix) searchTerms.push(`path:${prefix}`);
+    const codeSearch = await githubRepoApi(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
+    if (codeSearch.ok && codeSearch.data && typeof codeSearch.data === "object" && !Array.isArray(codeSearch.data)) {
+      const items = Array.isArray((codeSearch.data as Record<string, unknown>).items)
+        ? (codeSearch.data as Record<string, unknown>).items as Array<Record<string, unknown>>
+        : [];
+      const matches = items.slice(0, limit).map((item) => ({
+        path: item.path ?? null,
+        name: item.name ?? null,
+        sha: item.sha ?? null,
+        repository: config.repo,
+        source: "github_code_search",
+      }));
+      return {
+        ok: true,
+        query,
+        prefix: prefix || null,
+        matches,
+        returned_count: matches.length,
+        total_count: Number((codeSearch.data as Record<string, unknown>).total_count ?? matches.length),
+        truncated: Number((codeSearch.data as Record<string, unknown>).total_count ?? matches.length) > matches.length,
+        search_mode: "github_code_search",
+        external_requests: 1,
+        file_content_fanout: 0,
+        execution_policy: buildOperatorExecutionPolicy("searchRepoFiles", args),
+      };
     }
-    return { ok: true, query, matches, returned_count: matches.length, truncated: matches.length === limit };
+    const tree = await githubRepoApi(env, `/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
+    const entries = tree.data && typeof tree.data === "object" && !Array.isArray(tree.data) && Array.isArray((tree.data as Record<string, unknown>).tree)
+      ? (tree.data as Record<string, unknown>).tree as Array<Record<string, unknown>>
+      : [];
+    const normalizedQuery = query.toLowerCase();
+    const matches = entries
+      .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
+      .map((entry) => String(entry.path))
+      .filter((path) => (!prefix || path.startsWith(prefix)) && path.toLowerCase().includes(normalizedQuery))
+      .slice(0, limit)
+      .map((path) => ({ path, source: "bounded_tree_path_fallback" }));
+    return {
+      ok: tree.ok,
+      query,
+      prefix: prefix || null,
+      matches,
+      returned_count: matches.length,
+      truncated: matches.length === limit,
+      search_mode: "bounded_tree_path_fallback",
+      external_requests: 2,
+      file_content_fanout: 0,
+      code_search_status: codeSearch.status,
+      execution_policy: buildOperatorExecutionPolicy("searchRepoFiles", args),
+    };
   }
 
   if (toolName === "getRepoStatus") {
