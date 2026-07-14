@@ -1080,46 +1080,23 @@ describe("operator mode backend spine", () => {
     expect(data.blocking_failures?.some((failure) => failure.gate_key === "approved_before_schedule_gate")).toBe(true);
   }, 30000);
 
-    it("rejects unsupported saved-workflow batch shapes for every brand", async () => {
+      it("allows backend-supported review batch language while keeping each generation run source-card scoped", async () => {
     for (const brandKey of ALL_BRAND_KEYS) {
-      const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
-        brand_key: brandKey,
-      });
-      const sourceResponse = await fetchFromWorker("/api/operator/tools/create_source_card", {
-        method: "POST",
-        headers: AUTH_HEADERS,
-        body: JSON.stringify({
-          brand_key: brandKey,
-          workflow_session_id: session.workflow_session_id,
-          sequence_label: "universal_batch_guard_001",
-          title: "Twenty-four post batch fixture",
-          primary_source: { source_type: "archive_post", source_id: "archive-1", text: "A system makes the work easier." },
-          source_mechanism: "Generate 24 post batch from one source card.",
-          required_product: "Twenty four candidate posts for review.",
-          forbidden_surfaces: [],
-          pass_conditions: ["Specific operational payoff."],
-          fail_conditions: ["Generic motivation."],
-          recommended_direction: "Generate 24 candidates at once.",
-        }),
-      });
-      const sourceData = await sourceResponse.json() as { error?: string };
-      expect(sourceResponse.status, brandKey).toBe(400);
-      expect(sourceData.error).toBe("lensically_saved_workflow_required");
-
       const { sourceCardId } = await createLockedSourceCard([], brandKey);
-      const runResponse = await fetchFromWorker("/api/operator/tools/create_generation_run", {
-        method: "POST",
-        headers: AUTH_HEADERS,
-        body: JSON.stringify({
-          brand_key: brandKey,
-          source_card_id: sourceCardId,
-          objective: "Generate 24 candidate posts",
-          prompt_summary: "Batch generation fixture.",
-        }),
+      const run = await operatorTool<{ run_id: string; source_card_id: string }>("create_generation_run", {
+        brand_key: brandKey,
+        source_card_id: sourceCardId,
+        adaptation_plan: {
+          adaptation_goal: "Create one passing draft for a numbered multi-post owner review batch.",
+          preserved_functions: ["Keep this generation run attached to one canonical source card."],
+          transformed_elements: ["surface wording"],
+          intentionally_different_from_prior: "The review batch groups independent source-card runs rather than placing multiple posts inside one source card.",
+        },
+        objective: "Prepare one item for a four-post review batch.",
+        prompt_summary: "Backend-supported review batch fixture.",
       });
-      const runData = await runResponse.json() as { error?: string };
-      expect(runResponse.status, brandKey).toBe(400);
-      expect(runData.error).toBe("lensically_saved_workflow_required");
+      expect(run.run_id, brandKey).toBeTruthy();
+      expect(run.source_card_id).toBe(sourceCardId);
     }
   }, 40000);
 
