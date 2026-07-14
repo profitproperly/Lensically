@@ -12643,7 +12643,24 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             },
           });
         }
-        if (receipt.existing?.status === "started") {
+        if (!receipt.created && receipt.existing?.request_fingerprint && receipt.existing.request_fingerprint !== receiptFingerprint) {
+          const resultPayload = {
+            ok: false,
+            error: "idempotency_key_payload_mismatch",
+            idempotency: { version: OPERATOR_IDEMPOTENCY_VERSION, key: idempotencyKey, request_fingerprint: receiptFingerprint },
+            execution_policy: executionPolicy,
+          };
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: resultPayload,
+              content: [{ type: "text", text: `Lensically Operator Mode rejected reused operation identity with different inputs for ${toolName}.` }],
+              isError: true,
+            },
+          });
+        }
+        if (!receipt.created && receipt.existing?.status === "started") {
           const startedAt = Date.parse(String(receipt.existing.created_at ?? ""));
           if (Number.isFinite(startedAt) && Date.now() - startedAt < 120000) {
             const resultPayload = {
