@@ -53,19 +53,19 @@ jobs:
         run: npm ci
 
       - name: Typecheck
-        if: ${{ inputs.task == 'typecheck' }}
+        if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' }}
         run: npx tsc --noEmit
 
       - name: Operator MCP tests
-        if: ${{ inputs.task == 'operator-tests' }}
+        if: ${{ inputs.task == 'operator-tests' || inputs.task == 'worker-deploy' }}
         run: npm run test -- --run test/operatorMode.spec.ts --reporter=dot
 
       - name: GPT memory tests
-        if: ${{ inputs.task == 'gpt-memory-tests' }}
+        if: ${{ inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
         run: npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot
 
       - name: Deploy worker
-        if: ${{ false }}
+        if: ${{ inputs.task == 'worker-deploy' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
