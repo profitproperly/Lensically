@@ -6047,7 +6047,24 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     )`,
   ).run();
 
-    await env.DB.prepare(
+      await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_continuity_refs (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      brand_key TEXT NOT NULL,
+      workflow_session_id TEXT,
+      continuation_choice TEXT,
+      payload_json TEXT,
+      expires_at INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_continuity_refs_scope
+     ON operator_continuity_refs (brand_key, kind, expires_at)`,
+  ).run();
+
+  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_operation_receipts (
       idempotency_key TEXT PRIMARY KEY,
       brand_key TEXT,
