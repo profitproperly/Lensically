@@ -8867,6 +8867,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         normalizeOperatorText(payload.prompt_summary, 4000, true),
         normalizeOperatorJson({
           source: "operator_mode_mcp",
+          operation_id: operationId,
           canonical_source_card_reuse: Boolean(card.family_id),
           transformation_contract_version: SOURCE_TRANSFORMATION_CONTRACT_VERSION,
         }, {}),
