@@ -11152,7 +11152,7 @@ function operatorMcpInstructions(toolCount: number): string {
   return [
     "Use Lensically Operator Mode as source of truth.",
     "Before engineering, admin, workflow, or account work in a fresh session, call getOperatorStartupContext once and use that compact non-account bootstrap as the startup source of truth.",
-    "If getOperatorStartupContext is not directly callable, use runEngineeringTool with tool_name=getOperatorStartupContext; if that fails, use listMcpTools with execute_tool=getOperatorStartupContext. Do not treat one failed route as a full Lensically outage.",
+    "If getOperatorStartupContext is not directly exposed, use one callable alias only. Do not retry through multiple wrappers that reach the same backend; aliases are not independent recovery routes.",
         "Classify every change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless there is a valid account-specific reason.",
     "Follow the Operator Collaboration Contract returned by getOperatorStartupContext: inspect existing work, give independent judgment and edge cases, do not agree automatically, preserve owner authority, stop before implementation when design discussion is requested, and reduce wasted motion without reducing reasoning quality.",
     "When a durable decision is made, periodically tell the owner its change_name, primary_system_layer, additional_system_layers, universal_or_account_scope, why it survives new chats, and which secondary memory/audit records will also be written.",
