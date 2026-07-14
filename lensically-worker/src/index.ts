@@ -10519,8 +10519,10 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
   return {
     ok: true,
-        bootstrap_version: "operator-startup-v2",
+        bootstrap_version: "operator-startup-v3",
                 collaboration_contract: OPERATOR_COLLABORATION_CONTRACT,
+    continuity_contract: OPERATOR_CONTINUITY_CONTRACT,
+    execution_policy_contract: OPERATOR_EXECUTION_POLICY_CONTRACT,
     owner_interaction_contract: OPERATOR_OWNER_INTERACTION_CONTRACT,
     rejection_memory_contract: OPERATOR_REJECTION_MEMORY_CONTRACT,
     captured_at: new Date().toISOString(),
