@@ -1374,8 +1374,10 @@ describe("operator mode MCP endpoint", () => {
       "startup_contract",
       "supporting_memory",
     ]));
-    expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v1");
+        expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v2");
     expect(direct.owner_interaction_contract.silent_stages).toEqual(["generation_run_and_candidates", "gate_evaluation"]);
+    expect(direct.owner_interaction_contract.transition_label_contract.required_labels).toEqual(["Completed:", "Showing now:", "Next decision:"]);
+    expect(direct.owner_interaction_contract.transition_label_contract.instruction).toContain("Never make the owner infer");
     expect(direct.owner_interaction_contract.owner_visible_checkpoints).toEqual(expect.arrayContaining([
       "source_card_review",
       "draft_review_and_decision",
