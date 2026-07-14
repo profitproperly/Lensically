@@ -8111,6 +8111,279 @@ async function buildManifestQualifiedSourcePool(
   });
 }
 
+function operatorLocalDateTimeParts(value: Date, timezone: string): { date: string; hour: number; minute: number; second: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  return {
+    date: `${byType.get("year")}-${byType.get("month")}-${byType.get("day")}`,
+    hour: Number(byType.get("hour") ?? 0),
+    minute: Number(byType.get("minute") ?? 0),
+    second: Number(byType.get("second") ?? 0),
+  };
+}
+
+function addOperatorIsoDateDays(date: string, days: number): string {
+  const parsed = new Date(`${date}T12:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function operatorHourlySlot(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+async function getOperatorHourlyCoverage(
+  env: Env,
+  brand: GptResolvedBrand,
+  timezone = WORKSPACE_DEFAULT_TIMEZONE,
+  horizonDays = 14,
+  requestedStartDate: string | null = null,
+): Promise<Record<string, unknown>> {
+  const now = new Date();
+  const local = operatorLocalDateTimeParts(now, timezone);
+  const startDate = requestedStartDate && isValidIsoDate(requestedStartDate) ? requestedStartDate : local.date;
+  const fullDatesBefore: string[] = [];
+  const normalizedHorizon = Math.min(Math.max(Math.trunc(horizonDays), 1), 60);
+
+  for (let dayOffset = 0; dayOffset < normalizedHorizon; dayOffset += 1) {
+    const date = addOperatorIsoDateDays(startDate, dayOffset);
+    const isCurrentDate = date === local.date;
+    const firstEligibleHour = isCurrentDate ? Math.min(local.hour + 1, 24) : 0;
+    const candidateHours = Array.from({ length: Math.max(24 - firstEligibleHour, 0) }, (_, index) => firstEligibleHour + index);
+    if (!candidateHours.length) {
+      fullDatesBefore.push(date);
+      continue;
+    }
+    const scheduled = await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, date, timezone);
+    const occupiedHours = new Set<number>();
+    for (const item of scheduled) {
+      const localTime = String((item as Record<string, unknown>).local_time ?? (item as Record<string, unknown>).scheduled_time_local ?? "");
+      const match = localTime.match(/(?:\s|^)(\d{1,2}):(\d{2})(?:$|\s)/);
+      const hour = match?.[1] ? Number(match[1]) : Number(localTime.split(":")[0]);
+      if (Number.isInteger(hour) && hour >= 0 && hour <= 23) occupiedHours.add(hour);
+    }
+    const openHours = candidateHours.filter((hour) => !occupiedHours.has(hour));
+    if (!openHours.length) {
+      fullDatesBefore.push(date);
+      continue;
+    }
+    return {
+      timezone,
+      current_local_date: local.date,
+      current_local_time: `${operatorHourlySlot(local.hour).slice(0, 2)}:${String(local.minute).padStart(2, "0")}:${String(local.second).padStart(2, "0")}`,
+      earliest_incomplete_date: date,
+      open_slots: openHours.map(operatorHourlySlot),
+      open_count: openHours.length,
+      next_open_slot: operatorHourlySlot(openHours[0]),
+      scheduled_count_for_date: scheduled.length,
+      full_dates_before: fullDatesBefore,
+      past_slots_ignored: true,
+      hourly_requirement: 24,
+    };
+  }
+
+  return {
+    timezone,
+    current_local_date: local.date,
+    earliest_incomplete_date: null,
+    open_slots: [],
+    open_count: 0,
+    next_open_slot: null,
+    full_dates_before: fullDatesBefore,
+    horizon_days: normalizedHorizon,
+    horizon_fully_covered: true,
+  };
+}
+
+async function ensureManifestSourceBatchForDate(
+  env: Env,
+  brand: GptResolvedBrand,
+  workflowSessionId: string,
+  productionDate: string,
+  sourceTypes: string[],
+  freshDraw: boolean,
+): Promise<{ batch: Record<string, unknown>; selections: Record<string, unknown>[]; reused_existing: boolean }> {
+  if (freshDraw) {
+    await env.DB.prepare(
+      `UPDATE operator_source_selection_batches
+       SET status = 'retired', retired_at = CURRENT_TIMESTAMP,
+           retirement_reason = 'owner_approved_calendar_workflow_transition'
+       WHERE brand_key = ? AND status = 'active'
+         AND (production_date IS NULL OR production_date = ?)`,
+    ).bind(brand.brand_key, productionDate).run();
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT * FROM operator_source_selection_batches
+     WHERE brand_key = ? AND production_date = ? AND status = 'active'
+     ORDER BY datetime(created_at) DESC LIMIT 1`,
+  ).bind(brand.brand_key, productionDate).first<Record<string, unknown>>();
+  if (existing?.id) {
+    const rows = await env.DB.prepare(
+      `SELECT * FROM operator_source_selections
+       WHERE batch_id = ? AND brand_key = ? ORDER BY draw_order ASC`,
+    ).bind(String(existing.id), brand.brand_key).all<Record<string, unknown>>();
+    return { batch: existing, selections: rows.results ?? [], reused_existing: true };
+  }
+
+  const [qualifiedPool, exclusions, claims] = await Promise.all([
+    buildManifestQualifiedSourcePool(env, brand, sourceTypes),
+    env.DB.prepare(
+      `SELECT source_identity_key FROM operator_source_exclusions
+       WHERE brand_key = ? AND active = 1`,
+    ).bind(brand.brand_key).all<{ source_identity_key: string }>(),
+    env.DB.prepare(
+      `SELECT source_identity_key FROM operator_daily_source_claims
+       WHERE brand_key = ? AND production_date = ?`,
+    ).bind(brand.brand_key, productionDate).all<{ source_identity_key: string }>(),
+  ]);
+  const unavailable = new Set<string>([
+    ...(exclusions.results ?? []).map((row) => String(row.source_identity_key)),
+    ...(claims.results ?? []).map((row) => String(row.source_identity_key)),
+  ]);
+  const eligiblePool = qualifiedPool.filter((candidate) => !unavailable.has(String(candidate.source_identity_key ?? "")));
+  if (eligiblePool.length < MANIFEST_DAILY_SOURCE_DRAW_SIZE) {
+    throw new Error(`insufficient_qualified_sources:${eligiblePool.length}`);
+  }
+
+  const selectedAt = new Date().toISOString();
+  const batchId = crypto.randomUUID();
+  const selectedCandidates = shuffleOperatorSources(eligiblePool).slice(0, MANIFEST_DAILY_SOURCE_DRAW_SIZE);
+  const statements = [
+    env.DB.prepare(
+      `INSERT INTO operator_source_selection_batches (
+        id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+        qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+        production_date, status
+      ) VALUES (?, ?, ?, 'uniform_random_without_replacement', ?, ?, ?, ?, ?, ?, ?, 'active')`,
+    ).bind(
+      batchId,
+      brand.brand_key,
+      workflowSessionId,
+      MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      eligiblePool.length,
+      MANIFEST_DAILY_SOURCE_DRAW_SIZE,
+      selectedCandidates.length,
+      selectedAt,
+      normalizeOperatorJson({
+        production_date: productionDate,
+        cross_day_cooldown_applied: false,
+        cross_day_repetition_allowed: true,
+        same_day_source_claims_enforced: true,
+        performance_weighting_applied: false,
+      }, {}),
+      productionDate,
+    ),
+  ];
+  const selections = selectedCandidates.map((candidate, index) => {
+    const selectionId = crypto.randomUUID();
+    const metrics = candidate.metrics && typeof candidate.metrics === "object" ? candidate.metrics as Record<string, unknown> : {};
+    const metricsSnapshot = { ...metrics, captured_at: selectedAt, eligibility_min_likes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES };
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO operator_source_selections (
+          id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+          source_type, internal_source_id, threads_post_id, canonical_source_url,
+          post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        selectionId,
+        batchId,
+        brand.brand_key,
+        workflowSessionId,
+        index + 1,
+        String(candidate.source_identity_key ?? ""),
+        String(candidate.source_type ?? ""),
+        String(candidate.internal_source_id ?? candidate.source_id ?? ""),
+        candidate.threads_post_id ? String(candidate.threads_post_id) : null,
+        candidate.canonical_source_url ? String(candidate.canonical_source_url) : null,
+        String(candidate.text ?? ""),
+        candidate.posted_at ? String(candidate.posted_at) : null,
+        normalizeOperatorJson(metricsSnapshot, {}),
+        normalizeOperatorJson(candidate, {}),
+        selectedAt,
+      ),
+    );
+    return {
+      source_selection_id: selectionId,
+      source_batch_id: batchId,
+      draw_order: index + 1,
+      ...candidate,
+      metrics_snapshot: metricsSnapshot,
+    };
+  });
+  await env.DB.batch(statements);
+  const batch = await env.DB.prepare(
+    `SELECT * FROM operator_source_selection_batches WHERE id = ? LIMIT 1`,
+  ).bind(batchId).first<Record<string, unknown>>();
+  return { batch: batch ?? { id: batchId, production_date: productionDate }, selections, reused_existing: false };
+}
+
+async function serializeManifestReviewBatch(
+  env: Env,
+  brand: GptResolvedBrand,
+  reviewBatchId: string,
+): Promise<Record<string, unknown> | null> {
+  const batch = await env.DB.prepare(
+    `SELECT * FROM operator_review_batches
+     WHERE id = ? AND brand_key = ? LIMIT 1`,
+  ).bind(reviewBatchId, brand.brand_key).first<Record<string, unknown>>();
+  if (!batch) return null;
+  const rows = await env.DB.prepare(
+    `SELECT c.*, s.post_text AS source_text, s.metrics_snapshot_json,
+            s.canonical_source_url, s.threads_post_id, s.draw_order,
+            d.text AS draft_text, d.status AS draft_status, d.showable,
+            p.scheduled_time, p.status AS scheduled_status
+     FROM operator_daily_source_claims c
+     LEFT JOIN operator_source_selections s ON s.id = c.source_selection_id
+     LEFT JOIN gpt_generation_drafts d ON d.id = c.draft_id
+     LEFT JOIN scheduled_posts p ON p.id = c.scheduled_post_id
+     WHERE c.review_batch_id = ? AND c.brand_key = ?
+     ORDER BY c.review_item_number ASC`,
+  ).bind(reviewBatchId, brand.brand_key).all<Record<string, unknown>>();
+  return {
+    review_batch_id: batch.id,
+    production_date: batch.production_date,
+    timezone: batch.timezone,
+    status: batch.status,
+    batch_size: Number(batch.batch_size ?? MANIFEST_REVIEW_BATCH_SIZE),
+    items: (rows.results ?? []).map((row) => ({
+      item_number: Number(row.review_item_number ?? 0),
+      claim_id: row.id,
+      status: row.status,
+      source_identity_key: row.source_identity_key,
+      source_type: row.source_type,
+      internal_source_id: row.internal_source_id,
+      source_batch_id: row.source_batch_id,
+      source_selection_id: row.source_selection_id,
+      source_card_id: row.source_card_id ?? null,
+      generation_run_id: row.generation_run_id ?? null,
+      draft_id: row.draft_id ?? null,
+      scheduled_post_id: row.scheduled_post_id ?? null,
+      source_text: row.source_text,
+      source_metrics: safeParseJsonString(String(row.metrics_snapshot_json ?? "{}")) ?? {},
+      canonical_source_url: row.canonical_source_url ?? null,
+      threads_post_id: row.threads_post_id ?? null,
+      draw_order: Number(row.draw_order ?? 0),
+      generated_post: row.draft_text ?? null,
+      draft_status: row.draft_status ?? null,
+      showable: Number(row.showable ?? 0) === 1,
+      scheduled_time: row.scheduled_time ?? null,
+      scheduled_status: row.scheduled_status ?? null,
+      disposition_reason: row.disposition_reason ?? null,
+    })),
+  };
+}
+
 async function listSourceCandidatesForBrand(
 
   env: Env,
