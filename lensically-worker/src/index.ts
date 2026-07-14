@@ -11674,7 +11674,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
         `Full tool surface loaded: ${tools.length} tools available and usable.`,
         "Proceed to the next step?",
       ],
-                  after_explicit_proceed: "Ask the owner whether to resume the persisted workflow or start fresh, then call resolveContinuationContext with the exact owner choice. The backend verifies the short-lived proceed record and stores the canonical continuity state. Every later account-scoped call must include continuity_loaded=true. Conversation memory is not accepted as workflow state.",
+                        after_explicit_proceed: "confirmOperatorProceed automatically restores canonical persisted schedule, workflow, day-level source claims, and any active review batch. Never ask resume or start fresh. Every later account-scoped call must include continuity_loaded=true. Conversation memory is not accepted as workflow state.",
     },
     tool_surface: {
       total_tools: tools.length,
