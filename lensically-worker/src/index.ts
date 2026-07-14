@@ -510,10 +510,10 @@ const OPERATOR_REJECTION_MEMORY_CONTRACT = {
   required_generation_behavior: [
     "Persist a compact selected-account rejection context with each generation run so fresh chats retain explicit hard bans.",
     "For manifest_mental, enforce only words, phrases, surfaces, or patterns the owner explicitly marked as banned; do not treat every rejected draft as a semantic constraint.",
-    "Manifest generation should stay close to the approved source: preserve the hook, structure, meaning, tone, and payoff, make only slight wording changes, and do not invent scenes or premises.",
+        "Manifest generation should preserve the approved source mechanism, strongest structure, meaning, tone, and payoff while materially rewriting distinctive surface language. Do not lightly rearrange the source or invent unrelated scenes or premises.",
   ],
   required_gate_keys: ["historical_owner_rejection_gate", "required_gate_execution_gate"],
-  showability_rule: "For manifest_mental, a draft is blocked by an exact source copy, an explicit owner hard ban, or a missing required gate. Close source mimicry is allowed and preferred.",
+  showability_rule: "For manifest_mental, a draft is blocked by exact or near-verbatim source copying, an explicit owner hard ban, or a missing required gate. Mechanism and structure may be reused; distinctive language must be independently written unless the owner explicitly approves an exact reusable hook.",
 } as const;
 
 
