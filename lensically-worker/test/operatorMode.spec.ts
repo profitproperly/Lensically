@@ -2237,6 +2237,124 @@ describe("operator mode MCP endpoint", () => {
     expect(resolved.items.some((row) => row.id === item.item_id && row.status === "resolved")).toBe(true);
   }, 30000);
 
+    it("auto-resolves canonical continuity after Proceed and exposes calendar state", async () => {
+    const selected = await mcpToolRaw<{ selected_key: string }>("selectOperatorKey", { brand_key: "manifest_mental" });
+    expect(selected.structuredContent.selected_key).toBe("manifest_mental");
+
+    const proceeded = await mcpToolRaw<{
+      proceeded: boolean;
+      account_data_loaded: boolean;
+      continuity_loaded: boolean;
+      continuation_choice_required: boolean;
+      continuity_capsule: {
+        brand_key: string;
+        calendar_coverage: { earliest_incomplete_date: string | null; open_slots: string[] };
+        active_review_batch: unknown;
+      };
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+
+    expect(proceeded.isError).not.toBe(true);
+    expect(proceeded.structuredContent.proceeded).toBe(true);
+    expect(proceeded.structuredContent.account_data_loaded).toBe(true);
+    expect(proceeded.structuredContent.continuity_loaded).toBe(true);
+    expect(proceeded.structuredContent.continuation_choice_required).toBe(false);
+    expect(proceeded.structuredContent.continuity_capsule.brand_key).toBe("manifest_mental");
+    expect(Array.isArray(proceeded.structuredContent.continuity_capsule.calendar_coverage.open_slots)).toBe(true);
+
+    const status = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(status.isError).not.toBe(true);
+    expect(status.structuredContent.ok).toBe(true);
+  }, 40000);
+
+  it("persists four-item Manifest review batches and prevents same-day duplicate sources across chats", async () => {
+    await seedManifestPatterns(30);
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
+      brand_key: "manifest_mental",
+    });
+    const first = await operatorTool<{
+      review_batch_id: string;
+      production_date: string;
+      items: Array<{ item_number: number; source_identity_key: string; source_type: string; internal_source_id: string }>;
+    }>("claim_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      production_date: "2099-01-02",
+      timezone: "America/New_York",
+      fresh_draw: true,
+    });
+
+    expect(first.items).toHaveLength(4);
+    expect(first.items.map((item) => item.item_number)).toEqual([1, 2, 3, 4]);
+    expect(new Set(first.items.map((item) => item.source_identity_key)).size).toBe(4);
+
+    mcpSelectedKey = null;
+    mcpProceedConfirmed = false;
+    mcpContinuityLoaded = false;
+    await ensureMcpAccountOpen("manifest_mental");
+    const restored = await mcpTool<{
+      review_batch_id: string;
+      items: Array<{ item_number: number; source_identity_key: string }>;
+    }>("get_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      production_date: "2099-01-02",
+    });
+    expect(restored.review_batch_id).toBe(first.review_batch_id);
+    expect(restored.items.map((item) => item.source_identity_key)).toEqual(first.items.map((item) => item.source_identity_key));
+
+    for (const item of first.items) {
+      await operatorTool("skip_manifest_review_source", {
+        brand_key: "manifest_mental",
+        review_batch_id: first.review_batch_id,
+        item_number: item.item_number,
+        scope: "current_day",
+        reason: "Fixture moves to the next source set.",
+      });
+    }
+
+    const second = await operatorTool<{
+      review_batch_id: string;
+      items: Array<{ item_number: number; source_identity_key: string; source_type: string; internal_source_id: string }>;
+    }>("claim_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      production_date: "2099-01-02",
+      timezone: "America/New_York",
+    });
+    expect(second.items).toHaveLength(4);
+    const firstIdentities = new Set(first.items.map((item) => item.source_identity_key));
+    expect(second.items.every((item) => !firstIdentities.has(item.source_identity_key))).toBe(true);
+
+    const deletedItem = second.items[0];
+    expect(deletedItem.source_type).toBe("saved_pattern");
+    await operatorTool("skip_manifest_review_source", {
+      brand_key: "manifest_mental",
+      review_batch_id: second.review_batch_id,
+      item_number: deletedItem.item_number,
+      scope: "delete_source",
+      reason: "Delete this Saved Pattern as a future source while preserving its data.",
+    });
+    const preservedPattern = await env.DB.prepare(
+      `SELECT id FROM external_patterns WHERE id = ? LIMIT 1`,
+    ).bind(Number(deletedItem.internal_source_id)).first<{ id: number }>();
+    const exclusion = await env.DB.prepare(
+      `SELECT active FROM operator_source_exclusions
+       WHERE brand_key = 'manifest_mental' AND source_identity_key = ? LIMIT 1`,
+    ).bind(deletedItem.source_identity_key).first<{ active: number }>();
+    expect(preservedPattern?.id).toBe(Number(deletedItem.internal_source_id));
+    expect(Number(exclusion?.active ?? 0)).toBe(1);
+
+    const claimCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total, COUNT(DISTINCT source_identity_key) AS unique_total
+       FROM operator_daily_source_claims
+       WHERE brand_key = 'manifest_mental' AND production_date = '2099-01-02'`,
+    ).first<{ total: number; unique_total: number }>();
+    expect(Number(claimCount?.total ?? 0)).toBe(Number(claimCount?.unique_total ?? 0));
+  }, 60000);
+
   it("deploys and rolls back runtime MCP config snapshots", async () => {
     const deployment = await mcpTool<{ deployment_id: string; version: number }>("deployMcpChanges", {
       change_summary: "vitest runtime snapshot",
