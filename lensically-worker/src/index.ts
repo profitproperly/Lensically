@@ -397,9 +397,10 @@ const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
 } as const;
 
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
-  version: "operator-owner-interaction-v3",
+  version: "operator-owner-interaction-v4",
   owner_visible_checkpoints: [
     "initial_key_proceed",
+    "post_handshake_continuation_choice",
     "source_card_review",
     "draft_review_and_decision",
     "scheduling_confirmation",
