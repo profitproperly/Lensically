@@ -7726,7 +7726,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-    if (toolName === "list_source_candidates") {
+        if (toolName === "list_source_candidates") {
     const sourceTypes = Array.isArray(payload.source_types)
       ? payload.source_types.map((value) => String(value))
       : [];
@@ -7739,6 +7739,111 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       total_count: totalCount,
       has_more: offset + candidates.length < totalCount,
       eligibility_min_likes: brand.brand_key === "manifest_mental" ? MANIFEST_SOURCE_MIN_VERIFIED_LIKES : null,
+    });
+  }
+
+  if (toolName === "delete_saved_pattern_source") {
+    const patternId = Math.trunc(Number(payload.pattern_id ?? 0));
+    const ownerApproval = normalizeOperatorText(payload.owner_approval, 500, true) ?? "";
+    if (!Number.isInteger(patternId) || patternId <= 0 || !/delete/i.test(ownerApproval)) {
+      return operatorJsonResponse({ success: false, error: "pattern_id and explicit owner_approval containing delete are required" }, 400);
+    }
+
+    const pattern = await env.DB.prepare(
+      `SELECT id
+       FROM external_patterns
+       WHERE id = ?
+         AND app_user_id = ?
+         AND account_id = ?
+       LIMIT 1`,
+    ).bind(patternId, SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ id: number }>();
+
+    if (!pattern) {
+      return operatorJsonResponse({ deleted_pattern_count: 0, deleted_source_card_count: 0, unlinked_selection_count: 0, status: "not_found" });
+    }
+
+    const selectionRows = await env.DB.prepare(
+      `SELECT id, source_card_id
+       FROM operator_source_selections
+       WHERE brand_key = ?
+         AND source_type = 'saved_pattern'
+         AND internal_source_id = ?`,
+    ).bind(brand.brand_key, String(patternId)).all<{ id: string; source_card_id: string | null }>();
+
+    const requestedSourceCardId = normalizeOperatorText(payload.source_card_id, 120, true);
+    const sourceCardIds = Array.from(new Set([
+      requestedSourceCardId,
+      ...(selectionRows.results ?? []).map((row) => row.source_card_id),
+    ].filter((value): value is string => Boolean(value))));
+
+    let deletedSourceCardCount = 0;
+    let unlinkedSelectionCount = 0;
+    for (const sourceCardId of sourceCardIds) {
+      const card = await env.DB.prepare(
+        `SELECT id, status, family_id
+         FROM operator_source_cards
+         WHERE id = ?
+           AND brand_key = ?
+         LIMIT 1`,
+      ).bind(sourceCardId, brand.brand_key).first<{ id: string; status: string; family_id: string | null }>();
+      if (!card) {
+        continue;
+      }
+      const runCount = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM gpt_generation_runs
+         WHERE account_id = ?
+           AND source_card_id = ?`,
+      ).bind(brand.account_id, sourceCardId).first<{ total: number }>();
+      if (card.status !== "draft" || Number(runCount?.total ?? 0) > 0) {
+        return operatorJsonResponse({ success: false, error: "source_card_not_disposable", source_card_id: sourceCardId, status: card.status }, 409);
+      }
+
+      const unlinked = await env.DB.prepare(
+        `UPDATE operator_source_selections
+         SET source_card_id = NULL
+         WHERE brand_key = ?
+           AND source_card_id = ?`,
+      ).bind(brand.brand_key, sourceCardId).run();
+      unlinkedSelectionCount += Number(unlinked.meta.changes ?? 0);
+
+      await env.DB.prepare(
+        `UPDATE operator_workflow_sessions
+         SET active_source_card_id = NULL,
+             active_generation_run_id = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE brand_key = ?
+           AND active_source_card_id = ?`,
+      ).bind(brand.brand_key, sourceCardId).run();
+      await env.DB.prepare(`DELETE FROM operator_gate_results WHERE source_card_id = ?`).bind(sourceCardId).run();
+      await env.DB.prepare(`DELETE FROM operator_content_inventory WHERE source_card_id = ?`).bind(sourceCardId).run();
+      const removed = await env.DB.prepare(
+        `DELETE FROM operator_source_cards
+         WHERE id = ?
+           AND brand_key = ?
+           AND status = 'draft'`,
+      ).bind(sourceCardId, brand.brand_key).run();
+      deletedSourceCardCount += Number(removed.meta.changes ?? 0);
+
+      if (card.family_id) {
+        const remaining = await env.DB.prepare(
+          `SELECT COUNT(*) AS total
+           FROM operator_source_cards
+           WHERE family_id = ?`,
+        ).bind(card.family_id).first<{ total: number }>();
+        if (Number(remaining?.total ?? 0) === 0) {
+          await env.DB.prepare(`DELETE FROM operator_source_card_families WHERE id = ?`).bind(card.family_id).run();
+        }
+      }
+    }
+
+    const deletedPatternCount = await deleteExternalPatterns(env, SAVED_PATTERNS_APP_USER_ID, brand.account_id, [patternId]);
+    return operatorJsonResponse({
+      status: "deleted",
+      pattern_id: patternId,
+      deleted_pattern_count: deletedPatternCount,
+      deleted_source_card_count: deletedSourceCardCount,
+      unlinked_selection_count: unlinkedSelectionCount,
     });
   }
 
