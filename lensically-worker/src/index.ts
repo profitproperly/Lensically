@@ -12462,7 +12462,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 20);
     const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
     if (prefix) searchTerms.push(`path:${prefix}`);
-    const codeSearch = await githubRepoApi(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
+        const codeSearch = await githubApi(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
     if (codeSearch.ok && codeSearch.data && typeof codeSearch.data === "object" && !Array.isArray(codeSearch.data)) {
       const items = Array.isArray((codeSearch.data as Record<string, unknown>).items)
         ? (codeSearch.data as Record<string, unknown>).items as Array<Record<string, unknown>>
