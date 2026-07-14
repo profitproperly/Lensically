@@ -11829,7 +11829,12 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-            await createOperatorContinuityReference(env, {
+                await env.DB.prepare(
+      `UPDATE operator_continuity_refs
+       SET expires_at = 0
+       WHERE brand_key = ? AND kind IN ('continuation_nonce', 'continuity_context')`,
+    ).bind(brandKey).run();
+    await createOperatorContinuityReference(env, {
       kind: "continuation_nonce",
       brandKey,
       ttlSeconds: OPERATOR_CONTINUATION_NONCE_TTL_SECONDS,
