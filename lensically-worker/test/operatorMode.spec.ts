@@ -1787,13 +1787,16 @@ describe("operator mode MCP endpoint", () => {
     for (const name of ["mm_get_account_state", "om_get_account_state", "vx_get_account_state"]) {
       expect(toolNames).not.toContain(name);
     }
-    const manifestBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "mm_get_account_state", arguments: { proceed_confirmed: true } });
+    await ensureMcpAccountOpen("manifest_mental");
+    const manifestBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "mm_get_account_state", arguments: { proceed_confirmed: true, continuity_token: mcpContinuityToken } });
     const manifest = manifestBridge.result;
     expect(manifest.brand_key).toBe("manifest_mental");
-    const opmgBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "om_get_account_state", arguments: { proceed_confirmed: true } });
+    await ensureMcpAccountOpen("opmg_deadman");
+    const opmgBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "om_get_account_state", arguments: { proceed_confirmed: true, continuity_token: mcpContinuityToken } });
     const opmg = opmgBridge.result;
     expect(opmg.brand_key).toBe("opmg_deadman");
-    const vectrixBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "vx_get_account_state", arguments: { proceed_confirmed: true } });
+    await ensureMcpAccountOpen("vectrix");
+    const vectrixBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "vx_get_account_state", arguments: { proceed_confirmed: true, continuity_token: mcpContinuityToken } });
     const vectrix = vectrixBridge.result;
     expect(vectrix.brand_key).toBe("vectrix");
   }, 30000);
