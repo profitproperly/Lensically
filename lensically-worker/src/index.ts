@@ -454,16 +454,16 @@ const OPERATOR_EXECUTION_POLICY_CONTRACT = {
 } as const;
 
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
-  version: "operator-owner-interaction-v5",
+  version: "operator-owner-interaction-v6",
 
   owner_visible_checkpoints: [
     "initial_key_proceed",
-    "post_handshake_continuation_choice",
-    "source_card_review",
-    "draft_review_and_decision",
-    "scheduling_confirmation",
+    "calendar_coverage_confirmation",
+    "four_post_review_batch",
+    "confirmed_scheduling_report",
+    "day_completion_confirmation",
   ],
-  silent_stages: ["generation_run_and_candidates", "gate_evaluation"],
+  silent_stages: ["context_admission", "source_selection", "source_card", "review_batch_generation", "generation_run_and_candidates", "gate_evaluation"],
   transition_label_contract: {
     required_labels: ["Completed:", "Showing now:", "Next decision:"],
     instruction: "At every owner-visible transition, briefly state what action completed, identify the exact artifact currently being shown, and name the next owner decision. Never make the owner infer whether the content is a source card, generated post, scheduling confirmation, or completion report.",
