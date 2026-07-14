@@ -10796,7 +10796,23 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       proceeded: true,
       proceed_confirmed: true,
       account_data_loaded: false,
-      next_call_requirement: { proceed_confirmed: true },
+      continuation_choice_required: true,
+      continuation_choices: ["resume_existing_workflow", "start_fresh_workflow"],
+      next_owner_prompt: "Would you like to pick up where the existing workflow left off, or start fresh?",
+      before_continuation_choice_forbidden: [
+        "getWorkflowStatus",
+        "get_account_state",
+        "prepareFullPreflight",
+        "start_workflow_session",
+        "source_card_reads_or_writes",
+        "generation_or_draft_work",
+        "scheduling_work",
+      ],
+      continuation_behavior: {
+        resume_existing_workflow: "Load the persisted workflow and continue from its exact checkpoint without redrawing, restarting, or duplicating work.",
+        start_fresh_workflow: "Create a new workflow session while preserving the previous session and artifacts unless deletion is separately requested.",
+      },
+      next_call_requirement: { proceed_confirmed: true, explicit_continuation_choice: true },
     };
   }
 
