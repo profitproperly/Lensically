@@ -11000,6 +11000,59 @@ async function verifyOperatorContinuityToken(
   return payload;
 }
 
+async function createOperatorContinuityReference(
+  env: Env,
+  input: {
+    kind: "continuation_nonce" | "continuity_context";
+    brandKey: GptBrandKey;
+    workflowSessionId?: string | null;
+    continuationChoice?: OperatorContinuationChoice | null;
+    payload?: Record<string, unknown>;
+    ttlSeconds: number;
+  },
+): Promise<string> {
+  await ensureOperatorWorkflowTables(env);
+  const id = crypto.randomUUID();
+  const expiresAt = Math.floor(Date.now() / 1000) + input.ttlSeconds;
+  await env.DB.prepare(
+    `INSERT INTO operator_continuity_refs (
+      id, kind, brand_key, workflow_session_id, continuation_choice, payload_json, expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id,
+    input.kind,
+    input.brandKey,
+    input.workflowSessionId ?? null,
+    input.continuationChoice ?? null,
+    normalizeOperatorJson(input.payload ?? {}, {}),
+    expiresAt,
+  ).run();
+  return id;
+}
+
+async function readOperatorContinuityReference(
+  env: Env,
+  reference: unknown,
+  kind: "continuation_nonce" | "continuity_context",
+  brandKey: GptBrandKey | null,
+): Promise<Record<string, unknown> | null> {
+  const id = normalizeOperatorText(reference, 120, true);
+  if (!id) return null;
+  await ensureOperatorWorkflowTables(env);
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_continuity_refs
+     WHERE id = ? AND kind = ? AND expires_at >= ?
+     LIMIT 1`,
+  ).bind(id, kind, Math.floor(Date.now() / 1000)).first<Record<string, unknown>>();
+  if (!row || (brandKey && row.brand_key !== brandKey)) return null;
+  const payload = safeParseJsonString(String(row.payload_json ?? "{}"));
+  return {
+    ...row,
+    ...(payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {}),
+  };
+}
+
+
 function operatorChangeScope(changeDescription: unknown, intendedTool: string): { scope: "universal" | "account_scoped"; reason: string } {
   const text = `${typeof changeDescription === "string" ? changeDescription : ""} ${intendedTool}`.toLowerCase();
   const universalSignals = [
