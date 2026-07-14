@@ -434,8 +434,12 @@ describe("operator mode backend spine", () => {
       brand_key: "manifest_mental",
       source_card_id: card.source_card_id,
     });
-    expect(storedCard.source_card.primary_source.source_selection_id).toBe(first.source_selection_id);
+        expect(storedCard.source_card.primary_source.source_selection_id).toBe(first.source_selection_id);
     expect(storedCard.source_card.metrics_snapshot.likes).toBe(first.metrics_snapshot.likes);
+    expect(storedCard.owner_presentation.version).toBe("source-card-owner-presentation-v1");
+    expect(storedCard.owner_presentation.account_scope).toBe("manifest_mental");
+    expect(storedCard.owner_presentation.prohibited_owner_headings).toEqual(expect.arrayContaining(["Must preserve", "Pass conditions"]));
+    expect(storedCard.owner_presentation.manifest_mental_sections).toEqual(expect.arrayContaining(["Why the source works", "Generation freedom"]));
 
     const duplicateResponse = await fetchFromWorker("/api/operator/tools/create_source_card", {
       method: "POST",
