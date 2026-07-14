@@ -10428,11 +10428,12 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-    "Try the direct MCP tool first.",
-    "If a direct engineering tool is not callable, use runEngineeringTool with { tool_name, arguments }.",
-    "If runEngineeringTool is unavailable or fails, use listMcpTools with { execute_tool, arguments }.",
-    "For account-scoped operator reads after explicit proceed, prefer the account-specific wrapper when applicable.",
-    "Do not treat one failed route as a full Lensically outage; inspect structured errors and try the next route.",
+    "Classify the intended operation with operator-execution-policy-v1 before the first tool call.",
+    "Use the canonical execution plane returned by policy: engineering_control for repository/tests/deploys, operator_account for account workflow, and operator_control for universal MCP administration.",
+    "Do not hop between direct, runEngineeringTool, and listMcpTools when they target the same backend handler; they are aliases, not independent recovery routes.",
+    "Repository searches must use bounded GitHub code search with no per-file fan-out. Read a named file with line bounds after search identifies it.",
+    "Use the independent Lensically Recovery plane first only for main-MCP health, large-file repair, or deployment-plane failure; do not wait for repeated same-backend failures.",
+    "Never repeat a deterministic failed call with identical inputs. Change the route or input only when policy identifies a genuinely independent safe path.",
   ];
 }
 
