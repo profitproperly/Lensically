@@ -497,8 +497,7 @@ describe("operator mode backend spine", () => {
       opening_phrase: "If your finger touched this",
       realm_entrance_key: "finger_touch",
       preserved_functions: ["Physical contact with the post acts as personal selection."],
-      transformed_elements: ["payoff", "closing"],
-      satisfied_time_or_context_requirements: ["A named month or near-term time boundary is present."],
+            satisfied_time_or_context_requirements: ["A named month or near-term time boundary is present."],
       audience_reward_delivered: true,
     };
     const passing = await operatorTool<{ showable: boolean; gate_results: Array<{ gate_key: string; result: string }> }>("submit_candidate_draft", {
