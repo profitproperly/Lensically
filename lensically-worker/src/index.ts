@@ -12846,7 +12846,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         && allowed.status < 400
         && boundaryTest.blocked_before_proceed
         && boundaryTest.proceed_confirmed
-                && boundaryTest.continuation_ref_issued
+                        && boundaryTest.proceed_confirmation_recorded
         && boundaryTest.continuity_required_after_proceed
         && boundaryTest.continuity_resolved
         && boundaryTest.allowed_after_continuity,
