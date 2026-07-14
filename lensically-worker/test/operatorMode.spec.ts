@@ -653,12 +653,28 @@ describe("operator mode backend spine", () => {
        FROM sequence`,
     ).bind(first.runId, runOwner?.account_id, runOwner?.threads_user_id, oversizedStrategy).run();
 
-    const second = await createLockedSourceCard();
+        const second = await createLockedSourceCard();
+    let latestRunId = second.runId;
+    for (let index = 1; index <= 6; index += 1) {
+      const nextRun = await operatorTool<{ run_id: string }>("create_generation_run", {
+        brand_key: BRAND_KEY,
+        source_card_id: second.sourceCardId,
+        adaptation_plan: {
+          adaptation_goal: `Bounded repair run ${index}.`,
+          transformed_elements: [`payoff-${index}`],
+          intentionally_different_from_prior: `Flat repair variation ${index}.`,
+        },
+        prompt_summary: `Compact repeated source-card run ${index}.`,
+      });
+      latestRunId = nextRun.run_id;
+    }
+
     const persistedRun = await env.DB.prepare(
       `SELECT prior_adaptation_context_json FROM gpt_generation_runs WHERE id = ? LIMIT 1`,
-    ).bind(second.runId).first<{ prior_adaptation_context_json: string }>();
+    ).bind(latestRunId).first<{ prior_adaptation_context_json: string }>();
     const serialized = String(persistedRun?.prior_adaptation_context_json ?? "{}");
     const persistedContext = JSON.parse(serialized) as {
+      prior_runs?: Array<Record<string, unknown>>;
       account_rejection_context?: {
         coverage_complete?: boolean;
         required_review_count?: number;
@@ -671,8 +687,10 @@ describe("operator mode backend spine", () => {
     expect(rejectionContext?.required_review_count).toBe(120);
     expect(rejectionContext?.explicit_banned_surfaces).toContain("oversized_token");
     expect(rejectionContext?.rejected_drafts?.[0]).not.toHaveProperty("strategy");
+    expect(persistedContext.prior_runs?.length).toBe(7);
+    expect(persistedContext.prior_runs?.every((run) => !("prior_adaptation_context" in run))).toBe(true);
     expect(serialized.length).toBeLessThan(500000);
-  }, 30000);
+  }, 60000);
 
   it("preserves a Saved Pattern ID across Threads URL and username changes", async () => {
 
