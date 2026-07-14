@@ -1531,8 +1531,9 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.runtime.mcp_version).toBe("1.3.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
-    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("runEngineeringTool");
-    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("listMcpTools");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("canonical execution plane");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("aliases, not independent recovery routes");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("bounded GitHub code search");
     expect(direct.boundary.before_proceed_forbidden).toEqual(expect.arrayContaining(["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"]));
     expect(direct.boundary.after_explicit_proceed).toContain("resume the persisted workflow or start fresh");
     expect(direct.boundary.after_explicit_proceed).toContain("Do not load account/workflow state until the owner explicitly chooses");
