@@ -9235,6 +9235,20 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!draft || !date || !time) {
       return operatorJsonResponse({ success: false, error: "draft_id, date, and time are required" }, 400);
     }
+    if ((draft.status === "scheduled" || draft.status === "published") && draft.scheduled_post_id) {
+      const existingScheduled = await env.DB.prepare(
+        `SELECT id, post_text, status, scheduled_time, published_post_id
+         FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+      ).bind(Number(draft.scheduled_post_id), brand.profile.threads_user_id).first<Record<string, unknown>>();
+      return operatorJsonResponse({
+        scheduled_post_id: Number(draft.scheduled_post_id),
+        draft_id: draftId,
+        status: draft.status,
+        scheduled_post: existingScheduled,
+        reused_existing: true,
+        idempotency_reason: "draft_already_scheduled",
+      });
+    }
     const gateRun = await runOperatorGates(env, {
       brand,
       draftId,
