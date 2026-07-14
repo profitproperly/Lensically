@@ -12852,7 +12852,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         && boundaryTest.allowed_after_continuity,
       status: response.status,
       initialize: payload?.result ?? null,
-            transport_mode: "opaque_continuity_reference",
+                  transport_mode: "server_side_continuity_state",
       live_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
       boundary_test: boundaryTest,
     };
