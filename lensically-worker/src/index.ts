@@ -11452,7 +11452,10 @@ async function getOperatorMcpBoundaryBlock(
       message: "Wait for explicit user approval, call confirmOperatorProceed for the selected key, then retry with proceed_confirmed=true. Account data was not loaded.",
     };
   }
-  if (toolName === "resolveContinuationContext") {
+  const effectiveToolName = toolName === "listMcpTools"
+    ? normalizeOperatorText(args.execute_tool, 160, true) ?? toolName
+    : toolName;
+  if (effectiveToolName === "resolveContinuationContext") {
     return null;
   }
   const continuity = await verifyOperatorContinuityToken(env, operatorMcpContinuityToken(toolName, args), requestedBrand);
