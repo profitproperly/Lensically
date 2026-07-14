@@ -427,6 +427,31 @@ const OPERATOR_CONTINUITY_CONTRACT = {
   rule: "A fresh chat must resume from canonical persisted state and may not reconstruct workflow position from conversation memory.",
 } as const;
 
+const OPERATOR_EXECUTION_POLICY_CONTRACT = {
+  version: OPERATOR_EXECUTION_POLICY_VERSION,
+  scope: "universal",
+  authority_order: [
+    "backend enforcement",
+    "canonical workflow state",
+    "execution policy",
+    "MCP contract",
+    "database configuration",
+    "startup documentation",
+    "supporting memory",
+    "conversation context",
+  ],
+  execution_planes: {
+    engineering_control: "Repository reads/searches/patches, tests, deploys, runtime verification, and engineering audit.",
+    operator_control: "Universal MCP schemas, workflow requirements, routing policy, gates, continuity, and infrastructure administration.",
+    operator_account: "Selected-account workflow state, sources, source cards, generation, drafts, scheduling, and results.",
+    independent_recovery: "Main-MCP health, large-file repair, deployment-plane failure, and break-glass restoration.",
+  },
+  known_failure_rule: "A diagnosed failure with an available prevention policy is a regression and must be blocked before execution.",
+  alias_rule: "Direct tools and wrappers that reach the same backend are aliases, not fallback routes.",
+  scope_rule: "Infrastructure, transport, continuity, workflow, MCP, schema, idempotency, and regression changes default universal; selected-account creative or strategy changes remain account scoped.",
+  memory_rule: "Memory records rationale and history but cannot authorize or enforce a required workflow behavior.",
+} as const;
+
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
   version: "operator-owner-interaction-v5",
 
