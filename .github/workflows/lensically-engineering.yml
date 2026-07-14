@@ -58,6 +58,11 @@ jobs:
         working-directory: lensically-recovery-worker
         run: npm ci
 
+      - name: Typecheck recovery worker
+        if: ${{ inputs.task == 'worker-deploy' }}
+        working-directory: lensically-recovery-worker
+        run: npx tsc --noEmit
+
       - name: Deploy recovery worker
         if: ${{ inputs.task == 'worker-deploy' }}
         working-directory: lensically-recovery-worker
