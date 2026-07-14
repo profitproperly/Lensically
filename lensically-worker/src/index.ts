@@ -8915,6 +8915,26 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!runId || !sourceCardId || !text) {
       return operatorJsonResponse({ success: false, error: "run_id, source_card_id, and text are required" }, 400);
     }
+    const existingDraft = await env.DB.prepare(
+      `SELECT * FROM gpt_generation_drafts
+       WHERE account_id = ? AND run_id = ? AND source_card_id = ? AND text = ?
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).bind(brand.account_id, runId, sourceCardId, text).first<Record<string, unknown>>();
+    if (existingDraft?.id) {
+      const gateSummary = safeParseJsonString(String(existingDraft.gate_summary_json ?? "{}"));
+      const gateRecord = gateSummary && typeof gateSummary === "object" && !Array.isArray(gateSummary)
+        ? gateSummary as Record<string, unknown>
+        : {};
+      return operatorJsonResponse({
+        draft_id: existingDraft.id,
+        status: existingDraft.status,
+        showable: Number(existingDraft.showable ?? 0) === 1,
+        gate_results: Array.isArray(gateRecord.gate_results) ? gateRecord.gate_results : [],
+        blocking_failures: Array.isArray(gateRecord.blocking_failures) ? gateRecord.blocking_failures : [],
+        reused_existing: true,
+        idempotency_reason: "identical_run_draft_already_exists",
+      });
+    }
         const existingDraftCount = await countGenerationDraftsForRun(env, brand.account_id, runId, sourceCardId);
     if (existingDraftCount >= 2) {
       return operatorJsonResponse({
