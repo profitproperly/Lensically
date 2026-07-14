@@ -81,36 +81,34 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey }>("selectOperatorKey", { brand_key: brandKey });
     expect(selected.isError).not.toBe(true);
     expect(selected.structuredContent.selected_key).toBe(brandKey);
-        mcpSelectedKey = brandKey;
+    mcpSelectedKey = brandKey;
     mcpProceedConfirmed = false;
-    mcpContinuationRef = null;
-    mcpContinuityRef = null;
+    mcpContinuityLoaded = false;
   }
   if (!mcpProceedConfirmed) {
-    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuation_ref: string; continuation_choice_required: boolean; continuation_choices: string[]; next_owner_prompt: string; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
+    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuation_confirmation_recorded: boolean; continuation_choice_required: boolean; continuation_choices: string[]; next_owner_prompt: string; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.proceeded).toBe(true);
     expect(proceeded.structuredContent.account_data_loaded).toBe(false);
-    expect(proceeded.structuredContent.continuation_ref).toBeTruthy();
+    expect(proceeded.structuredContent.continuation_confirmation_recorded).toBe(true);
     expect(proceeded.structuredContent.continuation_choice_required).toBe(true);
     expect(proceeded.structuredContent.continuation_choices).toEqual(["resume_existing_workflow", "start_fresh_workflow"]);
     expect(proceeded.structuredContent.next_owner_prompt).toContain("pick up where the existing workflow left off");
-    mcpContinuationRef = proceeded.structuredContent.continuation_ref;
     mcpProceedConfirmed = true;
   }
-  if (!mcpContinuityRef) {
-    const continued = await mcpToolRaw<{ continuity_ref: string; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
+  if (!mcpContinuityLoaded) {
+    const continued = await mcpToolRaw<{ continuity_loaded: boolean; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
       brand_key: brandKey,
       proceed_confirmed: true,
       continuation_choice: "resume_existing_workflow",
-      continuation_ref: mcpContinuationRef,
     });
     expect(continued.isError).not.toBe(true);
-    expect(continued.structuredContent.continuity_ref).toBeTruthy();
+    expect(continued.structuredContent.continuity_loaded).toBe(true);
     expect(continued.structuredContent.continuity_capsule.brand_key).toBe(brandKey);
-    mcpContinuityRef = continued.structuredContent.continuity_ref;
+    mcpContinuityLoaded = true;
   }
 }
+
 
 async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
   const requestedBrand = testRequestedBrandKey(toolName, args);
