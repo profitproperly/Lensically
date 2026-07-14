@@ -2079,7 +2079,7 @@ describe("operator mode MCP endpoint", () => {
 
     const blocked = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string; blockers?: Array<Record<string, unknown>> }; isError?: boolean }>("tools/call", {
       name: "advanceWorkflowStage",
-            arguments: { brand_key: BRAND_KEY, workflow_session_id: session.workflow_session_id, target_stage: "context_admission", proceed_confirmed: true, continuity_token: mcpContinuityToken },
+                        arguments: { brand_key: BRAND_KEY, workflow_session_id: session.workflow_session_id, target_stage: "context_admission", proceed_confirmed: true, continuity_ref: mcpContinuityRef },
     });
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent.error).toBe("workflow_stage_blocked");
