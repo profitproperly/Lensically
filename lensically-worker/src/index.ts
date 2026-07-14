@@ -10203,10 +10203,10 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       type: "boolean",
       description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
     };
-        if (tool.name !== "resolveContinuationContext") {
-      properties.continuity_ref = {
-        type: "string",
-        description: "Opaque UUID returned by resolveContinuationContext. Required on every later account-scoped call so a fresh chat cannot skip canonical continuity loading.",
+            if (tool.name !== "resolveContinuationContext") {
+      properties.continuity_loaded = {
+        type: "boolean",
+        description: "Set true only after resolveContinuationContext succeeds. The backend verifies current server-side continuity state for the selected brand; no generated handle is passed between tools.",
       };
     }
 
