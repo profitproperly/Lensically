@@ -278,10 +278,12 @@ const OPERATOR_WORKFLOW_TEMPLATE_KEY = "content_operator_v1";
 const OPERATOR_WORKFLOW_STAGES = [
   "account_selection",
   "context_admission",
+  "calendar_coverage",
   "growth_context_review",
   "production_board",
   "source_selection",
   "source_card",
+  "review_batch_generation",
   "generation_run_and_candidates",
   "gate_evaluation",
   "owner_review_and_decision",
