@@ -7703,14 +7703,22 @@ async function buildOperatorContinuityCapsule(
        FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
     ).bind(Number(draft.scheduled_post_id), brand.profile.threads_user_id).first<Record<string, unknown>>()
     : null;
-  const completedSources = sessionId
+    const completedSources = sessionId && sourceBatch?.id
     ? await env.DB.prepare(
-      `SELECT COUNT(DISTINCT d.source_card_id) AS total
-       FROM gpt_generation_drafts d
-       JOIN operator_source_cards c ON c.id = d.source_card_id
-       WHERE c.brand_key = ? AND c.workflow_session_id = ?
-         AND d.status IN ('scheduled', 'published')`,
-    ).bind(brand.brand_key, sessionId).first<{ total: number }>()
+      `SELECT COUNT(DISTINCT c.id) AS total
+       FROM operator_source_cards c
+       JOIN operator_source_selections s
+         ON s.source_card_id = c.id
+        AND s.batch_id = ?
+       WHERE c.brand_key = ?
+         AND c.workflow_session_id = ?
+         AND c.is_current = 1
+         AND EXISTS (
+           SELECT 1 FROM gpt_generation_drafts d
+           WHERE d.source_card_id = c.id
+             AND d.status IN ('scheduled', 'published')
+         )`,
+    ).bind(String(sourceBatch.id), brand.brand_key, sessionId).first<{ total: number }>()
     : null;
   const next = operatorContinuationNextAction({ session, sourceBatch, nextSelection, sourceCard, draft, scheduledPost });
   const nextArtifactId = String(nextSelection?.id ?? draft?.id ?? sourceCard?.id ?? sourceBatch?.id ?? sessionId ?? "none");
