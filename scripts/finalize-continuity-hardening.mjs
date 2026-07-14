@@ -6,7 +6,6 @@ const root = process.cwd();
 const indexPath = path.join(root, "lensically-worker", "src", "index.ts");
 const testPath = path.join(root, "lensically-worker", "test", "operatorMode.spec.ts");
 const workflowPath = path.join(root, ".github", "workflows", "lensically-engineering.yml");
-const selfPath = fileURLToPath(import.meta.url);
 
 function replaceLiteralOnce(source, find, replacement, label) {
   const count = source.split(find).length - 1;
