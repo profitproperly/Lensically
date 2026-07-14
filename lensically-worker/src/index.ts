@@ -11858,10 +11858,10 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     if (!brandKey || !choice) {
       return { ok: false, error: "brand_key_and_continuation_choice_required", account_data_loaded: false };
     }
-        const continuationReference = await readOperatorContinuityReference(env, args.continuation_ref, "continuation_nonce", brandKey);
-    const legacyNonce = continuationReference ? null : await verifyOperatorContinuationNonce(env, args.continuation_nonce, brandKey);
-    if (!continuationReference && !legacyNonce) {
-      return { ok: false, error: "invalid_or_expired_continuation_reference", account_data_loaded: false, required_next_tool: "confirmOperatorProceed" };
+            const serverConfirmation = await readLatestOperatorContinuityState(env, "continuation_nonce", brandKey);
+    const legacyNonce = serverConfirmation ? null : await verifyOperatorContinuationNonce(env, args.continuation_nonce, brandKey);
+    if (!serverConfirmation && !legacyNonce) {
+      return { ok: false, error: "proceed_confirmation_missing_or_expired", account_data_loaded: false, required_next_tool: "confirmOperatorProceed" };
     }
     const brand = await resolveGptBrand(env, brandKey);
     if (!brand) {
