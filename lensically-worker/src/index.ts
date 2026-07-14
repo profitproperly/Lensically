@@ -408,26 +408,24 @@ const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
 const OPERATOR_CONTINUITY_CONTRACT = {
   version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
   scope: "universal",
-      source_of_truth: "canonical database state plus server-side continuity state",
+  source_of_truth: "canonical database state plus server-side continuity state",
   required_sequence: [
     "getOperatorStartupContext",
     "selectOperatorKey",
-    "confirmOperatorProceed",
-    "explicit resume-or-start-fresh owner choice",
-    "resolveContinuationContext",
-            "server-side continuity verification on every later account-scoped call",
+    "confirmOperatorProceed_and_auto_resolve_canonical_continuity",
+    "server-side continuity verification on every later account-scoped call",
   ],
   capsule_sections: [
     "workflow_checkpoint",
-    "last_completed_action",
-    "next_pending_action",
+    "calendar_coverage",
+    "active_review_batch",
     "active_artifact_ids",
     "source_batch_progress",
     "runtime_identity",
     "execution_policy",
     "idempotency",
   ],
-  rule: "A fresh chat must resume from canonical persisted state and may not reconstruct workflow position from conversation memory.",
+  rule: "A fresh chat automatically resumes canonical persisted schedule and production state after the four-line handshake is approved. It must never ask the owner to choose resume or start fresh, and it may not reconstruct workflow position from conversation memory.",
 } as const;
 
 const OPERATOR_EXECUTION_POLICY_CONTRACT = {
