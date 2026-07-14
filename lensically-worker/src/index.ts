@@ -12611,11 +12611,79 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
+      await prepareOperatorMode(env);
+      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);
+      await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
+      const idempotencyKey = await operatorIdempotencyKey(toolName, args);
+      let receiptFingerprint: string | null = null;
+      if (idempotencyKey) {
+        const receipt = await beginOperatorOperationReceipt(env, idempotencyKey, toolName, args);
+        receiptFingerprint = receipt.fingerprint;
+        if (receipt.existing?.status === "completed" && receipt.existing.result_json) {
+          const replayed = safeParseJsonString(String(receipt.existing.result_json));
+          const resultPayload = replayed && typeof replayed === "object" && !Array.isArray(replayed)
+            ? replayed as Record<string, unknown>
+            : { ok: false, error: "idempotency_receipt_parse_failed" };
+          resultPayload.execution_policy = executionPolicy;
+          resultPayload.idempotency = {
+            version: OPERATOR_IDEMPOTENCY_VERSION,
+            key: idempotencyKey,
+            replayed: true,
+            request_fingerprint: receiptFingerprint,
+          };
+          const isError = resultPayload.ok === false;
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: resultPayload,
+              content: [{ type: "text", text: isError ? `Lensically Operator Mode replayed failed operation ${toolName}.` : `Lensically Operator Mode replayed completed operation ${toolName}.` }],
+              isError,
+            },
+          });
+        }
+        if (receipt.existing?.status === "started") {
+          const startedAt = Date.parse(String(receipt.existing.created_at ?? ""));
+          if (Number.isFinite(startedAt) && Date.now() - startedAt < 120000) {
+            const resultPayload = {
+              ok: false,
+              error: "operation_already_in_progress",
+              retryable_after_seconds: 120,
+              idempotency: {
+                version: OPERATOR_IDEMPOTENCY_VERSION,
+                key: idempotencyKey,
+                replayed: false,
+                request_fingerprint: receiptFingerprint,
+              },
+              execution_policy: executionPolicy,
+            };
+            return mcpJsonResponse({
+              jsonrpc: "2.0",
+              id: id ?? null,
+              result: {
+                structuredContent: resultPayload,
+                content: [{ type: "text", text: `Lensically Operator Mode operation ${toolName} is already in progress.` }],
+                isError: true,
+              },
+            });
+          }
+        }
+      }
       const resultPayload = isOperatorMcpEngineeringToolName(toolName)
         ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
         : isOperatorMcpAdminToolName(toolName)
           ? await handleOperatorMcpAdminTool(request, env, toolName, args)
           : await callOperatorToolForMcp(request, env, toolName, args);
+      resultPayload.execution_policy = executionPolicy;
+      if (idempotencyKey) {
+        resultPayload.idempotency = {
+          version: OPERATOR_IDEMPOTENCY_VERSION,
+          key: idempotencyKey,
+          replayed: false,
+          request_fingerprint: receiptFingerprint,
+        };
+        await completeOperatorOperationReceipt(env, idempotencyKey, resultPayload);
+      }
       const isError = resultPayload.ok === false;
       return mcpJsonResponse({
         jsonrpc: "2.0",
