@@ -360,7 +360,7 @@ const OPERATOR_COLLABORATION_CONTRACT = {
 };
 
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
-  version: "operator-owner-interaction-v1",
+  version: "operator-owner-interaction-v2",
   owner_visible_checkpoints: [
     "initial_key_proceed",
     "source_card_review",
@@ -368,9 +368,15 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     "scheduling_confirmation",
   ],
   silent_stages: ["generation_run_and_candidates", "gate_evaluation"],
+  transition_label_contract: {
+    required_labels: ["Completed:", "Showing now:", "Next decision:"],
+    instruction: "At every owner-visible transition, briefly state what action completed, identify the exact artifact currently being shown, and name the next owner decision. Never make the owner infer whether the content is a source card, generated post, scheduling confirmation, or completion report.",
+  },
   rules: [
     "After a source card is approved and locked, create the generation run, generate candidates, self-reject weak candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
     "Do not present generation-run creation, adaptation-plan persistence, candidate-pool creation, self-rejection, draft submission, or gate execution as separate owner-facing steps.",
+    "At every owner-visible transition, use brief explicit labels for the completed action, the artifact being shown now, and the next owner decision.",
+    "After performing an owner-approved action, report that completion before presenting the next owner-visible artifact.",
     "The next owner approval question after source-card approval occurs only after at least one draft passed all blocking gates, returned showable=true, and was marked shown.",
     "If no draft passes, report the blocker or generation failure; do not ask the owner to approve an unshowable draft.",
     "Scheduling requires an approved shown draft and a separate owner confirmation of the scheduling details.",
