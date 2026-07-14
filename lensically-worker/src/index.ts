@@ -10896,11 +10896,11 @@ async function beginOperatorOperationReceipt(
   key: string,
   toolName: string,
   args: Record<string, unknown>,
-): Promise<{ existing: Record<string, unknown> | null; fingerprint: string }> {
+): Promise<{ existing: Record<string, unknown> | null; fingerprint: string; created: boolean }> {
   const fingerprint = await sha256OperatorText(JSON.stringify(args));
   const existing = await readOperatorOperationReceipt(env, key);
-  if (existing) return { existing, fingerprint };
-  await env.DB.prepare(
+  if (existing) return { existing, fingerprint, created: false };
+  const insert = await env.DB.prepare(
     `INSERT OR IGNORE INTO operator_operation_receipts (
       idempotency_key, brand_key, workflow_session_id, operation_type, tool_name, request_fingerprint, status
     ) VALUES (?, ?, ?, ?, ?, ?, 'started')`,
@@ -10912,7 +10912,8 @@ async function beginOperatorOperationReceipt(
     toolName,
     fingerprint,
   ).run();
-  return { existing: await readOperatorOperationReceipt(env, key), fingerprint };
+  const created = Number(insert.meta?.changes ?? 0) > 0;
+  return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created };
 }
 
 async function completeOperatorOperationReceipt(env: Env, key: string, result: Record<string, unknown>): Promise<void> {
