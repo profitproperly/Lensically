@@ -1172,7 +1172,10 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Completed:, Showing now:, and Next decision:");
     expect(initialized.instructions).toContain("The next owner approval question must occur only after a draft passed all blocking gates");
         expect(initialized.instructions).toContain("If no candidate becomes showable, report the blocker or generation failure instead of asking for approval");
-        expect(initialized.instructions).toContain("Manifest close-mimicry rule");
+                expect(initialized.instructions).toContain("Manifest close-mimicry rule");
+    expect(initialized.instructions).toContain("Source-card presentation rule");
+    expect(initialized.instructions).toContain("Never display Must preserve, May reuse, Must change, Cannot repeat, Pass conditions, Fail conditions");
+    expect(initialized.instructions).toContain("Original source, Source performance, Why the source works, Audience reward, Adaptation approach, Generation freedom");
     expect(initialized.instructions).toContain("explicit owner hard bans");
     expect(initialized.instructions).toContain("historical_owner_rejection_gate");
     expect(initialized.instructions).toContain("Never claim that a gate passed unless that exact gate_key appears");
