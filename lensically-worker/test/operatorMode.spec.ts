@@ -1764,23 +1764,17 @@ describe("operator mode MCP endpoint", () => {
     expect(allowed.structuredContent.ok).toBe(true);
   }, 30000);
 
-  it("start-fresh continuity preserves the previous session and creates one new active session", async () => {
+    it("automatic continuity preserves and resumes the current active workflow session", async () => {
     const prior = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: BRAND_KEY });
-            const proceeded = await mcpToolRaw<{ continuation_confirmation_recorded: boolean }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
-    expect(proceeded.structuredContent.continuation_confirmation_recorded).toBe(true);
-    const continued = await mcpToolRaw<{
+    const proceeded = await mcpToolRaw<{
       continuity_loaded: boolean;
-      continuity_capsule: { workflow_checkpoint: { workflow_session_id: string }; choice: string };
-    }>("resolveContinuationContext", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-      continuation_choice: "start_fresh_workflow",
-    });
-    expect(continued.isError).not.toBe(true);
-    expect(continued.structuredContent.continuity_capsule.choice).toBe("start_fresh_workflow");
-    expect(continued.structuredContent.continuity_capsule.workflow_checkpoint.workflow_session_id).not.toBe(prior.workflow_session_id);
-    const priorRow = await env.DB.prepare(`SELECT status FROM operator_workflow_sessions WHERE id = ?`).bind(prior.workflow_session_id).first<{ status: string }>();
-    expect(priorRow?.status).toBe("preserved");
+      continuation_choice_required: boolean;
+      continuity_capsule: { workflow_checkpoint: { workflow_session_id: string } };
+    }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+    expect(proceeded.isError).not.toBe(true);
+    expect(proceeded.structuredContent.continuity_loaded).toBe(true);
+    expect(proceeded.structuredContent.continuation_choice_required).toBe(false);
+    expect(proceeded.structuredContent.continuity_capsule.workflow_checkpoint.workflow_session_id).toBe(prior.workflow_session_id);
     const active = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_workflow_sessions WHERE brand_key = ? AND status = 'active'`).bind(BRAND_KEY).first<{ total: number }>();
     expect(Number(active?.total ?? 0)).toBe(1);
   }, 30000);
