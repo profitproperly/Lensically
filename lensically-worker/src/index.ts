@@ -11805,7 +11805,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       proceeded: true,
       proceed_confirmed: true,
       account_data_loaded: false,
-      continuation_nonce: continuationNonce,
+            continuation_ref: continuationRef,
       continuation_choice_required: true,
       continuation_choices: ["resume_existing_workflow", "start_fresh_workflow"],
       next_owner_prompt: "Would you like to pick up where the existing workflow left off, or start fresh?",
