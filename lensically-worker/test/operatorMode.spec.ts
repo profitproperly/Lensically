@@ -404,7 +404,7 @@ describe("operator mode backend spine", () => {
     expect(persisted.selections.map((selection) => selection.draw_order)).toEqual(Array.from({ length: 24 }, (_, index) => index + 1));
 
     const first = draw.selections[0];
-    const card = await operatorTool<{ source_card_id: string; source_selection_id: string }>("create_source_card", {
+        const card = await operatorTool<{ source_card_id: string; source_selection_id: string; owner_presentation: { version: string; account_scope: string; prohibited_owner_headings: string[]; manifest_mental_sections: string[] } }>("create_source_card", {
       brand_key: "manifest_mental",
       workflow_session_id: session.workflow_session_id,
       source_selection_id: first.source_selection_id,
