@@ -449,9 +449,56 @@ describe("operator mode backend spine", () => {
     });
         expect(duplicateResponse.status).toBe(200);
     const duplicateData = await duplicateResponse.json() as { source_card_id: string; reused_existing: boolean; reason: string };
-    expect(duplicateData.source_card_id).toBe(card.source_card_id);
+        expect(duplicateData.source_card_id).toBe(card.source_card_id);
     expect(duplicateData.reused_existing).toBe(true);
     expect(duplicateData.reason).toBe("selection_already_resolved");
+
+    await operatorTool("lock_source_card", {
+      brand_key: "manifest_mental",
+      source_card_id: card.source_card_id,
+    });
+    const revised = await operatorTool<{
+      source_card_id: string;
+      version_number: number;
+      supersedes_source_card_id: string;
+      reused_existing: boolean;
+    }>("create_source_card", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      source_selection_id: first.source_selection_id,
+      create_new_version: true,
+      version_reason: "Owner approved a gender-neutral direct-reader hook.",
+      title: "Gender-neutral revised card",
+      source_mechanism: "Directly identify the person reading the post.",
+      required_product: "A gender-neutral direct-reader prediction.",
+      transformation_contract: {
+        must_preserve_function: ["Directly identify the person reading the post."],
+        may_reuse: ["THE PERSON READING THIS"],
+        audience_reward: "Personal selection without gendering the reader.",
+      },
+      forbidden_surfaces: [],
+      pass_conditions: ["Uses a gender-neutral reader hook."],
+      fail_conditions: ["Uses a gendered reader hook."],
+    });
+    expect(revised.source_card_id).not.toBe(card.source_card_id);
+    expect(revised.version_number).toBe(2);
+    expect(revised.supersedes_source_card_id).toBe(card.source_card_id);
+    expect(revised.reused_existing).toBe(false);
+    const revisedCard = await operatorTool<{
+      source_card: { title: string; version_number: number; is_current: boolean; supersedes_source_card_id: string };
+    }>("get_source_card", {
+      brand_key: "manifest_mental",
+      source_card_id: revised.source_card_id,
+      include_history: false,
+    });
+    expect(revisedCard.source_card.title).toBe("Gender-neutral revised card");
+    expect(revisedCard.source_card.version_number).toBe(2);
+    expect(revisedCard.source_card.is_current).toBe(true);
+    expect(revisedCard.source_card.supersedes_source_card_id).toBe(card.source_card_id);
+    const relinkedSelection = await env.DB.prepare(
+      `SELECT source_card_id FROM operator_source_selections WHERE id = ? LIMIT 1`,
+    ).bind(first.source_selection_id).first<{ source_card_id: string }>();
+    expect(relinkedSelection?.source_card_id).toBe(revised.source_card_id);
 
   }, 30000);
 
