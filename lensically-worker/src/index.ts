@@ -11468,6 +11468,51 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     };
   }
 
+  if (toolName === "resolveContinuationContext") {
+    const brandKey = normalizeGptBrandKey(args.brand_key);
+    const choice = normalizeOperatorContinuationChoice(args.continuation_choice);
+    if (!brandKey || !choice) {
+      return { ok: false, error: "brand_key_and_continuation_choice_required", account_data_loaded: false };
+    }
+    const nonce = await verifyOperatorContinuationNonce(env, args.continuation_nonce, brandKey);
+    if (!nonce) {
+      return { ok: false, error: "invalid_or_expired_continuation_nonce", account_data_loaded: false, required_next_tool: "confirmOperatorProceed" };
+    }
+    const brand = await resolveGptBrand(env, brandKey);
+    if (!brand) {
+      return { ok: false, error: "brand_unavailable", account_data_loaded: false };
+    }
+    const requestedSessionId = normalizeOperatorText(args.workflow_session_id, 120, true);
+    const session = await resolveOperatorContinuationSession(env, brandKey, choice, requestedSessionId);
+    const capsule = await buildOperatorContinuityCapsule(request, env, brand, session, choice);
+    const workflowSessionId = normalizeOperatorText((capsule.workflow_checkpoint as Record<string, unknown> | undefined)?.workflow_session_id, 120, true);
+    const continuityToken = await createOperatorContinuityToken(env, brandKey, choice, workflowSessionId);
+    return {
+      ok: true,
+      selected_key: brandKey,
+      continuation_choice: choice,
+      continuity_token: continuityToken,
+      continuity_token_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+      continuity_capsule: capsule,
+      account_data_loaded: true,
+      next_call_requirement: {
+        proceed_confirmed: true,
+        continuity_token: "Reuse this exact token on every later account-scoped call in this chat.",
+        operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
+      },
+    };
+  }
+
+  if (toolName === "planOperatorExecution") {
+    const intendedTool = normalizeOperatorText(args.intended_tool, 160, true) ?? normalizeOperatorText(args.operation, 160, true) ?? "unknown_operation";
+    const policy = buildOperatorExecutionPolicy(intendedTool, args);
+    return {
+      ok: true,
+      policy,
+      enforcement: "The MCP dispatcher applies this policy before execution; this tool exposes the decision for audit or planning.",
+    };
+  }
+
   if (toolName === "getMcpAdminState") {
     const brand = args.brand_key ? await resolveOperatorBrandFromPayload(env, args) : null;
     const tools = await buildOperatorMcpTools(env, true);
