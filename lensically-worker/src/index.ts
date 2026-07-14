@@ -7591,8 +7591,7 @@ async function buildOperatorContinuityCapsule(
        WHERE batch_id = ? ORDER BY draw_order ASC`,
     ).bind(String(sourceBatch.id)).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
-  const selectionRows = selections.results ?? [];
-  const nextSelection = selectionRows.find((row) => !row.source_card_id) ?? null;
+    let selectionRows = selections.results ?? [];
   const activeSourceCardId = normalizeOperatorText(session?.active_source_card_id, 120, true);
   let sourceCard: Record<string, unknown> | null = activeSourceCardId
     ? await getOperatorSourceCard(env, brand.brand_key, activeSourceCardId)
@@ -7605,6 +7604,74 @@ async function buildOperatorContinuityCapsule(
     ).bind(brand.brand_key, sessionId).first<{ id: string }>();
     sourceCard = latestCard?.id ? await getOperatorSourceCard(env, brand.brand_key, latestCard.id) : null;
   }
+
+  const workflowCards = sessionId
+    ? await env.DB.prepare(
+      `SELECT id, source_selection_id, sequence_label, status
+       FROM operator_source_cards
+       WHERE brand_key = ? AND workflow_session_id = ? AND is_current = 1
+       ORDER BY datetime(created_at) ASC`,
+    ).bind(brand.brand_key, sessionId).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  for (const card of workflowCards.results ?? []) {
+    const selectionId = normalizeOperatorText(card.source_selection_id, 120, true);
+    if (!selectionId) continue;
+    const workflowSequence = parseOperatorWorkflowSequence(card.sequence_label);
+    await env.DB.prepare(
+      `UPDATE operator_source_selections
+       SET disposition = 'linked',
+           disposition_reason = 'source_card_linked',
+           disposition_at = COALESCE(disposition_at, CURRENT_TIMESTAMP),
+           workflow_sequence = COALESCE(?, workflow_sequence)
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(workflowSequence, selectionId, brand.brand_key).run();
+  }
+
+  if (sourceBatch?.id) {
+    const refreshed = await env.DB.prepare(
+      `SELECT id, draw_order, source_identity_key, source_type, internal_source_id, threads_post_id,
+              canonical_source_url, post_text, metrics_snapshot_json, source_card_id, selected_at,
+              disposition, disposition_reason, disposition_at, workflow_sequence
+       FROM operator_source_selections
+       WHERE batch_id = ? ORDER BY draw_order ASC`,
+    ).bind(String(sourceBatch.id)).all<Record<string, unknown>>();
+    selectionRows = refreshed.results ?? [];
+  }
+  const linkedDrawOrders = selectionRows
+    .filter((row) => Boolean(row.source_card_id))
+    .map((row) => Number(row.draw_order ?? 0))
+    .filter((drawOrder) => Number.isInteger(drawOrder) && drawOrder > 0);
+  const continuityAnchorDrawOrder = linkedDrawOrders.length ? Math.max(...linkedDrawOrders) : 0;
+  if (sourceBatch?.id && continuityAnchorDrawOrder > 0) {
+    await env.DB.prepare(
+      `UPDATE operator_source_selections
+       SET disposition = 'skipped',
+           disposition_reason = COALESCE(disposition_reason, 'historical_gap_before_continuity_anchor'),
+           disposition_at = COALESCE(disposition_at, CURRENT_TIMESTAMP)
+       WHERE batch_id = ?
+         AND source_card_id IS NULL
+         AND draw_order <= ?
+         AND COALESCE(disposition, 'pending') = 'pending'`,
+    ).bind(String(sourceBatch.id), continuityAnchorDrawOrder).run();
+    const refreshed = await env.DB.prepare(
+      `SELECT id, draw_order, source_identity_key, source_type, internal_source_id, threads_post_id,
+              canonical_source_url, post_text, metrics_snapshot_json, source_card_id, selected_at,
+              disposition, disposition_reason, disposition_at, workflow_sequence
+       FROM operator_source_selections
+       WHERE batch_id = ? ORDER BY draw_order ASC`,
+    ).bind(String(sourceBatch.id)).all<Record<string, unknown>>();
+    selectionRows = refreshed.results ?? [];
+  }
+  const workflowSequenceAnchor = selectionRows.reduce((highest, row) => {
+    const sequence = Number(row.workflow_sequence ?? 0);
+    return Number.isInteger(sequence) && sequence > highest ? sequence : highest;
+  }, 0);
+  const skippedSelectionCount = selectionRows.filter((row) => row.disposition === 'skipped').length;
+  const nextSelection = selectionRows.find((row) =>
+    !row.source_card_id
+    && Number(row.draw_order ?? 0) > continuityAnchorDrawOrder
+    && !['skipped', 'invalidated'].includes(String(row.disposition ?? 'pending'))
+  ) ?? null;
   const activeRunId = normalizeOperatorText(session?.active_generation_run_id, 120, true);
   const generationRun = activeRunId
     ? await env.DB.prepare(`SELECT * FROM gpt_generation_runs WHERE id = ? AND account_id = ? LIMIT 1`).bind(activeRunId, brand.account_id).first<Record<string, unknown>>()
