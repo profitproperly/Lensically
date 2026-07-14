@@ -11126,7 +11126,8 @@ function canonicalOperatorExecutionArgs(toolName: string, args: Record<string, u
     return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
   }
   const canonicalArgs = { ...args };
-  delete canonicalArgs.proceed_confirmed;
+    delete canonicalArgs.proceed_confirmed;
+  delete canonicalArgs.continuity_ref;
   delete canonicalArgs.continuity_token;
   return { tool_name: toolName, args: canonicalArgs };
 }
