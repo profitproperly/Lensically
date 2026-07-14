@@ -1536,13 +1536,14 @@ describe("operator mode MCP endpoint", () => {
     ]));
     expect(direct.owner_interaction_contract.source_card_presentation_contract.instruction).toContain("Never dump the raw transformation matrix");
     expect(direct.owner_interaction_contract.source_card_presentation_contract.no_finished_draft_rule).toContain("must not preselect");
-    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toEqual(expect.arrayContaining([
-      "source_card_review",
-      "draft_review_and_decision",
-      "scheduling_confirmation",
+        expect(direct.owner_interaction_contract.owner_visible_checkpoints).toEqual(expect.arrayContaining([
+      "calendar_coverage_confirmation",
+      "four_post_review_batch",
+      "confirmed_scheduling_report",
+      "day_completion_confirmation",
     ]));
-        expect(direct.owner_interaction_contract.rules.join(" ")).toContain("without asking the owner to proceed");
-    expect(direct.owner_interaction_contract.next_owner_decision_after_source_card).toContain("passing showable draft");
+    expect(direct.owner_interaction_contract.rules.join(" ")).toContain("four numbered Source / Generated post pairs");
+    expect(direct.owner_interaction_contract.next_owner_decision_after_review_batch).toContain("Posts 1 through 4");
         expect(direct.rejection_memory_contract.version).toBe("operator-rejection-context-v2");
     expect(direct.rejection_memory_contract.infrastructure_scope).toBe("universal");
     expect(direct.rejection_memory_contract.evidence_scope).toBe("selected_account");
