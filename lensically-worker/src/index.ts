@@ -6977,9 +6977,39 @@ async function runOperatorGates(
       const explicitBannedSurfaces = Array.isArray(rejectionContext?.explicit_banned_surfaces)
         ? rejectionContext.explicit_banned_surfaces.map(String)
         : [];
-      const matchedBannedSurfaces = explicitBannedSurfaces.filter((surface) =>
+            const matchedBannedSurfaces = explicitBannedSurfaces.filter((surface) =>
         draftContainsOperatorRejectedSurface(normalizedDraft, surface),
       );
+      if (manifestCloseMimicry) {
+        if (matchedBannedSurfaces.length) {
+          results.push(buildGateResult(
+            gate,
+            "fail",
+            "Manifest draft repeats language the owner explicitly hard-banned.",
+            {
+              enforcement_mode: "explicit_hard_bans_only",
+              context_fingerprint: expectedFingerprint,
+              matched_banned_surfaces: matchedBannedSurfaces,
+            },
+            "Remove only the matched hard-ban wording. Keep the source hook, structure, meaning, tone, and payoff close to the original.",
+          ));
+        } else {
+          results.push(buildGateResult(
+            gate,
+            coverageComplete ? "pass" : "pass_with_caution",
+            coverageComplete
+              ? "Manifest draft contains no explicit owner hard-ban surface."
+              : "Manifest draft contains no hard-ban surface in the available compact rejection context.",
+            {
+              enforcement_mode: "explicit_hard_bans_only",
+              context_fingerprint: expectedFingerprint,
+              explicit_hard_ban_count: explicitBannedSurfaces.length,
+              coverage_status: rejectionContext?.coverage_status ?? null,
+            },
+          ));
+        }
+        continue;
+      }
       const rejectedDrafts = Array.isArray(rejectionContext?.rejected_drafts)
         ? rejectionContext.rejected_drafts as Array<Record<string, unknown>>
         : [];
