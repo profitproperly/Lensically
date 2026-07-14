@@ -402,8 +402,34 @@ const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
   no_finished_draft_rule: "A source card explains how generation should use the source. It must not preselect or present the final generated post unless the owner explicitly requests an exact adaptation.",
 } as const;
 
+const OPERATOR_CONTINUITY_CONTRACT = {
+  version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+  scope: "universal",
+  source_of_truth: "canonical database state plus signed continuity token",
+  required_sequence: [
+    "getOperatorStartupContext",
+    "selectOperatorKey",
+    "confirmOperatorProceed",
+    "explicit resume-or-start-fresh owner choice",
+    "resolveContinuationContext",
+    "signed continuity token on every later account-scoped call",
+  ],
+  capsule_sections: [
+    "workflow_checkpoint",
+    "last_completed_action",
+    "next_pending_action",
+    "active_artifact_ids",
+    "source_batch_progress",
+    "runtime_identity",
+    "execution_policy",
+    "idempotency",
+  ],
+  rule: "A fresh chat must resume from canonical persisted state and may not reconstruct workflow position from conversation memory.",
+} as const;
+
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
-  version: "operator-owner-interaction-v4",
+  version: "operator-owner-interaction-v5",
+
   owner_visible_checkpoints: [
     "initial_key_proceed",
     "post_handshake_continuation_choice",
