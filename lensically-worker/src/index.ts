@@ -11708,19 +11708,28 @@ function operatorMcpProceedConfirmed(toolName: string, args: Record<string, unkn
   return args.proceed_confirmed === true;
 }
 
-function operatorMcpContinuityToken(toolName: string, args: Record<string, unknown>): unknown {
+function operatorMcpContinuityLoaded(toolName: string, args: Record<string, unknown>): boolean {
   if (toolName === "listMcpTools") {
     const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
     const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
       ? args.arguments as Record<string, unknown>
       : {};
-    return nestedTool ? operatorMcpContinuityToken(nestedTool, nestedArgs) : null;
+    return nestedTool ? operatorMcpContinuityLoaded(nestedTool, nestedArgs) : false;
   }
-  if (toolName === "runEngineeringTool") {
-    return null;
-  }
-    return args.continuity_ref ?? args.continuity_token;
+  return args.continuity_loaded === true;
 }
+
+function operatorMcpLegacyContinuityCredential(toolName: string, args: Record<string, unknown>): unknown {
+  if (toolName === "listMcpTools") {
+    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
+    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+      ? args.arguments as Record<string, unknown>
+      : {};
+    return nestedTool ? operatorMcpLegacyContinuityCredential(nestedTool, nestedArgs) : null;
+  }
+  return args.continuity_ref ?? args.continuity_token;
+}
+
 
 async function getOperatorMcpBoundaryBlock(
   _request: Request,
