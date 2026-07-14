@@ -8611,7 +8611,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         canonical_source_card_version: row.canonical_source_card_version === null || row.canonical_source_card_version === undefined
           ? null
           : Number(row.canonical_source_card_version),
-        canonical_source_card_status: row.canonical_source_card_status ?? null,
+                canonical_source_card_status: row.canonical_source_card_status ?? null,
+        disposition: row.disposition ?? 'pending',
+        disposition_reason: row.disposition_reason ?? null,
+        disposition_at: row.disposition_at ?? null,
+        workflow_sequence: row.workflow_sequence === null || row.workflow_sequence === undefined
+          ? null
+          : Number(row.workflow_sequence),
         selected_at: row.selected_at,
 
       })),
