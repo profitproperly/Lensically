@@ -191,6 +191,41 @@ async function resetTables(): Promise<void> {
   ).run();
 }
 
+async function seedManifestPatterns(count = 30): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS external_patterns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_user_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      platform TEXT NOT NULL DEFAULT 'threads',
+      source_url TEXT NOT NULL,
+      post_id TEXT,
+      post_text TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      views INTEGER,
+      posted_at TEXT,
+      capture_confidence TEXT NOT NULL DEFAULT 'high',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  for (let index = 1; index <= count; index += 1) {
+    await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, platform, source_url, post_id, post_text,
+        likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+      ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, ?, 2, 1, 0, 20000, '2026-07-11T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+    ).bind(
+      `https://www.threads.com/@fixture/post/calendar-${index}`,
+      `calendar-${index}`,
+      `Calendar workflow source ${index}`,
+      2000 + index,
+    ).run();
+  }
+}
+
 async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey = BRAND_KEY): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
   const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
     brand_key: brandKey,
