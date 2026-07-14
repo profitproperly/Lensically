@@ -8701,7 +8701,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
        WHERE id = ? AND brand_key = ?`,
     ).bind(workflowSessionId, brand.brand_key).run();
     const serialized = await serializeManifestReviewBatch(env, brand, reviewBatchId);
-    return operatorJsonResponse({ ...serialized, source_batch_reused: sourceBatch.reused_existing, fresh_draw: payload.fresh_draw === true });
+        return operatorJsonResponse({
+      ...serialized,
+      source_batch_reused: sourceBatch.reused_existing,
+      fresh_draw: payload.fresh_draw === true,
+      source_batch_rollover: sourceBatchRollover,
+    });
   }
 
   if (toolName === "get_manifest_review_batch") {
