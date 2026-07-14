@@ -10530,15 +10530,15 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "resolveContinuationContext",
     title: "Resolve continuation context",
-        description: "After the owner chooses resume or start fresh, load one canonical continuity capsule and return the exact persisted checkpoint. The backend stores continuity state in D1; later account calls pass continuity_loaded=true and never forward a generated handle. This is the only valid post-handshake entry into account work.",
+                description: "Backward-compatible continuity read. confirmOperatorProceed now auto-resolves canonical persisted continuity; this tool may be called without continuation_choice and defaults to resume_existing_workflow.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
-                continuation_choice: { type: "string", enum: ["resume_existing_workflow", "start_fresh_workflow"] },
+        continuation_choice: { type: "string", enum: ["resume_existing_workflow", "start_fresh_workflow"], description: "Optional legacy override. Omit for canonical automatic resume." },
         workflow_session_id: { type: "string", description: "Optional explicit persisted session to resume." },
       },
-                  required: ["brand_key", "continuation_choice"],
+      required: ["brand_key"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
