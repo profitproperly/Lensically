@@ -12796,9 +12796,9 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       blocked_before_proceed: blockedContent.error === "explicit_proceed_required" && blockedContent.account_data_loaded === false,
       blocked_error: blockedContent.error ?? null,
       proceed_confirmed: proceedContent.proceeded === true,
-      continuation_nonce_issued: typeof proceedContent.continuation_nonce === "string" && proceedContent.continuation_nonce.length > 0,
+            continuation_ref_issued: typeof proceedContent.continuation_ref === "string" && proceedContent.continuation_ref.length > 0,
       continuity_required_after_proceed: beforeContinuityContent.error === "continuity_context_required",
-      continuity_resolved: typeof continuationContent.continuity_token === "string" && continuationContent.continuity_token.length > 0,
+      continuity_resolved: typeof continuationContent.continuity_ref === "string" && continuationContent.continuity_ref.length > 0,
       continuity_capsule_version: (continuationContent.continuity_capsule as Record<string, unknown> | undefined)?.version ?? null,
       allowed_after_continuity: allowedContent.ok === true,
     };
