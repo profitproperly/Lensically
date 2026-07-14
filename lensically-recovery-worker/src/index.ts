@@ -180,23 +180,35 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     return { ...file, path, start_line: start, end_line: Math.min(lines.length, start + max - 1), content: lines.slice(start - 1, start - 1 + max).join("\n") };
   }
   if (name === "searchRepoFiles") {
-    const query = String(args.query || "").toLowerCase();
+    const query = String(args.query || "").trim();
     const prefix = safePath(args.prefix || "") || "";
-    const limit = Math.min(50, Math.max(1, Number(args.limit || 20)));
+    const limit = Math.min(20, Math.max(1, Number(args.limit || 20)));
+    if (!query) return { ok: false, error: "query_required" };
+    const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
+    if (prefix) searchTerms.push(`path:${prefix}`);
+    const codeSearch = await github(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
+    if (codeSearch.ok && codeSearch.data && typeof codeSearch.data === "object" && !Array.isArray(codeSearch.data)) {
+      const items = Array.isArray((codeSearch.data as Record<string, unknown>).items)
+        ? (codeSearch.data as { items: Array<Record<string, unknown>> }).items
+        : [];
+      return {
+        ok: true,
+        matches: items.slice(0, limit).map((item) => ({ path: item.path ?? null, name: item.name ?? null, sha: item.sha ?? null, source: "github_code_search" })),
+        search_mode: "github_code_search",
+        external_requests: 1,
+        file_content_fanout: 0,
+      };
+    }
     const tree = await github(env, `/repos/${config.owner}/${config.repo}/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
     const entries = Array.isArray((tree.data as Record<string, unknown> | null)?.tree) ? (tree.data as { tree: Array<Record<string, unknown>> }).tree : [];
-    const candidates = entries.filter((entry) => entry.type === "blob" && typeof entry.path === "string" && (!prefix || entry.path.startsWith(prefix))).slice(0, 500);
-    const pathMatches = candidates.filter((entry) => String(entry.path).toLowerCase().includes(query)).slice(0, limit).map((entry) => ({ path: entry.path, source: "path" }));
-    if (pathMatches.length >= limit) return { ok: true, matches: pathMatches };
-    const textMatches: Array<Record<string, unknown>> = [];
-    for (const entry of candidates.slice(0, 12)) {
-      if (textMatches.length + pathMatches.length >= limit) break;
-      const file = await repoFile(env, String(entry.path));
-      if (!file.content || file.content.length > 200000) continue;
-      const index = file.content.toLowerCase().indexOf(query);
-      if (index >= 0) textMatches.push({ path: entry.path, source: "content", excerpt: file.content.slice(Math.max(0, index - 120), index + query.length + 240) });
-    }
-    return { ok: true, matches: [...pathMatches, ...textMatches] };
+    const normalized = query.toLowerCase();
+    const matches = entries
+      .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
+      .map((entry) => String(entry.path))
+      .filter((path) => (!prefix || path.startsWith(prefix)) && path.toLowerCase().includes(normalized))
+      .slice(0, limit)
+      .map((path) => ({ path, source: "bounded_tree_path_fallback" }));
+    return { ok: tree.ok, matches, search_mode: "bounded_tree_path_fallback", external_requests: 2, file_content_fanout: 0, code_search_status: codeSearch.status };
   }
   if (name === "applyRepoTextPatch") {
     const path = safePath(args.path); const find = String(args.find || ""); const replace = String(args.replace ?? ""); const message = String(args.message || "");
