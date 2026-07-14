@@ -1683,11 +1683,11 @@ describe("operator mode MCP endpoint", () => {
     expect(continuityBlocked.isError).toBe(true);
     expect(continuityBlocked.structuredContent).toMatchObject({ error: "continuity_context_required", required_next_tool: "resolveContinuationContext" });
 
-    const continued = await mcpToolRaw<{ continuity_token: string; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
+        const continued = await mcpToolRaw<{ continuity_ref: string; continuity_capsule: { brand_key: string } }>("resolveContinuationContext", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
       continuation_choice: "resume_existing_workflow",
-      continuation_nonce: proceeded.structuredContent.continuation_nonce,
+      continuation_ref: proceeded.structuredContent.continuation_ref,
     });
     expect(continued.isError).not.toBe(true);
     expect(continued.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
@@ -1695,7 +1695,7 @@ describe("operator mode MCP endpoint", () => {
                 const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string; limit: number; source: string; coverage_status: string }> }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
-      continuity_token: continued.structuredContent.continuity_token,
+      continuity_ref: continued.structuredContent.continuity_ref,
     });
     expect(preflight.isError).not.toBe(true);
     expect(preflight.structuredContent.complete).toBe(true);
