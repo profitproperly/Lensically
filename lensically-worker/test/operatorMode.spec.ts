@@ -1671,10 +1671,10 @@ describe("operator mode MCP endpoint", () => {
       required_next_tool: "confirmOperatorProceed",
     });
 
-        const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuation_nonce: string }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
+                const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuation_ref: string }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: false });
-    expect(proceeded.structuredContent.continuation_nonce).toBeTruthy();
+    expect(proceeded.structuredContent.continuation_ref).toBeTruthy();
 
     const continuityBlocked = await mcpToolRaw<{ error: string; required_next_tool: string }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
