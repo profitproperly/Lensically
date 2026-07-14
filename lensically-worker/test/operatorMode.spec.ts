@@ -711,7 +711,10 @@ describe("operator mode backend spine", () => {
     });
 
     const blockedRun = await createLockedSourceCard([], "manifest_mental");
-    const blocked = await operatorTool<{ showable: boolean }>("submit_candidate_draft", {
+        const blocked = await operatorTool<{
+      showable: boolean;
+      gate_results: Array<{ gate_key: string; result: string }>;
+    }>("submit_candidate_draft", {
       brand_key: "manifest_mental",
       run_id: blockedRun.runId,
       source_card_id: blockedRun.sourceCardId,
@@ -722,7 +725,7 @@ describe("operator mode backend spine", () => {
         lane_key: "systems",
       },
     });
-    expect(blocked.showable).toBe(false);
+    expect(blocked.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("fail");
 
     const approvedRun = await createLockedSourceCard([], "manifest_mental");
     const approved = await operatorTool<{
