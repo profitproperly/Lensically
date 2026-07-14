@@ -8046,6 +8046,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
   if (toolName === "start_workflow_session") {
+    const existingSession = await getActiveOperatorSession(env, brand.brand_key);
+    if (existingSession?.id) {
+      return operatorJsonResponse({
+        workflow_session_id: existingSession.id,
+        current_stage: existingSession.current_stage ?? "account_selection",
+        next_required_stage: existingSession.current_stage === "account_selection" ? "context_admission" : null,
+        workflow_template: workflowTemplatePayload(),
+        reused_existing: true,
+        idempotency_reason: "active_workflow_session_already_exists",
+      });
+    }
     const sessionId = crypto.randomUUID();
     await env.DB.prepare(
       `INSERT INTO operator_workflow_sessions (
