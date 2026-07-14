@@ -7019,12 +7019,25 @@ async function runOperatorGates(
       const coverageComplete = rejectionContext?.coverage_complete === true;
       const requiredReviewCount = Number(rejectionContext?.required_review_count ?? 0);
       const expectedFingerprint = String(rejectionContext?.context_fingerprint ?? "");
-      const explicitBannedSurfaces = Array.isArray(rejectionContext?.explicit_banned_surfaces)
+            const explicitBannedSurfaces = Array.isArray(rejectionContext?.explicit_banned_surfaces)
         ? rejectionContext.explicit_banned_surfaces.map(String)
         : [];
-            const matchedBannedSurfaces = explicitBannedSurfaces.filter((surface) =>
-        draftContainsOperatorRejectedSurface(normalizedDraft, surface),
-      );
+      const ownerApprovedSurfaceInputs = [
+        ...(Array.isArray(input.draftAnalysis?.owner_approved_surfaces)
+          ? input.draftAnalysis.owner_approved_surfaces.map(String)
+          : []),
+        normalizeOperatorText(input.draftAnalysis?.owner_requested_exact_surface, 500, true),
+      ].filter((surface): surface is string => Boolean(surface));
+      const currentOwnerApprovedSurfaces = ownerApprovedSurfaceInputs
+        .map((surface) => normalizeComparableText(surface))
+        .filter((surface) => Boolean(surface) && normalizedDraft.includes(surface));
+      const matchedBannedSurfaces = explicitBannedSurfaces.filter((surface) => {
+        const normalizedSurface = normalizeComparableText(surface);
+        const approvedForCurrentDraft = currentOwnerApprovedSurfaces.some((approvedSurface) =>
+          approvedSurface === normalizedSurface || approvedSurface.includes(normalizedSurface),
+        );
+        return !approvedForCurrentDraft && draftContainsOperatorRejectedSurface(normalizedDraft, surface);
+      });
       if (manifestCloseMimicry) {
         if (matchedBannedSurfaces.length) {
           results.push(buildGateResult(
