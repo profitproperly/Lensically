@@ -6745,7 +6745,13 @@ async function runOperatorGates(
   const draftText = normalizeOperatorText(input.draftText, 20000, true) ?? "";
     const normalizedDraft = normalizeComparableText(draftText);
 
-  const sourceContract = normalizeSourceTransformationContract(sourceCard?.transformation_contract);
+    const sourceContract = normalizeSourceTransformationContract(sourceCard?.transformation_contract);
+  const manifestCloseMimicry = input.brand.brand_key === "manifest_mental";
+  const primarySource = sourceCard?.primary_source && typeof sourceCard.primary_source === "object" && !Array.isArray(sourceCard.primary_source)
+    ? sourceCard.primary_source as Record<string, unknown>
+    : {};
+  const primarySourceText = normalizeOperatorText(primarySource.text ?? primarySource.post_text, 20000, true) ?? "";
+  const exactSourceCopy = Boolean(primarySourceText) && normalizedDraft === normalizeComparableText(primarySourceText);
   const mustPreserveExact = sourceContract.must_preserve_exact as string[];
   const mayReuse = sourceContract.may_reuse as string[];
   const approvedReusableSurfaces = new Set(
