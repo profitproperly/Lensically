@@ -8206,13 +8206,18 @@ async function ensureManifestSourceBatchForDate(
   sourceTypes: string[],
   freshDraw: boolean,
 ): Promise<{ batch: Record<string, unknown>; selections: Record<string, unknown>[]; reused_existing: boolean }> {
+    await env.DB.prepare(
+    `UPDATE operator_source_selection_batches
+     SET status = 'retired', retired_at = CURRENT_TIMESTAMP,
+         retirement_reason = 'legacy_undated_batch_replaced_by_calendar_workflow'
+     WHERE brand_key = ? AND status = 'active' AND production_date IS NULL`,
+  ).bind(brand.brand_key).run();
   if (freshDraw) {
     await env.DB.prepare(
       `UPDATE operator_source_selection_batches
        SET status = 'retired', retired_at = CURRENT_TIMESTAMP,
-           retirement_reason = 'owner_approved_calendar_workflow_transition'
-       WHERE brand_key = ? AND status = 'active'
-         AND (production_date IS NULL OR production_date = ?)`,
+           retirement_reason = 'owner_approved_calendar_workflow_redraw'
+       WHERE brand_key = ? AND status = 'active' AND production_date = ?`,
     ).bind(brand.brand_key, productionDate).run();
   }
 
