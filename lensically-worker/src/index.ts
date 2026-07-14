@@ -8774,14 +8774,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
        SET disposition = 'skipped', disposition_reason = ?, disposition_at = CURRENT_TIMESTAMP
        WHERE id = ? AND brand_key = ?`,
     ).bind(nextStatus, claim.source_selection_id, brand.brand_key).run();
-    const unresolved = await env.DB.prepare(
+        const unresolved = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM operator_daily_source_claims
        WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
-    ).bind(reviewBatchId).first<{ total: number }>();
+    ).bind(resolvedReviewBatchId).first<{ total: number }>();
     await env.DB.prepare(
       `UPDATE operator_review_batches SET status = ? WHERE id = ?`,
-    ).bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", reviewBatchId).run();
-    return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, reviewBatchId)) ?? {});
+    ).bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", resolvedReviewBatchId).run();
+    return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, resolvedReviewBatchId)) ?? {});
   }
 
   if (toolName === "schedule_manifest_review_batch") {
