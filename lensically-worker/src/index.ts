@@ -7123,9 +7123,10 @@ async function runOperatorGates(
 
       const duplicateRows = await env.DB.prepare(
         `SELECT text AS candidate_text, 'draft' AS source_type
-         FROM gpt_generation_drafts
+                  FROM gpt_generation_drafts
          WHERE account_id = ?
            AND id != COALESCE(?, '')
+           AND status IN ('shown', 'approved', 'scheduled')
          ORDER BY updated_at DESC
          LIMIT 200`,
       ).bind(input.brand.account_id, input.draftId ?? "").all<{ candidate_text: string; source_type: string }>();
