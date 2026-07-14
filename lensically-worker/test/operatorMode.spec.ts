@@ -118,7 +118,7 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
   let callArgs = args;
   if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && toolName !== "resolveContinuationContext") {
     await ensureMcpAccountOpen(requestedBrand);
-    callArgs = { ...args, proceed_confirmed: true, continuity_token: mcpContinuityToken };
+        callArgs = { ...args, proceed_confirmed: true, continuity_ref: mcpContinuityRef };
   }
   const result = await mcpToolRaw<T>(toolName, callArgs);
   expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
