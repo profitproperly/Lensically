@@ -1536,7 +1536,9 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("bounded GitHub code search");
     expect(direct.boundary.before_proceed_forbidden).toEqual(expect.arrayContaining(["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"]));
     expect(direct.boundary.after_explicit_proceed).toContain("resume the persisted workflow or start fresh");
-    expect(direct.boundary.after_explicit_proceed).toContain("Do not load account/workflow state until the owner explicitly chooses");
+    expect(direct.boundary.after_explicit_proceed).toContain("resolveContinuationContext");
+    expect(direct.boundary.after_explicit_proceed).toContain("continuity_token");
+    expect(direct.boundary.after_explicit_proceed).toContain("Conversation memory is not accepted");
     expect(JSON.stringify(direct)).not.toContain("scheduled_posts_count");
     expect(JSON.stringify(direct)).not.toContain("latest_context_admission");
     expect(direct.universal_workflow_requirements.some((item) => item.stage === "context_admission" && item.required_sections.includes("operator_precheck"))).toBe(true);
