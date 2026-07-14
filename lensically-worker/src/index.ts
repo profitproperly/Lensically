@@ -12691,48 +12691,51 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     };
   }
 
-    if (toolName === "confirmOperatorProceed") {
+        if (toolName === "confirmOperatorProceed") {
     const brandKey = normalizeGptBrandKey(args.brand_key);
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-                await env.DB.prepare(
+    const brand = await resolveGptBrand(env, brandKey);
+    if (!brand) {
+      return { ok: false, error: "brand_unavailable", account_data_loaded: false };
+    }
+    await env.DB.prepare(
       `UPDATE operator_continuity_refs
        SET expires_at = 0
        WHERE brand_key = ? AND kind IN ('continuation_nonce', 'continuity_context')`,
     ).bind(brandKey).run();
+    const session = await resolveOperatorContinuationSession(env, brandKey, "resume_existing_workflow", null);
+    const capsule = await buildOperatorContinuityCapsule(request, env, brand, session, "resume_existing_workflow");
+    const workflowSessionId = normalizeOperatorText((capsule.workflow_checkpoint as Record<string, unknown> | undefined)?.workflow_session_id, 120, true);
     await createOperatorContinuityReference(env, {
-      kind: "continuation_nonce",
+      kind: "continuity_context",
       brandKey,
-      ttlSeconds: OPERATOR_CONTINUATION_NONCE_TTL_SECONDS,
-      payload: { nonce: crypto.randomUUID() },
+      workflowSessionId,
+      continuationChoice: "resume_existing_workflow",
+      ttlSeconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+      payload: {
+        continuity_version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+        execution_policy_version: OPERATOR_EXECUTION_POLICY_VERSION,
+        auto_resolved_after_proceed: true,
+      },
     });
     return {
-
       ok: true,
       selected_key: brandKey,
       proceeded: true,
       proceed_confirmed: true,
-      account_data_loaded: false,
-                  continuation_confirmation_recorded: true,
-      continuation_confirmation_expires_in_seconds: OPERATOR_CONTINUATION_NONCE_TTL_SECONDS,
-      continuation_choice_required: true,
-      continuation_choices: ["resume_existing_workflow", "start_fresh_workflow"],
-      next_owner_prompt: "Would you like to pick up where the existing workflow left off, or start fresh?",
-      before_continuation_choice_forbidden: [
-        "getWorkflowStatus",
-        "get_account_state",
-        "prepareFullPreflight",
-        "start_workflow_session",
-        "source_card_reads_or_writes",
-        "generation_or_draft_work",
-        "scheduling_work",
-      ],
-      continuation_behavior: {
-        resume_existing_workflow: "Load the persisted workflow and continue from its exact checkpoint without redrawing, restarting, or duplicating work.",
-        start_fresh_workflow: "Create a new workflow session while preserving the previous session and artifacts unless deletion is separately requested.",
+      account_data_loaded: true,
+      continuity_loaded: true,
+      continuation_choice_required: false,
+      continuation_choice: "resume_existing_workflow",
+      continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+      continuity_capsule: capsule,
+      next_call_requirement: {
+        proceed_confirmed: true,
+        continuity_loaded: true,
+        operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
       },
-      next_call_requirement: { proceed_confirmed: true, explicit_continuation_choice: true },
     };
   }
 
