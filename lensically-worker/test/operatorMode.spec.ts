@@ -421,10 +421,15 @@ describe("operator mode backend spine", () => {
       pass_conditions: ["Preserves the audience payoff."],
       fail_conditions: ["Copies the source wording."],
     });
-    expect(card.source_selection_id).toBe(first.source_selection_id);
+        expect(card.source_selection_id).toBe(first.source_selection_id);
+    expect(card.owner_presentation.version).toBe("source-card-owner-presentation-v1");
+    expect(card.owner_presentation.account_scope).toBe("manifest_mental");
+    expect(card.owner_presentation.prohibited_owner_headings).toContain("Must preserve");
+    expect(card.owner_presentation.manifest_mental_sections).toContain("Adaptation approach");
 
     const storedCard = await operatorTool<{
       source_card: { primary_source: Record<string, unknown>; metrics_snapshot: { likes: number } };
+      owner_presentation: { version: string; account_scope: string; prohibited_owner_headings: string[]; manifest_mental_sections: string[] };
     }>("get_source_card", {
       brand_key: "manifest_mental",
       source_card_id: card.source_card_id,
