@@ -206,9 +206,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const occurrences = file.content.split(find).length - 1;
     if (occurrences !== 1) return { ok: false, error: "find_text_must_match_exactly_once", occurrences };
     const content = file.content.replace(find, replace);
-    const result = await github(env, `/repos/${config.owner}/${config.repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, content: textToBase64(content), sha: file.sha, branch: config.branch }) });
-    const data = result.data as Record<string, unknown> | null;
-    return { ok: result.ok, status: result.status, path, commit_sha: (data?.commit as Record<string, unknown> | undefined)?.sha ?? null };
+    const result = await commitRepoFileViaGitData(env, path, content, message);
+    return { ok: result.ok, status: result.status, path, commit_sha: result.commit_sha, phase: result.phase ?? null, write_mode: "git_data_api" };
   }
   if (name === "listGitHubWorkflowRuns") {
     const limit = Math.min(20, Math.max(1, Number(args.limit || 10)));
