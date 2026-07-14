@@ -8723,12 +8723,16 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       const currentCard = currentCardId ? await getOperatorSourceCard(env, brand.brand_key, currentCardId) : null;
       if (currentCard && !createNewVersion) {
         await env.DB.prepare(
-          `UPDATE operator_source_selections
-           SET source_card_id = ?
+                    `UPDATE operator_source_selections
+           SET source_card_id = ?,
+               disposition = 'linked',
+               disposition_reason = 'canonical_source_card_reused',
+               disposition_at = CURRENT_TIMESTAMP,
+               workflow_sequence = COALESCE(?, workflow_sequence)
            WHERE id = ?
              AND brand_key = ?
              AND source_card_id IS NULL`,
-        ).bind(currentCard.id, sourceSelectionId, brand.brand_key).run();
+        ).bind(currentCard.id, parseOperatorWorkflowSequence(sequenceLabel), sourceSelectionId, brand.brand_key).run();
         if (workflowSessionId) {
           await env.DB.prepare(
             `UPDATE operator_workflow_sessions
