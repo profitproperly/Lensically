@@ -11697,7 +11697,7 @@ function operatorMcpContinuityToken(toolName: string, args: Record<string, unkno
   if (toolName === "runEngineeringTool") {
     return null;
   }
-  return args.continuity_token;
+    return args.continuity_ref ?? args.continuity_token;
 }
 
 async function getOperatorMcpBoundaryBlock(
