@@ -359,8 +359,45 @@ const OPERATOR_COLLABORATION_CONTRACT = {
   system_layers: OPERATOR_SYSTEM_LAYER_GLOSSARY,
 };
 
+const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
+  version: "source-card-owner-presentation-v1",
+  scope: "universal owner-facing presentation with a Manifest-specific natural review format",
+  raw_contract_fields_are_internal_only: true,
+  prohibited_owner_headings: [
+    "Must preserve",
+    "May reuse",
+    "Must change",
+    "Cannot repeat",
+    "Pass conditions",
+    "Fail conditions",
+    "must_preserve_exact",
+    "must_preserve_function",
+    "may_reuse",
+    "should_transform",
+    "must_transform",
+    "forbidden_complete_combinations",
+    "forbidden_surfaces",
+    "danger_surfaces",
+    "current_inventory_constraints",
+    "pass_conditions",
+    "fail_conditions",
+  ],
+  manifest_mental_sections: [
+    "Original source",
+    "Source performance",
+    "Why the source works",
+    "Audience reward",
+    "Adaptation approach",
+    "Generation freedom",
+    "Necessary boundaries",
+    "Recommended direction",
+  ],
+  instruction: "At source-card review, translate internal persistence and gate fields into a natural owner-facing build specification. Never dump the raw transformation matrix or use its property names as headings. For Manifest, explain the source, performance, mechanism, audience reward, adaptation approach, and generation freedom; include Necessary boundaries only when timing, safety, source integrity, or an explicit owner instruction genuinely requires them.",
+  no_finished_draft_rule: "A source card explains how generation should use the source. It must not preselect or present the final generated post unless the owner explicitly requests an exact adaptation.",
+} as const;
+
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
-  version: "operator-owner-interaction-v2",
+  version: "operator-owner-interaction-v3",
   owner_visible_checkpoints: [
     "initial_key_proceed",
     "source_card_review",
@@ -372,9 +409,11 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     required_labels: ["Completed:", "Showing now:", "Next decision:"],
     instruction: "At every owner-visible transition, briefly state what action completed, identify the exact artifact currently being shown, and name the next owner decision. Never make the owner infer whether the content is a source card, generated post, scheduling confirmation, or completion report.",
   },
+  source_card_presentation_contract: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
   rules: [
     "After a source card is approved and locked, create the generation run, generate candidates, self-reject weak candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
     "Do not present generation-run creation, adaptation-plan persistence, candidate-pool creation, self-rejection, draft submission, or gate execution as separate owner-facing steps.",
+    "At source-card review, keep raw schema, transformation, gate, pass/fail, and forbidden-surface fields internal. Present a natural build specification instead of a Must preserve / May reuse / Must change / Cannot repeat matrix.",
     "At every owner-visible transition, use brief explicit labels for the completed action, the artifact being shown now, and the next owner decision.",
     "After performing an owner-approved action, report that completion before presenting the next owner-visible artifact.",
     "The next owner approval question after source-card approval occurs only after at least one draft passed all blocking gates, returned showable=true, and was marked shown.",
