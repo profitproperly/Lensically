@@ -294,9 +294,3 @@ tests = tests.replaceAll('"1.3.0"', '"1.4.0"');
 tests = tests.replaceAll('"resilient-canonical-v2"', '"continuity-hardened-v3"');
 fs.writeFileSync(testPath, tests);
 
-let workflow = fs.readFileSync(workflowPath, "utf8");
-workflow = workflow.replace("permissions:\n  contents: write\n\n", "");
-workflow = workflow.replace(/\n      # BEGIN CONTINUITY FINALIZER[\s\S]*?      # END CONTINUITY FINALIZER\n/, "\n");
-fs.writeFileSync(workflowPath, workflow);
-
-fs.unlinkSync(selfPath);
