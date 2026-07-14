@@ -410,6 +410,27 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     required_labels: ["Completed:", "Showing now:", "Next decision:"],
     instruction: "At every owner-visible transition, briefly state what action completed, identify the exact artifact currently being shown, and name the next owner decision. Never make the owner infer whether the content is a source card, generated post, scheduling confirmation, or completion report.",
   },
+  continuation_choice_contract: {
+    required_after_confirm_operator_proceed: true,
+    owner_prompt: "Would you like to pick up where the existing workflow left off, or start fresh?",
+    allowed_choices: ["resume_existing_workflow", "start_fresh_workflow"],
+    before_choice_forbidden: [
+      "getWorkflowStatus",
+      "get_account_state",
+      "prepareFullPreflight",
+      "start_workflow_session",
+      "source_card_reads_or_writes",
+      "generation_or_draft_work",
+      "scheduling_work",
+    ],
+    resume_behavior: "Load the persisted workflow and continue from its exact checkpoint without redrawing, restarting, or duplicating work.",
+    fresh_behavior: "Create a new workflow session while preserving the previous session and artifacts unless deletion is separately requested.",
+    owner_visible_format: {
+      completed: "Key confirmed.",
+      showing_now: "Would you like to pick up where the existing workflow left off, or start fresh?",
+      next_decision: "Reply resume or start fresh.",
+    },
+  },
   source_card_presentation_contract: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
   rules: [
     "After a source card is approved and locked, create the generation run, generate candidates, self-reject weak candidates, submit survivors, and run gates without asking the owner to proceed between those operations.",
