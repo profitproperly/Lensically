@@ -11866,7 +11866,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       account_data_loaded: true,
       next_call_requirement: {
         proceed_confirmed: true,
-        continuity_token: "Reuse this exact token on every later account-scoped call in this chat.",
+                continuity_ref: "Reuse this exact UUID on every later account-scoped call in this chat.",
         operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
       },
     };
