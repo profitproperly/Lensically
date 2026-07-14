@@ -1370,6 +1370,8 @@ describe("operator mode MCP endpoint", () => {
             "get_post_results",
       "selectOperatorKey",
       "confirmOperatorProceed",
+      "resolveContinuationContext",
+      "planOperatorExecution",
       "getMcpAdminState",
       "inspectMcpFailure",
       "listMcpTools",
