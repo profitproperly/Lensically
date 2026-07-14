@@ -11213,7 +11213,7 @@ function operatorSemanticOperationIdentity(toolName: string, args: Record<string
   if (explicit) return explicit;
   const brand = requestedMcpBrandKey(toolName, args) ?? "unscoped";
   const session = normalizeOperatorText(args.workflow_session_id, 120, true) ?? "no-session";
-  if (toolName === "resolveContinuationContext") return normalizeOperatorText(args.continuation_nonce, 2000, true);
+    if (toolName === "resolveContinuationContext") return normalizeOperatorText(args.continuation_ref ?? args.continuation_nonce, 2000, true);
   if (toolName === "start_workflow_session") return `${brand}:active:${String(args.workflow_template_key ?? OPERATOR_WORKFLOW_TEMPLATE_KEY)}`;
   if (toolName === "draw_source_candidate_batch") return `${brand}:${session}:daily-source-batch`;
   if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? `${session}:${String(args.sequence_label ?? "unlabeled")}`)}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
