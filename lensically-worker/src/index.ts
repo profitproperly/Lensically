@@ -10128,12 +10128,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!scheduled.success || !scheduled.scheduledPostId) {
       return operatorJsonResponse({ success: false, error: scheduled.error ?? "schedule_failed" }, 400);
     }
-    await env.DB.prepare(
+        await env.DB.prepare(
       `UPDATE gpt_generation_drafts
        SET status = 'scheduled', scheduled_post_id = ?
        WHERE id = ?
          AND account_id = ?`,
     ).bind(scheduled.scheduledPostId, draftId, brand.account_id).run();
+    await env.DB.prepare(
+      `UPDATE operator_daily_source_claims
+       SET status = 'scheduled', scheduled_post_id = ?
+       WHERE brand_key = ? AND draft_id = ?`,
+    ).bind(scheduled.scheduledPostId, brand.brand_key, draftId).run();
     await upsertGptPostStrategyTag(env, {
       scheduledPostId: scheduled.scheduledPostId,
       accountId: brand.account_id,
