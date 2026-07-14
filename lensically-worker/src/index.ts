@@ -11201,12 +11201,14 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     };
   }
 
-  if (toolName === "confirmOperatorProceed") {
+    if (toolName === "confirmOperatorProceed") {
     const brandKey = normalizeGptBrandKey(args.brand_key);
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
+    const continuationNonce = await createOperatorContinuationNonce(env, brandKey);
     return {
+
       ok: true,
       selected_key: brandKey,
       proceeded: true,
