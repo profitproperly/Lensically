@@ -103,9 +103,24 @@ function textToBase64(value: string): string {
 
 async function repoFile(env: Env, path: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null }> {
   const config = repo(env);
-  const result = await github(env, `/repos/${config.owner}/${config.repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(config.branch)}`);
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const result = await github(env, `/repos/${config.owner}/${config.repo}/contents/${encodedPath}?ref=${encodeURIComponent(config.branch)}`);
   const data = result.data && typeof result.data === "object" && !Array.isArray(result.data) ? result.data as Record<string, unknown> : null;
-  return { ok: result.ok, status: result.status, sha: typeof data?.sha === "string" ? data.sha : null, content: typeof data?.content === "string" ? base64ToText(data.content) : null };
+  const content = typeof data?.content === "string" && data.content.trim() ? base64ToText(data.content) : null;
+  const sha = typeof data?.sha === "string" ? data.sha : null;
+  if (result.ok && content && sha) return { ok: true, status: result.status, sha, content };
+
+  const tree = await github(env, `/repos/${config.owner}/${config.repo}/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
+  const entries = Array.isArray((tree.data as Record<string, unknown> | null)?.tree)
+    ? (tree.data as { tree: Array<Record<string, unknown>> }).tree
+    : [];
+  const entry = entries.find((item) => item.type === "blob" && item.path === path);
+  const blobSha = typeof entry?.sha === "string" ? entry.sha : null;
+  if (!tree.ok || !blobSha) return { ok: false, status: tree.status || result.status, sha: null, content: null };
+  const blob = await github(env, `/repos/${config.owner}/${config.repo}/git/blobs/${blobSha}`);
+  const blobData = blob.data && typeof blob.data === "object" && !Array.isArray(blob.data) ? blob.data as Record<string, unknown> : null;
+  const blobContent = typeof blobData?.content === "string" ? base64ToText(blobData.content) : null;
+  return { ok: blob.ok && Boolean(blobContent), status: blob.status, sha: blobSha, content: blobContent };
 }
 
 async function commitRepoFileViaGitData(env: Env, path: string, content: string, message: string): Promise<{ ok: boolean; status: number; commit_sha: string | null; phase?: string }> {
