@@ -11760,11 +11760,15 @@ async function getOperatorMcpBoundaryBlock(
   if (effectiveToolName === "resolveContinuationContext") {
     return null;
   }
-    const continuityCredential = operatorMcpContinuityToken(toolName, args);
-  const continuityReference = await readOperatorContinuityReference(env, continuityCredential, "continuity_context", requestedBrand);
-  const legacyContinuity = continuityReference ? null : await verifyOperatorContinuityToken(env, continuityCredential, requestedBrand);
-  const continuity = continuityReference ?? legacyContinuity;
-  if (!continuity) {
+      const continuityLoaded = operatorMcpContinuityLoaded(toolName, args);
+  const serverContinuity = requestedBrand
+    ? await readLatestOperatorContinuityState(env, "continuity_context", requestedBrand)
+    : null;
+  const legacyCredential = operatorMcpLegacyContinuityCredential(toolName, args);
+  const legacyReference = serverContinuity ? null : await readOperatorContinuityReference(env, legacyCredential, "continuity_context", requestedBrand);
+  const legacyContinuity = serverContinuity || legacyReference ? null : await verifyOperatorContinuityToken(env, legacyCredential, requestedBrand);
+  const continuity = serverContinuity ?? legacyReference ?? legacyContinuity;
+  if (!continuityLoaded || !continuity) {
     return {
       ok: false,
       error: "continuity_context_required",
@@ -11773,10 +11777,10 @@ async function getOperatorMcpBoundaryBlock(
       required_next_tool: "resolveContinuationContext",
       required_arguments: {
         proceed_confirmed: true,
-                continuation_choice: ["resume_existing_workflow", "start_fresh_workflow"],
-        continuation_ref: "Use the opaque UUID returned by confirmOperatorProceed.",
+        continuation_choice: ["resume_existing_workflow", "start_fresh_workflow"],
       },
-      message: "Canonical continuity must be resolved before any account-scoped work. Conversation memory is not accepted as workflow state.",
+      later_call_requirement: { continuity_loaded: true },
+      message: "Canonical continuity must be resolved before account-scoped work. The backend stores continuity state; no generated handle is passed between tools.",
     };
   }
   const tokenSession = normalizeOperatorText(continuity.workflow_session_id, 120, true);
