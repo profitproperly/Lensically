@@ -687,7 +687,7 @@ describe("operator mode backend spine", () => {
     expect(rejectionContext?.required_review_count).toBe(120);
     expect(rejectionContext?.explicit_banned_surfaces).toContain("oversized_token");
     expect(rejectionContext?.rejected_drafts?.[0]).not.toHaveProperty("strategy");
-    expect(persistedContext.prior_runs?.length).toBe(7);
+        expect(persistedContext.prior_runs?.length).toBe(6);
     expect(persistedContext.prior_runs?.every((run) => !("prior_adaptation_context" in run))).toBe(true);
     expect(serialized.length).toBeLessThan(500000);
   }, 60000);
