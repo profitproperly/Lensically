@@ -12814,8 +12814,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       name: "getWorkflowStatus",
       arguments: {
         brand_key: "manifest_mental",
-                proceed_confirmed: true,
-        continuity_ref: continuationContent.continuity_ref,
+                        proceed_confirmed: true,
+        continuity_loaded: true,
       },
     });
 
