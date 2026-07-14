@@ -383,12 +383,12 @@ const OPERATOR_REJECTION_MEMORY_CONTRACT = {
   infrastructure_scope: "universal",
   evidence_scope: "selected_account",
   required_generation_behavior: [
-    "Load the selected account's owner-rejected drafts and rejection-feedback memory before candidate generation.",
-    "Use the rejection context during silent self-rejection; do not wait for the owner to repeat an existing lesson.",
-    "Persist the rejection context with the generation run so a fresh chat can resume with the same evidence.",
+    "Persist a compact selected-account rejection context with each generation run so fresh chats retain explicit hard bans.",
+    "For manifest_mental, enforce only words, phrases, surfaces, or patterns the owner explicitly marked as banned; do not treat every rejected draft as a semantic constraint.",
+    "Manifest generation should stay close to the approved source: preserve the hook, structure, meaning, tone, and payoff, make only slight wording changes, and do not invent scenes or premises.",
   ],
   required_gate_keys: ["historical_owner_rejection_gate", "required_gate_execution_gate"],
-  showability_rule: "A draft cannot become showable unless all account rejection records in the run context were reviewed, no historical rejection is repeated, and every active blocking gate executed with an auditable result.",
+  showability_rule: "For manifest_mental, a draft is blocked by an exact source copy, an explicit owner hard ban, or a missing required gate. Close source mimicry is allowed and preferred.",
 } as const;
 
 
