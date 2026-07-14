@@ -11845,13 +11845,23 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     const session = await resolveOperatorContinuationSession(env, brandKey, choice, requestedSessionId);
     const capsule = await buildOperatorContinuityCapsule(request, env, brand, session, choice);
     const workflowSessionId = normalizeOperatorText((capsule.workflow_checkpoint as Record<string, unknown> | undefined)?.workflow_session_id, 120, true);
-    const continuityToken = await createOperatorContinuityToken(env, brandKey, choice, workflowSessionId);
+        const continuityRef = await createOperatorContinuityReference(env, {
+      kind: "continuity_context",
+      brandKey,
+      workflowSessionId,
+      continuationChoice: choice,
+      ttlSeconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+      payload: {
+        continuity_version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+        execution_policy_version: OPERATOR_EXECUTION_POLICY_VERSION,
+      },
+    });
     return {
       ok: true,
       selected_key: brandKey,
       continuation_choice: choice,
-      continuity_token: continuityToken,
-      continuity_token_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
+      continuity_ref: continuityRef,
+      continuity_ref_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
       account_data_loaded: true,
       next_call_requirement: {
