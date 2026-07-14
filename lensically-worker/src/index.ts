@@ -8284,6 +8284,43 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!session) {
       return operatorJsonResponse({ success: false, error: "active_workflow_session_required" }, 400);
     }
+    const existingBatch = await env.DB.prepare(
+      `SELECT * FROM operator_source_selection_batches
+       WHERE brand_key = ? AND workflow_session_id = ?
+       ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(brand.brand_key, workflowSessionId).first<Record<string, unknown>>();
+    if (existingBatch?.id) {
+      const existingSelections = await env.DB.prepare(
+        `SELECT * FROM operator_source_selections
+         WHERE batch_id = ? AND brand_key = ? ORDER BY draw_order ASC`,
+      ).bind(String(existingBatch.id), brand.brand_key).all<Record<string, unknown>>();
+      return operatorJsonResponse({
+        source_batch_id: existingBatch.id,
+        workflow_session_id: workflowSessionId,
+        selection_method: existingBatch.selection_method,
+        eligibility_min_likes: Number(existingBatch.eligibility_min_likes ?? MANIFEST_SOURCE_MIN_VERIFIED_LIKES),
+        qualified_pool_count: Number(existingBatch.qualified_pool_count ?? 0),
+        selected_count: Number(existingBatch.selected_count ?? existingSelections.results?.length ?? 0),
+        cross_day_repetition_allowed: true,
+        cross_day_cooldown_applied: false,
+        posting_order_source: "draw_order",
+        selections: (existingSelections.results ?? []).map((row) => ({
+          source_selection_id: row.id,
+          source_batch_id: row.batch_id,
+          draw_order: Number(row.draw_order ?? 0),
+          source_identity_key: row.source_identity_key,
+          source_type: row.source_type,
+          internal_source_id: row.internal_source_id,
+          threads_post_id: row.threads_post_id ?? null,
+          canonical_source_url: row.canonical_source_url ?? null,
+          text: row.post_text,
+          metrics_snapshot: safeParseJsonString(String(row.metrics_snapshot_json ?? "{}")) ?? {},
+          source_card_id: row.source_card_id ?? null,
+        })),
+        reused_existing: true,
+        idempotency_reason: "workflow_source_batch_already_exists",
+      });
+    }
 
     const sourceTypes = Array.isArray(payload.source_types)
       ? payload.source_types.map((value) => String(value))
