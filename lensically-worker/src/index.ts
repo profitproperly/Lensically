@@ -8545,6 +8545,342 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
+    if (toolName === "get_hourly_coverage") {
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    const startDate = normalizeOperatorText(payload.start_date, 20, true);
+    const horizonDays = Math.min(Math.max(Math.trunc(Number(payload.horizon_days ?? 14)), 1), 60);
+    return operatorJsonResponse(await getOperatorHourlyCoverage(env, brand, timezone, horizonDays, startDate));
+  }
+
+  if (toolName === "claim_manifest_review_batch") {
+    if (brand.brand_key !== "manifest_mental") {
+      return operatorJsonResponse({ success: false, error: "review_batch_not_configured_for_brand" }, 400);
+    }
+    const productionDate = normalizeOperatorText(payload.production_date, 20);
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    if (!productionDate || !isValidIsoDate(productionDate)) {
+      return operatorJsonResponse({ success: false, error: "valid_production_date_required" }, 400);
+    }
+    let session = await getActiveOperatorSession(env, brand.brand_key);
+    if (!session) {
+      const sessionId = crypto.randomUUID();
+      await env.DB.prepare(
+        `INSERT INTO operator_workflow_sessions (
+          id, brand_key, workflow_template_key, objective, status, current_stage, notes
+        ) VALUES (?, ?, ?, NULL, 'active', 'calendar_coverage', ?)`,
+      ).bind(sessionId, brand.brand_key, OPERATOR_WORKFLOW_TEMPLATE_KEY, "Created automatically by calendar-first production workflow.").run();
+      session = await getActiveOperatorSession(env, brand.brand_key);
+    }
+    const workflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true)
+      ?? normalizeOperatorText(session?.id, 120, true);
+    if (!workflowSessionId) {
+      return operatorJsonResponse({ success: false, error: "workflow_session_unavailable" }, 400);
+    }
+
+    if (payload.fresh_draw === true) {
+      await env.DB.prepare(
+        `UPDATE operator_review_batches SET status = 'retired'
+         WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')`,
+      ).bind(brand.brand_key).run();
+    } else {
+      const existingReview = await env.DB.prepare(
+        `SELECT id FROM operator_review_batches
+         WHERE brand_key = ? AND production_date = ?
+           AND status IN ('building', 'owner_review', 'partially_resolved')
+         ORDER BY datetime(updated_at) DESC LIMIT 1`,
+      ).bind(brand.brand_key, productionDate).first<{ id: string }>();
+      if (existingReview?.id) {
+        const serialized = await serializeManifestReviewBatch(env, brand, existingReview.id);
+        return operatorJsonResponse({ ...serialized, reused_existing: true, idempotency_reason: "active_review_batch_already_exists" });
+      }
+    }
+
+    const sourceTypes = Array.isArray(payload.source_types) ? payload.source_types.map(String) : [];
+    let sourceBatch;
+    try {
+      sourceBatch = await ensureManifestSourceBatchForDate(
+        env,
+        brand,
+        workflowSessionId,
+        productionDate,
+        sourceTypes,
+        payload.fresh_draw === true,
+      );
+    } catch (error) {
+      return operatorJsonResponse({ success: false, error: error instanceof Error ? error.message : "source_batch_failed" }, 400);
+    }
+
+    const reviewBatchId = crypto.randomUUID();
+    const requestedSize = Math.min(Math.max(Math.trunc(Number(payload.batch_size ?? MANIFEST_REVIEW_BATCH_SIZE)), 1), MANIFEST_REVIEW_BATCH_SIZE);
+    await env.DB.prepare(
+      `INSERT INTO operator_review_batches (
+        id, brand_key, workflow_session_id, source_batch_id, production_date, timezone, batch_size, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'building')`,
+    ).bind(
+      reviewBatchId,
+      brand.brand_key,
+      workflowSessionId,
+      sourceBatch.batch.id,
+      productionDate,
+      timezone,
+      requestedSize,
+    ).run();
+
+    const available = await env.DB.prepare(
+      `SELECT s.*
+       FROM operator_source_selections s
+       LEFT JOIN operator_daily_source_claims c
+         ON c.brand_key = s.brand_key
+        AND c.production_date = ?
+        AND c.source_identity_key = s.source_identity_key
+       WHERE s.batch_id = ? AND s.brand_key = ?
+         AND c.id IS NULL
+         AND COALESCE(s.disposition, 'pending') NOT IN ('skipped', 'invalidated', 'claimed')
+       ORDER BY s.draw_order ASC`,
+    ).bind(productionDate, String(sourceBatch.batch.id), brand.brand_key).all<Record<string, unknown>>();
+
+    let itemNumber = 1;
+    for (const selection of available.results ?? []) {
+      if (itemNumber > requestedSize) break;
+      const claimId = crypto.randomUUID();
+      try {
+        await env.DB.prepare(
+          `INSERT INTO operator_daily_source_claims (
+            id, brand_key, production_date, timezone, source_identity_key, source_type,
+            internal_source_id, source_batch_id, source_selection_id, workflow_session_id,
+            review_batch_id, review_item_number, source_card_id, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'claimed')`,
+        ).bind(
+          claimId,
+          brand.brand_key,
+          productionDate,
+          timezone,
+          String(selection.source_identity_key ?? ""),
+          String(selection.source_type ?? ""),
+          String(selection.internal_source_id ?? ""),
+          String(selection.batch_id ?? sourceBatch.batch.id),
+          String(selection.id),
+          workflowSessionId,
+          reviewBatchId,
+          itemNumber,
+          selection.source_card_id ?? null,
+        ).run();
+      } catch {
+        continue;
+      }
+      await env.DB.prepare(
+        `UPDATE operator_source_selections
+         SET disposition = 'claimed', disposition_reason = ?, disposition_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND brand_key = ?`,
+      ).bind(`production_date:${productionDate}`, selection.id, brand.brand_key).run();
+      itemNumber += 1;
+    }
+
+    if (itemNumber === 1) {
+      await env.DB.prepare(`UPDATE operator_review_batches SET status = 'empty' WHERE id = ?`).bind(reviewBatchId).run();
+      return operatorJsonResponse({ success: false, error: "no_unclaimed_sources_available", production_date: productionDate }, 409);
+    }
+    await env.DB.prepare(
+      `UPDATE operator_workflow_sessions SET current_stage = 'review_batch_generation'
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(workflowSessionId, brand.brand_key).run();
+    const serialized = await serializeManifestReviewBatch(env, brand, reviewBatchId);
+    return operatorJsonResponse({ ...serialized, source_batch_reused: sourceBatch.reused_existing, fresh_draw: payload.fresh_draw === true });
+  }
+
+  if (toolName === "get_manifest_review_batch") {
+    if (brand.brand_key !== "manifest_mental") {
+      return operatorJsonResponse({ success: false, error: "review_batch_not_configured_for_brand" }, 400);
+    }
+    let reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120, true);
+    if (!reviewBatchId) {
+      const productionDate = normalizeOperatorText(payload.production_date, 20, true);
+      const row = productionDate
+        ? await env.DB.prepare(
+          `SELECT id FROM operator_review_batches
+           WHERE brand_key = ? AND production_date = ?
+             AND status IN ('building', 'owner_review', 'partially_resolved')
+           ORDER BY datetime(updated_at) DESC LIMIT 1`,
+        ).bind(brand.brand_key, productionDate).first<{ id: string }>()
+        : await env.DB.prepare(
+          `SELECT id FROM operator_review_batches
+           WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
+           ORDER BY datetime(updated_at) DESC LIMIT 1`,
+        ).bind(brand.brand_key).first<{ id: string }>();
+      reviewBatchId = row?.id ?? null;
+    }
+    if (!reviewBatchId) return operatorJsonResponse({ success: false, error: "active_review_batch_not_found" }, 404);
+    const serialized = await serializeManifestReviewBatch(env, brand, reviewBatchId);
+    return serialized ? operatorJsonResponse(serialized) : operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
+  }
+
+  if (toolName === "attach_manifest_review_draft") {
+    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
+    const itemNumber = Math.trunc(Number(payload.item_number));
+    const draftId = normalizeOperatorText(payload.draft_id, 120);
+    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
+    if (!reviewBatchId || !Number.isInteger(itemNumber) || itemNumber < 1 || itemNumber > MANIFEST_REVIEW_BATCH_SIZE || !draft) {
+      return operatorJsonResponse({ success: false, error: "review_batch_item_and_draft_required" }, 400);
+    }
+    if (!draft.showable || !["shown", "approved", "scheduled", "published"].includes(draft.status)) {
+      return operatorJsonResponse({ success: false, error: "passing_shown_draft_required", draft_status: draft.status }, 400);
+    }
+    const claim = await env.DB.prepare(
+      `SELECT id FROM operator_daily_source_claims
+       WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
+    ).bind(reviewBatchId, itemNumber, brand.brand_key).first<{ id: string }>();
+    if (!claim) return operatorJsonResponse({ success: false, error: "review_batch_item_not_found" }, 404);
+    await env.DB.prepare(
+      `UPDATE operator_daily_source_claims
+       SET source_card_id = ?, generation_run_id = ?, draft_id = ?, status = ?
+       WHERE id = ?`,
+    ).bind(
+      normalizeOperatorText(payload.source_card_id, 120, true) ?? draft.source_card_id,
+      normalizeOperatorText(payload.generation_run_id, 120, true) ?? draft.run_id,
+      draftId,
+      draft.status === "approved" ? "approved" : draft.status === "scheduled" || draft.status === "published" ? draft.status : "shown",
+      claim.id,
+    ).run();
+    await env.DB.prepare(`UPDATE operator_review_batches SET status = 'owner_review' WHERE id = ?`).bind(reviewBatchId).run();
+    return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, reviewBatchId)) ?? {});
+  }
+
+  if (toolName === "skip_manifest_review_source") {
+    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
+    const itemNumber = Math.trunc(Number(payload.item_number));
+    const scope = normalizeOperatorMachineKey(payload.scope, "current_day");
+    const reason = normalizeOperatorText(payload.reason, 2000, true) ?? "Owner rejected source for production use.";
+    const claim = await env.DB.prepare(
+      `SELECT * FROM operator_daily_source_claims
+       WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
+    ).bind(reviewBatchId, itemNumber, brand.brand_key).first<Record<string, unknown>>();
+    if (!claim) return operatorJsonResponse({ success: false, error: "review_batch_item_not_found" }, 404);
+    if (scope === "delete_source") {
+      if (claim.source_type !== "saved_pattern") {
+        return operatorJsonResponse({ success: false, error: "only_saved_patterns_can_be_deleted_as_sources" }, 400);
+      }
+      await env.DB.prepare(
+        `INSERT INTO operator_source_exclusions (
+          id, brand_key, source_identity_key, source_type, internal_source_id, reason, active
+        ) VALUES (?, ?, ?, ?, ?, ?, 1)
+        ON CONFLICT(brand_key, source_identity_key) DO UPDATE SET
+          active = 1, reason = excluded.reason, updated_at = CURRENT_TIMESTAMP`,
+      ).bind(
+        crypto.randomUUID(), brand.brand_key, claim.source_identity_key, claim.source_type,
+        claim.internal_source_id, reason,
+      ).run();
+    }
+    const nextStatus = scope === "delete_source" ? "source_deleted" : "source_skipped";
+    await env.DB.prepare(
+      `UPDATE operator_daily_source_claims SET status = ?, disposition_reason = ? WHERE id = ?`,
+    ).bind(nextStatus, reason, claim.id).run();
+    await env.DB.prepare(
+      `UPDATE operator_source_selections
+       SET disposition = 'skipped', disposition_reason = ?, disposition_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(nextStatus, claim.source_selection_id, brand.brand_key).run();
+    const unresolved = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_daily_source_claims
+       WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
+    ).bind(reviewBatchId).first<{ total: number }>();
+    await env.DB.prepare(
+      `UPDATE operator_review_batches SET status = ? WHERE id = ?`,
+    ).bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", reviewBatchId).run();
+    return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, reviewBatchId)) ?? {});
+  }
+
+  if (toolName === "schedule_manifest_review_batch") {
+    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
+    const batch = reviewBatchId
+      ? await env.DB.prepare(`SELECT * FROM operator_review_batches WHERE id = ? AND brand_key = ? LIMIT 1`).bind(reviewBatchId, brand.brand_key).first<Record<string, unknown>>()
+      : null;
+    if (!batch) return operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
+    const productionDate = String(batch.production_date);
+    const timezone = String(batch.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
+    const requestedNumbers = Array.isArray(payload.item_numbers)
+      ? new Set(payload.item_numbers.map((value) => Math.trunc(Number(value))).filter((value) => Number.isInteger(value)))
+      : null;
+    const local = operatorLocalDateTimeParts(new Date(), timezone);
+    const firstEligibleHour = productionDate === local.date ? Math.min(local.hour + 1, 24) : 0;
+    const scheduledToday = await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, productionDate, timezone);
+    const occupied = new Set<number>();
+    for (const item of scheduledToday) {
+      const localTime = String((item as Record<string, unknown>).local_time ?? (item as Record<string, unknown>).scheduled_time_local ?? "");
+      const hour = Number(localTime.match(/(?:\s|^)(\d{1,2}):\d{2}/)?.[1] ?? localTime.split(":")[0]);
+      if (Number.isInteger(hour)) occupied.add(hour);
+    }
+    const openSlots = Array.from({ length: Math.max(24 - firstEligibleHour, 0) }, (_, index) => firstEligibleHour + index)
+      .filter((hour) => !occupied.has(hour))
+      .map(operatorHourlySlot);
+    const claims = await env.DB.prepare(
+      `SELECT c.*, d.status AS draft_status, d.text AS draft_text, d.source_card_id
+       FROM operator_daily_source_claims c
+       JOIN gpt_generation_drafts d ON d.id = c.draft_id AND d.account_id = ?
+       WHERE c.review_batch_id = ? AND c.brand_key = ?
+         AND c.status = 'approved' AND d.status = 'approved'
+       ORDER BY c.review_item_number ASC`,
+    ).bind(brand.account_id, reviewBatchId, brand.brand_key).all<Record<string, unknown>>();
+    const eligibleClaims = (claims.results ?? []).filter((claim) => !requestedNumbers || requestedNumbers.has(Number(claim.review_item_number)));
+    if (openSlots.length < eligibleClaims.length) {
+      return operatorJsonResponse({ success: false, error: "insufficient_open_hourly_slots", open_slots: openSlots, approved_items: eligibleClaims.length }, 409);
+    }
+    const results: Record<string, unknown>[] = [];
+    for (let index = 0; index < eligibleClaims.length; index += 1) {
+      const claim = eligibleClaims[index];
+      const time = openSlots[index];
+      const draft = await getOperatorDraft(env, brand, String(claim.draft_id));
+      if (!draft) continue;
+      const gateRun = await runOperatorGates(env, {
+        brand,
+        draftId: draft.id,
+        sourceCardId: draft.source_card_id,
+        draftText: draft.text,
+        stageScope: "scheduling",
+        scheduling: { date: productionDate, time, timezone },
+      });
+      if (!gateRun.showable) {
+        results.push({ item_number: claim.review_item_number, success: false, error: "scheduling_gates_failed", gate_results: gateRun.gate_results });
+        continue;
+      }
+      const scheduled = await createScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id, draft.text, productionDate, time, timezone);
+      if (!scheduled.success || !scheduled.scheduledPostId) {
+        results.push({ item_number: claim.review_item_number, success: false, error: scheduled.error ?? "schedule_failed" });
+        continue;
+      }
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE gpt_generation_drafts SET status = 'scheduled', scheduled_post_id = ?
+           WHERE id = ? AND account_id = ?`,
+        ).bind(scheduled.scheduledPostId, draft.id, brand.account_id),
+        env.DB.prepare(
+          `UPDATE operator_daily_source_claims SET status = 'scheduled', scheduled_post_id = ? WHERE id = ?`,
+        ).bind(scheduled.scheduledPostId, claim.id),
+      ]);
+      await insertOperatorInventory(env, {
+        brandKey: brand.brand_key,
+        sourceType: "scheduled_post",
+        sourceId: String(scheduled.scheduledPostId),
+        text: draft.text,
+        sourceCardId: draft.source_card_id,
+        status: "scheduled",
+        strategy: draft.strategy && typeof draft.strategy === "object" ? draft.strategy as Record<string, unknown> : null,
+      });
+      results.push({ item_number: Number(claim.review_item_number), success: true, scheduled_post_id: scheduled.scheduledPostId, date: productionDate, time, timezone });
+    }
+    const unresolved = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_daily_source_claims
+       WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
+    ).bind(reviewBatchId).first<{ total: number }>();
+    await env.DB.prepare(`UPDATE operator_review_batches SET status = ? WHERE id = ?`)
+      .bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", reviewBatchId).run();
+    return operatorJsonResponse({
+      review_batch_id: reviewBatchId,
+      production_date: productionDate,
+      results,
+      review_batch: await serializeManifestReviewBatch(env, brand, reviewBatchId),
+    });
+  }
+
   if (toolName === "start_workflow_session") {
     const existingSession = await getActiveOperatorSession(env, brand.brand_key);
     if (existingSession?.id) {
