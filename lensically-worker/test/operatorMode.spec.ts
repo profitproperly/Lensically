@@ -1220,7 +1220,9 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
                 expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
-        expect(initialized.instructions).toContain("include proceed_confirmed=true on account-scoped calls");
+        expect(initialized.instructions).toContain("pick up where the persisted workflow left off or start fresh");
+        expect(initialized.instructions).toContain("Do not load account/workflow state or create a session until the owner explicitly chooses");
+        expect(initialized.instructions).toContain("include proceed_confirmed=true on the selected account-scoped path");
         expect(initialized.instructions).toContain("generation_run_and_candidates and gate_evaluation are silent internal stages");
     expect(initialized.instructions).toContain("Owner-visible transition labels are mandatory across accounts and fresh chats");
     expect(initialized.instructions).toContain("Completed:, Showing now:, and Next decision:");
