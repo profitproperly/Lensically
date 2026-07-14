@@ -116,9 +116,9 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
 async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
   const requestedBrand = testRequestedBrandKey(toolName, args);
   let callArgs = args;
-  if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") {
+  if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && toolName !== "resolveContinuationContext") {
     await ensureMcpAccountOpen(requestedBrand);
-    callArgs = { ...args, proceed_confirmed: true };
+    callArgs = { ...args, proceed_confirmed: true, continuity_token: mcpContinuityToken };
   }
   const result = await mcpToolRaw<T>(toolName, callArgs);
   expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
