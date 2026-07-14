@@ -42,7 +42,7 @@ jobs:
           node scripts/finalize-continuity-hardening.mjs
           git config user.name "lensically-engineering"
           git config user.email "lensically-engineering@users.noreply.github.com"
-          git add -A -- .github/workflows/lensically-engineering.yml scripts/finalize-continuity-hardening.mjs lensically-worker/src/index.ts lensically-worker/test/operatorMode.spec.ts
+          git add -- lensically-worker/src/index.ts lensically-worker/test/operatorMode.spec.ts
           if ! git diff --cached --quiet; then
             git commit -m "Finalize universal continuity hardening"
             git push origin HEAD:main
