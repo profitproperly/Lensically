@@ -8861,7 +8861,7 @@ const GENERATION_ADAPTATION_PLAN_SCHEMA = {
 
 const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
   type: "object",
-  description: "Gate evidence for the active source transformation contract. Copy contract wording exactly into preserved_functions, transformed_elements roles, and satisfied_time_or_context_requirements so backend checks are auditable.",
+  description: "Gate evidence for the active source contract. For Manifest, record preserved hook/function/time requirements and audience reward; transformed_elements is optional because close source mimicry is preferred.",
   properties: {
     opening_phrase: { type: "string" },
     realm_entrance_key: { type: "string" },
