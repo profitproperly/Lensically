@@ -8843,7 +8843,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         results.push({ item_number: claim.review_item_number, success: false, error: scheduled.error ?? "schedule_failed" });
         continue;
       }
-      await env.DB.batch([
+            await env.DB.batch([
         env.DB.prepare(
           `UPDATE gpt_generation_drafts SET status = 'scheduled', scheduled_post_id = ?
            WHERE id = ? AND account_id = ?`,
@@ -8852,6 +8852,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           `UPDATE operator_daily_source_claims SET status = 'scheduled', scheduled_post_id = ? WHERE id = ?`,
         ).bind(scheduled.scheduledPostId, claim.id),
       ]);
+      await upsertGptPostStrategyTag(env, {
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+        scheduledPostId: scheduled.scheduledPostId,
+        strategy: draft.strategy && typeof draft.strategy === "object"
+          ? draft.strategy as Record<string, unknown>
+          : {},
+      });
       await insertOperatorInventory(env, {
         brandKey: brand.brand_key,
         sourceType: "scheduled_post",
