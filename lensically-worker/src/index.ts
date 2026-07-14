@@ -7754,12 +7754,21 @@ async function buildOperatorContinuityCapsule(
       scheduled_post_id: scheduledPost?.id ?? draft?.scheduled_post_id ?? null,
       published_post_id: scheduledPost?.published_post_id ?? draft?.published_post_id ?? null,
     },
-    source_batch_progress: sourceBatch ? {
+        source_batch_progress: sourceBatch ? {
       selected_count: Number(sourceBatch.selected_count ?? selectionRows.length),
       completed_count: Number(completedSources?.total ?? 0),
-      remaining_count: Math.max(Number(sourceBatch.selected_count ?? selectionRows.length) - Number(completedSources?.total ?? 0), 0),
+      skipped_count: skippedSelectionCount,
+      remaining_count: Math.max(
+        Number(sourceBatch.selected_count ?? selectionRows.length)
+        - Number(completedSources?.total ?? 0)
+        - skippedSelectionCount,
+        0,
+      ),
+      workflow_sequence_completed: workflowSequenceAnchor,
+      continuation_anchor_draw_order: continuityAnchorDrawOrder || null,
       next_draw_order: nextSelection ? Number(nextSelection.draw_order ?? 0) : null,
       draw_order_preserved: true,
+      historical_gaps_preserved_as_skips: true,
       redraw_forbidden_on_resume: choice === "resume_existing_workflow",
     } : null,
     next_artifact: nextSelection ? {
