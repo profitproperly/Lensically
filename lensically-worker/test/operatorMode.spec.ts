@@ -1779,81 +1779,33 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(active?.total ?? 0)).toBe(1);
   }, 30000);
 
-  it("resume continuity returns the exact next unresolved source without redrawing", async () => {
-    const fixture = await createLockedSourceCard([], "manifest_mental");
-    await env.DB.prepare(
-      `INSERT INTO gpt_generation_drafts (
-        id, run_id, account_id, threads_user_id, source_card_id, draft_index, text, status, showable
-      ) VALUES (?, ?, 'manifest-mental', 'manifest-mental', ?, 1, ?, 'scheduled', 1)`,
-    ).bind("scheduled-continuity-fixture", fixture.runId, fixture.sourceCardId, "Scheduled fixture post.").run();
-        const originalBatch = await env.DB.prepare(
-      `SELECT id FROM operator_source_selection_batches WHERE workflow_session_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
-    ).bind(fixture.sessionId).first<{ id: string }>();
-    const anchorSelection = await env.DB.prepare(
-      `SELECT id FROM operator_source_selections WHERE batch_id = ? AND draw_order = 10 LIMIT 1`,
-    ).bind(originalBatch?.id).first<{ id: string }>();
-    await env.DB.prepare(
-      `UPDATE operator_source_selections SET source_card_id = NULL WHERE source_card_id = ?`,
-    ).bind(fixture.sourceCardId).run();
-    await env.DB.prepare(
-      `UPDATE operator_source_selections SET source_card_id = ? WHERE id = ?`,
-    ).bind(fixture.sourceCardId, anchorSelection?.id).run();
-    await env.DB.prepare(
-      `UPDATE operator_source_cards SET source_selection_id = ?, sequence_label = '7 of 24' WHERE id = ?`,
-    ).bind(anchorSelection?.id, fixture.sourceCardId).run();
-            const proceeded = await mcpToolRaw<{ continuation_confirmation_recorded: boolean }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
-    expect(proceeded.structuredContent.continuation_confirmation_recorded).toBe(true);
-    const continued = await mcpToolRaw<{
+    it("automatic continuity prioritizes the earliest incomplete calendar day without redrawing", async () => {
+    await seedManifestPatterns(30);
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
+    const batch = await operatorTool<{ review_batch_id: string; source_batch_reused: boolean; items: Array<{ source_identity_key: string }> }>("claim_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      production_date: "2099-01-03",
+      timezone: "America/New_York",
+      fresh_draw: true,
+    });
+    const proceeded = await mcpToolRaw<{
       continuity_loaded: boolean;
       continuity_capsule: {
         workflow_checkpoint: { workflow_session_id: string; next_pending_action: string; canonical_next_tool: string };
-        active_artifact_ids: { source_batch_id: string; source_selection_id: string };
-                source_batch_progress: {
-          completed_count: number;
-          skipped_count: number;
-          remaining_count: number;
-          workflow_sequence_completed: number;
-          next_workflow_sequence: number;
-          continuation_anchor_draw_order: number;
-          next_draw_order: number;
-          redraw_forbidden_on_resume: boolean;
-        };
-        next_artifact: { draw_order: number; source_selection_id: string };
+        active_review_batch: { review_batch_id: string; items: Array<{ source_identity_key: string }> };
+        calendar_coverage: { earliest_incomplete_date: string | null };
       };
-    }>("resolveContinuationContext", {
-      brand_key: "manifest_mental",
-      proceed_confirmed: true,
-      continuation_choice: "resume_existing_workflow",
-      workflow_session_id: fixture.sessionId,
-    });
-    expect(continued.isError).not.toBe(true);
-    const capsule = continued.structuredContent.continuity_capsule;
-    expect(capsule.workflow_checkpoint.workflow_session_id).toBe(fixture.sessionId);
-    expect(capsule.workflow_checkpoint.next_pending_action).toBe("build_next_source_card");
-    expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("create_source_card");
-        expect(capsule.active_artifact_ids.source_batch_id).toBe(originalBatch?.id);
-    expect(capsule.source_batch_progress.completed_count).toBe(1);
-    expect(capsule.source_batch_progress.skipped_count).toBe(9);
-    expect(capsule.source_batch_progress.remaining_count).toBe(14);
-    expect(capsule.source_batch_progress.workflow_sequence_completed).toBe(7);
-    expect(capsule.source_batch_progress.next_workflow_sequence).toBe(8);
-    expect(capsule.source_batch_progress.continuation_anchor_draw_order).toBe(10);
-    expect(capsule.source_batch_progress.next_draw_order).toBe(11);
-    expect(capsule.source_batch_progress.redraw_forbidden_on_resume).toBe(true);
-    expect(capsule.next_artifact.draw_order).toBe(11);
-    const skipped = await env.DB.prepare(
-      `SELECT draw_order, disposition, disposition_reason
-       FROM operator_source_selections
-       WHERE batch_id = ? AND draw_order IN (5, 6, 9)
-       ORDER BY draw_order ASC`,
-    ).bind(originalBatch?.id).all<{ draw_order: number; disposition: string; disposition_reason: string }>();
-    expect(skipped.results).toEqual([
-      expect.objectContaining({ draw_order: 5, disposition: "skipped", disposition_reason: "historical_gap_before_continuity_anchor" }),
-      expect.objectContaining({ draw_order: 6, disposition: "skipped", disposition_reason: "historical_gap_before_continuity_anchor" }),
-      expect.objectContaining({ draw_order: 9, disposition: "skipped", disposition_reason: "historical_gap_before_continuity_anchor" }),
-    ]);
-    const batchCount = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE workflow_session_id = ?`).bind(fixture.sessionId).first<{ total: number }>();
-    expect(Number(batchCount?.total ?? 0)).toBe(1);
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(proceeded.isError).not.toBe(true);
+    const capsule = proceeded.structuredContent.continuity_capsule;
+    expect(capsule.workflow_checkpoint.workflow_session_id).toBe(session.workflow_session_id);
+    expect(capsule.workflow_checkpoint.next_pending_action).toBe("resume_review_batch");
+    expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("get_manifest_review_batch");
+    expect(capsule.active_review_batch.review_batch_id).toBe(batch.review_batch_id);
+    expect(capsule.active_review_batch.items.map((item) => item.source_identity_key)).toEqual(batch.items.map((item) => item.source_identity_key));
+    const sourceBatchCount = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE workflow_session_id = ?`).bind(session.workflow_session_id).first<{ total: number }>();
+    expect(Number(sourceBatchCount?.total ?? 0)).toBe(1);
   }, 40000);
 
   it("blocks wrapper hopping after a same-backend deterministic failure", async () => {
