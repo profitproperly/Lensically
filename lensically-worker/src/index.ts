@@ -11118,29 +11118,63 @@ function operatorMcpContinuityToken(toolName: string, args: Record<string, unkno
 }
 
 async function getOperatorMcpBoundaryBlock(
-
   _request: Request,
   env: Env,
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  if (!operatorMcpCallRequiresProceed(toolName, args) || operatorMcpProceedConfirmed(toolName, args)) {
+  if (!operatorMcpCallRequiresProceed(toolName, args)) {
     return null;
   }
-    const requestedBrand = requestedMcpBrandKey(toolName, args);
-  const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
-  return {
-
-    ok: false,
-    error: "explicit_proceed_required",
-    selected_key: requestedBrand,
-    account_data_loaded: false,
-    handshake: requestedBrand ? operatorKeyHandshakeLines(toolCount, requestedBrand) : null,
-    required_next_tool: "confirmOperatorProceed",
-    required_argument: { proceed_confirmed: true },
-    message: "Wait for explicit user approval, call confirmOperatorProceed for the selected key, then retry the account-scoped call with proceed_confirmed=true. Account data was not loaded.",
-  };
+  const requestedBrand = requestedMcpBrandKey(toolName, args);
+  if (!operatorMcpProceedConfirmed(toolName, args)) {
+    const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
+    return {
+      ok: false,
+      error: "explicit_proceed_required",
+      selected_key: requestedBrand,
+      account_data_loaded: false,
+      handshake: requestedBrand ? operatorKeyHandshakeLines(toolCount, requestedBrand) : null,
+      required_next_tool: "confirmOperatorProceed",
+      required_argument: { proceed_confirmed: true },
+      message: "Wait for explicit user approval, call confirmOperatorProceed for the selected key, then retry with proceed_confirmed=true. Account data was not loaded.",
+    };
+  }
+  if (toolName === "resolveContinuationContext") {
+    return null;
+  }
+  const continuity = await verifyOperatorContinuityToken(env, operatorMcpContinuityToken(toolName, args), requestedBrand);
+  if (!continuity) {
+    return {
+      ok: false,
+      error: "continuity_context_required",
+      selected_key: requestedBrand,
+      account_data_loaded: false,
+      required_next_tool: "resolveContinuationContext",
+      required_arguments: {
+        proceed_confirmed: true,
+        continuation_choice: ["resume_existing_workflow", "start_fresh_workflow"],
+        continuation_nonce: "Use the signed nonce returned by confirmOperatorProceed.",
+      },
+      message: "Canonical continuity must be resolved before any account-scoped work. Conversation memory is not accepted as workflow state.",
+    };
+  }
+  const tokenSession = normalizeOperatorText(continuity.workflow_session_id, 120, true);
+  const requestedSession = normalizeOperatorText(args.workflow_session_id, 120, true);
+  if (tokenSession && requestedSession && tokenSession !== requestedSession) {
+    return {
+      ok: false,
+      error: "continuity_session_mismatch",
+      selected_key: requestedBrand,
+      account_data_loaded: false,
+      continuity_workflow_session_id: tokenSession,
+      requested_workflow_session_id: requestedSession,
+      message: "The call targets a different workflow than the signed continuity capsule.",
+    };
+  }
+  return null;
 }
+
 
 async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: OperatorMcpAdminToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await prepareOperatorMode(env);
