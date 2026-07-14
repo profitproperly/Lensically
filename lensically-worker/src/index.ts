@@ -11742,8 +11742,8 @@ async function getOperatorMcpBoundaryBlock(
       required_next_tool: "resolveContinuationContext",
       required_arguments: {
         proceed_confirmed: true,
-        continuation_choice: ["resume_existing_workflow", "start_fresh_workflow"],
-        continuation_nonce: "Use the signed nonce returned by confirmOperatorProceed.",
+                continuation_choice: ["resume_existing_workflow", "start_fresh_workflow"],
+        continuation_ref: "Use the opaque UUID returned by confirmOperatorProceed.",
       },
       message: "Canonical continuity must be resolved before any account-scoped work. Conversation memory is not accepted as workflow state.",
     };
