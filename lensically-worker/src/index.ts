@@ -8840,11 +8840,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (sourceSelectionId) {
             sourceCardStatements.push(
         env.DB.prepare(
-          `UPDATE operator_source_selections
-           SET source_card_id = ?
+                    `UPDATE operator_source_selections
+           SET source_card_id = ?,
+               disposition = 'linked',
+               disposition_reason = 'source_card_linked',
+               disposition_at = CURRENT_TIMESTAMP,
+               workflow_sequence = COALESCE(?, workflow_sequence)
            WHERE id = ?
              AND brand_key = ?`,
-        ).bind(sourceCardId, sourceSelectionId, brand.brand_key),
+        ).bind(sourceCardId, parseOperatorWorkflowSequence(sequenceLabel), sourceSelectionId, brand.brand_key),
       );
     }
     await env.DB.batch(sourceCardStatements);
