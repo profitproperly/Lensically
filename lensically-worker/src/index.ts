@@ -10159,7 +10159,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
         `Full tool surface loaded: ${tools.length} tools available and usable.`,
         "Proceed to the next step?",
       ],
-      after_explicit_proceed: "Load selected account context with prepareFullPreflight or the appropriate account-scoped tools.",
+      after_explicit_proceed: "Ask the owner whether to resume the persisted workflow or start fresh. Do not load account/workflow state until the owner explicitly chooses. Resume continues from the exact persisted checkpoint; start fresh creates a new session while preserving prior work unless deletion is separately requested.",
     },
     tool_surface: {
       total_tools: tools.length,
