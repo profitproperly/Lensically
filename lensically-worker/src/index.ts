@@ -8748,7 +8748,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       `SELECT * FROM operator_daily_source_claims
        WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
     ).bind(reviewBatchId, itemNumber, brand.brand_key).first<Record<string, unknown>>();
-    if (!claim) return operatorJsonResponse({ success: false, error: "review_batch_item_not_found" }, 404);
+        if (!claim) return operatorJsonResponse({ success: false, error: "review_batch_item_not_found" }, 404);
+    const resolvedReviewBatchId = String(claim.review_batch_id ?? reviewBatchId);
     if (scope === "delete_source") {
       if (claim.source_type !== "saved_pattern") {
         return operatorJsonResponse({ success: false, error: "only_saved_patterns_can_be_deleted_as_sources" }, 400);
