@@ -108,6 +108,56 @@ async function repoFile(env: Env, path: string): Promise<{ ok: boolean; status: 
   return { ok: result.ok, status: result.status, sha: typeof data?.sha === "string" ? data.sha : null, content: typeof data?.content === "string" ? base64ToText(data.content) : null };
 }
 
+async function commitRepoFileViaGitData(env: Env, path: string, content: string, message: string): Promise<{ ok: boolean; status: number; commit_sha: string | null; phase?: string }> {
+  const config = repo(env);
+  const refPath = `/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(config.branch)}`;
+  const ref = await github(env, refPath);
+  const refData = ref.data && typeof ref.data === "object" && !Array.isArray(ref.data) ? ref.data as Record<string, unknown> : null;
+  const refObject = refData?.object && typeof refData.object === "object" && !Array.isArray(refData.object) ? refData.object as Record<string, unknown> : null;
+  const headSha = typeof refObject?.sha === "string" ? refObject.sha : null;
+  if (!ref.ok || !headSha) return { ok: false, status: ref.status, commit_sha: null, phase: "read_ref" };
+
+  const parent = await github(env, `/repos/${config.owner}/${config.repo}/git/commits/${headSha}`);
+  const parentData = parent.data && typeof parent.data === "object" && !Array.isArray(parent.data) ? parent.data as Record<string, unknown> : null;
+  const parentTree = parentData?.tree && typeof parentData.tree === "object" && !Array.isArray(parentData.tree) ? parentData.tree as Record<string, unknown> : null;
+  const baseTreeSha = typeof parentTree?.sha === "string" ? parentTree.sha : null;
+  if (!parent.ok || !baseTreeSha) return { ok: false, status: parent.status, commit_sha: null, phase: "read_parent_commit" };
+
+  const blob = await github(env, `/repos/${config.owner}/${config.repo}/git/blobs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ content, encoding: "utf-8" }),
+  });
+  const blobData = blob.data && typeof blob.data === "object" && !Array.isArray(blob.data) ? blob.data as Record<string, unknown> : null;
+  const blobSha = typeof blobData?.sha === "string" ? blobData.sha : null;
+  if (!blob.ok || !blobSha) return { ok: false, status: blob.status, commit_sha: null, phase: "create_blob" };
+
+  const tree = await github(env, `/repos/${config.owner}/${config.repo}/git/trees`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ base_tree: baseTreeSha, tree: [{ path, mode: "100644", type: "blob", sha: blobSha }] }),
+  });
+  const treeData = tree.data && typeof tree.data === "object" && !Array.isArray(tree.data) ? tree.data as Record<string, unknown> : null;
+  const treeSha = typeof treeData?.sha === "string" ? treeData.sha : null;
+  if (!tree.ok || !treeSha) return { ok: false, status: tree.status, commit_sha: null, phase: "create_tree" };
+
+  const commit = await github(env, `/repos/${config.owner}/${config.repo}/git/commits`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, tree: treeSha, parents: [headSha] }),
+  });
+  const commitData = commit.data && typeof commit.data === "object" && !Array.isArray(commit.data) ? commit.data as Record<string, unknown> : null;
+  const commitSha = typeof commitData?.sha === "string" ? commitData.sha : null;
+  if (!commit.ok || !commitSha) return { ok: false, status: commit.status, commit_sha: null, phase: "create_commit" };
+
+  const update = await github(env, `/repos/${config.owner}/${config.repo}/git/refs/heads/${encodeURIComponent(config.branch)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sha: commitSha, force: false }),
+  });
+  return { ok: update.ok, status: update.status, commit_sha: update.ok ? commitSha : null, phase: update.ok ? undefined : "update_ref" };
+}
+
 async function toolCall(name: string, args: Record<string, unknown>, env: Env): Promise<Record<string, unknown>> {
   const config = repo(env);
   if (name === "recoveryHealth") {
