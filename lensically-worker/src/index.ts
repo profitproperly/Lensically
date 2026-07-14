@@ -6022,8 +6022,48 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     )`,
   ).run();
 
+    await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_operation_receipts (
+      idempotency_key TEXT PRIMARY KEY,
+      brand_key TEXT,
+      workflow_session_id TEXT,
+      operation_type TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      request_fingerprint TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'started',
+      result_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_operation_receipts_scope
+     ON operator_operation_receipts (brand_key, workflow_session_id, operation_type, updated_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_execution_events (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT,
+      workflow_session_id TEXT,
+      tool_name TEXT NOT NULL,
+      operation_class TEXT NOT NULL,
+      execution_plane TEXT NOT NULL,
+      policy_version TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      known_failure_prevented INTEGER NOT NULL DEFAULT 0,
+      evidence_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_execution_events_recent
+     ON operator_execution_events (created_at DESC, tool_name)`,
+  ).run();
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_ops_memory (
+
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       problem TEXT,
