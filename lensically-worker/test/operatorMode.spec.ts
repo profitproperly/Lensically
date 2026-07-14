@@ -84,9 +84,13 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     mcpProceedConfirmed = false;
   }
   if (!mcpProceedConfirmed) {
-    const proceeded = await mcpToolRaw<{ proceeded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
+    const proceeded = await mcpToolRaw<{ proceeded: boolean; continuation_choice_required: boolean; continuation_choices: string[]; next_owner_prompt: string; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent.proceeded).toBe(true);
+    expect(proceeded.structuredContent.account_data_loaded).toBe(false);
+    expect(proceeded.structuredContent.continuation_choice_required).toBe(true);
+    expect(proceeded.structuredContent.continuation_choices).toEqual(["resume_existing_workflow", "start_fresh_workflow"]);
+    expect(proceeded.structuredContent.next_owner_prompt).toContain("pick up where the existing workflow left off");
     mcpProceedConfirmed = true;
   }
 }
