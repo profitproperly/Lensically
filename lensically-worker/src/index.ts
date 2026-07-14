@@ -8145,13 +8145,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       );
     }
     if (sourceSelectionId) {
-      sourceCardStatements.push(
+            sourceCardStatements.push(
         env.DB.prepare(
           `UPDATE operator_source_selections
            SET source_card_id = ?
            WHERE id = ?
-             AND brand_key = ?
-             AND source_card_id IS NULL`,
+             AND brand_key = ?`,
         ).bind(sourceCardId, sourceSelectionId, brand.brand_key),
       );
     }
