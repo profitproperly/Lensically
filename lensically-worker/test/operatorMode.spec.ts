@@ -1821,9 +1821,21 @@ describe("operator mode MCP endpoint", () => {
         id, run_id, account_id, threads_user_id, source_card_id, draft_index, text, status, showable
       ) VALUES (?, ?, 'manifest-mental', 'manifest-mental', ?, 1, ?, 'scheduled', 1)`,
     ).bind("scheduled-continuity-fixture", fixture.runId, fixture.sourceCardId, "Scheduled fixture post.").run();
-    const originalBatch = await env.DB.prepare(
+        const originalBatch = await env.DB.prepare(
       `SELECT id FROM operator_source_selection_batches WHERE workflow_session_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
     ).bind(fixture.sessionId).first<{ id: string }>();
+    const anchorSelection = await env.DB.prepare(
+      `SELECT id FROM operator_source_selections WHERE batch_id = ? AND draw_order = 10 LIMIT 1`,
+    ).bind(originalBatch?.id).first<{ id: string }>();
+    await env.DB.prepare(
+      `UPDATE operator_source_selections SET source_card_id = NULL WHERE source_card_id = ?`,
+    ).bind(fixture.sourceCardId).run();
+    await env.DB.prepare(
+      `UPDATE operator_source_selections SET source_card_id = ? WHERE id = ?`,
+    ).bind(fixture.sourceCardId, anchorSelection?.id).run();
+    await env.DB.prepare(
+      `UPDATE operator_source_cards SET source_selection_id = ?, sequence_label = '7 of 24' WHERE id = ?`,
+    ).bind(anchorSelection?.id, fixture.sourceCardId).run();
             const proceeded = await mcpToolRaw<{ continuation_confirmation_recorded: boolean }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
     expect(proceeded.structuredContent.continuation_confirmation_recorded).toBe(true);
     const continued = await mcpToolRaw<{
