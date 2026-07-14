@@ -31,21 +31,6 @@ jobs:
           cache: npm
           cache-dependency-path: lensically-worker/package-lock.json
 
-      # BEGIN CONTINUITY FINALIZER
-      - name: Apply continuity hardening finalizer
-        if: ${{ inputs.task == 'worker-deploy' }}
-        working-directory: .
-        run: |
-          node scripts/finalize-continuity-hardening.mjs
-          git config user.name "lensically-engineering"
-          git config user.email "lensically-engineering@users.noreply.github.com"
-          git add -- lensically-worker/src/index.ts lensically-worker/test/operatorMode.spec.ts
-          if ! git diff --cached --quiet; then
-            git commit -m "Finalize universal continuity hardening"
-            git push origin HEAD:main
-          fi
-      # END CONTINUITY FINALIZER
-
       - name: Install dependencies
         run: npm ci
 
