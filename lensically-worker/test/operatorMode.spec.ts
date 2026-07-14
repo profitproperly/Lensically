@@ -491,7 +491,7 @@ describe("operator mode backend spine", () => {
     const run = await operatorTool<{ run_id: string }>("create_generation_run", {
       brand_key: "manifest_mental",
       source_card_id: card.source_card_id,
-      adaptation_plan: { adaptation_goal: "Create a money adaptation.", retained_exact_surfaces: ["If your finger touched this"], transformed_elements: ["payoff", "closing"] },
+            adaptation_plan: { adaptation_goal: "Create a close source mimic with only slight wording changes.", retained_exact_surfaces: ["If your finger touched this", "Something is shifting in your favour"] },
     });
     const analysis = {
       opening_phrase: "If your finger touched this",
