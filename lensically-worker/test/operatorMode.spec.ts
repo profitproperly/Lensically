@@ -376,7 +376,7 @@ describe("operator mode backend spine", () => {
         },
       },
     } as unknown as DurableObjectState;
-    const scheduler = new ScheduledPostScheduler(state, env as unknown as Parameters<typeof ScheduledPostScheduler>[1]);
+        const scheduler = new ScheduledPostScheduler(state, env as unknown as ConstructorParameters<typeof ScheduledPostScheduler>[1]);
 
     const initialResponse = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"));
     const initial = await initialResponse.json() as { healthy: boolean; heartbeat_fresh: boolean; run_count: number };
