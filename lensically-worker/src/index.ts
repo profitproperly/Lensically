@@ -13605,13 +13605,17 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       version: "operator-mcp-admin-v1",
       tool_count: tools.length,
       admin_tools: [...OPERATOR_MCP_ADMIN_TOOL_NAMES],
-      policies: {
+            policies: {
         full_preflight_before_serious_advancement: true,
         show_only_drafts_with_showable_true: true,
         schedule_only_approved_drafts: true,
         workflow_requirements_db_backed: true,
         gates_db_backed: true,
+        autonomy_decisions_db_backed: true,
+        governed_mutations_require_approved_decision: Boolean(autonomyProfile),
       },
+      autonomy_profile: autonomyProfile,
+      pending_autonomy_decisions: pendingAutonomyDecisions,
       workflow_requirements: requirements,
       active_gates_count: gates.length,
       last_deployment: lastDeployment ?? null,
