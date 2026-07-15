@@ -19871,7 +19871,181 @@ async function deleteScheduledPostForAppUser(
     .bind(scheduledPostId, appUserId, SCHEDULED_POST_STATUS_APPROVED)
     .run();
 
-  return "deleted";
+    return "deleted";
+}
+
+async function updateScheduledPostForAppUser(
+  env: Env,
+  input: {
+    appUserId: string;
+    scheduledPostId: number;
+    expectedThreadsUserId?: string | null;
+    text?: string;
+    date?: string;
+    time?: string;
+    timeZone?: string;
+    spoilerAllText?: boolean;
+    spoilerPhrases?: string[];
+  },
+): Promise<{
+  success: boolean;
+  statusCode: number;
+  error?: string;
+  scheduledPost?: {
+    id: number;
+    text: string;
+    status: string;
+    scheduled_time_utc: string;
+    spoiler_all_text: boolean;
+    spoiler_phrases: string[];
+  };
+  linkedDraftsUpdated?: number;
+}> {
+  const hasText = input.text !== undefined;
+  const hasDate = input.date !== undefined;
+  const hasTime = input.time !== undefined;
+  const hasSpoilerAllText = input.spoilerAllText !== undefined;
+  const hasSpoilerPhrases = input.spoilerPhrases !== undefined;
+  if (!hasText && !hasDate && !hasTime && !hasSpoilerAllText && !hasSpoilerPhrases) {
+    return { success: false, statusCode: 400, error: "at_least_one_edit_field_required" };
+  }
+  if (hasDate !== hasTime) {
+    return { success: false, statusCode: 400, error: "date_and_time_must_be_provided_together" };
+  }
+
+  await ensureScheduledPostsTable(env);
+  const existing = await env.DB.prepare(
+    `SELECT id, status, threads_user_id, post_text, scheduled_time,
+            spoiler_all_text, spoiler_phrases_json
+     FROM scheduled_posts
+     WHERE id = ?
+       AND user_id = ?
+     LIMIT 1`,
+  )
+    .bind(input.scheduledPostId, input.appUserId)
+    .first<{
+      id: number | string;
+      status: string;
+      threads_user_id: string;
+      post_text: string;
+      scheduled_time: string;
+      spoiler_all_text: number | string | null;
+      spoiler_phrases_json: string | null;
+    }>();
+
+  if (!existing || (input.expectedThreadsUserId && existing.threads_user_id !== input.expectedThreadsUserId)) {
+    return { success: false, statusCode: 404, error: "scheduled_post_not_found" };
+  }
+  if (existing.status !== SCHEDULED_POST_STATUS_APPROVED) {
+    return { success: false, statusCode: 409, error: "only_approved_scheduled_posts_can_be_edited" };
+  }
+
+  const text = hasText ? String(input.text ?? "").trim() : existing.post_text.trim();
+  if (!text) {
+    return { success: false, statusCode: 400, error: "post_text_is_required" };
+  }
+  const existingSpoilerPhrases = normalizeSpoilerPhrasesInput(
+    safeParseJsonString(existing.spoiler_phrases_json ?? "[]"),
+  );
+  const spoilerAllText = hasSpoilerAllText
+    ? input.spoilerAllText === true
+    : Number(existing.spoiler_all_text ?? 0) === 1;
+  const spoilerPhrases = hasSpoilerPhrases
+    ? normalizeSpoilerPhrasesInput(input.spoilerPhrases)
+    : existingSpoilerPhrases;
+  const spoilerValidationError = validateTextSpoilerConfig(text, spoilerAllText, spoilerPhrases);
+  if (spoilerValidationError) {
+    return { success: false, statusCode: 400, error: spoilerValidationError };
+  }
+
+  const timeZone = input.timeZone?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
+  const scheduledUtc = hasDate && hasTime
+    ? convertLocalDateTimeToUtcIso(String(input.date ?? "").trim(), String(input.time ?? "").trim(), timeZone)
+    : existing.scheduled_time;
+  if (!scheduledUtc) {
+    return { success: false, statusCode: 400, error: "invalid_date_time_or_timezone" };
+  }
+  if (isPastUtcTimestamp(scheduledUtc)) {
+    return { success: false, statusCode: 400, error: "scheduled_time_in_past" };
+  }
+
+  const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
+    input.appUserId,
+    existing.threads_user_id,
+    scheduledUtc,
+    text,
+    buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
+  );
+  const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
+  let linkedDraftsUpdated = 0;
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
+    const updated = await dbSession.prepare(
+      `UPDATE scheduled_posts
+       SET post_text = ?,
+           spoiler_all_text = ?,
+           spoiler_phrases_json = ?,
+           scheduled_time = ?,
+           idempotency_key = ?
+       WHERE id = ?
+         AND user_id = ?
+         AND threads_user_id = ?
+         AND status = ?`,
+    )
+      .bind(
+        text,
+        spoilerAllText ? 1 : 0,
+        serializeSpoilerPhrases(spoilerPhrases),
+        scheduledUtc,
+        scheduleIdempotencyKey,
+        input.scheduledPostId,
+        input.appUserId,
+        existing.threads_user_id,
+        SCHEDULED_POST_STATUS_APPROVED,
+      )
+      .run();
+    if (Number(updated.meta?.changes ?? 0) <= 0) {
+      await dbSession.prepare("ROLLBACK").run();
+      transactionStarted = false;
+      return { success: false, statusCode: 409, error: "scheduled_post_could_not_be_updated" };
+    }
+    if (hasDraftTable) {
+      const draftUpdate = await dbSession.prepare(
+        `UPDATE gpt_generation_drafts
+         SET text = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE scheduled_post_id = ?
+           AND threads_user_id = ?`,
+      ).bind(text, input.scheduledPostId, existing.threads_user_id).run();
+      linkedDraftsUpdated = Number(draftUpdate.meta?.changes ?? 0);
+    }
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      await dbSession.prepare("ROLLBACK").run();
+    }
+    if (isUniqueConstraintError(error)) {
+      return { success: false, statusCode: 409, error: "identical_scheduled_post_exists" };
+    }
+    throw error;
+  }
+
+  return {
+    success: true,
+    statusCode: 200,
+    scheduledPost: {
+      id: input.scheduledPostId,
+      text,
+      status: SCHEDULED_POST_STATUS_APPROVED,
+      scheduled_time_utc: scheduledUtc,
+      spoiler_all_text: spoilerAllText,
+      spoiler_phrases: spoilerPhrases,
+    },
+    linkedDraftsUpdated,
+  };
 }
 
 async function listScheduledPostsForThreadsAccountOnLocalDate(
