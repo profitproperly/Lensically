@@ -28154,6 +28154,24 @@ async function refreshExpiringThreadsTokens(env: Env): Promise<void> {
   }
 }
 
+type ScheduledPostSchedulerMode = "paused" | "canary" | "normal";
+
+type ScheduledPostSchedulerControl = {
+  mode: ScheduledPostSchedulerMode;
+  allowed_post_ids: number[];
+  max_posts: number;
+  updated_at: string | null;
+  reason: string | null;
+};
+
+const EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL: ScheduledPostSchedulerControl = {
+  mode: "paused",
+  allowed_post_ids: [],
+  max_posts: 0,
+  updated_at: null,
+  reason: "safe_default",
+};
+
 type ScheduledPostSchedulerHealth = {
   armed_at: string | null;
   next_alarm_at: string | null;
@@ -28167,6 +28185,8 @@ type ScheduledPostSchedulerHealth = {
   overdue_before: number;
   overdue_after: number;
   run_count: number;
+  last_processed_count: number;
+  last_processed_post_ids: number[];
 };
 
 const EMPTY_SCHEDULED_POST_SCHEDULER_HEALTH: ScheduledPostSchedulerHealth = {
@@ -28182,6 +28202,8 @@ const EMPTY_SCHEDULED_POST_SCHEDULER_HEALTH: ScheduledPostSchedulerHealth = {
   overdue_before: 0,
   overdue_after: 0,
   run_count: 0,
+  last_processed_count: 0,
+  last_processed_post_ids: [],
 };
 
 function getScheduledPostSchedulerStub(env: Env) {
