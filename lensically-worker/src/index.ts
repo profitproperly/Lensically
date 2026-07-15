@@ -471,6 +471,7 @@ const OPERATOR_EXECUTION_POLICY_CONTRACT = {
   scope: "universal",
   authority_order: [
     "backend enforcement",
+    "mandatory known-path registry",
     "canonical workflow state",
     "execution policy",
     "MCP contract",
@@ -480,15 +481,17 @@ const OPERATOR_EXECUTION_POLICY_CONTRACT = {
     "conversation context",
   ],
   execution_planes: {
-    engineering_control: "Repository reads/searches/patches, tests, deploys, runtime verification, and engineering audit.",
+    engineering_control: "Repository reads/searches/patches, tests, deploys, runtime verification, and engineering audit under persistent full-discretion authority.",
     operator_control: "Universal MCP schemas, workflow requirements, routing policy, gates, continuity, and infrastructure administration.",
     operator_account: "Selected-account workflow state, sources, source cards, generation, drafts, scheduling, and results.",
     independent_recovery: "Main-MCP health, large-file repair, deployment-plane failure, and break-glass restoration.",
   },
-  known_failure_rule: "A diagnosed failure with an available prevention policy is a regression and must be blocked before execution.",
-  alias_rule: "Direct tools and wrappers that reach the same backend are aliases, not fallback routes.",
+  known_failure_rule: "A diagnosed failure with an available prevention policy is a regression. Resolve the mandatory known path before the call and block the known-bad route.",
+  recursive_improvement_rule: "A newly solved engineering blocker pauses the current sequence until its reusable fix is promoted into policy, regression coverage, and audit state; then the original objective resumes automatically.",
+  alias_rule: "Direct tools and wrappers that reach the same backend are aliases, not fallback routes. Select the currently callable canonical route once.",
   scope_rule: "Infrastructure, transport, continuity, workflow, MCP, schema, idempotency, and regression changes default universal; selected-account creative or strategy changes remain account scoped.",
   memory_rule: "Memory records rationale and history but cannot authorize or enforce a required workflow behavior.",
+  owner_visibility_rule: "Routine client preflight, payload compaction, alias selection, and known-path routing stay in telemetry unless they create a true owner-required blocker.",
 } as const;
 
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
