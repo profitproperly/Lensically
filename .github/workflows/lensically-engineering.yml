@@ -65,8 +65,17 @@ jobs:
           jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
           expected_crons=$(printf '%s\n' '* * * * *' '0 */12 * * *' '1 4,5 * * *' '59 3,4 * * *' | sort)
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
-          test "${actual_crons}" = "${expected_crons}"
+                    test "${actual_crons}" = "${expected_crons}"
           echo "Wrangler-managed Cloudflare cron triggers verified without mutation."
+
+      - name: Verify safe scheduler activation state
+        if: ${{ inputs.task == 'worker-deploy' }}
+        run: |
+          set -euo pipefail
+          scheduler_url="https://api.lensically.com/api/operator/scheduler-health"
+          curl --fail-with-body --silent --show-error "${scheduler_url}" > /tmp/lensically-scheduler-health.json
+          jq -e '.enabled == true and ((.control.mode == "paused") or (.control.mode == "canary") or ((.control.mode == "normal") and ((.current_overdue_count | type) == "number") and (.current_overdue_count == 0)))' /tmp/lensically-scheduler-health.json > /dev/null
+          echo "Scheduler activation state verified: paused/canary, or normal with an empty overdue queue."
 
       - name: Install recovery dependencies
         if: ${{ inputs.task == 'worker-deploy' }}
