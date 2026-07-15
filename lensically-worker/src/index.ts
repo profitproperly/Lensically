@@ -11139,12 +11139,33 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, source: { type: "string" }, metadata: { type: "object", additionalProperties: true } }, required: ["brand_key", "kind", "body"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
+    {
     name: "list_scheduled_posts",
     title: "List scheduled posts",
     description: "Use this to inspect scheduled posts for a selected Lensically account and date.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, date: { type: "string" }, timezone: { type: "string" }, limit: { type: "integer" }, offset: { type: "integer" } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "edit_scheduled_post",
+    title: "Edit scheduled post",
+    description: "Edit the text, schedule, or spoiler settings of an existing approved unpublished scheduled post for the selected account. Omitted fields are preserved. Date and time must be provided together when rescheduling. Posting and posted records cannot be edited.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        scheduled_post_id: { type: "integer", minimum: 1 },
+        text: { type: "string" },
+        date: { type: "string" },
+        time: { type: "string" },
+        timezone: { type: "string" },
+        spoiler_all_text: { type: "boolean" },
+        spoiler_phrases: { type: "array", items: { type: "string" } },
+      },
+      required: ["brand_key", "scheduled_post_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "schedule_approved_draft",
