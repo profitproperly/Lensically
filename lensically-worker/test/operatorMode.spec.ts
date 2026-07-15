@@ -1751,12 +1751,14 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                expect(direct.runtime.mcp_version).toBe("1.7.0");
+                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.8.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
-    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("canonical execution plane");
-    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("aliases, not independent recovery routes");
-    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("bounded GitHub code search");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("mandatory known_path");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("without per-tool numerical budgets");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("one currently callable");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("exact file prefix");
+    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("stop, promote the fix");
     expect(direct.boundary.before_proceed_forbidden).toEqual(expect.arrayContaining(["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"]));
         expect(direct.boundary.after_explicit_proceed).toContain("automatically restores canonical persisted schedule");
     expect(direct.boundary.after_explicit_proceed).toContain("Never ask resume or start fresh");
