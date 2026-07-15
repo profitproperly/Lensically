@@ -382,13 +382,27 @@ const OPERATOR_AUTONOMY_CONTRACT = {
   active_account_scope: "manifest_mental",
   active_mode: MANIFEST_AUTONOMY_MODE,
   objective: MANIFEST_AUTONOMY_OBJECTIVE,
-  model_role: "The model owns problem selection, analysis, recommendation, sequencing, and execution planning. It does not ask the owner to invent the next routine action.",
-  owner_role: "The owner ratifies, rejects, or revises model-originated proposals during the training phase and remains available for business, taste, and irreversible strategic judgment.",
-  approval_policy: "Read-only investigation is autonomous. Every mutation requires a persisted matching approved decision until the autonomy profile is deliberately advanced.",
-  proposal_policy: "Before mutation, persist the decision, rationale, evidence, expected outcome, risks, reversibility, execution plan, authorized tools, and execution budget. Present the decision to the owner before acting.",
-  fresh_chat_rule: "After Manifest continuity loads, restore the autonomy profile and pending decisions. Resume a pending proposal first; otherwise investigate independently and originate the next proposal.",
+  model_role: "The model owns problem selection, analysis, recommendation, sequencing, execution planning, and routine engineering execution.",
+  owner_role: "The owner remains available for business, taste, account ownership, destructive data actions, and irreversible strategic judgment. Routine engineering does not require owner ratification.",
+  approval_policy: "Read-only investigation and routine engineering are autonomous. Account content, scheduling, and strategy mutations remain owner-ratified until separately advanced. Destructive and irreversible actions remain explicitly protected.",
+  proposal_policy: "Persist proposals for owner-ratified account or business decisions. Routine engineering uses persistent outcome-bound authority without per-tool numerical budgets.",
+  fresh_chat_rule: "After startup, restore autonomous engineering authority and mandatory known paths before any engineering call. After Manifest continuity loads, restore account governance and pending account decisions.",
   decision_categories: ["strategy", "content", "scheduling", "analytics", "experiment", "workflow", "engineering", "risk"],
-  training_exit_rule: "Do not remove owner ratification merely because the model feels confident. Advance autonomy only through a separate persisted owner-approved governance decision backed by operating evidence.",
+  training_exit_rule: "Account/content autonomy advances through a separate governance decision. Routine engineering is already authorized by the persistent engineering authority contract.",
+} as const;
+
+const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
+  version: OPERATOR_ENGINEERING_AUTHORITY_VERSION,
+  scope: "universal_engineering",
+  mode: "full_discretion_recursive",
+  authority: "Investigate, patch, test, retry with changed inputs, deploy, verify, repair, and improve Lensically engineering without routine owner approval.",
+  authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize destructive account data changes, credential ownership changes, account ownership changes, irreversible business decisions, repository file deletion, runtime rollback, tool disabling, or content publication controls.",
+  numerical_tool_budgets: false,
+  owner_ratification_required: false,
+  known_path_rule: "Before every engineering execution, resolve and apply the fastest proven canonical path. A diagnosed blocker may not be rediscovered through a known-bad route.",
+  recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
+  owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
+  protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
 } as const;
 
 const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
