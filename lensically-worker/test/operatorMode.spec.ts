@@ -2169,7 +2169,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(sourceBatchCount?.total ?? 0)).toBe(1);
   }, 40000);
 
-  it("blocks wrapper hopping after a same-backend deterministic failure", async () => {
+    it("blocks wrapper hopping after a same-backend deterministic failure", async () => {
     const direct = await mcpToolRaw<{ error: string }>("readRepoFile", { path: "missing-vitest-file.md" });
     expect(direct.isError).toBe(true);
     expect(direct.structuredContent.error).toBe("repo_file_read_failed");
@@ -2180,6 +2180,65 @@ describe("operator mode MCP endpoint", () => {
     expect(alias.isError).toBe(true);
     expect(alias.structuredContent.error).toBe("same_backend_route_retry_forbidden");
     expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
+  }, 30000);
+
+  it("authorizes routine engineering without owner decisions or numerical budgets and resolves known paths before execution", async () => {
+    const planned = await mcpTool<{
+      policy: {
+        version: string;
+        known_path: { rule_key: string; mandatory_route: string };
+        mandatory_path_applied: boolean;
+        numerical_tool_budget_applies: boolean;
+      };
+    }>("planOperatorExecution", {
+      intended_tool: "resolveOperatorDecision",
+      operation: "Resolve an owner-ratified account decision through the compact canonical path.",
+    });
+    expect(planned.policy).toMatchObject({
+      version: "operator-execution-policy-v2",
+      mandatory_path_applied: true,
+      numerical_tool_budget_applies: false,
+      known_path: {
+        rule_key: "compact_governance_payload",
+      },
+    });
+
+    const engineering = await mcpToolRaw<{
+      ok: boolean;
+      memory_id: string;
+      engineering_authority: {
+        mode: string;
+        version: string;
+        owner_ratification_required: boolean;
+        numerical_tool_budget_applies: boolean;
+      };
+      execution_policy: {
+        authorization_mode: string;
+        mandatory_path_applied: boolean;
+      };
+    }>("recordOpsMemory", {
+      title: "Autonomous engineering fixture",
+      fix: "Routine engineering executes through persistent outcome-bound authority.",
+      applies_when: "Any repository, test, deploy, routing, or infrastructure repair operation.",
+      tags: ["engineering", "recursive-improvement"],
+    });
+    expect(engineering.isError).not.toBe(true);
+    expect(engineering.structuredContent.ok).toBe(true);
+    expect(engineering.structuredContent.engineering_authority).toMatchObject({
+      mode: "full_discretion_recursive",
+      version: "operator-engineering-authority-v1",
+      owner_ratification_required: false,
+      numerical_tool_budget_applies: false,
+    });
+    expect(engineering.structuredContent.execution_policy).toMatchObject({
+      authorization_mode: "persistent_outcome_bound_engineering",
+      mandatory_path_applied: true,
+    });
+
+    const decisionEvents = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_decision_execution_events WHERE tool_name = 'recordOpsMemory'`,
+    ).first<{ total: number }>();
+    expect(Number(decisionEvents?.total ?? 0)).toBe(0);
   }, 30000);
 
     it("requires an approved model decision for governed Manifest mutations and enforces its tool budget", async () => {
