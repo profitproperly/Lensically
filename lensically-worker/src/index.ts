@@ -11146,7 +11146,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
+    {
     name: "markOperatorDecisionExecuted",
     title: "Mark operator decision executed",
     description: "Close an approved or executing decision after its authorized work is complete and persist the outcome and evidence for future learning.",
@@ -11162,6 +11162,44 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "getScheduledPostSchedulerState",
+    title: "Get scheduled-post scheduler state",
+    description: "Read the live scheduler mode, alarm and Cron heartbeats, overdue counts, and exact post IDs selected by the latest run.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "setScheduledPostSchedulerMode",
+    title: "Set scheduled-post scheduler mode",
+    description: "Explicitly set the universal scheduler to paused, canary, or normal. Canary requires exactly one scheduled_post_id, processes at most one due record, and automatically returns to paused after its attempt.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mode: { type: "string", enum: ["paused", "canary", "normal"] },
+        scheduled_post_id: { type: "integer", minimum: 1 },
+        reason: { type: "string" },
+      },
+      required: ["mode", "reason"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "auditScheduledPost",
+    title: "Audit scheduled post",
+    description: "Read one selected-account scheduled record by ID, including status, publication ID, attempt timestamps, publication timestamp, and stored error state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        scheduled_post_id: { type: "integer", minimum: 1 },
+      },
+      required: ["brand_key", "scheduled_post_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "inspectMcpFailure",
