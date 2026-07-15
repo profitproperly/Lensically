@@ -68,13 +68,26 @@ jobs:
                     test "${actual_crons}" = "${expected_crons}"
           echo "Wrangler-managed Cloudflare cron triggers verified without mutation."
 
-      - name: Verify safe scheduler activation state
+            - name: Verify safe scheduler activation state
         if: ${{ inputs.task == 'worker-deploy' }}
         run: |
           set -euo pipefail
           scheduler_url="https://api.lensically.com/api/operator/scheduler-health"
-          curl --fail-with-body --silent --show-error "${scheduler_url}" > /tmp/lensically-scheduler-health.json
-          jq -e '.enabled == true and ((.control.mode == "paused") or (.control.mode == "canary") or ((.control.mode == "normal") and ((.current_overdue_count | type) == "number") and (.current_overdue_count == 0)))' /tmp/lensically-scheduler-health.json > /dev/null
+          scheduler_safe=false
+          for attempt in $(seq 1 12); do
+            if curl --fail-with-body --silent --show-error "${scheduler_url}" > /tmp/lensically-scheduler-health.json \
+              && jq -e '.enabled == true and ((.control.mode == "paused") or (.control.mode == "canary") or ((.control.mode == "normal") and ((.current_overdue_count | type) == "number") and (.current_overdue_count == 0)))' /tmp/lensically-scheduler-health.json > /dev/null; then
+              scheduler_safe=true
+              break
+            fi
+            echo "Waiting for scheduler-health propagation (${attempt}/12)..."
+            sleep 5
+          done
+          if [ "${scheduler_safe}" != "true" ]; then
+            echo "Scheduler activation state did not become safely verifiable."
+            cat /tmp/lensically-scheduler-health.json || true
+            exit 1
+          fi
           echo "Scheduler activation state verified: paused/canary, or normal with an empty overdue queue."
 
       - name: Install recovery dependencies
