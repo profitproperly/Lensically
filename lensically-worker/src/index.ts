@@ -13847,6 +13847,40 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     return { ok: true, decision: row ? serializeOperatorDecisionProposal(row) : null };
   }
 
+    if (toolName === "getScheduledPostSchedulerState") {
+    return { ok: true, scheduler: await readScheduledPostSchedulerHealth(env) };
+  }
+
+  if (toolName === "setScheduledPostSchedulerMode") {
+    const mode = normalizeOperatorText(args.mode, 20, true) as ScheduledPostSchedulerMode | null;
+    const reason = normalizeOperatorText(args.reason, 500);
+    const scheduledPostId = Math.trunc(Number(args.scheduled_post_id));
+    if (!mode || !["paused", "canary", "normal"].includes(mode) || !reason) {
+      return { ok: false, error: "valid_scheduler_mode_and_reason_required" };
+    }
+    if (mode === "canary" && (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0)) {
+      return { ok: false, error: "canary_scheduled_post_id_required" };
+    }
+    const result = await setScheduledPostSchedulerControl(env, {
+      mode,
+      allowedPostIds: mode === "canary" ? [scheduledPostId] : [],
+      reason,
+    });
+    return { ok: true, scheduler: result };
+  }
+
+  if (toolName === "auditScheduledPost") {
+    const brand = await resolveOperatorBrandFromPayload(env, args);
+    const scheduledPostId = Math.trunc(Number(args.scheduled_post_id));
+    if (!brand || !Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
+      return { ok: false, error: "brand_and_scheduled_post_id_required" };
+    }
+    const record = await auditScheduledPost(env, brand, scheduledPostId);
+    return record
+      ? { ok: true, brand_key: brand.brand_key, scheduled_post: record }
+      : { ok: false, error: "scheduled_post_not_found" };
+  }
+
   if (toolName === "getMcpAdminState") {
     const brand = args.brand_key ? await resolveOperatorBrandFromPayload(env, args) : null;
     const tools = await buildOperatorMcpTools(env, true);
