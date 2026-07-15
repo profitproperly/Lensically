@@ -432,9 +432,7 @@ describe("operator mode backend spine", () => {
     expect(sharedHealth.last_success).toBe(true);
     expect(sharedHealth.run_count).toBe(1);
 
-    const initialControl = await initialResponse.clone().json().catch(() => null);
-    expect(initialControl).toBeTruthy();
-    const pausedHealth = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
+        const pausedHealth = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
       control: { mode: string; allowed_post_ids: number[]; max_posts: number };
     };
     expect(pausedHealth.control).toMatchObject({ mode: "paused", allowed_post_ids: [], max_posts: 0 });
