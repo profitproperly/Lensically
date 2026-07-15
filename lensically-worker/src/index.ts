@@ -508,9 +508,10 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     "day_completion_confirmation",
   ],
   silent_stages: ["context_admission", "source_selection", "source_card", "review_batch_generation", "generation_run_and_candidates", "gate_evaluation"],
-  transition_label_contract: {
-    required_labels: ["Completed:", "Showing now:", "Next decision:"],
-    instruction: "At every owner-visible transition, briefly state what action completed, identify the exact artifact currently being shown, and name the next owner decision. Never make the owner infer whether the content is a source card, generated post, scheduling confirmation, or completion report.",
+    transition_label_contract: {
+    account_required_labels: ["Completed:", "Showing now:", "Next decision:"],
+    engineering_required_labels: ["Completed:", "Showing now:", "Next action:"],
+    instruction: "Use decision language only when the owner actually must decide. For autonomous engineering, report completed outcomes, meaningful current state, and the automatic next action; suppress routine client, alias, compaction, retry, and routing friction.",
   },
     continuity_contract: {
     auto_resolve_after_confirm_operator_proceed: true,
