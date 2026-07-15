@@ -493,7 +493,7 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     continuity_contract: {
     auto_resolve_after_confirm_operator_proceed: true,
     owner_prompt_removed: true,
-    behavior: "Load the canonical persisted schedule, active review batch, day-level source claims, and workflow state automatically after Proceed. Preserve schedule reality across chats while allowing a deliberately retired source draw to be replaced by a fresh production-day draw.",
+        behavior: "Load the canonical persisted schedule, active review batch, day-level source claims, workflow state, autonomy profile, and pending model decisions automatically after Proceed. Resume the pending decision before originating another one. Preserve schedule reality across chats while allowing a deliberately retired source draw to be replaced by a fresh production-day draw.",
   },
   calendar_coverage_contract: {
     controller: "earliest_incomplete_future_day",
