@@ -13416,6 +13416,169 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     };
   }
 
+    if (toolName === "getOperatorDecisionState") {
+    const brand = await resolveOperatorBrandFromPayload(env, args);
+    if (!brand) return { ok: false, error: "brand_unavailable" };
+    const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
+    const statuses = Array.isArray(args.statuses) ? args.statuses.map(String) : [];
+    const decisions = await listOperatorDecisionProposals(env, brand.brand_key, statuses, Number(args.limit ?? 20));
+    const eventRows = await env.DB.prepare(
+      `SELECT decision_id, tool_name, status, COUNT(*) AS total
+       FROM operator_decision_execution_events
+       WHERE brand_key = ?
+       GROUP BY decision_id, tool_name, status`,
+    ).bind(brand.brand_key).all<Record<string, unknown>>();
+    return {
+      ok: true,
+      contract: OPERATOR_AUTONOMY_CONTRACT,
+      profile,
+      decisions,
+      execution_counts: eventRows.results ?? [],
+      next_behavior: decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
+        ? "Present the pending model-originated decision for owner ratification before mutation."
+        : "Investigate read-only state, originate the next decision, persist it, and present it before mutation.",
+    };
+  }
+
+  if (toolName === "proposeOperatorDecision") {
+    const brand = await resolveOperatorBrandFromPayload(env, args);
+    if (!brand) return { ok: false, error: "brand_unavailable" };
+    const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
+    if (!profile) return { ok: false, error: "autonomy_profile_not_active" };
+    const category = normalizeOperatorDecisionCategory(args.category);
+    const title = normalizeOperatorText(args.title, 300);
+    const decisionText = normalizeOperatorText(args.decision, 8000);
+    const rationale = normalizeOperatorText(args.rationale, 12000);
+    const expectedOutcome = normalizeOperatorText(args.expected_outcome, 6000);
+    const reversibility = normalizeOperatorText(args.reversibility, 3000);
+    const executionPlan = normalizeOperatorText(args.execution_plan, 12000);
+    const availableTools = new Set((await buildOperatorMcpTools(env, true, false)).map((tool) => tool.name));
+    const requestedTools = Array.isArray(args.authorized_tools)
+      ? args.authorized_tools.map((tool) => normalizeOperatorText(tool, 160, true)).filter((tool): tool is string => Boolean(tool))
+      : [];
+    const authorizedTools = Array.from(new Set(requestedTools));
+    const unknownTools = authorizedTools.filter((tool) => !availableTools.has(tool));
+    if (!category || !title || !decisionText || !rationale || !expectedOutcome || !reversibility || !executionPlan || !authorizedTools.length) {
+      return { ok: false, error: "complete_decision_proposal_required" };
+    }
+    if (unknownTools.length) return { ok: false, error: "unknown_authorized_tools", unknown_tools: unknownTools };
+    const suppliedBudget = args.execution_budget && typeof args.execution_budget === "object" && !Array.isArray(args.execution_budget)
+      ? args.execution_budget as Record<string, unknown>
+      : {};
+    const executionBudget = Object.fromEntries(authorizedTools.map((tool) => {
+      const raw = Number(suppliedBudget[tool] ?? 1);
+      return [tool, Number.isInteger(raw) ? Math.min(Math.max(raw, 1), 100) : 1];
+    }));
+    const evidence = Array.isArray(args.evidence) ? args.evidence.slice(0, 100) : [];
+    const risks = Array.isArray(args.risks) ? args.risks.map((risk) => String(risk).slice(0, 1000)).slice(0, 50) : [];
+    const decisionKey = normalizeOperatorMachineKey(args.decision_key, "")
+      || `${category}_${normalizeOperatorMachineKey(title, "decision")}_${Date.now()}`;
+    const existing = await env.DB.prepare(
+      `SELECT id, status FROM operator_decision_proposals WHERE brand_key = ? AND decision_key = ? LIMIT 1`,
+    ).bind(brand.brand_key, decisionKey).first<Record<string, unknown>>();
+    if (existing) return { ok: false, error: "decision_key_already_exists", existing_status: existing.status };
+    const supersedesDecisionId = normalizeOperatorText(args.supersedes_decision_id, 120, true);
+    if (supersedesDecisionId) {
+      await env.DB.prepare(
+        `UPDATE operator_decision_proposals
+         SET status = 'superseded', updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND brand_key = ? AND status <> 'executed'`,
+      ).bind(supersedesDecisionId, brand.brand_key).run();
+    }
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_decision_proposals (
+        id, brand_key, decision_key, category, title, decision_text, rationale, evidence_json,
+        expected_outcome, risks_json, reversibility, execution_plan, authorized_tools_json,
+        execution_budget_json, status, proposed_by, supersedes_decision_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', 'model', ?)`,
+    ).bind(
+      id,
+      brand.brand_key,
+      decisionKey,
+      category,
+      title,
+      decisionText,
+      rationale,
+      JSON.stringify(evidence),
+      expectedOutcome,
+      JSON.stringify(risks),
+      reversibility,
+      executionPlan,
+      JSON.stringify(authorizedTools),
+      JSON.stringify(executionBudget),
+      supersedesDecisionId ?? null,
+    ).run();
+    const row = await env.DB.prepare(`SELECT * FROM operator_decision_proposals WHERE id = ? LIMIT 1`).bind(id).first<Record<string, unknown>>();
+    return { ok: true, decision: row ? serializeOperatorDecisionProposal(row) : null, owner_action_required: "approve_reject_or_revise" };
+  }
+
+  if (toolName === "resolveOperatorDecision") {
+    const brand = await resolveOperatorBrandFromPayload(env, args);
+    const decisionId = normalizeOperatorText(args.decision_id, 120);
+    const resolution = normalizeOperatorText(args.resolution, 40, true);
+    const ownerResponse = normalizeOperatorText(args.owner_response, 8000);
+    const revisionRequest = normalizeOperatorText(args.revision_request, 8000, true);
+    if (!brand || !decisionId || !ownerResponse || !["approve", "reject", "revise"].includes(resolution ?? "")) {
+      return { ok: false, error: "valid_decision_resolution_required" };
+    }
+    const existing = await env.DB.prepare(
+      `SELECT * FROM operator_decision_proposals WHERE id = ? AND brand_key = ? LIMIT 1`,
+    ).bind(decisionId, brand.brand_key).first<Record<string, unknown>>();
+    if (!existing) return { ok: false, error: "decision_not_found" };
+    if (["executed", "superseded"].includes(String(existing.status))) return { ok: false, error: "decision_already_closed", status: existing.status };
+    if (resolution === "approve") {
+      await env.DB.prepare(
+        `UPDATE operator_decision_proposals
+         SET status = 'approved', owner_response = ?, revision_request = NULL,
+             approved_at = CURRENT_TIMESTAMP, rejected_at = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(ownerResponse, decisionId).run();
+    } else if (resolution === "reject") {
+      await env.DB.prepare(
+        `UPDATE operator_decision_proposals
+         SET status = 'rejected', owner_response = ?, revision_request = NULL,
+             rejected_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(ownerResponse, decisionId).run();
+    } else {
+      await env.DB.prepare(
+        `UPDATE operator_decision_proposals
+         SET status = 'revision_required', owner_response = ?, revision_request = ?,
+             approved_at = NULL, rejected_at = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(ownerResponse, revisionRequest ?? ownerResponse, decisionId).run();
+    }
+    const row = await env.DB.prepare(`SELECT * FROM operator_decision_proposals WHERE id = ? LIMIT 1`).bind(decisionId).first<Record<string, unknown>>();
+    return { ok: true, decision: row ? serializeOperatorDecisionProposal(row) : null };
+  }
+
+  if (toolName === "markOperatorDecisionExecuted") {
+    const brand = await resolveOperatorBrandFromPayload(env, args);
+    const decisionId = normalizeOperatorText(args.decision_id, 120);
+    const outcomeSummary = normalizeOperatorText(args.outcome_summary, 12000);
+    const resultEvidence = Array.isArray(args.result_evidence) ? args.result_evidence.slice(0, 100) : [];
+    if (!brand || !decisionId || !outcomeSummary) return { ok: false, error: "decision_outcome_required" };
+    const existing = await env.DB.prepare(
+      `SELECT * FROM operator_decision_proposals WHERE id = ? AND brand_key = ? LIMIT 1`,
+    ).bind(decisionId, brand.brand_key).first<Record<string, unknown>>();
+    if (!existing) return { ok: false, error: "decision_not_found" };
+    if (!["approved", "executing"].includes(String(existing.status))) return { ok: false, error: "approved_or_executing_decision_required", status: existing.status };
+    const incomplete = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_decision_execution_events
+       WHERE decision_id = ? AND status = 'started'`,
+    ).bind(decisionId).first<{ total: number }>();
+    if (Number(incomplete?.total ?? 0) > 0) return { ok: false, error: "decision_execution_still_in_progress" };
+    await env.DB.prepare(
+      `UPDATE operator_decision_proposals
+       SET status = 'executed', outcome_summary = ?, result_evidence_json = ?,
+           executed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(outcomeSummary, JSON.stringify(resultEvidence), decisionId).run();
+    const row = await env.DB.prepare(`SELECT * FROM operator_decision_proposals WHERE id = ? LIMIT 1`).bind(decisionId).first<Record<string, unknown>>();
+    return { ok: true, decision: row ? serializeOperatorDecisionProposal(row) : null };
+  }
+
   if (toolName === "getMcpAdminState") {
     const brand = args.brand_key ? await resolveOperatorBrandFromPayload(env, args) : null;
     const tools = await buildOperatorMcpTools(env, true);
