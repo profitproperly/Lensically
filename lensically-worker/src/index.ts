@@ -522,7 +522,7 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     "If no draft passes, replace it internally or report the blocker; never show an unshowable draft.",
     "When a target day becomes fully covered, report completion and ask whether to continue to the next incomplete day.",
   ],
-  next_owner_decision_after_review_batch: "Approve, reject, or revise Posts 1 through 4 by number.",
+    next_owner_decision_after_review_batch: "Ratify, reject, or revise the model's proposed Posts 1 through 4 by number.",
 } as const;
 
 const OPERATOR_REJECTION_MEMORY_CONTRACT = {
