@@ -11599,9 +11599,9 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
-    name: "edit_scheduled_post",
+        name: "edit_scheduled_post",
     title: "Edit scheduled post",
-    description: "Edit the text, schedule, or spoiler settings of an existing approved unpublished scheduled post for the selected account. Omitted fields are preserved. Date and time must be provided together when rescheduling. Posting and posted records cannot be edited.",
+    description: "Edit the text, schedule, or spoiler settings of an existing approved unpublished scheduled post for the selected account, or safely retry one approved unpublished post that is already due. Omitted fields are preserved. Date and time must be provided together when rescheduling. Posting and posted records cannot be edited or retried.",
     inputSchema: {
       type: "object",
       properties: {
@@ -11613,6 +11613,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         timezone: { type: "string" },
         spoiler_all_text: { type: "boolean" },
         spoiler_phrases: { type: "array", items: { type: "string" } },
+        retry_now: { type: "boolean", description: "Immediately retry one approved, unpublished post only after its scheduled time has passed. Future, posting, and published records are rejected." },
       },
       required: ["brand_key", "scheduled_post_id"],
       additionalProperties: false,
