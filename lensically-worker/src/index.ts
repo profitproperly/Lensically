@@ -28565,6 +28565,26 @@ export class ScheduledPostScheduler {
   }
 }
 
+async function executeScheduledPostSchedulerTrigger(
+  env: Env,
+  trigger: "alarm" | "cron",
+): Promise<Record<string, unknown>> {
+  const stub = getScheduledPostSchedulerStub(env);
+  if (!stub) {
+    throw new Error("scheduled_post_scheduler_binding_missing");
+  }
+  const response = await stub.fetch("https://scheduled-post-scheduler.internal/execute", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ trigger }),
+  });
+  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(String(payload?.error ?? `scheduled_post_scheduler_execute_failed:${response.status}`));
+  }
+  return payload ?? { ok: true };
+}
+
 async function handleScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
   const cron = event.cron?.trim() ?? "";
   logWorkerEvent("SCHEDULED_CRON_TRIGGERED", {
