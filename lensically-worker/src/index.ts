@@ -28591,25 +28591,8 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     cron,
   });
 
-    if (cron === SCHEDULED_POST_PUBLISH_CRON) {
-    const overdueBefore = await countOverdueScheduledPosts(env);
-    await recordCronSchedulerHeartbeat(env, "started", { overdue_before: overdueBefore });
-    try {
-      await processDueScheduledPosts(env);
-      const overdueAfter = await countOverdueScheduledPosts(env);
-      await recordCronSchedulerHeartbeat(env, "completed", {
-        overdue_before: overdueBefore,
-        overdue_after: overdueAfter,
-      });
-    } catch (error) {
-      const overdueAfter = await countOverdueScheduledPosts(env).catch(() => overdueBefore);
-      await recordCronSchedulerHeartbeat(env, "failed", {
-        error: getErrorMessage(error),
-        overdue_before: overdueBefore,
-        overdue_after: overdueAfter,
-      });
-      throw error;
-    }
+      if (cron === SCHEDULED_POST_PUBLISH_CRON) {
+    await executeScheduledPostSchedulerTrigger(env, "cron");
     return;
   }
 
