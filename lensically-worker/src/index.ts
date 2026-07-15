@@ -12686,6 +12686,147 @@ function operatorToolMutatesState(toolName: string): boolean {
   return !readOnly.has(toolName);
 }
 
+const OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS = new Set<string>([
+  "getOperatorDecisionState",
+  "proposeOperatorDecision",
+  "resolveOperatorDecision",
+  "markOperatorDecisionExecuted",
+  "inspectMcpFailure",
+  "start_workflow_session",
+  "admit_context",
+  "prepareFullPreflight",
+]);
+
+function canonicalAutonomyToolName(toolName: string): string {
+  const scoped = toolName.match(/^(?:mm|om|vx)_(.+)$/);
+  return scoped?.[1] ?? toolName;
+}
+
+async function beginOperatorAutonomyAuthorization(
+  env: Env,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<{
+  allowed: boolean;
+  governed: boolean;
+  decision_id?: string;
+  decision_title?: string;
+  event_id?: string;
+  brand_key?: string;
+  error?: string;
+  required_next_tool?: string;
+  pending_decisions?: Record<string, unknown>[];
+}> {
+  const canonical = canonicalOperatorExecutionArgs(toolName, args);
+  const canonicalTool = canonicalAutonomyToolName(canonical.tool_name);
+  if (!operatorToolMutatesState(canonicalTool) || OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS.has(canonicalTool)) {
+    return { allowed: true, governed: false };
+  }
+
+  const requestedBrand = requestedMcpBrandKey(canonicalTool, canonical.args) ?? requestedMcpBrandKey(toolName, args);
+  let profileRow: Record<string, unknown> | null = null;
+  if (requestedBrand) {
+    profileRow = await env.DB.prepare(
+      `SELECT * FROM operator_autonomy_profiles WHERE brand_key = ? AND active = 1 LIMIT 1`,
+    ).bind(requestedBrand).first<Record<string, unknown>>();
+  } else {
+    const profiles = await env.DB.prepare(
+      `SELECT * FROM operator_autonomy_profiles WHERE active = 1 ORDER BY datetime(updated_at) DESC LIMIT 2`,
+    ).all<Record<string, unknown>>();
+    const activeProfiles = profiles.results ?? [];
+    if (activeProfiles.length === 1) profileRow = activeProfiles[0];
+    if (activeProfiles.length > 1) {
+      return {
+        allowed: false,
+        governed: true,
+        error: "autonomy_brand_scope_required",
+        required_next_tool: "proposeOperatorDecision",
+      };
+    }
+  }
+  if (!profileRow || String(profileRow.mode) !== MANIFEST_AUTONOMY_MODE) {
+    return { allowed: true, governed: false };
+  }
+
+  const brandKey = String(profileRow.brand_key);
+  const decisions = await env.DB.prepare(
+    `SELECT * FROM operator_decision_proposals
+     WHERE brand_key = ? AND status IN ('approved', 'executing')
+     ORDER BY datetime(approved_at) ASC, datetime(updated_at) ASC`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  for (const row of decisions.results ?? []) {
+    const authorizedTools = safeParseJsonString(String(row.authorized_tools_json ?? "[]"));
+    if (!Array.isArray(authorizedTools) || !authorizedTools.map(String).includes(canonicalTool)) continue;
+    const budgetRecord = safeParseJsonString(String(row.execution_budget_json ?? "{}"));
+    const budget = budgetRecord && typeof budgetRecord === "object" && !Array.isArray(budgetRecord)
+      ? Math.min(Math.max(Number((budgetRecord as Record<string, unknown>)[canonicalTool] ?? 1), 1), 100)
+      : 1;
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM operator_decision_execution_events
+       WHERE decision_id = ? AND tool_name = ?`,
+    ).bind(String(row.id), canonicalTool).first<{ total: number }>();
+    if (Number(count?.total ?? 0) >= budget) continue;
+    const eventId = crypto.randomUUID();
+    const fingerprint = await operatorExecutionFingerprint(toolName, args);
+    await env.DB.prepare(
+      `INSERT INTO operator_decision_execution_events (
+        id, decision_id, brand_key, tool_name, operation_id, request_fingerprint, status
+      ) VALUES (?, ?, ?, ?, ?, ?, 'started')`,
+    ).bind(
+      eventId,
+      String(row.id),
+      brandKey,
+      canonicalTool,
+      normalizeOperatorText(args.operation_id, 240, true),
+      fingerprint,
+    ).run();
+    await env.DB.prepare(
+      `UPDATE operator_decision_proposals
+       SET status = 'executing', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = 'approved'`,
+    ).bind(String(row.id)).run();
+    return {
+      allowed: true,
+      governed: true,
+      decision_id: String(row.id),
+      decision_title: String(row.title),
+      event_id: eventId,
+      brand_key: brandKey,
+    };
+  }
+
+  const pending = await listOperatorDecisionProposals(env, brandKey as GptBrandKey, ["proposed", "revision_required", "approved", "executing"], 10);
+  return {
+    allowed: false,
+    governed: true,
+    brand_key: brandKey,
+    error: "approved_operator_decision_required",
+    required_next_tool: pending.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
+      ? "resolveOperatorDecision"
+      : "proposeOperatorDecision",
+    pending_decisions: pending,
+  };
+}
+
+async function completeOperatorAutonomyAuthorization(
+  env: Env,
+  authorization: { event_id?: string; decision_id?: string },
+  result: Record<string, unknown>,
+): Promise<void> {
+  if (!authorization.event_id) return;
+  const succeeded = result.ok !== false;
+  await env.DB.prepare(
+    `UPDATE operator_decision_execution_events
+     SET status = ?, result_summary = ?, completed_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+  ).bind(
+    succeeded ? "completed" : "failed",
+    JSON.stringify({ ok: succeeded, error: result.error ?? null, status: result.status ?? null }).slice(0, 2000),
+    authorization.event_id,
+  ).run();
+}
+
 function operatorSemanticOperationIdentity(toolName: string, args: Record<string, unknown>): string | null {
   const explicit = normalizeOperatorText(args.operation_id, 240, true);
   if (explicit) return explicit;
