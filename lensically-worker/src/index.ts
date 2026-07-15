@@ -10851,8 +10851,12 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
     "selectOperatorKey",
   "confirmOperatorProceed",
   "resolveContinuationContext",
-  "planOperatorExecution",
+    "planOperatorExecution",
   "getMcpAdminState",
+  "getOperatorDecisionState",
+  "proposeOperatorDecision",
+  "resolveOperatorDecision",
+  "markOperatorDecisionExecuted",
 
   "inspectMcpFailure",
   "listMcpTools",
