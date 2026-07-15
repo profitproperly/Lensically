@@ -1468,7 +1468,7 @@ describe("operator mode MCP endpoint", () => {
       "updateOpsMemory",
       "searchOpsMemory",
     ]);
-                expect(toolNames.slice(24, 54)).toEqual([
+                                expect(toolNames.slice(24, 57)).toEqual([
       "selectOperatorKey",
       "confirmOperatorProceed",
       "resolveContinuationContext",
@@ -1478,6 +1478,9 @@ describe("operator mode MCP endpoint", () => {
       "proposeOperatorDecision",
       "resolveOperatorDecision",
       "markOperatorDecisionExecuted",
+      "getScheduledPostSchedulerState",
+      "setScheduledPostSchedulerMode",
+      "auditScheduledPost",
       "inspectMcpFailure",
       "listMcpTools",
       "runEngineeringTool",
