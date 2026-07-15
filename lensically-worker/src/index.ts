@@ -28601,9 +28601,9 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     return;
   }
 
-  if (cron === LEGACY_COMBINED_SCHEDULED_CRON) {
+    if (cron === LEGACY_COMBINED_SCHEDULED_CRON) {
     await refreshExpiringThreadsTokens(env);
-    await processDueScheduledPosts(env);
+    await executeScheduledPostSchedulerTrigger(env, "cron");
     return;
   }
 
