@@ -1754,7 +1754,152 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(active?.total ?? 0)).toBe(1);
   }, 30000);
 
+      it("replaces a skipped Manifest review item without preserving stale source lineage", async () => {
+    await seedManifestPatterns(30);
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
+    const batch = await operatorTool<{
+      review_batch_id: string;
+      items: Array<{
+        item_number: number;
+        source_selection_id: string;
+        source_batch_id: string;
+        source_identity_key: string;
+        source_text: string;
+      }>;
+    }>("claim_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      production_date: "2099-01-04",
+      timezone: "America/New_York",
+      fresh_draw: true,
+    });
+    const original = batch.items[0];
+    expect(original).toBeTruthy();
+
+    const buildShownDraft = async (sourceSelectionId: string, title: string, text: string) => {
+      const card = await operatorTool<{ source_card_id: string }>("create_source_card", {
+        brand_key: "manifest_mental",
+        workflow_session_id: session.workflow_session_id,
+        source_selection_id: sourceSelectionId,
+        sequence_label: title,
+        lane_key: "systems",
+        title,
+        transformation_contract: {
+          must_preserve_function: ["Keep the source's calendar-workflow focus."],
+          may_reuse: ["calendar workflow"],
+          must_transform: [{ source_text: "complete source wording", role: "complete source wording", instruction: "Rewrite the complete source wording." }],
+          audience_reward: "Give the reader one concise calendar-workflow observation.",
+        },
+        source_mechanism: "Use the source's calendar-workflow focus in one concise observation.",
+        required_product: "One independently written calendar-workflow sentence.",
+        forbidden_surfaces: ["exact complete source sentence"],
+        pass_conditions: ["The calendar-workflow focus remains clear."],
+        fail_conditions: ["The complete source sentence is copied."],
+      });
+      await operatorTool("lock_source_card", { brand_key: "manifest_mental", source_card_id: card.source_card_id });
+      const run = await operatorTool<{ run_id: string }>("create_generation_run", {
+        brand_key: "manifest_mental",
+        source_card_id: card.source_card_id,
+        adaptation_plan: {
+          adaptation_goal: "Create one independently written calendar-workflow observation.",
+          preserved_functions: ["Keep the source's calendar-workflow focus."],
+          transformed_elements: ["complete source wording"],
+          intentionally_different_from_prior: "Use a new source and independently written surface language.",
+        },
+      });
+      const draft = await operatorTool<{ draft_id: string; showable: boolean }>("submit_candidate_draft", {
+        brand_key: "manifest_mental",
+        run_id: run.run_id,
+        source_card_id: card.source_card_id,
+        text,
+        draft_analysis: {
+          opening_phrase: text.split(" ").slice(0, 4).join(" "),
+          realm_entrance_key: "calendar_workflow",
+          hook_style: "direct_observation",
+          lane_key: "systems",
+          preserved_functions: ["Keep the source's calendar-workflow focus."],
+          transformed_elements: ["complete source wording"],
+          satisfied_time_or_context_requirements: [],
+          audience_reward_delivered: true,
+        },
+      });
+      expect(draft.showable).toBe(true);
+      await operatorTool("mark_draft_shown", { brand_key: "manifest_mental", draft_id: draft.draft_id });
+      return { sourceCardId: card.source_card_id, runId: run.run_id, draftId: draft.draft_id };
+    };
+
+    const originalDraft = await buildShownDraft(
+      original.source_selection_id,
+      "Original review source",
+      "A calendar workflow works better when each step stays connected.",
+    );
+    await operatorTool("attach_manifest_review_draft", {
+      brand_key: "manifest_mental",
+      review_batch_id: batch.review_batch_id,
+      item_number: 1,
+      source_card_id: originalDraft.sourceCardId,
+      generation_run_id: originalDraft.runId,
+      draft_id: originalDraft.draftId,
+    });
+    await operatorTool("skip_manifest_review_source", {
+      brand_key: "manifest_mental",
+      review_batch_id: batch.review_batch_id,
+      item_number: 1,
+      scope: "current_day",
+      reason: "Replace a recently used source.",
+    });
+
+    const claimedIds = new Set(batch.items.map((item) => item.source_selection_id));
+    const replacement = await env.DB.prepare(
+      `SELECT id, source_identity_key, post_text
+       FROM operator_source_selections
+       WHERE batch_id = ? AND brand_key = 'manifest_mental'
+       ORDER BY draw_order ASC`,
+    ).bind(original.source_batch_id).all<{ id: string; source_identity_key: string; post_text: string }>();
+    const replacementSelection = (replacement.results ?? []).find((row) => !claimedIds.has(row.id));
+    expect(replacementSelection).toBeTruthy();
+
+    const replacementDraft = await buildShownDraft(
+      replacementSelection!.id,
+      "Replacement review source",
+      "A different calendar workflow can keep every step clear and connected.",
+    );
+    const repaired = await operatorTool<{
+      items: Array<{
+        item_number: number;
+        source_selection_id: string;
+        source_identity_key: string;
+        source_text: string;
+        generated_post: string;
+        disposition_reason: string | null;
+      }>;
+    }>("attach_manifest_review_draft", {
+      brand_key: "manifest_mental",
+      review_batch_id: batch.review_batch_id,
+      item_number: 1,
+      source_card_id: replacementDraft.sourceCardId,
+      generation_run_id: replacementDraft.runId,
+      draft_id: replacementDraft.draftId,
+    });
+    const repairedItem = repaired.items.find((item) => item.item_number === 1);
+    expect(repairedItem).toMatchObject({
+      source_selection_id: replacementSelection!.id,
+      source_identity_key: replacementSelection!.source_identity_key,
+      source_text: replacementSelection!.post_text,
+      generated_post: "A different calendar workflow can keep every step clear and connected.",
+      disposition_reason: null,
+    });
+
+    const dispositions = await env.DB.prepare(
+      `SELECT id, disposition FROM operator_source_selections WHERE id IN (?, ?) ORDER BY id`,
+    ).bind(original.source_selection_id, replacementSelection!.id).all<{ id: string; disposition: string }>();
+    const dispositionById = new Map((dispositions.results ?? []).map((row) => [row.id, row.disposition]));
+    expect(dispositionById.get(original.source_selection_id)).toBe("skipped");
+    expect(dispositionById.get(replacementSelection!.id)).toBe("claimed");
+  }, 40000);
+
     it("automatic continuity prioritizes the earliest incomplete calendar day without redrawing", async () => {
+
     await seedManifestPatterns(30);
     const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
     const batch = await operatorTool<{ review_batch_id: string; source_batch_reused: boolean; items: Array<{ source_identity_key: string }> }>("claim_manifest_review_batch", {
