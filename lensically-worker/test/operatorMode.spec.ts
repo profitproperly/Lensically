@@ -1998,6 +1998,124 @@ describe("operator mode MCP endpoint", () => {
     expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
   }, 30000);
 
+    it("requires an approved model decision for governed Manifest mutations and enforces its tool budget", async () => {
+    await ensureMcpAccountOpen("manifest_mental");
+
+    const blocked = await mcpToolRaw<{
+      error: string;
+      required_next_tool: string;
+      governed: boolean;
+    }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "current_belief",
+      body: "Unapproved autonomy mutation fixture.",
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent).toMatchObject({
+      error: "approved_operator_decision_required",
+      required_next_tool: "proposeOperatorDecision",
+      governed: true,
+    });
+
+    const proposed = await mcpTool<{
+      decision: { id: string; status: string; authorized_tools: string[]; execution_budget: Record<string, number> };
+    }>("proposeOperatorDecision", {
+      brand_key: "manifest_mental",
+      decision_key: "vitest_autonomy_budget",
+      category: "strategy",
+      title: "Persist one approved Manifest belief",
+      decision: "Save one strategy belief as a governed autonomy execution fixture.",
+      rationale: "The regression must prove that the dispatcher blocks unapproved mutations and permits only the exact approved budget.",
+      evidence: [{ source: "vitest", fact: "No approved decision exists before the first attempt." }],
+      expected_outcome: "Exactly one save_strategy_memory call succeeds.",
+      risks: ["A loose budget could authorize unintended repeat mutations."],
+      reversibility: "The fixture database resets after the test.",
+      execution_plan: "Approve this proposal, execute save_strategy_memory once, verify the second attempt is blocked, then close the decision.",
+      authorized_tools: ["save_strategy_memory"],
+      execution_budget: { save_strategy_memory: 1 },
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(proposed.decision.status).toBe("proposed");
+    expect(proposed.decision.execution_budget.save_strategy_memory).toBe(1);
+
+    const approved = await mcpTool<{ decision: { status: string } }>("resolveOperatorDecision", {
+      brand_key: "manifest_mental",
+      decision_id: proposed.decision.id,
+      resolution: "approve",
+      owner_response: "Approved for the regression fixture.",
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(approved.decision.status).toBe("approved");
+
+    const allowed = await mcpToolRaw<{
+      ok: boolean;
+      memory_id: number;
+      autonomy_decision: { governed: boolean; decision_id: string; decision_title: string };
+    }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "current_belief",
+      body: "Approved autonomy mutation fixture.",
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(allowed.isError).not.toBe(true);
+    expect(allowed.structuredContent.ok).toBe(true);
+    expect(allowed.structuredContent.autonomy_decision).toMatchObject({
+      governed: true,
+      decision_id: proposed.decision.id,
+      decision_title: "Persist one approved Manifest belief",
+    });
+
+    const overBudget = await mcpToolRaw<{ error: string; required_next_tool: string }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "current_belief",
+      body: "Second mutation should exceed the approved budget.",
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(overBudget.isError).toBe(true);
+    expect(overBudget.structuredContent.error).toBe("approved_operator_decision_required");
+
+    const executed = await mcpTool<{ decision: { status: string; outcome_summary: string } }>("markOperatorDecisionExecuted", {
+      brand_key: "manifest_mental",
+      decision_id: proposed.decision.id,
+      outcome_summary: "One approved save succeeded and the second call was blocked by the finite tool budget.",
+      result_evidence: [{ tool: "save_strategy_memory", completed: 1, blocked_after_budget: true }],
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(executed.decision.status).toBe("executed");
+
+    const state = await mcpTool<{
+      profile: { mode: string; objective: string };
+      decisions: Array<{ id: string; status: string }>;
+    }>("getOperatorDecisionState", {
+      brand_key: "manifest_mental",
+      statuses: ["executed"],
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(state.profile.mode).toBe("ai_led_owner_ratified");
+    expect(state.profile.objective).toContain("1,000,000 followers");
+    expect(state.decisions).toEqual(expect.arrayContaining([{ id: proposed.decision.id, status: "executed" }]));
+
+    const reconfirmed = await mcpToolRaw<{
+      continuity_capsule: {
+        autonomy_governance: {
+          profile: { mode: string; objective: string };
+          pending_decisions: unknown[];
+        };
+      };
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(reconfirmed.isError).not.toBe(true);
+    expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.mode).toBe("ai_led_owner_ratified");
+    expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.objective).toContain("1,000,000 followers");
+  }, 40000);
+
   it("returns structured JSON-RPC errors for handler exceptions", async () => {
     await env.DB.prepare(`DROP TABLE IF EXISTS operator_workflow_requirements`).run();
     await env.DB.prepare(`CREATE TABLE operator_workflow_requirements (bad_column TEXT)`).run();
