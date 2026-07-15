@@ -1755,7 +1755,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("mandatory known_path");
-    expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("without per-tool numerical budgets");
+        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Do not create owner proposals or numerical tool budgets");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("one currently callable");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("exact file prefix");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("stop, promote the fix");
