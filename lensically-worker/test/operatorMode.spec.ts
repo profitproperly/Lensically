@@ -1428,11 +1428,11 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("automatically restores canonical persisted schedule");
     expect(initialized.instructions).toContain("Never ask resume or start fresh");
     expect(initialized.instructions).toContain("continuity_loaded=true");
-    expect(initialized.instructions).toContain("Pre-execution policy is mandatory");
-    expect(initialized.instructions).toContain("aliases are not independent recovery routes");
+        expect(initialized.instructions).toContain("Pre-execution policy v2 is mandatory and automatic");
+    expect(initialized.instructions).toContain("Use one currently callable surface for the canonical handler");
     expect(initialized.instructions).toContain("Source cards are backend-only during Manifest calendar production");
-    expect(initialized.instructions).toContain("Owner-visible transition labels are mandatory across accounts and fresh chats");
-    expect(initialized.instructions).toContain("Completed:, Showing now:, and Next decision:");
+    expect(initialized.instructions).toContain("Owner-visible account transitions use Completed:, Showing now:, and Next decision:");
+    expect(initialized.instructions).toContain("Autonomous engineering uses Completed:, Showing now:, and Next action:");
     expect(initialized.instructions).toContain("Calendar controller rule");
     expect(initialized.instructions).toContain("Four-post review rule");
     expect(initialized.instructions).toContain("If no candidate becomes showable, replace it internally or report the blocker");
