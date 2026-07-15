@@ -357,8 +357,68 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
 }
 
 describe("operator mode backend spine", () => {
-  beforeEach(async () => {
+    beforeEach(async () => {
     await resetTables();
+  }, 30000);
+
+  it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
+    const namespace = (env as unknown as { SCHEDULED_POST_SCHEDULER: DurableObjectNamespace }).SCHEDULED_POST_SCHEDULER;
+    expect(namespace).toBeTruthy();
+    const stub = namespace.get(namespace.idFromName(`scheduler-fixture-${crypto.randomUUID()}`));
+
+    const initialResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+    const initial = await initialResponse.json() as { healthy: boolean; heartbeat_fresh: boolean; run_count: number };
+    expect(initial.healthy).toBe(false);
+    expect(initial.heartbeat_fresh).toBe(false);
+    expect(initial.run_count).toBe(0);
+
+    const armResponse = await stub.fetch("https://scheduled-post-scheduler.internal/arm", { method: "POST" });
+    expect(armResponse.ok).toBe(true);
+    const armed = await armResponse.json() as { health: { next_alarm_at: string | null } };
+    expect(armed.health.next_alarm_at).toBeTruthy();
+
+    await runDurableObjectAlarm(stub);
+
+    const alarmHealthResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+    const alarmHealth = await alarmHealthResponse.json() as {
+      healthy: boolean;
+      heartbeat_fresh: boolean;
+      last_trigger: string;
+      last_success: boolean;
+      run_count: number;
+      alarm_last_completed_at: string | null;
+      next_alarm_at: string | null;
+      overdue_before: number;
+      overdue_after: number;
+    };
+    expect(alarmHealth.healthy).toBe(true);
+    expect(alarmHealth.heartbeat_fresh).toBe(true);
+    expect(alarmHealth.last_trigger).toBe("alarm");
+    expect(alarmHealth.last_success).toBe(true);
+    expect(alarmHealth.run_count).toBe(1);
+    expect(alarmHealth.alarm_last_completed_at).toBeTruthy();
+    expect(alarmHealth.next_alarm_at).toBeTruthy();
+    expect(alarmHealth.overdue_before).toBe(0);
+    expect(alarmHealth.overdue_after).toBe(0);
+    expect(Date.parse(String(alarmHealth.next_alarm_at))).toBeGreaterThanOrEqual(Date.parse(String(armed.health.next_alarm_at)));
+
+    const cronHeartbeat = await stub.fetch("https://scheduled-post-scheduler.internal/heartbeat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ trigger: "cron", phase: "completed", overdue_before: 0, overdue_after: 0 }),
+    });
+    expect(cronHeartbeat.ok).toBe(true);
+    const sharedHealthResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+    const sharedHealth = await sharedHealthResponse.json() as {
+      last_trigger: string;
+      cron_last_completed_at: string | null;
+      last_success: boolean;
+      run_count: number;
+    };
+    expect(sharedHealth.last_trigger).toBe("cron");
+    expect(sharedHealth.cron_last_completed_at).toBeTruthy();
+    expect(sharedHealth.last_success).toBe(true);
+    expect(sharedHealth.run_count).toBe(1);
   }, 30000);
 
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
