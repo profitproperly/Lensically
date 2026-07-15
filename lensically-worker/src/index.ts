@@ -28116,6 +28116,219 @@ async function refreshExpiringThreadsTokens(env: Env): Promise<void> {
   }
 }
 
+type ScheduledPostSchedulerHealth = {
+  armed_at: string | null;
+  next_alarm_at: string | null;
+  alarm_last_started_at: string | null;
+  alarm_last_completed_at: string | null;
+  cron_last_started_at: string | null;
+  cron_last_completed_at: string | null;
+  last_trigger: "alarm" | "cron" | null;
+  last_success: boolean | null;
+  last_error: string | null;
+  overdue_before: number;
+  overdue_after: number;
+  run_count: number;
+};
+
+const EMPTY_SCHEDULED_POST_SCHEDULER_HEALTH: ScheduledPostSchedulerHealth = {
+  armed_at: null,
+  next_alarm_at: null,
+  alarm_last_started_at: null,
+  alarm_last_completed_at: null,
+  cron_last_started_at: null,
+  cron_last_completed_at: null,
+  last_trigger: null,
+  last_success: null,
+  last_error: null,
+  overdue_before: 0,
+  overdue_after: 0,
+  run_count: 0,
+};
+
+function getScheduledPostSchedulerStub(env: Env) {
+  const namespace = env.SCHEDULED_POST_SCHEDULER;
+  if (!namespace) {
+    return null;
+  }
+  return namespace.get(namespace.idFromName(SCHEDULED_POST_ALARM_OBJECT_NAME));
+}
+
+async function countOverdueScheduledPosts(env: Env): Promise<number> {
+  await ensureScheduledPostsTable(env);
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total
+     FROM scheduled_posts
+     WHERE status = ?
+       AND scheduled_time <= ?`,
+  ).bind(SCHEDULED_POST_STATUS_APPROVED, new Date().toISOString()).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+async function ensureScheduledPostAlarm(env: Env): Promise<void> {
+  const stub = getScheduledPostSchedulerStub(env);
+  if (!stub) {
+    return;
+  }
+  const response = await stub.fetch("https://scheduled-post-scheduler.internal/arm", { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`scheduled_post_alarm_arm_failed:${response.status}`);
+  }
+}
+
+async function readScheduledPostSchedulerHealth(env: Env): Promise<Record<string, unknown>> {
+  const stub = getScheduledPostSchedulerStub(env);
+  if (!stub) {
+    return { enabled: false, reason: "durable_object_binding_missing" };
+  }
+  const response = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+  if (!response.ok) {
+    return { enabled: true, healthy: false, error: `health_read_failed:${response.status}` };
+  }
+  return await response.json() as Record<string, unknown>;
+}
+
+async function recordCronSchedulerHeartbeat(
+  env: Env,
+  phase: "started" | "completed" | "failed",
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  const stub = getScheduledPostSchedulerStub(env);
+  if (!stub) {
+    return;
+  }
+  await stub.fetch("https://scheduled-post-scheduler.internal/heartbeat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ trigger: "cron", phase, ...details }),
+  });
+}
+
+export class ScheduledPostScheduler {
+  constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
+
+  private async getHealth(): Promise<ScheduledPostSchedulerHealth> {
+    return await this.state.storage.get<ScheduledPostSchedulerHealth>("health")
+      ?? { ...EMPTY_SCHEDULED_POST_SCHEDULER_HEALTH };
+  }
+
+  private async setHealth(patch: Partial<ScheduledPostSchedulerHealth>): Promise<ScheduledPostSchedulerHealth> {
+    const next = { ...(await this.getHealth()), ...patch };
+    await this.state.storage.put("health", next);
+    return next;
+  }
+
+  private async scheduleNextAlarm(): Promise<number> {
+    const nextAlarmAt = Date.now() + SCHEDULED_POST_ALARM_INTERVAL_MS;
+    await this.state.storage.setAlarm(nextAlarmAt);
+    await this.setHealth({ next_alarm_at: new Date(nextAlarmAt).toISOString() });
+    return nextAlarmAt;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === "/arm" && request.method === "POST") {
+      const now = Date.now();
+      const existing = await this.state.storage.getAlarm();
+      const mustReset = existing === null || existing <= now || existing > now + (SCHEDULED_POST_ALARM_INTERVAL_MS * 2);
+      const nextAlarmAt = mustReset ? await this.scheduleNextAlarm() : existing;
+      const health = await this.setHealth({
+        armed_at: new Date(now).toISOString(),
+        next_alarm_at: nextAlarmAt === null ? null : new Date(nextAlarmAt).toISOString(),
+      });
+      return new Response(JSON.stringify({ ok: true, armed: true, reset: mustReset, health }), {
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/health" && request.method === "GET") {
+      const health = await this.getHealth();
+      const now = Date.now();
+      const lastCompletedAt = health.alarm_last_completed_at ?? health.cron_last_completed_at;
+      const lastCompletedMs = lastCompletedAt ? Date.parse(lastCompletedAt) : NaN;
+      const heartbeatFresh = Number.isFinite(lastCompletedMs)
+        ? now - lastCompletedMs <= SCHEDULED_POST_ALARM_INTERVAL_MS * 3
+        : false;
+      return new Response(JSON.stringify({ enabled: true, healthy: heartbeatFresh && health.last_success !== false, heartbeat_fresh: heartbeatFresh, ...health }), {
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/heartbeat" && request.method === "POST") {
+      const payload = await request.json().catch(() => ({})) as Record<string, unknown>;
+      const phase = String(payload.phase ?? "");
+      const nowIso = new Date().toISOString();
+      const patch: Partial<ScheduledPostSchedulerHealth> = {
+        last_trigger: "cron",
+        last_error: phase === "failed" ? String(payload.error ?? "cron_publish_failed") : null,
+      };
+      if (phase === "started") patch.cron_last_started_at = nowIso;
+      if (phase === "completed" || phase === "failed") {
+        patch.cron_last_completed_at = nowIso;
+        patch.last_success = phase === "completed";
+        if (Number.isFinite(Number(payload.overdue_before))) patch.overdue_before = Number(payload.overdue_before);
+        if (Number.isFinite(Number(payload.overdue_after))) patch.overdue_after = Number(payload.overdue_after);
+      }
+      const health = await this.setHealth(patch);
+      return new Response(JSON.stringify({ ok: true, health }), {
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
+    }
+
+    return new Response("Not found", { status: 404 });
+  }
+
+  async alarm(): Promise<void> {
+    const startedAt = new Date().toISOString();
+    let overdueBefore = 0;
+    let overdueAfter = 0;
+    let failure: unknown = null;
+    const previous = await this.getHealth();
+    await this.setHealth({
+      alarm_last_started_at: startedAt,
+      last_trigger: "alarm",
+      last_success: null,
+      last_error: null,
+      run_count: previous.run_count + 1,
+    });
+
+    try {
+      overdueBefore = await countOverdueScheduledPosts(this.env);
+      await processDueScheduledPosts(this.env);
+      overdueAfter = await countOverdueScheduledPosts(this.env);
+    } catch (error) {
+      failure = error;
+      overdueAfter = await countOverdueScheduledPosts(this.env).catch(() => overdueBefore);
+      logWorkerEvent("SCHEDULED_POST_ALARM_FAILED", {
+        error: getErrorMessage(error),
+        overdue_before: overdueBefore,
+        overdue_after: overdueAfter,
+      }, "error");
+    } finally {
+      const nextAlarmAt = await this.scheduleNextAlarm();
+      await this.setHealth({
+        alarm_last_completed_at: new Date().toISOString(),
+        next_alarm_at: new Date(nextAlarmAt).toISOString(),
+        last_trigger: "alarm",
+        last_success: failure === null,
+        last_error: failure === null ? null : getErrorMessage(failure),
+        overdue_before: overdueBefore,
+        overdue_after: overdueAfter,
+      });
+      logWorkerEvent("SCHEDULED_POST_ALARM_COMPLETED", {
+        success: failure === null,
+        overdue_before: overdueBefore,
+        overdue_after: overdueAfter,
+        next_alarm_at: new Date(nextAlarmAt).toISOString(),
+      });
+    }
+
+    if (failure !== null) {
+      throw failure;
+    }
+  }
+}
+
 async function handleScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
   const cron = event.cron?.trim() ?? "";
   logWorkerEvent("SCHEDULED_CRON_TRIGGERED", {
