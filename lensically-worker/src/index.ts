@@ -26294,29 +26294,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const scheduledPostId = Number(payload.scheduled_post_id);
+            const scheduledPostId = Number(payload.scheduled_post_id);
       const text = payload.text?.trim();
       const date = payload.date?.trim();
       const time = payload.time?.trim();
-      const timezone = payload.timezone?.trim() || null;
-      const spoilerAllText = normalizeSpoilerFlag(payload.spoiler_all_text);
-      const spoilerPhrases = normalizeSpoilerPhrasesInput(payload.spoiler_phrases);
-
+      const timezone = payload.timezone?.trim() || WORKSPACE_DEFAULT_TIMEZONE;
       if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !text || !date || !time) {
         return new Response(
-          JSON.stringify({
-            error: "scheduled_post_id, text, date, and time are required",
-          }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-      const spoilerValidationError = validateTextSpoilerConfig(text, spoilerAllText, spoilerPhrases);
-      if (spoilerValidationError) {
-        return new Response(
-          JSON.stringify({ error: spoilerValidationError }),
+          JSON.stringify({ error: "scheduled_post_id, text, date, and time are required" }),
           {
             status: 400,
             headers: { "content-type": "application/json; charset=UTF-8" },
@@ -26324,107 +26309,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const ownedAppUserId = WORKSPACE_APP_USER_ID;
-      const resolvedTimezone = timezone ?? WORKSPACE_DEFAULT_TIMEZONE;
-      const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, resolvedTimezone);
-      if (!scheduledUtc) {
-        return new Response(
-          JSON.stringify({ error: "Invalid date, time, or timezone" }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-      if (isPastUtcTimestamp(scheduledUtc)) {
-        return new Response(
-          JSON.stringify({ error: "Scheduled time must be in the future (UTC)." }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-
-      await ensureScheduledPostsTable(env);
-
-      const existingScheduledPost = await env.DB.prepare(
-        `SELECT id, status, threads_user_id
-         FROM scheduled_posts
-         WHERE id = ?
-           AND user_id = ?
-         LIMIT 1`,
-      )
-        .bind(scheduledPostId, ownedAppUserId)
-        .first<{ id: number | string; status: string; threads_user_id: string }>();
-      if (!existingScheduledPost) {
-        return new Response(
-          JSON.stringify({ error: "Scheduled post not found" }),
-          {
-            status: 404,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-      if (existingScheduledPost.status !== SCHEDULED_POST_STATUS_APPROVED) {
-        return new Response(
-          JSON.stringify({ error: "Only approved scheduled posts can be edited." }),
-          {
-            status: 409,
-            headers: { "content-type": "application/json; charset=UTF-8" },
-          },
-        );
-      }
-
-      const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
-        ownedAppUserId,
-        existingScheduledPost.threads_user_id,
-        scheduledUtc,
+      const updated = await updateScheduledPostForAppUser(env, {
+        appUserId: WORKSPACE_APP_USER_ID,
+        scheduledPostId,
         text,
-        buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
-      );
-
-      try {
-        const result = await env.DB.prepare(
-          `UPDATE scheduled_posts
-           SET post_text = ?,
-               spoiler_all_text = ?,
-               spoiler_phrases_json = ?,
-               scheduled_time = ?,
-               idempotency_key = ?
-           WHERE id = ?
-             AND user_id = ?
-             AND status = ?`,
-        )
-          .bind(
-            text,
-            spoilerAllText ? 1 : 0,
-            serializeSpoilerPhrases(spoilerPhrases),
-            scheduledUtc,
-            scheduleIdempotencyKey,
-            scheduledPostId,
-            ownedAppUserId,
-            SCHEDULED_POST_STATUS_APPROVED,
-          )
-          .run();
-
-        if (Number(result.meta?.changes ?? 0) <= 0) {
-          return new Response(
-            JSON.stringify({ error: "Scheduled post could not be updated." }),
-            {
-              status: 409,
-              headers: { "content-type": "application/json; charset=UTF-8" },
-            },
-          );
-        }
-      } catch (error) {
-        if (!isUniqueConstraintError(error)) {
-          throw error;
-        }
+        date,
+        time,
+        timeZone: timezone,
+        spoilerAllText: normalizeSpoilerFlag(payload.spoiler_all_text),
+        spoilerPhrases: normalizeSpoilerPhrasesInput(payload.spoiler_phrases),
+      });
+      if (!updated.success || !updated.scheduledPost) {
         return new Response(
-          JSON.stringify({ error: "An identical scheduled post already exists." }),
+          JSON.stringify({ error: updated.error ?? "Scheduled post could not be updated." }),
           {
-            status: 409,
+            status: updated.statusCode,
             headers: { "content-type": "application/json; charset=UTF-8" },
           },
         );
@@ -26433,14 +26332,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return new Response(
         JSON.stringify({
           success: true,
-          scheduled_post: {
-            id: scheduledPostId,
-            text,
-            status: SCHEDULED_POST_STATUS_APPROVED,
-            scheduled_time_utc: scheduledUtc,
-            spoiler_all_text: spoilerAllText,
-            spoiler_phrases: spoilerPhrases,
-          },
+          scheduled_post: updated.scheduledPost,
+          linked_drafts_updated: updated.linkedDraftsUpdated ?? 0,
         }),
         {
           status: 200,
