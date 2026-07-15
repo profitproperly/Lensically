@@ -364,7 +364,7 @@ describe("operator mode backend spine", () => {
   it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
     const namespace = (env as unknown as { SCHEDULED_POST_SCHEDULER: DurableObjectNamespace }).SCHEDULED_POST_SCHEDULER;
     expect(namespace).toBeTruthy();
-    const stub = namespace.get(namespace.idFromName(`scheduler-fixture-${crypto.randomUUID()}`));
+        using stub = namespace.get(namespace.idFromName(`scheduler-fixture-${crypto.randomUUID()}`));
 
     const initialResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
     const initial = await initialResponse.json() as { healthy: boolean; heartbeat_fresh: boolean; run_count: number };
