@@ -474,10 +474,12 @@ const OPERATOR_EXECUTION_POLICY_CONTRACT = {
 } as const;
 
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
-  version: "operator-owner-interaction-v6",
+    version: "operator-owner-interaction-v7",
 
   owner_visible_checkpoints: [
     "initial_key_proceed",
+    "decision_proposal",
+    "decision_execution_report",
     "calendar_coverage_confirmation",
     "four_post_review_batch",
     "confirmed_scheduling_report",
