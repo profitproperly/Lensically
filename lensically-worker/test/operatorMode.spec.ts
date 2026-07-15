@@ -2136,7 +2136,9 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(state.profile.mode).toBe("ai_led_owner_ratified");
     expect(state.profile.objective).toContain("1,000,000 followers");
-    expect(state.decisions).toEqual(expect.arrayContaining([{ id: proposed.decision.id, status: "executed" }]));
+        expect(state.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: proposed.decision.id, status: "executed" }),
+    ]));
 
     const reconfirmed = await mcpToolRaw<{
       continuity_capsule: {
