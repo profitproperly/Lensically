@@ -28051,6 +28051,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
+        if (url.pathname === "/api/operator/scheduler-health" && request.method === "GET") {
+      const health = await readScheduledPostSchedulerHealth(env);
+      return new Response(JSON.stringify(health), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
+    }
+
     return new Response("Lensically Worker Running", {
       status: 200,
       headers: { "content-type": "text/plain; charset=UTF-8" },
