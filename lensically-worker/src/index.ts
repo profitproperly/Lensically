@@ -14593,8 +14593,32 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     if (!query) {
       return { ok: false, error: "query_required" };
     }
-    const prefix = sanitizeRepoPath(args.prefix ?? "");
+        const prefix = sanitizeRepoPath(args.prefix ?? "");
     const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 20);
+    if (prefix && /\.[a-z0-9]+$/i.test(prefix)) {
+      const file = await getGithubFile(env, prefix);
+      if (!file.ok || file.content === null) {
+        return { ok: false, error: "named_repo_file_search_failed", path: prefix, status: file.status };
+      }
+      const matches = compactTextMatches(file.content, query, limit).map((match) => ({
+        ...match,
+        path: prefix,
+        source: "named_file_local_search",
+      }));
+      return {
+        ok: true,
+        query,
+        prefix,
+        matches,
+        returned_count: matches.length,
+        total_count: matches.length,
+        truncated: matches.length === limit,
+        search_mode: "named_file_local_search",
+        external_requests: 1,
+        file_content_fanout: 1,
+        execution_policy: buildOperatorExecutionPolicy("searchRepoFiles", args),
+      };
+    }
     const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
     if (prefix) searchTerms.push(`path:${prefix}`);
         const codeSearch = await githubApi(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
