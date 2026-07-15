@@ -1976,9 +1976,97 @@ describe("operator mode MCP endpoint", () => {
       time: "09:00",
       timezone: "America/New_York",
     });
-    expect(scheduled.status).toBe("scheduled");
+        expect(scheduled.status).toBe("scheduled");
     expect(scheduled.scheduled_post_id).toBeTruthy();
+
+    const listedTools = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(listedTools.tools.some((tool) => tool.name === "edit_scheduled_post")).toBe(true);
+    const beforeEdit = await env.DB.prepare(
+      `SELECT scheduled_time FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(scheduled.scheduled_post_id).first<{ scheduled_time: string }>();
+    const edited = await mcpTool<{
+      success: boolean;
+      scheduled_post: { id: number; text: string; scheduled_time_utc: string };
+      linked_drafts_updated: number;
+      linked_draft_id: string | null;
+    }>("edit_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduled.scheduled_post_id,
+      text: "A clean system makes every good idea easier to reuse.",
+    });
+    expect(edited.success).toBe(true);
+    expect(edited.scheduled_post.text).toBe("A clean system makes every good idea easier to reuse.");
+    expect(edited.scheduled_post.scheduled_time_utc).toBe(beforeEdit?.scheduled_time);
+    expect(edited.linked_drafts_updated).toBe(1);
+    expect(edited.linked_draft_id).toBe(draft.draft_id);
+
+    const persistedScheduled = await env.DB.prepare(
+      `SELECT post_text, scheduled_time FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(scheduled.scheduled_post_id).first<{ post_text: string; scheduled_time: string }>();
+    const persistedDraft = await env.DB.prepare(
+      `SELECT text FROM gpt_generation_drafts WHERE id = ? LIMIT 1`,
+    ).bind(draft.draft_id).first<{ text: string }>();
+    const inventory = await env.DB.prepare(
+      `SELECT text, source_id, status
+       FROM operator_content_inventory
+       WHERE brand_key = ? AND source_type = 'scheduled_post' AND source_id = ?
+       ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(BRAND_KEY, String(scheduled.scheduled_post_id)).first<{ text: string; source_id: string; status: string }>();
+    expect(persistedScheduled).toMatchObject({
+      post_text: "A clean system makes every good idea easier to reuse.",
+      scheduled_time: beforeEdit?.scheduled_time,
+    });
+    expect(persistedDraft?.text).toBe("A clean system makes every good idea easier to reuse.");
+    expect(inventory).toMatchObject({
+      text: "A clean system makes every good idea easier to reuse.",
+      source_id: String(scheduled.scheduled_post_id),
+      status: "scheduled",
+    });
+
+    await env.DB.prepare(
+      `UPDATE scheduled_posts SET status = 'posted' WHERE id = ?`,
+    ).bind(scheduled.scheduled_post_id).run();
+    const blocked = await mcpRequest<{
+      structuredContent: { success?: boolean; error?: string };
+      isError?: boolean;
+    }>("tools/call", {
+      name: "edit_scheduled_post",
+      arguments: {
+        brand_key: BRAND_KEY,
+        scheduled_post_id: scheduled.scheduled_post_id,
+        text: "This edit must not persist.",
+        proceed_confirmed: true,
+        continuity_loaded: true,
+      },
+    });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent.error).toBe("only_approved_scheduled_posts_can_be_edited");
   }, 40000);
+
+  it("hides scheduled posts from other account scopes when editing", async () => {
+    await operatorTool("list_accounts");
+    const inserted = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (
+        user_id, threads_user_id, post_text, status, scheduled_time
+      ) VALUES ('workspace-owner', 'manifest-mental', 'Other account post', 'approved', '2099-01-02T14:00:00.000Z')`,
+    ).run();
+    const response = await fetchFromWorker("/api/operator/tools/edit_scheduled_post", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        brand_key: BRAND_KEY,
+        scheduled_post_id: Number(inserted.meta?.last_row_id ?? 0),
+        text: "Cross-account edit must not persist.",
+      }),
+    });
+    const payload = await response.json() as { error?: string };
+    expect(response.status).toBe(404);
+    expect(payload.error).toBe("scheduled_post_not_found");
+    const stored = await env.DB.prepare(
+      `SELECT post_text FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(Number(inserted.meta?.last_row_id ?? 0)).first<{ post_text: string }>();
+    expect(stored?.post_text).toBe("Other account post");
+  }, 30000);
 
   it("returns structured MCP gate failure and blocks mark_draft_shown", async () => {
     const first = await createLockedSourceCard();
