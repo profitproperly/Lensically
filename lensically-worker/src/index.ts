@@ -325,6 +325,9 @@ const OPERATOR_REJECTION_CONTEXT_LIMIT = 200;
 const OPERATOR_CONTINUITY_CONTRACT_VERSION = "operator-continuity-v2";
 const OPERATOR_EXECUTION_POLICY_VERSION = "operator-execution-policy-v1";
 const OPERATOR_IDEMPOTENCY_VERSION = "operator-idempotency-v1";
+const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v1";
+const MANIFEST_AUTONOMY_OBJECTIVE = "Grow Manifest Mental to 1,000,000 followers.";
+const MANIFEST_AUTONOMY_MODE = "ai_led_owner_ratified";
 const OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 const OPERATOR_CONTINUATION_NONCE_TTL_SECONDS = 60 * 15;
 
