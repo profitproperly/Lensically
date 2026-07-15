@@ -427,10 +427,83 @@ describe("operator mode backend spine", () => {
       last_success: boolean;
       run_count: number;
     };
-    expect(sharedHealth.last_trigger).toBe("cron");
+        expect(sharedHealth.last_trigger).toBe("cron");
     expect(sharedHealth.cron_last_completed_at).toBeTruthy();
     expect(sharedHealth.last_success).toBe(true);
     expect(sharedHealth.run_count).toBe(1);
+
+    const initialControl = await initialResponse.clone().json().catch(() => null);
+    expect(initialControl).toBeTruthy();
+    const pausedHealth = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
+      control: { mode: string; allowed_post_ids: number[]; max_posts: number };
+    };
+    expect(pausedHealth.control).toMatchObject({ mode: "paused", allowed_post_ids: [], max_posts: 0 });
+
+    const firstInsert = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'missing-account', 'Canary target', 'approved', '2000-01-01T00:00:00.000Z')`,
+    ).run();
+    const secondInsert = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'missing-account', 'Held overdue post', 'approved', '2000-01-01T00:01:00.000Z')`,
+    ).run();
+    const firstPostId = Number(firstInsert.meta?.last_row_id ?? 0);
+    const secondPostId = Number(secondInsert.meta?.last_row_id ?? 0);
+
+    await scheduler.alarm();
+    const heldBeforeCanary = await env.DB.prepare(
+      `SELECT id, last_attempted_at FROM scheduled_posts WHERE id IN (?, ?) ORDER BY id`,
+    ).bind(firstPostId, secondPostId).all<{ id: number; last_attempted_at: string | null }>();
+    expect((heldBeforeCanary.results ?? []).every((row) => row.last_attempted_at === null)).toBe(true);
+
+    const invalidCanary = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "canary", allowed_post_ids: [firstPostId, secondPostId], reason: "invalid fixture" }),
+    }));
+    expect(invalidCanary.status).toBe(400);
+
+    const canaryControl = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "canary", allowed_post_ids: [firstPostId], reason: "isolated fixture" }),
+    }));
+    expect(canaryControl.ok).toBe(true);
+    const canaryRun = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/execute", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ trigger: "cron" }),
+    }));
+    expect(canaryRun.ok).toBe(true);
+
+    const afterCanary = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
+      control: { mode: string; allowed_post_ids: number[]; max_posts: number };
+      last_processed_count: number;
+      last_processed_post_ids: number[];
+      last_trigger: string;
+    };
+    expect(afterCanary.control).toMatchObject({ mode: "paused", allowed_post_ids: [], max_posts: 0 });
+    expect(afterCanary.last_trigger).toBe("cron");
+    expect(afterCanary.last_processed_count).toBe(1);
+    expect(afterCanary.last_processed_post_ids).toEqual([firstPostId]);
+
+    const audited = await env.DB.prepare(
+      `SELECT id, status, last_attempted_at, publish_error_message
+       FROM scheduled_posts WHERE id IN (?, ?) ORDER BY id`,
+    ).bind(firstPostId, secondPostId).all<{
+      id: number;
+      status: string;
+      last_attempted_at: string | null;
+      publish_error_message: string | null;
+    }>();
+    const rows = audited.results ?? [];
+    expect(rows.find((row) => row.id === firstPostId)?.last_attempted_at).toBeTruthy();
+    expect(rows.find((row) => row.id === firstPostId)?.publish_error_message).toContain("threads_account_not_connected");
+    expect(rows.find((row) => row.id === secondPostId)).toMatchObject({
+      status: "approved",
+      last_attempted_at: null,
+      publish_error_message: null,
+    });
   }, 30000);
 
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
