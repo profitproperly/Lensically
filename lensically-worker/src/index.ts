@@ -12694,6 +12694,90 @@ function operatorChangeScope(changeDescription: unknown, intendedTool: string): 
   return { scope: "account_scoped", reason: "The operation changes selected-account content, creative interpretation, strategy, artifacts, or metrics rather than shared system behavior." };
 }
 
+const OPERATOR_AUTONOMOUS_CONTROL_TOOLS = new Set<string>([
+  "updateMcpToolSchema",
+  "updateMcpToolBehavior",
+  "createMcpTool",
+  "runMcpTests",
+  "deployMcpChanges",
+  "createImplementationBacklogItem",
+  "markImplementationBacklogItemResolved",
+  "updateWorkflowRequirement",
+]);
+
+const OPERATOR_PROTECTED_ENGINEERING_TOOLS = new Set<string>([
+  "deleteRepoFile",
+  "rollbackMcpChanges",
+  "disableMcpTool",
+  "setScheduledPostSchedulerMode",
+]);
+
+function operatorUsesAutonomousEngineeringAuthority(toolName: string, args: Record<string, unknown>): boolean {
+  if (OPERATOR_PROTECTED_ENGINEERING_TOOLS.has(toolName)) return false;
+  if (isOperatorMcpEngineeringToolName(toolName)) return true;
+  if (!OPERATOR_AUTONOMOUS_CONTROL_TOOLS.has(toolName)) return false;
+  return operatorChangeScope(args.change_description ?? args.operation, toolName).scope === "universal";
+}
+
+function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+  const prefix = sanitizeRepoPath(args.prefix ?? "");
+  const path = sanitizeRepoPath(args.path ?? "");
+  if (toolName === "searchRepoFiles" && prefix && /\.[a-z0-9]+$/i.test(prefix)) {
+    return {
+      rule_key: "named_large_file_local_search",
+      mandatory_route: "read the named Git blob once and search its content locally",
+      reason: "GitHub code search does not reliably index oversized source files; do not retry empty code-search results or fan out across files.",
+    };
+  }
+  if (["proposeOperatorDecision", "resolveOperatorDecision", "markOperatorDecisionExecuted"].includes(toolName)) {
+    return {
+      rule_key: "compact_governance_payload",
+      mandatory_route: "send only required compact fields and use a safe account-key alias when client preflight rejects the canonical surface",
+      reason: "Verbose governance payloads are known to trigger client-side preflight blocks before reaching Lensically.",
+    };
+  }
+  if (toolName === "applyRepoTextPatch" && /\.ya?ml$/i.test(path)) {
+    return {
+      rule_key: "yaml_whole_block_indent_safe_patch",
+      mandatory_route: "replace a complete YAML block with explicit relative indentation, then read back the file before dispatch",
+      reason: "Partial multiline replacements can inherit first-line indentation and create parser failures.",
+    };
+  }
+  if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
+    return {
+      rule_key: "workflow_source_validation_before_dispatch",
+      mandatory_route: "validate changed workflow source before dispatch and poll the exact created run",
+      reason: "Invalid workflow YAML is rejected before a GitHub run exists; repeated dispatches cannot repair source structure.",
+    };
+  }
+  if (toolName === "verifyDeployedMcpVersion") {
+    return {
+      rule_key: "deployment_identity_before_new_fields",
+      mandatory_route: "verify the deployed commit/version identity before evaluating newly introduced runtime fields",
+      reason: "Custom domains can briefly return the previous successful payload after deployment.",
+    };
+  }
+  if (toolName === "getGitHubWorkflowRun") {
+    return {
+      rule_key: "bounded_same_run_poll",
+      mandatory_route: "poll the same run no faster than five seconds and fetch compact failure logs only after completion",
+      reason: "Polling alternate routes or requesting full logs early adds calls without changing state.",
+    };
+  }
+  if (toolName === "listMcpTools" || toolName === "runEngineeringTool") {
+    return {
+      rule_key: "callable_alias_is_not_recovery",
+      mandatory_route: "use one currently callable alias only when the direct schema is unavailable; never wrapper-hop after a backend failure",
+      reason: "Direct and bridged calls reach the same handler and are not independent recovery planes.",
+    };
+  }
+  return {
+    rule_key: "canonical_first_execution",
+    mandatory_route: isOperatorMcpEngineeringToolName(toolName) ? "engineering control handler" : "operator backend handler",
+    reason: "Use the canonical source-defined route once and change inputs only when evidence requires it.",
+  };
+}
+
 function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
   const nestedTool = toolName === "listMcpTools"
     ? normalizeOperatorText(args.execute_tool, 160, true)
@@ -12707,6 +12791,10 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
   const search = canonicalTool === "searchRepoFiles";
   const workflowPoll = canonicalTool === "getGitHubWorkflowRun";
   const scope = operatorChangeScope(args.change_description ?? args.operation, canonicalTool);
+  const knownPath = resolveOperatorKnownPath(canonicalTool, nestedTool && args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+    ? args.arguments as Record<string, unknown>
+    : args);
+  const engineeringAutonomous = operatorUsesAutonomousEngineeringAuthority(canonicalTool, args);
   return {
     version: OPERATOR_EXECUTION_POLICY_VERSION,
     canonical_tool: canonicalTool,
@@ -12716,16 +12804,26 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
     operation_class: search ? "bounded_repository_search" : workflowPoll ? "bounded_workflow_poll" : engineering ? "engineering" : accountScoped ? "account_workflow" : "control",
     scope_classification: scope,
     allowed: true,
+    authorization_mode: engineeringAutonomous ? "persistent_outcome_bound_engineering" : "owner_ratified_or_read_only",
+    engineering_authority_version: engineeringAutonomous ? OPERATOR_ENGINEERING_AUTHORITY_VERSION : null,
+    numerical_tool_budget_applies: false,
+    known_path: knownPath,
+    mandatory_path_applied: true,
     hard_bounds: search
-      ? { external_requests_max: 2, file_content_fanout_max: 0, result_limit_max: 20, prefix_recommended: true }
+      ? { external_requests_max: 2, file_content_fanout_max: prefix && /\.[a-z0-9]+$/i.test(prefix) ? 1 : 0, result_limit_max: 20, prefix_recommended: true }
       : workflowPoll
         ? { external_requests_max: 2, poll_same_run_min_seconds: 5, full_logs_only_on_completed_failure: true }
         : { identical_retry_max: 0, deterministic_failure_retryable: false },
     forbidden_routes: search
       ? ["recursive tree plus per-file content reads", "retrying the same search through runEngineeringTool", "retrying the same search through listMcpTools"]
       : ["treating same-backend wrappers as independent recovery planes", "repeating a deterministic failed call without changing inputs or route"],
-    known_failure_prevented: search,
-    canonical_route: search ? "single GitHub code-search request with bounded fallback" : engineering ? "engineering control handler" : "operator backend handler",
+    known_failure_prevented: knownPath.rule_key !== "canonical_first_execution",
+    canonical_route: knownPath.mandatory_route,
+    recursive_improvement: {
+      stop_on_new_reusable_failure: true,
+      promote_before_resume: true,
+      required_layers: ["execution_policy", "regression_test", "engineering_audit", "operating_memory"],
+    },
     idempotency_version: OPERATOR_IDEMPOTENCY_VERSION,
   };
 }
