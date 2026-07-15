@@ -28248,6 +28248,51 @@ async function readScheduledPostSchedulerHealth(env: Env): Promise<Record<string
   return await response.json() as Record<string, unknown>;
 }
 
+async function setScheduledPostSchedulerControl(
+  env: Env,
+  control: { mode: ScheduledPostSchedulerMode; allowedPostIds?: number[]; reason?: string | null },
+): Promise<Record<string, unknown>> {
+  const stub = getScheduledPostSchedulerStub(env);
+  if (!stub) {
+    throw new Error("scheduled_post_scheduler_binding_missing");
+  }
+  const response = await stub.fetch("https://scheduled-post-scheduler.internal/control", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      mode: control.mode,
+      allowed_post_ids: control.allowedPostIds ?? [],
+      reason: control.reason ?? null,
+    }),
+  });
+  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(String(payload?.error ?? `scheduled_post_scheduler_control_failed:${response.status}`));
+  }
+  return payload ?? { ok: true };
+}
+
+async function auditScheduledPost(
+  env: Env,
+  brand: GptResolvedBrand,
+  scheduledPostId: number,
+): Promise<Record<string, unknown> | null> {
+  await ensureScheduledPostsTable(env);
+  const row = await env.DB.prepare(
+    `SELECT id, user_id, threads_user_id, post_text, status, scheduled_time,
+            published_post_id, publish_request_id, publish_error_message,
+            last_attempted_at, processing_started_at, published_at, created_at, updated_at
+     FROM scheduled_posts
+     WHERE id = ? AND user_id = ? AND threads_user_id = ?
+     LIMIT 1`,
+  ).bind(
+    scheduledPostId,
+    WORKSPACE_APP_USER_ID,
+    brand.profile.threads_user_id,
+  ).first<Record<string, unknown>>();
+  return row ?? null;
+}
+
 async function recordCronSchedulerHeartbeat(
   env: Env,
   phase: "started" | "completed" | "failed",
