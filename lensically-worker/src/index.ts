@@ -10158,13 +10158,74 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ memory_id: memory?.id ?? null });
   }
 
-  if (toolName === "list_scheduled_posts") {
+    if (toolName === "list_scheduled_posts") {
     const date = normalizeOperatorText(payload.date, 20, true);
     const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
     const items = date && isValidIsoDate(date)
       ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, date, timezone)
       : [];
     return operatorJsonResponse({ items, returned_count: items.length, total_count: items.length, has_more: false });
+  }
+
+  if (toolName === "edit_scheduled_post") {
+    const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id ?? 0));
+    if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
+      return operatorJsonResponse({ success: false, error: "scheduled_post_id is required" }, 400);
+    }
+    const hasText = Object.prototype.hasOwnProperty.call(payload, "text");
+    const hasDate = Object.prototype.hasOwnProperty.call(payload, "date");
+    const hasTime = Object.prototype.hasOwnProperty.call(payload, "time");
+    const hasSpoilerAllText = Object.prototype.hasOwnProperty.call(payload, "spoiler_all_text");
+    const hasSpoilerPhrases = Object.prototype.hasOwnProperty.call(payload, "spoiler_phrases");
+    const updated = await updateScheduledPostForAppUser(env, {
+      appUserId: WORKSPACE_APP_USER_ID,
+      scheduledPostId,
+      expectedThreadsUserId: brand.profile.threads_user_id,
+      text: hasText ? normalizeOperatorText(payload.text, 20000) ?? "" : undefined,
+      date: hasDate ? normalizeOperatorText(payload.date, 20) ?? "" : undefined,
+      time: hasTime ? normalizeOperatorText(payload.time, 20) ?? "" : undefined,
+      timeZone: normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE,
+      spoilerAllText: hasSpoilerAllText ? payload.spoiler_all_text === true : undefined,
+      spoilerPhrases: hasSpoilerPhrases ? normalizeSpoilerPhrasesInput(payload.spoiler_phrases) : undefined,
+    });
+    if (!updated.success || !updated.scheduledPost) {
+      return operatorJsonResponse({ success: false, error: updated.error ?? "scheduled_post_update_failed" }, updated.statusCode);
+    }
+
+    const linkedDraft = await env.DB.prepare(
+      `SELECT id, source_card_id, strategy_json
+       FROM gpt_generation_drafts
+       WHERE scheduled_post_id = ?
+         AND account_id = ?
+         AND threads_user_id = ?
+       ORDER BY datetime(updated_at) DESC
+       LIMIT 1`,
+    ).bind(scheduledPostId, brand.account_id, brand.profile.threads_user_id).first<{
+      id: string;
+      source_card_id: string | null;
+      strategy_json: string | null;
+    }>();
+    await insertOperatorInventory(env, {
+      brandKey: brand.brand_key,
+      sourceType: "scheduled_post",
+      sourceId: String(scheduledPostId),
+      text: updated.scheduledPost.text,
+      sourceCardId: linkedDraft?.source_card_id ?? null,
+      status: "scheduled",
+      strategy: linkedDraft?.strategy_json
+        ? safeParseJsonString(linkedDraft.strategy_json) as Record<string, unknown> | null
+        : null,
+      analysis: {
+        edit_source: "edit_scheduled_post",
+        linked_draft_id: linkedDraft?.id ?? null,
+      },
+    });
+    return operatorJsonResponse({
+      success: true,
+      scheduled_post: updated.scheduledPost,
+      linked_drafts_updated: updated.linkedDraftsUpdated ?? 0,
+      linked_draft_id: linkedDraft?.id ?? null,
+    });
   }
 
   if (toolName === "schedule_approved_draft") {
