@@ -1690,8 +1690,9 @@ describe("operator mode MCP endpoint", () => {
       "supporting_memory",
     ]));
                                         expect(direct.owner_interaction_contract.version).toBe("operator-owner-interaction-v7");
-    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("decision_proposal");
-    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("decision_execution_report");
+        expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("owner_ratified_account_decision");
+    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("meaningful_engineering_outcome");
+    expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("true_owner_required_blocker");
     expect(direct.owner_interaction_contract.silent_stages).toEqual(expect.arrayContaining(["context_admission", "source_selection", "source_card", "review_batch_generation", "generation_run_and_candidates", "gate_evaluation"]));
     expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("calendar_coverage_confirmation");
     expect(direct.owner_interaction_contract.owner_visible_checkpoints).toContain("four_post_review_batch");
