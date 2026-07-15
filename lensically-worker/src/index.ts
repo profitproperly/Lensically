@@ -13590,12 +13590,16 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
        ORDER BY version DESC
        LIMIT 1`,
     ).first<Record<string, unknown>>();
-    const errors = await env.DB.prepare(
+        const errors = await env.DB.prepare(
       `SELECT id, tool_name, likely_cause, created_at
        FROM operator_mcp_admin_errors
        ORDER BY datetime(created_at) DESC
        LIMIT 10`,
     ).all<Record<string, unknown>>();
+    const autonomyProfile = brand ? await getOperatorAutonomyProfile(env, brand.brand_key) : null;
+    const pendingAutonomyDecisions = brand && autonomyProfile
+      ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
+      : [];
     return {
       ok: true,
       version: "operator-mcp-admin-v1",
