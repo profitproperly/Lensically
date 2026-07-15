@@ -2376,11 +2376,27 @@ describe("operator mode MCP endpoint", () => {
       scheduled_time: beforeEdit?.scheduled_time,
     });
     expect(persistedDraft?.text).toBe("A clean system makes every good idea easier to reuse.");
-    expect(inventory).toMatchObject({
+        expect(inventory).toMatchObject({
       text: "A clean system makes every good idea easier to reuse.",
       source_id: String(scheduled.scheduled_post_id),
       status: "scheduled",
     });
+
+    const futureRetry = await mcpRequest<{
+      structuredContent: { success?: boolean; error?: string; scheduled_time?: string };
+      isError?: boolean;
+    }>("tools/call", {
+      name: "edit_scheduled_post",
+      arguments: {
+        brand_key: BRAND_KEY,
+        scheduled_post_id: scheduled.scheduled_post_id,
+        retry_now: true,
+        proceed_confirmed: true,
+        continuity_loaded: true,
+      },
+    });
+    expect(futureRetry.isError).toBe(true);
+    expect(futureRetry.structuredContent.error).toBe("scheduled_post_not_due");
 
     await env.DB.prepare(
       `UPDATE scheduled_posts SET status = 'posted' WHERE id = ?`,
