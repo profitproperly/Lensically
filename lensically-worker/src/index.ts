@@ -20058,8 +20058,16 @@ async function updateScheduledPostForAppUser(
     text,
     buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
   );
-    const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
-  let linkedDraftsUpdated = 0;
+      const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
+  const linkedDraftCount = hasDraftTable
+    ? await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM gpt_generation_drafts
+       WHERE scheduled_post_id = ?
+         AND threads_user_id = ?`,
+    ).bind(input.scheduledPostId, existing.threads_user_id).first<{ total: number | string }>()
+    : null;
+  const linkedDraftsUpdated = Number(linkedDraftCount?.total ?? 0);
   try {
     const statements = [
       env.DB.prepare(
