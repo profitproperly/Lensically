@@ -13122,7 +13122,7 @@ function operatorMcpInstructions(toolCount: number): string {
     "Four-post review rule: claim_manifest_review_batch returns four durable numbered source claims. Silently create or reuse source cards, generate and gate each draft, mark passing drafts shown, attach them to their item numbers, then present only Post 1 through Post 4 with Source and Generated post.",
     "Owner-visible transition labels are mandatory across accounts and fresh chats: use brief explicit labels for Completed:, Showing now:, and Next decision:. Do not show provisional schedule times or backend identifiers.",
     "Process owner decisions by item number. Approvals schedule through schedule_manifest_review_batch into the earliest open hourly slots in item order; report confirmed times only after persistence succeeds. Rejections of wording retain the source for revision; source-level skips and deletions use skip_manifest_review_source.",
-    "If no candidate becomes showable, replace it internally or report the blocker. When the production day becomes fully covered, report completion and ask whether to continue to the next incomplete day.",
+        "If no candidate becomes showable, replace it internally or report the blocker. When the production day becomes fully covered, report completion; then the model independently evaluates coverage, performance, experiments, and infrastructure, persists its next proposed decision, and asks only for ratification.",
   ].join("\n");
 }
 
