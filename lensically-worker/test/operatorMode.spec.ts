@@ -1895,9 +1895,47 @@ describe("operator mode MCP endpoint", () => {
       `SELECT id, disposition FROM operator_source_selections WHERE id IN (?, ?) ORDER BY id`,
     ).bind(original.source_selection_id, replacementSelection!.id).all<{ id: string; disposition: string }>();
     const dispositionById = new Map((dispositions.results ?? []).map((row) => [row.id, row.disposition]));
-    expect(dispositionById.get(original.source_selection_id)).toBe("skipped");
+        expect(dispositionById.get(original.source_selection_id)).toBe("skipped");
     expect(dispositionById.get(replacementSelection!.id)).toBe("claimed");
-  }, 40000);
+
+    const reviewDrafts = [replacementDraft];
+    for (const item of batch.items.slice(1)) {
+      const itemDraft = await buildShownDraft(
+        item.source_selection_id,
+        `Sparse strategy review source ${item.item_number}`,
+        `Calendar workflow ${item.item_number} keeps each next step clear and connected.`,
+      );
+      await operatorTool("attach_manifest_review_draft", {
+        brand_key: "manifest_mental",
+        review_batch_id: batch.review_batch_id,
+        item_number: item.item_number,
+        source_card_id: itemDraft.sourceCardId,
+        generation_run_id: itemDraft.runId,
+        draft_id: itemDraft.draftId,
+      });
+      reviewDrafts.push(itemDraft);
+    }
+    for (const itemDraft of reviewDrafts) {
+      await operatorTool("approve_draft", {
+        brand_key: "manifest_mental",
+        draft_id: itemDraft.draftId,
+        feedback_note: "Approved sparse-strategy batch scheduling fixture.",
+      });
+    }
+
+    const scheduled = await operatorTool<{
+      results: Array<{ item_number: number; success: boolean; scheduled_post_id?: number }>;
+      review_batch: { status: string; items: Array<{ item_number: number; status: string; scheduled_post_id: number | null }> };
+    }>("schedule_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      review_batch_id: batch.review_batch_id,
+      item_numbers: [1, 2, 3, 4],
+    });
+    expect(scheduled.results).toHaveLength(4);
+    expect(scheduled.results.every((result) => result.success && Number(result.scheduled_post_id ?? 0) > 0)).toBe(true);
+    expect(scheduled.review_batch.status).toBe("completed");
+    expect(scheduled.review_batch.items.every((item) => item.status === "scheduled" && Number(item.scheduled_post_id ?? 0) > 0)).toBe(true);
+  }, 50000);
 
     it("automatic continuity prioritizes the earliest incomplete calendar day without redrawing", async () => {
 
