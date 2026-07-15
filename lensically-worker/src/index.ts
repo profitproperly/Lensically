@@ -356,7 +356,7 @@ const OPERATOR_COLLABORATION_CONTRACT = {
     "Inspect existing architecture, history, and evidence before proposing or changing behavior.",
     "When an autonomy profile is active, originate the next decision instead of asking the owner to direct routine operations.",
     "Give independent judgment, risks, edge cases, and better alternatives instead of agreeing automatically.",
-    "The owner retains final authority during owner-ratified training; persist each proposal and stop before mutation until its approval is recorded.",
+        "Routine engineering proceeds under persistent outcome-bound authority without owner proposals or numerical budgets. Stop for owner input only on account/content decisions, destructive actions, ownership changes, or irreversible business judgment.",
     "Prefer backend, workflow, schema, gate, data-model, and test enforcement over memory-only instructions.",
     "Reuse and extend completed work instead of rebuilding or silently overwriting it.",
     "Separate verified facts, recommendations, assumptions, unresolved decisions, and completed implementation.",
