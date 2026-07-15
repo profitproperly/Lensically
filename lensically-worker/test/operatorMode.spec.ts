@@ -1459,7 +1459,14 @@ describe("operator mode MCP endpoint", () => {
       open_implementation_backlog: Array<Record<string, unknown>>;
     }>("getOperatorStartupContext");
         expect(direct.bootstrap_version).toBe("operator-startup-v3");
-    expect(direct.collaboration_contract.version).toBe("operator-collaboration-v1");
+        expect(direct.collaboration_contract.version).toBe("operator-collaboration-v1");
+    expect(direct.autonomy_contract.version).toBe("operator-autonomy-governance-v1");
+    expect(direct.autonomy_contract.infrastructure_scope).toBe("universal");
+    expect(direct.autonomy_contract.active_account_scope).toBe("manifest_mental");
+    expect(direct.autonomy_contract.active_mode).toBe("ai_led_owner_ratified");
+    expect(direct.autonomy_contract.objective).toContain("1,000,000 followers");
+    expect(direct.autonomy_contract.model_role).toContain("owns problem selection");
+    expect(direct.autonomy_contract.approval_policy).toContain("Every mutation requires");
         expect(direct.continuity_contract.version).toBe("operator-continuity-v2");
     expect(direct.continuity_contract.scope).toBe("universal");
     expect(direct.continuity_contract.source_of_truth).toContain("canonical database state");
