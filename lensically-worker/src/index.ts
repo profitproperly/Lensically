@@ -10935,9 +10935,12 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
       "planOperatorExecution",
   "getMcpAdminState",
   "getOperatorDecisionState",
-  "proposeOperatorDecision",
+    "proposeOperatorDecision",
   "resolveOperatorDecision",
   "markOperatorDecisionExecuted",
+  "getScheduledPostSchedulerState",
+  "setScheduledPostSchedulerMode",
+  "auditScheduledPost",
 
   "inspectMcpFailure",
   "listMcpTools",
