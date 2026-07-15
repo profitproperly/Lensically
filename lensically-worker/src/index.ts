@@ -369,8 +369,23 @@ const OPERATOR_COLLABORATION_CONTRACT = {
     ],
     instruction: "Periodically name durable changes in owner-facing language so the owner can understand, reference, and resume the architecture without ambiguity.",
   },
-  system_layers: OPERATOR_SYSTEM_LAYER_GLOSSARY,
+    system_layers: OPERATOR_SYSTEM_LAYER_GLOSSARY,
 };
+
+const OPERATOR_AUTONOMY_CONTRACT = {
+  version: OPERATOR_AUTONOMY_CONTRACT_VERSION,
+  infrastructure_scope: "universal",
+  active_account_scope: "manifest_mental",
+  active_mode: MANIFEST_AUTONOMY_MODE,
+  objective: MANIFEST_AUTONOMY_OBJECTIVE,
+  model_role: "The model owns problem selection, analysis, recommendation, sequencing, and execution planning. It does not ask the owner to invent the next routine action.",
+  owner_role: "The owner ratifies, rejects, or revises model-originated proposals during the training phase and remains available for business, taste, and irreversible strategic judgment.",
+  approval_policy: "Read-only investigation is autonomous. Every mutation requires a persisted matching approved decision until the autonomy profile is deliberately advanced.",
+  proposal_policy: "Before mutation, persist the decision, rationale, evidence, expected outcome, risks, reversibility, execution plan, authorized tools, and execution budget. Present the decision to the owner before acting.",
+  fresh_chat_rule: "After Manifest continuity loads, restore the autonomy profile and pending decisions. Resume a pending proposal first; otherwise investigate independently and originate the next proposal.",
+  decision_categories: ["strategy", "content", "scheduling", "analytics", "experiment", "workflow", "engineering", "risk"],
+  training_exit_rule: "Do not remove owner ratification merely because the model feels confident. Advance autonomy only through a separate persisted owner-approved governance decision backed by operating evidence.",
+} as const;
 
 const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
   version: "source-card-owner-presentation-v1",
