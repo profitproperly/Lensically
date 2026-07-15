@@ -361,25 +361,37 @@ describe("operator mode backend spine", () => {
     await resetTables();
   }, 30000);
 
-  it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
-    const namespace = (env as unknown as { SCHEDULED_POST_SCHEDULER: DurableObjectNamespace }).SCHEDULED_POST_SCHEDULER;
-    expect(namespace).toBeTruthy();
-        using stub = namespace.get(namespace.idFromName(`scheduler-fixture-${crypto.randomUUID()}`));
+    it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
+    const values = new Map<string, unknown>();
+    let alarmAt: number | null = null;
+    const state = {
+      storage: {
+        get: async (key: string) => values.get(key),
+        put: async (key: string, value: unknown) => {
+          values.set(key, value);
+        },
+        getAlarm: async () => alarmAt,
+        setAlarm: async (value: number | Date) => {
+          alarmAt = typeof value === "number" ? value : value.getTime();
+        },
+      },
+    } as unknown as DurableObjectState;
+    const scheduler = new ScheduledPostScheduler(state, env as unknown as Parameters<typeof ScheduledPostScheduler>[1]);
 
-    const initialResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+    const initialResponse = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"));
     const initial = await initialResponse.json() as { healthy: boolean; heartbeat_fresh: boolean; run_count: number };
     expect(initial.healthy).toBe(false);
     expect(initial.heartbeat_fresh).toBe(false);
     expect(initial.run_count).toBe(0);
 
-    const armResponse = await stub.fetch("https://scheduled-post-scheduler.internal/arm", { method: "POST" });
+    const armResponse = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/arm", { method: "POST" }));
     expect(armResponse.ok).toBe(true);
     const armed = await armResponse.json() as { health: { next_alarm_at: string | null } };
     expect(armed.health.next_alarm_at).toBeTruthy();
 
-    await runDurableObjectAlarm(stub);
+    await scheduler.alarm();
 
-    const alarmHealthResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+    const alarmHealthResponse = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"));
     const alarmHealth = await alarmHealthResponse.json() as {
       healthy: boolean;
       heartbeat_fresh: boolean;
@@ -402,13 +414,13 @@ describe("operator mode backend spine", () => {
     expect(alarmHealth.overdue_after).toBe(0);
     expect(Date.parse(String(alarmHealth.next_alarm_at))).toBeGreaterThanOrEqual(Date.parse(String(armed.health.next_alarm_at)));
 
-    const cronHeartbeat = await stub.fetch("https://scheduled-post-scheduler.internal/heartbeat", {
+    const cronHeartbeat = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/heartbeat", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ trigger: "cron", phase: "completed", overdue_before: 0, overdue_after: 0 }),
-    });
+    }));
     expect(cronHeartbeat.ok).toBe(true);
-    const sharedHealthResponse = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+    const sharedHealthResponse = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"));
     const sharedHealth = await sharedHealthResponse.json() as {
       last_trigger: string;
       cron_last_completed_at: string | null;
