@@ -511,8 +511,8 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
   },
   source_card_presentation_contract: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
     rules: [
-    "After confirmOperatorProceed succeeds, automatically load canonical continuity and inspect hourly calendar coverage. Never ask resume or start fresh.",
-    "Find the earliest incomplete future publishing day and ask whether the owner wants to fill that day before generating content.",
+        "After confirmOperatorProceed succeeds, automatically load canonical continuity, the active autonomy profile, pending decisions, and hourly calendar coverage. Never ask resume or start fresh.",
+    "Under an active autonomy profile, the model selects the next priority from evidence, persists its decision, and asks the owner only to approve, reject, or revise it. Never ask the owner to invent the next routine action.",
     "For Manifest, create or reuse source cards silently, generate and gate four posts internally, then show four numbered Source / Generated post pairs.",
     "Do not expose source-card, source-selection, generation-run, draft, claim, or review-batch identifiers to the owner.",
     "Do not attach provisional time slots to drafts. Schedule approvals into the earliest open hourly slots only after the owner decides, then report persisted times.",
