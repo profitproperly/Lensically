@@ -12790,11 +12790,13 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
   const accountScoped = operatorMcpToolNameRequiresProceed(canonicalTool);
   const search = canonicalTool === "searchRepoFiles";
   const workflowPoll = canonicalTool === "getGitHubWorkflowRun";
-  const scope = operatorChangeScope(args.change_description ?? args.operation, canonicalTool);
-  const knownPath = resolveOperatorKnownPath(canonicalTool, nestedTool && args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+    const scope = operatorChangeScope(args.change_description ?? args.operation, canonicalTool);
+  const canonicalArgs = nestedTool && args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
     ? args.arguments as Record<string, unknown>
-    : args);
-  const engineeringAutonomous = operatorUsesAutonomousEngineeringAuthority(canonicalTool, args);
+    : args;
+  const knownPath = resolveOperatorKnownPath(canonicalTool, canonicalArgs);
+  const searchPrefix = sanitizeRepoPath(canonicalArgs.prefix ?? "");
+  const engineeringAutonomous = operatorUsesAutonomousEngineeringAuthority(canonicalTool, canonicalArgs);
   return {
     version: OPERATOR_EXECUTION_POLICY_VERSION,
     canonical_tool: canonicalTool,
