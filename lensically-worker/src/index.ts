@@ -1533,21 +1533,35 @@ function getScheduledPostBatchSize(env: Env): number {
   return Math.min(parsed, MAX_SCHEDULED_POST_MAX_BATCH_SIZE);
 }
 
+type ScheduledPostProcessingOptions = {
+  allowedPostIds?: number[];
+  maxPosts?: number;
+};
+
 async function getDueApprovedScheduledPosts(
   env: Env,
   nowIso: string,
   batchSize: number,
+  allowedPostIds: number[] = [],
 ): Promise<DueScheduledPost[]> {
+  const normalizedAllowedIds = Array.from(new Set(
+    allowedPostIds.filter((postId) => Number.isInteger(postId) && postId > 0),
+  ));
+  const effectiveLimit = Math.min(Math.max(Math.trunc(batchSize), 1), MAX_SCHEDULED_POST_MAX_BATCH_SIZE);
+  const allowedClause = normalizedAllowedIds.length
+    ? ` AND id IN (${normalizedAllowedIds.map(() => "?").join(", ")})`
+    : "";
   const rows = await env.DB.prepare(
     `SELECT id, user_id, threads_user_id, post_text, spoiler_all_text, spoiler_phrases_json
      FROM scheduled_posts
      WHERE status = ?
        AND scheduled_time <= ?
        AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
+       ${allowedClause}
      ORDER BY scheduled_time ASC, id ASC
      LIMIT ?`,
   )
-    .bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, batchSize)
+    .bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, ...normalizedAllowedIds, effectiveLimit)
     .all<DueScheduledPost>();
 
   return rows.results ?? [];
