@@ -65,10 +65,10 @@ jobs:
           jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
           expected_crons=$(printf '%s\n' '* * * * *' '0 */12 * * *' '1 4,5 * * *' '59 3,4 * * *' | sort)
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
-                    test "${actual_crons}" = "${expected_crons}"
+          test "${actual_crons}" = "${expected_crons}"
           echo "Wrangler-managed Cloudflare cron triggers verified without mutation."
 
-            - name: Verify safe scheduler activation state
+      - name: Verify safe scheduler activation state
         if: ${{ inputs.task == 'worker-deploy' }}
         run: |
           set -euo pipefail
