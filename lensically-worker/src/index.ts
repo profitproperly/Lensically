@@ -12812,7 +12812,7 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
     known_path: knownPath,
     mandatory_path_applied: true,
     hard_bounds: search
-      ? { external_requests_max: 2, file_content_fanout_max: prefix && /\.[a-z0-9]+$/i.test(prefix) ? 1 : 0, result_limit_max: 20, prefix_recommended: true }
+      ? { external_requests_max: 2, file_content_fanout_max: searchPrefix && /\.[a-z0-9]+$/i.test(searchPrefix) ? 1 : 0, result_limit_max: 20, prefix_recommended: true }
       : workflowPoll
         ? { external_requests_max: 2, poll_same_run_min_seconds: 5, full_logs_only_on_completed_failure: true }
         : { identical_retry_max: 0, deterministic_failure_retryable: false },
