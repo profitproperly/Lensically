@@ -1702,8 +1702,9 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.owner_interaction_contract.review_batch_contract.visible_batch_size).toBe(4);
     expect(direct.owner_interaction_contract.review_batch_contract.provisional_times_forbidden).toBe(true);
     expect(direct.owner_interaction_contract.review_batch_contract.visible_fields).toEqual(["Post number", "Source", "Generated post"]);
-    expect(direct.owner_interaction_contract.transition_label_contract.required_labels).toEqual(["Completed:", "Showing now:", "Next decision:"]);
-    expect(direct.owner_interaction_contract.transition_label_contract.instruction).toContain("Never make the owner infer");
+        expect(direct.owner_interaction_contract.transition_label_contract.account_required_labels).toEqual(["Completed:", "Showing now:", "Next decision:"]);
+    expect(direct.owner_interaction_contract.transition_label_contract.engineering_required_labels).toEqual(["Completed:", "Showing now:", "Next action:"]);
+    expect(direct.owner_interaction_contract.transition_label_contract.instruction).toContain("Use decision language only when the owner actually must decide");
     expect(direct.owner_interaction_contract.source_card_presentation_contract.version).toBe("source-card-owner-presentation-v1");
     expect(direct.owner_interaction_contract.source_card_presentation_contract.raw_contract_fields_are_internal_only).toBe(true);
     expect(direct.owner_interaction_contract.source_card_presentation_contract.prohibited_owner_headings).toEqual(expect.arrayContaining([
