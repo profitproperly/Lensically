@@ -1811,10 +1811,11 @@ describe("operator mode MCP endpoint", () => {
         brand_key: "manifest_mental",
         run_id: run.run_id,
         source_card_id: card.source_card_id,
-        text,
+                text,
+        strategy: { lane_key: "systems" },
         draft_analysis: {
           opening_phrase: text.split(" ").slice(0, 4).join(" "),
-          realm_entrance_key: "calendar_workflow",
+          realm_entrance_key: title.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
           hook_style: "direct_observation",
           lane_key: "systems",
           preserved_functions: ["Keep the source's calendar-workflow focus."],
