@@ -15259,12 +15259,20 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         throw error;
       }
       await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, resultPayload);
-      if (autonomyAuthorization.governed) {
+            if (autonomyAuthorization.governed) {
         resultPayload.autonomy_decision = {
           governed: true,
           decision_id: autonomyAuthorization.decision_id,
           decision_title: autonomyAuthorization.decision_title,
           execution_event_id: autonomyAuthorization.event_id,
+        };
+      } else if (autonomyAuthorization.engineering_autonomous) {
+        resultPayload.engineering_authority = {
+          mode: "full_discretion_recursive",
+          version: autonomyAuthorization.authority_version,
+          outcome_bound: true,
+          owner_ratification_required: false,
+          numerical_tool_budget_applies: false,
         };
       }
       resultPayload.execution_policy = executionPolicy;
