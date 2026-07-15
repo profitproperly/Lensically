@@ -497,10 +497,11 @@ const OPERATOR_EXECUTION_POLICY_CONTRACT = {
 const OPERATOR_OWNER_INTERACTION_CONTRACT = {
     version: "operator-owner-interaction-v7",
 
-  owner_visible_checkpoints: [
+    owner_visible_checkpoints: [
     "initial_key_proceed",
-    "decision_proposal",
-    "decision_execution_report",
+    "owner_ratified_account_decision",
+    "meaningful_engineering_outcome",
+    "true_owner_required_blocker",
     "calendar_coverage_confirmation",
     "four_post_review_batch",
     "confirmed_scheduling_report",
