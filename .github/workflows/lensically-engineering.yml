@@ -58,33 +58,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
+                run: |
           set -euo pipefail
           schedules_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/lensically-worker/schedules"
-          expected='[{"cron":"* * * * *"},{"cron":"0 */12 * * *"},{"cron":"1 4,5 * * *"},{"cron":"59 3,4 * * *"}]'
-          curl --fail-with-body --silent --show-error \
-            --request PUT \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data "${expected}" \
-            "${schedules_url}" > /tmp/lensically-cron-put.json
-          curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            "${schedules_url}" > /tmp/lensically-cron-get.json
-          python - <<'PY'
-          import json
-
-          expected = sorted(["* * * * *", "0 */12 * * *", "1 4,5 * * *", "59 3,4 * * *"])
-          for path in ("/tmp/lensically-cron-put.json", "/tmp/lensically-cron-get.json"):
-              with open(path, encoding="utf-8") as handle:
-                  payload = json.load(handle)
-              if payload.get("success") is not True:
-                  raise SystemExit(f"Cloudflare cron reconciliation failed: {payload}")
-              actual = sorted(item.get("cron") for item in payload.get("result", {}).get("schedules", []))
-              if actual != expected:
-                  raise SystemExit(f"Cloudflare cron mismatch: expected={expected} actual={actual}")
-          print("Cloudflare cron triggers reconciled and verified.")
-          PY
+          expected_payload='[{"cron":"* * * * *"},{"cron":"0 */12 * * *"},{"cron":"1 4,5 * * *"},{"cron":"59 3,4 * * *"}]'
+          curl --fail-with-body --silent --show-error --request PUT --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" --header "Content-Type: application/json" --data "${expected_payload}" "${schedules_url}" > /tmp/lensically-cron-put.json
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${schedules_url}" > /tmp/lensically-cron-get.json
+          jq -e '.success == true' /tmp/lensically-cron-put.json > /dev/null
+          jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
+          expected_crons=$(printf '%s\n' '* * * * *' '0 */12 * * *' '1 4,5 * * *' '59 3,4 * * *' | sort)
+          actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
+          test "${actual_crons}" = "${expected_crons}"
+          echo "Cloudflare cron triggers reconciled and verified."
 
       - name: Install recovery dependencies
         if: ${{ inputs.task == 'worker-deploy' }}
