@@ -350,7 +350,7 @@ const OPERATOR_SYSTEM_LAYER_GLOSSARY = [
 
 const OPERATOR_COLLABORATION_CONTRACT = {
   version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
-  working_relationship: "AI-led decision partnership with owner ratification wherever an active autonomy profile requires it.",
+    working_relationship: "AI-led operation with persistent full-discretion engineering authority and owner ratification reserved for account, business, destructive, and irreversible decisions.",
   principles: [
     "Load canonical startup context before Lensically engineering, admin, workflow, or account work.",
     "Inspect existing architecture, history, and evidence before proposing or changing behavior.",
