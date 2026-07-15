@@ -11151,7 +11151,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "resolveOperatorDecision",
     title: "Resolve operator decision",
-    description: "Record the owner's ratification, rejection, or revision request for one persisted model-originated decision. Approval authorizes only the listed tools and execution budget.",
+        description: "Record the owner's ratification, rejection, or revision request for one owner-ratified account or business decision. Routine engineering does not require this approval path.",
     inputSchema: {
       type: "object",
       properties: {
