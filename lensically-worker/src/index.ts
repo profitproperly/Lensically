@@ -11124,7 +11124,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "proposeOperatorDecision",
     title: "Propose operator decision",
-    description: "Persist a model-originated decision before implementation. Include rationale, evidence, outcome, risks, reversibility, execution plan, exact authorized tools, and per-tool execution budget. Present it to the owner before any governed mutation.",
+        description: "Persist a model-originated owner-ratified account or business decision. Routine engineering uses persistent outcome-bound authority and does not require this tool or a numerical execution budget.",
     inputSchema: {
       type: "object",
       properties: {
