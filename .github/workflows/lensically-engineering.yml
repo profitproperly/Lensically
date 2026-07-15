@@ -46,7 +46,7 @@ jobs:
         if: ${{ inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
         run: npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot
 
-                  - name: Deploy worker
+                        - name: Deploy worker
         if: ${{ inputs.task == 'worker-deploy' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
