@@ -13860,13 +13860,15 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       return { ok: false, error: "complete_decision_proposal_required" };
     }
     if (unknownTools.length) return { ok: false, error: "unknown_authorized_tools", unknown_tools: unknownTools };
-    const suppliedBudget = args.execution_budget && typeof args.execution_budget === "object" && !Array.isArray(args.execution_budget)
+        const suppliedBudget = args.execution_budget && typeof args.execution_budget === "object" && !Array.isArray(args.execution_budget)
       ? args.execution_budget as Record<string, unknown>
       : {};
-    const executionBudget = Object.fromEntries(authorizedTools.map((tool) => {
-      const raw = Number(suppliedBudget[tool] ?? 1);
-      return [tool, Number.isInteger(raw) ? Math.min(Math.max(raw, 1), 100) : 1];
-    }));
+    const executionBudget = category === "engineering"
+      ? {}
+      : Object.fromEntries(authorizedTools.map((tool) => {
+        const raw = Number(suppliedBudget[tool] ?? 1);
+        return [tool, Number.isInteger(raw) ? Math.min(Math.max(raw, 1), 100) : 1];
+      }));
     const evidence = Array.isArray(args.evidence) ? args.evidence.slice(0, 100) : [];
     const risks = Array.isArray(args.risks) ? args.risks.map((risk) => String(risk).slice(0, 1000)).slice(0, 50) : [];
     const decisionKey = normalizeOperatorMachineKey(args.decision_key, "")
