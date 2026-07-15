@@ -8058,8 +8058,16 @@ async function buildOperatorContinuityCapsule(
     version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
     choice,
     brand_key: brand.brand_key,
-        account_data_loaded: true,
+            account_data_loaded: true,
     canonical_state_source: "database",
+    autonomy_governance: autonomyProfile ? {
+      contract: OPERATOR_AUTONOMY_CONTRACT,
+      profile: autonomyProfile,
+      pending_decisions: pendingDecisions,
+      next_behavior: pendingDecisions.length
+        ? "Present the highest-priority pending model decision for owner ratification before mutation."
+        : "Investigate read-only state independently, originate the next decision, persist it, and present it for owner ratification.",
+    } : null,
     calendar_coverage: calendarCoverage,
     active_review_batch: activeReviewBatch,
     workflow_checkpoint: {
