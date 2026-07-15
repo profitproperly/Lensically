@@ -14939,11 +14939,43 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           }
         }
       }
-      const resultPayload = isOperatorMcpEngineeringToolName(toolName)
-        ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
-        : isOperatorMcpAdminToolName(toolName)
-          ? await handleOperatorMcpAdminTool(request, env, toolName, args)
-          : await callOperatorToolForMcp(request, env, toolName, args);
+            const autonomyAuthorization = await beginOperatorAutonomyAuthorization(env, toolName, args);
+      if (!autonomyAuthorization.allowed) {
+        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_autonomy_decision_required");
+        const resultPayload = { ok: false, ...autonomyAuthorization, execution_policy: executionPolicy };
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: resultPayload,
+            content: [{ type: "text", text: `Lensically Operator Mode blocked ${toolName}: an approved model-originated decision is required.` }],
+            isError: true,
+          },
+        });
+      }
+      let resultPayload: Record<string, unknown>;
+      try {
+        resultPayload = isOperatorMcpEngineeringToolName(toolName)
+          ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
+          : isOperatorMcpAdminToolName(toolName)
+            ? await handleOperatorMcpAdminTool(request, env, toolName, args)
+            : await callOperatorToolForMcp(request, env, toolName, args);
+      } catch (error) {
+        await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+      await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, resultPayload);
+      if (autonomyAuthorization.governed) {
+        resultPayload.autonomy_decision = {
+          governed: true,
+          decision_id: autonomyAuthorization.decision_id,
+          decision_title: autonomyAuthorization.decision_title,
+          execution_event_id: autonomyAuthorization.event_id,
+        };
+      }
       resultPayload.execution_policy = executionPolicy;
       if (idempotencyKey) {
         resultPayload.idempotency = {
