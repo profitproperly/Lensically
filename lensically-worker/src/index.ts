@@ -8049,7 +8049,11 @@ async function buildOperatorContinuityCapsule(
     workflow_session_id: sessionId,
     operation: next.action,
   });
-  const tools = await buildOperatorMcpTools(env, false, false);
+    const tools = await buildOperatorMcpTools(env, false, false);
+  const autonomyProfile = await getOperatorAutonomyProfile(env, brand.brand_key);
+  const pendingDecisions = autonomyProfile
+    ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
+    : [];
   return {
     version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
     choice,
