@@ -13833,13 +13833,14 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     ).bind(brand.brand_key).all<Record<string, unknown>>();
     return {
       ok: true,
-      contract: OPERATOR_AUTONOMY_CONTRACT,
+            contract: OPERATOR_AUTONOMY_CONTRACT,
+      engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
       profile,
       decisions,
       execution_counts: eventRows.results ?? [],
       next_behavior: decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
-        ? "Present the pending model-originated decision for owner ratification before mutation."
-        : "Investigate read-only state, originate the next decision, persist it, and present it before mutation.",
+        ? "Present the pending owner-ratified account or business decision. Routine engineering continues autonomously."
+        : "Routine engineering proceeds autonomously through mandatory known paths. Originate a proposal only for owner-ratified account, business, destructive, or irreversible decisions.",
     };
   }
 
