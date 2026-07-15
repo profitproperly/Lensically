@@ -28912,8 +28912,10 @@ export function shouldAutoArmScheduledPostAlarm(request: Request, env: Env): boo
   if (!env.CF_VERSION_METADATA?.id || !env.SCHEDULED_POST_SCHEDULER) {
     return false;
   }
-  try {
-    const configuredHost = new URL(env.WORKER_ORIGIN).hostname;
+    try {
+    const workerOrigin = env.WORKER_ORIGIN?.trim();
+    if (!workerOrigin) return false;
+    const configuredHost = new URL(workerOrigin).hostname;
     return Boolean(configuredHost) && new URL(request.url).hostname === configuredHost;
   } catch {
     return false;
