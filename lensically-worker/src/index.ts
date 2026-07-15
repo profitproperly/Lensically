@@ -20058,26 +20058,22 @@ async function updateScheduledPostForAppUser(
     text,
     buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
   );
-  const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
-  const dbSession = env.DB.withSession("first-primary");
-  let transactionStarted = false;
+    const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
   let linkedDraftsUpdated = 0;
   try {
-    await dbSession.prepare("BEGIN TRANSACTION").run();
-    transactionStarted = true;
-    const updated = await dbSession.prepare(
-      `UPDATE scheduled_posts
-       SET post_text = ?,
-           spoiler_all_text = ?,
-           spoiler_phrases_json = ?,
-           scheduled_time = ?,
-           idempotency_key = ?
-       WHERE id = ?
-         AND user_id = ?
-         AND threads_user_id = ?
-         AND status = ?`,
-    )
-      .bind(
+    const statements = [
+      env.DB.prepare(
+        `UPDATE scheduled_posts
+         SET post_text = ?,
+             spoiler_all_text = ?,
+             spoiler_phrases_json = ?,
+             scheduled_time = ?,
+             idempotency_key = ?
+         WHERE id = ?
+           AND user_id = ?
+           AND threads_user_id = ?
+           AND status = ?`,
+      ).bind(
         text,
         spoilerAllText ? 1 : 0,
         serializeSpoilerPhrases(spoilerPhrases),
@@ -20087,28 +20083,24 @@ async function updateScheduledPostForAppUser(
         input.appUserId,
         existing.threads_user_id,
         SCHEDULED_POST_STATUS_APPROVED,
-      )
-      .run();
-    if (Number(updated.meta?.changes ?? 0) <= 0) {
-      await dbSession.prepare("ROLLBACK").run();
-      transactionStarted = false;
+      ),
+    ];
+    if (hasDraftTable) {
+      statements.push(
+        env.DB.prepare(
+          `UPDATE gpt_generation_drafts
+           SET text = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE scheduled_post_id = ?
+             AND threads_user_id = ?`,
+        ).bind(text, input.scheduledPostId, existing.threads_user_id),
+      );
+    }
+    const results = await env.DB.batch(statements);
+    if (Number(results[0]?.meta?.changes ?? 0) <= 0) {
       return { success: false, statusCode: 409, error: "scheduled_post_could_not_be_updated" };
     }
-    if (hasDraftTable) {
-      const draftUpdate = await dbSession.prepare(
-        `UPDATE gpt_generation_drafts
-         SET text = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE scheduled_post_id = ?
-           AND threads_user_id = ?`,
-      ).bind(text, input.scheduledPostId, existing.threads_user_id).run();
-      linkedDraftsUpdated = Number(draftUpdate.meta?.changes ?? 0);
-    }
-    await dbSession.prepare("COMMIT").run();
-    transactionStarted = false;
+    linkedDraftsUpdated = hasDraftTable ? Number(results[1]?.meta?.changes ?? 0) : 0;
   } catch (error) {
-    if (transactionStarted) {
-      await dbSession.prepare("ROLLBACK").run();
-    }
     if (isUniqueConstraintError(error)) {
       return { success: false, statusCode: 409, error: "identical_scheduled_post_exists" };
     }
