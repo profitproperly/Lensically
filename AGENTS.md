@@ -83,6 +83,7 @@ For long goals, use checkpoint commits: when a coherent safe milestone is reache
 - Local agent work is multi-account by default. Do not add brand-specific agent runtimes unless the user explicitly asks for a one-off experiment.
 - For browser tasks, use both browser surfaces when available: use the Chrome extension browser for the user's real logged-in/live tab state, and use the Codex in-app browser for isolated verification, local app checks, and clean repro when relevant.
 - If `lensically-worker/src/index.ts` changed, include the backend auth/API smoke coverage used by this repo.
+- Scheduled publishing uses both Cloudflare Cron and a Durable Object alarm, but both must obey one persisted scheduler mode: `paused`, `canary`, or `normal`. New or missing control state defaults to `paused`. Canary mode requires exactly one scheduled-post ID, attempts at most that one record, and returns to `paused`. Deployments must fail when mode is `normal` and the live overdue count is nonzero; never validate scheduler infrastructure by exposing the full overdue queue.
 - Do not tell the user to run checks, push, or deploy. The agent does that work.
 - The usage meter is for learning/planning, not a stop sign. If runtime code changed, still shoot for deployment after final relevant checks. Only skip/defer deployment when credentials are unavailable, checks fail, the deploy command cannot run, or the user explicitly opts out.
 - In the final handoff, state what you ran and what you deployed.
