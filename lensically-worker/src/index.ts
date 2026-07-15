@@ -28321,7 +28321,12 @@ async function readScheduledPostSchedulerHealth(env: Env): Promise<Record<string
   if (!response.ok) {
     return { enabled: true, healthy: false, error: `health_read_failed:${response.status}` };
   }
-  return await response.json() as Record<string, unknown>;
+  const health = await response.json() as Record<string, unknown>;
+  const currentOverdueCount = await countOverdueScheduledPosts(env).catch(() => null);
+  return {
+    ...health,
+    current_overdue_count: currentOverdueCount,
+  };
 }
 
 async function setScheduledPostSchedulerControl(
