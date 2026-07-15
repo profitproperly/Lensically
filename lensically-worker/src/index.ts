@@ -1795,20 +1795,36 @@ async function processScheduledPost(
   );
 }
 
-async function processDueScheduledPosts(env: Env): Promise<void> {
+async function processDueScheduledPosts(
+  env: Env,
+  options: ScheduledPostProcessingOptions = {},
+): Promise<{ selected_count: number; attempted_post_ids: number[] }> {
   const scheduledPostsTableExists = await doesTableExist(env, "scheduled_posts");
   if (!scheduledPostsTableExists) {
-    return;
+    return { selected_count: 0, attempted_post_ids: [] };
   }
 
   await ensureScheduledPostsTable(env);
   await recoverStalePostingScheduledPosts(env);
   const nowIso = new Date().toISOString();
-  const posts = await getDueApprovedScheduledPosts(env, nowIso, getScheduledPostBatchSize(env));
+  const requestedMax = Number(options.maxPosts ?? getScheduledPostBatchSize(env));
+  const maxPosts = Number.isInteger(requestedMax)
+    ? Math.min(Math.max(requestedMax, 1), MAX_SCHEDULED_POST_MAX_BATCH_SIZE)
+    : getScheduledPostBatchSize(env);
+  const posts = await getDueApprovedScheduledPosts(
+    env,
+    nowIso,
+    maxPosts,
+    options.allowedPostIds ?? [],
+  );
 
   for (const post of posts) {
     await processScheduledPost(env, post);
   }
+  return {
+    selected_count: posts.length,
+    attempted_post_ids: posts.map((post) => post.id),
+  };
 }
 
 function withAuthCors(request: Request, env: Env, response: Response): Response {
