@@ -434,7 +434,8 @@ const OPERATOR_CONTINUITY_CONTRACT = {
     "confirmOperatorProceed_and_auto_resolve_canonical_continuity",
     "server-side continuity verification on every later account-scoped call",
   ],
-  capsule_sections: [
+    capsule_sections: [
+    "autonomy_governance",
     "workflow_checkpoint",
     "calendar_coverage",
     "active_review_batch",
