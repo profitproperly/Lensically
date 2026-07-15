@@ -28419,7 +28419,14 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
+    if (env.CF_VERSION_METADATA?.id && env.SCHEDULED_POST_SCHEDULER) {
+      ctx.waitUntil(ensureScheduledPostAlarm(env).catch((error) => {
+        logWorkerEvent("SCHEDULED_POST_ALARM_ARM_FAILED", {
+          error: getErrorMessage(error),
+        }, "error");
+      }));
+    }
     const path = new URL(request.url).pathname;
     const scheme = getRequestTransportScheme(request);
     if (!isLocalDevelopmentRequest(request) && scheme === "http") {
