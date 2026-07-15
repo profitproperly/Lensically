@@ -106,9 +106,41 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
     await ensureMcpAccountOpen(requestedBrand);
             callArgs = { ...args, proceed_confirmed: true, continuity_loaded: mcpContinuityLoaded };
   }
-  const result = await mcpToolRaw<T>(toolName, callArgs);
+  let result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
+  if (result.isError && result.structuredContent.error === "approved_operator_decision_required") {
+    const governanceBrand = requestedBrand ?? "manifest_mental";
+    const decisionKey = `vitest_auto_${toolName.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${crypto.randomUUID()}`;
+    const proposed = await mcpToolRaw<{ decision: { id: string } }>("proposeOperatorDecision", {
+      brand_key: governanceBrand,
+      decision_key: decisionKey,
+      category: "engineering",
+      title: `Authorize ${toolName} test fixture`,
+      decision: `Execute ${toolName} only for the current legacy regression fixture.`,
+      rationale: "Legacy MCP tests exercise isolated mutations; production governance remains covered by the dedicated raw-call autonomy regression.",
+      evidence: [{ source: "operatorMode.spec.ts", tool_name: toolName }],
+      expected_outcome: `${toolName} completes its existing regression path.`,
+      risks: ["Test-only auto-ratification must not alter production behavior."],
+      reversibility: "The test database resets after each test.",
+      execution_plan: `Authorize ${toolName} with a bounded test-only budget and retry the blocked fixture once.`,
+      authorized_tools: [toolName],
+      execution_budget: { [toolName]: 100 },
+      proceed_confirmed: true,
+      continuity_loaded: mcpContinuityLoaded,
+    });
+    expect(proposed.isError, `proposeOperatorDecision for ${toolName}`).not.toBe(true);
+    const approved = await mcpToolRaw("resolveOperatorDecision", {
+      brand_key: governanceBrand,
+      decision_id: proposed.structuredContent.decision.id,
+      resolution: "approve",
+      owner_response: "Approved automatically by the isolated test harness.",
+      proceed_confirmed: true,
+      continuity_loaded: mcpContinuityLoaded,
+    });
+    expect(approved.isError, `resolveOperatorDecision for ${toolName}`).not.toBe(true);
+    result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
+  }
   expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
-  return result.structuredContent;
+  return result.structuredContent as T;
 }
 
 
