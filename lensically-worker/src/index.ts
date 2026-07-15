@@ -6222,9 +6222,104 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_execution_events_recent
      ON operator_execution_events (created_at DESC, tool_name)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_autonomy_profiles (
+      brand_key TEXT PRIMARY KEY,
+      mode TEXT NOT NULL,
+      objective TEXT NOT NULL,
+      model_role TEXT NOT NULL,
+      owner_role TEXT NOT NULL,
+      approval_policy TEXT NOT NULL,
+      operating_constraints_json TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_decision_proposals (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      decision_key TEXT NOT NULL,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      decision_text TEXT NOT NULL,
+      rationale TEXT NOT NULL,
+      evidence_json TEXT NOT NULL,
+      expected_outcome TEXT NOT NULL,
+      risks_json TEXT NOT NULL,
+      reversibility TEXT NOT NULL,
+      execution_plan TEXT NOT NULL,
+      authorized_tools_json TEXT NOT NULL,
+      execution_budget_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'proposed',
+      proposed_by TEXT NOT NULL DEFAULT 'model',
+      owner_response TEXT,
+      revision_request TEXT,
+      outcome_summary TEXT,
+      result_evidence_json TEXT,
+      supersedes_decision_id TEXT,
+      approved_at TEXT,
+      rejected_at TEXT,
+      executed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_decision_proposals_key
+     ON operator_decision_proposals (brand_key, decision_key)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_decision_proposals_status
+     ON operator_decision_proposals (brand_key, status, updated_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_decision_execution_events (
+      id TEXT PRIMARY KEY,
+      decision_id TEXT NOT NULL,
+      brand_key TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      operation_id TEXT,
+      request_fingerprint TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'started',
+      result_summary TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_decision_execution_events_budget
+     ON operator_decision_execution_events (decision_id, tool_name, status, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO operator_autonomy_profiles (
+      brand_key, mode, objective, model_role, owner_role, approval_policy, operating_constraints_json, active, version
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+  ).bind(
+    "manifest_mental",
+    MANIFEST_AUTONOMY_MODE,
+    MANIFEST_AUTONOMY_OBJECTIVE,
+    OPERATOR_AUTONOMY_CONTRACT.model_role,
+    OPERATOR_AUTONOMY_CONTRACT.owner_role,
+    OPERATOR_AUTONOMY_CONTRACT.approval_policy,
+    JSON.stringify({
+      focus_accounts: ["manifest_mental"],
+      hourly_coverage_required: true,
+      target_schedule_buffer_hours: 48,
+      text_only_threads: true,
+      owner_ratification_required: true,
+      read_only_investigation_autonomous: true,
+    }),
   ).run();
 
   await env.DB.prepare(
