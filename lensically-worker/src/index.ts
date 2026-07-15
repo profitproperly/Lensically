@@ -20107,7 +20107,7 @@ async function updateScheduledPostForAppUser(
     if (Number(results[0]?.meta?.changes ?? 0) <= 0) {
       return { success: false, statusCode: 409, error: "scheduled_post_could_not_be_updated" };
     }
-    linkedDraftsUpdated = hasDraftTable ? Number(results[1]?.meta?.changes ?? 0) : 0;
+    
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return { success: false, statusCode: 409, error: "identical_scheduled_post_exists" };
