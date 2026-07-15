@@ -12952,6 +12952,8 @@ async function beginOperatorAutonomyAuthorization(
 ): Promise<{
   allowed: boolean;
   governed: boolean;
+  engineering_autonomous?: boolean;
+  authority_version?: string;
   decision_id?: string;
   decision_title?: string;
   event_id?: string;
@@ -12962,6 +12964,14 @@ async function beginOperatorAutonomyAuthorization(
 }> {
   const canonical = canonicalOperatorExecutionArgs(toolName, args);
   const canonicalTool = canonicalAutonomyToolName(canonical.tool_name);
+  if (operatorUsesAutonomousEngineeringAuthority(canonicalTool, canonical.args)) {
+    return {
+      allowed: true,
+      governed: false,
+      engineering_autonomous: true,
+      authority_version: OPERATOR_ENGINEERING_AUTHORITY_VERSION,
+    };
+  }
   if (!operatorToolMutatesState(canonicalTool) || OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS.has(canonicalTool)) {
     return { allowed: true, governed: false };
   }
