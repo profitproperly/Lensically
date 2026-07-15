@@ -6410,7 +6410,7 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
 
 function normalizeOperatorDecisionCategory(value: unknown): string | null {
   const category = normalizeOperatorMachineKey(value, "");
-  return OPERATOR_AUTONOMY_CONTRACT.decision_categories.includes(category as never) ? category : null;
+    return (OPERATOR_AUTONOMY_CONTRACT.decision_categories as readonly string[]).includes(category) ? category : null;
 }
 
 function serializeOperatorAutonomyProfile(row: Record<string, unknown> | null): Record<string, unknown> | null {
