@@ -8120,9 +8120,10 @@ async function buildOperatorContinuityCapsule(
       contract: OPERATOR_AUTONOMY_CONTRACT,
       profile: autonomyProfile,
       pending_decisions: pendingDecisions,
+            engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
       next_behavior: pendingDecisions.length
-        ? "Present the highest-priority pending model decision for owner ratification before mutation."
-        : "Investigate read-only state independently, originate the next decision, persist it, and present it for owner ratification.",
+        ? "Resume the pending owner-ratified account or business decision when relevant; routine engineering remains autonomous."
+        : "Proceed autonomously with routine engineering through mandatory known paths. Propose only owner-ratified account, business, destructive, or irreversible decisions.",
     } : null,
     calendar_coverage: calendarCoverage,
     active_review_batch: activeReviewBatch,
