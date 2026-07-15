@@ -12812,9 +12812,11 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
     operation_class: search ? "bounded_repository_search" : workflowPoll ? "bounded_workflow_poll" : engineering ? "engineering" : accountScoped ? "account_workflow" : "control",
     scope_classification: scope,
     allowed: true,
-    authorization_mode: engineeringAutonomous ? "persistent_outcome_bound_engineering" : "owner_ratified_or_read_only",
+        authorization_mode: engineeringAutonomous ? "persistent_outcome_bound_engineering" : "owner_ratified_or_read_only",
     engineering_authority_version: engineeringAutonomous ? OPERATOR_ENGINEERING_AUTHORITY_VERSION : null,
-    numerical_tool_budget_applies: false,
+    numerical_tool_budget_applies: engineeringAutonomous
+      ? false
+      : operatorToolMutatesState(canonicalTool) && !OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS.has(canonicalTool),
     known_path: knownPath,
     mandatory_path_applied: true,
     hard_bounds: search
