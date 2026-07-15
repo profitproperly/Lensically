@@ -28908,9 +28908,21 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
   }, "error");
 }
 
+export function shouldAutoArmScheduledPostAlarm(request: Request, env: Env): boolean {
+  if (!env.CF_VERSION_METADATA?.id || !env.SCHEDULED_POST_SCHEDULER) {
+    return false;
+  }
+  try {
+    const configuredHost = new URL(env.WORKER_ORIGIN).hostname;
+    return Boolean(configuredHost) && new URL(request.url).hostname === configuredHost;
+  } catch {
+    return false;
+  }
+}
+
 export default {
   async fetch(request, env, ctx): Promise<Response> {
-    if (env.CF_VERSION_METADATA?.id && env.SCHEDULED_POST_SCHEDULER) {
+    if (shouldAutoArmScheduledPostAlarm(request, env)) {
       ctx.waitUntil(ensureScheduledPostAlarm(env).catch((error) => {
         logWorkerEvent("SCHEDULED_POST_ALARM_ARM_FAILED", {
           error: getErrorMessage(error),
