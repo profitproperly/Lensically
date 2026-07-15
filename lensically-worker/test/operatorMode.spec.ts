@@ -361,6 +361,13 @@ describe("operator mode backend spine", () => {
     await resetTables();
   }, 30000);
 
+  it("auto-arms the scheduled-post alarm only on the configured canonical Worker host", () => {
+    const workerOrigin = (env as unknown as { WORKER_ORIGIN: string }).WORKER_ORIGIN;
+    expect(workerOrigin).toBeTruthy();
+    expect(shouldAutoArmScheduledPostAlarm(new Request("https://example.com/api/operator/health"), env)).toBe(false);
+    expect(shouldAutoArmScheduledPostAlarm(new Request(`${workerOrigin}/api/operator/health`), env)).toBe(true);
+  });
+
     it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
     const values = new Map<string, unknown>();
     let alarmAt: number | null = null;
