@@ -6407,6 +6407,89 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
   ).run();
 }
 
+function normalizeOperatorDecisionCategory(value: unknown): string | null {
+  const category = normalizeOperatorMachineKey(value, "");
+  return OPERATOR_AUTONOMY_CONTRACT.decision_categories.includes(category as never) ? category : null;
+}
+
+function serializeOperatorAutonomyProfile(row: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!row) return null;
+  return {
+    brand_key: row.brand_key,
+    mode: row.mode,
+    objective: row.objective,
+    model_role: row.model_role,
+    owner_role: row.owner_role,
+    approval_policy: row.approval_policy,
+    operating_constraints: safeParseJsonString(String(row.operating_constraints_json ?? "{}")) ?? {},
+    active: Number(row.active ?? 0) === 1,
+    version: Number(row.version ?? 1),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function serializeOperatorDecisionProposal(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    brand_key: row.brand_key,
+    decision_key: row.decision_key,
+    category: row.category,
+    title: row.title,
+    decision: row.decision_text,
+    rationale: row.rationale,
+    evidence: safeParseJsonString(String(row.evidence_json ?? "[]")) ?? [],
+    expected_outcome: row.expected_outcome,
+    risks: safeParseJsonString(String(row.risks_json ?? "[]")) ?? [],
+    reversibility: row.reversibility,
+    execution_plan: row.execution_plan,
+    authorized_tools: safeParseJsonString(String(row.authorized_tools_json ?? "[]")) ?? [],
+    execution_budget: safeParseJsonString(String(row.execution_budget_json ?? "{}")) ?? {},
+    status: row.status,
+    proposed_by: row.proposed_by,
+    owner_response: row.owner_response ?? null,
+    revision_request: row.revision_request ?? null,
+    outcome_summary: row.outcome_summary ?? null,
+    result_evidence: safeParseJsonString(String(row.result_evidence_json ?? "[]")) ?? [],
+    supersedes_decision_id: row.supersedes_decision_id ?? null,
+    approved_at: row.approved_at ?? null,
+    rejected_at: row.rejected_at ?? null,
+    executed_at: row.executed_at ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function getOperatorAutonomyProfile(env: Env, brandKey: GptBrandKey): Promise<Record<string, unknown> | null> {
+  await ensureOperatorMcpAdminTables(env);
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_autonomy_profiles WHERE brand_key = ? AND active = 1 LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+  return serializeOperatorAutonomyProfile(row ?? null);
+}
+
+async function listOperatorDecisionProposals(
+  env: Env,
+  brandKey: GptBrandKey,
+  statuses: string[],
+  limit = 20,
+): Promise<Record<string, unknown>[]> {
+  await ensureOperatorMcpAdminTables(env);
+  const normalizedStatuses = statuses.filter((status) => ["proposed", "approved", "executing", "rejected", "revision_required", "executed", "superseded"].includes(status));
+  const rows = normalizedStatuses.length
+    ? await env.DB.prepare(
+      `SELECT * FROM operator_decision_proposals
+       WHERE brand_key = ? AND status IN (${normalizedStatuses.map(() => "?").join(", ")})
+       ORDER BY datetime(updated_at) DESC LIMIT ?`,
+    ).bind(brandKey, ...normalizedStatuses, Math.min(Math.max(limit, 1), 100)).all<Record<string, unknown>>()
+    : await env.DB.prepare(
+      `SELECT * FROM operator_decision_proposals
+       WHERE brand_key = ?
+       ORDER BY datetime(updated_at) DESC LIMIT ?`,
+    ).bind(brandKey, Math.min(Math.max(limit, 1), 100)).all<Record<string, unknown>>();
+  return (rows.results ?? []).map(serializeOperatorDecisionProposal);
+}
+
 const DEFAULT_OPERATOR_GATES: Array<{
   gate_key: string;
   display_name: string;
