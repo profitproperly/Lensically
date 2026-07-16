@@ -1520,7 +1520,7 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("historical_owner_rejection_gate");
     expect(initialized.instructions).toContain("Never claim that a gate passed unless that exact gate_key appears");
 
-    expect(toolNames.slice(0, 24)).toEqual([
+        expect(toolNames.slice(0, 27)).toEqual([
       "getOperatorStartupContext",
       "engineeringPrecheck",
       "getEngineeringAccessState",
@@ -1529,6 +1529,7 @@ describe("operator mode MCP endpoint", () => {
       "searchRepoFiles",
       "getRepoStatus",
       "applyRepoTextPatch",
+      "applyRepoPatchSet",
       "startRepoFileWrite",
       "appendRepoFileChunk",
       "commitRepoFileWrite",
@@ -1537,6 +1538,8 @@ describe("operator mode MCP endpoint", () => {
       "listGitHubWorkflowRuns",
       "runGitHubWorkflow",
       "getGitHubWorkflowRun",
+      "runEngineeringRelease",
+      "getEngineeringRelease",
       "deployBackend",
       "verifyDeployedMcpVersion",
       "listEngineeringAudit",
@@ -1546,7 +1549,7 @@ describe("operator mode MCP endpoint", () => {
       "updateOpsMemory",
       "searchOpsMemory",
     ]);
-                                expect(toolNames.slice(24, 57)).toEqual([
+                                expect(toolNames.slice(27, 60)).toEqual([
       "selectOperatorKey",
       "confirmOperatorProceed",
       "resolveContinuationContext",
