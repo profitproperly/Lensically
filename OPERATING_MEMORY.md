@@ -4,6 +4,10 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: treating an expected protected-operation authorization block as a routing failure after the owner had already approved the action, then switching to recovery instead of preventing recurrence. Use: include the selected brand and the owner's exact approval in `owner_response` on the first protected call. The dispatcher atomically persists an executing decision and execution event before the handler, closes both after the result, and returns to the interrupted objective. Never make a knowingly blocked preliminary call or use recovery for a healthy main-MCP authorization path. Applies when: scheduler mode, repository deletion, runtime rollback, tool disabling, ownership changes, or another protected operation has just received explicit owner approval.
+
+
+
 - Use the global `operational-memory` skill for reusable lessons, repeated slowdowns, and token/usage efficiency.
 - Global memory lives at `C:\Users\brian\.codex\OPERATING_MEMORY.md`; project-specific Lensically memory stays in this file.
 - Project memory is the default write target for Lensically work. Use global memory only for rules that should apply across unrelated projects and chats.
