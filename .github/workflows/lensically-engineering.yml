@@ -1,4 +1,5 @@
 name: Lensically Engineering
+run-name: Lensically ${{ inputs.task }} · ${{ inputs.release_id || github.sha }}
 
 on:
   workflow_dispatch:
@@ -13,6 +14,15 @@ on:
           - operator-tests
           - gpt-memory-tests
           - worker-deploy
+      release_id:
+        description: Optional exact-SHA release identity
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: lensically-engineering-${{ inputs.task }}
+  cancel-in-progress: true
 
 jobs:
   worker:
@@ -24,6 +34,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Fast release preflight
+        if: ${{ inputs.task == 'worker-deploy' }}
+        run: node scripts/release-preflight.mjs
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -31,7 +45,15 @@ jobs:
           cache: npm
           cache-dependency-path: lensically-worker/package-lock.json
 
-      - name: Install dependencies
+      - name: Restore worker dependencies
+        id: worker-dependency-cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+      - name: Install worker dependencies
+        if: ${{ steps.worker-dependency-cache.outputs.cache-hit != 'true' }}
         run: npm ci
 
       - name: Typecheck
@@ -63,10 +85,10 @@ jobs:
           schedules_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/lensically-worker/schedules"
           curl --fail-with-body --silent --show-error --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${schedules_url}" > /tmp/lensically-cron-get.json
           jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
-          expected_crons=$(printf '%s\n' '* * * * *' '0 */12 * * *' '1 4,5 * * *' '0 * * * *' | sort)
+          expected_crons=$(node scripts/release-preflight.mjs --print-crons | sort)
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
           test "${actual_crons}" = "${expected_crons}"
-          echo "Wrangler-managed Cloudflare cron triggers verified without mutation."
+          echo "Wrangler-managed Cloudflare cron triggers verified from wrangler.jsonc without mutation."
 
       - name: Verify safe scheduler activation state
         if: ${{ inputs.task == 'worker-deploy' }}
@@ -90,8 +112,16 @@ jobs:
           fi
           echo "Scheduler activation state verified: paused/canary, or normal with an empty overdue queue."
 
-      - name: Install recovery dependencies
+      - name: Restore recovery dependencies
         if: ${{ inputs.task == 'worker-deploy' }}
+        id: recovery-dependency-cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-recovery-worker/node_modules
+          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
+
+      - name: Install recovery dependencies
+        if: ${{ inputs.task == 'worker-deploy' && steps.recovery-dependency-cache.outputs.cache-hit != 'true' }}
         working-directory: lensically-recovery-worker
         run: npm ci
 
