@@ -366,11 +366,65 @@ describe("operator mode backend spine", () => {
     await resetTables();
   }, 30000);
 
-  it("auto-arms the scheduled-post alarm only on the configured canonical Worker host", () => {
+    it("auto-arms the scheduled-post alarm only on the configured canonical Worker host", () => {
     const workerOrigin = (env as unknown as { WORKER_ORIGIN: string }).WORKER_ORIGIN;
     expect(workerOrigin).toBeTruthy();
     expect(shouldAutoArmScheduledPostAlarm(new Request("https://example.com/api/operator/health"), env)).toBe(false);
     expect(shouldAutoArmScheduledPostAlarm(new Request(`${workerOrigin}/api/operator/health`), env)).toBe(true);
+  });
+
+  it("admits Insights collection at four Eastern-time windows across daylight-saving changes", () => {
+    for (const timestamp of [
+      "2026-07-15T04:00:00.000Z",
+      "2026-07-15T10:00:00.000Z",
+      "2026-07-15T16:00:00.000Z",
+      "2026-07-15T22:00:00.000Z",
+      "2026-01-15T05:00:00.000Z",
+      "2026-01-15T11:00:00.000Z",
+    ]) {
+      expect(isSixHourInsightsRefreshWindow(Date.parse(timestamp)), timestamp).toBe(true);
+    }
+    expect(isSixHourInsightsRefreshWindow(Date.parse("2026-07-15T05:00:00.000Z"))).toBe(false);
+    expect(isSixHourInsightsRefreshWindow(Date.parse("2026-01-15T06:00:00.000Z"))).toBe(false);
+  });
+
+  it("quarantines structurally impossible post metrics from learning", () => {
+    const valid = evaluateThreadsPostMetricsForLearning({
+      id: "valid-post",
+      text: "Valid",
+      timestamp: null,
+      permalink: null,
+      username: null,
+      profile_picture_url: null,
+      views: 1000,
+      likes: 100,
+      replies: 10,
+      reposts: 5,
+      quotes: 2,
+      shares: 3,
+      engagement_total: 120,
+    });
+    expect(valid.validForLearning).toBe(true);
+    expect(valid.anomalyReason).toBeNull();
+
+    const broken = evaluateThreadsPostMetricsForLearning({
+      id: "broken-post",
+      text: "Broken",
+      timestamp: null,
+      permalink: null,
+      username: null,
+      profile_picture_url: null,
+      views: 1,
+      likes: 50000,
+      replies: 100000,
+      reposts: 500000,
+      quotes: 0,
+      shares: 1000000,
+      engagement_total: 1650000,
+    });
+    expect(broken.validForLearning).toBe(false);
+    expect(broken.anomalyReason).toContain("likes_exceeds_views");
+    expect(broken.anomalyReason).toContain("shares_exceeds_views");
   });
 
     it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
