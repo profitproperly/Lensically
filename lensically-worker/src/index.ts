@@ -13216,7 +13216,7 @@ async function recordOperatorExecutionDecision(
     if (!getErrorMessage(error).includes("no such table: operator_execution_events")) {
       throw error;
     }
-    await ensureOperatorMcpAdminTables(env);
+        await ensureOperatorExecutionEventsTable(env);
     await insertExecutionEvent();
   }
 }
