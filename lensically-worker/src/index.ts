@@ -7985,6 +7985,165 @@ function operatorContinuationNextAction(input: {
   return { action: "inspect_workflow_state", owner_checkpoint: "workflow_status", canonical_tool: "getWorkflowStatus", last_completed_action: "continuity_state_resolved" };
 }
 
+async function buildOperatorManifestProceedCapsule(
+  request: Request,
+  env: Env,
+  brand: GptResolvedBrand,
+  session: Record<string, unknown> | null,
+  choice: OperatorContinuationChoice,
+): Promise<Record<string, unknown>> {
+  const sessionId = normalizeOperatorText(session?.id, 120, true);
+  const calendarCoverage = await getOperatorHourlyCoverage(
+    env,
+    brand,
+    WORKSPACE_DEFAULT_TIMEZONE,
+    3,
+    null,
+  );
+  const activeReviewRow = await env.DB.prepare(
+    `SELECT id FROM operator_review_batches
+     WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
+     ORDER BY datetime(updated_at) DESC LIMIT 1`,
+  ).bind(brand.brand_key).first<{ id: string }>();
+  const activeReviewBatch = activeReviewRow?.id
+    ? await serializeManifestReviewBatch(env, brand, activeReviewRow.id)
+    : null;
+  const autonomyProfile = await getOperatorAutonomyProfile(env, brand.brand_key);
+  const pendingDecisions = autonomyProfile
+    ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
+    : [];
+  const tools = await buildOperatorMcpTools(env, false, false);
+  const reviewItems = activeReviewBatch && Array.isArray(activeReviewBatch.items)
+    ? activeReviewBatch.items as Array<Record<string, unknown>>
+    : [];
+  const currentItem = reviewItems.find((item) =>
+    !["scheduled", "published", "skipped", "rejected"].includes(String(item.status ?? ""))
+  ) ?? reviewItems[0] ?? null;
+  const scheduledCount = reviewItems.filter((item) => ["scheduled", "published"].includes(String(item.status ?? ""))).length;
+  const skippedCount = reviewItems.filter((item) => ["skipped", "rejected"].includes(String(item.status ?? ""))).length;
+  const next = activeReviewBatch
+    ? {
+      action: "resume_review_batch",
+      owner_checkpoint: "four_post_review_batch",
+      canonical_tool: "get_manifest_review_batch",
+      last_completed_action: "canonical_review_batch_restored",
+    }
+    : {
+      action: "confirm_fill_calendar_day",
+      owner_checkpoint: "calendar_coverage_confirmation",
+      canonical_tool: "get_hourly_coverage",
+      last_completed_action: "calendar_coverage_inspected",
+    };
+  const nextArtifactId = String(
+    activeReviewRow?.id
+    ?? calendarCoverage.earliest_incomplete_date
+    ?? sessionId
+    ?? "none",
+  );
+  const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${nextArtifactId}`;
+  const policy = buildOperatorExecutionPolicy(next.canonical_tool, {
+    brand_key: brand.brand_key,
+    workflow_session_id: sessionId,
+    operation: next.action,
+  });
+  return {
+    version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+    choice,
+    brand_key: brand.brand_key,
+    account_data_loaded: true,
+    canonical_state_source: "database",
+    continuity_mode: "bounded_manifest_proceed",
+    continuity_diagnostics: {
+      legacy_source_reconciliation_deferred: true,
+      mutation_free_capsule_build: true,
+      calendar_horizon_days: 3,
+    },
+    autonomy_governance: autonomyProfile ? {
+      contract: OPERATOR_AUTONOMY_CONTRACT,
+      profile: autonomyProfile,
+      pending_decisions: pendingDecisions,
+      engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
+      next_behavior: pendingDecisions.length
+        ? "Resume the pending owner-ratified account or business decision when relevant; routine engineering remains autonomous."
+        : "Proceed autonomously with routine engineering through mandatory known paths. Propose only owner-ratified account, business, destructive, or irreversible decisions.",
+    } : null,
+    calendar_coverage: calendarCoverage,
+    active_review_batch: activeReviewBatch,
+    workflow_checkpoint: {
+      workflow_session_id: sessionId,
+      workflow_status: session?.status ?? null,
+      current_stage: session?.current_stage ?? null,
+      last_completed_action: next.last_completed_action,
+      next_pending_action: next.action,
+      next_owner_checkpoint: next.owner_checkpoint,
+      canonical_next_tool: next.canonical_tool,
+      next_operation_id: operationId,
+    },
+    active_artifact_ids: {
+      source_batch_id: currentItem?.source_batch_id ?? null,
+      source_selection_id: currentItem?.source_selection_id ?? null,
+      source_card_id: currentItem?.source_card_id ?? null,
+      generation_run_id: currentItem?.generation_run_id ?? null,
+      draft_id: currentItem?.draft_id ?? null,
+      scheduled_post_id: currentItem?.scheduled_post_id ?? null,
+      published_post_id: null,
+    },
+    source_batch_progress: activeReviewBatch ? {
+      selected_count: reviewItems.length,
+      completed_count: scheduledCount,
+      skipped_count: skippedCount,
+      remaining_count: Math.max(reviewItems.length - scheduledCount - skippedCount, 0),
+      review_batch_id: activeReviewRow?.id ?? null,
+      redraw_forbidden_on_resume: choice === "resume_existing_workflow",
+    } : null,
+    next_artifact: currentItem ? {
+      source_selection_id: currentItem.source_selection_id ?? null,
+      source_type: currentItem.source_type ?? null,
+      internal_source_id: currentItem.internal_source_id ?? null,
+      threads_post_id: currentItem.threads_post_id ?? null,
+      canonical_source_url: currentItem.canonical_source_url ?? null,
+      post_text: currentItem.source_text ?? null,
+      metrics_snapshot: currentItem.source_metrics ?? {},
+    } : null,
+    current_source_card: currentItem?.source_card_id ? { id: currentItem.source_card_id } : null,
+    current_draft: currentItem?.draft_id ? {
+      id: currentItem.draft_id,
+      status: currentItem.draft_status ?? currentItem.status ?? null,
+      text: currentItem.generated_post ?? null,
+      showable: currentItem.showable === true,
+      owner_feedback: null,
+    } : null,
+    current_scheduled_post: currentItem?.scheduled_post_id ? {
+      id: currentItem.scheduled_post_id,
+      scheduled_time: currentItem.scheduled_time ?? null,
+      status: currentItem.scheduled_status ?? currentItem.status ?? null,
+    } : null,
+    execution_policy: policy,
+    idempotency: {
+      version: OPERATOR_IDEMPOTENCY_VERSION,
+      next_operation_id: operationId,
+      replay_same_operation_id_after_interruption: true,
+    },
+    runtime_identity: {
+      ...operatorRuntimeMetadata(env),
+      live_tool_count: tools.length,
+      request_origin: new URL(request.url).origin,
+    },
+  };
+}
+
+async function buildOperatorProceedCapsule(
+  request: Request,
+  env: Env,
+  brand: GptResolvedBrand,
+  session: Record<string, unknown> | null,
+  choice: OperatorContinuationChoice,
+): Promise<Record<string, unknown>> {
+  return brand.brand_key === "manifest_mental"
+    ? buildOperatorManifestProceedCapsule(request, env, brand, session, choice)
+    : buildOperatorContinuityCapsule(request, env, brand, session, choice);
+}
+
 async function buildOperatorContinuityCapsule(
   request: Request,
   env: Env,
