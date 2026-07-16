@@ -14076,9 +14076,9 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
       account_data_loaded: true,
-      next_call_requirement: {
+            next_call_requirement: {
+        brand_key: operatorClientSafeBrandKey(brandKey),
         proceed_confirmed: true,
-                        continuity_loaded: true,
         operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
       },
     };
