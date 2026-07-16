@@ -2901,7 +2901,48 @@ describe("operator mode MCP endpoint", () => {
     expect(reconfirmed.isError).not.toBe(true);
     expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.mode).toBe("autonomous_operator");
     expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.objective).toContain("1,000,000 followers");
-  }, 40000);
+    }, 40000);
+
+  it("persists explicit owner ratification before the first protected scheduler call", async () => {
+    await ensureMcpAccountOpen("manifest_mental");
+    const canary = await mcpToolRaw<{
+      ok: boolean;
+      result: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } };
+      autonomy_decision: { governed: boolean; decision_id: string };
+    }>("listMcpTools", {
+      execute_tool: "setScheduledPostSchedulerMode",
+      arguments: {
+        brand_key: "manifest_mental",
+        mode: "canary",
+        scheduled_post_id: 987654,
+        reason: "Protected-operation owner-ratification regression fixture.",
+        owner_response: "Proceed",
+      },
+    });
+    expect(canary.isError).not.toBe(true);
+    expect(canary.structuredContent.ok).toBe(true);
+    expect(canary.structuredContent.result.scheduler.control).toMatchObject({
+      mode: "canary",
+      allowed_post_ids: [987654],
+    });
+    expect(canary.structuredContent.autonomy_decision).toMatchObject({ governed: true });
+    const decision = await env.DB.prepare(
+      `SELECT status, owner_response FROM operator_decision_proposals WHERE id = ? LIMIT 1`,
+    ).bind(canary.structuredContent.autonomy_decision.decision_id).first<{ status: string; owner_response: string }>();
+    expect(decision).toEqual({ status: "executed", owner_response: "Proceed" });
+
+    const paused = await mcpToolRaw<{ ok: boolean; result: { scheduler: { control: { mode: string } } } }>("listMcpTools", {
+      execute_tool: "setScheduledPostSchedulerMode",
+      arguments: {
+        brand_key: "manifest_mental",
+        mode: "paused",
+        reason: "Return regression fixture scheduler to safe state.",
+        owner_response: "Proceed",
+      },
+    });
+    expect(paused.isError).not.toBe(true);
+    expect(paused.structuredContent.result.scheduler.control.mode).toBe("paused");
+  }, 30000);
 
     it("returns a compact tool inventory without recursive payloads", async () => {
     const listed = await mcpTool<{ tools: Array<{ name: string; required_fields: string[]; disabled: boolean }> }>("listMcpTools", {
