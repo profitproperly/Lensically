@@ -8018,10 +8018,12 @@ async function buildOperatorManifestProceedCapsule(
     : [];
   const currentItem = reviewItems.find((item) =>
     !["scheduled", "published", "skipped", "rejected"].includes(String(item.status ?? ""))
-  ) ?? reviewItems[0] ?? null;
+  ) ?? null;
   const scheduledCount = reviewItems.filter((item) => ["scheduled", "published"].includes(String(item.status ?? ""))).length;
   const skippedCount = reviewItems.filter((item) => ["skipped", "rejected"].includes(String(item.status ?? ""))).length;
-  const next = activeReviewBatch
+  const unresolvedCount = Math.max(reviewItems.length - scheduledCount - skippedCount, 0);
+  const resumableReviewBatch = activeReviewBatch && unresolvedCount > 0 ? activeReviewBatch : null;
+  const next = resumableReviewBatch
     ? {
       action: "resume_review_batch",
       owner_checkpoint: "four_post_review_batch",
@@ -8032,10 +8034,10 @@ async function buildOperatorManifestProceedCapsule(
       action: "confirm_fill_calendar_day",
       owner_checkpoint: "calendar_coverage_confirmation",
       canonical_tool: "get_hourly_coverage",
-      last_completed_action: "calendar_coverage_inspected",
+      last_completed_action: activeReviewBatch ? "terminal_review_batch_detected" : "calendar_coverage_inspected",
     };
   const nextArtifactId = String(
-    activeReviewRow?.id
+    (resumableReviewBatch ? activeReviewRow?.id : null)
     ?? calendarCoverage.earliest_incomplete_date
     ?? sessionId
     ?? "none",
