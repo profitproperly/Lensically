@@ -9282,12 +9282,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!replacement?.source_selection_id) {
       return operatorJsonResponse({ success: false, error: "manifest_source_card_selection_required" }, 409);
     }
-    if (String(replacement.source_production_date ?? "") !== String(claim.production_date ?? "")) {
+
+    const replacementSelectionId = String(replacement.source_selection_id);
+    const sameSourceIdentity = String(replacement.source_identity_key ?? "") === String(claim.source_identity_key ?? "");
+    if (!sameSourceIdentity && String(replacement.source_production_date ?? "") !== String(claim.production_date ?? "")) {
       return operatorJsonResponse({ success: false, error: "replacement_source_production_date_mismatch" }, 409);
     }
 
-    const replacementSelectionId = String(replacement.source_selection_id);
-    const replacingSource = replacementSelectionId !== String(claim.source_selection_id ?? "");
+    const replacingSource = !sameSourceIdentity && replacementSelectionId !== String(claim.source_selection_id ?? "");
     if (replacingSource && !["source_skipped", "source_deleted"].includes(String(claim.status ?? ""))) {
       return operatorJsonResponse({ success: false, error: "review_source_replacement_requires_skip" }, 409);
     }
