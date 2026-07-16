@@ -2097,6 +2097,53 @@ describe("operator mode MCP endpoint", () => {
     expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
   }, 30000);
 
+    it("requires a matching guard and normalizes known payload blockers before execution", async () => {
+    const unguarded = await mcpToolCallRaw<{ error: string; required_next_tool: string }>("readRepoFile", {
+      path: "CURRENT_STATE.md",
+      max_lines: 20,
+    });
+    expect(unguarded.isError).toBe(true);
+    expect(unguarded.structuredContent).toMatchObject({
+      error: "execution_guard_required",
+      required_next_tool: "guardLensicallyCall",
+    });
+
+    const guarded = await mcpToolCallRaw<{
+      ok: boolean;
+      execution_guard: string;
+      normalized_arguments: Record<string, unknown>;
+      corrections: Array<{ path: string; from: unknown; to: unknown; reason: string }>;
+    }>("guardLensicallyCall", {
+      intended_tool: "readRepoFile",
+      arguments_json: JSON.stringify({ path: "CURRENT_STATE.md", max_lines: 410 }),
+    });
+    expect(guarded.isError).not.toBe(true);
+    expect(guarded.structuredContent.ok).toBe(true);
+    expect(guarded.structuredContent.normalized_arguments).toMatchObject({ path: "CURRENT_STATE.md", max_lines: 400 });
+    expect(guarded.structuredContent.corrections).toContainEqual({
+      path: "$.max_lines",
+      from: 410,
+      to: 400,
+      reason: "maximum_enforced",
+    });
+
+    const read = await mcpToolCallRaw<{ ok: boolean; returned_lines: number }>("readRepoFile", {
+      ...guarded.structuredContent.normalized_arguments,
+      execution_guard: guarded.structuredContent.execution_guard,
+    });
+    expect(read.isError).not.toBe(true);
+    expect(read.structuredContent.ok).toBe(true);
+    expect(read.structuredContent.returned_lines).toBeLessThanOrEqual(400);
+
+    const sensitive = await mcpToolCallRaw<{ error: string; required_route: string }>("guardLensicallyCall", {
+      intended_tool: "searchRepoFiles",
+      arguments_json: JSON.stringify({ query: "x-openai-subject", prefix: "lensically-worker/src/index.ts", limit: 20 }),
+    });
+    expect(sensitive.isError).toBe(true);
+    expect(sensitive.structuredContent.error).toBe("known_blocker_prevented");
+    expect(sensitive.structuredContent.required_route).toContain("neutral function-name search");
+  }, 30000);
+
   it("replays interrupted workflow-session creation without duplicates", async () => {
     await ensureMcpAccountOpen(BRAND_KEY);
     const operationId = "vitest-session-create-001";
