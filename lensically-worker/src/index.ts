@@ -11946,24 +11946,28 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ...OPERATOR_MCP_TOOLS,
     ...scopedWrapperTools,
   ].map(cloneOperatorMcpTool);
-  for (const tool of tools) {
-    if (!operatorMcpToolNameRequiresProceed(tool.name) && tool.name !== "getMcpAdminState" && tool.name !== "updateWorkflowRequirement") {
-      continue;
-    }
+    for (const tool of tools) {
     const schema = tool.inputSchema as Record<string, unknown>;
     const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
       ? { ...(schema.properties as Record<string, unknown>) }
       : {};
-        properties.proceed_confirmed = {
-      type: "boolean",
-      description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
-    };
-                properties.operation_id = {
-      type: "string",
-      description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
-    };
+    if (operatorMcpToolNameRequiresProceed(tool.name) || tool.name === "getMcpAdminState" || tool.name === "updateWorkflowRequirement") {
+      properties.proceed_confirmed = {
+        type: "boolean",
+        description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
+      };
+      properties.operation_id = {
+        type: "string",
+        description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
+      };
+    }
+    if (!OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS.has(tool.name)) {
+      properties.execution_guard = {
+        type: "string",
+        description: "Signed token returned by guardLensicallyCall for this exact tool and normalized argument payload. Required before execution.",
+      };
+    }
     tool.inputSchema = { ...schema, properties };
-
   }
   return tools;
 }
