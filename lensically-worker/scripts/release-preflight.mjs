@@ -57,8 +57,15 @@ if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) {
 if (!workflow.includes("release_id:")) {
   errors.push("workflow_release_id_missing");
 }
+if (source.includes("follower_day_net_change")) {
+  errors.push("post_level_follower_attribution_forbidden");
+}
+if (!source.includes('post_level_attribution: "forbidden"') || !source.includes('day_or_period_post_attribution: "forbidden"')) {
+  errors.push("performance_evaluator_follower_policy_missing");
+}
 
 if (new Set(crons).size !== crons.length) {
+
   errors.push("duplicate_wrangler_crons");
 }
 

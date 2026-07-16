@@ -1352,25 +1352,35 @@ describe("GPT memory browser routes", () => {
     expect(generationPayload).toMatchObject({
       success: true,
       brand_key: TEST_BRAND_KEY,
-      posted_tagged_results: [
+            posted_tagged_results: [
         expect.objectContaining({
           scheduled_post_id: 888,
-          follower_day_net_change: 8,
+          published_post_id: "post-888",
+          post: expect.objectContaining({
+            likes: 90,
+            views: 1200,
+            engagement_total: 113,
+          }),
         }),
       ],
       tag_performance: expect.objectContaining({
         pillars: [
           expect.objectContaining({
             key: "offer",
-            median_follower_day_net_change: 8,
+            median_engagement_total: 113,
+            median_likes: 90,
+            median_views: 1200,
           }),
         ],
       }),
+
     });
     expect(generationPayload.account?.threads_biography).toBeNull();
     expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("profile_picture_url");
-    expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("permalink");
+        expect(generationPayload.archive?.recent?.[0]).not.toHaveProperty("permalink");
+    expect(JSON.stringify(generationPayload)).not.toContain("follower_day_net_change");
   });
+
 
   it("returns recent GPT post performance windows for learning before generation", async () => {
     await createPostedTaggedPostFixture();
