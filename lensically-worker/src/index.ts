@@ -14349,14 +14349,8 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     if (!brand) {
       return { ok: false, error: "brand_unavailable", account_data_loaded: false };
     }
-    await env.DB.prepare(
-      `UPDATE operator_continuity_refs
-       SET expires_at = 0
-       WHERE brand_key = ? AND kind IN ('continuation_nonce', 'continuity_context')`,
-    ).bind(brandKey).run();
     const session = await resolveOperatorContinuationSession(env, brandKey, "resume_existing_workflow", null);
-    const capsule = await buildOperatorContinuityCapsule(request, env, brand, session, "resume_existing_workflow");
-    const workflowSessionId = normalizeOperatorText((capsule.workflow_checkpoint as Record<string, unknown> | undefined)?.workflow_session_id, 120, true);
+    const workflowSessionId = normalizeOperatorText(session?.id, 120, true);
     await createOperatorContinuityReference(env, {
       kind: "continuity_context",
       brandKey,
@@ -14369,6 +14363,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         auto_resolved_after_proceed: true,
       },
     });
+    const capsule = await buildOperatorProceedCapsule(request, env, brand, session, "resume_existing_workflow");
     return {
       ok: true,
       selected_key: brandKey,
