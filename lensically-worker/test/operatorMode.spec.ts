@@ -2860,17 +2860,11 @@ describe("operator mode MCP endpoint", () => {
         expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent.error).toBe("only_approved_scheduled_posts_can_be_edited");
 
-    const publishedRetry = await mcpRequest<{
-      structuredContent: { success?: boolean; error?: string };
-      isError?: boolean;
-    }>("tools/call", {
-      name: "edit_scheduled_post",
-      arguments: {
-        brand_key: BRAND_KEY,
-                scheduled_post_id: scheduled.scheduled_post_id,
-        retry_now: true,
-        proceed_confirmed: true,
-      },
+        const publishedRetry = await mcpToolRaw<{ success?: boolean; error?: string }>("edit_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduled.scheduled_post_id,
+      retry_now: true,
+      proceed_confirmed: true,
     });
     expect(publishedRetry.isError).toBe(true);
     expect(publishedRetry.structuredContent.error).toBe("scheduled_post_already_published");
