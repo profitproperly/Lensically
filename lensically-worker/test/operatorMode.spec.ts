@@ -2560,24 +2560,27 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
-  it("bridges scoped account wrappers without brand-key payloads", async () => {
+    it("rejects generic account bridges and uses compact direct account tools", async () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
     for (const name of ["mm_get_account_state", "om_get_account_state", "vx_get_account_state"]) {
       expect(toolNames).not.toContain(name);
     }
-    await ensureMcpAccountOpen("manifest_mental");
-            const manifestBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "mm_get_account_state", arguments: { proceed_confirmed: true, continuity_loaded: true } });
-    const manifest = manifestBridge.result;
-    expect(manifest.brand_key).toBe("manifest_mental");
-    await ensureMcpAccountOpen("opmg_deadman");
-            const opmgBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "om_get_account_state", arguments: { proceed_confirmed: true, continuity_loaded: true } });
-    const opmg = opmgBridge.result;
-    expect(opmg.brand_key).toBe("opmg_deadman");
-    await ensureMcpAccountOpen("vectrix");
-            const vectrixBridge = await mcpTool<{ result: { brand_key: string } }>("listMcpTools", { execute_tool: "vx_get_account_state", arguments: { proceed_confirmed: true, continuity_loaded: true } });
-    const vectrix = vectrixBridge.result;
-    expect(vectrix.brand_key).toBe("vectrix");
+
+    const blockedBridge = await mcpToolRaw<{ error: string; bridge_scope: string }>("listMcpTools", {
+      execute_tool: "mm_get_account_state",
+      arguments: { proceed_confirmed: true },
+    });
+    expect(blockedBridge.isError).toBe(true);
+    expect(blockedBridge.structuredContent).toMatchObject({
+      error: "direct_typed_tool_required",
+      bridge_scope: "engineering_and_admin_only",
+    });
+
+    for (const brandKey of ALL_BRAND_KEYS) {
+      const direct = await mcpTool<{ brand_key: string }>("get_account_state", { brand_key: brandKey });
+      expect(direct.brand_key).toBe(brandKey);
+    }
   }, 30000);
 
   it("returns non-enumerating operator health metadata", async () => {
