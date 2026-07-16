@@ -13120,6 +13120,16 @@ function operatorUsesAutonomousEngineeringAuthority(toolName: string, args: Reco
 function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
   const prefix = sanitizeRepoPath(args.prefix ?? "");
   const path = sanitizeRepoPath(args.path ?? "");
+  const searchQuery = normalizeOperatorText(args.query, 4000, true) ?? "";
+  if (toolName === "searchRepoFiles" && /(?:x-openai|authorization|bearer\s|client[_ -]?secret|access[_ -]?token)/i.test(searchQuery)) {
+    return {
+      rule_key: "client_sensitive_literal_search",
+      mandatory_route: "use a neutral function-name search or a bounded named-file read; do not send sensitive header or token literals through client preflight",
+      reason: "ChatGPT may block sensitive header and credential-shaped search strings before Lensically receives the request.",
+      block_call: true,
+      suggested_tools: ["searchRepoFiles", "readRepoFile"],
+    };
+  }
   if (toolName === "searchRepoFiles" && prefix && /\.[a-z0-9]+$/i.test(prefix)) {
     return {
       rule_key: "named_large_file_local_search",
