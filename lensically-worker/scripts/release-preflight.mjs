@@ -72,6 +72,9 @@ if (!source.includes('post_level_attribution: "forbidden"') || !source.includes(
 if (source.includes('      await prepareOperatorMode(env);\n      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);')) {
   errors.push("duplicate_mcp_dispatcher_bootstrap_forbidden");
 }
+if (source.includes('      await ensureOperatorMcpAdminTables(env);\n      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);')) {
+  errors.push("mcp_dispatcher_schema_initialization_forbidden");
+}
 
 if (new Set(crons).size !== crons.length) {
 
