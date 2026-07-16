@@ -10154,15 +10154,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       return operatorJsonResponse({ success: false, error: "manifest_adaptation_goal_required" }, 400);
     }
         const canonicalContext = await getOperatorSourceCardHistory(env, brand, card);
-    const accountRejectionContext = await buildOperatorRejectionContext(env, brand);
+        const accountRejectionContext = await buildOperatorRejectionContext(env, brand);
+    const performanceLearning = await getLatestOperatorPerformanceLearning(env, brand.brand_key, false);
     const priorAdaptationContext = {
+
       family: canonicalContext.family ?? null,
       versions: canonicalContext.versions ?? [],
       prior_runs: Array.isArray(canonicalContext.adaptation_history)
         ? (canonicalContext.adaptation_history as unknown[]).slice(-24)
         : [],
-      account_rejection_context: accountRejectionContext,
+            account_rejection_context: accountRejectionContext,
+      performance_learning: performanceLearning,
     };
+
 
     const operationId = normalizeOperatorText(payload.operation_id, 240, true);
     if (operationId) {
@@ -10228,9 +10232,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       source_card_family_id: card.family_id ?? null,
       source_card_version_number: Number(card.version_number ?? 1),
       adaptation_plan: adaptationPlan,
-      prior_adaptation_context: priorAdaptationContext,
+            prior_adaptation_context: priorAdaptationContext,
+      performance_learning: performanceLearning,
       status: "drafted",
     });
+
 
   }
 
@@ -10750,7 +10756,16 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
   }
 
-            if (toolName === "get_post_results") {
+              if (toolName === "get_performance_learning") {
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      performance_learning: await getLatestOperatorPerformanceLearning(env, brand.brand_key, payload.include_posts === true),
+    });
+  }
+
+  if (toolName === "get_post_results") {
+
     await ensureThreadsPostsArchiveTable(env);
     await ensureOperatorPostMetricSnapshotsTable(env);
     const publishedPostId = normalizeOperatorText(payload.published_post_id, 255);
@@ -10873,8 +10888,23 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       }
     }
 
+        await ensureOperatorPerformanceEvaluatorTables(env);
+    const fingerprintRow = await env.DB.prepare(
+      `SELECT fingerprint_json, fingerprint_version, updated_at
+       FROM operator_post_fingerprints
+       WHERE brand_key = ? AND published_post_id = ?
+       LIMIT 1`,
+    ).bind(brand.brand_key, publishedPostId).first<Record<string, unknown>>();
+    const performanceRows = await env.DB.prepare(
+      `SELECT checkpoint_hours, post_age_hours, metrics_json, rates_json, velocity_json,
+              scores_json, distribution_state, captured_at
+       FROM operator_post_performance_scores
+       WHERE brand_key = ? AND published_post_id = ? AND valid_for_learning = 1
+       ORDER BY checkpoint_hours ASC`,
+    ).bind(brand.brand_key, publishedPostId).all<Record<string, unknown>>();
     const includeHistory = payload.include_history === true;
     const history = includeHistory
+
       ? await env.DB.prepare(
                 `SELECT metrics_json, captured_at, valid_for_learning, anomaly_reason, collection_source
          FROM operator_post_metric_snapshots
@@ -10919,8 +10949,30 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         metrics_snapshot: safeParseJsonString(String(sourceSelection.metrics_snapshot_json ?? "{}")) ?? {},
         selected_at: sourceSelection.selected_at,
       } : null,
-      source_card: sourceCard,
+            source_card: sourceCard,
+      performance_evaluation: {
+        follower_attribution_policy: {
+          post_level_attribution: "forbidden",
+          day_or_period_post_attribution: "forbidden",
+          account_level_tracking_only: true,
+        },
+        fingerprint: fingerprintRow
+          ? safeParseJsonString(String(fingerprintRow.fingerprint_json ?? "{}")) ?? {}
+          : null,
+        fingerprint_version: fingerprintRow?.fingerprint_version ?? null,
+        maturity_scores: (performanceRows.results ?? []).map((row) => ({
+          checkpoint_hours: Number(row.checkpoint_hours),
+          post_age_hours: Number(row.post_age_hours),
+          metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
+          rates: safeParseJsonString(String(row.rates_json ?? "{}")) ?? {},
+          velocity: safeParseJsonString(String(row.velocity_json ?? "{}")) ?? {},
+          scores: safeParseJsonString(String(row.scores_json ?? "{}")) ?? {},
+          distribution_state: row.distribution_state,
+          captured_at: row.captured_at,
+        })),
+      },
             metric_history: (history.results ?? []).map((row) => ({
+
         metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
         captured_at: row.captured_at,
         valid_for_learning: Number(row.valid_for_learning ?? 1) === 1,
@@ -11780,14 +11832,22 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" }, date: { type: "string" }, time: { type: "string" }, timezone: { type: "string" }, strategy: { type: "object", additionalProperties: true } }, required: ["brand_key", "draft_id", "date", "time"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
+    {
     name: "get_post_results",
     title: "Get post results",
     description: "Use this to retrieve published post results linked to a Lensically draft and source card when available.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, published_post_id: { type: "string" }, include_history: { type: "boolean" } }, required: ["brand_key", "published_post_id"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: "get_performance_learning",
+    title: "Get performance learning",
+    description: "Read the latest maturity-normalized post evidence, hypotheses, fatigue signals, and generation learning brief. Follower totals remain account-level only and are never attributed to posts or posting periods.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, include_posts: { type: "boolean" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
 ];
+
 
 function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
   return (OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(value);
@@ -12579,7 +12639,8 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.10.0";
+const OPERATOR_MCP_VERSION = "1.11.0";
+
 const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
@@ -23395,7 +23456,9 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         null,
       );
 
-            let metricSnapshots: { inserted: number; unchanged: number; anomalous: number; linked: number } | null = null;
+                        let metricSnapshots: { inserted: number; unchanged: number; anomalous: number; linked: number } | null = null;
+      let performanceEvaluation: Record<string, unknown> | null = null;
+
       if (postsPage) {
         await upsertThreadsPostsArchive(env, threadsUserId, postsPage.posts);
         await replaceThreadsPostsCache(env, threadsUserId, postsPage.posts, {
@@ -23405,7 +23468,7 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         });
         const brandKey = gptBrandKeyForAccountId(configuredAccount.id);
         if (brandKey) {
-          metricSnapshots = await appendOperatorMetricSnapshotsForPosts(
+                    metricSnapshots = await appendOperatorMetricSnapshotsForPosts(
             env,
             brandKey,
             configuredAccount.id,
@@ -23413,6 +23476,21 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
             postsPage.posts,
             "six_hour_insights",
           );
+          try {
+            performanceEvaluation = await refreshOperatorPerformanceEvaluator(
+              env,
+              brandKey,
+              configuredAccount.id,
+              threadsUserId,
+            );
+          } catch (error) {
+            logWorkerEvent("OPERATOR_PERFORMANCE_EVALUATOR_REFRESH_FAILED", {
+              brand_key: brandKey,
+              threads_user_id: threadsUserId,
+              error: getErrorMessage(error),
+            }, "error");
+          }
+
         }
       }
 
@@ -23424,8 +23502,14 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         metric_snapshots_inserted: metricSnapshots?.inserted ?? 0,
         unchanged_snapshots_skipped: metricSnapshots?.unchanged ?? 0,
         anomalous_snapshots_quarantined: metricSnapshots?.anomalous ?? 0,
-        snapshots_with_generation_lineage: metricSnapshots?.linked ?? 0,
+                snapshots_with_generation_lineage: metricSnapshots?.linked ?? 0,
+        evaluator_fingerprinted_posts: Number(performanceEvaluation?.fingerprinted_posts ?? 0),
+        evaluator_maturity_scores: Number(performanceEvaluation?.maturity_scores_upserted ?? 0),
+        evaluator_evidence_records: Number(performanceEvaluation?.evidence_records ?? 0),
+        evaluator_active_hypotheses: Number(performanceEvaluation?.active_hypotheses ?? 0),
+        evaluator_checkpoint_hours: performanceEvaluation?.checkpoint_hours ?? null,
         user_insights_cached: userInsights !== null,
+
         follower_snapshot_saved: snapshotDate !== null && currentFollowersCount !== null,
       });
     } catch (error) {
