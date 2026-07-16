@@ -1674,8 +1674,8 @@ describe("operator mode MCP endpoint", () => {
       "submitAndGateDraft",
       "createImplementationBacklogItem",
       "listImplementationBacklogItems",
-      "markImplementationBacklogItemResolved",
-    ]);
+            "markImplementationBacklogItemResolved",
+    ]));
     for (const name of [
       "getOperatorStartupContext",
       "engineeringPrecheck",
