@@ -2595,9 +2595,9 @@ describe("operator mode MCP endpoint", () => {
       bridge_scope: "engineering_and_admin_only",
     });
 
-    for (const brandKey of ALL_BRAND_KEYS) {
-      const direct = await mcpTool<{ brand_key: string }>("get_account_state", { brand_key: brandKey });
-      expect(direct.brand_key).toBe(brandKey);
+        for (const [clientKey, canonicalKey] of [["manifestmental", "manifest_mental"], ["opmgdeadman", "opmg_deadman"], ["vectrix", "vectrix"]] as const) {
+      const direct = await mcpTool<{ brand_key: string }>("get_account_state", { brand_key: clientKey });
+      expect(direct.brand_key).toBe(canonicalKey);
     }
   }, 30000);
 
