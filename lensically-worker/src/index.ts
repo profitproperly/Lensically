@@ -15703,7 +15703,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         payload: await readJsonSafe(liveResponse) as Record<string, unknown> | null,
       };
     };
-    const structured = (result: Record<string, unknown> | null): Record<string, unknown> => {
+        const structured = (result: Record<string, unknown> | null): Record<string, unknown> => {
       const rpcResult = result?.result && typeof result.result === "object" && !Array.isArray(result.result)
         ? result.result as Record<string, unknown>
         : {};
@@ -15711,29 +15711,36 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         ? rpcResult.structuredContent as Record<string, unknown>
         : {};
     };
+    let nextLiveId = 3;
+    const callGuardedLiveTool = async (name: string, args: Record<string, unknown>) => {
+      const guard = await callLiveMcp(nextLiveId++, "tools/call", {
+        name: "guardLensicallyCall",
+        arguments: { intended_tool: name, arguments_json: JSON.stringify(args) },
+      });
+      const guardContent = structured(guard.payload);
+      if (guardContent.ok !== true || typeof guardContent.execution_guard !== "string") return guard;
+      return callLiveMcp(nextLiveId++, "tools/call", {
+        name,
+        arguments: { ...(guardContent.normalized_arguments as Record<string, unknown> ?? args), execution_guard: guardContent.execution_guard },
+      });
+    };
 
     const listed = await callLiveMcp(2, "tools/list", {});
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
-    const select = await callLiveMcp(3, "tools/call", { name: "selectOperatorKey", arguments: { brand_key: "manifest_mental" } });
-    const blocked = await callLiveMcp(4, "tools/call", { name: "getWorkflowStatus", arguments: { brand_key: "manifest_mental" } });
-        const proceed = await callLiveMcp(5, "tools/call", { name: "confirmOperatorProceed", arguments: { brand_key: "manifest_mental" } });
+    const select = await callGuardedLiveTool("selectOperatorKey", { brand_key: "manifest_mental" });
+    const blocked = await callGuardedLiveTool("getWorkflowStatus", { brand_key: "manifest_mental" });
+    const proceed = await callGuardedLiveTool("confirmOperatorProceed", { brand_key: "manifest_mental" });
     const proceedContent = structured(proceed.payload);
-    const allowed = await callLiveMcp(6, "tools/call", {
-      name: "getWorkflowStatus",
-            arguments: {
-        brand_key: "manifest_mental",
-        proceed_confirmed: true,
-      },
+    const allowed = await callGuardedLiveTool("getWorkflowStatus", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
     });
-    const coverage = await callLiveMcp(7, "tools/call", {
-      name: "get_hourly_coverage",
-            arguments: {
-        brand_key: "manifest_mental",
-        proceed_confirmed: true,
-        timezone: "America/New_York",
-      },
+    const coverage = await callGuardedLiveTool("get_hourly_coverage", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+      timezone: "America/New_York",
     });
 
     const selectContent = structured(select.payload);
