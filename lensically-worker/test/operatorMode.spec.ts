@@ -60,12 +60,36 @@ async function mcpRequest<T = Record<string, unknown>>(method: string, params: R
   return data.result as T;
 }
 
-async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
+async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
   return mcpRequest<{ structuredContent: T; isError?: boolean }>("tools/call", {
     name: toolName,
     arguments: args,
   });
 }
+
+const MCP_GUARD_EXEMPT_TOOLS = new Set(["getOperatorStartupContext", "guardLensicallyCall"]);
+
+async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
+  if (MCP_GUARD_EXEMPT_TOOLS.has(toolName)) {
+    return mcpToolCallRaw<T>(toolName, args);
+  }
+  const guarded = await mcpToolCallRaw<{
+    ok: boolean;
+    execution_guard: string;
+    normalized_arguments: Record<string, unknown>;
+    corrections: Array<Record<string, unknown>>;
+  }>("guardLensicallyCall", {
+    intended_tool: toolName,
+    arguments_json: JSON.stringify(args),
+  });
+  expect(guarded.isError, `guardLensicallyCall for ${toolName}`).not.toBe(true);
+  expect(guarded.structuredContent.ok, `guardLensicallyCall for ${toolName}`).toBe(true);
+  return mcpToolCallRaw<T>(toolName, {
+    ...guarded.structuredContent.normalized_arguments,
+    execution_guard: guarded.structuredContent.execution_guard,
+  });
+}
+
 
 function testRequestedBrandKey(toolName: string, args: Record<string, unknown>): CanonicalBrandKey | null {
   if (toolName.startsWith("mm_")) {
