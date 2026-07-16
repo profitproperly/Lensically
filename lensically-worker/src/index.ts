@@ -12119,6 +12119,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["get_performance_learning", 13],
     ["markOperatorDecisionExecuted", 14],
     ["edit_scheduled_post", 15],
+    ["skip_manifest_review_source", 16],
   ]);
   const tools = [
     ...OPERATOR_MCP_ENGINEERING_TOOLS,
