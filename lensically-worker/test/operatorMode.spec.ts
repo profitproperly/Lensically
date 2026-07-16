@@ -110,7 +110,7 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
   let callArgs = args;
   if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && toolName !== "resolveContinuationContext") {
     await ensureMcpAccountOpen(requestedBrand);
-            callArgs = { ...args, proceed_confirmed: true, continuity_loaded: mcpContinuityLoaded };
+                        callArgs = { ...args, proceed_confirmed: true };
   }
   let result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
   if (result.isError && result.structuredContent.error === "approved_operator_decision_required") {
