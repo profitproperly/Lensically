@@ -82,6 +82,9 @@ if (!source.includes('name: "guardLensicallyCall"') || !source.includes('error: 
 if (!tests.includes('requires a matching guard and normalizes known payload blockers before execution')) {
   errors.push("mandatory_execution_guard_regression_missing");
 }
+if (!recoverySource.includes('exact_sha_not_current_branch_head') || !recoverySource.includes('dispatch_ref: dispatchRef') || !recoverySource.includes('verified_head_sha: verifiedHeadSha')) {
+  errors.push("recovery_exact_sha_dispatch_guard_missing");
+}
 
 if (new Set(crons).size !== crons.length) {
 
