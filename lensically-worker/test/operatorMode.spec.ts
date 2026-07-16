@@ -2595,9 +2595,11 @@ describe("operator mode MCP endpoint", () => {
       bridge_scope: "engineering_and_admin_only",
     });
 
-        for (const [clientKey, canonicalKey] of [["manifestmental", "manifest_mental"], ["opmgdeadman", "opmg_deadman"], ["vectrix", "vectrix"]] as const) {
-      const direct = await mcpTool<{ brand_key: string }>("get_account_state", { brand_key: clientKey });
-      expect(direct.brand_key).toBe(canonicalKey);
+            for (const [clientKey, canonicalKey] of [["manifestmental", "manifest_mental"], ["opmgdeadman", "opmg_deadman"], ["vectrix", "vectrix"]] as const) {
+      await ensureMcpAccountOpen(canonicalKey);
+      const direct = await mcpToolRaw<{ brand_key: string }>("get_account_state", { brand_key: clientKey, proceed_confirmed: true });
+      expect(direct.isError).not.toBe(true);
+      expect(direct.structuredContent.brand_key).toBe(canonicalKey);
     }
   }, 30000);
 
