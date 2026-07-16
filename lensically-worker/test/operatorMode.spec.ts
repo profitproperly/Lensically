@@ -100,8 +100,7 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     expect(proceeded.structuredContent.continuity_loaded).toBe(true);
     expect(proceeded.structuredContent.continuation_choice_required).toBe(false);
     expect(proceeded.structuredContent.continuity_capsule.brand_key).toBe(brandKey);
-    mcpProceedConfirmed = true;
-    mcpContinuityLoaded = true;
+        mcpProceedConfirmed = true;
   }
 }
 
