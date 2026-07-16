@@ -8,6 +8,8 @@
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
 - `/dashboard` now targets an operator-dashboard role rather than a simple profile/stats card.
 - `/followers` is a dedicated paginated follower-history surface for daily snapshot tracking.
+- Insights collection is backend-owned and runs at 12:00 AM, 6:00 AM, 12:00 PM, and 6:00 PM America/New_York. An hourly Cloudflare cron is admitted only at those four local-time windows so daylight-saving changes cannot shift the schedule.
+- Each autonomous Insights run pulls the latest 40 posts without pagination, upserts Post Archive and the live cache, appends only changed metric snapshots, links available source-card/generation/draft/scheduled-post lineage, and marks structurally abnormal snapshots ineligible for learning instead of deleting historical evidence.
 
 ## Core Scheduling State
 
