@@ -16193,6 +16193,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           protected_operations_owner_ratified: true,
         };
       }
+      if (dispatcherGuardFallback) {
+        resultPayload.execution_guard_enforcement = {
+          version: OPERATOR_EXECUTION_GUARD_VERSION,
+          mode: "server_side_dispatcher_fallback",
+          normalized_before_execution: true,
+          known_path_checked: true,
+        };
+      }
       resultPayload.execution_policy = executionPolicy;
       if (idempotencyKey) {
         resultPayload.idempotency = {
