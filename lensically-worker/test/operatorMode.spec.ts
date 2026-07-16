@@ -2549,6 +2549,16 @@ describe("operator mode MCP endpoint", () => {
     expect(scheduledReviewBatch?.status).toBe("completed");
     expect(scheduledReviewBatch?.items.every((item) => item.status === "scheduled" && Number(item.scheduled_post_id ?? 0) > 0)).toBe(true);
 
+    const reconciledAttachment = await operatorTool<{ status: string }>("attach_manifest_review_draft", {
+      brand_key: "manifest_mental",
+      review_batch_id: batch.review_batch_id,
+      item_number: 1,
+      source_card_id: replacementDraft.sourceCardId,
+      generation_run_id: replacementDraft.runId,
+      draft_id: replacementDraft.draftId,
+    });
+    expect(reconciledAttachment.status).toBe("completed");
+
     await env.DB.prepare(
       `UPDATE operator_review_batches SET status = 'owner_review' WHERE id = ?`,
     ).bind(batch.review_batch_id).run();
