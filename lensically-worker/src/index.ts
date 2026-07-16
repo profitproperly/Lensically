@@ -13908,9 +13908,8 @@ async function getOperatorMcpBoundaryBlock(
       selected_key: requestedBrand,
       account_data_loaded: false,
             required_next_tool: "confirmOperatorProceed",
-      required_arguments: { proceed_confirmed: true },
-      later_call_requirement: { continuity_loaded: true },
-      message: "Explicit Proceed must be confirmed first. confirmOperatorProceed automatically restores canonical continuity; no resume/start-fresh choice or generated handle is required.",
+            required_arguments: { proceed_confirmed: true },
+      message: "Call confirmOperatorProceed once for the selected key. Later direct account calls send proceed_confirmed=true; Lensically verifies canonical continuity from server-side state.",
     };
   }
   const tokenSession = normalizeOperatorText(continuity.workflow_session_id, 120, true);
