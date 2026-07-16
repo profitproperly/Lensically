@@ -13123,6 +13123,28 @@ async function operatorExecutionFingerprint(toolName: string, args: Record<strin
   return sha256OperatorText(JSON.stringify({ tool_name: canonical.tool_name, args: canonical.args }));
 }
 
+async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_execution_events (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT,
+      workflow_session_id TEXT,
+      tool_name TEXT NOT NULL,
+      operation_class TEXT NOT NULL,
+      execution_plane TEXT NOT NULL,
+      policy_version TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      known_failure_prevented INTEGER NOT NULL DEFAULT 0,
+      evidence_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_execution_events_recent
+     ON operator_execution_events (created_at DESC, tool_name)`,
+  ).run();
+}
+
 async function getKnownAliasRetryBlock(
   env: Env,
   toolName: string,
