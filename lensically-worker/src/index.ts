@@ -12639,7 +12639,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.11.0";
+const OPERATOR_MCP_VERSION = "1.12.0";
 
 const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
 
@@ -20632,9 +20632,9 @@ export function evaluateThreadsPostMetricsForLearning(post: CachedThreadsPost): 
   };
 }
 
-const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v1";
+const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v2";
 const OPERATOR_POST_FINGERPRINT_VERSION = "post-fingerprint-v1";
-export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 24, 48, 72] as const;
+export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 18, 24] as const;
 
 type OperatorMetricRecord = {
   views: number;
@@ -20994,8 +20994,15 @@ async function refreshOperatorPerformanceEvaluator(
   accountId: string,
   threadsUserId: string,
 ): Promise<Record<string, unknown>> {
-  await ensureOperatorPostMetricSnapshotsTable(env);
+    await ensureOperatorPostMetricSnapshotsTable(env);
   await ensureOperatorPerformanceEvaluatorTables(env);
+  const checkpointPlaceholders = OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS.map(() => "?").join(", ");
+  await env.DB.prepare(
+    `UPDATE operator_post_performance_scores
+     SET valid_for_learning = 0, updated_at = CURRENT_TIMESTAMP
+     WHERE brand_key = ?
+       AND checkpoint_hours NOT IN (${checkpointPlaceholders})`,
+  ).bind(brandKey, ...OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS).run();
   const postRows = await env.DB.prepare(
     `SELECT
        a.post_id AS published_post_id,
@@ -21360,8 +21367,15 @@ async function refreshOperatorPerformanceEvaluator(
   const brief = {
     version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
     generated_at: generatedAt,
-    checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
+        checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
     mature_sample_size: matureSampleSize,
+    measurement_policy: {
+      checkpoints_hours: [...OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS],
+      final_authoritative_checkpoint_hours: 24,
+      collection_scope: "existing_latest_40_full_insights_only",
+      targeted_older_post_calls: "forbidden",
+      later_metrics: "incidental_archive_context_only",
+    },
     follower_attribution_policy: {
       post_level_attribution: "forbidden",
       day_or_period_post_attribution: "forbidden",
@@ -21374,7 +21388,7 @@ async function refreshOperatorPerformanceEvaluator(
     fatigue_risks: fatigueRisks,
     experiment_allocation: allocation,
     generation_guidance: [
-      "Use mature age-matched evidence; do not compare posts at different maturity stages.",
+            "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result."
       "Exploit reliable positive mechanisms, improve one variable at a time, and preserve controlled exploration.",
       "Avoid overused recent features when an equally supported alternative exists.",
       "Do not infer follower conversion from any post, day, batch, or surrounding time period.",
@@ -21418,25 +21432,25 @@ async function getLatestOperatorPerformanceLearning(
 ): Promise<Record<string, unknown>> {
   await ensureOperatorPerformanceEvaluatorTables(env);
   const briefRow = await env.DB.prepare(
-    `SELECT id, checkpoint_hours, sample_size, brief_json, generated_at
+        `SELECT id, checkpoint_hours, sample_size, brief_json, generated_at
      FROM operator_generation_learning_briefs
-     WHERE brand_key = ? AND active = 1
+     WHERE brand_key = ? AND active = 1 AND evaluator_version = ?
      ORDER BY datetime(generated_at) DESC LIMIT 1`,
-  ).bind(brandKey).first<Record<string, unknown>>();
+  ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).first<Record<string, unknown>>();
   const hypotheses = await env.DB.prepare(
     `SELECT checkpoint_hours, dimension, feature_key, hypothesis_text, direction,
             sample_size, confidence_score, confidence_label, evidence_json, updated_at
-     FROM operator_performance_hypotheses
-     WHERE brand_key = ? AND status = 'active'
+          FROM operator_performance_hypotheses
+     WHERE brand_key = ? AND status = 'active' AND evaluator_version = ?
      ORDER BY confidence_score DESC, sample_size DESC, updated_at DESC LIMIT 30`,
-  ).bind(brandKey).all<Record<string, unknown>>();
+  ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).all<Record<string, unknown>>();
   const evidence = await env.DB.prepare(
     `SELECT checkpoint_hours, dimension, feature_key, sample_size, cohort_size,
             medians_json, effect_json, confidence_score, confidence_label, direction, updated_at
-     FROM operator_performance_evidence
-     WHERE brand_key = ? AND status = 'active'
+          FROM operator_performance_evidence
+     WHERE brand_key = ? AND status = 'active' AND evaluator_version = ?
      ORDER BY checkpoint_hours DESC, confidence_score DESC, sample_size DESC LIMIT 100`,
-  ).bind(brandKey).all<Record<string, unknown>>();
+  ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).all<Record<string, unknown>>();
   const posts = includePosts
     ? await env.DB.prepare(
       `SELECT s.published_post_id, s.checkpoint_hours, s.post_age_hours, s.metrics_json,
@@ -21444,9 +21458,9 @@ async function getLatestOperatorPerformanceLearning(
        FROM operator_post_performance_scores s
        INNER JOIN operator_post_fingerprints f
          ON f.brand_key = s.brand_key AND f.published_post_id = s.published_post_id
-       WHERE s.brand_key = ? AND s.valid_for_learning = 1
+              WHERE s.brand_key = ? AND s.valid_for_learning = 1 AND s.evaluator_version = ?
        ORDER BY s.checkpoint_hours DESC, datetime(s.updated_at) DESC LIMIT 100`,
-    ).bind(brandKey).all<Record<string, unknown>>()
+    ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   return {
     available: Boolean(briefRow),

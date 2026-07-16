@@ -60,6 +60,12 @@ if (!workflow.includes("release_id:")) {
 if (source.includes("follower_day_net_change")) {
   errors.push("post_level_follower_attribution_forbidden");
 }
+if (!source.includes("export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 18, 24] as const;")) {
+  errors.push("performance_checkpoint_contract_mismatch");
+}
+if (!source.includes('limit: "40",')) {
+  errors.push("latest_40_insights_collection_contract_missing");
+}
 if (!source.includes('post_level_attribution: "forbidden"') || !source.includes('day_or_period_post_attribution: "forbidden"')) {
   errors.push("performance_evaluator_follower_policy_missing");
 }
