@@ -12499,7 +12499,7 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-    "Resolve operator-execution-policy-v2 and its mandatory known_path before every engineering call; do not execute first and route afterward.",
+        "After getOperatorStartupContext, call guardLensicallyCall before every Lensically tool. Use its normalized_arguments and signed execution_guard; unguarded or known-bad routes are dispatcher-blocked before execution.",
     "Routine engineering uses persistent full-discretion outcome-bound authority. Do not create owner proposals or numerical tool budgets for repository, test, deploy, verification, routing, or infrastructure repair work.",
     "Use the canonical execution plane returned by policy: engineering_control for repository/tests/deploys, operator_account for account workflow, and operator_control for universal MCP administration.",
                 "Call account tools directly with compact typed schemas. In ChatGPT tool calls, use the client-safe aliases manifestmental and opmgdeadman instead of underscored account keys; Lensically normalizes them to canonical keys. Vectrix remains vectrix. listMcpTools and runEngineeringTool are engineering/admin bridges only; never send account workflow payloads through a generic arguments object.",
