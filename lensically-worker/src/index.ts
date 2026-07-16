@@ -9521,6 +9521,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       review_batch_id: resolvedReviewBatchId,
       production_date: productionDate,
       results,
+      invocation_item_limit: 1,
+      remaining_approved_item_numbers: eligibleClaimsAll.slice(1).map((claim) => Number(claim.review_item_number)),
+      continuation_required: eligibleClaimsAll.length > 1,
       review_batch: await serializeManifestReviewBatch(env, brand, resolvedReviewBatchId),
     });
   }
