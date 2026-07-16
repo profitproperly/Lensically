@@ -13659,6 +13659,13 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
       reason: "GitHub code search does not reliably index oversized source files; do not retry empty code-search results or fan out across files.",
     };
   }
+    if (MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(toolName)) {
+    return {
+      rule_key: "explicit_owner_ratification_handoff",
+      mandatory_route: "after the owner explicitly approves, include brand_key and the exact owner message in owner_response on the first protected call; persist ratification and execute once. Do not make a knowingly blocked attempt and do not switch to recovery",
+      reason: "An owner approval already given in the conversation must become durable authorization before execution rather than producing an avoidable block.",
+    };
+  }
   if (["proposeOperatorDecision", "resolveOperatorDecision", "markOperatorDecisionExecuted"].includes(toolName)) {
     return {
       rule_key: "compact_governance_payload",
