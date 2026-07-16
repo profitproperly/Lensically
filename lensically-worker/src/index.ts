@@ -12267,6 +12267,92 @@ async function putGithubFile(env: Env, input: { path: string; content: string; m
   };
 }
 
+async function putGithubFiles(
+  env: Env,
+  input: {
+    files: Array<{ path: string; content: string }>;
+    message: string;
+    expectedHeadSha?: string | null;
+  },
+): Promise<{ ok: boolean; status: number; commit_sha: string | null; data: unknown; head_sha: string | null }> {
+  const config = githubRepoConfig(env);
+  const branchRef = config.branch.split("/").map(encodeURIComponent).join("/");
+  const ref = await githubRepoApi(env, `/git/ref/heads/${branchRef}`);
+  const refData = ref.data && typeof ref.data === "object" && !Array.isArray(ref.data) ? ref.data as Record<string, unknown> : null;
+  const refObject = refData?.object && typeof refData.object === "object" && !Array.isArray(refData.object)
+    ? refData.object as Record<string, unknown>
+    : null;
+  const headSha = typeof refObject?.sha === "string" ? refObject.sha : null;
+  if (!ref.ok || !headSha) {
+    return { ok: false, status: ref.status, commit_sha: null, head_sha: headSha, data: { phase: "read_ref", response: ref.data } };
+  }
+  if (input.expectedHeadSha && input.expectedHeadSha !== headSha) {
+    return { ok: false, status: 409, commit_sha: null, head_sha: headSha, data: { phase: "head_changed", expected_head_sha: input.expectedHeadSha, actual_head_sha: headSha } };
+  }
+
+  const parent = await githubRepoApi(env, `/git/commits/${headSha}`);
+  const parentData = parent.data && typeof parent.data === "object" && !Array.isArray(parent.data) ? parent.data as Record<string, unknown> : null;
+  const parentTree = parentData?.tree && typeof parentData.tree === "object" && !Array.isArray(parentData.tree)
+    ? parentData.tree as Record<string, unknown>
+    : null;
+  const baseTreeSha = typeof parentTree?.sha === "string" ? parentTree.sha : null;
+  if (!parent.ok || !baseTreeSha) {
+    return { ok: false, status: parent.status, commit_sha: null, head_sha: headSha, data: { phase: "read_parent_commit", response: parent.data } };
+  }
+
+  const blobResults = await Promise.all(input.files.map(async (file) => {
+    const blob = await githubRepoApi(env, "/git/blobs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: file.content, encoding: "utf-8" }),
+    });
+    const blobData = blob.data && typeof blob.data === "object" && !Array.isArray(blob.data) ? blob.data as Record<string, unknown> : null;
+    return { path: file.path, ok: blob.ok, status: blob.status, sha: typeof blobData?.sha === "string" ? blobData.sha : null, response: blob.data };
+  }));
+  const failedBlob = blobResults.find((result) => !result.ok || !result.sha);
+  if (failedBlob) {
+    return { ok: false, status: failedBlob.status, commit_sha: null, head_sha: headSha, data: { phase: "create_blob", path: failedBlob.path, response: failedBlob.response } };
+  }
+
+  const tree = await githubRepoApi(env, "/git/trees", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      base_tree: baseTreeSha,
+      tree: blobResults.map((blob) => ({ path: blob.path, mode: "100644", type: "blob", sha: blob.sha })),
+    }),
+  });
+  const treeData = tree.data && typeof tree.data === "object" && !Array.isArray(tree.data) ? tree.data as Record<string, unknown> : null;
+  const treeSha = typeof treeData?.sha === "string" ? treeData.sha : null;
+  if (!tree.ok || !treeSha) {
+    return { ok: false, status: tree.status, commit_sha: null, head_sha: headSha, data: { phase: "create_tree", response: tree.data } };
+  }
+
+  const commit = await githubRepoApi(env, "/git/commits", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: input.message, tree: treeSha, parents: [headSha] }),
+  });
+  const commitData = commit.data && typeof commit.data === "object" && !Array.isArray(commit.data) ? commit.data as Record<string, unknown> : null;
+  const commitSha = typeof commitData?.sha === "string" ? commitData.sha : null;
+  if (!commit.ok || !commitSha) {
+    return { ok: false, status: commit.status, commit_sha: null, head_sha: headSha, data: { phase: "create_commit", response: commit.data } };
+  }
+
+  const update = await githubRepoApi(env, `/git/refs/heads/${branchRef}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sha: commitSha, force: false }),
+  });
+  return {
+    ok: update.ok,
+    status: update.status,
+    commit_sha: update.ok ? commitSha : null,
+    head_sha: headSha,
+    data: update.ok ? { write_mode: "git_data_api_atomic", commit: commit.data } : { phase: "update_ref", response: update.data },
+  };
+}
+
 async function recordEngineeringAudit(env: Env, input: {
   action: string;
   filesChanged?: string[];
