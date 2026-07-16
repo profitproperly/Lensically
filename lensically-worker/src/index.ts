@@ -11965,7 +11965,8 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
       ? { ...(schema.properties as Record<string, unknown>) }
       : {};
-    if (operatorMcpToolNameRequiresProceed(tool.name) || tool.name === "getMcpAdminState" || tool.name === "updateWorkflowRequirement") {
+        const acceptsBrandContext = Object.prototype.hasOwnProperty.call(properties, "brand_key");
+    if (operatorMcpToolNameRequiresProceed(tool.name) || acceptsBrandContext || tool.name === "getMcpAdminState" || tool.name === "updateWorkflowRequirement") {
       properties.proceed_confirmed = {
         type: "boolean",
         description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
