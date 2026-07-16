@@ -10813,7 +10813,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(brand.brand_key, sourceCardId).first<Record<string, unknown>>()
       : null;
 
-    const metrics = archivePost ? {
+        const metricValues = archivePost ? {
       views: Number(archivePost.views ?? 0),
       likes: Number(archivePost.likes ?? 0),
       replies: Number(archivePost.replies ?? 0),
@@ -10821,11 +10821,25 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       quotes: Number(archivePost.quotes ?? 0),
       shares: Number(archivePost.shares ?? 0),
       engagement_total: Number(archivePost.engagement_total ?? 0),
-      captured_at: archivePost.last_synced_at ?? new Date().toISOString(),
+    } : null;
+    const evaluatedMetrics = metricValues ? evaluateThreadsPostMetricsForLearning({
+      id: publishedPostId,
+      text: null,
+      timestamp: null,
+      permalink: null,
+      username: null,
+      profile_picture_url: null,
+      ...metricValues,
+    }) : null;
+    const metrics = metricValues ? {
+      ...metricValues,
+      captured_at: archivePost?.last_synced_at ?? new Date().toISOString(),
+      valid_for_learning: evaluatedMetrics?.validForLearning ?? false,
+      anomaly_reason: evaluatedMetrics?.anomalyReason ?? null,
     } : null;
 
-    if (metrics) {
-      const serializedMetrics = normalizeOperatorJson(metrics, {});
+    if (metrics && evaluatedMetrics) {
+      const serializedMetrics = normalizeOperatorJson(evaluatedMetrics.metrics, {});
       const latestSnapshot = await env.DB.prepare(
         `SELECT metrics_json
          FROM operator_post_metric_snapshots
@@ -10838,8 +10852,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         await env.DB.prepare(
           `INSERT INTO operator_post_metric_snapshots (
             id, brand_key, published_post_id, scheduled_post_id, draft_id,
-            source_card_id, source_selection_id, metrics_json, captured_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            source_card_id, source_selection_id, metrics_json, captured_at,
+            valid_for_learning, anomaly_reason, collection_source
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'get_post_results')`,
         ).bind(
           crypto.randomUUID(),
           brand.brand_key,
@@ -10852,6 +10867,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           sourceSelection?.id ? String(sourceSelection.id) : null,
           serializedMetrics,
           String(metrics.captured_at),
+          evaluatedMetrics.validForLearning ? 1 : 0,
+          evaluatedMetrics.anomalyReason,
         ).run();
       }
     }
