@@ -10876,7 +10876,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const includeHistory = payload.include_history === true;
     const history = includeHistory
       ? await env.DB.prepare(
-        `SELECT metrics_json, captured_at
+                `SELECT metrics_json, captured_at, valid_for_learning, anomaly_reason, collection_source
          FROM operator_post_metric_snapshots
          WHERE brand_key = ?
            AND published_post_id = ?
