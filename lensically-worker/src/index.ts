@@ -12886,18 +12886,35 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
       reason: "Verbose governance payloads are known to trigger client-side preflight blocks before reaching Lensically.",
     };
   }
-  if (toolName === "applyRepoTextPatch" && /\.ya?ml$/i.test(path)) {
+    const patchSetTouchesYaml = toolName === "applyRepoPatchSet"
+    && Array.isArray(args.patches)
+    && (args.patches as Array<Record<string, unknown>>).some((patch) => /\.ya?ml$/i.test(sanitizeRepoPath(patch.path)));
+  if ((toolName === "applyRepoTextPatch" && /\.ya?ml$/i.test(path)) || patchSetTouchesYaml) {
     return {
       rule_key: "yaml_whole_block_indent_safe_patch",
       mandatory_route: "replace a complete YAML block with explicit relative indentation, then read back the file before dispatch",
       reason: "Partial multiline replacements can inherit first-line indentation and create parser failures.",
     };
   }
+  if (toolName === "runEngineeringRelease") {
+    return {
+      rule_key: "single_exact_sha_release",
+      mandatory_route: "apply one atomic patch set, run one exact-SHA validate-and-deploy workflow, reuse successful receipts, and wait through getEngineeringRelease",
+      reason: "Separate typecheck, test, deploy, and polling loops repeat cold runner setup and validation without improving release confidence.",
+    };
+  }
+  if (toolName === "getEngineeringRelease") {
+    return {
+      rule_key: "bounded_server_side_release_wait",
+      mandatory_route: "wait on the exact release run server-side for up to 55 seconds per call and fetch detailed jobs only at completion",
+      reason: "Chat-side sleep and repeated two-request job polling waste elapsed time and tool calls.",
+    };
+  }
   if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
     return {
       rule_key: "workflow_source_validation_before_dispatch",
-      mandatory_route: "validate changed workflow source before dispatch and poll the exact created run",
-      reason: "Invalid workflow YAML is rejected before a GitHub run exists; repeated dispatches cannot repair source structure.",
+      mandatory_route: "use runEngineeringRelease for normal releases; reserve direct workflow dispatch for isolated diagnostics",
+      reason: "Normal releases must not repeat full validation through separate workflow calls.",
     };
   }
   if (toolName === "verifyDeployedMcpVersion") {
