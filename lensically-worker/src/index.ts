@@ -28889,13 +28889,14 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     return;
   }
 
-  if (cron === THREADS_INSIGHTS_DAILY_WINDOW_CRON) {
+    if (cron === THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON) {
     const scheduledTime = typeof event.scheduledTime === "number" ? event.scheduledTime : Date.now();
-    if (!isDailyInsightsRefreshWindow(scheduledTime)) {
-      logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_SKIPPED", {
+    if (!isSixHourInsightsRefreshWindow(scheduledTime)) {
+      logWorkerEvent("THREADS_SIX_HOUR_INSIGHTS_REFRESH_SKIPPED", {
         cron,
         scheduled_time: new Date(scheduledTime).toISOString(),
         target_time_zone: THREADS_INSIGHTS_TIME_ZONE,
+        target_hours: [...THREADS_INSIGHTS_TARGET_HOURS],
       });
       return;
     }
