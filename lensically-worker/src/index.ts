@@ -15034,8 +15034,172 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ message, sha: existing.sha, branch: config.branch }),
     });
-    await recordEngineeringAudit(env, { action: "deleteRepoFile", filesChanged: [path], diffSummary: `Deleted ${path}.`, result: result.ok ? "ok" : "failed", ownerApproval: approval, metadata: { status: result.status } });
+        await recordEngineeringAudit(env, { action: "deleteRepoFile", filesChanged: [path], diffSummary: `Deleted ${path}.`, result: result.ok ? "ok" : "failed", ownerApproval: approval, metadata: { status: result.status } });
     return { ok: result.ok, status: result.status, path };
+  }
+
+  if (toolName === "runEngineeringRelease") {
+    const workflowId = normalizeOperatorText(args.workflow_id, 160, true) ?? "lensically-engineering.yml";
+    const ref = normalizeOperatorText(args.ref, 160, true) ?? config.branch;
+    const force = args.force === true;
+    const commit = await githubRepoApi(env, `/commits/${encodeURIComponent(ref)}`);
+    const commitData = commit.data && typeof commit.data === "object" && !Array.isArray(commit.data)
+      ? commit.data as Record<string, unknown>
+      : {};
+    const headSha = typeof commitData.sha === "string" ? commitData.sha : null;
+    if (!commit.ok || !headSha) {
+      return { ok: false, error: "release_ref_not_found", status: commit.status, ref };
+    }
+
+    const listRuns = async (): Promise<Array<Record<string, unknown>>> => {
+      const listed = await githubRepoApi(
+        env,
+        `/actions/workflows/${encodeURIComponent(workflowId)}/runs?event=workflow_dispatch&per_page=30`,
+      );
+      if (!listed.ok || !listed.data || typeof listed.data !== "object" || Array.isArray(listed.data)) return [];
+      const runs = (listed.data as Record<string, unknown>).workflow_runs;
+      return Array.isArray(runs) ? runs as Array<Record<string, unknown>> : [];
+    };
+    const isReleaseRun = (run: Record<string, unknown>): boolean => {
+      if (run.head_sha !== headSha) return false;
+      const displayTitle = String(run.display_title ?? "").toLowerCase();
+      return displayTitle.includes("worker-deploy") || displayTitle.includes(headSha.slice(0, 12).toLowerCase());
+    };
+    const compactRun = (run: Record<string, unknown>) => ({
+      id: run.id,
+      name: run.name,
+      display_title: run.display_title,
+      status: run.status,
+      conclusion: run.conclusion,
+      head_sha: run.head_sha,
+      created_at: run.created_at,
+      html_url: run.html_url,
+    });
+
+    const existingRuns = (await listRuns()).filter(isReleaseRun);
+    const reusable = existingRuns.find((run) => run.status === "completed" && run.conclusion === "success");
+    if (reusable && !force) {
+      return {
+        ok: true,
+        reused: true,
+        dispatched: false,
+        exact_sha: headSha,
+        workflow_id: workflowId,
+        run: compactRun(reusable),
+        release_policy: "successful exact-SHA releases are never rerun",
+      };
+    }
+    const active = existingRuns.find((run) => run.status === "queued" || run.status === "in_progress");
+    if (active && !force) {
+      return {
+        ok: true,
+        reused: true,
+        dispatched: false,
+        exact_sha: headSha,
+        workflow_id: workflowId,
+        run: compactRun(active),
+        release_policy: "one active release per exact SHA",
+      };
+    }
+
+    const dispatchedAt = Date.now();
+    const dispatch = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ref,
+        inputs: {
+          task: "worker-deploy",
+          release_id: headSha.slice(0, 12),
+        },
+      }),
+    });
+    if (!dispatch.ok) {
+      await recordEngineeringAudit(env, {
+        action: "runEngineeringRelease",
+        filesChanged: [],
+        diffSummary: `Failed to dispatch exact-SHA release ${headSha}.`,
+        result: "failed",
+        metadata: { status: dispatch.status, workflow_id: workflowId, ref, exact_sha: headSha },
+      });
+      return { ok: false, status: dispatch.status, error: "release_dispatch_failed", workflow_id: workflowId, ref, exact_sha: headSha };
+    }
+
+    let createdRun: Record<string, unknown> | null = null;
+    for (let attempt = 0; attempt < 8 && !createdRun; attempt += 1) {
+      if (attempt > 0) await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      const runs = await listRuns();
+      createdRun = runs.find((run) => {
+        if (!isReleaseRun(run)) return false;
+        const createdAt = Date.parse(String(run.created_at ?? ""));
+        return Number.isFinite(createdAt) && createdAt >= dispatchedAt - 5000;
+      }) ?? null;
+    }
+
+    await recordEngineeringAudit(env, {
+      action: "runEngineeringRelease",
+      filesChanged: [],
+      diffSummary: `Dispatched one validate-and-deploy release for ${headSha}.`,
+      testsRun: [{ workflow_id: workflowId, task: "worker-deploy", exact_sha: headSha }],
+      result: "ok",
+      metadata: { status: dispatch.status, workflow_id: workflowId, ref, exact_sha: headSha, run_id: createdRun?.id ?? null },
+    });
+    return {
+      ok: true,
+      reused: false,
+      dispatched: true,
+      exact_sha: headSha,
+      workflow_id: workflowId,
+      run: createdRun ? compactRun(createdRun) : null,
+      run_discovery_pending: createdRun === null,
+      release_policy: "one full validation and deployment workflow per exact SHA",
+    };
+  }
+
+  if (toolName === "getEngineeringRelease") {
+    const runId = Number(args.run_id);
+    const waitSeconds = Math.min(Math.max(Number(args.wait_seconds ?? 0), 0), 55);
+    if (!Number.isFinite(runId)) {
+      return { ok: false, error: "run_id_required" };
+    }
+    const startedAt = Date.now();
+    let runResult: { ok: boolean; status: number; data: unknown };
+    let runData: Record<string, unknown> = {};
+    do {
+      runResult = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
+      runData = runResult.data && typeof runResult.data === "object" && !Array.isArray(runResult.data)
+        ? runResult.data as Record<string, unknown>
+        : {};
+      if (!runResult.ok || runData.status === "completed" || Date.now() - startedAt >= waitSeconds * 1000) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, 5000));
+    } while (true);
+
+    const waitedSeconds = Math.round((Date.now() - startedAt) / 1000);
+    if (runData.status === "completed") {
+      const detailed = await handleOperatorMcpEngineeringTool(request, env, "getGitHubWorkflowRun", { run_id: runId });
+      return {
+        ...detailed,
+        terminal: true,
+        waited_seconds: waitedSeconds,
+        release_complete: runData.conclusion === "success",
+      };
+    }
+    return {
+      ok: runResult.ok,
+      status: runResult.status,
+      terminal: false,
+      waited_seconds: waitedSeconds,
+      release_complete: false,
+      run: {
+        id: runData.id,
+        name: runData.name,
+        display_title: runData.display_title,
+        status: runData.status,
+        conclusion: runData.conclusion,
+        head_sha: runData.head_sha,
+        html_url: runData.html_url,
+      },
+    };
   }
 
   if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
