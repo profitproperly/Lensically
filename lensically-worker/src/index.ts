@@ -198,8 +198,8 @@ type GptTaggedPostedPost = {
   status: string;
   scheduled_time_utc: string;
   published_at: string | null;
-  local_date?: string | null;
-  follower_day_net_change?: number | null;
+    local_date?: string | null;
+
   strategy: ReturnType<typeof serializeGptPostStrategyTag>;
   post: CachedThreadsPost | null;
 };
@@ -5233,8 +5233,8 @@ function summarizeTaggedPostPerformance(
   posts_with_metrics: number;
   median_engagement_total: number;
   median_likes: number;
-  median_views: number;
-  median_follower_day_net_change: number;
+    median_views: number;
+
 }> {
   const grouped = new Map<string, GptTaggedPostedPost[]>();
   for (const taggedPost of taggedPosts) {
@@ -5256,8 +5256,8 @@ function summarizeTaggedPostPerformance(
         posts_with_metrics: postsWithMetrics.length,
         median_engagement_total: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.engagement_total ?? 0)).toFixed(2)),
         median_likes: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.likes ?? 0)).toFixed(2)),
-        median_views: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.views ?? 0)).toFixed(2)),
-        median_follower_day_net_change: Number(calculateMedian(posts.map((post) => post.follower_day_net_change ?? 0)).toFixed(2)),
+                median_views: Number(calculateMedian(postsWithMetrics.map((post) => post.post?.views ?? 0)).toFixed(2)),
+
       };
     })
     .sort((left, right) => right.posts_with_metrics - left.posts_with_metrics || right.median_engagement_total - left.median_engagement_total || left.key.localeCompare(right.key));
@@ -16191,8 +16191,8 @@ function serializePostedTaggedPostCompact(post: GptTaggedPostedPost): Record<str
     status: post.status,
     scheduled_time_utc: post.scheduled_time_utc,
     published_at: post.published_at,
-    local_date: post.local_date ?? null,
-    follower_day_net_change: post.follower_day_net_change ?? null,
+        local_date: post.local_date ?? null,
+
     strategy: post.strategy,
     post: post.post ? serializeArchivePostCompact(post.post) : null,
   };
@@ -16202,8 +16202,8 @@ type GptRecentInsightsSort =
   | "published_at_desc"
   | "engagement_total_desc"
   | "likes_desc"
-  | "views_desc"
-  | "follower_day_net_change_desc";
+  | "views_desc";
+
 
 type GptRecentInsightRecord = {
   post_id: string;
@@ -16220,9 +16220,9 @@ type GptRecentInsightRecord = {
   reposts: number;
   quote_posts: number;
   shares: number;
-  engagement_total: number;
-  follower_day_net_change: number | null;
+    engagement_total: number;
   strategy: ReturnType<typeof serializeGptPostStrategyTag> | null;
+
   permalink: string | null;
   account_username?: string | null;
   last_synced_at?: string | null;
@@ -16232,9 +16232,9 @@ function normalizeGptRecentInsightsSort(value: string | null | undefined): GptRe
   const normalized = value?.trim().toLowerCase();
   return normalized === "engagement_total_desc"
     || normalized === "likes_desc"
-    || normalized === "views_desc"
-    || normalized === "follower_day_net_change_desc"
+        || normalized === "views_desc"
     || normalized === "published_at_desc"
+
     ? normalized
     : "published_at_desc";
 }
@@ -16274,9 +16274,9 @@ function serializeRecentInsightRecord(
     reposts: insight.reposts,
     quote_posts: insight.quote_posts,
     shares: insight.shares,
-    engagement_total: insight.engagement_total,
-    follower_day_net_change: insight.follower_day_net_change,
+        engagement_total: insight.engagement_total,
     strategy: insight.strategy
+
       ? {
           pillar: insight.strategy.pillar,
           hook_style: insight.strategy.hook_style,
@@ -16474,16 +16474,8 @@ async function listGptRecentInsights(
       .all<GptRecentInsightsRow>();
     recentRows = cachedRows.results ?? [];
   }
-  const followerSnapshots = await listThreadsFollowerSnapshots(env, brand.profile.threads_user_id, Math.max((days ?? 1) + 3, 7));
-  const dailyGrowth = followerSnapshots.map((snapshot, index) => {
-    const previous = index > 0 ? followerSnapshots[index - 1] : null;
-    const netChange = snapshot.baseline_followers_count !== null && snapshot.baseline_followers_count !== undefined
-      ? snapshot.followers_count - snapshot.baseline_followers_count
-      : (previous ? snapshot.followers_count - previous.followers_count : 0);
-    return { date: snapshot.snapshot_date, net_change: netChange };
-  });
-  const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day.net_change]));
-  const nowMs = Date.now();
+    const nowMs = Date.now();
+
   const records: GptRecentInsightRecord[] = recentRows.map((row) => {
     const publishedAt = row.post_timestamp ?? row.scheduled_published_at ?? row.scheduled_time ?? null;
     const publishedMs = publishedAt ? Date.parse(publishedAt) : Number.NaN;
@@ -16511,9 +16503,9 @@ async function listGptRecentInsights(
       reposts: Number(row.reposts ?? 0),
       quote_posts: Number(row.quotes ?? 0),
       shares: Number(row.shares ?? 0),
-      engagement_total: Number(row.engagement_total ?? 0),
-      follower_day_net_change: localDate ? growthByDate.get(localDate) ?? null : null,
+            engagement_total: Number(row.engagement_total ?? 0),
       strategy: hasStrategy ? serializeGptPostStrategyTag({
+
         scheduled_post_id: scheduledPostId,
         account_id: row.tag_account_id ?? brand.account_id,
         threads_user_id: row.tag_threads_user_id ?? brand.profile.threads_user_id,
@@ -16550,8 +16542,7 @@ async function listGptRecentInsights(
         return right.likes - left.likes || right.engagement_total - left.engagement_total || publishedDesc;
       case "views_desc":
         return right.views - left.views || right.engagement_total - left.engagement_total || publishedDesc;
-      case "follower_day_net_change_desc":
-        return (right.follower_day_net_change ?? -999999) - (left.follower_day_net_change ?? -999999) || right.engagement_total - left.engagement_total;
+      
       case "published_at_desc":
       default:
         return publishedDesc || right.engagement_total - left.engagement_total;
@@ -17320,16 +17311,8 @@ async function buildGptRecentPostPerformance(
       captured_at: snapshot.captured_at,
     };
   });
-  const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day]));
-  const taggedPosts = await listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 250);
-  const taggedPostsWithGrowth = taggedPosts.map((taggedPost) => {
-    const localDate = getPostLocalDate({ timestamp: taggedPost.published_at ?? taggedPost.scheduled_time_utc } as Pick<CachedThreadsPost, "timestamp">, THREADS_INSIGHTS_TIME_ZONE);
-    return {
-      ...taggedPost,
-      local_date: localDate,
-      follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
-    };
-  });
+    const taggedPosts = await listPostedGptStrategyTaggedPosts(env, brand.profile.threads_user_id, 250);
+
 
   return {
     success: true,
@@ -17342,8 +17325,9 @@ async function buildGptRecentPostPerformance(
     },
     evaluated_at_utc: new Date(nowMs).toISOString(),
     windows: {
-      last_hours: summarizeGptRecentPerformanceWindow(taggedPostsWithGrowth, nowMs - hours * 60 * 60 * 1000, `last_${hours}_hours`),
-      last_days: summarizeGptRecentPerformanceWindow(taggedPostsWithGrowth, nowMs - days * 24 * 60 * 60 * 1000, `last_${days}_days`),
+            last_hours: summarizeGptRecentPerformanceWindow(taggedPosts, nowMs - hours * 60 * 60 * 1000, `last_${hours}_hours`),
+      last_days: summarizeGptRecentPerformanceWindow(taggedPosts, nowMs - days * 24 * 60 * 60 * 1000, `last_${days}_days`),
+
     },
     follower_growth: {
       timezone: THREADS_INSIGHTS_TIME_ZONE,
@@ -17355,7 +17339,9 @@ async function buildGptRecentPostPerformance(
     guidance: [
       "Use last-hours results as freshness, not final proof.",
       "Use the last-days window for stronger directional learning.",
-      "Compare winners and weak posts by tag, text mechanism, and follower-day movement before proposing rule changes.",
+            "Compare winners and weak posts only through their own age-matched post metrics and evaluator evidence.",
+      "Keep follower totals as separate account-level trajectory data; never attribute them to posts or posting periods.",
+
       "Save durable learnings as rule_proposal, experiment_result, approval_feedback, rejection_feedback, or current_belief only when the evidence supports it.",
     ],
   };
@@ -17413,49 +17399,13 @@ async function buildGptGrowthContext(
     strategy: scheduledTagMap.get(post.id) ?? null,
   }));
   const scheduledTags = Array.from(scheduledTagMap.values());
-  const growthByDate = new Map(dailyGrowth.map((day) => [day.date, day]));
-  const taggedPostResultsWithGrowth = taggedPostResults.map((taggedPost) => {
-    const localDate = getPostLocalDate({ timestamp: taggedPost.published_at ?? taggedPost.scheduled_time_utc } as Pick<CachedThreadsPost, "timestamp">, THREADS_INSIGHTS_TIME_ZONE);
-    return {
-      ...taggedPost,
-      local_date: localDate,
-      follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
-    };
-  });
-
-  const postsByDate = new Map<string, CachedThreadsPost[]>();
-  for (const post of recentArchive.posts) {
-    const localDate = getPostLocalDate(post, THREADS_INSIGHTS_TIME_ZONE);
-    if (!localDate) {
-      continue;
-    }
-    const posts = postsByDate.get(localDate) ?? [];
-    posts.push(post);
-    postsByDate.set(localDate, posts);
-  }
-
-  const growthWindows = dailyGrowth.map((day) => {
-    const posts = postsByDate.get(day.date) ?? [];
-    const previousDate = addDaysToIsoDate(day.date, -1);
-    const adjacentPosts = previousDate ? postsByDate.get(previousDate) ?? [] : [];
-    const candidatePosts = [...posts, ...adjacentPosts]
-      .sort((left, right) => right.engagement_total - left.engagement_total || right.likes - left.likes)
-      .slice(0, 12);
-    return {
-      date: day.date,
-      net_followers: day.net_change,
-      posts_published: posts.length,
-      posts: candidatePosts,
-      likely_drivers: candidatePosts.slice(0, 5),
-    };
-  });
-
-  const bestGrowthDays = [...growthWindows]
-    .sort((left, right) => right.net_followers - left.net_followers || left.date.localeCompare(right.date))
+    const bestGrowthDays = [...dailyGrowth]
+    .sort((left, right) => right.net_change - left.net_change || left.date.localeCompare(right.date))
     .slice(0, 7);
-  const weakGrowthDays = [...growthWindows]
-    .sort((left, right) => left.net_followers - right.net_followers || left.date.localeCompare(right.date))
+  const weakGrowthDays = [...dailyGrowth]
+    .sort((left, right) => left.net_change - right.net_change || left.date.localeCompare(right.date))
     .slice(0, 7);
+
 
   const recentPostsForFloor = recentArchive.posts.slice(0, 50);
   const likes = recentPostsForFloor.map((post) => post.likes);
@@ -17469,12 +17419,11 @@ async function buildGptGrowthContext(
     ? netChanges.reduce((sum, value) => sum + value, 0) / netChanges.length
     : 0;
 
-  const compactGrowthWindow = (window: typeof growthWindows[number]) => ({
-    date: window.date,
-    net_followers: window.net_followers,
-    posts_published: window.posts_published,
-    likely_drivers: window.likely_drivers.slice(0, 5).map(serializeArchivePostCompact),
+    const compactGrowthDay = (day: typeof dailyGrowth[number]) => ({
+    date: day.date,
+    net_followers: day.net_change,
   });
+
 
   return {
     success: true,
@@ -17499,13 +17448,14 @@ async function buildGptGrowthContext(
       current: currentFollowers ?? dailyGrowth[dailyGrowth.length - 1]?.latest_followers ?? null,
       net_change_period: netChangePeriod,
       avg_daily_growth: Number(averageDailyGrowth.toFixed(2)),
-      best_growth_days: bestGrowthDays.map((day) => ({ date: day.date, net_followers: day.net_followers })),
-      weak_growth_days: weakGrowthDays.map((day) => ({ date: day.date, net_followers: day.net_followers })),
+            best_growth_days: bestGrowthDays.map(compactGrowthDay),
+      weak_growth_days: weakGrowthDays.map(compactGrowthDay),
+      attribution_policy: "Account follower changes are trajectory data only and are not linked to posts, days of posts, batches, or periods of posts.",
     },
     daily_growth: dailyGrowth,
-    growth_windows: includeDetail ? growthWindows : growthWindows.map(compactGrowthWindow),
-    top_growth_windows: includeDetail ? bestGrowthDays : bestGrowthDays.map(compactGrowthWindow),
-    weak_growth_windows: includeDetail ? weakGrowthDays : weakGrowthDays.map(compactGrowthWindow),
+    top_growth_windows: bestGrowthDays.map(compactGrowthDay),
+    weak_growth_windows: weakGrowthDays.map(compactGrowthDay),
+
     engagement_floor: {
       sample_size: recentPostsForFloor.length,
       median_likes: Number(calculateMedian(likes).toFixed(2)),
@@ -17530,25 +17480,28 @@ async function buildGptGrowthContext(
       experiments: summarizeTagUsage(scheduledTags, "experiment"),
       novelty_levels: summarizeTagUsage(scheduledTags, "novelty_level"),
     },
-    tagged_post_results: includeDetail
-      ? taggedPostResultsWithGrowth
-      : taggedPostResultsWithGrowth.slice(0, 60).map(serializePostedTaggedPostCompact),
+        tagged_post_results: includeDetail
+      ? taggedPostResults
+      : taggedPostResults.slice(0, 60).map(serializePostedTaggedPostCompact),
     tag_performance: {
-      pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
-      hook_styles: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "hook_style"),
-      formats: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "format"),
-      intents: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "intent"),
-      experiments: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "experiment"),
-      novelty_levels: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "novelty_level"),
+      pillars: summarizeTaggedPostPerformance(taggedPostResults, "pillar"),
+      hook_styles: summarizeTaggedPostPerformance(taggedPostResults, "hook_style"),
+      formats: summarizeTaggedPostPerformance(taggedPostResults, "format"),
+      intents: summarizeTaggedPostPerformance(taggedPostResults, "intent"),
+      experiments: summarizeTaggedPostPerformance(taggedPostResults, "experiment"),
+      novelty_levels: summarizeTaggedPostPerformance(taggedPostResults, "novelty_level"),
     },
+
     strategy_memory: includeDetail ? strategyMemory : strategyMemory.map((memory) => serializeGptStrategyMemoryCompact(memory)),
     experiment_summary: buildGptExperimentSummary(strategyMemory),
-    growth_rules: [
-      "Separate engagement winners from follower-growth winners.",
-      "Prioritize posts that raise the engagement floor and create qualified follower growth.",
-      "When evidence is thin, propose an experiment instead of a rule.",
-      "When evidence is strong, propose a rule change with specific supporting data.",
+        growth_rules: [
+      "Evaluate posts only through their own maturity-normalized reach, resonance, propagation, and conversation evidence.",
+      "Track follower count separately as account-level progress toward the growth objective.",
+      "Never infer which post, posting day, batch, or period produced follower growth.",
+      "When evidence is thin, propose a controlled experiment instead of a rule.",
+      "When evidence is strong, propose a rule change with specific supporting post-metric data.",
     ],
+
   };
 }
 
