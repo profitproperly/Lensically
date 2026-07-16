@@ -31435,6 +31435,113 @@ async function executeScheduledPostSchedulerTrigger(
   return payload ?? { ok: true };
 }
 
+function approvedScheduledPostCanaryId(decision: Record<string, unknown>): number | null {
+  const evidence = safeParseJsonString(String(decision.evidence_json ?? "[]"));
+  if (Array.isArray(evidence)) {
+    for (const item of evidence) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+      const scheduledPostId = Math.trunc(Number((item as Record<string, unknown>).scheduled_post_id));
+      if (Number.isInteger(scheduledPostId) && scheduledPostId > 0) return scheduledPostId;
+    }
+  }
+  const combined = [decision.title, decision.decision_text, decision.execution_plan]
+    .map((value) => String(value ?? ""))
+    .join(" ");
+  const match = combined.match(/(?:scheduled\s+)?post\s+#?(\d+)/i);
+  const scheduledPostId = match?.[1] ? Number(match[1]) : NaN;
+  return Number.isInteger(scheduledPostId) && scheduledPostId > 0 ? scheduledPostId : null;
+}
+
+export async function activateNextApprovedScheduledPostCanary(env: Env): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  await ensureScheduledPostsTable(env);
+  const decisions = await env.DB.prepare(
+    `SELECT * FROM operator_decision_proposals
+     WHERE brand_key = 'manifest_mental' AND status = 'approved'
+     ORDER BY datetime(approved_at) ASC, datetime(created_at) ASC
+     LIMIT 10`,
+  ).all<Record<string, unknown>>();
+
+  for (const decision of decisions.results ?? []) {
+    const authorizedTools = safeParseJsonString(String(decision.authorized_tools_json ?? "[]"));
+    if (!Array.isArray(authorizedTools) || !authorizedTools.map(String).includes("setScheduledPostSchedulerMode")) continue;
+    const decisionId = String(decision.id ?? "");
+    if (!decisionId) continue;
+    const prior = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_decision_execution_events
+       WHERE decision_id = ? AND tool_name = 'setScheduledPostSchedulerMode'
+         AND status IN ('started', 'completed')`,
+    ).bind(decisionId).first<{ total: number }>();
+    if (Number(prior?.total ?? 0) > 0) continue;
+
+    const scheduledPostId = approvedScheduledPostCanaryId(decision);
+    if (!scheduledPostId) continue;
+    const scheduledPost = await env.DB.prepare(
+      `SELECT id, status, published_post_id FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(scheduledPostId).first<{ id: number; status: string; published_post_id: string | null }>();
+    if (!scheduledPost || scheduledPost.status !== SCHEDULED_POST_STATUS_APPROVED || scheduledPost.published_post_id) continue;
+
+    const eventId = crypto.randomUUID();
+    const fingerprint = await operatorExecutionFingerprint("setScheduledPostSchedulerMode", {
+      brand_key: "manifest_mental",
+      mode: "canary",
+      scheduled_post_id: scheduledPostId,
+      decision_id: decisionId,
+    });
+    await env.DB.prepare(
+      `UPDATE operator_decision_proposals
+       SET status = 'executing', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = 'approved'`,
+    ).bind(decisionId).run();
+    await env.DB.prepare(
+      `INSERT INTO operator_decision_execution_events (
+        id, decision_id, brand_key, tool_name, operation_id, request_fingerprint, status
+      ) VALUES (?, ?, 'manifest_mental', 'setScheduledPostSchedulerMode', ?, ?, 'started')`,
+    ).bind(eventId, decisionId, `approved-canary:${scheduledPostId}`, fingerprint).run();
+
+    try {
+      const scheduler = await setScheduledPostSchedulerControl(env, {
+        mode: "canary",
+        allowedPostIds: [scheduledPostId],
+        reason: `Approved decision ${decisionId}: one-post delivery canary`,
+      });
+      await env.DB.prepare(
+        `UPDATE operator_decision_execution_events
+         SET status = 'completed', result_summary = ?, completed_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(JSON.stringify({ ok: true, scheduled_post_id: scheduledPostId }), eventId).run();
+      await env.DB.prepare(
+        `UPDATE operator_decision_proposals
+         SET status = 'executed', outcome_summary = ?, result_evidence_json = ?,
+             executed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(
+        `Activated the approved one-post canary for scheduled post ${scheduledPostId}.`,
+        JSON.stringify([{ scheduled_post_id: scheduledPostId, scheduler }]),
+        decisionId,
+      ).run();
+      logWorkerEvent("APPROVED_SCHEDULED_POST_CANARY_ACTIVATED", {
+        decision_id: decisionId,
+        scheduled_post_id: scheduledPostId,
+      });
+      return { activated: true, decision_id: decisionId, scheduled_post_id: scheduledPostId, scheduler };
+    } catch (error) {
+      await env.DB.prepare(
+        `UPDATE operator_decision_execution_events
+         SET status = 'failed', result_summary = ?, completed_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(JSON.stringify({ ok: false, error: getErrorMessage(error) }), eventId).run();
+      await env.DB.prepare(
+        `UPDATE operator_decision_proposals
+         SET status = 'revision_required', revision_request = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(`Automatic canary activation failed: ${getErrorMessage(error)}`, decisionId).run();
+      throw error;
+    }
+  }
+  return { activated: false };
+}
+
 async function handleScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
   const cron = event.cron?.trim() ?? "";
   logWorkerEvent("SCHEDULED_CRON_TRIGGERED", {
