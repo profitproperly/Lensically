@@ -2035,9 +2035,8 @@ describe("operator mode MCP endpoint", () => {
       executed_tool: string;
       result: { ok: boolean; open_slots: string[] };
     }>("listMcpTools", {
-      execute_tool: "get_hourly_coverage",
+      execute_tool: "mm_get_hourly_coverage",
       arguments: {
-        brand_key: "manifest_mental",
         proceed_confirmed: true,
         timezone: "America/New_York",
         horizon_days: 3,
