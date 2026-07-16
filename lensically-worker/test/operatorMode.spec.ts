@@ -2732,10 +2732,9 @@ describe("operator mode MCP endpoint", () => {
       name: "edit_scheduled_post",
       arguments: {
         brand_key: BRAND_KEY,
-        scheduled_post_id: scheduled.scheduled_post_id,
+                scheduled_post_id: scheduled.scheduled_post_id,
         retry_now: true,
         proceed_confirmed: true,
-        continuity_loaded: true,
       },
     });
     expect(futureRetry.isError).toBe(true);
