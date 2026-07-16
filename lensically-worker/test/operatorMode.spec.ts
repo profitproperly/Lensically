@@ -25,7 +25,6 @@ type CanonicalBrandKey = typeof ALL_BRAND_KEYS[number];
 
 let mcpSelectedKey: CanonicalBrandKey | null = null;
 let mcpProceedConfirmed = false;
-let mcpContinuityLoaded = false;
 
 
 
