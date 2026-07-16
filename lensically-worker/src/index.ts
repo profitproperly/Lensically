@@ -14791,16 +14791,28 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         "attach_manifest_review_draft",
         "schedule_manifest_review_batch",
         "get_performance_learning",
-        "markOperatorDecisionExecuted",
         "edit_scheduled_post",
       ]);
-      if (clientCapAccountBridgeTools.has(executeTool)) {
-        const definition = (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === executeTool);
+      const scopedClientCapMatch = executeTool.match(/^(mm|om|vx)_(.+)$/);
+      const canonicalClientCapTool = scopedClientCapMatch?.[2] ?? executeTool;
+      const scopedClientCapBrand = scopedClientCapMatch?.[1] === "mm"
+        ? "manifest_mental"
+        : scopedClientCapMatch?.[1] === "om"
+          ? "opmg_deadman"
+          : scopedClientCapMatch?.[1] === "vx"
+            ? "vectrix"
+            : null;
+      if (clientCapAccountBridgeTools.has(canonicalClientCapTool)) {
+        const definition = (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === canonicalClientCapTool);
         if (!definition) {
-          return { ok: false, error: "client_cap_bridge_tool_not_found", requested_tool: executeTool };
+          return { ok: false, error: "client_cap_bridge_tool_not_found", requested_tool: executeTool, canonical_tool: canonicalClientCapTool };
         }
+        const clientCapArgs = {
+          ...bridgeArgs,
+          ...(scopedClientCapBrand ? { brand_key: scopedClientCapBrand } : {}),
+        };
         const normalized = normalizeOperatorGuardValue(
-          bridgeArgs,
+          clientCapArgs,
           definition.inputSchema as Record<string, unknown>,
         );
         const normalizedBridgeArgs = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
@@ -14811,19 +14823,20 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
             ok: false,
             error: "client_cap_bridge_payload_invalid",
             requested_tool: executeTool,
+            canonical_tool: canonicalClientCapTool,
             normalized_arguments: normalizedBridgeArgs,
             corrections: normalized.corrections,
             validation_errors: normalized.errors,
           };
         }
-        const result = executeTool === "markOperatorDecisionExecuted"
-          ? await handleOperatorMcpAdminTool(request, env, executeTool, normalizedBridgeArgs)
-          : await callOperatorToolForMcp(request, env, executeTool, normalizedBridgeArgs);
+        const result = await callOperatorToolForMcp(request, env, canonicalClientCapTool, normalizedBridgeArgs);
         return {
           ok: result.ok !== false,
           bridge_tool: "listMcpTools",
           bridge_mode: "strict_client_cap_allowlist",
           executed_tool: executeTool,
+          canonical_executed_tool: canonicalClientCapTool,
+          scoped_brand_key: scopedClientCapBrand,
           normalized_arguments: normalizedBridgeArgs,
           corrections: normalized.corrections,
           result,
