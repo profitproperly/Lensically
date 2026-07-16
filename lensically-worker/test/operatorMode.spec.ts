@@ -1,6 +1,11 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import worker, { ScheduledPostScheduler, shouldAutoArmScheduledPostAlarm } from "../src";
+import worker, {
+  ScheduledPostScheduler,
+  evaluateThreadsPostMetricsForLearning,
+  isSixHourInsightsRefreshWindow,
+  shouldAutoArmScheduledPostAlarm,
+} from "../src";
 
 const AUTH_HEADERS = {
   Authorization: "Bearer test-gpt-key",
