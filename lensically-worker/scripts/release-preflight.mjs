@@ -30,8 +30,12 @@ if (!version) {
   errors.push("operator_mcp_version_missing");
 }
 
-const assertionPattern = /(?:runtime\.mcp_version|serverInfo\.version|payload\.mcp_version\)\.toBe)\(?"([0-9]+\.[0-9]+\.[0-9]+)"\)?/g;
-const assertedVersions = [...tests.matchAll(assertionPattern)].map((match) => match[1]);
+const versionAssertionLines = tests
+  .split(/\r?\n/)
+  .filter((line) => /runtime\.mcp_version|serverInfo\.version|payload\.mcp_version/.test(line));
+const assertedVersions = versionAssertionLines
+  .map((line) => line.match(/\.toBe\("([0-9]+\.[0-9]+\.[0-9]+)"\)/)?.[1] ?? null)
+  .filter((value) => value !== null);
 if (assertedVersions.length < 3) {
   errors.push(`operator_version_assertions_incomplete:${assertedVersions.length}`);
 } else if (version && assertedVersions.some((asserted) => asserted !== version)) {
