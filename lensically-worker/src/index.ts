@@ -14124,10 +14124,10 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     const category = normalizeOperatorDecisionCategory(args.category);
     const title = normalizeOperatorText(args.title, 300);
     const decisionText = normalizeOperatorText(args.decision, 8000);
-    const rationale = normalizeOperatorText(args.rationale, 12000);
-    const expectedOutcome = normalizeOperatorText(args.expected_outcome, 6000);
-    const reversibility = normalizeOperatorText(args.reversibility, 3000);
-    const executionPlan = normalizeOperatorText(args.execution_plan, 12000);
+        const rationale = normalizeOperatorText(args.rationale, 1600, true) ?? `Protected decision requiring owner approval: ${decisionText ?? title ?? "decision"}`;
+    const expectedOutcome = normalizeOperatorText(args.expected_outcome, 1000, true) ?? "Execute the approved protected action within its authorized scope.";
+    const reversibility = normalizeOperatorText(args.reversibility, 600, true) ?? "No reversibility claim supplied; treat the action as protected until the owner decides.";
+    const executionPlan = normalizeOperatorText(args.execution_plan, 1200, true) ?? "After owner approval, execute only the authorized tools and record the outcome.";
     const availableTools = new Set((await buildOperatorMcpTools(env, true, false)).map((tool) => tool.name));
     const requestedTools = Array.isArray(args.authorized_tools)
       ? args.authorized_tools.map((tool) => normalizeOperatorText(tool, 160, true)).filter((tool): tool is string => Boolean(tool))
