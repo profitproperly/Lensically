@@ -2028,6 +2028,55 @@ describe("operator mode MCP endpoint", () => {
     expect(allowed.structuredContent.ok).toBe(true);
   }, 30000);
 
+  it("uses a strict schema-validated allowlist when the current chat cached a capped account surface", async () => {
+    await ensureMcpAccountOpen("manifest_mental");
+    const coverage = await mcpToolRaw<{
+      bridge_mode: string;
+      executed_tool: string;
+      result: { ok: boolean; open_slots: string[] };
+    }>("listMcpTools", {
+      execute_tool: "get_hourly_coverage",
+      arguments: {
+        brand_key: "manifest_mental",
+        proceed_confirmed: true,
+        timezone: "America/New_York",
+        horizon_days: 3,
+      },
+    });
+    expect(coverage.isError).not.toBe(true);
+    expect(coverage.structuredContent).toMatchObject({
+      bridge_mode: "strict_client_cap_allowlist",
+      executed_tool: "get_hourly_coverage",
+    });
+    expect(coverage.structuredContent.result.ok).toBe(true);
+    expect(Array.isArray(coverage.structuredContent.result.open_slots)).toBe(true);
+
+    const invalid = await mcpToolRaw<{ error: string; validation_errors: Array<{ path: string; error: string }> }>("listMcpTools", {
+      execute_tool: "get_hourly_coverage",
+      arguments: {
+        brand_key: "manifest_mental",
+        proceed_confirmed: true,
+        unexpected: true,
+      },
+    });
+    expect(invalid.isError).toBe(true);
+    expect(invalid.structuredContent.error).toBe("client_cap_bridge_payload_invalid");
+    expect(invalid.structuredContent.validation_errors).toContainEqual({
+      path: "$.unexpected",
+      error: "additional_property_forbidden",
+    });
+
+    const forbidden = await mcpToolRaw<{ error: string }>("listMcpTools", {
+      execute_tool: "create_source_card",
+      arguments: {
+        brand_key: "manifest_mental",
+        proceed_confirmed: true,
+      },
+    });
+    expect(forbidden.isError).toBe(true);
+    expect(forbidden.structuredContent.error).toBe("direct_typed_tool_required");
+  }, 30000);
+
   it("server-blocks selected account context until explicit proceed", async () => {
     await mcpRequest("initialize", {
       protocolVersion: "2025-06-18",
