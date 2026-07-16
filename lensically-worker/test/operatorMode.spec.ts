@@ -1563,7 +1563,7 @@ describe("operator mode MCP endpoint", () => {
                     expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
     expect(initialized.instructions).toContain("automatically restores canonical persisted schedule");
     expect(initialized.instructions).toContain("Never ask resume or start fresh");
-    expect(initialized.instructions).toContain("continuity_loaded=true");
+        expect(initialized.instructions).toContain("verifies continuity from server-side state");
         expect(initialized.instructions).toContain("Pre-execution policy v2 is mandatory and automatic");
     expect(initialized.instructions).toContain("Use one currently callable surface for the canonical handler");
     expect(initialized.instructions).toContain("Source cards are backend-only during Manifest calendar production");
