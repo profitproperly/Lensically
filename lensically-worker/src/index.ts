@@ -14458,9 +14458,8 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       const result = await response.json().catch(() => ({ ok: false, error: "bridge_response_parse_failed" }));
       return { ok: response.ok && (result as Record<string, unknown>).ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
     }
-        const tools = await buildOperatorMcpTools(env, args.include_disabled === true, false);
+    const tools = await buildOperatorMcpTools(env, false, false);
     const compactTools = tools.map((tool) => {
-      const runtimeConfig = (tool as unknown as Record<string, unknown>).runtime_config as Record<string, unknown> | undefined;
       const requiredFields = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
         ? ((tool.inputSchema as Record<string, unknown>).required as unknown[]).map(String)
         : [];
@@ -14469,10 +14468,36 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         title: tool.title,
         description: tool.description,
         required_fields: requiredFields,
-        disabled: runtimeConfig?.disabled === true,
+        disabled: false,
       };
     });
-    return { ok: true, tools: compactTools }; 
+    if (args.include_disabled === true) {
+      const activeNames = new Set(compactTools.map((tool) => tool.name));
+      const baseByName = new Map(buildOperatorMcpBaseTools(false).map((tool) => [tool.name, tool]));
+      const overrides = await listOperatorMcpOverrides(env).catch(() => [] as Array<Record<string, unknown>>);
+      for (const override of overrides) {
+        if (Number(override.disabled ?? 0) !== 1) continue;
+        const name = String(override.tool_name ?? "");
+        if (!name || activeNames.has(name)) continue;
+        const base = baseByName.get(name);
+        const schemaPatch = safeParseJsonString(String(override.schema_patch_json ?? "null"));
+        const patchRequired = schemaPatch && typeof schemaPatch === "object" && !Array.isArray(schemaPatch)
+          && Array.isArray((schemaPatch as Record<string, unknown>).required)
+          ? ((schemaPatch as Record<string, unknown>).required as unknown[]).map(String)
+          : [];
+        const baseRequired = base && Array.isArray((base.inputSchema as Record<string, unknown>).required)
+          ? ((base.inputSchema as Record<string, unknown>).required as unknown[]).map(String)
+          : [];
+        compactTools.push({
+          name,
+          title: base?.title ?? name,
+          description: String(override.description_override ?? base?.description ?? `Runtime configured tool ${name}.`),
+          required_fields: patchRequired.length ? patchRequired : baseRequired,
+          disabled: true,
+        });
+      }
+    }
+    return { ok: true, tools: compactTools };
   }
 
   if (toolName === "runEngineeringTool") {
