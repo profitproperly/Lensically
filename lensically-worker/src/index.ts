@@ -15007,7 +15007,9 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
 }
 
 async function handleOperatorMcpEngineeringTool(request: Request, env: Env, toolName: OperatorMcpEngineeringToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  await prepareOperatorMode(env);
+  if (toolName !== "guardLensicallyCall") {
+    await prepareOperatorMode(env);
+  }
   const config = githubRepoConfig(env);
 
   if (toolName === "getEngineeringAccessState") {
