@@ -9453,7 +9453,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          AND c.status = 'approved' AND d.status = 'approved'
        ORDER BY c.review_item_number ASC`,
         ).bind(brand.account_id, resolvedReviewBatchId, brand.brand_key).all<Record<string, unknown>>();
-    const eligibleClaims = (claims.results ?? []).filter((claim) => !requestedNumbers || requestedNumbers.has(Number(claim.review_item_number)));
+    const eligibleClaimsAll = (claims.results ?? []).filter((claim) => !requestedNumbers || requestedNumbers.has(Number(claim.review_item_number)));
+    const eligibleClaims = eligibleClaimsAll.slice(0, 1);
     if (openSlots.length < eligibleClaims.length) {
       return operatorJsonResponse({ success: false, error: "insufficient_open_hourly_slots", open_slots: openSlots, approved_items: eligibleClaims.length }, 409);
     }
