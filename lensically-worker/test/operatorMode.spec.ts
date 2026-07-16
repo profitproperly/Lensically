@@ -2139,9 +2139,31 @@ describe("operator mode MCP endpoint", () => {
       intended_tool: "searchRepoFiles",
       arguments_json: JSON.stringify({ query: "x-openai-subject", prefix: "lensically-worker/src/index.ts", limit: 20 }),
     });
-    expect(sensitive.isError).toBe(true);
+        expect(sensitive.isError).toBe(true);
     expect(sensitive.structuredContent.error).toBe("known_blocker_prevented");
     expect(sensitive.structuredContent.required_route).toContain("neutral function-name search");
+
+    const releaseBridge = await mcpToolCallRaw<{ error: string; required_route: string; blocker_key: string }>("guardLensicallyCall", {
+      intended_tool: "runEngineeringTool",
+      arguments_json: JSON.stringify({
+        tool_name: "runEngineeringRelease",
+        arguments: { ref: "abc123" },
+      }),
+    });
+    expect(releaseBridge.isError).toBe(true);
+    expect(releaseBridge.structuredContent).toMatchObject({
+      error: "known_blocker_prevented",
+      blocker_key: "release_bridge_client_preflight",
+    });
+    expect(releaseBridge.structuredContent.required_route).toContain("runEngineeringRelease directly");
+
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
+    expect(listed.tools.slice(0, 4).map((tool) => tool.name)).toEqual([
+      "getOperatorStartupContext",
+      "guardLensicallyCall",
+      "runEngineeringRelease",
+      "getEngineeringRelease",
+    ]);
   }, 30000);
 
   it("replays interrupted workflow-session creation without duplicates", async () => {
