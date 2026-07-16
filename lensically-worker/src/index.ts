@@ -11595,8 +11595,9 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
     "proposeOperatorDecision",
   "resolveOperatorDecision",
   "markOperatorDecisionExecuted",
-  "getScheduledPostSchedulerState",
+    "getScheduledPostSchedulerState",
   "setScheduledPostSchedulerMode",
+  "runApprovedPostCanary",
   "auditScheduledPost",
 
   "inspectMcpFailure",
