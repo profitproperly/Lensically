@@ -15058,7 +15058,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     const normalizedArguments = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
       ? normalized.value as Record<string, unknown>
       : {};
-    if (normalized.errors.length) {
+        if (normalized.errors.length) {
       return {
         ok: false,
         error: "execution_guard_payload_invalid",
@@ -15066,6 +15066,23 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         normalized_arguments: normalizedArguments,
         corrections: normalized.corrections,
         validation_errors: normalized.errors,
+      };
+    }
+    const nestedBridgeTool = intendedTool === "runEngineeringTool"
+      ? normalizeOperatorText(normalizedArguments.tool_name, 160, true)
+      : intendedTool === "listMcpTools"
+        ? normalizeOperatorText(normalizedArguments.execute_tool, 160, true)
+        : null;
+    if (nestedBridgeTool === "runEngineeringRelease" || nestedBridgeTool === "getEngineeringRelease") {
+      return {
+        ok: false,
+        error: "known_blocker_prevented",
+        intended_tool: intendedTool,
+        normalized_arguments: normalizedArguments,
+        corrections: normalized.corrections,
+        required_route: `call ${nestedBridgeTool} directly through its compact typed schema`,
+        suggested_tools: [nestedBridgeTool],
+        blocker_key: "release_bridge_client_preflight",
       };
     }
     const policy = buildOperatorExecutionPolicy(intendedTool, normalizedArguments);
