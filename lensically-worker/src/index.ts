@@ -13152,6 +13152,7 @@ async function getKnownAliasRetryBlock(
   policy: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
   if (policy.route_is_alias !== true) return null;
+  await ensureOperatorExecutionEventsTable(env);
   const fingerprint = await operatorExecutionFingerprint(toolName, args);
   let prior: Record<string, unknown> | null = null;
   try {
