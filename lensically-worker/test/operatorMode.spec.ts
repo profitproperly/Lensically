@@ -89,9 +89,8 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
     const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey }>("selectOperatorKey", { brand_key: brandKey });
     expect(selected.isError).not.toBe(true);
     expect(selected.structuredContent.selected_key).toBe(brandKey);
-    mcpSelectedKey = brandKey;
+        mcpSelectedKey = brandKey;
     mcpProceedConfirmed = false;
-    mcpContinuityLoaded = false;
   }
     if (!mcpProceedConfirmed) {
     const proceeded = await mcpToolRaw<{ proceeded: boolean; continuity_loaded: boolean; continuation_choice_required: boolean; continuity_capsule: { brand_key: string }; account_data_loaded: boolean }>("confirmOperatorProceed", { brand_key: brandKey });
