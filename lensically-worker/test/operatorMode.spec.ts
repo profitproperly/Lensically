@@ -2478,18 +2478,28 @@ describe("operator mode MCP endpoint", () => {
       });
     }
 
-    const scheduled = await operatorTool<{
-      results: Array<{ item_number: number; success: boolean; scheduled_post_id?: number }>;
-      review_batch: { status: string; items: Array<{ item_number: number; status: string; scheduled_post_id: number | null }> };
-    }>("schedule_manifest_review_batch", {
-      brand_key: "manifest_mental",
-      review_batch_id: batch.review_batch_id,
-      item_numbers: [1, 2, 3, 4],
-    });
-    expect(scheduled.results).toHaveLength(4);
-    expect(scheduled.results.every((result) => result.success && Number(result.scheduled_post_id ?? 0) > 0)).toBe(true);
-    expect(scheduled.review_batch.status).toBe("completed");
-    expect(scheduled.review_batch.items.every((item) => item.status === "scheduled" && Number(item.scheduled_post_id ?? 0) > 0)).toBe(true);
+    const scheduledResults: Array<{ item_number: number; success: boolean; scheduled_post_id?: number }> = [];
+    let scheduledReviewBatch: { status: string; items: Array<{ item_number: number; status: string; scheduled_post_id: number | null }> } | null = null;
+    for (const itemNumber of [1, 2, 3, 4]) {
+      const scheduled = await operatorTool<{
+        results: Array<{ item_number: number; success: boolean; scheduled_post_id?: number }>;
+        invocation_item_limit: number;
+        continuation_required: boolean;
+        review_batch: { status: string; items: Array<{ item_number: number; status: string; scheduled_post_id: number | null }> };
+      }>("schedule_manifest_review_batch", {
+        brand_key: "manifest_mental",
+        review_batch_id: batch.review_batch_id,
+        item_numbers: [itemNumber],
+      });
+      expect(scheduled.invocation_item_limit).toBe(1);
+      expect(scheduled.results).toHaveLength(1);
+      scheduledResults.push(...scheduled.results);
+      scheduledReviewBatch = scheduled.review_batch;
+    }
+    expect(scheduledResults).toHaveLength(4);
+    expect(scheduledResults.every((result) => result.success && Number(result.scheduled_post_id ?? 0) > 0)).toBe(true);
+    expect(scheduledReviewBatch?.status).toBe("completed");
+    expect(scheduledReviewBatch?.items.every((item) => item.status === "scheduled" && Number(item.scheduled_post_id ?? 0) > 0)).toBe(true);
 
     await env.DB.prepare(
       `UPDATE operator_review_batches SET status = 'owner_review' WHERE id = ?`,
