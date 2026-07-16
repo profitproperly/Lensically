@@ -15462,10 +15462,9 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     });
     const coverage = await callLiveMcp(7, "tools/call", {
       name: "get_hourly_coverage",
-      arguments: {
+            arguments: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
-        continuity_loaded: true,
         timezone: "America/New_York",
       },
     });
