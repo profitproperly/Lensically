@@ -2582,6 +2582,7 @@ describe("operator mode MCP endpoint", () => {
       expect(toolNames).not.toContain(name);
     }
 
+        await ensureMcpAccountOpen("manifest_mental");
     const blockedBridge = await mcpToolRaw<{ error: string; bridge_scope: string }>("listMcpTools", {
       execute_tool: "mm_get_account_state",
       arguments: { proceed_confirmed: true },
