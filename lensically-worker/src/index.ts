@@ -13163,7 +13163,7 @@ async function recordOperatorExecutionDecision(
     ...policy,
     canonical_fingerprint: await operatorExecutionFingerprint(toolName, args),
   };
-  await env.DB.prepare(
+  const insertExecutionEvent = () => env.DB.prepare(
     `INSERT INTO operator_execution_events (
       id, brand_key, workflow_session_id, tool_name, operation_class, execution_plane,
       policy_version, decision, known_failure_prevented, evidence_json
@@ -13180,6 +13180,15 @@ async function recordOperatorExecutionDecision(
     policy.known_failure_prevented === true ? 1 : 0,
     normalizeOperatorJson(evidence, {}),
   ).run();
+  try {
+    await insertExecutionEvent();
+  } catch (error) {
+    if (!getErrorMessage(error).includes("no such table: operator_execution_events")) {
+      throw error;
+    }
+    await ensureOperatorMcpAdminTables(env);
+    await insertExecutionEvent();
+  }
 }
 
 function operatorToolMutatesState(toolName: string): boolean {
