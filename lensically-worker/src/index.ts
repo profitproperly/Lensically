@@ -11373,8 +11373,8 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "listMcpTools",
     title: "List MCP tools",
-    description: "List active Lensically MCP tools. If direct tools are not exposed by ChatGPT, pass execute_tool and arguments to bridge-call engineering tools or safe operator wrapper tools.",
-    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" }, execute_tool: { type: "string", description: "Optional tool name to execute through this already-callable admin tool." }, arguments: { type: "object", additionalProperties: true, description: "Arguments for execute_tool." } }, additionalProperties: false },
+        description: "List active Lensically MCP tools. execute_tool is restricted to source-defined engineering and admin handlers when their direct schema is unavailable. Account workflow tools must be called directly through their typed schemas.",
+    inputSchema: { type: "object", properties: { include_disabled: { type: "boolean" }, execute_tool: { type: "string", description: "Optional source-defined engineering or admin tool name." }, arguments: { type: "object", additionalProperties: true, description: "Compact arguments for an engineering or admin execute_tool only." } }, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
