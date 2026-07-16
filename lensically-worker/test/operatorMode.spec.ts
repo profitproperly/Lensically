@@ -1806,13 +1806,13 @@ describe("operator mode MCP endpoint", () => {
     }>("getOperatorStartupContext");
         expect(direct.bootstrap_version).toBe("operator-startup-v3");
         expect(direct.collaboration_contract.version).toBe("operator-collaboration-v1");
-        expect(direct.autonomy_contract.version).toBe("operator-autonomy-governance-v2");
+                expect(direct.autonomy_contract.version).toBe("operator-autonomy-governance-v3");
     expect(direct.autonomy_contract.infrastructure_scope).toBe("universal");
     expect(direct.autonomy_contract.active_account_scope).toBe("manifest_mental");
-    expect(direct.autonomy_contract.active_mode).toBe("ai_led_owner_ratified");
+    expect(direct.autonomy_contract.active_mode).toBe("autonomous_operator");
     expect(direct.autonomy_contract.objective).toContain("1,000,000 followers");
-    expect(direct.autonomy_contract.model_role).toContain("routine engineering execution");
-    expect(direct.autonomy_contract.approval_policy).toContain("routine engineering are autonomous");
+    expect(direct.autonomy_contract.model_role).toContain("content decisions");
+    expect(direct.autonomy_contract.approval_policy).toContain("Routine Manifest account operations");
     expect(direct.engineering_authority_contract).toMatchObject({
       version: "operator-engineering-authority-v1",
       scope: "universal_engineering",
@@ -1912,7 +1912,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.12.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.13.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("mandatory known_path");
@@ -2417,123 +2417,82 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(decisionEvents?.total ?? 0)).toBe(0);
   }, 30000);
 
-    it("requires an approved model decision for governed Manifest mutations and enforces its tool budget", async () => {
+      it("runs routine Manifest mutations autonomously while preserving protected operations", async () => {
     await ensureMcpAccountOpen("manifest_mental");
 
-    const blocked = await mcpToolRaw<{
-      error: string;
-      required_next_tool: string;
-      governed: boolean;
+    const first = await mcpToolRaw<{
+      ok: boolean;
+      account_authority: { mode: string; owner_ratification_required: boolean; protected_operations_owner_ratified: boolean };
     }>("save_strategy_memory", {
       brand_key: "manifest_mental",
       kind: "current_belief",
-      body: "Unapproved autonomy mutation fixture.",
+      body: "First autonomous Manifest mutation fixture.",
       proceed_confirmed: true,
       continuity_loaded: true,
     });
-    expect(blocked.isError).toBe(true);
-    expect(blocked.structuredContent).toMatchObject({
+    expect(first.isError).not.toBe(true);
+    expect(first.structuredContent.ok).toBe(true);
+    expect(first.structuredContent.account_authority).toMatchObject({
+      mode: "autonomous_operator",
+      owner_ratification_required: false,
+      protected_operations_owner_ratified: true,
+    });
+
+    const second = await mcpToolRaw<{ ok: boolean }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "current_belief",
+      body: "Second autonomous Manifest mutation fixture.",
+      proceed_confirmed: true,
+      continuity_loaded: true,
+    });
+    expect(second.isError).not.toBe(true);
+    expect(second.structuredContent.ok).toBe(true);
+
+    const protectedAttempt = await mcpToolRaw<{
+      error: string;
+      required_next_tool: string;
+      governed: boolean;
+    }>("deleteRepoFile", {
+      path: "AUTONOMY_PROTECTED_FIXTURE.md",
+      message: "Protected-operation regression fixture.",
+      owner_approval: "No specific protected-operation approval supplied.",
+    });
+    expect(protectedAttempt.isError).toBe(true);
+    expect(protectedAttempt.structuredContent).toMatchObject({
       error: "approved_operator_decision_required",
       required_next_tool: "proposeOperatorDecision",
       governed: true,
     });
 
-    const proposed = await mcpTool<{
-      decision: { id: string; status: string; authorized_tools: string[]; execution_budget: Record<string, number> };
-    }>("proposeOperatorDecision", {
-      brand_key: "manifest_mental",
-      decision_key: "vitest_autonomy_budget",
-      category: "strategy",
-      title: "Persist one approved Manifest belief",
-      decision: "Save one strategy belief as a governed autonomy execution fixture.",
-      rationale: "The regression must prove that the dispatcher blocks unapproved mutations and permits only the exact approved budget.",
-      evidence: [{ source: "vitest", fact: "No approved decision exists before the first attempt." }],
-      expected_outcome: "Exactly one save_strategy_memory call succeeds.",
-      risks: ["A loose budget could authorize unintended repeat mutations."],
-      reversibility: "The fixture database resets after the test.",
-      execution_plan: "Approve this proposal, execute save_strategy_memory once, verify the second attempt is blocked, then close the decision.",
-      authorized_tools: ["save_strategy_memory"],
-      execution_budget: { save_strategy_memory: 1 },
-      proceed_confirmed: true,
-      continuity_loaded: true,
-    });
-    expect(proposed.decision.status).toBe("proposed");
-    expect(proposed.decision.execution_budget.save_strategy_memory).toBe(1);
-
-    const approved = await mcpTool<{ decision: { status: string } }>("resolveOperatorDecision", {
-      brand_key: "manifest_mental",
-      decision_id: proposed.decision.id,
-      resolution: "approve",
-      owner_response: "Approved for the regression fixture.",
-      proceed_confirmed: true,
-      continuity_loaded: true,
-    });
-    expect(approved.decision.status).toBe("approved");
-
-    const allowed = await mcpToolRaw<{
-      ok: boolean;
-      memory_id: number;
-      autonomy_decision: { governed: boolean; decision_id: string; decision_title: string };
-    }>("save_strategy_memory", {
-      brand_key: "manifest_mental",
-      kind: "current_belief",
-      body: "Approved autonomy mutation fixture.",
-      proceed_confirmed: true,
-      continuity_loaded: true,
-    });
-    expect(allowed.isError).not.toBe(true);
-    expect(allowed.structuredContent.ok).toBe(true);
-    expect(allowed.structuredContent.autonomy_decision).toMatchObject({
-      governed: true,
-      decision_id: proposed.decision.id,
-      decision_title: "Persist one approved Manifest belief",
-    });
-
-    const overBudget = await mcpToolRaw<{ error: string; required_next_tool: string }>("save_strategy_memory", {
-      brand_key: "manifest_mental",
-      kind: "current_belief",
-      body: "Second mutation should exceed the approved budget.",
-      proceed_confirmed: true,
-      continuity_loaded: true,
-    });
-    expect(overBudget.isError).toBe(true);
-    expect(overBudget.structuredContent.error).toBe("approved_operator_decision_required");
-
-    const executed = await mcpTool<{ decision: { status: string; outcome_summary: string } }>("markOperatorDecisionExecuted", {
-      brand_key: "manifest_mental",
-      decision_id: proposed.decision.id,
-      outcome_summary: "One approved save succeeded and the second call was blocked by the finite tool budget.",
-      result_evidence: [{ tool: "save_strategy_memory", completed: 1, blocked_after_budget: true }],
-      proceed_confirmed: true,
-      continuity_loaded: true,
-    });
-    expect(executed.decision.status).toBe("executed");
-
     const state = await mcpTool<{
-      profile: { mode: string; objective: string };
-      decisions: Array<{ id: string; status: string }>;
+      profile: { mode: string; objective: string; operating_constraints: Record<string, unknown> };
     }>("getOperatorDecisionState", {
       brand_key: "manifest_mental",
-      statuses: ["executed"],
       proceed_confirmed: true,
       continuity_loaded: true,
     });
-    expect(state.profile.mode).toBe("ai_led_owner_ratified");
+    expect(state.profile.mode).toBe("autonomous_operator");
     expect(state.profile.objective).toContain("1,000,000 followers");
-        expect(state.decisions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: proposed.decision.id, status: "executed" }),
-    ]));
+    expect(state.profile.operating_constraints).toMatchObject({
+      owner_ratification_required: false,
+      routine_account_operations_autonomous: true,
+      protected_operations_owner_ratified: true,
+    });
+
+    const decisionEvents = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_decision_execution_events WHERE tool_name = 'save_strategy_memory'`,
+    ).first<{ total: number }>();
+    expect(Number(decisionEvents?.total ?? 0)).toBe(0);
 
     const reconfirmed = await mcpToolRaw<{
       continuity_capsule: {
         autonomy_governance: {
           profile: { mode: string; objective: string };
-          pending_decisions: unknown[];
         };
       };
     }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
     expect(reconfirmed.isError).not.toBe(true);
-    expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.mode).toBe("ai_led_owner_ratified");
+    expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.mode).toBe("autonomous_operator");
     expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.objective).toContain("1,000,000 followers");
   }, 40000);
 
@@ -2566,7 +2525,7 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.12.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.13.0");
     expect(listed.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
       "engineeringPrecheck",
@@ -2629,7 +2588,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-        expect(payload.mcp_version).toBe("1.12.0");
+                expect(payload.mcp_version).toBe("1.13.0");
     expect(payload.registry_generation).toBe("recursive-engineering-execution-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();

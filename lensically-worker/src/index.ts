@@ -328,10 +328,11 @@ const OPERATOR_REJECTION_CONTEXT_LIMIT = 200;
 const OPERATOR_CONTINUITY_CONTRACT_VERSION = "operator-continuity-v2";
 const OPERATOR_EXECUTION_POLICY_VERSION = "operator-execution-policy-v2";
 const OPERATOR_IDEMPOTENCY_VERSION = "operator-idempotency-v1";
-const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v2";
+const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v3";
 const OPERATOR_ENGINEERING_AUTHORITY_VERSION = "operator-engineering-authority-v1";
 const MANIFEST_AUTONOMY_OBJECTIVE = "Grow Manifest Mental to 1,000,000 followers.";
-const MANIFEST_AUTONOMY_MODE = "ai_led_owner_ratified";
+const MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE = "ai_led_owner_ratified";
+const MANIFEST_AUTONOMY_MODE = "autonomous_operator";
 const OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 const OPERATOR_CONTINUATION_NONCE_TTL_SECONDS = 60 * 15;
 
@@ -382,13 +383,13 @@ const OPERATOR_AUTONOMY_CONTRACT = {
   active_account_scope: "manifest_mental",
   active_mode: MANIFEST_AUTONOMY_MODE,
   objective: MANIFEST_AUTONOMY_OBJECTIVE,
-  model_role: "The model owns problem selection, analysis, recommendation, sequencing, execution planning, and routine engineering execution.",
-  owner_role: "The owner remains available for business, taste, account ownership, destructive data actions, and irreversible strategic judgment. Routine engineering does not require owner ratification.",
-  approval_policy: "Read-only investigation and routine engineering are autonomous. Account content, scheduling, and strategy mutations remain owner-ratified until separately advanced. Destructive and irreversible actions remain explicitly protected.",
-  proposal_policy: "Persist proposals for owner-ratified account or business decisions. Routine engineering uses persistent outcome-bound authority without per-tool numerical budgets.",
-  fresh_chat_rule: "After startup, restore autonomous engineering authority and mandatory known paths before any engineering call. After Manifest continuity loads, restore account governance and pending account decisions.",
+  model_role: "The model owns routine Manifest problem selection, content decisions, source selection, generation, approval, scheduling, analytics, experiments, workflow sequencing, and routine engineering execution.",
+  owner_role: "The owner monitors the operation and may intervene at any time. Owner ratification remains required only for protected destructive actions, credential or ownership changes, scheduler safety mode, and irreversible business decisions.",
+  approval_policy: "Routine Manifest account operations and routine engineering are autonomous. Existing content gates, source fidelity, duplicate prevention, idempotency, schedule safety, and protected-operation controls remain mandatory.",
+  proposal_policy: "Persist proposals only for protected destructive, ownership, credential, scheduler safety, or irreversible business decisions. Routine account and engineering work executes without per-tool budgets.",
+  fresh_chat_rule: "After startup and Manifest continuity restoration, immediately resume autonomous account operation and autonomous engineering through mandatory known paths. Do not wait for routine owner approval.",
   decision_categories: ["strategy", "content", "scheduling", "analytics", "experiment", "workflow", "engineering", "risk"],
-  training_exit_rule: "Account/content autonomy advances through a separate governance decision. Routine engineering is already authorized by the persistent engineering authority contract.",
+  training_exit_rule: "The owner explicitly ended the owner-ratified training phase and transferred routine Manifest operation to the model.",
 } as const;
 
 const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
@@ -6402,11 +6403,41 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     JSON.stringify({
       focus_accounts: ["manifest_mental"],
       hourly_coverage_required: true,
-      target_schedule_buffer_hours: 48,
+            target_schedule_buffer_hours: 48,
       text_only_threads: true,
-      owner_ratification_required: true,
+      owner_ratification_required: false,
+      routine_account_operations_autonomous: true,
+      owner_monitoring_and_intervention_enabled: true,
+      protected_operations_owner_ratified: true,
       read_only_investigation_autonomous: true,
     }),
+    ).run();
+
+  await env.DB.prepare(
+    `UPDATE operator_autonomy_profiles
+     SET mode = ?, objective = ?, model_role = ?, owner_role = ?, approval_policy = ?,
+         operating_constraints_json = ?, active = 1, version = version + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE brand_key = ? AND mode <> ?`,
+  ).bind(
+    MANIFEST_AUTONOMY_MODE,
+    MANIFEST_AUTONOMY_OBJECTIVE,
+    OPERATOR_AUTONOMY_CONTRACT.model_role,
+    OPERATOR_AUTONOMY_CONTRACT.owner_role,
+    OPERATOR_AUTONOMY_CONTRACT.approval_policy,
+    JSON.stringify({
+      focus_accounts: ["manifest_mental"],
+      hourly_coverage_required: true,
+      target_schedule_buffer_hours: 48,
+      text_only_threads: true,
+      owner_ratification_required: false,
+      routine_account_operations_autonomous: true,
+      owner_monitoring_and_intervention_enabled: true,
+      protected_operations_owner_ratified: true,
+      read_only_investigation_autonomous: true,
+    }),
+    "manifest_mental",
+    MANIFEST_AUTONOMY_MODE,
   ).run();
 
   await env.DB.prepare(
@@ -12639,7 +12670,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.12.0";
+const OPERATOR_MCP_VERSION = "1.13.0";
 
 const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
 
@@ -13172,6 +13203,17 @@ const OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS = new Set<string>([
   "prepareFullPreflight",
 ]);
 
+const MANIFEST_AUTONOMOUS_PROTECTED_TOOLS = new Set<string>([
+  "deleteRepoFile",
+  "rollbackMcpChanges",
+  "disableMcpTool",
+  "setScheduledPostSchedulerMode",
+  "delete_scheduled_post",
+  "bulk_delete_scheduled_posts",
+  "update_account_credentials",
+  "transfer_account_ownership",
+]);
+
 function canonicalAutonomyToolName(toolName: string): string {
   const scoped = toolName.match(/^(?:mm|om|vx)_(.+)$/);
   return scoped?.[1] ?? toolName;
@@ -13184,7 +13226,8 @@ async function beginOperatorAutonomyAuthorization(
 ): Promise<{
   allowed: boolean;
   governed: boolean;
-  engineering_autonomous?: boolean;
+    engineering_autonomous?: boolean;
+  account_autonomous?: boolean;
   authority_version?: string;
   decision_id?: string;
   decision_title?: string;
@@ -13229,11 +13272,24 @@ async function beginOperatorAutonomyAuthorization(
       };
     }
   }
-  if (!profileRow || String(profileRow.mode) !== MANIFEST_AUTONOMY_MODE) {
+    if (!profileRow) {
     return { allowed: true, governed: false };
   }
 
+  const profileMode = String(profileRow.mode);
   const brandKey = String(profileRow.brand_key);
+  if (profileMode === MANIFEST_AUTONOMY_MODE && !MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(canonicalTool)) {
+    return {
+      allowed: true,
+      governed: false,
+      account_autonomous: true,
+      authority_version: OPERATOR_AUTONOMY_CONTRACT_VERSION,
+      brand_key: brandKey,
+    };
+  }
+  if (![MANIFEST_AUTONOMY_MODE, MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE].includes(profileMode)) {
+    return { allowed: true, governed: false };
+  }
   const decisions = await env.DB.prepare(
     `SELECT * FROM operator_decision_proposals
      WHERE brand_key = ? AND status IN ('approved', 'executing')
@@ -15784,13 +15840,21 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           decision_title: autonomyAuthorization.decision_title,
           execution_event_id: autonomyAuthorization.event_id,
         };
-      } else if (autonomyAuthorization.engineering_autonomous) {
+            } else if (autonomyAuthorization.engineering_autonomous) {
         resultPayload.engineering_authority = {
           mode: "full_discretion_recursive",
           version: autonomyAuthorization.authority_version,
           outcome_bound: true,
           owner_ratification_required: false,
           numerical_tool_budget_applies: false,
+        };
+      } else if (autonomyAuthorization.account_autonomous) {
+        resultPayload.account_authority = {
+          mode: MANIFEST_AUTONOMY_MODE,
+          version: autonomyAuthorization.authority_version,
+          objective: MANIFEST_AUTONOMY_OBJECTIVE,
+          owner_ratification_required: false,
+          protected_operations_owner_ratified: true,
         };
       }
       resultPayload.execution_policy = executionPolicy;
