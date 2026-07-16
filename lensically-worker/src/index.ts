@@ -4351,9 +4351,40 @@ async function ensureThreadsPostsArchiveTable(env: Env): Promise<void> {
      ON threads_posts_archive (threads_user_id, engagement_total DESC, likes DESC, views DESC)`,
   ).run();
 
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_threads_posts_archive_user_synced
      ON threads_posts_archive (threads_user_id, last_synced_at DESC)`,
+  ).run();
+}
+
+async function ensureOperatorPostMetricSnapshotsTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_post_metric_snapshots (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      published_post_id TEXT NOT NULL,
+      scheduled_post_id INTEGER,
+      draft_id TEXT,
+      source_card_id TEXT,
+      source_selection_id TEXT,
+      metrics_json TEXT NOT NULL,
+      captured_at TEXT NOT NULL,
+      valid_for_learning INTEGER NOT NULL DEFAULT 1,
+      anomaly_reason TEXT,
+      collection_source TEXT NOT NULL DEFAULT 'operator',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await addColumnIfMissing(env, "operator_post_metric_snapshots", "valid_for_learning", "INTEGER NOT NULL DEFAULT 1");
+  await addColumnIfMissing(env, "operator_post_metric_snapshots", "anomaly_reason", "TEXT");
+  await addColumnIfMissing(env, "operator_post_metric_snapshots", "collection_source", "TEXT NOT NULL DEFAULT 'operator'");
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_post_metric_snapshots_post_captured
+     ON operator_post_metric_snapshots (brand_key, published_post_id, captured_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_post_metric_snapshots_learning
+     ON operator_post_metric_snapshots (brand_key, valid_for_learning, captured_at DESC)`,
   ).run();
 }
 
