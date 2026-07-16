@@ -405,7 +405,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
   authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize destructive account data changes, credential ownership changes, account ownership changes, irreversible business decisions, repository file deletion, runtime rollback, tool disabling, or content publication controls.",
   numerical_tool_budgets: false,
   owner_ratification_required: false,
-  known_path_rule: "Before every engineering execution, resolve and apply the fastest proven canonical path. A diagnosed blocker may not be rediscovered through a known-bad route.",
+    known_path_rule: "After startup, every Lensically tool call must first obtain a signed guardLensicallyCall receipt for its exact normalized arguments. The dispatcher rejects unguarded, mismatched, schema-invalid, or known-bad routes before execution.",
   recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
   owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
   protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
