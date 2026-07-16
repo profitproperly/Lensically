@@ -2099,10 +2099,9 @@ describe("operator mode MCP endpoint", () => {
     expect(reconfirmed.structuredContent.continuation_choice_required).toBe(false);
     expect(reconfirmed.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
 
-    const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
+        const allowed = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
-      continuity_loaded: true,
     });
     expect(allowed.isError).not.toBe(true);
     expect(allowed.structuredContent.ok).toBe(true);
