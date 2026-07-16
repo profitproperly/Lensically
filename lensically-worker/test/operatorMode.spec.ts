@@ -2794,7 +2794,7 @@ describe("operator mode MCP endpoint", () => {
     expect(blockedBridge.isError).toBe(true);
     expect(blockedBridge.structuredContent).toMatchObject({
       error: "direct_typed_tool_required",
-      bridge_scope: "engineering_and_admin_only",
+      bridge_scope: "engineering_admin_and_strict_client_cap_allowlist",
     });
 
             for (const [clientKey, canonicalKey] of [["manifestmental", "manifest_mental"], ["opmgdeadman", "opmg_deadman"], ["vectrix", "vectrix"]] as const) {
