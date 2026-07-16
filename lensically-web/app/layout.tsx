@@ -19,13 +19,14 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   icons: {
     icon: [
-      { url: "/lensically-logo-black-with-white-bg.png", type: "image/png" },
+      { url: "/lensically-icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/lensically-icon-192.png", sizes: "192x192", type: "image/png" },
     ],
     shortcut: [
-      { url: "/lensically-logo-black-with-white-bg.png", type: "image/png" },
+      { url: "/lensically-icon-32.png", sizes: "32x32", type: "image/png" },
     ],
     apple: [
-      { url: "/lensically-logo-black-with-white-bg.png", type: "image/png" },
+      { url: "/lensically-icon-192.png", sizes: "192x192", type: "image/png" },
     ],
   },
   appleWebApp: {
