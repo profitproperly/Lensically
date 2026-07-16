@@ -492,7 +492,7 @@ const OPERATOR_EXECUTION_POLICY_CONTRACT = {
     operator_account: "Selected-account workflow state, sources, source cards, generation, drafts, scheduling, and results.",
     independent_recovery: "Main-MCP health, large-file repair, deployment-plane failure, and break-glass restoration.",
   },
-  known_failure_rule: "A diagnosed failure with an available prevention policy is a regression. Resolve the mandatory known path before the call and block the known-bad route.",
+    known_failure_rule: "A diagnosed failure with an available prevention policy is a regression. guardLensicallyCall must read that policy, normalize the exact payload, block known-bad routes, and issue the signed receipt required by the dispatcher before execution.",
   recursive_improvement_rule: "A newly solved engineering blocker pauses the current sequence until its reusable fix is promoted into policy, regression coverage, and audit state; then the original objective resumes automatically.",
   alias_rule: "Direct tools and wrappers that reach the same backend are aliases, not fallback routes. Select the currently callable canonical route once.",
   scope_rule: "Infrastructure, transport, continuity, workflow, MCP, schema, idempotency, and regression changes default universal; selected-account creative or strategy changes remain account scoped.",
