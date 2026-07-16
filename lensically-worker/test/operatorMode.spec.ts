@@ -2416,9 +2416,8 @@ describe("operator mode MCP endpoint", () => {
     }>("save_strategy_memory", {
       brand_key: "manifest_mental",
       kind: "current_belief",
-      body: "First autonomous Manifest mutation fixture.",
+            body: "First autonomous Manifest mutation fixture.",
       proceed_confirmed: true,
-      continuity_loaded: true,
     });
     expect(first.isError).not.toBe(true);
     expect(first.structuredContent.ok).toBe(true);
