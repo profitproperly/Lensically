@@ -13999,9 +13999,9 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       continuation_choice: "resume_existing_workflow",
       continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
-      next_call_requirement: {
+            next_call_requirement: {
+        brand_key: operatorClientSafeBrandKey(brandKey),
         proceed_confirmed: true,
-        continuity_loaded: true,
         operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
       },
     };
