@@ -2910,11 +2910,10 @@ describe("operator mode MCP endpoint", () => {
       ok: boolean;
       result: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } };
       autonomy_decision: { governed: boolean; decision_id: string };
-    }>("listMcpTools", {
-      execute_tool: "setScheduledPostSchedulerMode",
+        }>("listMcpTools", {
+      execute_tool: "runApprovedPostCanary",
       arguments: {
         brand_key: "manifest_mental",
-        mode: "canary",
         scheduled_post_id: 987654,
         reason: "Protected-operation owner-ratification regression fixture.",
         owner_response: "Proceed",
