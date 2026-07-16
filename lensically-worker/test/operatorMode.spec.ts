@@ -2047,7 +2047,9 @@ describe("operator mode MCP endpoint", () => {
     expect(coverage.isError).not.toBe(true);
     expect(coverage.structuredContent).toMatchObject({
       bridge_mode: "strict_client_cap_allowlist",
-      executed_tool: "get_hourly_coverage",
+      executed_tool: "mm_get_hourly_coverage",
+      canonical_executed_tool: "get_hourly_coverage",
+      scoped_brand_key: "manifest_mental",
     });
     expect(coverage.structuredContent.result.ok).toBe(true);
     expect(Array.isArray(coverage.structuredContent.result.open_slots)).toBe(true);
