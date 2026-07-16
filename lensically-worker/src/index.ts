@@ -20184,6 +20184,129 @@ async function upsertThreadsPostsArchive(
   }
 }
 
+export function evaluateThreadsPostMetricsForLearning(post: CachedThreadsPost): {
+  validForLearning: boolean;
+  anomalyReason: string | null;
+  metrics: Record<string, number>;
+} {
+  const metrics = {
+    views: Number(post.views),
+    likes: Number(post.likes),
+    replies: Number(post.replies),
+    reposts: Number(post.reposts),
+    quotes: Number(post.quotes),
+    shares: Number(post.shares),
+    engagement_total: Number(post.engagement_total),
+  };
+  const anomalies: string[] = [];
+  for (const [metric, value] of Object.entries(metrics)) {
+    if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+      anomalies.push(`${metric}_invalid`);
+    }
+  }
+  const componentTotal = metrics.likes + metrics.replies + metrics.reposts + metrics.quotes + metrics.shares;
+  if (metrics.views === 0 && componentTotal > 0) {
+    anomalies.push("engagement_without_views");
+  }
+  if (metrics.views > 0) {
+    for (const metric of ["likes", "replies", "reposts", "quotes", "shares"] as const) {
+      if (metrics[metric] > metrics.views) {
+        anomalies.push(`${metric}_exceeds_views`);
+      }
+    }
+  }
+  if (metrics.engagement_total < componentTotal) {
+    anomalies.push("engagement_total_below_components");
+  }
+  return {
+    validForLearning: anomalies.length === 0,
+    anomalyReason: anomalies.length ? anomalies.join(",") : null,
+    metrics,
+  };
+}
+
+async function appendOperatorMetricSnapshotsForPosts(
+  env: Env,
+  brandKey: GptBrandKey,
+  accountId: string,
+  threadsUserId: string,
+  posts: CachedThreadsPost[],
+  collectionSource: string,
+): Promise<{ inserted: number; unchanged: number; anomalous: number; linked: number }> {
+  await ensureOperatorWorkflowTables(env);
+  await ensureOperatorPostMetricSnapshotsTable(env);
+  const capturedAt = new Date().toISOString();
+  let inserted = 0;
+  let unchanged = 0;
+  let anomalous = 0;
+  let linked = 0;
+
+  for (const post of posts) {
+    if (!post.id) continue;
+    const evaluated = evaluateThreadsPostMetricsForLearning(post);
+    const metricsJson = normalizeOperatorJson(evaluated.metrics, {});
+    const latest = await env.DB.prepare(
+      `SELECT metrics_json
+       FROM operator_post_metric_snapshots
+       WHERE brand_key = ? AND published_post_id = ?
+       ORDER BY datetime(captured_at) DESC, datetime(created_at) DESC
+       LIMIT 1`,
+    ).bind(brandKey, post.id).first<{ metrics_json: string }>();
+    if (latest?.metrics_json === metricsJson) {
+      unchanged += 1;
+      continue;
+    }
+
+    const scheduled = await env.DB.prepare(
+      `SELECT s.id AS scheduled_post_id, d.id AS draft_id, d.source_card_id, c.source_selection_id
+       FROM scheduled_posts s
+       LEFT JOIN gpt_generation_drafts d
+         ON d.scheduled_post_id = s.id AND d.account_id = ?
+       LEFT JOIN operator_source_cards c
+         ON c.id = d.source_card_id AND c.brand_key = ?
+       WHERE s.threads_user_id = ? AND s.published_post_id = ?
+       ORDER BY s.id DESC
+       LIMIT 1`,
+    ).bind(accountId, brandKey, threadsUserId, post.id).first<Record<string, unknown>>();
+    const fallback = scheduled ? null : await env.DB.prepare(
+      `SELECT d.scheduled_post_id, d.id AS draft_id, d.source_card_id, c.source_selection_id
+       FROM gpt_generation_drafts d
+       LEFT JOIN operator_source_cards c
+         ON c.id = d.source_card_id AND c.brand_key = ?
+       WHERE d.account_id = ? AND d.threads_user_id = ? AND d.published_post_id = ?
+       ORDER BY datetime(d.updated_at) DESC
+       LIMIT 1`,
+    ).bind(brandKey, accountId, threadsUserId, post.id).first<Record<string, unknown>>();
+    const lineage = scheduled ?? fallback;
+    if (lineage) linked += 1;
+    if (!evaluated.validForLearning) anomalous += 1;
+
+    await env.DB.prepare(
+      `INSERT INTO operator_post_metric_snapshots (
+        id, brand_key, published_post_id, scheduled_post_id, draft_id,
+        source_card_id, source_selection_id, metrics_json, captured_at,
+        valid_for_learning, anomaly_reason, collection_source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      brandKey,
+      post.id,
+      lineage?.scheduled_post_id === null || lineage?.scheduled_post_id === undefined ? null : Number(lineage.scheduled_post_id),
+      lineage?.draft_id ? String(lineage.draft_id) : null,
+      lineage?.source_card_id ? String(lineage.source_card_id) : null,
+      lineage?.source_selection_id ? String(lineage.source_selection_id) : null,
+      metricsJson,
+      capturedAt,
+      evaluated.validForLearning ? 1 : 0,
+      evaluated.anomalyReason,
+      collectionSource,
+    ).run();
+    inserted += 1;
+  }
+
+  return { inserted, unchanged, anomalous, linked };
+}
+
 async function replaceThreadsPostsCache(
   env: Env,
   threadsUserId: string,
