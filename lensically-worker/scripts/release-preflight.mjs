@@ -69,6 +69,9 @@ if (!source.includes('limit: "40",')) {
 if (!source.includes('post_level_attribution: "forbidden"') || !source.includes('day_or_period_post_attribution: "forbidden"')) {
   errors.push("performance_evaluator_follower_policy_missing");
 }
+if (source.includes('      await prepareOperatorMode(env);\n      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);')) {
+  errors.push("duplicate_mcp_dispatcher_bootstrap_forbidden");
+}
 
 if (new Set(crons).size !== crons.length) {
 
