@@ -2097,7 +2097,7 @@ describe("operator mode MCP endpoint", () => {
     expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
   }, 30000);
 
-    it("enforces the same guard through client preflight or the server-side dispatcher fallback", async () => {
+    it("requires a matching guard and normalizes known payload blockers before execution through client preflight or the server-side dispatcher fallback", async () => {
     const unguarded = await mcpToolCallRaw<{
       ok: boolean;
       execution_guard_enforcement: { mode: string; normalized_before_execution: boolean; known_path_checked: boolean };
