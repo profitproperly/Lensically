@@ -21864,12 +21864,13 @@ function isFollowerStartOfDayRefreshWindow(timestampMs: number): boolean {
   );
 }
 
-function isDailyInsightsRefreshWindow(timestampMs: number): boolean {
-  return isThreadsRefreshWindow(
-    timestampMs,
-    THREADS_INSIGHTS_TARGET_HOUR,
-    THREADS_INSIGHTS_TARGET_MINUTE,
-  );
+export function isSixHourInsightsRefreshWindow(timestampMs: number): boolean {
+  for (const targetHour of THREADS_INSIGHTS_TARGET_HOURS) {
+    if (isThreadsRefreshWindow(timestampMs, targetHour, THREADS_INSIGHTS_TARGET_MINUTE)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function refreshFollowerBaselinesForConfiguredAccounts(env: Env): Promise<void> {
