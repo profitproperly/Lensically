@@ -35,6 +35,8 @@
 ## Scheduled Posts State
 
 - `/scheduled-posts` is the management surface for upcoming scheduled posts.
+- Fresh-chat Operator continuity reconciles past-due approved/posting records into durable operational incidents. Needs Attention posts are excluded from published coverage, block new scheduling from superseding the failed hour, carry an explicit recovery action across chats and deployments, and close only after verified `posted` state with a published Threads ID.
+
 - It supports edit, retry, single delete, and bulk delete selection mode.
 - The source-defined Operator MCP exposes `edit_scheduled_post` across Manifest, OPMG, and Vectrix. It edits approved unpublished scheduled posts through the same shared backend path as the UI, preserves omitted text/time/spoiler fields, requires date and time together when rescheduling, enforces selected-account ownership, and synchronizes linked generation-draft wording for continuity.
 - bulk delete currently reuses the existing delete API in a controlled client loop.

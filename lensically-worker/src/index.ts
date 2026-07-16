@@ -5844,13 +5844,54 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_operator_review_batches_active
      ON operator_review_batches (brand_key, production_date, status, updated_at DESC)`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE TRIGGER IF NOT EXISTS trg_operator_review_batches_touch_updated_at
      AFTER UPDATE ON operator_review_batches
      FOR EACH ROW
      WHEN NEW.updated_at = OLD.updated_at
      BEGIN
        UPDATE operator_review_batches SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_operational_incidents (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      incident_key TEXT NOT NULL,
+      incident_type TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'critical',
+      status TEXT NOT NULL DEFAULT 'open',
+      scheduled_post_id INTEGER,
+      production_date TEXT,
+      scheduled_time TEXT,
+      observed_status TEXT,
+      delivery_state TEXT,
+      published_post_id TEXT,
+      publish_error_message TEXT,
+      last_attempted_at TEXT,
+      required_recovery_action TEXT NOT NULL,
+      evidence_json TEXT,
+      opened_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_observed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      resolved_at TEXT,
+      resolution_note TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, incident_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_operational_incidents_open
+     ON operator_operational_incidents (brand_key, status, severity, last_observed_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_operational_incidents_touch_updated_at
+     AFTER UPDATE ON operator_operational_incidents
+     FOR EACH ROW
+     WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_operational_incidents SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
      END`,
   ).run();
 
@@ -7985,6 +8026,230 @@ function operatorContinuationNextAction(input: {
   return { action: "inspect_workflow_state", owner_checkpoint: "workflow_status", canonical_tool: "getWorkflowStatus", last_completed_action: "continuity_state_resolved" };
 }
 
+type OperatorDeliveryIncidentRow = {
+  id: string;
+  incident_key: string;
+  incident_type: string;
+  severity: string;
+  status: string;
+  scheduled_post_id: number | string | null;
+  production_date: string | null;
+  scheduled_time: string | null;
+  observed_status: string | null;
+  delivery_state: string | null;
+  published_post_id: string | null;
+  publish_error_message: string | null;
+  last_attempted_at: string | null;
+  required_recovery_action: string;
+  evidence_json: string | null;
+  opened_at: string;
+  last_observed_at: string;
+  resolved_at: string | null;
+  resolution_note: string | null;
+};
+
+type OperatorScheduledDeliveryRow = {
+  id: number | string;
+  status: string;
+  scheduled_time: string;
+  published_post_id: string | null;
+  publish_error_message: string | null;
+  last_attempted_at: string | null;
+  processing_started_at: string | null;
+};
+
+function classifyOperatorScheduledDelivery(
+  row: OperatorScheduledDeliveryRow,
+  nowMs = Date.now(),
+): { delivery_state: string; required_recovery_action: string } {
+  const scheduledMs = Date.parse(row.scheduled_time);
+  const isPastDue = Number.isFinite(scheduledMs) && scheduledMs < nowMs;
+  if (row.status === SCHEDULED_POST_STATUS_POSTING) {
+    return {
+      delivery_state: isPastDue ? "publishing_stalled" : "publishing",
+      required_recovery_action: "Audit the active publishing attempt and verify the Threads account result before any retry.",
+    };
+  }
+  if (!isPastDue) {
+    return {
+      delivery_state: "scheduled",
+      required_recovery_action: "No recovery is required before the scheduled time.",
+    };
+  }
+  if (row.publish_error_message) {
+    return {
+      delivery_state: "failed",
+      required_recovery_action: "Inspect the persisted publish error, verify that Threads did not publish the post, then retry the same scheduled post idempotently and verify the result.",
+    };
+  }
+  if (row.last_attempted_at) {
+    return {
+      delivery_state: "retry_required",
+      required_recovery_action: "Verify that the previous attempt did not publish on Threads, then retry the same scheduled post idempotently and verify the result.",
+    };
+  }
+  return {
+    delivery_state: "not_attempted",
+    required_recovery_action: "Investigate why the automatic scheduler did not claim the post, repair delivery, then retry the same scheduled post and verify the real Threads result.",
+  };
+}
+
+function serializeOperatorDeliveryIncident(row: OperatorDeliveryIncidentRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    incident_key: row.incident_key,
+    incident_type: row.incident_type,
+    severity: row.severity,
+    status: row.status,
+    scheduled_post_id: row.scheduled_post_id === null ? null : Number(row.scheduled_post_id),
+    production_date: row.production_date,
+    scheduled_time: row.scheduled_time,
+    observed_status: row.observed_status,
+    delivery_state: row.delivery_state,
+    published_post_id: row.published_post_id,
+    publish_error_message: row.publish_error_message,
+    last_attempted_at: row.last_attempted_at,
+    required_recovery_action: row.required_recovery_action,
+    evidence: safeParseJsonString(row.evidence_json ?? "{}") ?? {},
+    opened_at: row.opened_at,
+    last_observed_at: row.last_observed_at,
+    resolved_at: row.resolved_at,
+    resolution_note: row.resolution_note,
+  };
+}
+
+async function reconcileOperatorDeliveryIncidents(
+  env: Env,
+  brand: GptResolvedBrand,
+  timezone: string,
+): Promise<{
+  unresolved_incidents: Record<string, unknown>[];
+  required_recovery_actions: Record<string, unknown>[];
+}> {
+  await ensureScheduledPostsTable(env);
+  const nowIso = new Date().toISOString();
+  const overdueRows = await env.DB.prepare(
+    `SELECT id, status, scheduled_time, published_post_id, publish_error_message,
+            last_attempted_at, processing_started_at
+     FROM scheduled_posts
+     WHERE threads_user_id = ?
+       AND scheduled_time < ?
+       AND status IN (?, ?)
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
+     ORDER BY scheduled_time ASC, id ASC
+     LIMIT 100`,
+  ).bind(
+    brand.profile.threads_user_id,
+    nowIso,
+    SCHEDULED_POST_STATUS_APPROVED,
+    SCHEDULED_POST_STATUS_POSTING,
+  ).all<OperatorScheduledDeliveryRow>();
+
+  for (const row of overdueRows.results ?? []) {
+    const classification = classifyOperatorScheduledDelivery(row);
+    const scheduledMs = Date.parse(row.scheduled_time);
+    const productionDate = Number.isFinite(scheduledMs)
+      ? operatorLocalDateTimeParts(new Date(scheduledMs), timezone).date
+      : null;
+    const incidentKey = `scheduled_post_delivery:${row.id}`;
+    const evidence = {
+      source_of_truth: "scheduled_posts",
+      threads_user_id: brand.profile.threads_user_id,
+      scheduled_time: row.scheduled_time,
+      observed_status: row.status,
+      delivery_state: classification.delivery_state,
+      published_post_id: row.published_post_id,
+      publish_error_message: row.publish_error_message,
+      last_attempted_at: row.last_attempted_at,
+      processing_started_at: row.processing_started_at,
+      reconciled_at: nowIso,
+    };
+    await env.DB.prepare(
+      `INSERT INTO operator_operational_incidents (
+        id, brand_key, incident_key, incident_type, severity, status,
+        scheduled_post_id, production_date, scheduled_time, observed_status,
+        delivery_state, published_post_id, publish_error_message, last_attempted_at,
+        required_recovery_action, evidence_json, opened_at, last_observed_at, updated_at
+      ) VALUES (?, ?, ?, 'scheduled_post_delivery', 'critical', 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(brand_key, incident_key) DO UPDATE SET
+        incident_type = 'scheduled_post_delivery',
+        severity = 'critical',
+        status = 'open',
+        scheduled_post_id = excluded.scheduled_post_id,
+        production_date = excluded.production_date,
+        scheduled_time = excluded.scheduled_time,
+        observed_status = excluded.observed_status,
+        delivery_state = excluded.delivery_state,
+        published_post_id = excluded.published_post_id,
+        publish_error_message = excluded.publish_error_message,
+        last_attempted_at = excluded.last_attempted_at,
+        required_recovery_action = excluded.required_recovery_action,
+        evidence_json = excluded.evidence_json,
+        last_observed_at = CURRENT_TIMESTAMP,
+        resolved_at = NULL,
+        resolution_note = NULL,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      crypto.randomUUID(),
+      brand.brand_key,
+      incidentKey,
+      Number(row.id),
+      productionDate,
+      row.scheduled_time,
+      row.status,
+      classification.delivery_state,
+      row.published_post_id,
+      row.publish_error_message,
+      row.last_attempted_at,
+      classification.required_recovery_action,
+      JSON.stringify(evidence),
+    ).run();
+  }
+
+  await env.DB.prepare(
+    `UPDATE operator_operational_incidents
+     SET status = 'resolved',
+         resolved_at = CURRENT_TIMESTAMP,
+         resolution_note = 'verified_scheduled_post_published',
+         last_observed_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE brand_key = ?
+       AND incident_type = 'scheduled_post_delivery'
+       AND status = 'open'
+       AND EXISTS (
+         SELECT 1 FROM scheduled_posts scheduled
+         WHERE scheduled.id = operator_operational_incidents.scheduled_post_id
+           AND scheduled.status = ?
+           AND scheduled.published_post_id IS NOT NULL
+           AND length(trim(scheduled.published_post_id)) > 0
+       )`,
+  ).bind(brand.brand_key, SCHEDULED_POST_STATUS_POSTED).run();
+
+  const openRows = await env.DB.prepare(
+    `SELECT id, incident_key, incident_type, severity, status, scheduled_post_id,
+            production_date, scheduled_time, observed_status, delivery_state,
+            published_post_id, publish_error_message, last_attempted_at,
+            required_recovery_action, evidence_json, opened_at, last_observed_at,
+            resolved_at, resolution_note
+     FROM operator_operational_incidents
+     WHERE brand_key = ? AND status = 'open'
+     ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
+              datetime(opened_at) ASC, scheduled_post_id ASC
+     LIMIT 50`,
+  ).bind(brand.brand_key).all<OperatorDeliveryIncidentRow>();
+  const unresolvedIncidents = (openRows.results ?? []).map(serializeOperatorDeliveryIncident);
+  return {
+    unresolved_incidents: unresolvedIncidents,
+    required_recovery_actions: unresolvedIncidents.map((incident) => ({
+      incident_id: incident.id,
+      incident_key: incident.incident_key,
+      scheduled_post_id: incident.scheduled_post_id,
+      action: incident.required_recovery_action,
+      verification_required: "authoritative Threads publication success or explicit verified terminal resolution",
+    })),
+  };
+}
+
 async function buildOperatorManifestProceedCapsule(
   request: Request,
   env: Env,
@@ -7993,6 +8258,21 @@ async function buildOperatorManifestProceedCapsule(
   choice: OperatorContinuationChoice,
 ): Promise<Record<string, unknown>> {
   const sessionId = normalizeOperatorText(session?.id, 120, true);
+  const deliveryReconciliation = await reconcileOperatorDeliveryIncidents(
+    env,
+    brand,
+    WORKSPACE_DEFAULT_TIMEZONE,
+  );
+  const blockingIncident = deliveryReconciliation.unresolved_incidents[0] ?? null;
+  const engineeringContinuation = await env.DB.prepare(
+    `SELECT id, title, observed_issue, expected_behavior, required_change,
+            acceptance_test, priority, related_stage, created_at
+     FROM operator_mcp_backlog_items
+     WHERE status = 'open'
+     ORDER BY CASE lower(priority) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
+              datetime(created_at) ASC
+     LIMIT 1`,
+  ).first<Record<string, unknown>>();
   const calendarCoverage = await getOperatorHourlyCoverage(
     env,
     brand,
@@ -8022,22 +8302,30 @@ async function buildOperatorManifestProceedCapsule(
   const scheduledCount = reviewItems.filter((item) => ["scheduled", "published"].includes(String(item.status ?? ""))).length;
   const skippedCount = reviewItems.filter((item) => ["skipped", "rejected"].includes(String(item.status ?? ""))).length;
   const unresolvedCount = Math.max(reviewItems.length - scheduledCount - skippedCount, 0);
-  const resumableReviewBatch = activeReviewBatch && unresolvedCount > 0 ? activeReviewBatch : null;
-  const next = resumableReviewBatch
+    const resumableReviewBatch = activeReviewBatch && unresolvedCount > 0 ? activeReviewBatch : null;
+  const next = blockingIncident
     ? {
-      action: "resume_review_batch",
-      owner_checkpoint: "four_post_review_batch",
-      canonical_tool: "get_manifest_review_batch",
-      last_completed_action: "canonical_review_batch_restored",
+      action: "resolve_delivery_incident",
+      owner_checkpoint: "production_incident_recovery",
+      canonical_tool: "list_scheduled_posts",
+      last_completed_action: "unresolved_delivery_incident_restored",
     }
-    : {
-      action: "confirm_fill_calendar_day",
-      owner_checkpoint: "calendar_coverage_confirmation",
-      canonical_tool: "get_hourly_coverage",
-      last_completed_action: activeReviewBatch ? "terminal_review_batch_detected" : "calendar_coverage_inspected",
-    };
+    : resumableReviewBatch
+      ? {
+        action: "resume_review_batch",
+        owner_checkpoint: "four_post_review_batch",
+        canonical_tool: "get_manifest_review_batch",
+        last_completed_action: "canonical_review_batch_restored",
+      }
+      : {
+        action: "confirm_fill_calendar_day",
+        owner_checkpoint: "calendar_coverage_confirmation",
+        canonical_tool: "get_hourly_coverage",
+        last_completed_action: activeReviewBatch ? "terminal_review_batch_detected" : "calendar_coverage_inspected",
+      };
   const nextArtifactId = String(
-    (resumableReviewBatch ? activeReviewRow?.id : null)
+    (blockingIncident ? blockingIncident.id : null)
+    ?? (resumableReviewBatch ? activeReviewRow?.id : null)
     ?? calendarCoverage.earliest_incomplete_date
     ?? sessionId
     ?? "none",
@@ -8055,9 +8343,10 @@ async function buildOperatorManifestProceedCapsule(
     account_data_loaded: true,
     canonical_state_source: "database",
     continuity_mode: "bounded_manifest_proceed",
-    continuity_diagnostics: {
+        continuity_diagnostics: {
       legacy_source_reconciliation_deferred: true,
-      mutation_free_capsule_build: true,
+      mutation_free_capsule_build: false,
+      delivery_reconciliation_executed: true,
       calendar_horizon_days: 3,
     },
     autonomy_governance: autonomyProfile ? {
@@ -8069,9 +8358,32 @@ async function buildOperatorManifestProceedCapsule(
         ? "Resume the pending owner-ratified account or business decision when relevant; routine engineering remains autonomous."
         : "Proceed autonomously with routine engineering through mandatory known paths. Propose only owner-ratified account, business, destructive, or irreversible decisions.",
     } : null,
-    calendar_coverage: calendarCoverage,
+        calendar_coverage: {
+      ...calendarCoverage,
+      unresolved_delivery_count: deliveryReconciliation.unresolved_incidents.length,
+      unresolved_delivery_slots: deliveryReconciliation.unresolved_incidents.map((incident) => ({
+        incident_id: incident.id,
+        scheduled_post_id: incident.scheduled_post_id,
+        production_date: incident.production_date,
+        scheduled_time: incident.scheduled_time,
+        delivery_state: incident.delivery_state,
+      })),
+      published_coverage_excludes_unresolved_delivery: true,
+    },
     active_review_batch: resumableReviewBatch,
     completed_review_batch: activeReviewBatch && !resumableReviewBatch ? activeReviewBatch : null,
+    unresolved_incidents: deliveryReconciliation.unresolved_incidents,
+    required_recovery_actions: deliveryReconciliation.required_recovery_actions,
+    new_scheduling_blocked: Boolean(blockingIncident),
+    current_engineering_continuation: blockingIncident || engineeringContinuation ? {
+      kind: blockingIncident ? "delivery_incident" : "implementation_backlog",
+      blocking: Boolean(blockingIncident),
+      incident: blockingIncident,
+      backlog_item: engineeringContinuation ?? null,
+      next_action: blockingIncident?.required_recovery_action
+        ?? engineeringContinuation?.required_change
+        ?? null,
+    } : null,
     workflow_checkpoint: {
       workflow_session_id: sessionId,
       workflow_status: session?.status ?? null,
@@ -12882,7 +13194,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.15.0";
+const OPERATOR_MCP_VERSION = "1.16.0";
 
 const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
 
@@ -23336,9 +23648,15 @@ async function listScheduledPostsForThreadsAccountOnLocalDate(
   id: number;
   post_text: string;
   status: string;
+  delivery_state: string;
+  is_past_due: boolean;
   scheduled_time_utc: string;
   scheduled_time_local: string;
   local_time: string;
+  published_post_id: string | null;
+  publish_error_message: string | null;
+  last_attempted_at: string | null;
+  processing_started_at: string | null;
 }>> {
   const startUtc = convertLocalDateTimeToUtcIso(date, "00:00", timeZone);
   const nextDate = addDaysToIsoDate(date, 1);
@@ -23349,7 +23667,8 @@ async function listScheduledPostsForThreadsAccountOnLocalDate(
 
   await ensureScheduledPostsTable(env);
   const rows = await env.DB.prepare(
-    `SELECT id, post_text, status, scheduled_time
+    `SELECT id, post_text, status, scheduled_time, published_post_id,
+            publish_error_message, last_attempted_at, processing_started_at
      FROM scheduled_posts
      WHERE threads_user_id = ?
        AND scheduled_time >= ?
@@ -23369,6 +23688,10 @@ async function listScheduledPostsForThreadsAccountOnLocalDate(
       post_text: string;
       status: string;
       scheduled_time: string;
+      published_post_id: string | null;
+      publish_error_message: string | null;
+      last_attempted_at: string | null;
+      processing_started_at: string | null;
     }>();
 
   return (rows.results ?? []).map((row) => {
@@ -23377,16 +23700,24 @@ async function listScheduledPostsForThreadsAccountOnLocalDate(
     const localTime = parts
       ? `${parts.hour.toString().padStart(2, "0")}:${parts.minute.toString().padStart(2, "0")}`
       : "";
+    const delivery = classifyOperatorScheduledDelivery(row);
+    const isPastDue = Number.isFinite(utcMs) && utcMs < Date.now();
 
     return {
       id: Number(row.id),
       post_text: row.post_text,
       status: row.status,
+      delivery_state: delivery.delivery_state,
+      is_past_due: isPastDue,
       scheduled_time_utc: row.scheduled_time,
       scheduled_time_local: parts
         ? `${formatIsoDateParts(parts.year, parts.month, parts.day)} ${localTime}`
         : row.scheduled_time,
       local_time: localTime,
+      published_post_id: row.published_post_id ?? null,
+      publish_error_message: row.publish_error_message ?? null,
+      last_attempted_at: row.last_attempted_at ?? null,
+      processing_started_at: row.processing_started_at ?? null,
     };
   });
 }

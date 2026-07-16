@@ -202,7 +202,8 @@ async function resetTables(): Promise<void> {
     "operator_mcp_tool_overrides",
         "operator_gate_results",
     "operator_content_inventory",
-        "operator_post_metric_snapshots",
+            "operator_post_metric_snapshots",
+    "operator_operational_incidents",
     "operator_daily_source_claims",
     "operator_review_batches",
     "operator_source_exclusions",
@@ -2620,8 +2621,109 @@ describe("operator mode MCP endpoint", () => {
     expect(capsule.active_review_batch.review_batch_id).toBe(batch.review_batch_id);
     expect(capsule.active_review_batch.items.map((item) => item.source_identity_key)).toEqual(batch.items.map((item) => item.source_identity_key));
     const sourceBatchCount = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE workflow_session_id = ?`).bind(session.workflow_session_id).first<{ total: number }>();
-    expect(Number(sourceBatchCount?.total ?? 0)).toBe(1);
+        expect(Number(sourceBatchCount?.total ?? 0)).toBe(1);
   }, 40000);
+
+  it("restores unresolved delivery incidents before Manifest review work and closes them only after verified publication", async () => {
+    await seedManifestPatterns(30);
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
+      brand_key: "manifest_mental",
+    });
+    const batch = await operatorTool<{ review_batch_id: string }>("claim_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      production_date: "2099-01-03",
+      timezone: "America/New_York",
+      fresh_draw: true,
+    });
+    const accounts = await operatorTool<{ accounts: Array<{ brand_key: string; threads_user_id: string | null }> }>("list_accounts");
+    const manifestThreadsUserId = accounts.accounts.find((account) => account.brand_key === "manifest_mental")?.threads_user_id;
+    expect(manifestThreadsUserId).toBeTruthy();
+    await operatorTool("list_scheduled_posts", {
+      brand_key: "manifest_mental",
+      date: "2000-01-01",
+      timezone: "America/New_York",
+    });
+    const inserted = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (
+        user_id, threads_user_id, post_text, status, scheduled_time
+      ) VALUES ('workspace-owner', ?, 'Past-due delivery incident fixture', 'approved', '2000-01-01T12:00:00.000Z')`,
+    ).bind(manifestThreadsUserId).run();
+    const scheduledPostId = Number(inserted.meta?.last_row_id ?? 0);
+    expect(scheduledPostId).toBeGreaterThan(0);
+
+    const proceeded = await mcpToolRaw<{
+      continuity_capsule: {
+        active_review_batch: { review_batch_id: string };
+        unresolved_incidents: Array<{ scheduled_post_id: number; delivery_state: string }>;
+        required_recovery_actions: Array<{ scheduled_post_id: number }>;
+        new_scheduling_blocked: boolean;
+        current_engineering_continuation: { kind: string; blocking: boolean };
+        calendar_coverage: { unresolved_delivery_count: number; published_coverage_excludes_unresolved_delivery: boolean };
+        workflow_checkpoint: { next_pending_action: string; canonical_next_tool: string };
+      };
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(proceeded.isError).not.toBe(true);
+    const blockedCapsule = proceeded.structuredContent.continuity_capsule;
+    expect(blockedCapsule.active_review_batch.review_batch_id).toBe(batch.review_batch_id);
+    expect(blockedCapsule.unresolved_incidents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scheduled_post_id: scheduledPostId, delivery_state: "not_attempted" }),
+    ]));
+    expect(blockedCapsule.required_recovery_actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scheduled_post_id: scheduledPostId }),
+    ]));
+    expect(blockedCapsule.new_scheduling_blocked).toBe(true);
+    expect(blockedCapsule.current_engineering_continuation).toMatchObject({
+      kind: "delivery_incident",
+      blocking: true,
+    });
+    expect(blockedCapsule.calendar_coverage).toMatchObject({
+      unresolved_delivery_count: 1,
+      published_coverage_excludes_unresolved_delivery: true,
+    });
+    expect(blockedCapsule.workflow_checkpoint).toMatchObject({
+      next_pending_action: "resolve_delivery_incident",
+      canonical_next_tool: "list_scheduled_posts",
+    });
+
+    const listed = await operatorTool<{
+      items: Array<{ id: number; delivery_state: string; is_past_due: boolean }>;
+    }>("list_scheduled_posts", {
+      brand_key: "manifest_mental",
+      date: "2000-01-01",
+      timezone: "America/New_York",
+    });
+    expect(listed.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: scheduledPostId, delivery_state: "not_attempted", is_past_due: true }),
+    ]));
+
+    await env.DB.prepare(
+      `UPDATE scheduled_posts
+       SET status = 'posted', published_post_id = 'verified-thread-post', published_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(scheduledPostId).run();
+    const resumed = await mcpToolRaw<{
+      continuity_capsule: {
+        unresolved_incidents: Array<Record<string, unknown>>;
+        new_scheduling_blocked: boolean;
+        workflow_checkpoint: { next_pending_action: string; canonical_next_tool: string };
+      };
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(resumed.isError).not.toBe(true);
+    expect(resumed.structuredContent.continuity_capsule.unresolved_incidents).toHaveLength(0);
+    expect(resumed.structuredContent.continuity_capsule.new_scheduling_blocked).toBe(false);
+    expect(resumed.structuredContent.continuity_capsule.workflow_checkpoint).toMatchObject({
+      next_pending_action: "resume_review_batch",
+      canonical_next_tool: "get_manifest_review_batch",
+    });
+    const incident = await env.DB.prepare(
+      `SELECT status, resolution_note FROM operator_operational_incidents WHERE scheduled_post_id = ? LIMIT 1`,
+    ).bind(scheduledPostId).first<{ status: string; resolution_note: string | null }>();
+    expect(incident).toMatchObject({
+      status: "resolved",
+      resolution_note: "verified_scheduled_post_published",
+    });
+  }, 50000);
 
     it("blocks same-build wrapper hopping but clears stale failures after deployment", async () => {
     const mutableEnv = env as unknown as Record<string, unknown>;
