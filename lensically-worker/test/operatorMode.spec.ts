@@ -2,6 +2,7 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { beforeEach, describe, expect, it } from "vitest";
 import worker, {
     ScheduledPostScheduler,
+  activateNextApprovedScheduledPostCanary,
   buildOperatorMaturityObservation,
   buildOperatorPostFingerprint,
   evaluateThreadsPostMetricsForLearning,
