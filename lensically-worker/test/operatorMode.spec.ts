@@ -2455,9 +2455,8 @@ describe("operator mode MCP endpoint", () => {
     const state = await mcpTool<{
       profile: { mode: string; objective: string; operating_constraints: Record<string, unknown> };
     }>("getOperatorDecisionState", {
-      brand_key: "manifest_mental",
+            brand_key: "manifest_mental",
       proceed_confirmed: true,
-      continuity_loaded: true,
     });
     expect(state.profile.mode).toBe("autonomous_operator");
     expect(state.profile.objective).toContain("1,000,000 followers");
