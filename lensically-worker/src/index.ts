@@ -14793,6 +14793,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         "schedule_manifest_review_batch",
         "get_performance_learning",
         "edit_scheduled_post",
+        "skip_manifest_review_source",
       ]);
       const scopedClientCapMatch = executeTool.match(/^(mm|om|vx)_(.+)$/);
       const canonicalClientCapTool = scopedClientCapMatch?.[2] ?? executeTool;
