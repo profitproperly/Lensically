@@ -652,6 +652,61 @@ describe("operator mode backend spine", () => {
       last_attempted_at: null,
       publish_error_message: null,
     });
+    }, 30000);
+
+  it("automatically consumes an approved scheduled-post canary decision", async () => {
+    await operatorTool("list_accounts");
+    const inserted = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'missing-account', 'Approved automatic canary', 'approved', '2000-01-01T00:00:00.000Z')`,
+    ).run();
+    const scheduledPostId = Number(inserted.meta?.last_row_id ?? 0);
+    const decisionId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_decision_proposals (
+        id, brand_key, decision_key, category, title, decision_text, rationale, evidence_json,
+        expected_outcome, risks_json, reversibility, execution_plan, authorized_tools_json,
+        execution_budget_json, status, proposed_by, owner_response, approved_at
+      ) VALUES (?, 'manifest_mental', ?, 'risk', ?, ?, 'Owner approved fixture.', ?,
+                'Run one canary.', '[]', 'One attempt.', 'Activate and execute one scheduled post canary.',
+                ?, ?, 'approved', 'model', 'Proceed', CURRENT_TIMESTAMP)`,
+    ).bind(
+      decisionId,
+      `approved_canary_${scheduledPostId}`,
+      `Scheduled post ${scheduledPostId} canary`,
+      `Authorize exactly one canary for scheduled post ${scheduledPostId}.`,
+      JSON.stringify([{ scheduled_post_id: scheduledPostId }]),
+      JSON.stringify(["setScheduledPostSchedulerMode"]),
+      JSON.stringify({ setScheduledPostSchedulerMode: 1 }),
+    ).run();
+
+    const activated = await activateNextApprovedScheduledPostCanary(env as unknown as Parameters<typeof activateNextApprovedScheduledPostCanary>[0]);
+    expect(activated).toMatchObject({
+      activated: true,
+      decision_id: decisionId,
+      scheduled_post_id: scheduledPostId,
+    });
+    const decision = await env.DB.prepare(
+      `SELECT status, outcome_summary FROM operator_decision_proposals WHERE id = ?`,
+    ).bind(decisionId).first<{ status: string; outcome_summary: string }>();
+    expect(decision?.status).toBe("executed");
+    expect(decision?.outcome_summary).toContain(String(scheduledPostId));
+    const event = await env.DB.prepare(
+      `SELECT status, tool_name FROM operator_decision_execution_events WHERE decision_id = ?`,
+    ).bind(decisionId).first<{ status: string; tool_name: string }>();
+    expect(event).toEqual({ status: "completed", tool_name: "setScheduledPostSchedulerMode" });
+
+    const namespace = (env as unknown as { SCHEDULED_POST_SCHEDULER: DurableObjectNamespace }).SCHEDULED_POST_SCHEDULER;
+    const stub = namespace.get(namespace.idFromName("scheduled-post-publisher"));
+    const health = await (await stub.fetch("https://scheduled-post-scheduler.internal/health")).json() as {
+      control: { mode: string; allowed_post_ids: number[] };
+    };
+    expect(health.control).toMatchObject({ mode: "canary", allowed_post_ids: [scheduledPostId] });
+    await stub.fetch("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "paused", reason: "reset automatic canary fixture" }),
+    });
   }, 30000);
 
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
