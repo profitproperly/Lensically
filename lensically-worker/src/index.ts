@@ -9085,7 +9085,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(brand.brand_key, productionDate).first<{ id: string }>();
       if (existingReview?.id) {
         const serialized = await serializeManifestReviewBatch(env, brand, existingReview.id);
-        return operatorJsonResponse({ ...serialized, reused_existing: true, idempotency_reason: "active_review_batch_already_exists" });
+        const existingItems = serialized && Array.isArray(serialized.items)
+          ? serialized.items as Array<Record<string, unknown>>
+          : [];
+        const terminalExistingReview = existingItems.length > 0 && existingItems.every((item) =>
+          ["scheduled", "published", "source_skipped", "source_deleted"].includes(String(item.status ?? ""))
+        );
+        if (!terminalExistingReview) {
+          return operatorJsonResponse({ ...serialized, reused_existing: true, idempotency_reason: "active_review_batch_already_exists" });
+        }
+        await env.DB.prepare(`UPDATE operator_review_batches SET status = 'completed' WHERE id = ?`)
+          .bind(existingReview.id).run();
       }
     }
 
