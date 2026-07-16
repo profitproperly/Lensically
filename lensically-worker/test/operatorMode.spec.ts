@@ -2440,6 +2440,7 @@ describe("operator mode MCP endpoint", () => {
     const proceeded = await mcpToolRaw<{
       continuity_loaded: boolean;
       continuity_capsule: {
+        continuity_mode: string;
         workflow_checkpoint: { workflow_session_id: string; next_pending_action: string; canonical_next_tool: string };
         active_review_batch: { review_batch_id: string; items: Array<{ source_identity_key: string }> };
         calendar_coverage: { earliest_incomplete_date: string | null };
