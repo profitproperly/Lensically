@@ -2576,7 +2576,20 @@ describe("operator mode MCP endpoint", () => {
       next_pending_action: "confirm_fill_calendar_day",
       canonical_next_tool: "get_hourly_coverage",
     });
-  }, 60000);
+
+    const nextBatch = await operatorTool<{ review_batch_id: string; reused_existing?: boolean }>("claim_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      production_date: "2099-01-04",
+      timezone: "America/New_York",
+    });
+    expect(nextBatch.review_batch_id).not.toBe(batch.review_batch_id);
+    expect(nextBatch.reused_existing).not.toBe(true);
+    const repairedParent = await env.DB.prepare(
+      `SELECT status FROM operator_review_batches WHERE id = ?`,
+    ).bind(batch.review_batch_id).first<{ status: string }>();
+    expect(repairedParent?.status).toBe("completed");
+  }, 70000);
 
     it("automatic continuity prioritizes the earliest incomplete calendar day without redrawing", async () => {
 
