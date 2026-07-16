@@ -2980,9 +2980,8 @@ describe("operator mode MCP endpoint", () => {
     expect(first.items.map((item) => item.item_number)).toEqual([1, 2, 3, 4]);
     expect(new Set(first.items.map((item) => item.source_identity_key)).size).toBe(4);
 
-    mcpSelectedKey = null;
+        mcpSelectedKey = null;
     mcpProceedConfirmed = false;
-    mcpContinuityLoaded = false;
     await ensureMcpAccountOpen("manifest_mental");
     const restored = await mcpTool<{
       review_batch_id: string;
