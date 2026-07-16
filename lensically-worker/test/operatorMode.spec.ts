@@ -2617,12 +2617,12 @@ describe("operator mode MCP endpoint", () => {
       expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
 
       mutableEnv.LENSICALLY_COMMIT_SHA = "vitest-deployment-b";
-      const afterDeployment = await mcpToolRaw<{ error: string }>("runEngineeringTool", {
+      const afterDeployment = await mcpToolRaw<{ ok: boolean; result: { error: string } }>("runEngineeringTool", {
         tool_name: "readRepoFile",
         arguments: { path: "missing-vitest-file.md" },
       });
       expect(afterDeployment.isError).toBe(true);
-      expect(afterDeployment.structuredContent.error).toBe("repo_file_read_failed");
+      expect(afterDeployment.structuredContent.result.error).toBe("repo_file_read_failed");
     } finally {
       mutableEnv.LENSICALLY_COMMIT_SHA = originalCommitSha;
     }
