@@ -13982,7 +13982,8 @@ const MANIFEST_AUTONOMOUS_PROTECTED_TOOLS = new Set<string>([
 
 function canonicalAutonomyToolName(toolName: string): string {
   const scoped = toolName.match(/^(?:mm|om|vx)_(.+)$/);
-  return scoped?.[1] ?? toolName;
+  const canonical = scoped?.[1] ?? toolName;
+  return canonical === "runApprovedPostCanary" ? "setScheduledPostSchedulerMode" : canonical;
 }
 
 async function beginOperatorAutonomyAuthorization(
