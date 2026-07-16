@@ -13131,14 +13131,21 @@ async function getKnownAliasRetryBlock(
 ): Promise<Record<string, unknown> | null> {
   if (policy.route_is_alias !== true) return null;
   const fingerprint = await operatorExecutionFingerprint(toolName, args);
-  const prior = await env.DB.prepare(
-    `SELECT tool_name, decision, evidence_json, created_at
-     FROM operator_execution_events
-     WHERE json_extract(evidence_json, '$.canonical_fingerprint') = ?
-       AND decision = 'failed'
-       AND datetime(created_at) >= datetime('now', '-15 minutes')
-     ORDER BY datetime(created_at) DESC LIMIT 1`,
-  ).bind(fingerprint).first<Record<string, unknown>>();
+  let prior: Record<string, unknown> | null = null;
+  try {
+    prior = await env.DB.prepare(
+      `SELECT tool_name, decision, evidence_json, created_at
+       FROM operator_execution_events
+       WHERE json_extract(evidence_json, '$.canonical_fingerprint') = ?
+         AND decision = 'failed'
+         AND datetime(created_at) >= datetime('now', '-15 minutes')
+       ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(fingerprint).first<Record<string, unknown>>();
+  } catch (error) {
+    if (!getErrorMessage(error).includes("no such table: operator_execution_events")) {
+      throw error;
+    }
+  }
   if (!prior) return null;
   return {
     ok: false,
