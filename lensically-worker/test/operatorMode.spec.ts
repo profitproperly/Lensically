@@ -1580,7 +1580,10 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
         expect(new Set(toolNames).size).toBe(toolNames.length);
-    expect(listed.tools.slice(0, 75).map((tool) => tool.name)).toContain("setScheduledPostSchedulerMode");
+        expect(listed.tools.slice(0, 75).map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "setScheduledPostSchedulerMode",
+      "runApprovedPostCanary",
+    ]));
     expect(() => JSON.stringify(listed.tools)).not.toThrow();
     expect(toolNames.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(initialized.instructions).toContain("Initial key-selection stop");
