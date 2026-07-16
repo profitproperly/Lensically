@@ -12111,6 +12111,14 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["confirmOperatorProceed", 5],
     ["getScheduledPostSchedulerState", 6],
     ["auditScheduledPost", 7],
+    ["get_hourly_coverage", 8],
+    ["claim_manifest_review_batch", 9],
+    ["get_manifest_review_batch", 10],
+    ["attach_manifest_review_draft", 11],
+    ["schedule_manifest_review_batch", 12],
+    ["get_performance_learning", 13],
+    ["markOperatorDecisionExecuted", 14],
+    ["edit_scheduled_post", 15],
   ]);
   const tools = [
     ...OPERATOR_MCP_ENGINEERING_TOOLS,
