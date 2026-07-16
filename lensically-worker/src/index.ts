@@ -12793,7 +12793,157 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
   if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
     return null;
   }
-  return payload as Record<string, unknown>;
+    return payload as Record<string, unknown>;
+}
+
+const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v1";
+const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
+const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
+  "getOperatorStartupContext",
+  "guardLensicallyCall",
+]);
+
+type OperatorGuardCorrection = { path: string; from: unknown; to: unknown; reason: string };
+type OperatorGuardError = { path: string; error: string; expected?: unknown; received?: unknown };
+
+function normalizeOperatorGuardValue(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path = "$",
+): { value: unknown; corrections: OperatorGuardCorrection[]; errors: OperatorGuardError[] } {
+  const corrections: OperatorGuardCorrection[] = [];
+  const errors: OperatorGuardError[] = [];
+  const type = typeof schema.type === "string" ? schema.type : null;
+  const enumValues = Array.isArray(schema.enum) ? schema.enum : null;
+  if (enumValues && !enumValues.some((item) => Object.is(item, value))) {
+    errors.push({ path, error: "enum_mismatch", expected: enumValues, received: value });
+    return { value, corrections, errors };
+  }
+  if (type === "integer" || type === "number") {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(numeric) || (type === "integer" && !Number.isInteger(numeric))) {
+      errors.push({ path, error: `${type}_required`, received: value });
+      return { value, corrections, errors };
+    }
+    let normalized = numeric;
+    const minimum = typeof schema.minimum === "number" ? schema.minimum : null;
+    const maximum = typeof schema.maximum === "number" ? schema.maximum : null;
+    if (minimum !== null && normalized < minimum) {
+      corrections.push({ path, from: normalized, to: minimum, reason: "minimum_enforced" });
+      normalized = minimum;
+    }
+    if (maximum !== null && normalized > maximum) {
+      corrections.push({ path, from: normalized, to: maximum, reason: "maximum_enforced" });
+      normalized = maximum;
+    }
+    return { value: normalized, corrections, errors };
+  }
+  if (type === "string") {
+    if (typeof value !== "string") {
+      errors.push({ path, error: "string_required", received: value });
+      return { value, corrections, errors };
+    }
+    const minLength = typeof schema.minLength === "number" ? schema.minLength : null;
+    const maxLength = typeof schema.maxLength === "number" ? schema.maxLength : null;
+    if (minLength !== null && value.length < minLength) errors.push({ path, error: "string_too_short", expected: minLength, received: value.length });
+    if (maxLength !== null && value.length > maxLength) errors.push({ path, error: "string_too_long", expected: maxLength, received: value.length });
+    return { value, corrections, errors };
+  }
+  if (type === "boolean") {
+    if (typeof value !== "boolean") errors.push({ path, error: "boolean_required", received: value });
+    return { value, corrections, errors };
+  }
+  if (type === "array") {
+    if (!Array.isArray(value)) {
+      errors.push({ path, error: "array_required", received: value });
+      return { value, corrections, errors };
+    }
+    const minItems = typeof schema.minItems === "number" ? schema.minItems : null;
+    const maxItems = typeof schema.maxItems === "number" ? schema.maxItems : null;
+    if (minItems !== null && value.length < minItems) errors.push({ path, error: "array_too_short", expected: minItems, received: value.length });
+    if (maxItems !== null && value.length > maxItems) errors.push({ path, error: "array_too_long", expected: maxItems, received: value.length });
+    const itemSchema = schema.items && typeof schema.items === "object" && !Array.isArray(schema.items)
+      ? schema.items as Record<string, unknown>
+      : null;
+    const normalizedItems = value.map((item, index) => {
+      if (!itemSchema) return item;
+      const normalized = normalizeOperatorGuardValue(item, itemSchema, `${path}[${index}]`);
+      corrections.push(...normalized.corrections);
+      errors.push(...normalized.errors);
+      return normalized.value;
+    });
+    return { value: normalizedItems, corrections, errors };
+  }
+  if (type === "object") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      errors.push({ path, error: "object_required", received: value });
+      return { value, corrections, errors };
+    }
+    const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+      ? schema.properties as Record<string, unknown>
+      : {};
+    const required = Array.isArray(schema.required) ? schema.required.map(String) : [];
+    const normalizedObject: Record<string, unknown> = {};
+    for (const requiredKey of required) {
+      if (!Object.prototype.hasOwnProperty.call(value, requiredKey)) {
+        errors.push({ path: `${path}.${requiredKey}`, error: "required_property_missing" });
+      }
+    }
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      const propertySchema = properties[key];
+      if (!propertySchema) {
+        if (schema.additionalProperties === false) {
+          errors.push({ path: `${path}.${key}`, error: "additional_property_forbidden" });
+        } else {
+          normalizedObject[key] = item;
+        }
+        continue;
+      }
+      if (typeof propertySchema !== "object" || Array.isArray(propertySchema)) {
+        normalizedObject[key] = item;
+        continue;
+      }
+      const normalized = normalizeOperatorGuardValue(item, propertySchema as Record<string, unknown>, `${path}.${key}`);
+      corrections.push(...normalized.corrections);
+      errors.push(...normalized.errors);
+      normalizedObject[key] = normalized.value;
+    }
+    return { value: normalizedObject, corrections, errors };
+  }
+  return { value, corrections, errors };
+}
+
+async function createOperatorExecutionGuard(
+  env: Env,
+  intendedTool: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  return createSignedOperatorEnvelope(env, {
+    kind: "operator_execution_guard",
+    version: OPERATOR_EXECUTION_GUARD_VERSION,
+    intended_tool: intendedTool,
+    args_fingerprint: await operatorExecutionFingerprint(intendedTool, args),
+    exp: Math.floor(Date.now() / 1000) + OPERATOR_EXECUTION_GUARD_TTL_SECONDS,
+  });
+}
+
+async function verifyOperatorExecutionGuard(
+  env: Env,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  if (OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS.has(toolName)) return { ok: true };
+  const payload = await verifySignedOperatorEnvelope(env, args.execution_guard);
+  if (!payload || payload.kind !== "operator_execution_guard" || payload.version !== OPERATOR_EXECUTION_GUARD_VERSION) {
+    return { ok: false, error: "execution_guard_required" };
+  }
+  const guardedArgs = { ...args };
+  delete guardedArgs.execution_guard;
+  const fingerprint = await operatorExecutionFingerprint(toolName, guardedArgs);
+  if (payload.intended_tool !== toolName || payload.args_fingerprint !== fingerprint) {
+    return { ok: false, error: "execution_guard_mismatch" };
+  }
+  return { ok: true };
 }
 
 async function createOperatorContinuationNonce(env: Env, brandKey: GptBrandKey): Promise<string> {
