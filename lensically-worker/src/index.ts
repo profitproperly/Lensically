@@ -14868,6 +14868,92 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: diffSummary };
   }
 
+    if (toolName === "applyRepoPatchSet") {
+    const rawPatches = Array.isArray(args.patches) ? args.patches as Array<Record<string, unknown>> : [];
+    const message = normalizeOperatorText(args.message, 200);
+    const expectedHeadSha = normalizeOperatorText(args.expected_head_sha, 120, true);
+    const dryRun = args.dry_run === true;
+    if (!message || rawPatches.length < 1 || rawPatches.length > 20) {
+      return { ok: false, error: "patches_1_to_20_and_message_required" };
+    }
+
+    const normalizedPatches = rawPatches.map((patch, index) => ({
+      index,
+      path: sanitizeRepoPath(patch.path),
+      find: normalizeOperatorText(patch.find, 100000),
+      replace: typeof patch.replace === "string" ? patch.replace : "",
+    }));
+    const invalidPatch = normalizedPatches.find((patch) => !patch.path || !patch.find);
+    if (invalidPatch) {
+      return { ok: false, error: "patch_path_and_find_required", patch_index: invalidPatch.index };
+    }
+
+    const paths = [...new Set(normalizedPatches.map((patch) => patch.path))];
+    if (paths.length > 12) {
+      return { ok: false, error: "patch_set_file_limit_exceeded", max_files: 12 };
+    }
+    const loaded = await Promise.all(paths.map(async (path) => ({ path, file: await getGithubFile(env, path) })));
+    const missing = loaded.find((entry) => !entry.file.ok || entry.file.content === null);
+    if (missing) {
+      return { ok: false, error: "repo_file_read_failed", path: missing.path, status: missing.file.status };
+    }
+
+    const nextFiles: Array<{ path: string; content: string }> = [];
+    for (const entry of loaded) {
+      let content = String(entry.file.content ?? "");
+      const filePatches = normalizedPatches.filter((patch) => patch.path === entry.path);
+      for (const patch of filePatches) {
+        const count = content.split(patch.find).length - 1;
+        if (count !== 1) {
+          return { ok: false, error: "find_must_match_once", path: entry.path, patch_index: patch.index, match_count: count, no_commit_created: true };
+        }
+        content = content.replace(patch.find, patch.replace);
+      }
+      nextFiles.push({ path: entry.path, content });
+    }
+
+    const diffSummary = normalizeOperatorText(args.summary, 1000, true)
+      ?? `Applied ${normalizedPatches.length} exact replacements across ${nextFiles.length} files in one commit.`;
+    if (dryRun) {
+      return {
+        ok: true,
+        dry_run: true,
+        validated: true,
+        patch_count: normalizedPatches.length,
+        files_changed: paths,
+        diff_summary: diffSummary,
+      };
+    }
+
+    const put = await putGithubFiles(env, {
+      files: nextFiles,
+      message,
+      expectedHeadSha,
+    });
+    await recordEngineeringAudit(env, {
+      action: "applyRepoPatchSet",
+      filesChanged: paths,
+      diffSummary,
+      result: put.ok ? "ok" : "failed",
+      metadata: {
+        status: put.status,
+        commit_sha: put.commit_sha,
+        previous_head_sha: put.head_sha,
+        patch_count: normalizedPatches.length,
+      },
+    });
+    return {
+      ok: put.ok,
+      status: put.status,
+      commit_sha: put.commit_sha,
+      previous_head_sha: put.head_sha,
+      patch_count: normalizedPatches.length,
+      files_changed: paths,
+      diff_summary: diffSummary,
+      failure: put.ok ? null : put.data,
+    };
+  }
+
   if (toolName === "startRepoFileWrite") {
     const path = sanitizeRepoPath(args.path);
     const mode = normalizeOperatorMachineKey(args.mode, "replace");
