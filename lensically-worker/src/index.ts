@@ -14044,9 +14044,9 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         account_data_loaded: true,
         reused_existing: true,
         idempotency_reason: "current_server_continuity_already_resolved",
-        next_call_requirement: {
+                next_call_requirement: {
+          brand_key: operatorClientSafeBrandKey(brandKey),
           proceed_confirmed: true,
-          continuity_loaded: true,
           operation_id: (replayCapsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
         },
       };
