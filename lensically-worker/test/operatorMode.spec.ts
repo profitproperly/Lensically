@@ -2600,17 +2600,32 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(sourceBatchCount?.total ?? 0)).toBe(1);
   }, 40000);
 
-    it("blocks wrapper hopping after a same-backend deterministic failure", async () => {
-    const direct = await mcpToolRaw<{ error: string }>("readRepoFile", { path: "missing-vitest-file.md" });
-    expect(direct.isError).toBe(true);
-    expect(direct.structuredContent.error).toBe("repo_file_read_failed");
-    const alias = await mcpToolRaw<{ error: string; prior_failed_route: string }>("runEngineeringTool", {
-      tool_name: "readRepoFile",
-      arguments: { path: "missing-vitest-file.md" },
-    });
-    expect(alias.isError).toBe(true);
-    expect(alias.structuredContent.error).toBe("same_backend_route_retry_forbidden");
-    expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
+    it("blocks same-build wrapper hopping but clears stale failures after deployment", async () => {
+    const mutableEnv = env as unknown as Record<string, unknown>;
+    const originalCommitSha = mutableEnv.LENSICALLY_COMMIT_SHA;
+    try {
+      mutableEnv.LENSICALLY_COMMIT_SHA = "vitest-deployment-a";
+      const direct = await mcpToolRaw<{ error: string }>("readRepoFile", { path: "missing-vitest-file.md" });
+      expect(direct.isError).toBe(true);
+      expect(direct.structuredContent.error).toBe("repo_file_read_failed");
+      const alias = await mcpToolRaw<{ error: string; prior_failed_route: string }>("runEngineeringTool", {
+        tool_name: "readRepoFile",
+        arguments: { path: "missing-vitest-file.md" },
+      });
+      expect(alias.isError).toBe(true);
+      expect(alias.structuredContent.error).toBe("same_backend_route_retry_forbidden");
+      expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
+
+      mutableEnv.LENSICALLY_COMMIT_SHA = "vitest-deployment-b";
+      const afterDeployment = await mcpToolRaw<{ error: string }>("runEngineeringTool", {
+        tool_name: "readRepoFile",
+        arguments: { path: "missing-vitest-file.md" },
+      });
+      expect(afterDeployment.isError).toBe(true);
+      expect(afterDeployment.structuredContent.error).toBe("repo_file_read_failed");
+    } finally {
+      mutableEnv.LENSICALLY_COMMIT_SHA = originalCommitSha;
+    }
   }, 30000);
 
   it("authorizes routine engineering without owner decisions or numerical budgets and resolves known paths before execution", async () => {
