@@ -14472,7 +14472,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         title: tool.title,
         description: tool.description,
         required_fields: requiredFields,
-        disabled: false,
+        disabled: false as boolean,
       }] as const;
     }));
     const overrides = await listOperatorMcpOverrides(env).catch(() => [] as Array<Record<string, unknown>>);
