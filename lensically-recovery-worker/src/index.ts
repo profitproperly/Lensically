@@ -245,8 +245,25 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   if (name === "runGitHubWorkflow") {
     const task = String(args.task || "");
     if (!["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"].includes(task)) return { ok: false, error: "invalid_workflow_task" };
-    const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: String(args.ref || config.branch), inputs: { task } }) });
-    return { ok: result.ok, status: result.status, task, dispatched: result.status === 204 };
+    const requestedRef = String(args.ref || config.branch).trim();
+    let dispatchRef = requestedRef;
+    let verifiedHeadSha: string | null = null;
+    if (/^[a-f0-9]{40}$/i.test(requestedRef)) {
+      const branchRef = await github(env, `/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(config.branch)}`);
+      const branchData = branchRef.data && typeof branchRef.data === "object" && !Array.isArray(branchRef.data)
+        ? branchRef.data as Record<string, unknown>
+        : {};
+      const objectData = branchData.object && typeof branchData.object === "object" && !Array.isArray(branchData.object)
+        ? branchData.object as Record<string, unknown>
+        : {};
+      verifiedHeadSha = typeof objectData.sha === "string" ? objectData.sha : null;
+      if (!branchRef.ok || verifiedHeadSha !== requestedRef) {
+        return { ok: false, error: "exact_sha_not_current_branch_head", requested_ref: requestedRef, branch: config.branch, current_head_sha: verifiedHeadSha, status: branchRef.status };
+      }
+      dispatchRef = config.branch;
+    }
+    const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: dispatchRef, inputs: { task } }) });
+    return { ok: result.ok, status: result.status, task, dispatched: result.status === 204, requested_ref: requestedRef, dispatch_ref: dispatchRef, verified_head_sha: verifiedHeadSha };
   }
   if (name === "getGitHubWorkflowRun") {
     const id = Math.trunc(Number(args.run_id));
