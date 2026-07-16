@@ -14903,7 +14903,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     const normalizedPatches = rawPatches.map((patch, index) => ({
       index,
       path: sanitizeRepoPath(patch.path),
-      find: normalizeOperatorText(patch.find, 100000),
+            find: normalizeOperatorText(patch.find, 100000) ?? "",
       replace: typeof patch.replace === "string" ? patch.replace : "",
     }));
     const invalidPatch = normalizedPatches.find((patch) => !patch.path || !patch.find);
