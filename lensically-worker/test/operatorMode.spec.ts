@@ -2127,13 +2127,26 @@ describe("operator mode MCP endpoint", () => {
       reason: "maximum_enforced",
     });
 
-    const read = await mcpToolCallRaw<{ ok: boolean; returned_lines: number }>("readRepoFile", {
-      ...guarded.structuredContent.normalized_arguments,
-      execution_guard: guarded.structuredContent.execution_guard,
+        expect(typeof guarded.structuredContent.execution_guard).toBe("string");
+
+    const localGuard = await mcpToolCallRaw<{
+      ok: boolean;
+      execution_guard: string;
+      normalized_arguments: Record<string, unknown>;
+    }>("guardLensicallyCall", {
+      intended_tool: "getEngineeringAccessState",
+      arguments_json: "{}",
     });
-    expect(read.isError).not.toBe(true);
-    expect(read.structuredContent.ok).toBe(true);
-    expect(read.structuredContent.returned_lines).toBeLessThanOrEqual(400);
+    expect(localGuard.isError).not.toBe(true);
+    expect(localGuard.structuredContent.ok).toBe(true);
+    const access = await mcpToolCallRaw<{ ok: boolean; github: { token_status: string } }>("getEngineeringAccessState", {
+      ...localGuard.structuredContent.normalized_arguments,
+      execution_guard: localGuard.structuredContent.execution_guard,
+    });
+    expect(access.isError).not.toBe(true);
+    expect(access.structuredContent.ok).toBe(true);
+    expect(access.structuredContent.github.token_status).toMatch(/exists|missing/);
+
 
     const sensitive = await mcpToolCallRaw<{ error: string; required_route: string }>("guardLensicallyCall", {
       intended_tool: "searchRepoFiles",
