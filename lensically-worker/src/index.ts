@@ -10920,9 +10920,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         selected_at: sourceSelection.selected_at,
       } : null,
       source_card: sourceCard,
-      metric_history: (history.results ?? []).map((row) => ({
+            metric_history: (history.results ?? []).map((row) => ({
         metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
         captured_at: row.captured_at,
+        valid_for_learning: Number(row.valid_for_learning ?? 1) === 1,
+        anomaly_reason: row.anomaly_reason ?? null,
+        collection_source: row.collection_source ?? null,
       })),
       warning: archivePost ? null : "Published post lineage was found, but synced Threads metrics are not available yet.",
     });
