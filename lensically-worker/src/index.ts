@@ -11940,13 +11940,27 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       .filter((tool) => tool.name !== "list_accounts")
       .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
   ] : [];
+    const directPriority = new Map([
+    ["getOperatorStartupContext", 0],
+    ["guardLensicallyCall", 1],
+    ["runEngineeringRelease", 2],
+    ["getEngineeringRelease", 3],
+    ["selectOperatorKey", 4],
+    ["confirmOperatorProceed", 5],
+    ["getScheduledPostSchedulerState", 6],
+    ["auditScheduledPost", 7],
+  ]);
   const tools = [
     ...OPERATOR_MCP_ENGINEERING_TOOLS,
     ...OPERATOR_MCP_ADMIN_TOOLS,
     ...OPERATOR_MCP_TOOLS,
     ...scopedWrapperTools,
-  ].map(cloneOperatorMcpTool);
-    for (const tool of tools) {
+  ].map(cloneOperatorMcpTool).sort((left, right) => {
+    const leftPriority = directPriority.get(left.name) ?? 1000;
+    const rightPriority = directPriority.get(right.name) ?? 1000;
+    return leftPriority - rightPriority;
+  });
+  for (const tool of tools) {
     const schema = tool.inputSchema as Record<string, unknown>;
     const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
       ? { ...(schema.properties as Record<string, unknown>) }
