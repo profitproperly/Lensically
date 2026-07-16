@@ -11921,7 +11921,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     name: "disableMcpTool",
     title: "Disable MCP tool",
     description: "Disable or re-enable a runtime MCP tool advertisement.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, disabled: { type: "boolean" }, reason: { type: "string" } }, required: ["tool_name"], additionalProperties: false },
+        inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, tool_name: { type: "string" }, disabled: { type: "boolean" }, reason: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["tool_name"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   },
   {
