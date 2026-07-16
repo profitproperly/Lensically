@@ -336,6 +336,11 @@ const MANIFEST_AUTONOMY_MODE = "autonomous_operator";
 const OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 const OPERATOR_CONTINUATION_NONCE_TTL_SECONDS = 60 * 15;
 
+function operatorClientSafeBrandKey(brandKey: GptBrandKey): string {
+  if (brandKey === "manifest_mental") return "manifestmental";
+  if (brandKey === "opmg_deadman") return "opmgdeadman";
+  return brandKey;
+}
 
 
 const OPERATOR_SYSTEM_LAYER_GLOSSARY = [
