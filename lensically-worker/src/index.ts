@@ -21388,7 +21388,7 @@ async function refreshOperatorPerformanceEvaluator(
     fatigue_risks: fatigueRisks,
     experiment_allocation: allocation,
     generation_guidance: [
-            "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result."
+                  "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result.",
       "Exploit reliable positive mechanisms, improve one variable at a time, and preserve controlled exploration.",
       "Avoid overused recent features when an equally supported alternative exists.",
       "Do not infer follower conversion from any post, day, batch, or surrounding time period.",
