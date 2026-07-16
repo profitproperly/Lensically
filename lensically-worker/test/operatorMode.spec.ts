@@ -2606,7 +2606,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-                expect(payload.mcp_version).toBe("1.14.0");
+                expect(payload.mcp_version).toBe("1.14.1");
     expect(payload.registry_generation).toBe("recursive-engineering-execution-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
