@@ -14409,7 +14409,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       const existingSession = existingSessionId
         ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(existingSessionId, brandKey).first<Record<string, unknown>>()
         : null;
-      const replayCapsule = await buildOperatorContinuityCapsule(request, env, brand, existingSession, choice);
+      const replayCapsule = await buildOperatorProceedCapsule(request, env, brand, existingSession, choice);
       return {
         ok: true,
         selected_key: brandKey,
