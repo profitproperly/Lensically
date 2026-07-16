@@ -2446,11 +2446,26 @@ describe("operator mode MCP endpoint", () => {
       owner_approval: "No specific protected-operation approval supplied.",
     });
     expect(protectedAttempt.isError).toBe(true);
-    expect(protectedAttempt.structuredContent).toMatchObject({
+        expect(protectedAttempt.structuredContent).toMatchObject({
       error: "approved_operator_decision_required",
       required_next_tool: "proposeOperatorDecision",
       governed: true,
     });
+
+    const compactProposal = await mcpToolRaw<{ decision: { id: string; rationale: string; expected_outcome: string; reversibility: string; execution_plan: string } }>("proposeOperatorDecision", {
+      brand_key: "manifest_mental",
+      category: "risk",
+      title: "Protected deletion fixture",
+      decision: "Authorize one protected repository deletion fixture.",
+      authorized_tools: ["deleteRepoFile"],
+      proceed_confirmed: true,
+    });
+    expect(compactProposal.isError).not.toBe(true);
+    expect(compactProposal.structuredContent.decision.id).toBeTruthy();
+    expect(compactProposal.structuredContent.decision.rationale).toBeTruthy();
+    expect(compactProposal.structuredContent.decision.expected_outcome).toBeTruthy();
+    expect(compactProposal.structuredContent.decision.reversibility).toBeTruthy();
+    expect(compactProposal.structuredContent.decision.execution_plan).toBeTruthy();
 
     const state = await mcpTool<{
       profile: { mode: string; objective: string; operating_constraints: Record<string, unknown> };
