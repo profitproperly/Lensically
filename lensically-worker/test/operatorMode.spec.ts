@@ -2190,6 +2190,19 @@ describe("operator mode MCP endpoint", () => {
       "runEngineeringRelease",
       "getEngineeringRelease",
     ]);
+    for (const criticalTool of [
+      "get_hourly_coverage",
+      "claim_manifest_review_batch",
+      "get_manifest_review_batch",
+      "attach_manifest_review_draft",
+      "schedule_manifest_review_batch",
+      "get_performance_learning",
+      "markOperatorDecisionExecuted",
+      "edit_scheduled_post",
+    ]) {
+      expect(listed.tools.findIndex((tool) => tool.name === criticalTool)).toBeGreaterThanOrEqual(0);
+      expect(listed.tools.findIndex((tool) => tool.name === criticalTool)).toBeLessThan(75);
+    }
   }, 30000);
 
   it("replays interrupted workflow-session creation without duplicates", async () => {
