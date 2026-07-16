@@ -2823,7 +2823,7 @@ describe("operator mode MCP endpoint", () => {
 
     const call = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string }; isError?: boolean }>("tools/call", {
       name: "mark_draft_shown",
-                              arguments: { brand_key: BRAND_KEY, draft_id: blocked.draft_id, proceed_confirmed: true, continuity_loaded: true },
+                                                            arguments: { brand_key: BRAND_KEY, draft_id: blocked.draft_id, proceed_confirmed: true },
     });
     expect(call.isError).toBe(true);
     expect(call.structuredContent.error).toBe("draft_not_showable");
