@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   icons: {
     icon: [
-      { url: "/lensically-icon-premium-16.png", sizes: "16x16", type: "image/png" },
       { url: "/lensically-icon-premium-32.png", sizes: "32x32", type: "image/png" },
       { url: "/lensically-icon-premium-192.png", sizes: "192x192", type: "image/png" },
     ],
