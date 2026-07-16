@@ -2033,6 +2033,8 @@ describe("operator mode MCP endpoint", () => {
     const coverage = await mcpToolRaw<{
       bridge_mode: string;
       executed_tool: string;
+      canonical_executed_tool: string;
+      scoped_brand_key: string;
       result: { ok: boolean; open_slots: string[] };
     }>("listMcpTools", {
       execute_tool: "mm_get_hourly_coverage",
