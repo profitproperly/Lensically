@@ -22140,6 +22140,7 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
         null,
       );
 
+            let metricSnapshots: { inserted: number; unchanged: number; anomalous: number; linked: number } | null = null;
       if (postsPage) {
         await upsertThreadsPostsArchive(env, threadsUserId, postsPage.posts);
         await replaceThreadsPostsCache(env, threadsUserId, postsPage.posts, {
@@ -22147,18 +22148,33 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
           next_cursor: postsPage.nextCursor,
           has_more: postsPage.hasMore,
         });
+        const brandKey = gptBrandKeyForAccountId(configuredAccount.id);
+        if (brandKey) {
+          metricSnapshots = await appendOperatorMetricSnapshotsForPosts(
+            env,
+            brandKey,
+            configuredAccount.id,
+            threadsUserId,
+            postsPage.posts,
+            "six_hour_insights",
+          );
+        }
       }
 
-      logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_SUCCEEDED", {
+      logWorkerEvent("THREADS_SIX_HOUR_INSIGHTS_REFRESH_SUCCEEDED", {
         configured_account_id: configuredAccount.id,
         configured_username: configuredAccount.username,
         threads_user_id: threadsUserId,
         posts_count: postsPage?.posts.length ?? 0,
+        metric_snapshots_inserted: metricSnapshots?.inserted ?? 0,
+        unchanged_snapshots_skipped: metricSnapshots?.unchanged ?? 0,
+        anomalous_snapshots_quarantined: metricSnapshots?.anomalous ?? 0,
+        snapshots_with_generation_lineage: metricSnapshots?.linked ?? 0,
         user_insights_cached: userInsights !== null,
         follower_snapshot_saved: snapshotDate !== null && currentFollowersCount !== null,
       });
     } catch (error) {
-      logWorkerEvent("THREADS_DAILY_INSIGHTS_REFRESH_FAILED", {
+      logWorkerEvent("THREADS_SIX_HOUR_INSIGHTS_REFRESH_FAILED", {
         configured_account_id: configuredAccount.id,
         configured_username: configuredAccount.username,
         error: getErrorMessage(error),
