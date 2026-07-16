@@ -15697,6 +15697,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
+      await ensureOperatorMcpAdminTables(env);
       const executionPolicy = buildOperatorExecutionPolicy(toolName, args);
       const aliasRetryBlock = await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
       if (aliasRetryBlock) {
