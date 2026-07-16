@@ -137,9 +137,8 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
       brand_key: governanceBrand,
       decision_id: proposed.structuredContent.decision.id,
       resolution: "approve",
-      owner_response: "Approved automatically by the isolated test harness.",
+            owner_response: "Approved automatically by the isolated test harness.",
       proceed_confirmed: true,
-      continuity_loaded: mcpContinuityLoaded,
     });
     expect(approved.isError, `resolveOperatorDecision for ${toolName}`).not.toBe(true);
     result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
