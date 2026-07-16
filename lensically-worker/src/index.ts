@@ -15019,8 +15019,64 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     };
   }
 
-  if (toolName === "getOperatorStartupContext") {
+    if (toolName === "getOperatorStartupContext") {
     return buildOperatorStartupContext(request, env);
+  }
+
+  if (toolName === "guardLensicallyCall") {
+    const intendedTool = normalizeOperatorText(args.intended_tool, 160);
+    const argumentsJson = normalizeOperatorText(args.arguments_json, 50000) ?? "{}";
+    const parsed = safeParseJsonString(argumentsJson);
+    if (!intendedTool || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, error: "execution_guard_arguments_invalid", required_format: "arguments_json must contain one JSON object" };
+    }
+    const availableTools = await buildOperatorMcpTools(env, false, false);
+    const intendedDefinition = availableTools.find((tool) => tool.name === intendedTool);
+    if (!intendedDefinition) {
+      return { ok: false, error: "execution_guard_unknown_tool", intended_tool: intendedTool };
+    }
+    const intendedArgs = { ...(parsed as Record<string, unknown>) };
+    delete intendedArgs.execution_guard;
+    const normalized = normalizeOperatorGuardValue(intendedArgs, intendedDefinition.inputSchema as Record<string, unknown>);
+    const normalizedArguments = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
+      ? normalized.value as Record<string, unknown>
+      : {};
+    if (normalized.errors.length) {
+      return {
+        ok: false,
+        error: "execution_guard_payload_invalid",
+        intended_tool: intendedTool,
+        normalized_arguments: normalizedArguments,
+        corrections: normalized.corrections,
+        validation_errors: normalized.errors,
+      };
+    }
+    const policy = buildOperatorExecutionPolicy(intendedTool, normalizedArguments);
+    const knownPath = policy.known_path && typeof policy.known_path === "object" && !Array.isArray(policy.known_path)
+      ? policy.known_path as Record<string, unknown>
+      : {};
+    if (knownPath.block_call === true) {
+      return {
+        ok: false,
+        error: "known_blocker_prevented",
+        intended_tool: intendedTool,
+        normalized_arguments: normalizedArguments,
+        corrections: normalized.corrections,
+        execution_policy: policy,
+        required_route: knownPath.mandatory_route ?? null,
+        suggested_tools: knownPath.suggested_tools ?? [],
+      };
+    }
+    return {
+      ok: true,
+      guard_version: OPERATOR_EXECUTION_GUARD_VERSION,
+      intended_tool: intendedTool,
+      normalized_arguments: normalizedArguments,
+      corrections: normalized.corrections,
+      execution_guard: await createOperatorExecutionGuard(env, intendedTool, normalizedArguments),
+      execution_policy: policy,
+      expires_in_seconds: OPERATOR_EXECUTION_GUARD_TTL_SECONDS,
+    };
   }
 
   if (toolName === "engineeringPrecheck") {
