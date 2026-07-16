@@ -13917,7 +13917,7 @@ async function getOperatorMcpBoundaryBlock(
   const legacyReference = serverContinuity ? null : await readOperatorContinuityReference(env, legacyCredential, "continuity_context", requestedBrand);
   const legacyContinuity = serverContinuity || legacyReference ? null : await verifyOperatorContinuityToken(env, legacyCredential, requestedBrand);
   const continuity = serverContinuity ?? legacyReference ?? legacyContinuity;
-  if (!continuityLoaded || !continuity) {
+  if (!continuity) {
     return {
       ok: false,
       error: "continuity_context_required",
