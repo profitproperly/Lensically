@@ -14153,14 +14153,31 @@ async function completeOperatorAutonomyAuthorization(
 ): Promise<void> {
   if (!authorization.event_id) return;
   const succeeded = result.ok !== false;
+  const resultSummary = JSON.stringify({ ok: succeeded, error: result.error ?? null, status: result.status ?? null }).slice(0, 2000);
   await env.DB.prepare(
     `UPDATE operator_decision_execution_events
      SET status = ?, result_summary = ?, completed_at = CURRENT_TIMESTAMP
      WHERE id = ?`,
   ).bind(
     succeeded ? "completed" : "failed",
-    JSON.stringify({ ok: succeeded, error: result.error ?? null, status: result.status ?? null }).slice(0, 2000),
+    resultSummary,
     authorization.event_id,
+  ).run();
+  if (!authorization.decision_id) return;
+  const incomplete = await env.DB.prepare(
+    `SELECT COUNT(*) AS total FROM operator_decision_execution_events
+     WHERE decision_id = ? AND status = 'started'`,
+  ).bind(authorization.decision_id).first<{ total: number }>();
+  if (Number(incomplete?.total ?? 0) > 0) return;
+  await env.DB.prepare(
+    `UPDATE operator_decision_proposals
+     SET status = 'executed', outcome_summary = ?, result_evidence_json = ?,
+         executed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND status IN ('approved', 'executing')`,
+  ).bind(
+    succeeded ? "Owner-ratified protected operation completed." : "Owner-ratified protected operation executed but returned a failure.",
+    JSON.stringify([{ ok: succeeded, result: safeParseJsonString(resultSummary) ?? resultSummary }]),
+    authorization.decision_id,
   ).run();
 }
 
