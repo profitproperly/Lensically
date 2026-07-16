@@ -2424,7 +2424,25 @@ describe("operator mode MCP endpoint", () => {
     expect(scheduled.results.every((result) => result.success && Number(result.scheduled_post_id ?? 0) > 0)).toBe(true);
     expect(scheduled.review_batch.status).toBe("completed");
     expect(scheduled.review_batch.items.every((item) => item.status === "scheduled" && Number(item.scheduled_post_id ?? 0) > 0)).toBe(true);
-  }, 50000);
+
+    await env.DB.prepare(
+      `UPDATE operator_review_batches SET status = 'owner_review' WHERE id = ?`,
+    ).bind(batch.review_batch_id).run();
+    const continued = await mcpToolRaw<{
+      continuity_capsule: {
+        active_review_batch: null;
+        completed_review_batch: { review_batch_id: string };
+        workflow_checkpoint: { next_pending_action: string; canonical_next_tool: string };
+      };
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(continued.isError).not.toBe(true);
+    expect(continued.structuredContent.continuity_capsule.active_review_batch).toBeNull();
+    expect(continued.structuredContent.continuity_capsule.completed_review_batch.review_batch_id).toBe(batch.review_batch_id);
+    expect(continued.structuredContent.continuity_capsule.workflow_checkpoint).toMatchObject({
+      next_pending_action: "confirm_fill_calendar_day",
+      canonical_next_tool: "get_hourly_coverage",
+    });
+  }, 60000);
 
     it("automatic continuity prioritizes the earliest incomplete calendar day without redrawing", async () => {
 
