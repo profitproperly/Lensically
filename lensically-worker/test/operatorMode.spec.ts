@@ -2496,6 +2496,16 @@ describe("operator mode MCP endpoint", () => {
     expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.objective).toContain("1,000,000 followers");
   }, 40000);
 
+    it("returns a compact tool inventory without recursive payloads", async () => {
+    const listed = await mcpTool<{ tools: Array<{ name: string; required_fields: string[]; disabled: boolean }> }>("listMcpTools", {
+      include_disabled: true,
+    });
+    expect(listed.tools.length).toBeGreaterThan(0);
+    expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
+    expect(listed.tools.every((tool) => Array.isArray(tool.required_fields))).toBe(true);
+    expect(JSON.stringify(listed)).not.toContain("inputSchema");
+  });
+
   it("returns structured JSON-RPC errors for handler exceptions", async () => {
     await env.DB.prepare(`DROP TABLE IF EXISTS operator_workflow_requirements`).run();
     await env.DB.prepare(`CREATE TABLE operator_workflow_requirements (bad_column TEXT)`).run();

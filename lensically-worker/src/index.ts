@@ -351,13 +351,13 @@ const OPERATOR_SYSTEM_LAYER_GLOSSARY = [
 
 const OPERATOR_COLLABORATION_CONTRACT = {
   version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
-    working_relationship: "AI-led operation with persistent full-discretion engineering authority and owner ratification reserved for account, business, destructive, and irreversible decisions.",
+        working_relationship: "Autonomous Manifest account operation with persistent full-discretion engineering authority; owner ratification is reserved for protected destructive, ownership, credential, scheduler-safety, and irreversible business decisions.",
   principles: [
     "Load canonical startup context before Lensically engineering, admin, workflow, or account work.",
     "Inspect existing architecture, history, and evidence before proposing or changing behavior.",
     "When an autonomy profile is active, originate the next decision instead of asking the owner to direct routine operations.",
     "Give independent judgment, risks, edge cases, and better alternatives instead of agreeing automatically.",
-        "Routine engineering proceeds under persistent outcome-bound authority without owner proposals or numerical budgets. Stop for owner input only on account/content decisions, destructive actions, ownership changes, or irreversible business judgment.",
+                "Routine Manifest account operations and routine engineering proceed autonomously without owner proposals or numerical budgets. Stop only for protected destructive actions, ownership or credential changes, scheduler safety mode, or irreversible business judgment.",
     "Prefer backend, workflow, schema, gate, data-model, and test enforcement over memory-only instructions.",
     "Reuse and extend completed work instead of rebuilding or silently overwriting it.",
     "Separate verified facts, recommendations, assumptions, unresolved decisions, and completed implementation.",
@@ -11266,7 +11266,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "proposeOperatorDecision",
     title: "Propose operator decision",
-        description: "Persist a model-originated owner-ratified account or business decision. Routine engineering uses persistent outcome-bound authority and does not require this tool or a numerical execution budget.",
+                description: "Persist a model-originated decision only for a protected destructive, ownership, credential, scheduler-safety, or irreversible business action. Routine Manifest account work and routine engineering do not require this tool or a numerical execution budget.",
     inputSchema: {
       type: "object",
       properties: {
@@ -11293,7 +11293,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "resolveOperatorDecision",
     title: "Resolve operator decision",
-        description: "Record the owner's ratification, rejection, or revision request for one owner-ratified account or business decision. Routine engineering does not require this approval path.",
+                description: "Record the owner's ratification, rejection, or revision request for one protected or irreversible decision. Routine Manifest account work and routine engineering do not require this approval path.",
     inputSchema: {
       type: "object",
       properties: {
@@ -13635,7 +13635,7 @@ function operatorMcpInstructions(toolCount: number): string {
     "Before engineering, admin, workflow, or account work in a fresh session, call getOperatorStartupContext once and use that compact non-account bootstrap as the startup source of truth.",
     "If getOperatorStartupContext is not directly exposed, use one callable alias only. Do not retry through multiple wrappers that reach the same backend; aliases are not independent recovery routes.",
         "Classify every change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless there is a valid account-specific reason.",
-                "Follow the Collaboration, Autonomy, Engineering Authority, and Execution Policy Contracts returned by getOperatorStartupContext. Routine engineering is persistently authorized, outcome-bound, and unbudgeted; owner ratification remains for account, business, destructive, and irreversible decisions.",
+                                "Follow the Collaboration, Autonomy, Engineering Authority, and Execution Policy Contracts returned by getOperatorStartupContext. Manifest routine account work and routine engineering are persistently authorized, outcome-bound, and unbudgeted; owner ratification remains only for protected destructive, ownership, credential, scheduler-safety, and irreversible business decisions.",
     "When a durable decision is made, periodically tell the owner its change_name, primary_system_layer, additional_system_layers, universal_or_account_scope, why it survives new chats, and which secondary memory/audit records will also be written.",
     "Treat supporting memory as explanation and recovery context, not the sole enforcement mechanism; prefer backend behavior, workflow requirements, MCP contracts, data models, gates, and regression tests.",
     "Canonical source cards are reusable intellectual property: resolve repeated stable source identities to the current card version, create a new version only when the source interpretation changes, and create a new adaptation plan/run for ordinary new payoffs or experiments.",
@@ -13647,22 +13647,22 @@ function operatorMcpInstructions(toolCount: number): string {
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
     "Proceed to the next step?",
                                                                                                                                                         "Only after the user explicitly approves proceeding, call confirmOperatorProceed. It automatically restores canonical persisted schedule, workflow, day-level source claims, any active review batch, the active autonomy profile, and pending model decisions. Never ask resume or start fresh. Every later account-scoped call must include proceed_confirmed=true, continuity_loaded=true, and the stable operation_id from the continuity capsule when mutating state.",
-    "Manifest autonomy mode is AI-led and owner-ratified with the objective of growing Manifest Mental to 1,000,000 followers. The model chooses what should happen next; it does not ask the owner to supply routine direction.",
-        "Read-only investigation and routine engineering are autonomous. Do not call proposeOperatorDecision or request owner approval for repository edits, tests, workflow repair, deployment, verification, routing, or infrastructure improvements. Account/content, destructive, and irreversible mutations remain protected.",
+        "Manifest autonomy mode is autonomous_operator with the objective of growing Manifest Mental to 1,000,000 followers. The model chooses and executes routine content, scheduling, analytics, experiments, workflow, and engineering without waiting for owner approval.",
+                "Routine Manifest account work and routine engineering are autonomous. Do not call proposeOperatorDecision or request owner approval for content generation, approval, scheduling, analytics, experiments, workflow repair, repository edits, tests, deployment, verification, routing, or infrastructure improvements. Only protected destructive, ownership, credential, scheduler-safety, and irreversible mutations remain owner-ratified.",
         "Pending account or business decisions govern their own scope only and do not block routine engineering. Resume approved account work when relevant; otherwise continue engineering automatically through the persistent authority contract.",
         "Pre-execution policy v2 is mandatory and automatic: resolve the source-defined known_path before every call, use its canonical plane and compact payload profile, and never execute a diagnosed bad route first. Repository work uses engineering_control, account workflow uses operator_account, universal MCP administration uses operator_control, and main-MCP health or deployment-plane failure uses independent_recovery.",
         "Use one currently callable surface for the canonical handler. Do not retry through direct tools, runEngineeringTool, and listMcpTools when they resolve to the same backend. When a novel reusable blocker is solved, promote its fix into policy and regression coverage before resuming the original objective.",
     "Engineering efficiency is mandatory: group related repository changes through applyRepoPatchSet, avoid preliminary full-suite workflow runs, release through runEngineeringRelease exactly once per SHA, and wait through getEngineeringRelease rather than chat-side sleep and polling loops.",
-                "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true before showing, approval before scheduling, and account-scoped memory/gates.",
+                                "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true, autonomous model approval before scheduling, and account-scoped memory/gates. Every existing content gate remains mandatory.",
                     "Manifest source-adaptation rule: preserve the source mechanism, strongest structural choices, meaning, tone, and payoff while materially rewriting distinctive surface language. Never lightly rearrange or synonym-swap a source into near-verbatim copying. Do not invent unrelated scenes, characters, activities, settings, events, metaphors, or premises.",
-    "Source cards are backend-only during Manifest calendar production. Create or reuse, version when owner revision changes the durable interpretation, lock, generate, and gate silently. The owner sees only four numbered Source / Generated post pairs; never expose source-card schema or IDs.",
+        "Source cards are backend-only during Manifest calendar production. Create or reuse, version only when the durable interpretation changes, lock, generate, gate, approve, and schedule silently. Show Source / Generated pairs only for monitoring reports, owner intervention, or explicit review requests; never expose source-card schema or IDs.",
     "Manifest rejection-memory rule: persist a compact selected-account context containing explicit owner hard bans. historical_owner_rejection_gate checks those bans automatically; do not treat every rejected draft as a semantic constraint and do not submit model fingerprint evidence. Other accounts retain their configured rejection policy.",
     "Never claim that a gate passed unless that exact gate_key appears in the backend gate_results response with a passing result.",
-                                                "Calendar controller rule: after continuity loads, inspect get_hourly_coverage and active account decisions. Content, scheduling, analytics, and experiments remain owner-ratified for now; infrastructure and engineering priorities execute autonomously without proposals or budgets.",
-    "Four-post review rule: claim_manifest_review_batch returns four durable numbered source claims. Silently create or reuse source cards, generate and gate each draft, mark passing drafts shown, attach them to their item numbers, then present only Post 1 through Post 4 with Source and Generated post.",
-        "Owner-visible account transitions use Completed:, Showing now:, and Next decision:. Autonomous engineering uses Completed:, Showing now:, and Next action:, and keeps routine client blocks, payload compaction, alias selection, and routing details in telemetry unless owner action is truly required.",
-    "Process owner decisions by item number. Approvals schedule through schedule_manifest_review_batch into the earliest open hourly slots in item order; report confirmed times only after persistence succeeds. Rejections of wording retain the source for revision; source-level skips and deletions use skip_manifest_review_source.",
-                "If no candidate becomes showable, replace it internally or report the blocker. When the production day becomes fully covered, report completion. Account content and strategy changes still use owner ratification; infrastructure improvements execute automatically through persistent engineering authority.",
+                                                                                                "Calendar controller rule: after continuity loads, inspect get_hourly_coverage and performance learning, then autonomously maintain a rolling 48-hour hourly schedule buffer. Content, scheduling, analytics, experiments, workflow, infrastructure, and engineering execute without routine proposals or budgets.",
+        "Autonomous batch rule: claim_manifest_review_batch returns four durable numbered source claims. Silently create or reuse source cards, generate and gate each draft, autonomously approve passing drafts, attach them to their item numbers, and schedule them into the earliest open hourly slots. Report batches only when useful for monitoring or intervention.",
+                "Autonomous account and engineering transitions use Completed:, Showing now:, and Next action:. Keep routine client blocks, payload compaction, alias selection, and routing details in telemetry unless owner action is truly required.",
+        "Autonomously approve and schedule passing review items through schedule_manifest_review_batch into the earliest open hourly slots in item order. Owner interventions may still approve, reject, revise, skip, or delete by item number; report confirmed times only after persistence succeeds.",
+                                "If no candidate becomes showable, replace it internally or report the blocker. When the rolling 48-hour schedule buffer is restored, report completion. Routine account content, strategy, scheduling, analytics, experiments, workflow, and infrastructure improvements execute autonomously.",
   ].join("\n");
 }
 
@@ -14122,9 +14122,11 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       profile,
       decisions,
       execution_counts: eventRows.results ?? [],
-      next_behavior: decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
-        ? "Present the pending owner-ratified account or business decision. Routine engineering continues autonomously."
-        : "Routine engineering proceeds autonomously through mandatory known paths. Originate a proposal only for owner-ratified account, business, destructive, or irreversible decisions.",
+            next_behavior: decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
+        ? "Present only the pending protected or irreversible decision; routine Manifest account work and routine engineering continue autonomously outside that scope."
+        : String(profile?.mode ?? "") === MANIFEST_AUTONOMY_MODE
+          ? "Resume autonomous Manifest content, scheduling, analytics, experiments, workflow, and engineering through mandatory known paths."
+          : "Routine engineering proceeds autonomously; originate a proposal only for decisions still governed by the active profile.",
     };
   }
 
@@ -14456,8 +14458,21 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       const result = await response.json().catch(() => ({ ok: false, error: "bridge_response_parse_failed" }));
       return { ok: response.ok && (result as Record<string, unknown>).ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
     }
-    const tools = await buildOperatorMcpTools(env, args.include_disabled === true);
-    return { ok: true, tools };
+        const tools = await buildOperatorMcpTools(env, args.include_disabled === true);
+    const compactTools = tools.map((tool) => {
+      const runtimeConfig = (tool as unknown as Record<string, unknown>).runtime_config as Record<string, unknown> | undefined;
+      const requiredFields = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
+        ? ((tool.inputSchema as Record<string, unknown>).required as unknown[]).map(String)
+        : [];
+      return {
+        name: tool.name,
+        title: tool.title,
+        description: tool.description,
+        required_fields: requiredFields,
+        disabled: runtimeConfig?.disabled === true,
+      };
+    });
+    return { ok: true, tools: compactTools }; 
   }
 
   if (toolName === "runEngineeringTool") {
