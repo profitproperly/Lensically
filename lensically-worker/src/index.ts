@@ -13559,6 +13559,8 @@ async function recordOperatorExecutionDecision(
   const evidence = {
     ...policy,
     canonical_fingerprint: await operatorExecutionFingerprint(toolName, args),
+    runtime_commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+    runtime_mcp_version: OPERATOR_MCP_VERSION,
   };
   const insertExecutionEvent = () => env.DB.prepare(
     `INSERT INTO operator_execution_events (
