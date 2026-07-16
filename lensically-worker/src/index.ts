@@ -15094,6 +15094,20 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     return { ok: true, scheduler: await readScheduledPostSchedulerHealth(env) };
   }
 
+    if (toolName === "runApprovedPostCanary") {
+    const scheduledPostId = Math.trunc(Number(args.scheduled_post_id));
+    const reason = normalizeOperatorText(args.reason, 500);
+    if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !reason) {
+      return { ok: false, error: "scheduled_post_id_and_reason_required" };
+    }
+    const result = await setScheduledPostSchedulerControl(env, {
+      mode: "canary",
+      allowedPostIds: [scheduledPostId],
+      reason,
+    });
+    return { ok: true, scheduler: result, scheduled_post_id: scheduledPostId, mode: "canary" };
+  }
+
   if (toolName === "setScheduledPostSchedulerMode") {
     const mode = normalizeOperatorText(args.mode, 20, true) as ScheduledPostSchedulerMode | null;
     const reason = normalizeOperatorText(args.reason, 500);
