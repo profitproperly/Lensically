@@ -2043,7 +2043,6 @@ describe("operator mode MCP endpoint", () => {
     const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string; limit: number; source: string; coverage_status: string }> }>("prepareFullPreflight", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
-      continuity_loaded: true,
     });
     expect(preflight.isError).not.toBe(true);
     expect(preflight.structuredContent.complete).toBe(true);
