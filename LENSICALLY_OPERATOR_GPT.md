@@ -48,7 +48,9 @@ For generation, scheduling, growth review, or strategy work:
 - Separate engagement winners from follower-growth winners.
 - Prefer raising the engagement floor over chasing one viral outlier.
 - Use follower context, post archive, saved patterns, scheduled strategy tags, tag performance, experiments, and owner feedback together.
-- Treat posted tag performance and follower-day movement as directional evidence with sample-size caution.
+- Treat maturity-normalized post evidence and confidence-scored feature hypotheses as directional evidence with sample-size caution.
+- Keep follower count as separate account-level trajectory data. Never attribute follower changes to a post, posting day, batch, surrounding window, or posting period.
+
 - If evidence is thin, propose a test with sample size, success criteria, and review window.
 - If evidence is strong, propose a reviewable rule change with supporting data.
 

@@ -1,10 +1,14 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker, {
-  ScheduledPostScheduler,
+    ScheduledPostScheduler,
+  buildOperatorMaturityObservation,
+  buildOperatorPostFingerprint,
   evaluateThreadsPostMetricsForLearning,
   isSixHourInsightsRefreshWindow,
+  OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
   shouldAutoArmScheduledPostAlarm,
+
 } from "../src";
 
 const AUTH_HEADERS = {
@@ -424,10 +428,70 @@ describe("operator mode backend spine", () => {
     });
     expect(broken.validForLearning).toBe(false);
     expect(broken.anomalyReason).toContain("likes_exceeds_views");
-    expect(broken.anomalyReason).toContain("shares_exceeds_views");
+        expect(broken.anomalyReason).toContain("shares_exceeds_views");
+  });
+
+  it("fingerprints content and evaluates age-matched post performance without follower attribution", () => {
+    const fingerprint = buildOperatorPostFingerprint({
+      text: "Trust what your intuition keeps telling you. BELIEVE IT.",
+      strategy: {
+        pillar: "intuition",
+        hook_style: "direct_validation",
+        format: "short_text",
+        intent: "reassurance",
+        experiment: "payoff_test",
+        novelty_level: "improvement",
+      },
+      sourceCard: {
+        source_mechanism: "urgent_internal_warning",
+        required_product: "permission_to_trust_yourself",
+      },
+      sourceSelection: { source_identity_key: "threads:source-1" },
+      adaptationPlan: { adaptation_style: "structure_preserving_rewrite" },
+    });
+    expect(OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS).toEqual([6, 12, 24, 48, 72]);
+    expect(fingerprint).toMatchObject({
+      hook_style: "direct_validation",
+      topic: "intuition",
+      source_mechanism: "urgent_internal_warning",
+      payoff_style: "all_caps_declaration",
+      adaptation_style: "structure_preserving_rewrite",
+      direct_address: "yes",
+    });
+    expect(JSON.stringify(fingerprint)).not.toContain("follower");
+
+    const observation = buildOperatorMaturityObservation({
+      checkpointHours: 12,
+      currentMetrics: {
+        views: 260,
+        likes: 30,
+        replies: 6,
+        reposts: 3,
+        quotes: 1,
+        shares: 2,
+        engagement_total: 42,
+      },
+      currentAgeHours: 12,
+      previousMetrics: {
+        views: 100,
+        likes: 8,
+        replies: 1,
+        reposts: 0,
+        quotes: 0,
+        shares: 0,
+        engagement_total: 9,
+      },
+      previousAgeHours: 6,
+    });
+    expect(observation.distribution_state).toBe("accelerating");
+    expect(observation.rates.like_rate).toBeCloseTo(30 / 260, 6);
+    expect(observation.rates.propagation_rate).toBeCloseTo(6 / 260, 6);
+    expect(observation.velocity.interval_views_per_hour).toBeCloseTo(160 / 6, 3);
+    expect(JSON.stringify(observation)).not.toContain("follower");
   });
 
     it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
+
     const values = new Map<string, unknown>();
     let alarmAt: number | null = null;
     const state = {
@@ -1647,8 +1711,10 @@ describe("operator mode MCP endpoint", () => {
       "save_strategy_memory",
       "list_scheduled_posts",
       "schedule_approved_draft",
-            "get_post_results",
+                        "get_post_results",
+      "get_performance_learning",
       "selectOperatorKey",
+
       "confirmOperatorProceed",
       "resolveContinuationContext",
             "planOperatorExecution",
@@ -1846,7 +1912,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.10.0");
+                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.11.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("mandatory known_path");
@@ -2500,7 +2566,7 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.10.0");
+                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.11.0");
     expect(listed.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
       "engineeringPrecheck",
@@ -2563,7 +2629,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-        expect(payload.mcp_version).toBe("1.10.0");
+        expect(payload.mcp_version).toBe("1.11.0");
     expect(payload.registry_generation).toBe("recursive-engineering-execution-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
