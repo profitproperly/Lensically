@@ -2430,9 +2430,8 @@ describe("operator mode MCP endpoint", () => {
     const second = await mcpToolRaw<{ ok: boolean }>("save_strategy_memory", {
       brand_key: "manifest_mental",
       kind: "current_belief",
-      body: "Second autonomous Manifest mutation fixture.",
+            body: "Second autonomous Manifest mutation fixture.",
       proceed_confirmed: true,
-      continuity_loaded: true,
     });
     expect(second.isError).not.toBe(true);
     expect(second.structuredContent.ok).toBe(true);
