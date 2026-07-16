@@ -20611,7 +20611,876 @@ export function evaluateThreadsPostMetricsForLearning(post: CachedThreadsPost): 
   };
 }
 
+const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v1";
+const OPERATOR_POST_FINGERPRINT_VERSION = "post-fingerprint-v1";
+export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 24, 48, 72] as const;
+
+type OperatorMetricRecord = {
+  views: number;
+  likes: number;
+  replies: number;
+  reposts: number;
+  quotes: number;
+  shares: number;
+  engagement_total: number;
+};
+
+type OperatorPerformanceScoreRecord = {
+  reach: number;
+  resonance: number;
+  propagation: number;
+  conversation: number;
+  overall: number;
+};
+
+function stableOperatorTextHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function operatorRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function normalizeOperatorFeatureValue(value: unknown, fallback = "unknown"): string {
+  return normalizeGptStrategyToken(value, 120) ?? fallback;
+}
+
+function operatorMetricRecord(value: unknown): OperatorMetricRecord {
+  const record = operatorRecord(value);
+  return {
+    views: Math.max(0, Number(record.views ?? 0)),
+    likes: Math.max(0, Number(record.likes ?? 0)),
+    replies: Math.max(0, Number(record.replies ?? 0)),
+    reposts: Math.max(0, Number(record.reposts ?? 0)),
+    quotes: Math.max(0, Number(record.quotes ?? 0)),
+    shares: Math.max(0, Number(record.shares ?? 0)),
+    engagement_total: Math.max(0, Number(record.engagement_total ?? 0)),
+  };
+}
+
+function operatorScoreRecord(value: unknown): OperatorPerformanceScoreRecord {
+  const record = operatorRecord(value);
+  return {
+    reach: Number(record.reach ?? 50),
+    resonance: Number(record.resonance ?? 50),
+    propagation: Number(record.propagation ?? 50),
+    conversation: Number(record.conversation ?? 50),
+    overall: Number(record.overall ?? 50),
+  };
+}
+
+function operatorAverage(values: number[]): number {
+  const valid = values.filter((value) => Number.isFinite(value));
+  return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : 0;
+}
+
+function operatorPercentileRank(value: number, values: number[]): number {
+  const valid = values.filter((candidate) => Number.isFinite(candidate));
+  if (!valid.length || !Number.isFinite(value)) return 50;
+  const below = valid.filter((candidate) => candidate < value).length;
+  const equal = valid.filter((candidate) => candidate === value).length;
+  return Number((((below + equal * 0.5) / valid.length) * 100).toFixed(2));
+}
+
+function inferOperatorOpeningType(text: string): string {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return "empty";
+  if (normalized.endsWith("?") || /^(what|why|how|when do|do you|are you)\b/.test(normalized)) return "question";
+  if (/^(repeat after me|say this|remember|trust|believe|stop|never|do not|don't|let go|listen)\b/.test(normalized)) return "directive";
+  if (/^(when|if|whenever|once)\b/.test(normalized)) return "conditional";
+  if (/^(you|your)\b/.test(normalized)) return "direct_address";
+  if (/^(i|i'm|im|my)\b/.test(normalized)) return "first_person";
+  return "statement";
+}
+
+function inferOperatorPayoffStyle(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "empty";
+  const segments = trimmed.split(/\n|(?<=[.!?])\s+/).map((segment) => segment.trim()).filter(Boolean);
+  const ending = segments[segments.length - 1] ?? trimmed;
+  if (ending.endsWith("?")) return "question";
+  const letters = ending.replace(/[^A-Za-z]/g, "");
+  if (letters.length >= 4 && letters === letters.toUpperCase()) return "all_caps_declaration";
+  if (/^(believe|trust|remember|stop|never|do not|don't|keep|choose|let)\b/i.test(ending)) return "directive";
+  if (segments.length > 1 && normalizeComparableText(segments[0]) === normalizeComparableText(ending)) return "repeated_refrain";
+  return "declaration";
+}
+
+function inferOperatorTone(text: string, metadata: Record<string, unknown>): string {
+  const explicit = normalizeGptStrategyToken(metadata.tone ?? metadata.voice ?? metadata.emotional_tone, 80);
+  if (explicit) return explicit;
+  const letters = text.replace(/[^A-Za-z]/g, "");
+  const uppercaseRatio = letters.length ? letters.replace(/[^A-Z]/g, "").length / letters.length : 0;
+  if (text.includes("!") || uppercaseRatio >= 0.35) return "forceful";
+  if (/\b(maybe|perhaps|sometimes|wonder|realize|notice)\b/i.test(text)) return "reflective";
+  if (text.includes("?")) return "inquisitive";
+  return "direct";
+}
+
+export function buildOperatorPostFingerprint(input: {
+  text: string;
+  strategy?: Record<string, unknown> | null;
+  sourceCard?: Record<string, unknown> | null;
+  sourceSelection?: Record<string, unknown> | null;
+  adaptationPlan?: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  const text = input.text.trim();
+  const strategy = operatorRecord(input.strategy);
+  const parsedStrategyMetadata = safeParseJsonString(String(strategy.metadata_json ?? ""));
+  const strategyMetadata = operatorRecord(strategy.metadata ?? parsedStrategyMetadata);
+  const sourceCard = operatorRecord(input.sourceCard);
+  const sourceSelection = operatorRecord(input.sourceSelection);
+  const adaptationPlan = operatorRecord(input.adaptationPlan);
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const sentences = text.split(/[.!?]+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
+  const words = text.split(/\s+/).filter(Boolean);
+  const structure = lines.length > 1
+    ? "line_broken"
+    : sentences.length <= 1
+      ? "single_sentence"
+      : sentences.length === 2
+        ? "two_sentence"
+        : "multi_sentence";
+  const lengthBucket = words.length <= 8 ? "micro" : words.length <= 20 ? "short" : words.length <= 40 ? "medium" : "long";
+  return {
+    version: OPERATOR_POST_FINGERPRINT_VERSION,
+    text_hash: stableOperatorTextHash(text),
+    hook_style: normalizeOperatorFeatureValue(strategy.hook_style ?? strategyMetadata.hook_style, "unclassified"),
+    topic: normalizeOperatorFeatureValue(strategy.pillar ?? sourceCard.lane_key ?? strategyMetadata.topic, "unclassified"),
+    format: normalizeOperatorFeatureValue(strategy.format, structure),
+    intent: normalizeOperatorFeatureValue(strategy.intent ?? strategyMetadata.intent, "unclassified"),
+    experiment: normalizeOperatorFeatureValue(strategy.experiment, "none"),
+    novelty_level: normalizeOperatorFeatureValue(strategy.novelty_level, "unclassified"),
+    source_mechanism: normalizeOperatorFeatureValue(sourceCard.source_mechanism, "unclassified"),
+    audience_reward: normalizeOperatorFeatureValue(sourceCard.required_product ?? strategyMetadata.audience_reward, "unclassified"),
+    opening_type: inferOperatorOpeningType(text),
+    structure,
+    length_bucket: lengthBucket,
+    payoff_style: inferOperatorPayoffStyle(text),
+    tone: inferOperatorTone(text, strategyMetadata),
+    direct_address: /\b(you|your|you're|youre)\b/i.test(text) ? "yes" : "no",
+    adaptation_style: normalizeOperatorFeatureValue(
+      adaptationPlan.adaptation_style ?? adaptationPlan.variation_axis ?? adaptationPlan.experiment_key ?? strategy.experiment,
+      "baseline",
+    ),
+    source_identity_key: normalizeOperatorFeatureValue(sourceSelection.source_identity_key ?? sourceCard.family_id, "unlinked"),
+    word_count: words.length,
+    sentence_count: sentences.length,
+    line_count: lines.length,
+  };
+}
+
+export function buildOperatorMaturityObservation(input: {
+  checkpointHours: number;
+  currentMetrics: Record<string, unknown>;
+  currentAgeHours: number;
+  previousMetrics?: Record<string, unknown> | null;
+  previousAgeHours?: number | null;
+}): {
+  metrics: OperatorMetricRecord;
+  rates: Record<string, number>;
+  velocity: Record<string, number>;
+  distribution_state: "initial" | "accelerating" | "sustained" | "stalled";
+} {
+  const metrics = operatorMetricRecord(input.currentMetrics);
+  const previous = input.previousMetrics ? operatorMetricRecord(input.previousMetrics) : null;
+  const denominator = Math.max(metrics.views, 1);
+  const currentAge = Math.max(input.currentAgeHours, 0.25);
+  const previousAge = Math.max(Number(input.previousAgeHours ?? 0), 0);
+  const intervalHours = previous && previousAge > 0 ? Math.max(currentAge - previousAge, 0.25) : currentAge;
+  const delta = (key: keyof OperatorMetricRecord) => previous ? Math.max(0, metrics[key] - previous[key]) : metrics[key];
+  const intervalViewVelocity = delta("views") / intervalHours;
+  const previousCumulativeVelocity = previous && previousAge > 0 ? previous.views / previousAge : 0;
+  const velocityRatio = previousCumulativeVelocity > 0 ? intervalViewVelocity / previousCumulativeVelocity : 1;
+  const distributionState = !previous
+    ? "initial"
+    : intervalViewVelocity <= 0
+      ? "stalled"
+      : velocityRatio >= 1.25
+        ? "accelerating"
+        : velocityRatio >= 0.35
+          ? "sustained"
+          : "stalled";
+  return {
+    metrics,
+    rates: {
+      like_rate: Number((metrics.likes / denominator).toFixed(6)),
+      propagation_rate: Number(((metrics.reposts + metrics.quotes + metrics.shares) / denominator).toFixed(6)),
+      conversation_rate: Number((metrics.replies / denominator).toFixed(6)),
+      engagement_rate: Number(((metrics.likes + metrics.replies + metrics.reposts + metrics.quotes + metrics.shares) / denominator).toFixed(6)),
+    },
+    velocity: {
+      cumulative_views_per_hour: Number((metrics.views / currentAge).toFixed(4)),
+      interval_views_per_hour: Number(intervalViewVelocity.toFixed(4)),
+      interval_likes_per_hour: Number((delta("likes") / intervalHours).toFixed(4)),
+      interval_reposts_per_hour: Number((delta("reposts") / intervalHours).toFixed(4)),
+      interval_replies_per_hour: Number((delta("replies") / intervalHours).toFixed(4)),
+      velocity_ratio_to_prior_cumulative: Number(velocityRatio.toFixed(4)),
+    },
+    distribution_state: distributionState,
+  };
+}
+
+function operatorFingerprintDimensions(fingerprint: Record<string, unknown>): Array<{ dimension: string; feature: string }> {
+  return [
+    "hook_style", "topic", "format", "intent", "experiment", "novelty_level",
+    "source_mechanism", "audience_reward", "opening_type", "structure", "length_bucket",
+    "payoff_style", "tone", "direct_address", "adaptation_style",
+  ].map((dimension) => ({ dimension, feature: normalizeOperatorFeatureValue(fingerprint[dimension], "unknown") }))
+    .filter((item) => item.feature !== "unknown" && item.feature !== "unclassified");
+}
+
+async function ensureOperatorPerformanceEvaluatorTables(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_post_fingerprints (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      published_post_id TEXT NOT NULL,
+      scheduled_post_id INTEGER,
+      draft_id TEXT,
+      source_card_id TEXT,
+      source_selection_id TEXT,
+      text_hash TEXT,
+      fingerprint_version TEXT NOT NULL,
+      fingerprint_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, published_post_id)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_post_fingerprints_brand_updated
+     ON operator_post_fingerprints (brand_key, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_post_performance_scores (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      published_post_id TEXT NOT NULL,
+      checkpoint_hours INTEGER NOT NULL,
+      snapshot_id TEXT NOT NULL,
+      captured_at TEXT NOT NULL,
+      post_age_hours REAL NOT NULL,
+      metrics_json TEXT NOT NULL,
+      rates_json TEXT NOT NULL,
+      velocity_json TEXT NOT NULL,
+      scores_json TEXT NOT NULL,
+      distribution_state TEXT NOT NULL,
+      valid_for_learning INTEGER NOT NULL DEFAULT 1,
+      evaluator_version TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, published_post_id, checkpoint_hours)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_post_performance_scores_cohort
+     ON operator_post_performance_scores (brand_key, checkpoint_hours, valid_for_learning, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_performance_evidence (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      checkpoint_hours INTEGER NOT NULL,
+      dimension TEXT NOT NULL,
+      feature_key TEXT NOT NULL,
+      sample_size INTEGER NOT NULL,
+      cohort_size INTEGER NOT NULL,
+      medians_json TEXT NOT NULL,
+      effect_json TEXT NOT NULL,
+      confidence_score REAL NOT NULL,
+      confidence_label TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      evaluator_version TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, checkpoint_hours, dimension, feature_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_performance_evidence_lookup
+     ON operator_performance_evidence (brand_key, status, checkpoint_hours, confidence_score DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_performance_hypotheses (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      checkpoint_hours INTEGER NOT NULL,
+      dimension TEXT NOT NULL,
+      feature_key TEXT NOT NULL,
+      hypothesis_text TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      sample_size INTEGER NOT NULL,
+      confidence_score REAL NOT NULL,
+      confidence_label TEXT NOT NULL,
+      evidence_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      evaluator_version TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, checkpoint_hours, dimension, feature_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_performance_hypotheses_lookup
+     ON operator_performance_hypotheses (brand_key, status, confidence_score DESC, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_generation_learning_briefs (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      checkpoint_hours INTEGER,
+      sample_size INTEGER NOT NULL DEFAULT 0,
+      brief_json TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      evaluator_version TEXT NOT NULL,
+      generated_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_generation_learning_briefs_active
+     ON operator_generation_learning_briefs (brand_key, active, generated_at DESC)`,
+  ).run();
+}
+
+function chooseOperatorCheckpointSnapshot(
+  rows: Array<Record<string, unknown>>,
+  publishedAtMs: number,
+  checkpointHours: number,
+): { row: Record<string, unknown>; ageHours: number } | null {
+  const tolerance = checkpointHours >= 48 ? 8 : 7;
+  return rows.map((row) => {
+    const capturedMs = Date.parse(String(row.captured_at ?? ""));
+    return { row, ageHours: Number.isFinite(capturedMs) ? (capturedMs - publishedAtMs) / 3600000 : Number.NaN };
+  }).filter((candidate) => Number.isFinite(candidate.ageHours)
+    && candidate.ageHours >= checkpointHours
+    && candidate.ageHours <= checkpointHours + tolerance)
+    .sort((left, right) => left.ageHours - right.ageHours)[0] ?? null;
+}
+
+async function refreshOperatorPerformanceEvaluator(
+  env: Env,
+  brandKey: GptBrandKey,
+  accountId: string,
+  threadsUserId: string,
+): Promise<Record<string, unknown>> {
+  await ensureOperatorPostMetricSnapshotsTable(env);
+  await ensureOperatorPerformanceEvaluatorTables(env);
+  const postRows = await env.DB.prepare(
+    `SELECT
+       a.post_id AS published_post_id,
+       a.post_text,
+       a.post_timestamp,
+       s.id AS scheduled_post_id,
+       s.published_at,
+       d.id AS draft_id,
+       d.source_card_id,
+       r.adaptation_plan_json,
+       t.pillar,
+       t.hook_style,
+       t.format,
+       t.intent,
+       t.experiment,
+       t.novelty_level,
+       t.metadata_json AS strategy_metadata_json,
+       c.family_id,
+       c.lane_key,
+       c.source_mechanism,
+       c.required_product,
+       c.recommended_direction,
+       c.source_selection_id,
+       sel.source_identity_key
+     FROM threads_posts_archive a
+     INNER JOIN (
+       SELECT DISTINCT published_post_id
+       FROM operator_post_metric_snapshots
+       WHERE brand_key = ?
+     ) snap ON snap.published_post_id = a.post_id
+     LEFT JOIN scheduled_posts s
+       ON s.threads_user_id = a.threads_user_id
+      AND s.published_post_id = a.post_id
+     LEFT JOIN gpt_generation_drafts d
+       ON d.scheduled_post_id = s.id
+      AND d.account_id = ?
+     LEFT JOIN gpt_generation_runs r ON r.id = d.run_id
+     LEFT JOIN gpt_post_strategy_tags t ON t.scheduled_post_id = s.id
+     LEFT JOIN operator_source_cards c
+       ON c.id = d.source_card_id
+      AND c.brand_key = ?
+     LEFT JOIN operator_source_selections sel ON sel.id = c.source_selection_id
+     WHERE a.threads_user_id = ?
+     ORDER BY datetime(a.post_timestamp) DESC, s.id DESC
+     LIMIT 250`,
+  ).bind(brandKey, accountId, brandKey, threadsUserId).all<Record<string, unknown>>();
+  const postsById = new Map<string, Record<string, unknown>>();
+  for (const row of postRows.results ?? []) {
+    const postId = String(row.published_post_id ?? "");
+    if (postId && !postsById.has(postId)) postsById.set(postId, row);
+  }
+  const snapshotRows = await env.DB.prepare(
+    `SELECT id, published_post_id, metrics_json, captured_at
+     FROM operator_post_metric_snapshots
+     WHERE brand_key = ? AND valid_for_learning = 1
+     ORDER BY published_post_id ASC, datetime(captured_at) ASC, datetime(created_at) ASC`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const snapshotsByPost = new Map<string, Array<Record<string, unknown>>>();
+  for (const row of snapshotRows.results ?? []) {
+    const postId = String(row.published_post_id ?? "");
+    if (!postId) continue;
+    const rows = snapshotsByPost.get(postId) ?? [];
+    rows.push(row);
+    snapshotsByPost.set(postId, rows);
+  }
+
+  let fingerprintedPosts = 0;
+  let maturityScores = 0;
+  for (const [postId, row] of postsById) {
+    const text = String(row.post_text ?? "");
+    const publishedAtMs = Date.parse(String(row.post_timestamp ?? row.published_at ?? ""));
+    if (!text || !Number.isFinite(publishedAtMs)) continue;
+    const fingerprint = buildOperatorPostFingerprint({
+      text,
+      strategy: {
+        pillar: row.pillar,
+        hook_style: row.hook_style,
+        format: row.format,
+        intent: row.intent,
+        experiment: row.experiment,
+        novelty_level: row.novelty_level,
+        metadata: safeParseJsonString(String(row.strategy_metadata_json ?? "")),
+      },
+      sourceCard: {
+        family_id: row.family_id,
+        lane_key: row.lane_key,
+        source_mechanism: row.source_mechanism,
+        required_product: row.required_product,
+        recommended_direction: row.recommended_direction,
+      },
+      sourceSelection: { source_identity_key: row.source_identity_key },
+      adaptationPlan: operatorRecord(safeParseJsonString(String(row.adaptation_plan_json ?? ""))),
+    });
+    await env.DB.prepare(
+      `INSERT INTO operator_post_fingerprints (
+        id, brand_key, published_post_id, scheduled_post_id, draft_id, source_card_id,
+        source_selection_id, text_hash, fingerprint_version, fingerprint_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(brand_key, published_post_id) DO UPDATE SET
+        scheduled_post_id = excluded.scheduled_post_id,
+        draft_id = excluded.draft_id,
+        source_card_id = excluded.source_card_id,
+        source_selection_id = excluded.source_selection_id,
+        text_hash = excluded.text_hash,
+        fingerprint_version = excluded.fingerprint_version,
+        fingerprint_json = excluded.fingerprint_json,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      crypto.randomUUID(), brandKey, postId,
+      row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : Number(row.scheduled_post_id),
+      row.draft_id ? String(row.draft_id) : null,
+      row.source_card_id ? String(row.source_card_id) : null,
+      row.source_selection_id ? String(row.source_selection_id) : null,
+      String(fingerprint.text_hash ?? ""), OPERATOR_POST_FINGERPRINT_VERSION,
+      normalizeOperatorJson(fingerprint, {}),
+    ).run();
+    fingerprintedPosts += 1;
+
+    let previousSelection: { row: Record<string, unknown>; ageHours: number } | null = null;
+    for (const checkpointHours of OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS) {
+      const selection = chooseOperatorCheckpointSnapshot(snapshotsByPost.get(postId) ?? [], publishedAtMs, checkpointHours);
+      if (!selection) continue;
+      const currentMetrics = operatorRecord(safeParseJsonString(String(selection.row.metrics_json ?? "{}")));
+      const previousMetrics = previousSelection
+        ? operatorRecord(safeParseJsonString(String(previousSelection.row.metrics_json ?? "{}")))
+        : null;
+      const observation = buildOperatorMaturityObservation({
+        checkpointHours,
+        currentMetrics,
+        currentAgeHours: selection.ageHours,
+        previousMetrics,
+        previousAgeHours: previousSelection?.ageHours ?? null,
+      });
+      await env.DB.prepare(
+        `INSERT INTO operator_post_performance_scores (
+          id, brand_key, published_post_id, checkpoint_hours, snapshot_id, captured_at,
+          post_age_hours, metrics_json, rates_json, velocity_json, scores_json,
+          distribution_state, valid_for_learning, evaluator_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
+          snapshot_id = excluded.snapshot_id,
+          captured_at = excluded.captured_at,
+          post_age_hours = excluded.post_age_hours,
+          metrics_json = excluded.metrics_json,
+          rates_json = excluded.rates_json,
+          velocity_json = excluded.velocity_json,
+          distribution_state = excluded.distribution_state,
+          valid_for_learning = 1,
+          evaluator_version = excluded.evaluator_version,
+          updated_at = CURRENT_TIMESTAMP`,
+      ).bind(
+        crypto.randomUUID(), brandKey, postId, checkpointHours,
+        String(selection.row.id), String(selection.row.captured_at), Number(selection.ageHours.toFixed(3)),
+        normalizeOperatorJson(observation.metrics, {}), normalizeOperatorJson(observation.rates, {}),
+        normalizeOperatorJson(observation.velocity, {}),
+        normalizeOperatorJson({ reach: 50, resonance: 50, propagation: 50, conversation: 50, overall: 50 }, {}),
+        observation.distribution_state, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+      ).run();
+      maturityScores += 1;
+      previousSelection = selection;
+    }
+  }
+
+  const scoreRows = await env.DB.prepare(
+    `SELECT id, published_post_id, checkpoint_hours, metrics_json, rates_json, velocity_json, scores_json
+     FROM operator_post_performance_scores
+     WHERE brand_key = ? AND valid_for_learning = 1`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const byCheckpoint = new Map<number, Array<Record<string, unknown>>>();
+  for (const row of scoreRows.results ?? []) {
+    const checkpoint = Number(row.checkpoint_hours);
+    const rows = byCheckpoint.get(checkpoint) ?? [];
+    rows.push(row);
+    byCheckpoint.set(checkpoint, rows);
+  }
+  for (const rows of byCheckpoint.values()) {
+    const parsed = rows.map((row) => ({
+      row,
+      metrics: operatorMetricRecord(safeParseJsonString(String(row.metrics_json ?? "{}"))),
+      rates: operatorRecord(safeParseJsonString(String(row.rates_json ?? "{}"))),
+      velocity: operatorRecord(safeParseJsonString(String(row.velocity_json ?? "{}"))),
+    }));
+    const views = parsed.map((item) => item.metrics.views);
+    const cumulativeVelocity = parsed.map((item) => Number(item.velocity.cumulative_views_per_hour ?? 0));
+    const intervalVelocity = parsed.map((item) => Number(item.velocity.interval_views_per_hour ?? 0));
+    const likeRates = parsed.map((item) => Number(item.rates.like_rate ?? 0));
+    const propagationRates = parsed.map((item) => Number(item.rates.propagation_rate ?? 0));
+    const conversationRates = parsed.map((item) => Number(item.rates.conversation_rate ?? 0));
+    for (const item of parsed) {
+      const reach = operatorAverage([
+        operatorPercentileRank(item.metrics.views, views),
+        operatorPercentileRank(Number(item.velocity.cumulative_views_per_hour ?? 0), cumulativeVelocity),
+        operatorPercentileRank(Number(item.velocity.interval_views_per_hour ?? 0), intervalVelocity),
+      ]);
+      const resonance = operatorPercentileRank(Number(item.rates.like_rate ?? 0), likeRates);
+      const propagation = operatorPercentileRank(Number(item.rates.propagation_rate ?? 0), propagationRates);
+      const conversation = operatorPercentileRank(Number(item.rates.conversation_rate ?? 0), conversationRates);
+      const scores = {
+        reach: Number(reach.toFixed(2)),
+        resonance: Number(resonance.toFixed(2)),
+        propagation: Number(propagation.toFixed(2)),
+        conversation: Number(conversation.toFixed(2)),
+        overall: Number(operatorAverage([reach, resonance, propagation, conversation]).toFixed(2)),
+      };
+      await env.DB.prepare(
+        `UPDATE operator_post_performance_scores SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(normalizeOperatorJson(scores, {}), item.row.id).run();
+      item.row.scores_json = normalizeOperatorJson(scores, {});
+    }
+  }
+
+  await env.DB.prepare(`UPDATE operator_performance_evidence SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
+  await env.DB.prepare(`UPDATE operator_performance_hypotheses SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
+  const joinedRows = await env.DB.prepare(
+    `SELECT s.checkpoint_hours, s.scores_json, s.rates_json, f.fingerprint_json
+     FROM operator_post_performance_scores s
+     INNER JOIN operator_post_fingerprints f
+       ON f.brand_key = s.brand_key AND f.published_post_id = s.published_post_id
+     WHERE s.brand_key = ? AND s.valid_for_learning = 1`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const joinedByCheckpoint = new Map<number, Array<Record<string, unknown>>>();
+  for (const row of joinedRows.results ?? []) {
+    const checkpoint = Number(row.checkpoint_hours);
+    const rows = joinedByCheckpoint.get(checkpoint) ?? [];
+    rows.push(row);
+    joinedByCheckpoint.set(checkpoint, rows);
+  }
+  const evidenceRows: Array<Record<string, unknown>> = [];
+  for (const [checkpointHours, rows] of joinedByCheckpoint) {
+    const baselineOverall = calculateMedian(rows.map((row) => operatorScoreRecord(safeParseJsonString(String(row.scores_json ?? "{}"))).overall));
+    const groups = new Map<string, { dimension: string; feature: string; rows: Array<Record<string, unknown>> }>();
+    for (const row of rows) {
+      const fingerprint = operatorRecord(safeParseJsonString(String(row.fingerprint_json ?? "{}")));
+      for (const item of operatorFingerprintDimensions(fingerprint)) {
+        const key = `${item.dimension}:${item.feature}`;
+        const group = groups.get(key) ?? { ...item, rows: [] };
+        group.rows.push(row);
+        groups.set(key, group);
+      }
+    }
+    for (const group of groups.values()) {
+      const scores = group.rows.map((row) => operatorScoreRecord(safeParseJsonString(String(row.scores_json ?? "{}"))));
+      const rates = group.rows.map((row) => operatorRecord(safeParseJsonString(String(row.rates_json ?? "{}"))));
+      const medians = {
+        overall_score: Number(calculateMedian(scores.map((score) => score.overall)).toFixed(2)),
+        reach_score: Number(calculateMedian(scores.map((score) => score.reach)).toFixed(2)),
+        resonance_score: Number(calculateMedian(scores.map((score) => score.resonance)).toFixed(2)),
+        propagation_score: Number(calculateMedian(scores.map((score) => score.propagation)).toFixed(2)),
+        conversation_score: Number(calculateMedian(scores.map((score) => score.conversation)).toFixed(2)),
+        like_rate: Number(calculateMedian(rates.map((rate) => Number(rate.like_rate ?? 0))).toFixed(6)),
+        propagation_rate: Number(calculateMedian(rates.map((rate) => Number(rate.propagation_rate ?? 0))).toFixed(6)),
+        conversation_rate: Number(calculateMedian(rates.map((rate) => Number(rate.conversation_rate ?? 0))).toFixed(6)),
+      };
+      const effectValue = medians.overall_score - baselineOverall;
+      const sampleSize = group.rows.length;
+      const confidenceScore = Number(((Math.min(1, sampleSize / 8) * 0.75 + Math.min(1, Math.abs(effectValue) / 20) * 0.25) * 100).toFixed(2));
+      const confidenceLabel = sampleSize >= 8 ? "reliable" : sampleSize >= 3 ? "directional" : "insufficient";
+      const direction = effectValue >= 5 ? "positive" : effectValue <= -5 ? "negative" : "neutral";
+      const effect = {
+        overall_score_vs_cohort: Number(effectValue.toFixed(2)),
+        cohort_median_overall_score: Number(baselineOverall.toFixed(2)),
+      };
+      await env.DB.prepare(
+        `INSERT INTO operator_performance_evidence (
+          id, brand_key, checkpoint_hours, dimension, feature_key, sample_size, cohort_size,
+          medians_json, effect_json, confidence_score, confidence_label, direction, status, evaluator_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+        ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
+          sample_size = excluded.sample_size,
+          cohort_size = excluded.cohort_size,
+          medians_json = excluded.medians_json,
+          effect_json = excluded.effect_json,
+          confidence_score = excluded.confidence_score,
+          confidence_label = excluded.confidence_label,
+          direction = excluded.direction,
+          status = 'active',
+          evaluator_version = excluded.evaluator_version,
+          updated_at = CURRENT_TIMESTAMP`,
+      ).bind(
+        crypto.randomUUID(), brandKey, checkpointHours, group.dimension, group.feature,
+        sampleSize, rows.length, normalizeOperatorJson(medians, {}), normalizeOperatorJson(effect, {}),
+        confidenceScore, confidenceLabel, direction, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+      ).run();
+      const evidence = {
+        checkpoint_hours: checkpointHours,
+        dimension: group.dimension,
+        feature_key: group.feature,
+        sample_size: sampleSize,
+        cohort_size: rows.length,
+        medians,
+        effect,
+        confidence_score: confidenceScore,
+        confidence_label: confidenceLabel,
+        direction,
+      };
+      evidenceRows.push(evidence);
+      if (sampleSize >= 3 && direction !== "neutral") {
+        const hypothesisText = `At the ${checkpointHours}-hour maturity checkpoint, ${group.dimension}=${group.feature} is associated with ${direction === "positive" ? "stronger" : "weaker"} normalized post performance across ${sampleSize} posts.`;
+        await env.DB.prepare(
+          `INSERT INTO operator_performance_hypotheses (
+            id, brand_key, checkpoint_hours, dimension, feature_key, hypothesis_text,
+            direction, sample_size, confidence_score, confidence_label, evidence_json, status, evaluator_version
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+          ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
+            hypothesis_text = excluded.hypothesis_text,
+            direction = excluded.direction,
+            sample_size = excluded.sample_size,
+            confidence_score = excluded.confidence_score,
+            confidence_label = excluded.confidence_label,
+            evidence_json = excluded.evidence_json,
+            status = 'active',
+            evaluator_version = excluded.evaluator_version,
+            updated_at = CURRENT_TIMESTAMP`,
+        ).bind(
+          crypto.randomUUID(), brandKey, checkpointHours, group.dimension, group.feature,
+          hypothesisText, direction, sampleSize, confidenceScore, confidenceLabel,
+          normalizeOperatorJson(evidence, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+        ).run();
+      }
+    }
+  }
+
+  const checkpointCounts = Array.from(joinedByCheckpoint.entries())
+    .map(([checkpoint, rows]) => ({ checkpoint, sample_size: rows.length }))
+    .sort((left, right) => right.checkpoint - left.checkpoint);
+  const selectedCheckpoint = checkpointCounts.find((item) => item.sample_size >= 3)
+    ?? [...checkpointCounts].sort((left, right) => right.sample_size - left.sample_size || right.checkpoint - left.checkpoint)[0]
+    ?? null;
+  const selectedEvidence = selectedCheckpoint
+    ? evidenceRows.filter((row) => Number(row.checkpoint_hours) === selectedCheckpoint.checkpoint)
+    : [];
+  const positive = selectedEvidence.filter((row) => row.direction === "positive" && row.confidence_label !== "insufficient")
+    .sort((left, right) => Number(right.confidence_score) - Number(left.confidence_score));
+  const negative = selectedEvidence.filter((row) => row.direction === "negative" && row.confidence_label !== "insufficient")
+    .sort((left, right) => Number(right.confidence_score) - Number(left.confidence_score));
+  const recentFingerprints = await env.DB.prepare(
+    `SELECT fingerprint_json FROM operator_post_fingerprints WHERE brand_key = ? ORDER BY datetime(updated_at) DESC LIMIT 24`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const fatigueCounts = new Map<string, { dimension: string; feature: string; used: number }>();
+  for (const row of recentFingerprints.results ?? []) {
+    const fingerprint = operatorRecord(safeParseJsonString(String(row.fingerprint_json ?? "{}")));
+    for (const item of operatorFingerprintDimensions(fingerprint)) {
+      const key = `${item.dimension}:${item.feature}`;
+      const count = fatigueCounts.get(key) ?? { ...item, used: 0 };
+      count.used += 1;
+      fatigueCounts.set(key, count);
+    }
+  }
+  const recentSampleSize = recentFingerprints.results?.length ?? 0;
+  const fatigueRisks = Array.from(fatigueCounts.values())
+    .filter((item) => item.used >= 5 && (recentSampleSize === 0 || item.used / recentSampleSize >= 0.25))
+    .sort((left, right) => right.used - left.used)
+    .slice(0, 10)
+    .map((item) => ({ ...item, recent_sample_size: recentSampleSize, fatigue_risk: item.used >= 10 ? "high" : "medium" }));
+  const matureSampleSize = selectedCheckpoint?.sample_size ?? 0;
+  const allocation = matureSampleSize < 8
+    ? { exploitation_percent: 35, improvement_percent: 25, exploration_percent: 40 }
+    : matureSampleSize < 20
+      ? { exploitation_percent: 50, improvement_percent: 30, exploration_percent: 20 }
+      : { exploitation_percent: 60, improvement_percent: 30, exploration_percent: 10 };
+  const generatedAt = new Date().toISOString();
+  const brief = {
+    version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    generated_at: generatedAt,
+    checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
+    mature_sample_size: matureSampleSize,
+    follower_attribution_policy: {
+      post_level_attribution: "forbidden",
+      day_or_period_post_attribution: "forbidden",
+      account_level_follower_tracking_only: true,
+      reason: "Threads does not expose reliable post-level follower attribution.",
+    },
+    proven_features: positive.filter((row) => row.confidence_label === "reliable").slice(0, 8),
+    directional_features: positive.filter((row) => row.confidence_label === "directional").slice(0, 8),
+    weak_features: negative.slice(0, 8),
+    fatigue_risks: fatigueRisks,
+    experiment_allocation: allocation,
+    generation_guidance: [
+      "Use mature age-matched evidence; do not compare posts at different maturity stages.",
+      "Exploit reliable positive mechanisms, improve one variable at a time, and preserve controlled exploration.",
+      "Avoid overused recent features when an equally supported alternative exists.",
+      "Do not infer follower conversion from any post, day, batch, or surrounding time period.",
+    ],
+    source_selection_guidance: {
+      prioritize_supported_source_mechanisms: positive.filter((row) => row.dimension === "source_mechanism").slice(0, 5),
+      deprioritize_weak_or_fatigued_mechanisms: [
+        ...negative.filter((row) => row.dimension === "source_mechanism").slice(0, 5),
+        ...fatigueRisks.filter((row) => row.dimension === "source_mechanism").slice(0, 5),
+      ],
+      confidence_rule: "Account evidence influences selection only when the sample is directional or reliable; otherwise retain broad exploration.",
+    },
+  };
+  await env.DB.prepare(`UPDATE operator_generation_learning_briefs SET active = 0 WHERE brand_key = ? AND active = 1`).bind(brandKey).run();
+  const briefId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_generation_learning_briefs (
+      id, brand_key, checkpoint_hours, sample_size, brief_json, active, evaluator_version, generated_at
+    ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).bind(
+    briefId, brandKey, selectedCheckpoint?.checkpoint ?? null, matureSampleSize,
+    normalizeOperatorJson(brief, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION, generatedAt,
+  ).run();
+  return {
+    ok: true,
+    evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    fingerprinted_posts: fingerprintedPosts,
+    maturity_scores_upserted: maturityScores,
+    evidence_records: evidenceRows.length,
+    active_hypotheses: evidenceRows.filter((row) => Number(row.sample_size) >= 3 && row.direction !== "neutral").length,
+    brief_id: briefId,
+    checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
+    mature_sample_size: matureSampleSize,
+  };
+}
+
+async function getLatestOperatorPerformanceLearning(
+  env: Env,
+  brandKey: GptBrandKey,
+  includePosts = false,
+): Promise<Record<string, unknown>> {
+  await ensureOperatorPerformanceEvaluatorTables(env);
+  const briefRow = await env.DB.prepare(
+    `SELECT id, checkpoint_hours, sample_size, brief_json, generated_at
+     FROM operator_generation_learning_briefs
+     WHERE brand_key = ? AND active = 1
+     ORDER BY datetime(generated_at) DESC LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+  const hypotheses = await env.DB.prepare(
+    `SELECT checkpoint_hours, dimension, feature_key, hypothesis_text, direction,
+            sample_size, confidence_score, confidence_label, evidence_json, updated_at
+     FROM operator_performance_hypotheses
+     WHERE brand_key = ? AND status = 'active'
+     ORDER BY confidence_score DESC, sample_size DESC, updated_at DESC LIMIT 30`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const evidence = await env.DB.prepare(
+    `SELECT checkpoint_hours, dimension, feature_key, sample_size, cohort_size,
+            medians_json, effect_json, confidence_score, confidence_label, direction, updated_at
+     FROM operator_performance_evidence
+     WHERE brand_key = ? AND status = 'active'
+     ORDER BY checkpoint_hours DESC, confidence_score DESC, sample_size DESC LIMIT 100`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const posts = includePosts
+    ? await env.DB.prepare(
+      `SELECT s.published_post_id, s.checkpoint_hours, s.post_age_hours, s.metrics_json,
+              s.rates_json, s.velocity_json, s.scores_json, s.distribution_state, f.fingerprint_json
+       FROM operator_post_performance_scores s
+       INNER JOIN operator_post_fingerprints f
+         ON f.brand_key = s.brand_key AND f.published_post_id = s.published_post_id
+       WHERE s.brand_key = ? AND s.valid_for_learning = 1
+       ORDER BY s.checkpoint_hours DESC, datetime(s.updated_at) DESC LIMIT 100`,
+    ).bind(brandKey).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  return {
+    available: Boolean(briefRow),
+    evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    brief_id: briefRow?.id ?? null,
+    checkpoint_hours: briefRow?.checkpoint_hours ?? null,
+    sample_size: Number(briefRow?.sample_size ?? 0),
+    generated_at: briefRow?.generated_at ?? null,
+    brief: briefRow ? safeParseJsonString(String(briefRow.brief_json ?? "{}")) ?? {} : null,
+    hypotheses: (hypotheses.results ?? []).map((row) => ({
+      checkpoint_hours: Number(row.checkpoint_hours),
+      dimension: row.dimension,
+      feature_key: row.feature_key,
+      hypothesis_text: row.hypothesis_text,
+      direction: row.direction,
+      sample_size: Number(row.sample_size),
+      confidence_score: Number(row.confidence_score),
+      confidence_label: row.confidence_label,
+      evidence: safeParseJsonString(String(row.evidence_json ?? "{}")) ?? {},
+      updated_at: row.updated_at,
+    })),
+    evidence: (evidence.results ?? []).map((row) => ({
+      checkpoint_hours: Number(row.checkpoint_hours),
+      dimension: row.dimension,
+      feature_key: row.feature_key,
+      sample_size: Number(row.sample_size),
+      cohort_size: Number(row.cohort_size),
+      medians: safeParseJsonString(String(row.medians_json ?? "{}")) ?? {},
+      effect: safeParseJsonString(String(row.effect_json ?? "{}")) ?? {},
+      confidence_score: Number(row.confidence_score),
+      confidence_label: row.confidence_label,
+      direction: row.direction,
+      updated_at: row.updated_at,
+    })),
+    posts: (posts.results ?? []).map((row) => ({
+      published_post_id: row.published_post_id,
+      checkpoint_hours: Number(row.checkpoint_hours),
+      post_age_hours: Number(row.post_age_hours),
+      metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
+      rates: safeParseJsonString(String(row.rates_json ?? "{}")) ?? {},
+      velocity: safeParseJsonString(String(row.velocity_json ?? "{}")) ?? {},
+      scores: safeParseJsonString(String(row.scores_json ?? "{}")) ?? {},
+      distribution_state: row.distribution_state,
+      fingerprint: safeParseJsonString(String(row.fingerprint_json ?? "{}")) ?? {},
+    })),
+    follower_attribution_policy: {
+      post_level_attribution: "forbidden",
+      day_or_period_post_attribution: "forbidden",
+      account_level_tracking_only: true,
+    },
+  };
+}
+
 async function appendOperatorMetricSnapshotsForPosts(
+
   env: Env,
   brandKey: GptBrandKey,
   accountId: string,
