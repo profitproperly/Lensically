@@ -2935,9 +2935,10 @@ describe("operator mode MCP endpoint", () => {
     expect(blocked.showable).toBe(false);
     expect(blocked.blocking_failures.some((failure) => failure.gate_key === "current_inventory_repeat_gate")).toBe(true);
 
-    const call = await mcpRequest<{ structuredContent: { ok?: boolean; error?: string }; isError?: boolean }>("tools/call", {
-      name: "mark_draft_shown",
-                                                            arguments: { brand_key: BRAND_KEY, draft_id: blocked.draft_id, proceed_confirmed: true },
+        const call = await mcpToolRaw<{ ok?: boolean; error?: string }>("mark_draft_shown", {
+      brand_key: BRAND_KEY,
+      draft_id: blocked.draft_id,
+      proceed_confirmed: true,
     });
     expect(call.isError).toBe(true);
     expect(call.structuredContent.error).toBe("draft_not_showable");
