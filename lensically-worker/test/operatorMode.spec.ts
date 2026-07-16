@@ -1573,13 +1573,12 @@ describe("operator mode MCP endpoint", () => {
         expect(initialized.instructions).toContain("Pre-execution policy v2 is mandatory and automatic");
     expect(initialized.instructions).toContain("Use one currently callable surface for the canonical handler");
     expect(initialized.instructions).toContain("Source cards are backend-only during Manifest calendar production");
-    expect(initialized.instructions).toContain("Owner-visible account transitions use Completed:, Showing now:, and Next decision:");
-    expect(initialized.instructions).toContain("Autonomous engineering uses Completed:, Showing now:, and Next action:");
+    expect(initialized.instructions).toContain("Autonomous account and engineering transitions use Completed:, Showing now:, and Next action:");
     expect(initialized.instructions).toContain("Calendar controller rule");
-    expect(initialized.instructions).toContain("Four-post review rule");
+    expect(initialized.instructions).toContain("Autonomous batch rule");
     expect(initialized.instructions).toContain("If no candidate becomes showable, replace it internally or report the blocker");
     expect(initialized.instructions).toContain("Manifest source-adaptation rule");
-    expect(initialized.instructions).toContain("four numbered Source / Generated post pairs");
+    expect(initialized.instructions).toContain("Show Source / Generated pairs only for monitoring reports");
     expect(initialized.instructions).toContain("explicit owner hard bans");
     expect(initialized.instructions).toContain("historical_owner_rejection_gate");
         expect(initialized.instructions).toContain("Never claim that a gate passed unless that exact gate_key appears");
