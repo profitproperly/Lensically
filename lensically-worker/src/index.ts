@@ -15944,9 +15944,29 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       if (!tool) {
         return mcpErrorResponse(id, -32602, "Unknown tool");
       }
-            const args = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
+                        const rawArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
         ? message.params.arguments as Record<string, unknown>
         : {};
+      const guardCheck = await verifyOperatorExecutionGuard(env, toolName, rawArgs);
+      if (!guardCheck.ok) {
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: {
+              ok: false,
+              error: guardCheck.error ?? "execution_guard_required",
+              intended_tool: toolName,
+              required_next_tool: "guardLensicallyCall",
+              account_data_loaded: false,
+            },
+            content: [{ type: "text", text: `Lensically blocked ${toolName} before execution. Call guardLensicallyCall with the exact intended arguments first.` }],
+            isError: true,
+          },
+        });
+      }
+      const args = { ...rawArgs };
+      delete args.execution_guard;
       const boundaryBlock = await getOperatorMcpBoundaryBlock(request, env, toolName, args);
       if (boundaryBlock) {
         return mcpJsonResponse({
