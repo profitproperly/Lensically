@@ -9373,7 +9373,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       );
     }
     await env.DB.batch(statements);
-    await env.DB.prepare(`UPDATE operator_review_batches SET status = 'owner_review' WHERE id = ?`).bind(reviewBatchId).run();
+    const unresolvedAfterAttach = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_daily_source_claims
+       WHERE review_batch_id = ?
+         AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
+    ).bind(reviewBatchId).first<{ total: number }>();
+    await env.DB.prepare(`UPDATE operator_review_batches SET status = ? WHERE id = ?`)
+      .bind(Number(unresolvedAfterAttach?.total ?? 0) === 0 ? "completed" : "owner_review", reviewBatchId).run();
     return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, reviewBatchId)) ?? {});
   }
 
