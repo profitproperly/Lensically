@@ -22097,8 +22097,8 @@ async function refreshInsightsForConfiguredAccounts(env: Env): Promise<void> {
       const profile = await fetchThreadsProfileByAccessToken(configuredAccount.accessToken);
       const threadsUserId = profile?.threads_user_id;
 
-      if (!threadsUserId) {
-        logWorkerEvent("THREADS_DAILY_INSIGHTS_PROFILE_SKIPPED", {
+            if (!threadsUserId) {
+        logWorkerEvent("THREADS_SIX_HOUR_INSIGHTS_PROFILE_SKIPPED", {
           configured_account_id: configuredAccount.id,
           configured_username: configuredAccount.username,
         }, "error");
