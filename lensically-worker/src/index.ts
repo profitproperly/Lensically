@@ -15986,29 +15986,56 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       if (!tool) {
         return mcpErrorResponse(id, -32602, "Unknown tool");
       }
-                        const rawArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
+      const rawArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
         ? message.params.arguments as Record<string, unknown>
         : {};
       const guardCheck = await verifyOperatorExecutionGuard(env, toolName, rawArgs);
+      let args: Record<string, unknown>;
+      let dispatcherGuardFallback = false;
       if (!guardCheck.ok) {
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: {
-              ok: false,
-              error: guardCheck.error ?? "execution_guard_required",
-              intended_tool: toolName,
-              required_next_tool: "guardLensicallyCall",
-              account_data_loaded: false,
+        const mayUseServerGuard = guardCheck.error === "execution_guard_required"
+          && rawArgs.execution_guard === undefined;
+        if (!mayUseServerGuard) {
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: {
+                ok: false,
+                error: guardCheck.error ?? "execution_guard_required",
+                intended_tool: toolName,
+                required_next_tool: "guardLensicallyCall",
+                account_data_loaded: false,
+              },
+              content: [{ type: "text", text: `Lensically blocked ${toolName} before execution because its supplied execution guard was invalid or mismatched.` }],
+              isError: true,
             },
-            content: [{ type: "text", text: `Lensically blocked ${toolName} before execution. Call guardLensicallyCall with the exact intended arguments first.` }],
-            isError: true,
-          },
+          });
+        }
+        const serverGuard = await handleOperatorMcpEngineeringTool(request, env, "guardLensicallyCall", {
+          intended_tool: toolName,
+          arguments_json: JSON.stringify(rawArgs),
         });
+        if (serverGuard.ok !== true) {
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: serverGuard,
+              content: [{ type: "text", text: `Lensically blocked ${toolName} before execution: ${String(serverGuard.error ?? "execution_guard_failed")}.` }],
+              isError: true,
+            },
+          });
+        }
+        const normalizedArguments = serverGuard.normalized_arguments;
+        args = normalizedArguments && typeof normalizedArguments === "object" && !Array.isArray(normalizedArguments)
+          ? normalizedArguments as Record<string, unknown>
+          : {};
+        dispatcherGuardFallback = true;
+      } else {
+        args = { ...rawArgs };
+        delete args.execution_guard;
       }
-      const args = { ...rawArgs };
-      delete args.execution_guard;
       const boundaryBlock = await getOperatorMcpBoundaryBlock(request, env, toolName, args);
       if (boundaryBlock) {
         return mcpJsonResponse({
