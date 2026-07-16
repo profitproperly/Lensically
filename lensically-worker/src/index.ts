@@ -15455,10 +15455,9 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     const proceedContent = structured(proceed.payload);
     const allowed = await callLiveMcp(6, "tools/call", {
       name: "getWorkflowStatus",
-      arguments: {
+            arguments: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
-        continuity_loaded: true,
       },
     });
     const coverage = await callLiveMcp(7, "tools/call", {
