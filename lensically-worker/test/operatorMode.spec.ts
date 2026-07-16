@@ -2851,17 +2851,11 @@ describe("operator mode MCP endpoint", () => {
     await env.DB.prepare(
       `UPDATE scheduled_posts SET status = 'posted' WHERE id = ?`,
     ).bind(scheduled.scheduled_post_id).run();
-    const blocked = await mcpRequest<{
-      structuredContent: { success?: boolean; error?: string };
-      isError?: boolean;
-    }>("tools/call", {
-      name: "edit_scheduled_post",
-      arguments: {
-        brand_key: BRAND_KEY,
-        scheduled_post_id: scheduled.scheduled_post_id,
-                text: "This edit must not persist.",
-        proceed_confirmed: true,
-      },
+        const blocked = await mcpToolRaw<{ success?: boolean; error?: string }>("edit_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduled.scheduled_post_id,
+      text: "This edit must not persist.",
+      proceed_confirmed: true,
     });
         expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent.error).toBe("only_approved_scheduled_posts_can_be_edited");
