@@ -14726,8 +14726,11 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       tool_block_prevention: [
         "Call getOperatorStartupContext once at fresh-session startup before engineering/admin/workflow/account work.",
         "Prefer readRepoFile with line bounds before edits.",
-        "Prefer applyRepoTextPatch exact find/replace for small changes.",
-        "Use chunked file writes for large content.",
+                "Use applyRepoTextPatch only for one isolated replacement.",
+        "Use applyRepoPatchSet for related multi-file or multi-replacement work so one commit advances main.",
+        "Use chunked file writes for large whole-file content.",
+        "Use runEngineeringRelease once after the final patch set; do not run separate full typecheck/test workflows first.",
+        "Use getEngineeringRelease with bounded waiting instead of chat-side sleep and repeated workflow polling.",
         ...operatorStartupFallbackRoutes(),
         "Keep workflow dispatch output compact; request full logs only outside this MCP.",
       ],
