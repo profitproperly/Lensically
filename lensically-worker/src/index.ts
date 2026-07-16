@@ -11841,10 +11841,12 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     description: "Explicitly set the universal scheduler to paused, canary, or normal. Canary requires exactly one scheduled_post_id, processes at most one due record, and automatically returns to paused after its attempt.",
     inputSchema: {
       type: "object",
-      properties: {
+            properties: {
+        brand_key: BRAND_KEY_SCHEMA,
         mode: { type: "string", enum: ["paused", "canary", "normal"] },
         scheduled_post_id: { type: "integer", minimum: 1 },
         reason: { type: "string" },
+        owner_response: { type: "string", description: "Exact owner approval from the current conversation. When present, Lensically persists ratification before executing the protected scheduler change." },
       },
       required: ["mode", "reason"],
       additionalProperties: false,
