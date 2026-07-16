@@ -8070,7 +8070,8 @@ async function buildOperatorManifestProceedCapsule(
         : "Proceed autonomously with routine engineering through mandatory known paths. Propose only owner-ratified account, business, destructive, or irreversible decisions.",
     } : null,
     calendar_coverage: calendarCoverage,
-    active_review_batch: activeReviewBatch,
+    active_review_batch: resumableReviewBatch,
+    completed_review_batch: activeReviewBatch && !resumableReviewBatch ? activeReviewBatch : null,
     workflow_checkpoint: {
       workflow_session_id: sessionId,
       workflow_status: session?.status ?? null,
