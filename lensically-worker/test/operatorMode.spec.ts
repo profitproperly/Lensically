@@ -2751,9 +2751,8 @@ describe("operator mode MCP endpoint", () => {
       arguments: {
         brand_key: BRAND_KEY,
         scheduled_post_id: scheduled.scheduled_post_id,
-        text: "This edit must not persist.",
+                text: "This edit must not persist.",
         proceed_confirmed: true,
-        continuity_loaded: true,
       },
     });
         expect(blocked.isError).toBe(true);
