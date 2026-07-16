@@ -14784,12 +14784,57 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
         const result = await handleOperatorMcpAdminTool(request, env, executeTool, bridgeArgs);
         return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
       }
-            return {
+      const clientCapAccountBridgeTools = new Set([
+        "get_hourly_coverage",
+        "claim_manifest_review_batch",
+        "get_manifest_review_batch",
+        "attach_manifest_review_draft",
+        "schedule_manifest_review_batch",
+        "get_performance_learning",
+        "markOperatorDecisionExecuted",
+        "edit_scheduled_post",
+      ]);
+      if (clientCapAccountBridgeTools.has(executeTool)) {
+        const definition = (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === executeTool);
+        if (!definition) {
+          return { ok: false, error: "client_cap_bridge_tool_not_found", requested_tool: executeTool };
+        }
+        const normalized = normalizeOperatorGuardValue(
+          bridgeArgs,
+          definition.inputSchema as Record<string, unknown>,
+        );
+        const normalizedBridgeArgs = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
+          ? normalized.value as Record<string, unknown>
+          : {};
+        if (normalized.errors.length) {
+          return {
+            ok: false,
+            error: "client_cap_bridge_payload_invalid",
+            requested_tool: executeTool,
+            normalized_arguments: normalizedBridgeArgs,
+            corrections: normalized.corrections,
+            validation_errors: normalized.errors,
+          };
+        }
+        const result = executeTool === "markOperatorDecisionExecuted"
+          ? await handleOperatorMcpAdminTool(request, env, executeTool, normalizedBridgeArgs)
+          : await callOperatorToolForMcp(request, env, executeTool, normalizedBridgeArgs);
+        return {
+          ok: result.ok !== false,
+          bridge_tool: "listMcpTools",
+          bridge_mode: "strict_client_cap_allowlist",
+          executed_tool: executeTool,
+          normalized_arguments: normalizedBridgeArgs,
+          corrections: normalized.corrections,
+          result,
+        };
+      }
+      return {
         ok: false,
         error: "direct_typed_tool_required",
         requested_tool: executeTool,
-        bridge_scope: "engineering_and_admin_only",
-        message: "Call account workflow and runtime-configured tools directly through their typed schemas. Generic arguments payloads are forbidden for account work.",
+        bridge_scope: "engineering_admin_and_strict_client_cap_allowlist",
+        message: "Call account workflow tools directly through typed schemas. Only the strict client-cap recovery allowlist may use this bridge when the current conversation cached an incomplete connector surface.",
       };
     }
     const staticTools = [
