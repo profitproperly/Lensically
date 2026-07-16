@@ -11951,14 +11951,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       type: "boolean",
       description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
     };
-            if (tool.name !== "resolveContinuationContext") {
-      properties.continuity_loaded = {
-        type: "boolean",
-        description: "Set true only after resolveContinuationContext succeeds. The backend verifies current server-side continuity state for the selected brand; no generated handle is passed between tools.",
-      };
-    }
-
-    properties.operation_id = {
+                properties.operation_id = {
       type: "string",
       description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
     };
