@@ -1250,8 +1250,20 @@ describe("operator mode backend spine", () => {
     expect(results.lineage.generation_run_id).toBe(runId);
     expect(results.lineage.draft_id).toBe(draft.draft_id);
     expect(results.lineage.scheduled_post_id).toBe(scheduled.scheduled_post_id);
-    expect(results.lineage.published_post_id).toBe(publishedPostId);
+        expect(results.lineage.published_post_id).toBe(publishedPostId);
     expect(results.metric_history.at(-1)?.metrics.likes).toBe(1400);
+
+    await operatorTool("get_post_results", {
+      brand_key: BRAND_KEY,
+      published_post_id: publishedPostId,
+      include_history: true,
+    });
+    const snapshotCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM operator_post_metric_snapshots
+       WHERE brand_key = ? AND published_post_id = ?`,
+    ).bind(BRAND_KEY, publishedPostId).first<{ total: number | string }>();
+    expect(Number(snapshotCount?.total ?? 0)).toBe(1);
   }, 30000);
 
 
