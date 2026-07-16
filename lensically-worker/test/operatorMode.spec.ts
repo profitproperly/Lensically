@@ -2448,6 +2448,7 @@ describe("operator mode MCP endpoint", () => {
     }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
     expect(proceeded.isError).not.toBe(true);
     const capsule = proceeded.structuredContent.continuity_capsule;
+    expect(capsule.continuity_mode).toBe("bounded_manifest_proceed");
     expect(capsule.workflow_checkpoint.workflow_session_id).toBe(session.workflow_session_id);
     expect(capsule.workflow_checkpoint.next_pending_action).toBe("resume_review_batch");
     expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("get_manifest_review_batch");
