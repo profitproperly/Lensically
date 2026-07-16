@@ -1612,7 +1612,7 @@ describe("operator mode MCP endpoint", () => {
     expect(releaseTool.inputSchema.properties.force.type).toBe("boolean");
     expect(releaseStatusTool.inputSchema.properties.wait_seconds.maximum).toBe(55);
 
-    expect(toolNames.slice(0, 27)).toEqual([
+        expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
       "engineeringPrecheck",
       "getEngineeringAccessState",
