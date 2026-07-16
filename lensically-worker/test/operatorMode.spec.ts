@@ -2389,7 +2389,47 @@ describe("operator mode MCP endpoint", () => {
       "Original review source",
       "A calendar workflow works better when each step stays connected.",
     );
-    await operatorTool("attach_manifest_review_draft", {
+
+    const priorBatchId = crypto.randomUUID();
+    const priorSelectionId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_source_selection_batches (
+        id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+        qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+        production_date, status
+      )
+      SELECT ?, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+             qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+             '2099-01-03', 'retired'
+      FROM operator_source_selection_batches
+      WHERE id = ?`,
+    ).bind(priorBatchId, original.source_batch_id).run();
+    await env.DB.prepare(
+      `INSERT INTO operator_source_selections (
+        id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+        source_type, internal_source_id, threads_post_id, canonical_source_url,
+        post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+      )
+      SELECT ?, ?, brand_key, workflow_session_id, draw_order, source_identity_key,
+             source_type, internal_source_id, threads_post_id, canonical_source_url,
+             post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+      FROM operator_source_selections
+      WHERE id = ?`,
+    ).bind(priorSelectionId, priorBatchId, original.source_selection_id).run();
+    await env.DB.prepare(
+      `UPDATE operator_source_cards SET source_selection_id = ? WHERE id = ?`,
+    ).bind(priorSelectionId, originalDraft.sourceCardId).run();
+
+    const canonicalReuse = await operatorTool<{
+      items: Array<{
+        item_number: number;
+        source_selection_id: string;
+        source_identity_key: string;
+        source_text: string;
+        source_card_id: string;
+        generated_post: string;
+      }>;
+    }>("attach_manifest_review_draft", {
       brand_key: "manifest_mental",
       review_batch_id: batch.review_batch_id,
       item_number: 1,
@@ -2397,6 +2437,14 @@ describe("operator mode MCP endpoint", () => {
       generation_run_id: originalDraft.runId,
       draft_id: originalDraft.draftId,
     });
+    expect(canonicalReuse.items.find((item) => item.item_number === 1)).toMatchObject({
+      source_selection_id: original.source_selection_id,
+      source_identity_key: original.source_identity_key,
+      source_text: original.source_text,
+      source_card_id: originalDraft.sourceCardId,
+      generated_post: "A calendar workflow works better when each step stays connected.",
+    });
+
     await operatorTool("skip_manifest_review_source", {
       brand_key: "manifest_mental",
       review_batch_id: batch.review_batch_id,
