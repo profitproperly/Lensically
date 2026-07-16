@@ -2251,6 +2251,7 @@ describe("operator mode MCP endpoint", () => {
       "get_performance_learning",
       "markOperatorDecisionExecuted",
       "edit_scheduled_post",
+      "skip_manifest_review_source",
     ]) {
       expect(listed.tools.findIndex((tool) => tool.name === criticalTool)).toBeGreaterThanOrEqual(0);
       expect(listed.tools.findIndex((tool) => tool.name === criticalTool)).toBeLessThan(75);
