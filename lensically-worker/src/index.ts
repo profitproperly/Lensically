@@ -12491,7 +12491,7 @@ function operatorStartupFallbackRoutes(): string[] {
     "Resolve operator-execution-policy-v2 and its mandatory known_path before every engineering call; do not execute first and route afterward.",
     "Routine engineering uses persistent full-discretion outcome-bound authority. Do not create owner proposals or numerical tool budgets for repository, test, deploy, verification, routing, or infrastructure repair work.",
     "Use the canonical execution plane returned by policy: engineering_control for repository/tests/deploys, operator_account for account workflow, and operator_control for universal MCP administration.",
-    "Use one currently callable direct or bridged surface for the canonical handler. Do not hop between direct, runEngineeringTool, and listMcpTools after a backend failure.",
+        "Call account tools directly with compact typed schemas. listMcpTools and runEngineeringTool are engineering/admin bridges only; never send account workflow payloads through a generic arguments object.",
     "Governance calls use compact required fields only. Verbose owner-response, evidence, and budget payloads are known client-preflight blockers.",
     "An exact file prefix uses one Git-blob read plus local text search, especially for oversized lensically-worker/src/index.ts. Do not retry empty GitHub code-search results.",
         "YAML changes replace a complete block with explicit relative indentation and are read back before workflow dispatch.",
