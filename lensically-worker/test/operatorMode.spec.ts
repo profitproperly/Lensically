@@ -2097,15 +2097,28 @@ describe("operator mode MCP endpoint", () => {
     expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
   }, 30000);
 
-    it("requires a matching guard and normalizes known payload blockers before execution", async () => {
-    const unguarded = await mcpToolCallRaw<{ error: string; required_next_tool: string }>("readRepoFile", {
-      path: "CURRENT_STATE.md",
-      max_lines: 20,
+    it("enforces the same guard through client preflight or the server-side dispatcher fallback", async () => {
+    const unguarded = await mcpToolCallRaw<{
+      ok: boolean;
+      execution_guard_enforcement: { mode: string; normalized_before_execution: boolean; known_path_checked: boolean };
+    }>("getEngineeringAccessState", {});
+    expect(unguarded.isError).not.toBe(true);
+    expect(unguarded.structuredContent.ok).toBe(true);
+    expect(unguarded.structuredContent.execution_guard_enforcement).toMatchObject({
+      mode: "server_side_dispatcher_fallback",
+      normalized_before_execution: true,
+      known_path_checked: true,
     });
-    expect(unguarded.isError).toBe(true);
-    expect(unguarded.structuredContent).toMatchObject({
-      error: "execution_guard_required",
-      required_next_tool: "guardLensicallyCall",
+
+    const invalid = await mcpToolCallRaw<{ error: string; validation_errors: Array<{ path: string; error: string }> }>("readRepoFile", {
+      path: "CURRENT_STATE.md",
+      unexpected: true,
+    });
+    expect(invalid.isError).toBe(true);
+    expect(invalid.structuredContent.error).toBe("execution_guard_payload_invalid");
+    expect(invalid.structuredContent.validation_errors).toContainEqual({
+      path: "$.unexpected",
+      error: "additional_property_forbidden",
     });
 
     const guarded = await mcpToolCallRaw<{
