@@ -1518,9 +1518,20 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("four numbered Source / Generated post pairs");
     expect(initialized.instructions).toContain("explicit owner hard bans");
     expect(initialized.instructions).toContain("historical_owner_rejection_gate");
-    expect(initialized.instructions).toContain("Never claim that a gate passed unless that exact gate_key appears");
+        expect(initialized.instructions).toContain("Never claim that a gate passed unless that exact gate_key appears");
+    expect(initialized.instructions).toContain("Engineering efficiency is mandatory");
+    expect(initialized.instructions).toContain("applyRepoPatchSet");
+    expect(initialized.instructions).toContain("runEngineeringRelease exactly once per SHA");
+    expect(initialized.instructions).toContain("getEngineeringRelease");
 
-        expect(toolNames.slice(0, 27)).toEqual([
+    const patchSetTool = listed.tools.find((tool) => tool.name === "applyRepoPatchSet") as unknown as { inputSchema: { properties: { patches: { maxItems: number } } } };
+    const releaseTool = listed.tools.find((tool) => tool.name === "runEngineeringRelease") as unknown as { inputSchema: { properties: { force: { type: string } } } };
+    const releaseStatusTool = listed.tools.find((tool) => tool.name === "getEngineeringRelease") as unknown as { inputSchema: { properties: { wait_seconds: { maximum: number } } } };
+    expect(patchSetTool.inputSchema.properties.patches.maxItems).toBe(20);
+    expect(releaseTool.inputSchema.properties.force.type).toBe("boolean");
+    expect(releaseStatusTool.inputSchema.properties.wait_seconds.maximum).toBe(55);
+
+    expect(toolNames.slice(0, 27)).toEqual([
       "getOperatorStartupContext",
       "engineeringPrecheck",
       "getEngineeringAccessState",
