@@ -13095,21 +13095,25 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
 
 function canonicalOperatorExecutionArgs(toolName: string, args: Record<string, unknown>): { tool_name: string; args: Record<string, unknown> } {
   if (toolName === "listMcpTools") {
-    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true) ?? toolName;
-    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
+    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
+    if (nestedTool && nestedTool !== toolName) {
+      const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+        ? args.arguments as Record<string, unknown>
+        : {};
+      return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
+    }
   }
   if (toolName === "runEngineeringTool") {
-    const nestedTool = normalizeOperatorText(args.tool_name, 160, true) ?? toolName;
-    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
+    const nestedTool = normalizeOperatorText(args.tool_name, 160, true);
+    if (nestedTool && nestedTool !== toolName) {
+      const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+        ? args.arguments as Record<string, unknown>
+        : {};
+      return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
+    }
   }
   const canonicalArgs = { ...args };
-      delete canonicalArgs.proceed_confirmed;
+  delete canonicalArgs.proceed_confirmed;
   delete canonicalArgs.continuity_loaded;
   delete canonicalArgs.continuity_ref;
   delete canonicalArgs.continuity_token;
