@@ -75,6 +75,12 @@ if (source.includes('      await prepareOperatorMode(env);\n      const executio
 if (source.includes('      await ensureOperatorMcpAdminTables(env);\n      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);')) {
   errors.push("mcp_dispatcher_schema_initialization_forbidden");
 }
+if (!source.includes('name: "guardLensicallyCall"') || !source.includes('error: "execution_guard_required"') || !source.includes('error: "known_blocker_prevented"')) {
+  errors.push("mandatory_execution_guard_contract_missing");
+}
+if (!tests.includes('requires a matching guard and normalizes known payload blockers before execution')) {
+  errors.push("mandatory_execution_guard_regression_missing");
+}
 
 if (new Set(crons).size !== crons.length) {
 
