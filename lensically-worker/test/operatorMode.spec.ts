@@ -2839,17 +2839,11 @@ describe("operator mode MCP endpoint", () => {
       status: "scheduled",
     });
 
-    const futureRetry = await mcpRequest<{
-      structuredContent: { success?: boolean; error?: string; scheduled_time?: string };
-      isError?: boolean;
-    }>("tools/call", {
-      name: "edit_scheduled_post",
-      arguments: {
-        brand_key: BRAND_KEY,
-                scheduled_post_id: scheduled.scheduled_post_id,
-        retry_now: true,
-        proceed_confirmed: true,
-      },
+        const futureRetry = await mcpToolRaw<{ success?: boolean; error?: string; scheduled_time?: string }>("edit_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduled.scheduled_post_id,
+      retry_now: true,
+      proceed_confirmed: true,
     });
     expect(futureRetry.isError).toBe(true);
     expect(futureRetry.structuredContent.error).toBe("scheduled_post_not_due");
