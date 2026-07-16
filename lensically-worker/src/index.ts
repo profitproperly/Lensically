@@ -17553,7 +17553,9 @@ async function buildGptGrowthReview(
     objective: input.objective,
     review_version: "growth_review_v1",
     review_contract: [
-      "Separate follower-growth evidence from engagement-only evidence.",
+            "Keep account follower trajectory separate from post-level engagement evidence.",
+      "Never infer that a post, day, batch, or posting period caused account follower changes.",
+
       "Name what to exploit, what to explore, what to stop, and what needs a retest.",
       "Use sample-size caution; propose experiments when evidence is thin.",
       "Suggest rule changes only when the evidence is strong enough and still fits owner taste.",
@@ -17576,8 +17578,10 @@ async function buildGptGrowthReview(
       weak_likes_threshold: engagementFloor.weak_likes_threshold ?? null,
       top_quartile_likes: engagementFloor.top_quartile_likes ?? null,
     },
-    likely_drivers: topGrowthWindows.slice(0, 5),
-    weak_windows: weakGrowthWindows.slice(0, 5),
+        account_growth_days: topGrowthWindows.slice(0, 5),
+    account_weak_growth_days: weakGrowthWindows.slice(0, 5),
+    follower_attribution_policy: "Unavailable and forbidden at post, day-of-posts, batch, and posting-period levels.",
+
     post_samples: {
       recent: archiveRecent.slice(0, 15),
       winners: winnerPosts
@@ -17807,7 +17811,8 @@ async function buildGptRuleSuggestions(
         winner_examples: winners.slice(0, 5),
       },
       recommended_action: winnerRate >= 0.18 && sampleSize >= 25 ? "save_rule_proposal" : "save_experiment",
-      caution: "Engagement winners are not automatically follower-growth winners.",
+            caution: "Post engagement cannot establish follower attribution because Threads exposes only account-level follower totals.",
+
     },
     {
       suggestion_type: weakPostRate >= 0.35 ? "cooldown" : "watch",
@@ -17830,7 +17835,8 @@ async function buildGptRuleSuggestions(
       title: openExperiments.length ? "Review open experiments before adding new rules" : "Create a fresh growth experiment",
       proposed_rule: openExperiments.length
         ? "Do not add a new rule until open experiments are reviewed or enough new evidence arrives."
-        : "Run one small experiment aimed at follower growth or raising the engagement floor before promoting a new rule.",
+                : "Run one controlled content experiment aimed at raising mature post performance before promoting a new rule; review account follower trajectory separately.",
+
       evidence_level: recentExperimentResults.length >= 3 ? "moderate" : "thin",
       evidence: {
         open_experiments: openExperiments.slice(0, 5),
@@ -18419,15 +18425,8 @@ async function buildGptGenerationContext(
   const netGrowth = growthDeltas.length >= 2
     ? growthDeltas[growthDeltas.length - 1].followers - growthDeltas[0].followers
     : growthDeltas.reduce((sum, day) => sum + day.net_change, 0);
-  const growthByDate = new Map(growthDeltas.map((day) => [day.date, day]));
-  const taggedPostResultsWithGrowth = taggedPostResults.map((taggedPost) => {
-    const localDate = getPostLocalDate({ timestamp: taggedPost.published_at ?? taggedPost.scheduled_time_utc } as Pick<CachedThreadsPost, "timestamp">, THREADS_INSIGHTS_TIME_ZONE);
-    return {
-      ...taggedPost,
-      local_date: localDate,
-      follower_day_net_change: localDate ? growthByDate.get(localDate)?.net_change ?? null : null,
-    };
-  });
+    const performanceLearning = await getLatestOperatorPerformanceLearning(env, brand.brand_key, false);
+
   const recentArchivePosts = compact ? recentArchive.posts.map(serializeArchivePostCompact) : recentArchive.posts;
   const topArchivePosts = compact ? topArchive.posts.map(serializeArchivePostCompact) : topArchive.posts;
   const weakArchivePosts = compact ? weakPosts.map(serializeArchivePostCompact) : weakPosts;
@@ -18446,9 +18445,10 @@ async function buildGptGenerationContext(
     groups[memory.kind] = (groups[memory.kind] ?? 0) + 1;
     return groups;
   }, {});
-  const taggedPostResultsForPayload = compact
-    ? taggedPostResultsWithGrowth.slice(0, 8).map(serializePostedTaggedPostCompact)
-    : taggedPostResultsWithGrowth.slice(0, 80);
+    const taggedPostResultsForPayload = compact
+    ? taggedPostResults.slice(0, 8).map(serializePostedTaggedPostCompact)
+    : taggedPostResults.slice(0, 80);
+
   const generationRunsForPayload = compact
     ? generationRuns.map((run) => ({
         id: run.id,
@@ -18527,15 +18527,17 @@ async function buildGptGenerationContext(
     saved_patterns: savedPatterns,
     scheduled_posts: scheduledPostsForPayload,
     posted_tagged_results: taggedPostResultsForPayload,
-    tag_performance: {
-      pillars: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "pillar"),
-      hook_styles: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "hook_style"),
-      formats: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "format"),
-      intents: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "intent"),
-      experiments: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "experiment"),
-      novelty_levels: summarizeTaggedPostPerformance(taggedPostResultsWithGrowth, "novelty_level"),
+        tag_performance: {
+      pillars: summarizeTaggedPostPerformance(taggedPostResults, "pillar"),
+      hook_styles: summarizeTaggedPostPerformance(taggedPostResults, "hook_style"),
+      formats: summarizeTaggedPostPerformance(taggedPostResults, "format"),
+      intents: summarizeTaggedPostPerformance(taggedPostResults, "intent"),
+      experiments: summarizeTaggedPostPerformance(taggedPostResults, "experiment"),
+      novelty_levels: summarizeTaggedPostPerformance(taggedPostResults, "novelty_level"),
     },
+    performance_learning: performanceLearning,
     growth_signals: {
+
       days: growthDays,
       net_growth: netGrowth,
       daily: growthDeltas,
@@ -18603,7 +18605,9 @@ function buildGptGenerationWorkflowBrief(
     generation_contract: [
       "Use getOperatorPlaybook as the operating workflow for generation, scheduling, and learning loops.",
       "Study the returned context before writing.",
-      "Use posted tag performance and follower-day movement as directional evidence, not as rigid creative categories.",
+            "Use the latest maturity-normalized performance learning brief as directional evidence, not as rigid creative categories.",
+      "Keep account follower trajectory separate; never infer follower attribution for a post, day, batch, or posting period.",
+
       "Create an internal candidate pool larger than the requested batch before showing drafts.",
       "Self-reject weak, corny, generic, repetitive, off-brand, unclear, or overfit drafts before showing them.",
       "Use flexible creative directions; do not force posts into fixed categories.",
@@ -18824,7 +18828,8 @@ function buildGptOperatorPlaybook(
       "Use prepareMemoryHygieneReview and applyMemoryHygieneActions when duplicate or stale memory is crowding the current taste signal.",
     ],
     growth_review_rules: [
-      "Separate engagement winners from follower-growth winners.",
+            "Separate post performance learning from account-level follower trajectory; do not label posts as follower-growth winners.",
+
       "Focus on raising the engagement floor, not just chasing one viral outlier.",
       "Use follower context, post archive, scheduled strategy tags, experiments, and owner feedback together.",
       "Require sample-size caution before turning data into a durable rule.",
@@ -19258,7 +19263,8 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
               required: false,
               schema: {
                 type: "string",
-                enum: ["published_at_desc", "engagement_total_desc", "likes_desc", "views_desc", "follower_day_net_change_desc"],
+                                enum: ["published_at_desc", "engagement_total_desc", "likes_desc", "views_desc"],
+
                 default: "published_at_desc",
               },
             },
@@ -19293,7 +19299,8 @@ function buildGptOpenApiSchema(workerOrigin: string): Record<string, unknown> {
       "/api/gpt/recent-performance": {
         get: {
           operationId: "getRecentPostPerformance",
-          summary: "Evaluate GPT-tagged posts that already went out in recent windows, including last hours, last days, winners, weak posts, tag performance, and follower-day movement.",
+                    summary: "Evaluate published posts through their own metrics, maturity windows, winners, weak posts, tag performance, and normalized evaluator evidence; follower trajectory remains account-level only.",
+
           parameters: [
             { name: "brand_key", in: "query", required: true, schema: { "$ref": "#/components/schemas/BrandKey" } },
             { name: "hours", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 168, default: 24 } },
