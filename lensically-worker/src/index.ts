@@ -11285,7 +11285,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
         execution_budget: { type: "object", additionalProperties: { type: "integer", minimum: 1, maximum: 100 } },
         supersedes_decision_id: { type: "string" },
       },
-      required: ["brand_key", "category", "title", "decision", "rationale", "expected_outcome", "reversibility", "execution_plan", "authorized_tools"],
+            required: ["brand_key", "category", "title", "decision", "authorized_tools"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
