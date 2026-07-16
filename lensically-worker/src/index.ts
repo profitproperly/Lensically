@@ -13910,7 +13910,6 @@ async function getOperatorMcpBoundaryBlock(
   if (effectiveToolName === "resolveContinuationContext") {
     return null;
   }
-      const continuityLoaded = operatorMcpContinuityLoaded(toolName, args);
   const serverContinuity = requestedBrand
     ? await readLatestOperatorContinuityState(env, "continuity_context", requestedBrand)
     : null;
