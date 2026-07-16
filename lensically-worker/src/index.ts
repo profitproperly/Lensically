@@ -13529,6 +13529,14 @@ async function getKnownAliasRetryBlock(
     }
   }
   if (!prior) return null;
+  const priorEvidence = safeParseJsonString(String(prior.evidence_json ?? "{}"));
+  const priorCommitSha = priorEvidence && typeof priorEvidence === "object" && !Array.isArray(priorEvidence)
+    ? normalizeOperatorText((priorEvidence as Record<string, unknown>).runtime_commit_sha, 120, true)
+    : null;
+  const currentCommitSha = env.LENSICALLY_COMMIT_SHA?.trim() || null;
+  if (currentCommitSha && priorCommitSha !== currentCommitSha) {
+    return null;
+  }
   return {
     ok: false,
     error: "same_backend_route_retry_forbidden",
