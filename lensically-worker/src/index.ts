@@ -14458,7 +14458,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       const result = await response.json().catch(() => ({ ok: false, error: "bridge_response_parse_failed" }));
       return { ok: response.ok && (result as Record<string, unknown>).ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
     }
-        const tools = await buildOperatorMcpTools(env, args.include_disabled === true);
+        const tools = await buildOperatorMcpTools(env, args.include_disabled === true, false);
     const compactTools = tools.map((tool) => {
       const runtimeConfig = (tool as unknown as Record<string, unknown>).runtime_config as Record<string, unknown> | undefined;
       const requiredFields = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
