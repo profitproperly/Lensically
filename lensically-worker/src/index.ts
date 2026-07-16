@@ -31548,7 +31548,8 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     cron,
   });
 
-      if (cron === SCHEDULED_POST_PUBLISH_CRON) {
+            if (cron === SCHEDULED_POST_PUBLISH_CRON) {
+    await activateNextApprovedScheduledPostCanary(env);
     await executeScheduledPostSchedulerTrigger(env, "cron");
     return;
   }
