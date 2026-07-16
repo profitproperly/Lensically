@@ -2851,7 +2851,8 @@ describe("operator mode MCP endpoint", () => {
     const preflightDefinition = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", {
       tool_name: "prepareFullPreflight",
     });
-    expect(preflightDefinition.tool?.inputSchema?.properties?.objective).toBeUndefined();
+        expect(preflightDefinition.tool?.inputSchema?.properties?.objective).toBeUndefined();
+    expect(preflightDefinition.tool?.inputSchema?.properties?.continuity_loaded).toBeUndefined();
 
     const patched = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("updateMcpToolSchema", {
       tool_name: "prepareFullPreflight",
