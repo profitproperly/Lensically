@@ -129,9 +129,8 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
       reversibility: "The test database resets after each test.",
       execution_plan: `Authorize ${toolName} with a bounded test-only budget and retry the blocked fixture once.`,
       authorized_tools: [toolName],
-      execution_budget: { [toolName]: 100 },
+            execution_budget: { [toolName]: 100 },
       proceed_confirmed: true,
-      continuity_loaded: mcpContinuityLoaded,
     });
     expect(proposed.isError, `proposeOperatorDecision for ${toolName}`).not.toBe(true);
     const approved = await mcpToolRaw("resolveOperatorDecision", {
