@@ -1272,9 +1272,9 @@ describe("GPT memory browser routes", () => {
     });
   });
 
-  it("includes posted strategy-tag performance in GPT growth context", async () => {
-    const fixtureTimes = recentPostedFixtureTimes();
+    it("includes posted strategy-tag performance without follower attribution in GPT growth context", async () => {
     await createPostedTaggedPostFixture();
+
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
 
     const response = await fetchFromWorker(`/api/gpt/growth-context?brand_key=${TEST_BRAND_KEY}`, {
@@ -1282,12 +1282,13 @@ describe("GPT memory browser routes", () => {
     });
 
     expect(response.status).toBe(200);
-    const growthPayload = await response.json() as {
+        const growthPayload = await response.json() as {
       compact?: boolean;
-      growth_windows?: Array<Record<string, unknown>>;
+      followers?: { attribution_policy?: string };
       tagged_post_results?: Array<Record<string, unknown>>;
       [key: string]: unknown;
     };
+
     expect(growthPayload).toMatchObject({
       success: true,
       brand_key: TEST_BRAND_KEY,
@@ -1295,10 +1296,9 @@ describe("GPT memory browser routes", () => {
       tagged_post_results: [
         expect.objectContaining({
           scheduled_post_id: 888,
-          published_post_id: "post-888",
-          local_date: fixtureTimes.localDate,
-          follower_day_net_change: 8,
+                    published_post_id: "post-888",
           strategy: expect.objectContaining({
+
             pillar: "offer",
             hook_style: "direct",
           }),
@@ -1314,14 +1314,19 @@ describe("GPT memory browser routes", () => {
           expect.objectContaining({
             key: "offer",
             posts: 1,
-            posts_with_metrics: 1,
+                        posts_with_metrics: 1,
             median_engagement_total: 113,
-            median_follower_day_net_change: 8,
+            median_likes: 90,
+            median_views: 1200,
+
           }),
         ],
       }),
     });
-    expect(growthPayload.growth_windows?.[0]).not.toHaveProperty("posts");
+        expect(growthPayload).not.toHaveProperty("growth_windows");
+    expect(growthPayload.followers?.attribution_policy).toContain("not linked to posts");
+    expect(JSON.stringify(growthPayload)).not.toContain("follower_day_net_change");
+
 
     const detailedGrowthResponse = await fetchFromWorker(`/api/gpt/growth-context?brand_key=${TEST_BRAND_KEY}&include_detail=true`, {
       headers: { Authorization: "Bearer test-gpt-key" },
