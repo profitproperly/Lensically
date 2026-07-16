@@ -2945,10 +2945,9 @@ describe("operator mode MCP endpoint", () => {
     expect(proceeded.structuredContent.continuity_capsule.brand_key).toBe("manifest_mental");
     expect(Array.isArray(proceeded.structuredContent.continuity_capsule.calendar_coverage.open_slots)).toBe(true);
 
-    const status = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
+        const status = await mcpToolRaw<{ ok: boolean }>("getWorkflowStatus", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
-      continuity_loaded: true,
     });
     expect(status.isError).not.toBe(true);
     expect(status.structuredContent.ok).toBe(true);
