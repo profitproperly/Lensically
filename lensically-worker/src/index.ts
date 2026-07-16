@@ -11854,6 +11854,23 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
+    {
+    name: "runApprovedPostCanary",
+    title: "Run approved post canary",
+    description: "Run exactly one owner-approved scheduled-post delivery canary for the supplied post ID. The scheduler automatically returns to paused after the attempt. This compact command maps to the protected scheduler-control authority without exposing a mode field through generic client arguments.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        scheduled_post_id: { type: "integer", minimum: 1 },
+        reason: { type: "string" },
+        owner_response: { type: "string", description: "Exact owner approval when authorization has not already been persisted." },
+      },
+      required: ["brand_key", "scheduled_post_id", "reason"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
   {
     name: "auditScheduledPost",
     title: "Audit scheduled post",
