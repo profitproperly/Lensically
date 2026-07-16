@@ -12668,7 +12668,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.14.0";
+const OPERATOR_MCP_VERSION = "1.14.1";
 
 const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
 
