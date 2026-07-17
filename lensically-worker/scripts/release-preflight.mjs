@@ -317,9 +317,11 @@ if (!tests.includes("consulted_before_execution: true")
     || !tests.includes("stale_fixture_table")
     || !tests.includes("refreshes policy sources on the next action after a policy write")
     || !tests.includes("Preserve source-defined phonebook policies during forced refresh.")
-    || !tests.includes('"ops_memory"')
+    || !tests.includes("consulted_source_types")
     || !tests.includes('"pre_call_route"')
-    || !tests.includes('"map_entry"')) {
+    || !tests.includes('"map_entry"')
+    || !tests.includes('"tool_registry"')
+    || !tests.includes('"d1_table_manifest"')) {
   errors.push("mandatory_execution_library_regression_missing");
 }
 
