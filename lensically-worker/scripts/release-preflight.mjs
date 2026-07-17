@@ -44,6 +44,8 @@ const recoverySource = read("../lensically-recovery-worker/src/index.ts");
 const sourceDefinedRoutes = source.match(/const SOURCE_DEFINED_PRE_CALL_ROUTES = \[[\s\S]*?\] as const;/)?.[0] ?? "";
 const sourceDefinedProcedures = executionMap.match(/const overrides: Record<string, Record<string, unknown>> = \{[\s\S]*?return overrides\[tool\.name\][\s\S]*?\n\}/)?.[0] ?? "";
 const generatedKnowledge = {
+  ...repositoryTextKnowledge,
+  "__repository_file_manifest__": JSON.stringify(repositoryFileManifest),
   "OPERATING_MEMORY.md": operatingMemory,
   "AGENTS.md": agents,
   "CURRENT_STATE.md": currentState,
