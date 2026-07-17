@@ -649,9 +649,9 @@ async function promoteDiscovery(
     `INSERT INTO operator_execution_map_entries (
       id, action_key, version, status, task_class, intent_aliases_json, tool_name,
       fixed_arguments_json, allowed_input_keys_json, required_input_keys_json,
-      forbidden_tools_json, success_rule_json, source_type, source_incident_id,
-      supersedes_entry_id, verification_summary, verified_at
-    ) VALUES (?, ?, ?, 'active', ?, ?, ?, '{}', ?, ?, ?, ?, 'verified_discovery', ?, ?, ?, CURRENT_TIMESTAMP)`,
+      forbidden_tools_json, procedure_json, historical_failures_json, success_rule_json,
+      source_type, source_incident_id, supersedes_entry_id, verification_summary, verified_at
+    ) VALUES (?, ?, ?, 'active', ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?, 'verified_discovery', ?, ?, ?, CURRENT_TIMESTAMP)`,
   ).bind(
     entryId,
     actionKey,
