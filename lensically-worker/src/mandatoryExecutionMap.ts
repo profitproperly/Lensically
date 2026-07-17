@@ -362,7 +362,9 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       decision_key || ' ' || category || ' ' || title || ' ' || decision_text || ' ' || rationale || ' ' || evidence_json || ' ' || expected_outcome || ' ' || risks_json || ' ' || execution_plan || ' ' || authorized_tools_json || ' ' || status || ' ' || COALESCE(owner_response, '') || ' ' || COALESCE(revision_request, '') || ' ' || COALESCE(outcome_summary, '') || ' ' || COALESCE(result_evidence_json, ''),
       updated_at
     FROM operator_decision_proposals
-    UNION ALL
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
     SELECT 'decision_execution', id,
       decision_id || ' ' || tool_name || ' ' || status || ' ' || COALESCE(result_summary, ''),
       COALESCE(completed_at, created_at)
