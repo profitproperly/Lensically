@@ -15347,20 +15347,15 @@ async function handleOperatorMcpAdminTool(
       recommendedFix = ["Run prepareFullPreflight, inspect getWorkflowStatus, then updateWorkflowRequirement only if the rule is wrong."];
     } else if (lower.includes("required") || lower.includes("schema") || lower.includes("unknown tool")) {
       likelyCause = "tool_schema_or_advertisement";
-      recommendedFix = ["Use readMcpToolDefinition and updateMcpToolSchema to patch required fields or descriptions."];
+      recommendedFix = ["Read the active source-defined definition, patch its typed schema or handler in source, add a focused regression, and release the exact SHA."];
     }
-    const id = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO operator_mcp_admin_errors (id, tool_name, payload_json, error_response_json, likely_cause)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).bind(
-      id,
-      normalizeOperatorText(args.tool_name, 160, true),
-      normalizeOperatorJson(args.payload, {}),
-      normalizeOperatorJson(args.error_response ?? args.error_text, {}),
-      likelyCause,
-    ).run();
-    return { ok: true, inspection_id: id, likely_cause: likelyCause, recommended_fix_path: recommendedFix };
+    return {
+      ok: true,
+      tool_name: normalizeOperatorText(args.tool_name, 160, true),
+      likely_cause: likelyCause,
+      recommended_fix_path: recommendedFix,
+      persisted: false,
+    };
   }
 
     if (toolName === "listMcpTools") {
