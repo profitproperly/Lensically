@@ -31488,6 +31488,7 @@ async function setScheduledPostSchedulerControl(
       max_posts: control.mode === "canary" ? 1 : 0,
       reason: control.reason ?? null,
       updated_at: new Date().toISOString(),
+      resume_mode: null,
     };
     return {
       ok: true,
