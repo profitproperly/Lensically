@@ -75,10 +75,7 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "listEngineeringAudit",
   "inspectMcpFailure",
   "listMcpTools",
-  "createMcpTool",
   "readMcpToolDefinition",
-  "updateMcpToolSchema",
-  "updateMcpToolBehavior",
 ]);
 
 const INTENT_STOP_WORDS = new Set([
