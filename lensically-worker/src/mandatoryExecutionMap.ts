@@ -409,11 +409,13 @@ async function executionLibraryRefreshDue(
   db: D1Database,
   sourceName: string,
   maximumAgeSeconds: number,
+  expectedFingerprint?: string,
 ): Promise<boolean> {
   const state = await db.prepare(
-    `SELECT last_synced_at FROM operator_execution_library_ingestion_state
+    `SELECT source_fingerprint, last_synced_at FROM operator_execution_library_ingestion_state
      WHERE source_system = 'refresh' AND source_name = ? LIMIT 1`,
-  ).bind(sourceName).first<{ last_synced_at: string }>();
+  ).bind(sourceName).first<{ source_fingerprint: string; last_synced_at: string }>();
+  if (expectedFingerprint && state?.source_fingerprint !== expectedFingerprint) return true;
   const lastSynced = executionLibraryTimestampMs(state?.last_synced_at);
   return !Number.isFinite(lastSynced) || Date.now() - lastSynced > maximumAgeSeconds * 1000;
 }
@@ -422,6 +424,7 @@ async function markExecutionLibraryRefresh(
   db: D1Database,
   sourceName: string,
   sourceCount: number,
+  sourceFingerprint = `${sourceName}:${sourceCount}`,
 ): Promise<void> {
   await db.prepare(
     `INSERT INTO operator_execution_library_ingestion_state (
@@ -431,7 +434,19 @@ async function markExecutionLibraryRefresh(
       source_fingerprint = excluded.source_fingerprint,
       source_count = excluded.source_count,
       last_synced_at = CURRENT_TIMESTAMP`,
-  ).bind(sourceName, `${sourceName}:${sourceCount}`, sourceCount).run();
+  ).bind(sourceName, sourceFingerprint, sourceCount).run();
+}
+
+async function deactivateExecutionPolicyLibrarySourceTypes(
+  db: D1Database,
+  sourceTypes: string[],
+): Promise<void> {
+  if (!sourceTypes.length) return;
+  await db.prepare(
+    `UPDATE operator_execution_library_sources
+     SET active = 0, synced_at = CURRENT_TIMESTAMP
+     WHERE source_type IN (${sourceTypes.map(() => "?").join(", ")})`,
+  ).bind(...sourceTypes).run();
 }
 
 async function syncExecutionPolicyLibrarySources(
