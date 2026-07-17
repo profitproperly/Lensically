@@ -17352,11 +17352,22 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         ? routedGatewayMetadata.route_trail as Array<Record<string, unknown>>
         : [];
       const effectivePreCallRoute = preCallRouting.route ?? routedRouteTrail[routedRouteTrail.length - 1] ?? null;
-      const executionPolicy: Record<string, unknown> = {
-        ...buildOperatorExecutionPolicy(toolName, args),
-        pre_call_route: effectivePreCallRoute,
-        pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
-      };
+      const executionPolicy: Record<string, unknown> = sourceDefinedDirectEngineering
+        ? {
+            version: OPERATOR_EXECUTION_POLICY_VERSION,
+            canonical_tool: toolName,
+            execution_plane: "engineering_control",
+            operation_class: "engineering",
+            mandatory_path_applied: true,
+            source_defined_direct: true,
+            compact_receipt_only: true,
+            model_tool_choice_allowed: false,
+          }
+        : {
+            ...buildOperatorExecutionPolicy(toolName, args),
+            pre_call_route: effectivePreCallRoute,
+            pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+          };
       const aliasRetryBlock = await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
       if (aliasRetryBlock) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_known_regression");
