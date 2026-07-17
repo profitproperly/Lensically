@@ -255,7 +255,23 @@ async function compileExecutionPolicyLibrary(
   const forbiddenRules = mandatoryRules
     .filter((item) => /\b(?:never|do not|must not|forbidden|failed:|block)\b/i.test(item.rule))
     .slice(0, 20);
-  const coverage = new Map<string, number>();
+  const coverage = new Map<string, number>([
+    "repository_knowledge",
+    "ops_memory",
+    "pre_call_route",
+    "workflow_requirement",
+    "admin_error",
+    "engineering_audit",
+    "execution_event",
+    "operational_incident",
+    "map_entry",
+    "map_incident",
+    "map_attempt",
+    "map_promotion",
+    "backlog",
+    "strategy_memory",
+    "tool_registry",
+  ].map((sourceType) => [sourceType, 0]));
   for (const source of sources) coverage.set(source.source_type, (coverage.get(source.source_type) ?? 0) + 1);
   const tableCatalog = await db.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
