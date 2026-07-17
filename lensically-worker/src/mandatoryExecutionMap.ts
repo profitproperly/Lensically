@@ -137,7 +137,7 @@ function executionLibrarySourceScore(queryTokens: string[], source: ExecutionPol
   if (!sourceTokens.length) return 0;
   const overlap = sourceTokens.filter((token) => queryTokens.includes(token));
   const coverage = overlap.length / Math.max(1, Math.min(sourceTokens.length, 20));
-  const operationalBoost = ["ops_memory", "pre_call_route", "workflow_requirement", "map_entry"].includes(source.source_type) ? 4 : 0;
+  const operationalBoost = ["ops_memory", "pre_call_route", "source_defined_pre_call_route", "workflow_requirement", "map_entry"].includes(source.source_type) ? 4 : 0;
   return overlap.length * 5 + coverage * 10 + operationalBoost;
 }
 
