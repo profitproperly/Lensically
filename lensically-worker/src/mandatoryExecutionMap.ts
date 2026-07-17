@@ -432,8 +432,10 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       brand_key || ' ' || selection_method || ' minimum_likes ' || eligibility_min_likes || ' pool ' || qualified_pool_count || ' requested ' || requested_count || ' selected ' || selected_count || ' ' || COALESCE(metadata_json, ''),
       created_at
     FROM operator_source_selection_batches
-    UNION ALL
-    SELECT 'source_selection', id,
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'source_selection' AS source_type, id AS source_id,
       brand_key || ' ' || source_type || ' ' || source_identity_key || ' ' || post_text || ' ' || metrics_snapshot_json || ' ' || source_snapshot_json || ' ' || COALESCE(disposition, '') || ' ' || COALESCE(disposition_reason, ''),
       created_at
     FROM operator_source_selections
