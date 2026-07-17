@@ -16616,9 +16616,9 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         filesChanged: [],
         diffSummary: `Failed to dispatch exact-SHA release ${headSha}.`,
         result: "failed",
-        metadata: { status: dispatch.status, workflow_id: workflowId, ref, exact_sha: headSha },
+        metadata: { status: dispatch.status, workflow_id: workflowId, requested_ref: ref, dispatch_ref: dispatchRef, exact_sha: headSha },
       });
-      return { ok: false, status: dispatch.status, error: "release_dispatch_failed", workflow_id: workflowId, ref, exact_sha: headSha };
+      return { ok: false, status: dispatch.status, error: "release_dispatch_failed", workflow_id: workflowId, requested_ref: ref, dispatch_ref: dispatchRef, exact_sha: headSha };
     }
 
     let createdRun: Record<string, unknown> | null = null;
