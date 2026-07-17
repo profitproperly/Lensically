@@ -92,10 +92,25 @@ jobs:
       - name: Surface Operator test failure
         if: ${{ steps.operator_tests.outcome == 'failure' }}
         run: |
-          echo "Operator MCP tests failed. Bounded diagnostic tail follows."
-          tail -n 120 /tmp/lensically-operator-tests.log | while IFS= read -r line; do
-            safe_line=${line//'%'/'%25'}
-            safe_line=${safe_line//
+          diagnostic=$(tail -n 120 /tmp/lensically-operator-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=Operator MCP test failure::$diagnostic"
+          exit 1
+
+      - name: GPT memory tests
+        id: gpt_memory_tests
+        if: ${{ inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=verbose 2>&1 | tee /tmp/lensically-gpt-memory-tests.log
+
+      - name: Surface GPT memory test failure
+        if: ${{ steps.gpt_memory_tests.outcome == 'failure' }}
+        run: |
+          diagnostic=$(tail -n 120 /tmp/lensically-gpt-memory-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=GPT memory test failure::$diagnostic"
+          exit 1
+
       - name: Deploy worker
         if: ${{ inputs.task == 'worker-deploy' }}
         env:
