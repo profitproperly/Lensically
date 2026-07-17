@@ -13231,9 +13231,9 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.22.0";
+const OPERATOR_MCP_VERSION = "1.23.0";
 
-const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
+const OPERATOR_REGISTRY_GENERATION = "mandatory-execution-map-v1";
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   return {
