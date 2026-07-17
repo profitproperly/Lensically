@@ -12450,12 +12450,28 @@ function cloneOperatorMcpTool(tool: OperatorMcpToolDefinition): OperatorMcpToolD
   return JSON.parse(JSON.stringify(tool)) as OperatorMcpToolDefinition;
 }
 
-async function listOperatorMcpOverrides(env: Env): Promise<Array<Record<string, unknown>>> {
-  const rows = await env.DB.prepare(
-    `SELECT * FROM operator_mcp_tool_overrides ORDER BY tool_name ASC`,
-  ).all<Record<string, unknown>>();
-  return rows.results ?? [];
-}
+const RETIRED_INTERNAL_TOOL_NAMES = new Set([
+  "guardLensicallyCall",
+  "routeAndExecuteLensicallyCall",
+  "executeMappedIntent",
+  "runEngineeringTool",
+  "listPreCallRoutes",
+  "recordPreCallRoute",
+  "recordOpsMemory",
+  "listOpsMemory",
+  "searchOpsMemory",
+  "readOpsMemory",
+  "updateOpsMemory",
+  "createMcpTool",
+  "updateMcpToolSchema",
+  "updateMcpToolBehavior",
+  "disableMcpTool",
+  "deployMcpChanges",
+  "rollbackMcpChanges",
+  "createImplementationBacklogItem",
+  "listImplementationBacklogItems",
+  "markImplementationBacklogItemResolved",
+]);
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   const scopedWrapperTools = includeScopedWrappers ? [
