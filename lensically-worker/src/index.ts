@@ -13186,7 +13186,6 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     completion_recording_rule: "Completed fixes must be source-controlled, covered by focused regression tests, and recorded once in the engineering audit.",
     payload_limits: {
       source_documents: "3 docs, first 80 nonblank lines each, 6000 chars max per doc",
-      ops_memory_limit: 12,
       recent_failures_limit: 10,
       recent_successful_fixes_limit: 8,
       backlog_limit: 20,
