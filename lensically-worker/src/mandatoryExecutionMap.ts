@@ -957,6 +957,7 @@ function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] 
     runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha", "deployment", "deploy worker", "deploy mcp", "release worker", "release mcp"],
     getEngineeringRelease: ["check engineering release", "wait for release completion"],
     verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version", "post-deployment verification", "deployment verification", "runtime alignment verification", "mcp status verification", "verify runtime", "verify worker", "verify current deployment"],
+        listEngineeringAudit: ["list engineering audit", "read engineering audit", "inspect engineering audit", "inspect execution audit", "read execution audit", "inspect execution policy records"],
     inspectMcpFailure: ["inspect mcp failure", "engineering diagnosis", "diagnose gateway failure", "repair path diagnosis", "diagnose mcp", "diagnose operator", "inspect gateway failure", "inspect execution failure"],
     listMcpTools: ["list mcp tools", "inspect internal mcp registry", "bridge cached tool call"],
     createMcpTool: ["create mcp tool", "add internal mcp tool", "register internal mcp tool"],
@@ -1005,7 +1006,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   }
   if (has(/\b(create|add|register)\b/) && has(/\b(mcp|internal)\b/) && has(/\btool\b/)) return "createMcpTool";
   if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bschema\b/)) return "updateMcpToolSchema";
-  if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bbehavior\b/)) return "updateMcpToolBehavior";
+    if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bbehavior\b/)) return "updateMcpToolBehavior";
+  if (has(/\b(engineering|execution|policy)\s+audit\b/) || has(/\baudit\s+(entries|records|history)\b/)) return "listEngineeringAudit";
   if (has(/\b(engineering|gateway|mcp|operator|execution)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect|broken|timeout|timed out)\b/)) return "inspectMcpFailure";
   if (has(/\b(engineering|repository|repo|code|source|gateway|mcp|operator)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
   if (has(/\btypecheck\b/) || has(/\boperator\s+tests?\b/) || has(/\bgpt\s+memory\s+tests?\b/) || has(/\bregression\s+tests?\b/)) return "runGitHubWorkflow";
@@ -1386,7 +1388,15 @@ export async function prepareMandatoryExecutionMapCall(
     };
   }
 
-  const permitPayload = await callbacks.verifyPermit(rawInput.permit ?? rawInput.discovery_permit);
+    const continuationIncidentId = normalizeText(rawInput.continuation_id, 160);
+  const continuationIncident = continuationIncidentId ? await readOpenIncident(db, continuationIncidentId) : null;
+  const signedPermitPayload = await callbacks.verifyPermit(rawInput.permit ?? rawInput.discovery_permit);
+  const permitPayload = signedPermitPayload ?? (continuationIncident ? {
+    kind: "mandatory_execution_map_discovery",
+    version: MANDATORY_EXECUTION_MAP_VERSION,
+    incident_id: continuationIncident.id,
+    action_intent: continuationIncident.action_intent,
+  } : null);
   if (permitPayload?.kind === "mandatory_execution_map_discovery"
       && permitPayload.version === MANDATORY_EXECUTION_MAP_VERSION
       && typeof permitPayload.incident_id === "string") {

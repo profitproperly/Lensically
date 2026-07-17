@@ -4,6 +4,10 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: broad execution-audit reads matched generic failure inspection, and signed discovery permits were blocked by ChatGPT client preflight before reaching the gateway. Use: route engineering/execution/policy audit reads deterministically to `listEngineeringAudit`; continue an open unknown/stale map incident by sending its UUID as `continuation_id` with the exact original inputs and `discovery_tool`, allowing verified discovery and automatic promotion without resending the signed permit. Applies when: reading execution policy history or continuing Mandatory Execution Map discovery through constrained clients.
+
+
+
 - Failed: release preflight passed arbitrary generated repository text as the replacement string to `String.replace`; `## Global Memory
 
 `, `- Failed: release preflight embedded repository text with `JSON.stringify` directly into TypeScript; raw Unicode U+2028/U+2029 line separators remained valid JSON but broke JavaScript string literals during release-only typecheck. Use: escape both separators in the generated knowledge literal before writing the source block. Applies when: generating JavaScript or TypeScript source from arbitrary repository text.
