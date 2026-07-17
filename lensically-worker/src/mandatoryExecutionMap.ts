@@ -558,9 +558,9 @@ async function compileExecutionPolicyLibrary(
 ): Promise<Record<string, unknown>> {
     await ensureExecutionPolicyLibraryTables(db);
   const synchronized = await syncExecutionPolicyLibrarySources(db, tools);
-  const sources = synchronized.sources;
   const sourceReadError = synchronized.sourceReadError;
   const queryTokens = executionLibraryTokens(`${actionIntent} ${stringify(inputs)}`);
+  const sources = await readExecutionPolicyLibraryCandidates(db, queryTokens);
   const matched = sources
     .map((source) => ({ source, score: executionLibrarySourceScore(queryTokens, source) }))
     .filter((item) => item.score >= 5)
