@@ -298,7 +298,7 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       updated_at
     FROM operator_ops_memory WHERE active = 1
     UNION ALL
-    SELECT 'pre_call_route', id,
+    SELECT 'pre_call_route_override', id,
       route_key || ' ' || mandatory_route || ' ' || reason || ' ' || verification_summary,
       updated_at
     FROM operator_pre_call_routes WHERE active = 1
