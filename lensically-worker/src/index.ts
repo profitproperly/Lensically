@@ -16646,6 +16646,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       dispatched: true,
       exact_sha: headSha,
       workflow_id: workflowId,
+      requested_ref: ref,
+      dispatch_ref: dispatchRef,
       run: createdRun ? compactRun(createdRun) : null,
       run_discovery_pending: createdRun === null,
       release_policy: "one full validation and deployment workflow per exact SHA",
