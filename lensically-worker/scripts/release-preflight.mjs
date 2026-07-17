@@ -221,6 +221,10 @@ const staticPolicyCallbackCount = (source.match(/readStaticPolicySources:/g) ?? 
 if (staticPolicyCallbackCount < 2) {
   errors.push(`execution_library_static_policy_callbacks_incomplete:${staticPolicyCallbackCount}`);
 }
+const overridePolicyReferenceCount = (executionMap.match(/"pre_call_route_override"/g) ?? []).length;
+if (overridePolicyReferenceCount < 4) {
+  errors.push(`execution_library_override_policy_incomplete:${overridePolicyReferenceCount}`);
+}
 
 if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v2"')
     || !executionMap.includes("operator_execution_library_sources")
