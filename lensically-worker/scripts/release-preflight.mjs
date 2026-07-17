@@ -79,6 +79,7 @@ if (!generatedPattern.test(executionMap)) throw new Error("execution_knowledge_m
 executionMap = executionMap.replace(generatedPattern, generatedBlock);
 writeFileSync(resolve(root, "src/mandatoryExecutionMap.ts"), executionMap, "utf8");
 const generatedKnowledgeHasRepositoryManifest = generatedBlock.includes('"__repository_file_manifest__"');
+const generatedKnowledgeIsJavaScriptSafe = !/[\u2028\u2029]/.test(generatedKnowledgeLiteral);
 executionMap = executionMap.replace(
   generatedPattern,
   "// BEGIN GENERATED EXECUTION KNOWLEDGE\n<release-generated-knowledge-omitted>\n// END GENERATED EXECUTION KNOWLEDGE",
