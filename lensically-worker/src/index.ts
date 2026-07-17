@@ -12417,6 +12417,8 @@ const RETIRED_INTERNAL_TOOL_NAMES = new Set([
   "createImplementationBacklogItem",
   "listImplementationBacklogItems",
   "markImplementationBacklogItemResolved",
+  "planOperatorExecution",
+  "getMcpAdminState",
 ]);
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
