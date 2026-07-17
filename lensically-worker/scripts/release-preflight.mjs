@@ -1,15 +1,32 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
-const executionMap = read("src/mandatoryExecutionMap.ts");
+let executionMap = read("src/mandatoryExecutionMap.ts");
 const tests = read("test/operatorMode.spec.ts");
 const workflow = read("../.github/workflows/lensically-engineering.yml");
 const currentState = read("../CURRENT_STATE.md");
+const operatingMemory = read("../OPERATING_MEMORY.md");
+const agents = read("../AGENTS.md");
 const recoverySource = read("../lensically-recovery-worker/src/index.ts");
+
+const sourceDefinedRoutes = source.match(/const SOURCE_DEFINED_PRE_CALL_ROUTES = \[[\s\S]*?\] as const;/)?.[0] ?? "";
+const sourceDefinedProcedures = executionMap.match(/const overrides: Record<string, Record<string, unknown>> = \{[\s\S]*?return overrides\[tool\.name\][\s\S]*?\n\}/)?.[0] ?? "";
+const generatedKnowledge = {
+  "OPERATING_MEMORY.md": operatingMemory,
+  "AGENTS.md": agents,
+  "CURRENT_STATE.md": currentState,
+  "source_defined_pre_call_routes": sourceDefinedRoutes,
+  "source_defined_execution_procedures": sourceDefinedProcedures,
+};
+const generatedBlock = `// BEGIN GENERATED EXECUTION KNOWLEDGE\nconst GENERATED_EXECUTION_KNOWLEDGE: Record<string, string> = ${JSON.stringify(generatedKnowledge, null, 2)};\n// END GENERATED EXECUTION KNOWLEDGE`;
+const generatedPattern = /\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE[\s\S]*?\/\/ END GENERATED EXECUTION KNOWLEDGE/;
+if (!generatedPattern.test(executionMap)) throw new Error("execution_knowledge_marker_missing");
+executionMap = executionMap.replace(generatedPattern, generatedBlock);
+writeFileSync(resolve(root, "src/mandatoryExecutionMap.ts"), executionMap, "utf8");
 
 const cronMatch = wrangler.match(/"crons"\s*:\s*(\[[\s\S]*?\])/);
 if (!cronMatch) {
