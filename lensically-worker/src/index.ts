@@ -13583,7 +13583,10 @@ async function prepareOperatorRoutedGatewayCall(
       return { ...mapped, ok: true, tool_name: toolName, arguments: args, corrections, route_trail: routeTrail };
     }
     const requiredTool = normalizeOperatorText(routing.route?.required_tool, 160, true);
-    if (!requiredTool || requiredTool === toolName || requiredTool === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
+    if (requiredTool === toolName) {
+      return { ...mapped, ok: false, error: "known_blocker_prevented", corrections, route_trail: routeTrail };
+    }
+    if (!requiredTool || requiredTool === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
       return { ...mapped, ok: false, error: "routed_gateway_redirect_invalid", corrections, route_trail: routeTrail };
     }
     toolName = requiredTool;
