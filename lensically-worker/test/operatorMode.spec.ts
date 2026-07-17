@@ -795,7 +795,7 @@ describe("operator mode backend spine", () => {
     });
   }, 30000);
 
-      it.only("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
+      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
     await operatorTool("list_accounts");
     await env.DB.prepare(
       `CREATE TABLE threads_posts_archive (
