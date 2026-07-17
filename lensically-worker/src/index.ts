@@ -15,6 +15,7 @@ import {
   getMandatoryExecutionMapSummary,
   MANDATORY_EXECUTION_MAP_VERSION,
   prepareMandatoryExecutionMapCall,
+  type ExecutionPolicyLibrarySource,
   type MandatoryExecutionToolDefinition,
 } from "./mandatoryExecutionMap";
 
