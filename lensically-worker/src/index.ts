@@ -8185,15 +8185,6 @@ async function buildOperatorManifestProceedCapsule(
     WORKSPACE_DEFAULT_TIMEZONE,
   );
   const blockingIncident = deliveryReconciliation.unresolved_incidents[0] ?? null;
-  const engineeringContinuation = await env.DB.prepare(
-    `SELECT id, title, observed_issue, expected_behavior, required_change,
-            acceptance_test, priority, related_stage, created_at
-     FROM operator_mcp_backlog_items
-     WHERE status = 'open'
-     ORDER BY CASE lower(priority) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
-              datetime(created_at) ASC
-     LIMIT 1`,
-  ).first<Record<string, unknown>>();
   const calendarCoverage = await getOperatorHourlyCoverage(
     env,
     brand,
