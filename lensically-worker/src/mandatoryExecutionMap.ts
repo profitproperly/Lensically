@@ -328,10 +328,12 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       CAST(version AS TEXT) || ' ' || status || ' ' || COALESCE(change_summary, '') || ' ' || snapshot_json,
       COALESCE(activated_at, created_at)
     FROM operator_mcp_deployments
-    UNION ALL
-    SELECT 'continuity_ref', id,
-      kind || ' ' || brand_key || ' ' || COALESCE(workflow_session_id, '') || ' ' || COALESCE(continuation_choice, '') || ' ' || COALESCE(payload_json, ''),
-      created_at
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'continuity_ref' AS source_type, id AS source_id,
+      kind || ' ' || brand_key || ' ' || COALESCE(workflow_session_id, '') || ' ' || COALESCE(continuation_choice, '') || ' ' || COALESCE(payload_json, '') AS text,
+      created_at AS updated_at
     FROM operator_continuity_refs
     UNION ALL
     SELECT 'operation_receipt', idempotency_key,
