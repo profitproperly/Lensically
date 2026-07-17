@@ -952,7 +952,7 @@ function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] 
     applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "repair repository", "repair gateway", "repair mcp", "fix gateway", "fix mcp", "dry-run patch", "harmless test patch"],
     applyRepoTextPatch: ["apply one exact patch", "replace exact repository text", "single file repair"],
     deleteRepoFile: ["delete repository file", "remove repository file"],
-    runMcpTests: ["run mcp self checks", "run built-in mcp checks", "test gateway configuration", "test mcp configuration"],
+    runMcpTests: ["run mcp tests", "run mcp self checks", "run built-in mcp checks", "test gateway configuration", "test mcp configuration"],
     runGitHubWorkflow: ["run typecheck", "run operator tests", "run gpt memory tests", "run focused engineering tests", "run regression tests"],
     runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha", "deployment", "deploy worker", "deploy mcp", "release worker", "release mcp"],
     getEngineeringRelease: ["check engineering release", "wait for release completion"],
