@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger bounded main-worker validation when workflow dispatch is client-blocked.
+// Recovery source commits may carry [operator-tests] to trigger one bounded main-worker validation when workflow dispatch is client-blocked.
 
 interface Env {
   GITHUB_TOKEN: string;
