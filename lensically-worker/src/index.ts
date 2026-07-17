@@ -358,7 +358,7 @@ const OPERATOR_COLLABORATION_CONTRACT = {
   version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
         working_relationship: "Autonomous Manifest account operation with persistent full-discretion engineering authority; owner ratification is reserved for protected destructive, ownership, credential, scheduler-safety, and irreversible business decisions.",
   principles: [
-        "Load canonical startup context first, then call guardLensicallyCall with the exact intended tool and JSON arguments before every later Lensically action.",
+        "Load canonical startup context first, then route every later Lensically action through guardLensicallyCall. The guard must consult the persistent pre-call route phonebook, force any verified successful path, and issue a token only for the routed arguments.",
     "Inspect existing architecture, history, and evidence before proposing or changing behavior.",
     "When an autonomy profile is active, originate the next decision instead of asking the owner to direct routine operations.",
     "Give independent judgment, risks, edge cases, and better alternatives instead of agreeing automatically.",
@@ -405,7 +405,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
   authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize destructive account data changes, credential ownership changes, account ownership changes, irreversible business decisions, repository file deletion, runtime rollback, tool disabling, or content publication controls.",
   numerical_tool_budgets: false,
   owner_ratification_required: false,
-    known_path_rule: "After startup, every Lensically tool call must first obtain a signed guardLensicallyCall receipt for its exact normalized arguments. The dispatcher rejects unguarded, mismatched, schema-invalid, or known-bad routes before execution.",
+    known_path_rule: "After startup, every Lensically tool call must first pass through the persistent pre-call route phonebook in guardLensicallyCall. A verified route overrides model judgment, rewrites or redirects the call before execution, and is rechecked by the dispatcher even when a valid token already exists.",
   recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
   owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
   protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
@@ -16686,6 +16686,111 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       ? await env.DB.prepare(`SELECT * FROM operator_engineering_audit WHERE action = ? ORDER BY datetime(created_at) DESC LIMIT ?`).bind(action, limit).all<Record<string, unknown>>()
       : await env.DB.prepare(`SELECT * FROM operator_engineering_audit ORDER BY datetime(created_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
     return { ok: true, entries: rows.results ?? [] };
+  }
+
+    if (toolName === "listPreCallRoutes") {
+    await ensureOperatorPreCallRoutesTable(env);
+    const limit = Math.min(Math.max(Number(args.limit ?? 100), 1), 200);
+    const provider = normalizeOperatorPreCallKey(args.provider, "");
+    const toolFilter = normalizeOperatorText(args.tool_name, 160, true);
+    const activeFilter = args.active === undefined ? null : args.active === false ? 0 : 1;
+    const rows = await env.DB.prepare(
+      `SELECT * FROM operator_pre_call_routes
+       WHERE (? = '' OR provider = ?)
+         AND (? IS NULL OR tool_name = ?)
+         AND (? IS NULL OR active = ?)
+       ORDER BY priority DESC, datetime(updated_at) DESC LIMIT ?`,
+    ).bind(provider, provider, toolFilter, toolFilter, activeFilter, activeFilter, limit).all<Record<string, unknown>>();
+    const persistent = (rows.results ?? []).map(serializeOperatorPreCallRoute);
+    const sourceDefined = SOURCE_DEFINED_PRE_CALL_ROUTES
+      .filter((route) => (!provider || route.provider === provider) && (!toolFilter || route.tool_name === toolFilter || route.tool_name === "*"))
+      .map((route) => ({ ...route, source: "source_defined", version: OPERATOR_PRE_CALL_ROUTING_VERSION, active: true }));
+    return {
+      ok: true,
+      version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+      routes: [...persistent, ...sourceDefined].slice(0, limit),
+      persistent_count: persistent.length,
+      source_defined_count: sourceDefined.length,
+    };
+  }
+
+  if (toolName === "recordPreCallRoute") {
+    await ensureOperatorPreCallRoutesTable(env);
+    const routeKey = normalizeOperatorMachineKey(args.route_key, "");
+    const routeTool = normalizeOperatorText(args.tool_name, 160);
+    const provider = normalizeOperatorPreCallKey(args.provider, operatorPreCallProvider(routeTool ?? ""));
+    const operationKey = normalizeOperatorPreCallKey(args.operation_key, "*");
+    const action = args.action === "redirect" ? "redirect" : "apply";
+    const requiredTool = normalizeOperatorText(args.required_tool, 160, true);
+    const mandatoryRoute = normalizeOperatorText(args.mandatory_route, 1600);
+    const reason = normalizeOperatorText(args.reason, 1600);
+    const verificationSummary = normalizeOperatorText(args.verification_summary, 1600);
+    if (!routeKey || !routeTool || !mandatoryRoute || !reason || !verificationSummary) {
+      return { ok: false, error: "pre_call_route_fields_required" };
+    }
+    if (action === "redirect" && !requiredTool) {
+      return { ok: false, error: "pre_call_route_required_tool_missing" };
+    }
+    const match = args.match && typeof args.match === "object" && !Array.isArray(args.match) ? args.match : {};
+    const argumentPatch = args.argument_patch && typeof args.argument_patch === "object" && !Array.isArray(args.argument_patch) ? args.argument_patch : {};
+    const allowedArgumentKeys = Array.isArray(args.allowed_argument_keys)
+      ? args.allowed_argument_keys.map((item) => normalizeOperatorText(item, 160, true)).filter(Boolean)
+      : null;
+    let sourceMemoryId = normalizeOperatorText(args.source_memory_id, 160, true);
+    if (!sourceMemoryId) {
+      sourceMemoryId = crypto.randomUUID();
+      await env.DB.prepare(
+        `INSERT INTO operator_ops_memory (id, title, problem, fix, applies_when, tags_json)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        sourceMemoryId,
+        `Pre-call route: ${routeKey}`,
+        `A prior ${provider} path for ${routeTool} produced a reusable blocker.`,
+        mandatoryRoute,
+        `${provider}:${routeTool}:${operationKey}`,
+        JSON.stringify(["pre-call-route", provider, routeTool, operationKey].slice(0, 8)),
+      ).run();
+    }
+    const existing = await env.DB.prepare(`SELECT id FROM operator_pre_call_routes WHERE route_key = ? LIMIT 1`)
+      .bind(routeKey).first<{ id: string }>();
+    const id = existing?.id ?? crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_pre_call_routes (
+        id, route_key, provider, tool_name, operation_key, match_json, action, required_tool,
+        mandatory_route, argument_patch_json, allowed_argument_keys_json, reason,
+        verification_summary, source_memory_id, priority, active, expires_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(route_key) DO UPDATE SET
+        provider = excluded.provider, tool_name = excluded.tool_name, operation_key = excluded.operation_key,
+        match_json = excluded.match_json, action = excluded.action, required_tool = excluded.required_tool,
+        mandatory_route = excluded.mandatory_route, argument_patch_json = excluded.argument_patch_json,
+        allowed_argument_keys_json = excluded.allowed_argument_keys_json, reason = excluded.reason,
+        verification_summary = excluded.verification_summary, source_memory_id = excluded.source_memory_id,
+        priority = excluded.priority, active = excluded.active, expires_at = excluded.expires_at,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      id, routeKey, provider, routeTool, operationKey, normalizeOperatorJson(match, {}), action, requiredTool,
+      mandatoryRoute, normalizeOperatorJson(argumentPatch, {}),
+      allowedArgumentKeys === null ? null : normalizeOperatorJson(allowedArgumentKeys, []),
+      reason, verificationSummary, sourceMemoryId,
+      Math.min(Math.max(Number(args.priority ?? 100), 1), 1000),
+      args.active === false ? 0 : 1,
+      normalizeOperatorText(args.expires_at, 80, true),
+    ).run();
+    await recordEngineeringAudit(env, {
+      action: "recordPreCallRoute",
+      result: "ok",
+      diffSummary: routeKey,
+      metadata: { route_id: id, provider, tool_name: routeTool, operation_key: operationKey, source_memory_id: sourceMemoryId },
+    });
+    const row = await env.DB.prepare(`SELECT * FROM operator_pre_call_routes WHERE route_key = ? LIMIT 1`)
+      .bind(routeKey).first<Record<string, unknown>>();
+    return {
+      ok: true,
+      version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+      route: row ? serializeOperatorPreCallRoute(row) : null,
+      source_memory_id: sourceMemoryId,
+    };
   }
 
   if (toolName === "recordOpsMemory") {
