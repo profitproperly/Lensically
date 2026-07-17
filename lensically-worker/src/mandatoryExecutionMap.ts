@@ -604,7 +604,7 @@ async function compileExecutionPolicyLibrary(
     consulted_before_execution: true,
     model_path_choice_allowed: false,
     action_intent: actionIntent,
-    source_coverage: Array.from(coverage.entries()).map(([source_type, total]) => ({ source_type, total })),
+    source_coverage: coverage,
     d1_table_catalog: (tableCatalog.results ?? []).map((row) => row.name),
     matched_source_keys: matched.map((item) => `${item.source.source_type}:${item.source.source_id}`),
     mandatory_rules: mandatoryRules,
