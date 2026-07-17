@@ -16942,8 +16942,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       return mcpJsonResponse({ jsonrpc: "2.0", id: id ?? null, result: {} });
     }
 
-    if (method === "tools/list") {
-      const tools = await buildOperatorMcpTools(env, false, false);
+        if (method === "tools/list") {
+      const tools = (await buildOperatorMcpTools(env, false, false)).filter((tool) => tool.name === "getOperatorStartupContext" || tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY);
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
