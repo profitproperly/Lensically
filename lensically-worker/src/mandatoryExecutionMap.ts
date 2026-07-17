@@ -207,8 +207,16 @@ async function ensureExecutionPolicyLibraryDirtyTriggers(db: D1Database): Promis
   const existingPolicyTables = (existing.results ?? [])
     .map((row) => String(row.name ?? "").trim())
     .filter((tableName) => /(ops_memory|pre_call_routes|workflow_requirements|operational_incidents|mcp_tool_overrides|autonomy_profiles|decision_proposals|execution_map_entries|execution_map_incidents|execution_map_promotions|mcp_backlog_items|gpt_strategy_memory|production_board_items|source_exclusions|source_cards|operator_gates)$/.test(tableName));
-  const fingerprint = executionLibraryTextFingerprint(existingPolicyTables.join("|"));
-  if (!(await executionLibraryRefreshDue(db, "dirty_triggers", 86400, fingerprint))) return;
+  const expectedTriggerNames = existingPolicyTables.flatMap((tableName) =>
+    ["insert", "update", "delete"].map((operation) => `trg_execution_library_dirty_${machineKey(tableName)}_${operation}`),
+  );
+  const existingTriggers = await db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_execution_library_dirty_%' ORDER BY name`,
+  ).all<{ name: string }>();
+  const existingTriggerNames = new Set((existingTriggers.results ?? []).map((row) => String(row.name ?? "")));
+  const triggersComplete = expectedTriggerNames.every((name) => existingTriggerNames.has(name));
+  const fingerprint = executionLibraryTextFingerprint(`${existingPolicyTables.join("|")}::${expectedTriggerNames.join("|")}`);
+  if (triggersComplete && !(await executionLibraryRefreshDue(db, "dirty_triggers", 86400, fingerprint))) return;
   const statements: D1PreparedStatement[] = [];
   for (const tableName of existingPolicyTables) {
     for (const operation of ["INSERT", "UPDATE", "DELETE"] as const) {
