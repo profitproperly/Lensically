@@ -753,7 +753,7 @@ async function compileExecutionPolicyLibrary(
   const missingRequiredSourceTypes = requiredSourceTypes.filter((sourceType) => Number(coverageByType.get(sourceType) ?? 0) === 0);
   const policyReady = sourceReadError === null
     && missingRequiredSourceTypes.length === 0
-    && tableManifestCount >= tableCatalogCount;
+    && tableManifestComplete;
   const policyEventId = crypto.randomUUID();
   const bundle = {
     version: EXECUTION_POLICY_LIBRARY_VERSION,
