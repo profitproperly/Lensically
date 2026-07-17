@@ -16557,9 +16557,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       return Array.isArray(runs) ? runs as Array<Record<string, unknown>> : [];
     };
     const isReleaseRun = (run: Record<string, unknown>): boolean => {
-      if (run.head_sha !== headSha) return false;
       const displayTitle = String(run.display_title ?? "").toLowerCase();
-      return displayTitle.includes("worker-deploy") || displayTitle.includes(headSha.slice(0, 12).toLowerCase());
+      return run.head_sha === headSha || displayTitle.includes(headSha.slice(0, 12).toLowerCase());
     };
     const compactRun = (run: Record<string, unknown>) => ({
       id: run.id,
