@@ -474,14 +474,36 @@ export default {
       if (!env.RECOVERY_MCP_ACCESS_TOKEN || bearer(request) !== env.RECOVERY_MCP_ACCESS_TOKEN) return json({ ok: false, error: "unauthorized" }, 401);
       const message = await request.json().catch(() => null) as { id?: string | number | null; method?: string; params?: Record<string, unknown> } | null;
       if (!message?.method) return json({ jsonrpc: "2.0", id: message?.id ?? null, error: { code: -32600, message: "Invalid Request" } });
-      if (message.method === "initialize") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { protocolVersion: String(message.params?.protocolVersion || "2025-06-18"), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "lensically-recovery", title: "Lensically Recovery", version: VERSION }, instructions: "Independent break-glass recovery plane for repairing the main Lensically MCP. Diagnose first, patch narrowly, run CI, deploy only after tests pass, and verify the main endpoint. This service does not access Lensically account or generation data." } });
+      if (message.method === "initialize") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { protocolVersion: String(message.params?.protocolVersion || "2025-06-18"), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "lensically-recovery", title: "Lensically Recovery", version: VERSION }, instructions: "Independent break-glass recovery plane. Call getRecoveryStartupContext first, then submit every recovery action through executeMappedRecoveryIntent. The model never selects an internal recovery tool when a known procedure exists. Unknown or stale recovery terrain requires a signed discovery incident and automatic promotion before the interrupted objective resumes. This service does not access Lensically account or generation data." } });
       if (message.method === "notifications/initialized") return new Response(null, { status: 202 });
       if (message.method === "ping") return json({ jsonrpc: "2.0", id: message.id ?? null, result: {} });
-      if (message.method === "tools/list") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { tools: TOOLS } });
+      if (message.method === "tools/list") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { tools: PUBLIC_TOOLS } });
       if (message.method === "tools/call") {
-        const name = String(message.params?.name || ""); const tool = TOOLS.find((item) => item.name === name); if (!tool) return json({ jsonrpc: "2.0", id: message.id ?? null, error: { code: -32602, message: "Unknown recovery tool" } });
+        const name = String(message.params?.name || "");
         const args = message.params?.arguments && typeof message.params.arguments === "object" ? message.params.arguments as Record<string, unknown> : {};
-        const result = await toolCall(name, args, env); return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: result.ok === false ? `Recovery tool ${name} failed: ${String(result.error || result.status || "unknown")}` : `Recovery tool ${name} completed.` }], isError: result.ok === false } });
+        if (name === "getRecoveryStartupContext") {
+          const health = await toolCall("recoveryHealth", {}, env);
+          const result = { ok: health.ok !== false, recovery: metadata(env), health, mandatory_execution_map: await recoveryMapSummary(env.RECOVERY_SESSIONS, TOOLS.length), account_data_loaded: false };
+          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "Recovery startup context loaded." }], isError: false } });
+        }
+        if (name !== "executeMappedRecoveryIntent") {
+          const result = { ok: false, error: "mandatory_recovery_map_required", requested_tool: name, required_tool: "executeMappedRecoveryIntent" };
+          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "Recovery actions must enter through the Mandatory Recovery Map." }], isError: true } });
+        }
+        const prepared = await prepareRecoveryAction(env.RECOVERY_SESSIONS, args, TOOLS as RecoveryMapTool[], {
+          sign: (payload) => signRecoveryEnvelope(env, payload),
+          verify: (token) => verifyRecoveryEnvelope(env, token),
+        });
+        if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
+          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: prepared, content: [{ type: "text", text: `Recovery map could not resolve the action: ${String(prepared.error || "unknown")}` }], isError: true } });
+        }
+        const underlying = await toolCall(prepared.tool_name, prepared.arguments, env);
+        const lifecycle = await finalizeRecoveryAction(env.RECOVERY_SESSIONS, prepared.execution ?? null, prepared.tool_name, prepared.arguments, underlying, {
+          sign: (payload) => signRecoveryEnvelope(env, payload),
+          verify: (token) => verifyRecoveryEnvelope(env, token),
+        });
+        const result = { ...underlying, mandatory_execution_map: lifecycle, mapped_execution: { version: MANDATORY_RECOVERY_MAP_VERSION, action_intent: args.action_intent ?? null, executed_tool: prepared.tool_name, state: prepared.state, entry: prepared.entry ?? null, incident: prepared.incident ?? null, model_tool_choice_allowed: false } };
+        return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: result.ok === false ? `Mapped recovery action failed: ${String(result.error || result.status || "unknown")}` : "Mapped recovery action completed." }], isError: result.ok === false } });
       }
       return json({ jsonrpc: "2.0", id: message.id ?? null, error: { code: -32601, message: "Method not found" } });
     } catch (error) {
