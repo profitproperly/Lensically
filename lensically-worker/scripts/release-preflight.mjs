@@ -236,6 +236,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes('SELECT \'pre_call_route_override\'')
     || !source.includes("SOURCE_DEFINED_PRE_CALL_ROUTES.map")
     || !source.includes('source_type: "pre_call_route"')
+    || !source.includes("await prepareOperatorMode(env);\n  const availableTools = await buildOperatorMcpTools")
     || !executionMap.includes("readExecutionPolicyLibraryTableCatalog")
     || !executionMap.includes("d1_table_manifest")
     || !executionMap.includes("executionLibraryRefreshDue")
