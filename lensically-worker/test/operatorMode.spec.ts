@@ -3077,10 +3077,10 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.22.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.23.0");
     expect(listed.tools.map((tool) => tool.name)).toEqual([
       "getOperatorStartupContext",
-      "routeAndExecuteLensicallyCall",
+      "executeMappedIntent",
     ]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
