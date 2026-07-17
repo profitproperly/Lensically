@@ -2349,7 +2349,7 @@ describe("operator mode MCP endpoint", () => {
       github: { token_status: string };
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
       mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean };
-      execution_library: { mandatory: boolean; policy_ready: boolean; consulted_before_execution: boolean; model_path_choice_allowed: boolean; table_manifest_complete: boolean; missing_required_source_types: string[]; source_coverage: Array<{ source_type: string }> };
+      execution_library: { mandatory: boolean; policy_ready: boolean; consulted_before_execution: boolean; model_path_choice_allowed: boolean; table_manifest_complete: boolean; missing_required_source_types: string[]; consulted_source_types: string[]; source_type_count: number; total_source_count: number };
       execution_guard_enforcement: { mode: string; model_tool_choice_allowed: boolean };
     }>("executeLensicallyIntent", {
       objective: "Inspect engineering access before repository work.",
