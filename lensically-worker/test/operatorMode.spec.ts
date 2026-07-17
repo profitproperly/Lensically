@@ -2505,7 +2505,7 @@ describe("operator mode MCP endpoint", () => {
       intent: "repository runtime alignment",
       inputs: {},
     });
-    expect(alignment.isError).not.toBe(true);
+    expect(alignment.isError, `alignment failed: ${JSON.stringify(alignment.structuredContent)}`).not.toBe(true);
     expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
 
     const repair = await mcpToolCallRaw<{
