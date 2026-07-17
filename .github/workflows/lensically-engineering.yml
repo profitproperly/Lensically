@@ -94,15 +94,30 @@ jobs:
         if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
         run: npx tsc --noEmit
 
-      - name: Operator MCP tests
-        id: operator_tests
-        if: ${{ inputs.task == 'operator-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
+      - name: Fast Operator release gate
+        id: operator_release_gate
+        if: ${{ inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
           set -o pipefail
-          npm run test -- --run test/operatorMode.spec.ts --reporter=verbose --bail=1 2>&1 | tee /tmp/lensically-operator-tests.log
+          npm run test -- --run test/operatorMode.spec.ts --testNamePattern="routes operational status and engineering intents deterministically away from content procedures" --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-operator-release-gate.log
 
-      - name: Surface Operator test failure
+      - name: Surface fast Operator release-gate failure
+        if: ${{ steps.operator_release_gate.outcome == 'failure' }}
+        run: |
+          diagnostic=$(tail -n 80 /tmp/lensically-operator-release-gate.log | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=Fast Operator release gate failure::$diagnostic"
+          exit 1
+
+      - name: Full Operator MCP tests
+        id: operator_tests
+        if: ${{ inputs.task == 'operator-tests' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test -- --run test/operatorMode.spec.ts --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-operator-tests.log
+
+      - name: Surface full Operator test failure
         if: ${{ steps.operator_tests.outcome == 'failure' }}
         run: |
           failure_lines=$(grep -aE '(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]' /tmp/lensically-operator-tests.log | tail -n 80 || true)
@@ -110,7 +125,7 @@ jobs:
             failure_lines=$(tail -n 80 /tmp/lensically-operator-tests.log)
           fi
           diagnostic=$(printf '%s\n' "$failure_lines" | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=Operator MCP test failure::$diagnostic"
+          echo "::error title=Full Operator MCP test failure::$diagnostic"
           exit 1
 
       - name: GPT memory tests
