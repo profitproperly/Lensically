@@ -68,15 +68,19 @@ async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, arg
   });
 }
 
-const MCP_DIRECT_ENTRY_TOOLS = new Set(["getOperatorStartupContext", "guardLensicallyCall", "routeAndExecuteLensicallyCall"]);
+const MCP_DIRECT_ENTRY_TOOLS = new Set(["getOperatorStartupContext", "executeMappedIntent"]);
+
+function testActionIntent(toolName: string): string {
+  return toolName.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase();
+}
 
 async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
   if (MCP_DIRECT_ENTRY_TOOLS.has(toolName)) {
     return mcpToolCallRaw<T>(toolName, args);
   }
-  return mcpToolCallRaw<T>("routeAndExecuteLensicallyCall", {
-    intended_tool: toolName,
-    arguments_json: JSON.stringify(args),
+  return mcpToolCallRaw<T>("executeMappedIntent", {
+    action_intent: testActionIntent(toolName),
+    inputs_json: JSON.stringify(args),
   });
 }
 
