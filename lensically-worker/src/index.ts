@@ -15394,13 +15394,13 @@ async function handleOperatorMcpAdminTool(
     const names = new Set(tools.map((tool) => tool.name));
     const requirements = await listOperatorWorkflowRequirements(env, null);
     const checks = [
-      { name: "all_admin_tools_advertised", passed: OPERATOR_MCP_ADMIN_TOOL_NAMES.every((name) => names.has(name)) },
-      { name: "single_gateway_advertised", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
-      { name: "session_handshake_tools_advertised", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
+      { name: "single_gateway_registered", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
+      { name: "retired_internal_tools_absent", passed: [...RETIRED_INTERNAL_TOOL_NAMES].every((name) => !names.has(name)) },
+      { name: "session_handshake_tools_registered", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
       { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
       { name: "schedule_requires_approved", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
-      { name: "runtime_deploy_available", passed: names.has("deployMcpChanges") && names.has("rollbackMcpChanges") },
+      { name: "static_router_active", passed: OPERATOR_REGISTRY_GENERATION === "static-execution-router-v1" },
     ];
     return { ok: checks.every((check) => check.passed), checks };
   }
