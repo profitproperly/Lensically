@@ -433,6 +433,24 @@ async function hmac(secret: string, value: string): Promise<string> {
   return base64Url(binary);
 }
 
+async function signRecoveryMapPayload(env: Env, payload: Record<string, unknown>): Promise<string> {
+  const encoded = base64Url(JSON.stringify(payload));
+  return `${encoded}.${await hmac(env.RECOVERY_MCP_ACCESS_TOKEN, encoded)}`;
+}
+
+async function verifyRecoveryMapPayload(env: Env, token: unknown): Promise<Record<string, unknown> | null> {
+  if (typeof token !== "string") return null;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature || await hmac(env.RECOVERY_MCP_ACCESS_TOKEN, payload) !== signature) return null;
+  try {
+    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - payload.length % 4) % 4));
+    const parsed = JSON.parse(decoded) as Record<string, unknown>;
+    return Number(parsed.exp ?? 0) > Math.floor(Date.now() / 1000) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 async function oauthCode(env: Env, clientId: string, redirectUri: string): Promise<string> {
   const payload = base64Url(JSON.stringify({ client_id: clientId, redirect_uri: redirectUri, exp: Math.floor(Date.now() / 1000) + 600, nonce: crypto.randomUUID() }));
   return `${payload}.${await hmac(env.RECOVERY_MCP_ACCESS_TOKEN, payload)}`;
