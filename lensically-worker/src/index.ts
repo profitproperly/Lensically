@@ -13355,8 +13355,9 @@ const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v1";
 const OPERATOR_ROUTED_EXECUTION_GATEWAY = "routeAndExecuteLensicallyCall";
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
-  "getOperatorStartupContext",
+    "getOperatorStartupContext",
   "guardLensicallyCall",
+  OPERATOR_ROUTED_EXECUTION_GATEWAY,
 ]);
 
 type OperatorGuardCorrection = { path: string; from: unknown; to: unknown; reason: string };
