@@ -16754,6 +16754,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         : null;
       const sourceDefinedStaticRoute = routedMapExecution?.d1_execution_library_bypassed === true;
       const sourceDefinedDirectEngineering = routedMapExecution?.mode === "source_defined_direct_engineering";
+      const sourceDefinedProtectedOperation = sourceDefinedDirectEngineering
+        && MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(canonicalAutonomyToolName(toolName));
       const preCallRouting = sourceDefinedStaticRoute
         ? { arguments: args, corrections: [], route: null, redirect: false }
         : await resolveOperatorPreCallRouting(env, toolName, args);
