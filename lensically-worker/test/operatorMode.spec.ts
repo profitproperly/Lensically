@@ -2326,7 +2326,7 @@ describe("operator mode MCP endpoint", () => {
     expect(directStartup.isError).toBe(true);
     expect(directStartup.structuredContent.required_tool).toBe("executeLensicallyIntent");
 
-    const startup = await mcpToolCallRaw<{ gateway: { intent: string; public_schema_frozen: boolean }; tool_surface: { total_tools: number } }>("executeLensicallyIntent", {
+    const startup = await mcpToolCallRaw<{ gateway: { intent: string; public_schema_frozen: boolean }; execution_library: { policy_ready: boolean; consulted_before_execution: boolean }; tool_surface: { total_tools: number } }>("executeLensicallyIntent", {
       objective: "Load startup.",
       intent: "startup",
       inputs: {},
