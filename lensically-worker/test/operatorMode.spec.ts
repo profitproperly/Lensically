@@ -2252,13 +2252,33 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(localGuard.isError).not.toBe(true);
     expect(localGuard.structuredContent.ok).toBe(true);
-    const access = await mcpToolCallRaw<{ ok: boolean; github: { token_status: string } }>("getEngineeringAccessState", {
+        const directWithGuard = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {
       ...localGuard.structuredContent.normalized_arguments,
       execution_guard: localGuard.structuredContent.execution_guard,
     });
+    expect(directWithGuard.isError).toBe(true);
+    expect(directWithGuard.structuredContent).toMatchObject({
+      error: "routed_execution_gateway_required",
+      required_tool: "routeAndExecuteLensicallyCall",
+    });
+
+    const access = await mcpToolRaw<{
+      ok: boolean;
+      github: { token_status: string };
+      routed_execution: { requested_tool: string; executed_tool: string };
+      execution_guard_enforcement: { mode: string; direct_operational_calls_allowed: boolean };
+    }>("getEngineeringAccessState", {});
     expect(access.isError).not.toBe(true);
     expect(access.structuredContent.ok).toBe(true);
     expect(access.structuredContent.github.token_status).toMatch(/exists|missing/);
+    expect(access.structuredContent.routed_execution).toMatchObject({
+      requested_tool: "getEngineeringAccessState",
+      executed_tool: "getEngineeringAccessState",
+    });
+    expect(access.structuredContent.execution_guard_enforcement).toMatchObject({
+      mode: "mandatory_routed_gateway",
+      direct_operational_calls_allowed: false,
+    });
 
 
     const sensitive = await mcpToolCallRaw<{ error: string; required_route: string }>("guardLensicallyCall", {
