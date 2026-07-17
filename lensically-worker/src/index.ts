@@ -31773,6 +31773,12 @@ export class ScheduledPostScheduler {
         ? payload.allowed_post_ids.map(Number)
         : [];
       const reason = typeof payload.reason === "string" ? payload.reason.slice(0, 500) : null;
+      const existingControl = await this.getControl();
+      const resumeMode = mode === "canary"
+        ? existingControl.mode === "normal" || isTemporarySchedulerPauseReason(existingControl.reason)
+          ? "normal"
+          : "paused"
+        : null;
       try {
         if (mode === "normal") {
           const activation = await this.withExclusiveSchedulerControl(async () => {
