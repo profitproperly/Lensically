@@ -158,11 +158,17 @@ if (!executionMap.includes("isDeterministicInputValidationFailure")
     || !executionMap.includes("await repairDeterministicInputValidationIncidents(db)")) {
   errors.push("mandatory_execution_map_input_validation_repair_missing");
 }
-if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v1"')
+if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v2"')
+    || !executionMap.includes("operator_execution_library_sources")
+    || !executionMap.includes("operator_execution_library_ingestion_state")
+    || !executionMap.includes("syncExecutionPolicyLibrarySources")
+    || !executionMap.includes("readExecutionPolicyLibraryTableCatalog")
+    || !executionMap.includes("d1_table_manifest")
     || !executionMap.includes("compileExecutionPolicyLibrary")
     || !executionMap.includes("consulted_before_execution: true")
     || !executionMap.includes("failed_recorded_before_repair")
     || !executionMap.includes("mandatory_path_updated_before_resume")
+    || !executionMap.includes("__repository_file_manifest__")
     || !source.includes("execution_library: prepared.execution_library ?? null")
     || !source.includes("resultPayload.execution_library = routedGatewayMetadata.execution_library")) {
   errors.push("mandatory_execution_library_contract_missing");
