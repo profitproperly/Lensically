@@ -15389,25 +15389,6 @@ async function handleOperatorMcpAdminTool(
     return definition ? { ok: true, tool: definition } : { ok: false, error: "tool_not_found" };
   }
 
-  if (toolName === "updateMcpToolSchema" || toolName === "updateMcpToolBehavior") {
-    const targetTool = normalizeOperatorText(args.tool_name, 160);
-    if (!targetTool) {
-      return { ok: false, error: "tool_name_required" };
-    }
-    const schemaPatch = toolName === "updateMcpToolSchema" ? normalizeOperatorJson(args.schema_patch, {}) : null;
-    const behaviorPatch = toolName === "updateMcpToolBehavior" ? normalizeOperatorJson(args.behavior_patch, {}) : null;
-    await env.DB.prepare(
-      `INSERT INTO operator_mcp_tool_overrides (
-        tool_name, schema_patch_json, behavior_patch_json, last_reason
-      ) VALUES (?, ?, ?, ?)
-      ON CONFLICT(tool_name) DO UPDATE SET
-        schema_patch_json = COALESCE(excluded.schema_patch_json, operator_mcp_tool_overrides.schema_patch_json),
-        behavior_patch_json = COALESCE(excluded.behavior_patch_json, operator_mcp_tool_overrides.behavior_patch_json),
-        last_reason = excluded.last_reason`,
-    ).bind(targetTool, schemaPatch, behaviorPatch, normalizeOperatorText(args.reason, 1000, true)).run();
-    return { ok: true, tool_name: targetTool, tool: await readOperatorMcpToolDefinition(env, targetTool) };
-  }
-
   if (toolName === "createMcpTool") {
     const targetTool = normalizeOperatorMachineKey(args.tool_name, "");
     if (!targetTool) {
