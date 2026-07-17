@@ -525,6 +525,7 @@ async function syncExecutionPolicyLibrarySources(
   tools: MandatoryExecutionToolDefinition[],
   forceDynamic = false,
 ): Promise<{ sources: ExecutionPolicyLibrarySource[]; sourceReadError: string | null }> {
+  await ensureExecutionPolicyLibraryDirtyTriggers(db);
   const dynamicSourceTypes = [
     "ops_memory", "pre_call_route", "workflow_requirement", "admin_error", "engineering_audit",
     "execution_event", "operational_incident", "tool_override", "mcp_deployment", "continuity_ref",
