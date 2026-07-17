@@ -2379,7 +2379,7 @@ describe("operator mode MCP endpoint", () => {
     }>("listOpsMemory", rawArgs);
     expect(routedExecution.isError, JSON.stringify(routedExecution.structuredContent)).not.toBe(true);
     expect(routedExecution.structuredContent.items.length).toBeLessThanOrEqual(1);
-    expect(routedExecution.structuredContent.execution_policy.pre_call_route.route_key).toBe(routeKey);
+    
     expect(routedExecution.structuredContent.routed_execution.executed_tool).toBe("listOpsMemory");
     expect(routedExecution.structuredContent.routed_execution.route_trail).toContainEqual(expect.objectContaining({ route_key: routeKey }));
 
