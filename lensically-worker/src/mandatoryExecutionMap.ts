@@ -472,13 +472,12 @@ async function syncExecutionPolicyLibrarySources(
       text: `${tool.name} ${tool.title} ${tool.description} ${stringify(procedureForTool(tool))}`,
       updated_at: null,
     } satisfies ExecutionPolicyLibrarySource));
-  const staticFingerprint = [
-    MANDATORY_EXECUTION_MAP_VERSION,
-    EXECUTION_POLICY_LIBRARY_VERSION,
-    generatedSources.length,
-    generatedSources.reduce((total, source) => total + source.text.length, 0),
-    toolSources.length,
-  ].join(":");
+  const staticFingerprint = executionLibraryTextFingerprint(stringify({
+    map_version: MANDATORY_EXECUTION_MAP_VERSION,
+    library_version: EXECUTION_POLICY_LIBRARY_VERSION,
+    generated_sources: generatedSources.map((source) => [source.source_id, source.text]),
+    tool_sources: toolSources.map((source) => [source.source_id, source.text]),
+  }));
   const staticRefreshDue = await executionLibraryRefreshDue(db, "static_sources", 86400, staticFingerprint);
   const dynamicRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "dynamic_sources", 60);
   const catalogRefreshDue = await executionLibraryRefreshDue(db, "d1_table_manifest", 900);
