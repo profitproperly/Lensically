@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: a routed tool can lazily create a D1 table after policy admission, leaving the materialized table manifest behind the live schema; a timer-only refresh would make the next action fail closed until the interval expired. Use: compare the live `sqlite_master` table count with active `d1_table_manifest` coverage on every admission and immediately rebuild the one-query schema manifest when coverage is lower. Applies when: handlers add tables lazily, migrations deploy, or execution-library admission validates D1 completeness.
+
 - Failed: `intent=startup` had a special gateway branch that called startup directly and returned before the mandatory execution library, making startup the only non-conversational action outside the universal gate. Use: startup resolves through the same map/library/guard/finalization path as every other action; preserve its public `gateway.intent=startup` metadata after routed execution and forbid any startup-specific bypass in release preflight. Applies when: changing startup bootstrap, the one-tool public gateway, initialization, or result assembly.
 
 - Failed: runtime gateway metadata added `execution_library`, but `OperatorRoutedGatewayResult` omitted that field, causing exact-SHA TypeScript validation to fail before tests. Use: update the routed result type in the same change as every gateway metadata field and keep TypeScript validation before any test or deployment workflow. Applies when: adding or changing prepared gateway metadata, execution receipts, map state, or public result assembly.
