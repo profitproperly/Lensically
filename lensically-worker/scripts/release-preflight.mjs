@@ -58,6 +58,20 @@ if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) {
 if (!workflow.includes("release_id:")) {
   errors.push("workflow_release_id_missing");
 }
+if (!workflow.includes("release_sha:")) {
+  errors.push("workflow_release_sha_missing");
+}
+if (!workflow.includes('ref: ${{ inputs.release_sha || github.sha }}')) {
+  errors.push("workflow_exact_sha_checkout_missing");
+}
+if (!workflow.includes('test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"')) {
+  errors.push("workflow_exact_sha_verification_missing");
+}
+if (!source.includes("const dispatchRef = config.branch;")
+    || !source.includes("release_sha: headSha")
+    || !source.includes("ref: dispatchRef")) {
+  errors.push("main_release_exact_sha_dispatch_guard_missing");
+}
 if (source.includes("follower_day_net_change")) {
   errors.push("post_level_follower_attribution_forbidden");
 }
