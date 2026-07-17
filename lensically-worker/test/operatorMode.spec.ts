@@ -1981,7 +1981,7 @@ describe("operator mode MCP endpoint", () => {
       "required_gate_execution_gate",
     ]));
             expect(direct.rejection_memory_contract.showability_rule).toContain("near-verbatim source copying");
-    expect(direct.tool_surface.total_tools).toBe(listed.tools.length);
+        expect(direct.tool_surface.total_tools).toBe(registry.tools.length);
 
 
     expect(direct.account_data_loaded).toBe(false);
