@@ -16233,7 +16233,7 @@ async function handleOperatorMcpEngineeringTool(
         github_available: branch.ok,
       },
       tool_surface: {
-        total_tools: (await buildOperatorMcpTools(env, true, false)).length,
+        total_tools: buildOperatorMcpBaseTools(false).length,
         engineering_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
         admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
