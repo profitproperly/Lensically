@@ -16333,26 +16333,28 @@ async function handleOperatorMcpEngineeringTool(
       const items = Array.isArray((codeSearch.data as Record<string, unknown>).items)
         ? (codeSearch.data as Record<string, unknown>).items as Array<Record<string, unknown>>
         : [];
-      const matches = items.slice(0, limit).map((item) => ({
-        path: item.path ?? null,
-        name: item.name ?? null,
-        sha: item.sha ?? null,
-        repository: config.repo,
-        source: "github_code_search",
-      }));
-      return {
-        ok: true,
-        query,
-        prefix: prefix || null,
-        matches,
-        returned_count: matches.length,
-        total_count: Number((codeSearch.data as Record<string, unknown>).total_count ?? matches.length),
-        truncated: Number((codeSearch.data as Record<string, unknown>).total_count ?? matches.length) > matches.length,
-        search_mode: "github_code_search",
-        external_requests: 1,
-        file_content_fanout: 0,
-        execution_policy: buildOperatorExecutionPolicy("searchRepoFiles", args),
-      };
+      if (items.length) {
+        const matches = items.slice(0, limit).map((item) => ({
+          path: item.path ?? null,
+          name: item.name ?? null,
+          sha: item.sha ?? null,
+          repository: config.repo,
+          source: "github_code_search",
+        }));
+        return {
+          ok: true,
+          query,
+          prefix: prefix || null,
+          matches,
+          returned_count: matches.length,
+          total_count: Number((codeSearch.data as Record<string, unknown>).total_count ?? matches.length),
+          truncated: Number((codeSearch.data as Record<string, unknown>).total_count ?? matches.length) > matches.length,
+          search_mode: "github_code_search",
+          external_requests: 1,
+          file_content_fanout: 0,
+          execution_policy: buildOperatorExecutionPolicy("searchRepoFiles", args),
+        };
+      }
     }
     const tree = await githubRepoApi(env, `/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
     const entries = tree.data && typeof tree.data === "object" && !Array.isArray(tree.data) && Array.isArray((tree.data as Record<string, unknown>).tree)
