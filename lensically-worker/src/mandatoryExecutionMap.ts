@@ -380,9 +380,11 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       verification_summary,
       created_at
     FROM operator_execution_map_promotions
-    UNION ALL
-    SELECT 'backlog', id,
-      title || ' ' || COALESCE(observed_issue, '') || ' ' || COALESCE(expected_behavior, '') || ' ' || COALESCE(required_change, '') || ' ' || COALESCE(acceptance_test, ''),
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'backlog' AS source_type, id AS source_id,
+      title || ' ' || COALESCE(observed_issue, '') || ' ' || COALESCE(expected_behavior, '') || ' ' || COALESCE(required_change, '') || ' ' || COALESCE(acceptance_test, '') AS text,
       updated_at
     FROM operator_mcp_backlog_items WHERE status <> 'resolved'
     UNION ALL
