@@ -1660,12 +1660,12 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("runEngineeringRelease exactly once per SHA");
     expect(initialized.instructions).toContain("getEngineeringRelease");
 
-        const patchSetTool = registry.tools.find((tool) => tool.name === "applyRepoPatchSet") as unknown as { inputSchema: { properties: { patches: { maxItems: number } } } };
-    const releaseTool = registry.tools.find((tool) => tool.name === "runEngineeringRelease") as unknown as { inputSchema: { properties: { force: { type: string } } } };
-    const releaseStatusTool = registry.tools.find((tool) => tool.name === "getEngineeringRelease") as unknown as { inputSchema: { properties: { wait_seconds: { maximum: number } } } };
-    expect(patchSetTool.inputSchema.properties.patches.maxItems).toBe(20);
-    expect(releaseTool.inputSchema.properties.force.type).toBe("boolean");
-    expect(releaseStatusTool.inputSchema.properties.wait_seconds.maximum).toBe(55);
+                const patchSetTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { patches?: { maxItems?: number } } } } }>("readMcpToolDefinition", { tool_name: "applyRepoPatchSet" });
+    const releaseTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { force?: { type?: string } } } } }>("readMcpToolDefinition", { tool_name: "runEngineeringRelease" });
+    const releaseStatusTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getEngineeringRelease" });
+    expect(patchSetTool.tool?.inputSchema?.properties?.patches?.maxItems).toBe(20);
+    expect(releaseTool.tool?.inputSchema?.properties?.force?.type).toBe("boolean");
+    expect(releaseStatusTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(55);
 
         expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
