@@ -16843,6 +16843,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             source_defined_direct: true,
             compact_receipt_only: true,
             model_tool_choice_allowed: false,
+            protected_operation: sourceDefinedProtectedOperation,
+            authorization_mode: sourceDefinedProtectedOperation ? "owner_ratified" : "autonomous_engineering",
           }
         : {
             ...buildOperatorExecutionPolicy(toolName, args),
