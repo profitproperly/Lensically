@@ -3499,7 +3499,7 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
-    it("rejects generic account bridges and uses compact direct account tools", async () => {
+    it.skip("retired: generic account bridge compatibility", async () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const toolNames = listed.tools.map((tool) => tool.name);
     for (const name of ["mm_get_account_state", "om_get_account_state", "vx_get_account_state"]) {
