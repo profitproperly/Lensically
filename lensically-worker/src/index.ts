@@ -16943,7 +16943,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           }
         }
       }
-            const autonomyAuthorization = sourceDefinedDirectEngineering
+            const autonomyAuthorization = sourceDefinedDirectEngineering && !sourceDefinedProtectedOperation
         ? {
             allowed: true,
             governed: false,
