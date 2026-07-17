@@ -883,6 +883,12 @@ async function seedMandatoryExecutionMap(
   for (const tool of tools) {
     if (MAP_EXCLUDED_TOOLS.has(tool.name)) continue;
     const actionKey = actionKeyForTool(tool.name);
+    const desiredAliases = stringify(intentAliasesForTool(tool));
+    const desiredAllowedInputs = stringify(toolSchemaProperties(tool));
+    const desiredRequiredInputs = stringify(toolRequiredProperties(tool));
+    const desiredProcedure = stringify(procedureForTool(tool));
+    const desiredSuccessRule = stringify({ kind: "mapped_handler_result", path_failure_classifier: "reusable_execution_path_failure_only" });
+    const desiredVerificationSummary = `Seeded from the live internal typed tool registry. The map, not the model, selects this tool for the matching action intent. Contract ${MANDATORY_EXECUTION_MAP_VERSION}.`;
     const existing = await db.prepare(
       `SELECT id FROM operator_execution_map_entries
        WHERE action_key = ?
