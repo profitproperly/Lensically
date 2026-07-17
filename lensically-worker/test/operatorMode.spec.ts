@@ -2323,7 +2323,15 @@ describe("operator mode MCP endpoint", () => {
     });
 
     const replacement = await mcpToolCallRaw<{
-      mandatory_execution_map: { map_state: string; previous_path_superseded: boolean; active_entry: { tool_name: string } };
+      mandatory_execution_map: {
+        map_state: string;
+        previous_path_superseded: boolean;
+        active_entry: {
+          tool_name: string;
+          procedure: { ordered_steps: string[]; testimony: { failed_paths: Array<{ tool_name: string }>; verified_successful_tool: string; mandatory_statement: string } };
+          historical_failures: Array<{ tool_name: string }>;
+        };
+      };
     }>("executeMappedIntent", {
       objective: "Exercise stale-path replacement.",
       action_intent: actionIntent,
