@@ -692,14 +692,16 @@ describe("operator mode backend spine", () => {
         ],
       }),
     }));
-    expect(recoveryResponse.ok).toBe(true);
     const recoveryPayload = await recoveryResponse.json() as {
+      ok?: boolean;
+      error?: string;
       recovery: {
         retired_post_ids: number[];
         rescheduled_post_ids: number[];
         remaining_overdue_post_ids: number[];
       };
     };
+    expect(recoveryResponse.ok, `recovery failed: ${JSON.stringify(recoveryPayload)}`).toBe(true);
     expect(recoveryPayload.recovery.retired_post_ids).toEqual([secondPostId]);
     expect(recoveryPayload.recovery.rescheduled_post_ids).toEqual([firstPostId]);
     expect(recoveryPayload.recovery.remaining_overdue_post_ids).toEqual([]);
