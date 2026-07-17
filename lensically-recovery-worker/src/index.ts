@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one focused current-head validation of canonical four-column execution-source groups.
+// Recovery source commits may carry [operator-tests] to trigger one bounded current-head validation of canonical four-column execution-source groups.
 
 interface Env {
   GITHUB_TOKEN: string;
