@@ -82,6 +82,137 @@ function equivalentJson(left: unknown, right: unknown): boolean {
   return stringify(left) === stringify(right);
 }
 
+type ExecutionPolicyLibrarySource = {
+  source_type: string;
+  source_id: string;
+  text: string;
+  updated_at: string | null;
+};
+
+function executionLibraryTokens(value: unknown): string[] {
+  return tokenize(typeof value === "string" ? value : stringify(value));
+}
+
+function executionLibrarySourceScore(queryTokens: string[], source: ExecutionPolicyLibrarySource): number {
+  const sourceTokens = executionLibraryTokens(source.text);
+  if (!sourceTokens.length) return 0;
+  const overlap = sourceTokens.filter((token) => queryTokens.includes(token));
+  const coverage = overlap.length / Math.max(1, Math.min(sourceTokens.length, 20));
+  const operationalBoost = ["ops_memory", "pre_call_route", "workflow_requirement", "map_entry"].includes(source.source_type) ? 4 : 0;
+  return overlap.length * 5 + coverage * 10 + operationalBoost;
+}
+
+function generatedExecutionKnowledgeSources(): ExecutionPolicyLibrarySource[] {
+  const sources: ExecutionPolicyLibrarySource[] = [];
+  for (const [document, content] of Object.entries(GENERATED_EXECUTION_KNOWLEDGE)) {
+    const sections = content
+      .split(/\n(?=#{1,6}\s|[-*]\s+(?:Failed:|Verified:|Use:|Applies when:)|\d+\.\s)/g)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 1000);
+    sections.forEach((text, index) => sources.push({
+      source_type: "repository_knowledge",
+      source_id: `${document}:${index + 1}`,
+      text,
+      updated_at: null,
+    }));
+  }
+  return sources;
+}
+
+async function ensureExecutionPolicyLibraryTables(db: D1Database): Promise<void> {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS operator_execution_library_events (
+    id TEXT PRIMARY KEY,
+    action_intent TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    mapped_tool TEXT,
+    source_keys_json TEXT NOT NULL DEFAULT '[]',
+    policy_json TEXT NOT NULL DEFAULT '{}',
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_execution_library_events
+    ON operator_execution_library_events (action_intent, created_at DESC)`).run();
+}
+
+async function readExecutionPolicyLibrarySources(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
+  const rows = await db.prepare(`
+    SELECT 'ops_memory' AS source_type, id AS source_id,
+      title || ' ' || COALESCE(problem, '') || ' ' || fix || ' ' || COALESCE(applies_when, '') || ' ' || COALESCE(tags_json, '') AS text,
+      updated_at
+    FROM operator_ops_memory WHERE active = 1
+    UNION ALL
+    SELECT 'pre_call_route', id,
+      route_key || ' ' || mandatory_route || ' ' || reason || ' ' || verification_summary,
+      updated_at
+    FROM operator_pre_call_routes WHERE active = 1
+    UNION ALL
+    SELECT 'workflow_requirement', id,
+      stage || ' ' || required_sections_json || ' ' || completion_rule || ' ' || enforcement_type,
+      updated_at
+    FROM operator_workflow_requirements WHERE active = 1
+    UNION ALL
+    SELECT 'admin_error', id,
+      COALESCE(tool_name, '') || ' ' || COALESCE(likely_cause, '') || ' ' || COALESCE(error_response_json, ''),
+      created_at
+    FROM operator_mcp_admin_errors
+    UNION ALL
+    SELECT 'engineering_audit', id,
+      action || ' ' || COALESCE(diff_summary, '') || ' ' || COALESCE(tests_run_json, '') || ' ' || result || ' ' || COALESCE(metadata_json, ''),
+      created_at
+    FROM operator_engineering_audit
+    UNION ALL
+    SELECT 'execution_event', id,
+      tool_name || ' ' || operation_class || ' ' || execution_plane || ' ' || decision || ' ' || COALESCE(evidence_json, ''),
+      created_at
+    FROM operator_execution_events
+    UNION ALL
+    SELECT 'operational_incident', id,
+      incident_key || ' ' || incident_type || ' ' || severity || ' ' || status || ' ' || required_recovery_action || ' ' || COALESCE(publish_error_message, '') || ' ' || COALESCE(evidence_json, ''),
+      updated_at
+    FROM operator_operational_incidents
+    UNION ALL
+    SELECT 'map_entry', id,
+      action_key || ' ' || task_class || ' ' || tool_name || ' ' || intent_aliases_json || ' ' || procedure_json || ' ' || historical_failures_json,
+      updated_at
+    FROM operator_execution_map_entries WHERE status = 'active'
+    UNION ALL
+    SELECT 'map_incident', id,
+      action_intent || ' ' || COALESCE(action_key, '') || ' ' || state || ' ' || status || ' ' || COALESCE(failure_signature, ''),
+      updated_at
+    FROM operator_execution_map_incidents
+    UNION ALL
+    SELECT 'map_attempt', id,
+      action_intent || ' ' || tool_name || ' ' || mode || ' ' || outcome || ' ' || result_summary_json,
+      created_at
+    FROM operator_execution_map_attempts
+    UNION ALL
+    SELECT 'map_promotion', id,
+      verification_summary,
+      created_at
+    FROM operator_execution_map_promotions
+    UNION ALL
+    SELECT 'backlog', id,
+      title || ' ' || COALESCE(observed_issue, '') || ' ' || COALESCE(expected_behavior, '') || ' ' || COALESCE(required_change, '') || ' ' || COALESCE(acceptance_test, ''),
+      updated_at
+    FROM operator_mcp_backlog_items WHERE status <> 'resolved'
+    UNION ALL
+    SELECT 'strategy_memory', CAST(id AS TEXT),
+      kind || ' ' || COALESCE(title, '') || ' ' || body || ' ' || COALESCE(metadata_json, ''),
+      updated_at
+    FROM gpt_strategy_memory
+    ORDER BY updated_at DESC
+    LIMIT 1200
+  `).all<Record<string, unknown>>();
+  return (rows.results ?? []).map((row) => ({
+    source_type: String(row.source_type ?? "unknown"),
+    source_id: String(row.source_id ?? "unknown"),
+    text: String(row.text ?? ""),
+    updated_at: row.updated_at == null ? null : String(row.updated_at),
+  }));
+}
+
 function toolCategory(toolName: string): string {
   if (/repo|github|file|patch|commit/i.test(toolName)) return "repository";
   if (/deploy|release|cloudflare|version/i.test(toolName)) return "deployment";
