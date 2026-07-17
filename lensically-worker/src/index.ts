@@ -13183,7 +13183,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     universal_workflow_requirements: requirements,
     mandatory_fallback_execution_routes: operatorStartupFallbackRoutes(),
     implementation_scope_rule: "Evaluate every Lensically change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless a valid account-specific reason exists.",
-    completion_recording_rule: "Completed fixes must be written into source-controlled operating documentation, OpsMemory, engineering audit history, and tests.",
+    completion_recording_rule: "Completed fixes must be source-controlled, covered by focused regression tests, and recorded once in the engineering audit.",
     payload_limits: {
       source_documents: "3 docs, first 80 nonblank lines each, 6000 chars max per doc",
       ops_memory_limit: 12,
