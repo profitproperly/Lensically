@@ -97,6 +97,27 @@ function toolRequiredProperties(tool: MandatoryExecutionToolDefinition): string[
   return Array.isArray(tool.inputSchema.required) ? tool.inputSchema.required.map(String) : [];
 }
 
+function procedureForTool(tool: MandatoryExecutionToolDefinition): Record<string, unknown> {
+  const overrides: Record<string, Record<string, unknown>> = {
+    getRepoStatus: { ordered_steps: ["Read the configured branch head once.", "Return the exact commit SHA before any mutation."], forbidden_paths: ["Guessing the current SHA", "Using a stale previously observed SHA"], success_signals: ["ok=true", "nonempty sha"] },
+    readRepoFile: { ordered_steps: ["Use the bounded named-file read.", "Respect the schema line maximum.", "Use the returned SHA/content as the source of truth."], forbidden_paths: ["Retrying an oversized line request", "Assuming code search indexed a large file"], success_signals: ["ok=true", "content returned"] },
+    searchRepoFiles: { ordered_steps: ["Use a neutral query.", "When an exact large file is known, read that blob once and search locally."], forbidden_paths: ["Credential-shaped queries", "Repeated empty code searches", "Recursive per-file fanout"], success_signals: ["bounded matches or an authoritative empty result"] },
+    applyRepoTextPatch: { ordered_steps: ["Read the current target text.", "Anchor the replacement so it matches exactly once.", "Commit the exact replacement against the current branch head.", "Read back the changed boundary when syntax is sensitive."], forbidden_paths: ["Retrying duplicate matches", "Patching generated strings without readback"], success_signals: ["ok=true", "commit_sha returned"] },
+    applyRepoPatchSet: { ordered_steps: ["Read the latest repository head.", "Validate every exact replacement together.", "Commit once with the expected head SHA.", "If the head changes, reload and revalidate instead of retrying stale input."], forbidden_paths: ["Removing optimistic concurrency", "Resending an oversized rejected payload", "Serial independent commits for one coherent change"], success_signals: ["all replacements validated", "one commit SHA returned"] },
+    runGitHubWorkflow: { ordered_steps: ["Use an exact current commit SHA.", "Dispatch only an isolated diagnostic task."], forbidden_paths: ["Dispatching against an unverified branch alias", "Using diagnostic workflows as a normal release"], success_signals: ["dispatched=true", "verified_head_sha matches"] },
+    runEngineeringRelease: { ordered_steps: ["Resolve the exact final SHA.", "Run one combined validation and deploy release.", "Reuse an existing successful receipt for the same SHA."], forbidden_paths: ["Separate full validation and deploy loops", "Duplicate same-SHA releases"], success_signals: ["release identity returned", "exact SHA preserved"] },
+    getEngineeringRelease: { ordered_steps: ["Read the exact release identity.", "Use bounded server-side waiting.", "Inspect detailed failure state only after completion."], forbidden_paths: ["Chat-side rapid polling", "Switching to a different run"], success_signals: ["terminal release status"] },
+    verifyDeployedMcpVersion: { ordered_steps: ["Verify deployed commit and MCP version identity.", "Only then evaluate newly introduced runtime fields."], forbidden_paths: ["Judging new fields on a stale deployment response"], success_signals: ["expected commit", "expected MCP version"] },
+    setScheduledPostSchedulerMode: { ordered_steps: ["Inspect scheduler state and overdue inventory.", "Require owner ratification for protected mode changes.", "Use canary for exactly one post before normal activation.", "Keep normal blocked while overdue rows exist."], forbidden_paths: ["Activating the full overdue queue", "Generic unapproved mode changes"], success_signals: ["persisted safe mode", "allowed-post set verified"] },
+    runApprovedPostCanary: { ordered_steps: ["Audit the exact scheduled post.", "Authorize only that post.", "Attempt once.", "Return automatically to paused."], forbidden_paths: ["Canary without an exact post ID", "Leaving scheduler normal after the attempt"], success_signals: ["one attempted post", "mode paused afterward"] },
+  };
+  return overrides[tool.name] ?? {
+    ordered_steps: ["Validate variable inputs against the live typed schema.", `Execute ${tool.name} through the selected internal handler once.`, "Record the result and success evidence."],
+    forbidden_paths: ["Choosing a same-handler alias as a fallback", "Repeating a deterministic failure without a changed verified path"],
+    success_signals: ["handler returned through the mapped execution boundary"],
+  };
+}
+
 function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] {
   const explicit: Record<string, string[]> = {
     engineeringPrecheck: ["inspect engineering state", "load engineering context", "engineering precheck"],
