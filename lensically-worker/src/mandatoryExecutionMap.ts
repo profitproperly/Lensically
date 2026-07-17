@@ -384,8 +384,8 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
     ORDER BY updated_at DESC
   `).all<Record<string, unknown>>(),
     db.prepare(`
-    SELECT 'map_incident', id,
-      action_intent || ' ' || COALESCE(action_key, '') || ' ' || state || ' ' || status || ' ' || COALESCE(failure_signature, ''),
+    SELECT 'map_incident' AS source_type, id AS source_id,
+      action_intent || ' ' || COALESCE(action_key, '') || ' ' || state || ' ' || status || ' ' || COALESCE(failure_signature, '') AS text,
       updated_at
     FROM operator_execution_map_incidents
     UNION ALL
