@@ -195,6 +195,8 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("execution_policy_library_not_ready")
     || !executionMap.includes("policy_ready: policyReady")
     || !executionMap.includes("table_manifest_complete")
+    || !executionMap.includes("tableManifestCount < tableCatalogCount")
+    || !executionMap.includes("repairedCatalog")
     || !executionMap.includes("compileExecutionPolicyLibrary")
     || !executionMap.includes("consulted_before_execution: true")
     || !executionMap.includes("failed_recorded_before_repair")
