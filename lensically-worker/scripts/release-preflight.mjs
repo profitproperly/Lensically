@@ -178,7 +178,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("executionLibraryRefreshDue")
     || !executionMap.includes("executionLibraryTextFingerprint")
     || !executionMap.includes("readExecutionPolicyLibraryCandidates")
-    || !source.includes("sha256: createHash")
+    || !releasePreflightSource.includes("sha256: createHash")
     || !executionMap.includes("execution_policy_library_not_ready")
     || !executionMap.includes("policy_ready: policyReady")
     || !executionMap.includes("table_manifest_complete")
