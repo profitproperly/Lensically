@@ -91,11 +91,24 @@ const errors = [];
 const executionLibrarySourceBlock = executionMap.match(
   /async function readExecutionPolicyLibrarySources[\s\S]*?function executionLibraryTextFingerprint/,
 )?.[0] ?? "";
-const executionLibraryGroupSizes = [...executionLibrarySourceBlock.matchAll(
+const executionLibraryGroups = [...executionLibrarySourceBlock.matchAll(
   /db\.prepare\(`([\s\S]*?)`\)\.all<Record<string, unknown>>\(\)/g,
-)].map((match) => (match[1].match(/\bUNION ALL\b/g)?.length ?? 0) + 1);
+)].map((match) => match[1]);
+const executionLibraryGroupSizes = executionLibraryGroups.map(
+  (sql) => (sql.match(/\bUNION ALL\b/g)?.length ?? 0) + 1,
+);
 if (executionLibraryGroupSizes.length === 0 || executionLibraryGroupSizes.some((size) => size > 4)) {
   errors.push("execution_library_compound_group_limit_exceeded");
+}
+const executionLibraryGroupsHaveCanonicalColumns = executionLibraryGroups.every((sql) => {
+  const firstSelect = sql.split(/\bUNION ALL\b/)[0] ?? "";
+  return /AS source_type\b/.test(firstSelect)
+    && /AS source_id\b/.test(firstSelect)
+    && /AS text\b/.test(firstSelect)
+    && /(?:AS updated_at\b|\n\s*updated_at\s*(?:\n|$))/.test(firstSelect);
+});
+if (!executionLibraryGroupsHaveCanonicalColumns) {
+  errors.push("execution_library_group_alias_contract_missing");
 }
 const versionMatch = source.match(/const OPERATOR_MCP_VERSION = "([^"]+)";/);
 const version = versionMatch?.[1] ?? null;
