@@ -2424,6 +2424,14 @@ describe("operator mode MCP endpoint", () => {
     expect(gatewayHealth.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
     expect(gatewayHealth.structuredContent.status_kind).toBe("compact_engineering_precheck");
 
+    const alignment = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
+      objective: "Check repository runtime alignment.",
+      intent: "repository runtime alignment",
+      inputs: {},
+    });
+    expect(alignment.isError).not.toBe(true);
+    expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
+
     const repair = await mcpToolCallRaw<{
       tool_name: string;
       error: string;

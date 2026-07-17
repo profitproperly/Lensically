@@ -173,8 +173,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
     || has(/\bcheck\s+(mcp|operator|runtime|gateway)\b/)
     || has(/\bgateway\s+execution\s+health\b/)
   ) return "engineeringPrecheck";
-  if (has(/\b(runtime|deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
   if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime|runtime source|source runtime)\b/) && has(/\b(alignment|verify|verification|sha|status|current)\b/)) return "getRepoStatus";
+  if (has(/\b(deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
   if (has(/\b(repository|repo|source|file)\b/) && has(/\b(read|inspect|open|status|sha|head)\b/)) {
     if (normalizeText(inputs.path, 1000) || has(/\b(read|open|file|source)\b/)) return "readRepoFile";
     return "getRepoStatus";
