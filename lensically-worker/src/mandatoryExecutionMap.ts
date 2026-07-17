@@ -451,6 +451,8 @@ async function syncExecutionPolicyLibrarySources(
     "content_inventory", "post_metric_snapshot",
   ];
   let sourceReadError: string | null = null;
+  let dynamicRefreshSucceeded = false;
+  let catalogRefreshSucceeded = false;
   let dynamicSources: ExecutionPolicyLibrarySource[] = [];
   let tableCatalogSources: ExecutionPolicyLibrarySource[] = [];
   const generatedSources = generatedExecutionKnowledgeSources();
