@@ -765,7 +765,7 @@ async function compileExecutionPolicyLibrary(
     action_intent: actionIntent,
     required_source_types: requiredSourceTypes,
     missing_required_source_types: missingRequiredSourceTypes,
-    table_manifest_complete: tableManifestCount >= tableCatalogCount,
+    table_manifest_complete: tableManifestComplete,
     source_coverage: coverage,
     d1_table_catalog: (tableCatalog.results ?? []).map((row) => row.name),
     matched_source_keys: matched.map((item) => `${item.source.source_type}:${item.source.source_id}`),
