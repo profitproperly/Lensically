@@ -274,7 +274,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("consulted_before_execution: true")
     || !executionMap.includes("failed_recorded_before_repair")
     || !executionMap.includes("mandatory_path_updated_before_resume")
-    || !executionMap.includes("__repository_file_manifest__")
+    || !generatedKnowledgeHasRepositoryManifest
     || source.includes('if (gatewayIntent === "startup")')
     || !source.includes("execution_library?: Record<string, unknown>")
     || !source.includes("execution_library: prepared.execution_library ?? null")
