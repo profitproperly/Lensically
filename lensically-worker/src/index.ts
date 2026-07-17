@@ -13518,6 +13518,13 @@ type OperatorRoutedGatewayResult = {
   corrections?: OperatorGuardCorrection[];
   route_trail?: Array<Record<string, unknown>>;
   validation_errors?: OperatorGuardError[];
+  map_state?: "known" | "unknown" | "discovery";
+  map_entry?: Record<string, unknown> | null;
+  incident?: Record<string, unknown> | null;
+  discovery_permit?: string | null;
+  missing_inputs?: string[];
+  candidates?: Array<Record<string, unknown>>;
+  map_execution?: Record<string, unknown>;
 };
 
 async function prepareOperatorRoutedGatewayCall(
