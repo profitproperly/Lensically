@@ -158,34 +158,21 @@ async function ensureExecutionPolicyLibraryTables(db: D1Database): Promise<void>
   )`).run();
 }
 
-function quoteExecutionLibraryIdentifier(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
 async function readExecutionPolicyLibraryTableCatalog(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
   const tables = await db.prepare(
-    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
-  ).all<{ name: string }>();
-  const sources: ExecutionPolicyLibrarySource[] = [];
-  for (const row of tables.results ?? []) {
-    const tableName = String(row.name ?? "").trim();
-    if (!tableName) continue;
-    const quoted = quoteExecutionLibraryIdentifier(tableName);
-    const columns = await db.prepare(`PRAGMA table_info(${quoted})`).all<Record<string, unknown>>();
-    const count = await db.prepare(`SELECT COUNT(*) AS total FROM ${quoted}`).first<{ total: number }>();
-    const columnSummary = (columns.results ?? []).map((column) => ({
-      name: String(column.name ?? ""),
-      type: String(column.type ?? ""),
-      primary_key: Number(column.pk ?? 0) > 0,
-    }));
-    sources.push({
+    `SELECT name, COALESCE(sql, '') AS schema_sql
+     FROM sqlite_master
+     WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+     ORDER BY name`,
+  ).all<{ name: string; schema_sql: string }>();
+  return (tables.results ?? [])
+    .map((row) => ({
       source_type: "d1_table_manifest",
-      source_id: tableName,
-      text: `D1 table ${tableName} rows ${Number(count?.total ?? 0)} columns ${stringify(columnSummary)}`,
+      source_id: String(row.name ?? "").trim(),
+      text: `D1 table ${String(row.name ?? "").trim()} schema ${String(row.schema_sql ?? "")}`,
       updated_at: null,
-    });
-  }
-  return sources;
+    }))
+    .filter((source) => Boolean(source.source_id));
 }
 
 async function persistExecutionPolicyLibrarySources(
