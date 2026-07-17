@@ -15384,23 +15384,6 @@ async function handleOperatorMcpAdminTool(
     return { ok: true, tools: [...compactByName.values()] };
   }
 
-  if (toolName === "runEngineeringTool") {
-    const executeTool = normalizeOperatorText(args.tool_name, 160);
-    if (!executeTool || !isOperatorMcpEngineeringToolName(executeTool)) {
-      return {
-        ok: false,
-        error: "engineering_tool_required",
-        requested_tool: executeTool,
-        available_engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
-      };
-    }
-    const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs, true);
-    return { ok: result.ok !== false, bridge_tool: "runEngineeringTool", executed_tool: executeTool, result };
-  }
-
   if (toolName === "readMcpToolDefinition") {
     const definition = await readOperatorMcpToolDefinition(env, normalizeOperatorText(args.tool_name, 160) ?? "");
     return definition ? { ok: true, tool: definition } : { ok: false, error: "tool_not_found" };
