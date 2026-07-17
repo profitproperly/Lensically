@@ -17451,6 +17451,11 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         );
         resultPayload.mandatory_execution_map = mapLifecycle;
         resultPayload.execution_library = routedGatewayMetadata.execution_library ?? null;
+        resultPayload.gateway = {
+          name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+          intent: routedGatewayMetadata.action_intent ?? gatewayIntent ?? null,
+          public_schema_frozen: true,
+        };
         resultPayload.routed_execution = routedGatewayMetadata;
         resultPayload.execution_guard_enforcement = {
           version: OPERATOR_EXECUTION_GUARD_VERSION,
