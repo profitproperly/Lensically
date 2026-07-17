@@ -13192,6 +13192,7 @@ const RETIRED_EXECUTION_TABLES = [
   "operator_pre_call_routes",
   "operator_ops_memory",
   "operator_execution_events",
+  "operator_mcp_tool_overrides",
 ] as const;
 
 const RETIRED_EXECUTION_TRIGGER_TABLES = [
