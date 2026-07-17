@@ -158,6 +158,66 @@ async function ensureExecutionPolicyLibraryTables(db: D1Database): Promise<void>
   )`).run();
 }
 
+function quoteExecutionLibraryIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+async function readExecutionPolicyLibraryTableCatalog(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
+  const tables = await db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+  ).all<{ name: string }>();
+  const sources: ExecutionPolicyLibrarySource[] = [];
+  for (const row of tables.results ?? []) {
+    const tableName = String(row.name ?? "").trim();
+    if (!tableName) continue;
+    const quoted = quoteExecutionLibraryIdentifier(tableName);
+    const columns = await db.prepare(`PRAGMA table_info(${quoted})`).all<Record<string, unknown>>();
+    const count = await db.prepare(`SELECT COUNT(*) AS total FROM ${quoted}`).first<{ total: number }>();
+    const columnSummary = (columns.results ?? []).map((column) => ({
+      name: String(column.name ?? ""),
+      type: String(column.type ?? ""),
+      primary_key: Number(column.pk ?? 0) > 0,
+    }));
+    sources.push({
+      source_type: "d1_table_manifest",
+      source_id: tableName,
+      text: `D1 table ${tableName} rows ${Number(count?.total ?? 0)} columns ${stringify(columnSummary)}`,
+      updated_at: null,
+    });
+  }
+  return sources;
+}
+
+async function persistExecutionPolicyLibrarySources(
+  db: D1Database,
+  sources: ExecutionPolicyLibrarySource[],
+): Promise<void> {
+  const unique = new Map<string, ExecutionPolicyLibrarySource>();
+  for (const source of sources) unique.set(`${source.source_type}:${source.source_id}`, source);
+  const rows = Array.from(unique.values());
+  for (let offset = 0; offset < rows.length; offset += 50) {
+    const batch = rows.slice(offset, offset + 50).map((source) => db.prepare(
+      `INSERT INTO operator_execution_library_sources (
+        source_key, source_type, source_id, source_scope, text, metadata_json, active, source_updated_at, synced_at
+      ) VALUES (?, ?, ?, 'universal', ?, '{}', 1, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(source_key) DO UPDATE SET
+        source_type = excluded.source_type,
+        source_id = excluded.source_id,
+        text = excluded.text,
+        active = 1,
+        source_updated_at = excluded.source_updated_at,
+        synced_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      `${source.source_type}:${source.source_id}`,
+      source.source_type,
+      source.source_id,
+      source.text.slice(0, 50000),
+      source.updated_at,
+    ));
+    if (batch.length) await db.batch(batch);
+  }
+}
+
 async function readExecutionPolicyLibrarySources(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
   const rows = await db.prepare(`
     SELECT 'ops_memory' AS source_type, id AS source_id,
