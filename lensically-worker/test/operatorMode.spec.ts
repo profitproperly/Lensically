@@ -2001,7 +2001,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("submit every external action through executeMappedIntent");
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Do not create owner proposals or numerical tool budgets");
-        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery intent through routeAndExecuteLensicallyCall");
+        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery actions through executeMappedIntent");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("exact file prefix");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("stop, promote the fix");
     expect(direct.boundary.before_proceed_forbidden).toEqual(expect.arrayContaining(["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"]));
