@@ -15389,33 +15389,6 @@ async function handleOperatorMcpAdminTool(
     return definition ? { ok: true, tool: definition } : { ok: false, error: "tool_not_found" };
   }
 
-  if (toolName === "createMcpTool") {
-    const targetTool = normalizeOperatorMachineKey(args.tool_name, "");
-    if (!targetTool) {
-      return { ok: false, error: "tool_name_required" };
-    }
-    await env.DB.prepare(
-      `INSERT INTO operator_mcp_tool_overrides (
-        tool_name, disabled, schema_patch_json, behavior_patch_json, description_override, handler_spec_json, last_reason
-      ) VALUES (?, 0, ?, ?, ?, ?, ?)
-      ON CONFLICT(tool_name) DO UPDATE SET
-        disabled = 0,
-        schema_patch_json = excluded.schema_patch_json,
-        behavior_patch_json = excluded.behavior_patch_json,
-        description_override = excluded.description_override,
-        handler_spec_json = excluded.handler_spec_json,
-        last_reason = excluded.last_reason`,
-    ).bind(
-      targetTool,
-      normalizeOperatorJson(args.input_schema, { type: "object", properties: {}, additionalProperties: true }),
-      normalizeOperatorJson(args.behavior, {}),
-      normalizeOperatorText(args.description, 2000),
-      normalizeOperatorJson(args.handler_spec, { requires_backend_handler: true }),
-      normalizeOperatorText(args.reason, 1000, true),
-    ).run();
-    return { ok: true, tool_name: targetTool, requires_backend_handler: true, tool: await readOperatorMcpToolDefinition(env, targetTool) };
-  }
-
   if (toolName === "disableMcpTool") {
     const targetTool = normalizeOperatorText(args.tool_name, 160);
     await env.DB.prepare(
