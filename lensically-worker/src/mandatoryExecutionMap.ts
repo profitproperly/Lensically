@@ -278,8 +278,9 @@ async function seedMandatoryExecutionMap(
       `INSERT INTO operator_execution_map_entries (
         id, action_key, version, status, task_class, intent_aliases_json, tool_name,
         fixed_arguments_json, allowed_input_keys_json, required_input_keys_json,
-        forbidden_tools_json, success_rule_json, source_type, verification_summary, verified_at
-      ) VALUES (?, ?, 1, 'active', ?, ?, ?, '{}', ?, ?, '[]', ?, 'tool_registry_seed', ?, CURRENT_TIMESTAMP)`,
+        forbidden_tools_json, procedure_json, historical_failures_json, success_rule_json,
+        source_type, verification_summary, verified_at
+      ) VALUES (?, ?, 1, 'active', ?, ?, ?, '{}', ?, ?, '[]', ?, '[]', ?, 'tool_registry_seed', ?, CURRENT_TIMESTAMP)`,
     ).bind(
       crypto.randomUUID(),
       actionKey,
