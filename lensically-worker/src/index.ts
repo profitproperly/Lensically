@@ -16602,10 +16602,11 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        ref,
+        ref: dispatchRef,
         inputs: {
           task: "worker-deploy",
           release_id: headSha.slice(0, 12),
+          release_sha: headSha,
         },
       }),
     });
