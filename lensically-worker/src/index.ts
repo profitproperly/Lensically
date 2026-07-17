@@ -16695,7 +16695,7 @@ async function handleOperatorMcpEngineeringTool(
 
     const waitedSeconds = Math.round((Date.now() - startedAt) / 1000);
     if (runData.status === "completed") {
-      const detailed = await handleOperatorMcpEngineeringTool(request, env, "getGitHubWorkflowRun", { run_id: runId });
+      const detailed = await handleOperatorMcpEngineeringTool(request, env, "getGitHubWorkflowRun", { run_id: runId }, true);
       return {
         ...detailed,
         terminal: true,
