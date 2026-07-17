@@ -17184,7 +17184,6 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       let rawArgs = requestedArgs;
       let routedGatewayMetadata: Record<string, unknown> | null = null;
       if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
-        const gatewayIntent = normalizeOperatorText(requestedArgs.intent ?? requestedArgs.action_intent, 8000, true);
         const prepared = await prepareOperatorRoutedGatewayCall(env, requestedArgs);
         if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
           return mcpJsonResponse({
