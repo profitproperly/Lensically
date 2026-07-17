@@ -467,23 +467,10 @@ async function compileExecutionPolicyLibrary(
   inputs: Record<string, unknown>,
   tools: MandatoryExecutionToolDefinition[],
 ): Promise<Record<string, unknown>> {
-  await ensureExecutionPolicyLibraryTables(db);
-  let dynamicSources: ExecutionPolicyLibrarySource[] = [];
-  let sourceReadError: string | null = null;
-  try {
-    dynamicSources = await readExecutionPolicyLibrarySources(db);
-  } catch (error) {
-    sourceReadError = error instanceof Error ? error.message : String(error);
-  }
-  const toolSources = tools
-    .filter((tool) => !MAP_EXCLUDED_TOOLS.has(tool.name))
-    .map((tool) => ({
-      source_type: "tool_registry",
-      source_id: tool.name,
-      text: `${tool.name} ${tool.title} ${tool.description} ${stringify(procedureForTool(tool))}`,
-      updated_at: null,
-    } satisfies ExecutionPolicyLibrarySource));
-  const sources = [...generatedExecutionKnowledgeSources(), ...dynamicSources, ...toolSources];
+    await ensureExecutionPolicyLibraryTables(db);
+  const synchronized = await syncExecutionPolicyLibrarySources(db, tools);
+  const sources = synchronized.sources;
+  const sourceReadError = synchronized.sourceReadError;
   const queryTokens = executionLibraryTokens(`${actionIntent} ${stringify(inputs)}`);
   const matched = sources
     .map((source) => ({ source, score: executionLibrarySourceScore(queryTokens, source) }))
