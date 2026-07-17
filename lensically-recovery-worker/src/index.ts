@@ -1,3 +1,11 @@
+import {
+  finalizeRecoveryAction,
+  MANDATORY_RECOVERY_MAP_VERSION,
+  prepareRecoveryAction,
+  recoveryMapSummary,
+  type RecoveryMapTool,
+} from "./mandatoryRecoveryMap";
+
 interface Env {
   GITHUB_TOKEN: string;
   RECOVERY_MCP_ACCESS_TOKEN: string;
