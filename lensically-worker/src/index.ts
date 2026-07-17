@@ -17417,9 +17417,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       let resultPayload: Record<string, unknown>;
       try {
         resultPayload = isOperatorMcpEngineeringToolName(toolName)
-          ? await handleOperatorMcpEngineeringTool(request, env, toolName, args)
+          ? await handleOperatorMcpEngineeringTool(request, env, toolName, args, routedGatewayMetadata !== null)
           : isOperatorMcpAdminToolName(toolName)
-            ? await handleOperatorMcpAdminTool(request, env, toolName, args)
+            ? await handleOperatorMcpAdminTool(request, env, toolName, args, routedGatewayMetadata !== null)
             : await callOperatorToolForMcp(request, env, toolName, args);
       } catch (error) {
         await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, {
