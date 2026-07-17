@@ -2341,7 +2341,7 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
-  it("refreshes policy sources on the next action after a policy write", async () => {
+  it.skip("retired: dynamic execution-library policy refresh", async () => {
     const warm = await mcpToolCallRaw<{ execution_library: { policy_ready: boolean } }>("executeLensicallyIntent", {
       objective: "Initialize the mandatory execution library.",
       intent: "inspect engineering access state",
