@@ -16638,7 +16638,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       diffSummary: `Dispatched one validate-and-deploy release for ${headSha}.`,
       testsRun: [{ workflow_id: workflowId, task: "worker-deploy", exact_sha: headSha }],
       result: "ok",
-      metadata: { status: dispatch.status, workflow_id: workflowId, ref, exact_sha: headSha, run_id: createdRun?.id ?? null },
+      metadata: { status: dispatch.status, workflow_id: workflowId, requested_ref: ref, dispatch_ref: dispatchRef, exact_sha: headSha, run_id: createdRun?.id ?? null },
     });
     return {
       ok: true,
