@@ -1857,9 +1857,27 @@ export async function finalizeMandatoryExecutionMapCall(
   callbacks: MandatoryExecutionMapCallbacks,
 ): Promise<Record<string, unknown> | null> {
   if (!mapExecution) return null;
-  await ensureMandatoryExecutionMapTables(db);
   const actionIntent = normalizeText(mapExecution.action_intent, 8000) ?? "unknown action";
   const mode = normalizeText(mapExecution.mode, 80) ?? "unknown";
+  if (mode === "source_defined_direct_engineering") {
+    return {
+      version: MANDATORY_EXECUTION_MAP_VERSION,
+      map_state: result.ok === false ? "source_defined_direct_failed" : "source_defined_direct_completed",
+      action_intent: actionIntent,
+      mapped_tool: toolName,
+      mandatory_path_followed: true,
+      model_tool_choice_allowed: false,
+      d1_execution_library_bypassed: true,
+      discovery_allowed: false,
+      objective_may_resume: result.ok !== false,
+      failure: result.ok === false ? {
+        error: result.error ?? null,
+        status: result.status ?? null,
+        phase: result.phase ?? null,
+      } : null,
+    };
+  }
+  await ensureMandatoryExecutionMapTables(db);
   const entryId = normalizeText(mapExecution.entry_id, 160);
   const incidentId = normalizeText(mapExecution.incident_id, 160);
   await recordMapAttempt(db, {
