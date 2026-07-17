@@ -15995,7 +15995,12 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
   }
 
     if (toolName === "getOperatorStartupContext") {
-    return buildOperatorStartupContext(request, env);
+    const startup = await buildOperatorStartupContext(request, env);
+    startup.mandatory_execution_map = await getMandatoryExecutionMapSummary(
+      env.DB,
+      await buildOperatorMcpTools(env, false, false) as MandatoryExecutionToolDefinition[],
+    );
+    return startup;
   }
 
   if (toolName === "guardLensicallyCall") {
