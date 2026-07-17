@@ -415,8 +415,10 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       brand_key || ' ' || workflow_template_key || ' ' || COALESCE(objective, '') || ' ' || status || ' ' || COALESCE(current_stage, '') || ' ' || COALESCE(notes, ''),
       updated_at
     FROM operator_workflow_sessions
-    UNION ALL
-    SELECT 'context_admission', id,
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'context_admission' AS source_type, id AS source_id,
       brand_key || ' ' || admission_scope || ' ' || sections_json || ' partial ' || is_partial || ' ' || COALESCE(notes, ''),
       created_at
     FROM operator_context_admissions
