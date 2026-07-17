@@ -68,26 +68,15 @@ async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, arg
   });
 }
 
-const MCP_GUARD_EXEMPT_TOOLS = new Set(["getOperatorStartupContext", "guardLensicallyCall"]);
+const MCP_DIRECT_ENTRY_TOOLS = new Set(["getOperatorStartupContext", "guardLensicallyCall", "routeAndExecuteLensicallyCall"]);
 
 async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
-  if (MCP_GUARD_EXEMPT_TOOLS.has(toolName)) {
+  if (MCP_DIRECT_ENTRY_TOOLS.has(toolName)) {
     return mcpToolCallRaw<T>(toolName, args);
   }
-  const guarded = await mcpToolCallRaw<{
-    ok: boolean;
-    execution_guard: string;
-    normalized_arguments: Record<string, unknown>;
-    corrections: Array<Record<string, unknown>>;
-  }>("guardLensicallyCall", {
+  return mcpToolCallRaw<T>("routeAndExecuteLensicallyCall", {
     intended_tool: toolName,
     arguments_json: JSON.stringify(args),
-  });
-  expect(guarded.isError, `guardLensicallyCall for ${toolName}`).not.toBe(true);
-  expect(guarded.structuredContent.ok, `guardLensicallyCall for ${toolName}`).toBe(true);
-  return mcpToolCallRaw<T>(toolName, {
-    ...guarded.structuredContent.normalized_arguments,
-    execution_guard: guarded.structuredContent.execution_guard,
   });
 }
 
