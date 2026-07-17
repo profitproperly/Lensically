@@ -1715,7 +1715,52 @@ describe("operator mode MCP endpoint", () => {
     expect(initializedBody.result?.serverInfo?.name).toBe("lensically-operator-mode");
   }, 30000);
 
-  it("lists required MCP tools and Lensically accounts", async () => {
+  it("lists only the active static MCP registry and concise instructions", async () => {
+    const initialized = await mcpRequest<{ instructions: string }>("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "vitest", version: "1.0.0" },
+    });
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
+    const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
+    const names = registry.tools.map((tool) => tool.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(expect.arrayContaining([
+      "engineeringPrecheck",
+      "getRepoStatus",
+      "readRepoFile",
+      "searchRepoFiles",
+      "applyRepoPatchSet",
+      "runEngineeringRelease",
+      "verifyDeployedMcpVersion",
+      "selectOperatorKey",
+      "confirmOperatorProceed",
+      "getWorkflowStatus",
+      "get_hourly_coverage",
+      "create_source_card",
+      "create_generation_run",
+      "schedule_approved_draft",
+    ]));
+    expect(names).not.toEqual(expect.arrayContaining([
+      "runEngineeringTool",
+      "recordOpsMemory",
+      "listOpsMemory",
+      "listPreCallRoutes",
+      "createMcpTool",
+      "updateMcpToolSchema",
+      "deployMcpChanges",
+      "createImplementationBacklogItem",
+    ]));
+    expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
+    expect(initialized.instructions).toContain("sole public action is executeLensicallyIntent");
+    expect(initialized.instructions).toContain("source-defined static router");
+    expect(initialized.instructions).toContain("phonebook routes, and OpsMemory routing are retired");
+    expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
+    expect(initialized.instructions.length).toBeLessThan(5000);
+  }, 30000);
+
+  it.skip("retired: bloated internal registry contract", async () => {
     const initialized = await mcpRequest<{ serverInfo: { name: string }; capabilities: Record<string, unknown>; instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
