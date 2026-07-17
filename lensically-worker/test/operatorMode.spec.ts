@@ -1882,6 +1882,7 @@ describe("operator mode MCP endpoint", () => {
             "markOperatorDecisionExecuted",
       "getScheduledPostSchedulerState",
       "setScheduledPostSchedulerMode",
+      "recoverOverdueScheduledPosts",
       "auditScheduledPost",
       "inspectMcpFailure",
       "listMcpTools",
