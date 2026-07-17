@@ -13056,7 +13056,7 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-                "After getOperatorStartupContext, submit every operational intent through routeAndExecuteLensicallyCall. Direct operational tool names are absent from discovery and rejected before lookup; the gateway applies the phonebook before execution.",
+                "After getOperatorStartupContext, submit every external action through executeMappedIntent. Direct operational tool names are absent from discovery and rejected before lookup; the Mandatory Execution Map selects and enforces the active procedure before execution.",
     "Routine engineering uses persistent full-discretion outcome-bound authority. Do not create owner proposals or numerical tool budgets for repository, test, deploy, verification, routing, or infrastructure repair work.",
     "Use the canonical execution plane returned by policy: engineering_control for repository/tests/deploys, operator_account for account workflow, and operator_control for universal MCP administration.",
                                 "Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery intent through routeAndExecuteLensicallyCall. The gateway uses the internal typed schema and persistent route registry; direct tool and bridge selection is not delegated to the model.",
