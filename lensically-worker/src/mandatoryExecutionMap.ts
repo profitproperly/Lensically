@@ -253,7 +253,47 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
     SELECT 'operational_incident', id,
       incident_key || ' ' || incident_type || ' ' || severity || ' ' || status || ' ' || required_recovery_action || ' ' || COALESCE(publish_error_message, '') || ' ' || COALESCE(evidence_json, ''),
       updated_at
-    FROM operator_operational_incidents
+        FROM operator_operational_incidents
+    UNION ALL
+    SELECT 'tool_override', tool_name,
+      tool_name || ' disabled ' || disabled || ' ' || COALESCE(schema_patch_json, '') || ' ' || COALESCE(behavior_patch_json, '') || ' ' || COALESCE(description_override, '') || ' ' || COALESCE(handler_spec_json, '') || ' ' || COALESCE(output_schema_json, '') || ' ' || COALESCE(last_reason, ''),
+      updated_at
+    FROM operator_mcp_tool_overrides
+    UNION ALL
+    SELECT 'mcp_deployment', id,
+      CAST(version AS TEXT) || ' ' || status || ' ' || COALESCE(change_summary, '') || ' ' || snapshot_json,
+      COALESCE(activated_at, created_at)
+    FROM operator_mcp_deployments
+    UNION ALL
+    SELECT 'continuity_ref', id,
+      kind || ' ' || brand_key || ' ' || COALESCE(workflow_session_id, '') || ' ' || COALESCE(continuation_choice, '') || ' ' || COALESCE(payload_json, ''),
+      created_at
+    FROM operator_continuity_refs
+    UNION ALL
+    SELECT 'operation_receipt', idempotency_key,
+      operation_type || ' ' || tool_name || ' ' || status || ' ' || COALESCE(result_json, ''),
+      updated_at
+    FROM operator_operation_receipts
+    UNION ALL
+    SELECT 'autonomy_profile', brand_key,
+      mode || ' ' || objective || ' ' || model_role || ' ' || owner_role || ' ' || approval_policy || ' ' || operating_constraints_json,
+      updated_at
+    FROM operator_autonomy_profiles WHERE active = 1
+    UNION ALL
+    SELECT 'decision_proposal', id,
+      decision_key || ' ' || category || ' ' || title || ' ' || decision_text || ' ' || rationale || ' ' || evidence_json || ' ' || expected_outcome || ' ' || risks_json || ' ' || execution_plan || ' ' || authorized_tools_json || ' ' || status || ' ' || COALESCE(owner_response, '') || ' ' || COALESCE(revision_request, '') || ' ' || COALESCE(outcome_summary, '') || ' ' || COALESCE(result_evidence_json, ''),
+      updated_at
+    FROM operator_decision_proposals
+    UNION ALL
+    SELECT 'decision_execution', id,
+      decision_id || ' ' || tool_name || ' ' || status || ' ' || COALESCE(result_summary, ''),
+      COALESCE(completed_at, created_at)
+    FROM operator_decision_execution_events
+    UNION ALL
+    SELECT 'repo_write_session', id,
+      path || ' ' || mode || ' ' || message || ' ' || COALESCE(summary, '') || ' ' || status,
+      updated_at
+    FROM operator_repo_write_sessions
     UNION ALL
     SELECT 'map_entry', id,
       action_key || ' ' || task_class || ' ' || tool_name || ' ' || intent_aliases_json || ' ' || procedure_json || ' ' || historical_failures_json,
