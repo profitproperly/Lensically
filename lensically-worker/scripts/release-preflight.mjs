@@ -229,6 +229,15 @@ if (!executionSourceQueries.length
     || executionSourceQueries.some((query) => (query.match(/UNION ALL/g) ?? []).length > 3)) {
   errors.push("execution_library_compound_query_bound_missing");
 }
+const receiptFunction = executionMap.match(
+  /function executionPolicyLibraryReceipt[\s\S]*?\n}\n\nasync function recordExecutionPolicyLibraryEvent/,
+)?.[0] ?? "";
+if (!receiptFunction.includes("consulted_source_types")
+    || !receiptFunction.includes("source_type_count")
+    || !receiptFunction.includes("total_source_count")
+    || receiptFunction.includes("source_coverage: coverage")) {
+  errors.push("execution_library_compact_receipt_missing");
+}
 const staticPolicyCallbackCount = (source.match(/readStaticPolicySources:/g) ?? []).length;
 if (staticPolicyCallbackCount < 2) {
   errors.push(`execution_library_static_policy_callbacks_incomplete:${staticPolicyCallbackCount}`);
