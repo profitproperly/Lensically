@@ -727,17 +727,27 @@ async function compileExecutionPolicyLibrary(
   const tableCatalog = await db.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
   ).all<{ name: string }>();
-  const tableCatalogCount = (tableCatalog.results ?? []).length;
+  const liveTableNames = (tableCatalog.results ?? []).map((row) => String(row.name)).sort();
+  const readManifestNames = async (): Promise<string[]> => {
+    const rows = await db.prepare(
+      `SELECT source_id FROM operator_execution_library_sources
+       WHERE active = 1 AND source_type = 'd1_table_manifest'
+       ORDER BY source_id`,
+    ).all<{ source_id: string }>();
+    return (rows.results ?? []).map((row) => String(row.source_id));
+  };
+  let manifestTableNames = await readManifestNames();
+  let tableManifestComplete = equivalentJson(manifestTableNames, liveTableNames);
   let coverageByType = new Map(coverage.map((item) => [item.source_type, item.total]));
-  let tableManifestCount = Number(coverageByType.get("d1_table_manifest") ?? 0);
-  if (tableManifestCount < tableCatalogCount) {
+  if (!tableManifestComplete) {
     const repairedCatalog = await readExecutionPolicyLibraryTableCatalog(db);
     await deactivateExecutionPolicyLibrarySourceTypes(db, ["d1_table_manifest"]);
     await persistExecutionPolicyLibrarySources(db, repairedCatalog);
     await markExecutionLibraryRefresh(db, "d1_table_manifest", repairedCatalog.length);
     coverage = await readExecutionPolicyLibraryCoverage(db);
     coverageByType = new Map(coverage.map((item) => [item.source_type, item.total]));
-    tableManifestCount = Number(coverageByType.get("d1_table_manifest") ?? 0);
+    manifestTableNames = await readManifestNames();
+    tableManifestComplete = equivalentJson(manifestTableNames, liveTableNames);
   }
   const requiredSourceTypes = ["pre_call_route", "map_entry", "tool_registry", "d1_table_manifest"];
   const missingRequiredSourceTypes = requiredSourceTypes.filter((sourceType) => Number(coverageByType.get(sourceType) ?? 0) === 0);
