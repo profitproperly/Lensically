@@ -15325,55 +15325,6 @@ async function handleOperatorMcpAdminTool(
       : { ok: false, error: "scheduled_post_not_found" };
   }
 
-  if (toolName === "getMcpAdminState") {
-    const brand = args.brand_key ? await resolveOperatorBrandFromPayload(env, args) : null;
-    const tools = await buildOperatorMcpTools(env, true);
-    const gates = brand ? await listOperatorGates(env, brand.brand_key, null, null, null) : [];
-    const requirements = await listOperatorWorkflowRequirements(env, brand?.brand_key ?? null);
-    const lastDeployment = await env.DB.prepare(
-      `SELECT id, version, status, change_summary, created_at, activated_at, rolled_back_at
-       FROM operator_mcp_deployments
-       ORDER BY version DESC
-       LIMIT 1`,
-    ).first<Record<string, unknown>>();
-        const errors = await env.DB.prepare(
-      `SELECT id, tool_name, likely_cause, created_at
-       FROM operator_mcp_admin_errors
-       ORDER BY datetime(created_at) DESC
-       LIMIT 10`,
-    ).all<Record<string, unknown>>();
-    const autonomyProfile = brand ? await getOperatorAutonomyProfile(env, brand.brand_key) : null;
-    const pendingAutonomyDecisions = brand && autonomyProfile
-      ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
-      : [];
-    return {
-      ok: true,
-      version: "operator-mcp-admin-v1",
-      tool_count: tools.length,
-      admin_tools: [...OPERATOR_MCP_ADMIN_TOOL_NAMES],
-            policies: {
-        full_preflight_before_serious_advancement: true,
-        show_only_drafts_with_showable_true: true,
-        schedule_only_approved_drafts: true,
-        workflow_requirements_db_backed: true,
-        gates_db_backed: true,
-                autonomy_decisions_db_backed: true,
-        owner_ratification_applies_to_account_mutations: Boolean(autonomyProfile),
-        routine_engineering_full_discretion: true,
-        engineering_numerical_tool_budgets: false,
-        mandatory_known_path_before_execution: true,
-        recursive_stop_fix_test_resume: true,
-      },
-      engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
-      autonomy_profile: autonomyProfile,
-      pending_autonomy_decisions: pendingAutonomyDecisions,
-      workflow_requirements: requirements,
-      active_gates_count: gates.length,
-      last_deployment: lastDeployment ?? null,
-      recent_failures: errors.results ?? [],
-    };
-  }
-
   if (toolName === "inspectMcpFailure") {
     const errorText = JSON.stringify(args.error_response ?? {}) + " " + String(args.error_text ?? "");
     const lower = errorText.toLowerCase();
