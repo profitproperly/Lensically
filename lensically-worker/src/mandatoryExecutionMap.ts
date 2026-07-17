@@ -560,6 +560,7 @@ async function deactivateExecutionPolicyLibrarySourceTypes(
 async function syncExecutionPolicyLibrarySources(
   db: D1Database,
   tools: MandatoryExecutionToolDefinition[],
+  staticPolicySources: ExecutionPolicyLibrarySource[],
   forceDynamic = false,
 ): Promise<{ sources: ExecutionPolicyLibrarySource[]; sourceReadError: string | null }> {
   await ensureExecutionPolicyLibraryDirtyTriggers(db);
