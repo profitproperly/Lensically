@@ -15941,29 +15941,39 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         blocker_key: "release_bridge_client_preflight",
       };
     }
-    const policy = buildOperatorExecutionPolicy(intendedTool, normalizedArguments);
-    const knownPath = policy.known_path && typeof policy.known_path === "object" && !Array.isArray(policy.known_path)
-      ? policy.known_path as Record<string, unknown>
-      : {};
-    if (knownPath.block_call === true) {
+        const preCallRouting = await resolveOperatorPreCallRouting(env, intendedTool, normalizedArguments, args.operation);
+    const routedArguments = preCallRouting.arguments;
+    const corrections = [...normalized.corrections, ...preCallRouting.corrections];
+    const policy = {
+      ...buildOperatorExecutionPolicy(intendedTool, routedArguments),
+      pre_call_route: preCallRouting.route,
+      pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+    };
+    if (preCallRouting.redirect) {
+      const requiredTool = normalizeOperatorText(preCallRouting.route?.required_tool, 160, true) ?? intendedTool;
       return {
         ok: false,
-        error: "known_blocker_prevented",
+        error: normalizeOperatorText(preCallRouting.route?.error, 160, true) ?? "pre_call_route_required",
         intended_tool: intendedTool,
-        normalized_arguments: normalizedArguments,
-        corrections: normalized.corrections,
+        normalized_arguments: routedArguments,
+        corrections,
         execution_policy: policy,
-        required_route: knownPath.mandatory_route ?? null,
-        suggested_tools: knownPath.suggested_tools ?? [],
+        pre_call_route: preCallRouting.route,
+        pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+        required_tool: requiredTool,
+        required_route: preCallRouting.route?.mandatory_route ?? null,
+        suggested_tools: [requiredTool],
       };
     }
     return {
       ok: true,
       guard_version: OPERATOR_EXECUTION_GUARD_VERSION,
+      pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
       intended_tool: intendedTool,
-      normalized_arguments: normalizedArguments,
-      corrections: normalized.corrections,
-      execution_guard: await createOperatorExecutionGuard(env, intendedTool, normalizedArguments),
+      normalized_arguments: routedArguments,
+      corrections,
+      pre_call_route: preCallRouting.route,
+      execution_guard: await createOperatorExecutionGuard(env, intendedTool, routedArguments),
       execution_policy: policy,
       expires_in_seconds: OPERATOR_EXECUTION_GUARD_TTL_SECONDS,
     };
@@ -16887,10 +16897,37 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           ? normalizedArguments as Record<string, unknown>
           : {};
         dispatcherGuardFallback = true;
-      } else {
+            } else {
         args = { ...rawArgs };
         delete args.execution_guard;
       }
+      const preCallRouting = await resolveOperatorPreCallRouting(env, toolName, args);
+      if (preCallRouting.redirect) {
+        const requiredTool = normalizeOperatorText(preCallRouting.route?.required_tool, 160, true) ?? toolName;
+        const resultPayload = {
+          ok: false,
+          error: normalizeOperatorText(preCallRouting.route?.error, 160, true) ?? "pre_call_route_required",
+          intended_tool: toolName,
+          normalized_arguments: preCallRouting.arguments,
+          corrections: preCallRouting.corrections,
+          pre_call_route: preCallRouting.route,
+          pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+          required_tool: requiredTool,
+          required_route: preCallRouting.route?.mandatory_route ?? null,
+          suggested_tools: [requiredTool],
+          account_data_loaded: false,
+        };
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: resultPayload,
+            content: [{ type: "text", text: `Lensically requires the proven pre-call route for ${toolName} before execution.` }],
+            isError: true,
+          },
+        });
+      }
+      args = preCallRouting.arguments;
       const boundaryBlock = await getOperatorMcpBoundaryBlock(request, env, toolName, args);
       if (boundaryBlock) {
         return mcpJsonResponse({
@@ -16908,7 +16945,11 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
-      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);
+            const executionPolicy = {
+        ...buildOperatorExecutionPolicy(toolName, args),
+        pre_call_route: preCallRouting.route,
+        pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+      };
       const aliasRetryBlock = await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
       if (aliasRetryBlock) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_known_regression");
