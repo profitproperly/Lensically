@@ -1784,7 +1784,10 @@ export async function finalizeMandatoryExecutionMapCall(
     },
   });
   if (result.ok !== false && shouldRefreshExecutionLibraryAfterTool(toolName)) {
-    await syncExecutionPolicyLibrarySources(db, tools, true);
+    const staticPolicySources = callbacks.readStaticPolicySources
+      ? await callbacks.readStaticPolicySources()
+      : [];
+    await syncExecutionPolicyLibrarySources(db, tools, staticPolicySources, true);
   }
 
   if (mode === "mandatory_known_path" && entryId && isReusableExecutionPathFailure(toolName, result)) {
