@@ -517,9 +517,14 @@ describe("operator mode backend spine", () => {
 
     it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
 
-    const values = new Map<string, unknown>();
+        const values = new Map<string, unknown>();
     let alarmAt: number | null = null;
+    let exclusiveControlCount = 0;
     const state = {
+      blockConcurrencyWhile: async <T>(callback: () => Promise<T>) => {
+        exclusiveControlCount += 1;
+        return callback();
+      },
       storage: {
         get: async (key: string) => values.get(key),
         put: async (key: string, value: unknown) => {
@@ -652,11 +657,79 @@ describe("operator mode backend spine", () => {
     const rows = audited.results ?? [];
     expect(rows.find((row) => row.id === firstPostId)?.last_attempted_at).toBeTruthy();
     expect(rows.find((row) => row.id === firstPostId)?.publish_error_message).toContain("threads_account_not_connected");
-    expect(rows.find((row) => row.id === secondPostId)).toMatchObject({
+        expect(rows.find((row) => row.id === secondPostId)).toMatchObject({
       status: "approved",
       last_attempted_at: null,
       publish_error_message: null,
     });
+
+    const blockedActivation = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "normal", reason: "must remain blocked with overdue rows" }),
+    }));
+    expect(blockedActivation.status).toBe(409);
+    const blockedPayload = await blockedActivation.json() as {
+      error: string;
+      control: { mode: string };
+      overdue_post_ids: number[];
+      required_recovery_actions: string[];
+    };
+    expect(blockedPayload.error).toBe("scheduler_overdue_recovery_required");
+    expect(blockedPayload.control.mode).toBe("paused");
+    expect(blockedPayload.overdue_post_ids).toEqual([firstPostId, secondPostId]);
+    expect(blockedPayload.required_recovery_actions).toEqual(["retire", "reschedule"]);
+
+    const futureScheduledTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const recoveryResponse = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/recover-overdue", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        reason: "bounded recovery fixture",
+        actions: [
+          { scheduled_post_id: firstPostId, action: "reschedule", scheduled_time: futureScheduledTime },
+          { scheduled_post_id: secondPostId, action: "retire" },
+        ],
+      }),
+    }));
+    expect(recoveryResponse.ok).toBe(true);
+    const recoveryPayload = await recoveryResponse.json() as {
+      recovery: {
+        retired_post_ids: number[];
+        rescheduled_post_ids: number[];
+        remaining_overdue_post_ids: number[];
+      };
+    };
+    expect(recoveryPayload.recovery.retired_post_ids).toEqual([secondPostId]);
+    expect(recoveryPayload.recovery.rescheduled_post_ids).toEqual([firstPostId]);
+    expect(recoveryPayload.recovery.remaining_overdue_post_ids).toEqual([]);
+
+    const recoveredRows = await env.DB.prepare(
+      `SELECT id, scheduled_time, cancelled_at, publish_error_message
+       FROM scheduled_posts WHERE id IN (?, ?) ORDER BY id`,
+    ).bind(firstPostId, secondPostId).all<{
+      id: number;
+      scheduled_time: string;
+      cancelled_at: string | null;
+      publish_error_message: string | null;
+    }>();
+    const recovered = recoveredRows.results ?? [];
+    expect(recovered.find((row) => row.id === firstPostId)).toMatchObject({
+      scheduled_time: futureScheduledTime,
+      cancelled_at: null,
+      publish_error_message: null,
+    });
+    expect(recovered.find((row) => row.id === secondPostId)?.cancelled_at).toBeTruthy();
+
+    const normalActivation = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "normal", reason: "overdue set resolved" }),
+    }));
+    expect(normalActivation.ok).toBe(true);
+    const normalPayload = await normalActivation.json() as { control: { mode: string } };
+    expect(normalPayload.control.mode).toBe("normal");
+    expect(exclusiveControlCount).toBeGreaterThanOrEqual(3);
     }, 30000);
 
   it("automatically consumes an approved scheduled-post canary decision", async () => {

@@ -415,7 +415,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
         known_path_rule: "After startup, the model can call only executeLensicallyIntent for operational work. Direct operational names are absent from discovery and rejected before lookup. The Mandatory Execution Map selects the active verified procedure from the action intent, permits discovery only for signed unknown or stale incidents, and promotes the verified replacement before the interrupted objective resumes.",
   recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
   owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
-  protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
+    protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
 } as const;
 
 const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
@@ -11605,8 +11605,9 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
     "proposeOperatorDecision",
   "resolveOperatorDecision",
   "markOperatorDecisionExecuted",
-    "getScheduledPostSchedulerState",
+        "getScheduledPostSchedulerState",
   "setScheduledPostSchedulerMode",
+  "recoverOverdueScheduledPosts",
   "runApprovedPostCanary",
   "auditScheduledPost",
 
@@ -11866,6 +11867,37 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
         owner_response: { type: "string", description: "Exact owner approval from the current conversation. When present, Lensically persists ratification before executing the protected scheduler change." },
       },
       required: ["mode", "reason"],
+      additionalProperties: false,
+    },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "recoverOverdueScheduledPosts",
+    title: "Recover overdue scheduled posts",
+    description: "While the universal scheduler is paused, transactionally retire or move up to 25 overdue approved rows to explicit future timestamps. Normal activation remains blocked until no overdue rows remain.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        actions: {
+          type: "array",
+          minItems: 1,
+          maxItems: 25,
+          items: {
+            type: "object",
+            properties: {
+              scheduled_post_id: { type: "integer", minimum: 1 },
+              action: { type: "string", enum: ["retire", "reschedule"] },
+              scheduled_time: { type: "string", description: "Required future ISO timestamp when action is reschedule." },
+            },
+            required: ["scheduled_post_id", "action"],
+            additionalProperties: false,
+          },
+        },
+        reason: { type: "string" },
+        owner_response: { type: "string", description: "Exact owner approval from the current conversation for this bounded protected recovery." },
+      },
+      required: ["actions", "reason"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -12479,11 +12511,12 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["getEngineeringRelease", 3],
     ["selectOperatorKey", 4],
     ["confirmOperatorProceed", 5],
-        ["getScheduledPostSchedulerState", 6],
+                ["getScheduledPostSchedulerState", 6],
     ["auditScheduledPost", 7],
         ["setScheduledPostSchedulerMode", 8],
-    ["runApprovedPostCanary", 9],
-    ["get_hourly_coverage", 10],
+    ["recoverOverdueScheduledPosts", 9],
+    ["runApprovedPostCanary", 10],
+    ["get_hourly_coverage", 11],
     ["claim_manifest_review_batch", 9],
     ["get_manifest_review_batch", 10],
     ["attach_manifest_review_draft", 11],
@@ -13753,6 +13786,7 @@ const OPERATOR_PROTECTED_ENGINEERING_TOOLS = new Set<string>([
   "rollbackMcpChanges",
   "disableMcpTool",
   "setScheduledPostSchedulerMode",
+  "recoverOverdueScheduledPosts",
 ]);
 
 function operatorUsesAutonomousEngineeringAuthority(toolName: string, args: Record<string, unknown>): boolean {
@@ -13780,7 +13814,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 
 function operatorPreCallProvider(toolName: string): string {
   if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "runEngineeringRelease", "getEngineeringRelease", "deployBackend"].includes(toolName)) return "github";
-  if (["verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
+    if (["verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
   if (["schedule_approved_draft", "schedule_manifest_review_batch", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
 }
@@ -14256,6 +14290,7 @@ const MANIFEST_AUTONOMOUS_PROTECTED_TOOLS = new Set<string>([
   "rollbackMcpChanges",
   "disableMcpTool",
   "setScheduledPostSchedulerMode",
+  "recoverOverdueScheduledPosts",
   "delete_scheduled_post",
   "bulk_delete_scheduled_posts",
   "update_account_credentials",
@@ -15405,6 +15440,25 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
       allowedPostIds: mode === "canary" ? [scheduledPostId] : [],
       reason,
     });
+        return { ok: true, scheduler: result };
+  }
+
+  if (toolName === "recoverOverdueScheduledPosts") {
+    const reason = normalizeOperatorText(args.reason, 500);
+    const actions = Array.isArray(args.actions)
+      ? args.actions.map((entry) => {
+          const action = entry && typeof entry === "object" && !Array.isArray(entry) ? entry as Record<string, unknown> : {};
+          return {
+            scheduled_post_id: Math.trunc(Number(action.scheduled_post_id)),
+            action: String(action.action ?? "") as "retire" | "reschedule",
+            scheduled_time: typeof action.scheduled_time === "string" ? action.scheduled_time : null,
+          } satisfies ScheduledPostRecoveryAction;
+        })
+      : [];
+    if (!reason || !actions.length) {
+      return { ok: false, error: "recovery_actions_and_reason_required" };
+    }
+    const result = await recoverScheduledPostSchedulerOverdue(env, actions, reason);
     return { ok: true, scheduler: result };
   }
 
