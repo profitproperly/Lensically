@@ -31818,7 +31818,7 @@ export class ScheduledPostScheduler {
             headers: { "content-type": "application/json; charset=UTF-8" },
           });
         }
-        const control = await this.setControl({ mode, allowedPostIds, reason });
+        const control = await this.setControl({ mode, allowedPostIds, reason, resumeMode });
         await this.scheduleNextAlarm();
         return new Response(JSON.stringify({ ok: true, control }), {
           headers: { "content-type": "application/json; charset=UTF-8" },
