@@ -13238,6 +13238,67 @@ function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   };
 }
 
+const RETIRED_EXECUTION_TABLES = [
+  "operator_execution_library_events",
+  "operator_execution_library_sources",
+  "operator_execution_library_ingestion_state",
+  "operator_execution_map_entries",
+  "operator_execution_map_incidents",
+  "operator_execution_map_attempts",
+  "operator_execution_map_promotions",
+  "operator_pre_call_routes",
+  "operator_ops_memory",
+  "operator_execution_events",
+] as const;
+
+const RETIRED_EXECUTION_TRIGGER_TABLES = [
+  "operator_ops_memory",
+  "operator_pre_call_routes",
+  "operator_workflow_requirements",
+  "operator_operational_incidents",
+  "operator_mcp_tool_overrides",
+  "operator_autonomy_profiles",
+  "operator_decision_proposals",
+  "operator_execution_map_entries",
+  "operator_execution_map_incidents",
+  "operator_execution_map_promotions",
+  "operator_mcp_backlog_items",
+  "gpt_strategy_memory",
+  "operator_production_board_items",
+  "operator_source_exclusions",
+  "operator_source_cards",
+  "operator_gates",
+] as const;
+
+const retiredExecutionInfrastructureByEnv = new WeakMap<object, Promise<void>>();
+
+async function retireLegacyExecutionInfrastructure(env: Env): Promise<void> {
+  const cached = retiredExecutionInfrastructureByEnv.get(env as object);
+  if (cached) return cached;
+  const retirement = (async () => {
+    const statements: D1PreparedStatement[] = [];
+    for (const tableName of RETIRED_EXECUTION_TRIGGER_TABLES) {
+      const triggerKey = tableName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+      for (const operation of ["insert", "update", "delete"] as const) {
+        statements.push(env.DB.prepare(`DROP TRIGGER IF EXISTS "trg_execution_library_dirty_${triggerKey}_${operation}"`));
+      }
+    }
+    for (const tableName of RETIRED_EXECUTION_TABLES) {
+      statements.push(env.DB.prepare(`DROP TABLE IF EXISTS "${tableName}"`));
+    }
+    for (let offset = 0; offset < statements.length; offset += 40) {
+      await env.DB.batch(statements.slice(offset, offset + 40));
+    }
+  })();
+  retiredExecutionInfrastructureByEnv.set(env as object, retirement);
+  try {
+    await retirement;
+  } catch (error) {
+    retiredExecutionInfrastructureByEnv.delete(env as object);
+    throw error;
+  }
+}
+
 function operatorTransportFailure(env: Env, requestId: string, phase: string, error: unknown, status = 500): Response {
   const safeMessage = error instanceof Error ? error.message : String(error || "unknown_error");
   return new Response(JSON.stringify({
