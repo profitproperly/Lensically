@@ -2684,6 +2684,13 @@ describe("operator mode MCP endpoint", () => {
       ok: boolean;
       routed_execution: { executed_tool: string };
       mandatory_execution_map: { map_state: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
+      execution_guard_enforcement: {
+        mode: string;
+        d1_bootstrap_bypassed: boolean;
+        d1_pre_call_routing_bypassed: boolean;
+        d1_execution_events_bypassed: boolean;
+        d1_autonomy_bypassed: boolean;
+      };
       status_kind?: string;
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
