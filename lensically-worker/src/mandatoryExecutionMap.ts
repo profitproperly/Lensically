@@ -910,6 +910,7 @@ export async function prepareMandatoryExecutionMapCall(
     arguments: argumentsObject,
     map_state: "known",
     map_entry: found.entry,
+    execution_library: executionLibrary,
     map_execution: {
       version: MANDATORY_EXECUTION_MAP_VERSION,
       mode: "mandatory_known_path",
@@ -921,6 +922,7 @@ export async function prepareMandatoryExecutionMapCall(
       mapped_tool: found.entry.tool_name,
       requested_inputs: inputs,
       enforced_arguments: argumentsObject,
+      execution_library: executionLibrary,
       model_tool_choice_allowed: false,
     },
   };
