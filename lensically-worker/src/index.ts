@@ -15093,8 +15093,14 @@ async function getOperatorMcpBoundaryBlock(
 }
 
 
-async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: OperatorMcpAdminToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  await prepareOperatorMode(env);
+async function handleOperatorMcpAdminTool(
+  request: Request,
+  env: Env,
+  toolName: OperatorMcpAdminToolName,
+  args: Record<string, unknown>,
+  preparationAlreadyComplete = false,
+): Promise<Record<string, unknown>> {
+  if (!preparationAlreadyComplete) await prepareOperatorMode(env);
 
     if (toolName === "selectOperatorKey") {
     const brandKey = normalizeGptBrandKey(args.brand_key);
