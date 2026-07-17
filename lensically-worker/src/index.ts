@@ -15405,49 +15405,6 @@ async function handleOperatorMcpAdminTool(
     return { ok: checks.every((check) => check.passed), checks };
   }
 
-  if (toolName === "createImplementationBacklogItem") {
-    const id = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO operator_mcp_backlog_items (
-        id, title, observed_issue, expected_behavior, required_change, acceptance_test, priority, related_stage
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      id,
-      normalizeOperatorText(args.title, 500),
-      normalizeOperatorText(args.observed_issue, 4000, true),
-      normalizeOperatorText(args.expected_behavior, 4000, true),
-      normalizeOperatorText(args.required_change, 4000),
-      normalizeOperatorText(args.acceptance_test, 4000, true),
-      normalizeOperatorMachineKey(args.priority, "normal"),
-      normalizeOperatorMachineKey(args.related_stage, "") || null,
-    ).run();
-    return { ok: true, item_id: id, status: "open" };
-  }
-
-  if (toolName === "listImplementationBacklogItems") {
-    const status = normalizeOperatorMachineKey(args.status, "open");
-    const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100);
-    const offset = Math.max(Number(args.offset ?? 0), 0);
-    const rows = await env.DB.prepare(
-      `SELECT * FROM operator_mcp_backlog_items
-       WHERE (? = 'all' OR status = ?)
-       ORDER BY datetime(created_at) DESC
-       LIMIT ? OFFSET ?`,
-    ).bind(status, status, limit, offset).all<Record<string, unknown>>();
-    return { ok: true, items: rows.results ?? [], returned_count: rows.results?.length ?? 0 };
-  }
-
-  if (toolName === "markImplementationBacklogItemResolved") {
-    const itemId = normalizeOperatorText(args.item_id, 120);
-    await env.DB.prepare(
-      `UPDATE operator_mcp_backlog_items
-       SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
-           acceptance_test = COALESCE(?, acceptance_test)
-       WHERE id = ?`,
-    ).bind(normalizeOperatorText(args.resolution_note, 4000, true), itemId).run();
-    return { ok: true, item_id: itemId, status: "resolved" };
-  }
-
   const brand = await resolveOperatorBrandFromPayload(env, args);
   if (!brand) {
     return { ok: false, error: "brand_key is required or unavailable" };
