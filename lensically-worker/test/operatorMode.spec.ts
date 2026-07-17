@@ -1651,7 +1651,7 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("automatically restores canonical persisted schedule");
     expect(initialized.instructions).toContain("Never ask resume or start fresh");
         expect(initialized.instructions).toContain("verifies continuity from server-side state");
-                                expect(initialized.instructions).toContain("Routed execution gateway is mandatory");
+                                expect(initialized.instructions).toContain("Mandatory Execution Map is universal");
         expect(initialized.instructions).toContain("Direct operational tool calls are not advertised or executable");
     expect(initialized.instructions).toContain("Source cards are backend-only during Manifest calendar production");
     expect(initialized.instructions).toContain("Autonomous account and engineering transitions use Completed:, Showing now:, and Next action:");
