@@ -419,8 +419,8 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
   `).all<Record<string, unknown>>(),
     db.prepare(`
     SELECT 'context_admission' AS source_type, id AS source_id,
-      brand_key || ' ' || admission_scope || ' ' || sections_json || ' partial ' || is_partial || ' ' || COALESCE(notes, ''),
-      created_at
+      brand_key || ' ' || admission_scope || ' ' || sections_json || ' partial ' || is_partial || ' ' || COALESCE(notes, '') AS text,
+      created_at AS updated_at
     FROM operator_context_admissions
     UNION ALL
     SELECT 'production_board', id,
