@@ -2345,6 +2345,12 @@ describe("operator mode MCP endpoint", () => {
       previous_path_superseded: true,
       active_entry: { tool_name: "listRepoFiles" },
     });
+    const promotedEntry = replacement.structuredContent.mandatory_execution_map.active_entry;
+    expect(promotedEntry.procedure.ordered_steps.length).toBeGreaterThan(0);
+    expect(promotedEntry.procedure.testimony.verified_successful_tool).toBe("listRepoFiles");
+    expect(promotedEntry.procedure.testimony.mandatory_statement).toContain("active verified path");
+    expect(promotedEntry.procedure.testimony.failed_paths).toContainEqual(expect.objectContaining({ tool_name: "readRepoFile" }));
+    expect(promotedEntry.historical_failures).toContainEqual(expect.objectContaining({ tool_name: "readRepoFile" }));
 
     const enforced = await mcpToolCallRaw<{
       routed_execution: { executed_tool: string };
