@@ -10,6 +10,13 @@ import {
 import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 import { logAuthEvent, logWorkerOperationalEvent } from "../auth/operationalLog.js";
+import {
+  finalizeMandatoryExecutionMapCall,
+  getMandatoryExecutionMapSummary,
+  MANDATORY_EXECUTION_MAP_VERSION,
+  prepareMandatoryExecutionMapCall,
+  type MandatoryExecutionToolDefinition,
+} from "./mandatoryExecutionMap";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
