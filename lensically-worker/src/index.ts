@@ -11926,27 +11926,6 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
 
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
-    name: "createImplementationBacklogItem",
-    title: "Create implementation backlog item",
-    description: "Record a concrete engineering backlog item from MCP/operator observations without using free-text strategy memory as the backlog.",
-    inputSchema: { type: "object", properties: { title: { type: "string" }, observed_issue: { type: "string" }, expected_behavior: { type: "string" }, required_change: { type: "string" }, acceptance_test: { type: "string" }, priority: { type: "string" }, related_stage: { type: "string" } }, required: ["title", "required_change"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "listImplementationBacklogItems",
-    title: "List implementation backlog items",
-    description: "List open/resolved MCP implementation backlog items.",
-    inputSchema: { type: "object", properties: { status: { type: "string" }, limit: { type: "integer" }, offset: { type: "integer" } }, additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  },
-  {
-    name: "markImplementationBacklogItemResolved",
-    title: "Resolve implementation backlog item",
-    description: "Mark an MCP implementation backlog item resolved with audit state.",
-    inputSchema: { type: "object", properties: { item_id: { type: "string" }, resolution_note: { type: "string" } }, required: ["item_id"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
 ];
 
 const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
