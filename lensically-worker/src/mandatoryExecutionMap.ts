@@ -462,9 +462,12 @@ export async function finalizeMandatoryExecutionMapCall(
   if (!mapExecution) return null;
   const actionIntent = normalizeText(mapExecution.action_intent, 8000) ?? "unknown action";
   const mode = normalizeText(mapExecution.mode, 80) ?? "source_defined_static_route";
+  const directEngineering = mode === "source_defined_direct_engineering";
   return {
     version: MANDATORY_EXECUTION_MAP_VERSION,
-    map_state: result.ok === false ? "source_defined_route_failed" : "source_defined_route_completed",
+    map_state: directEngineering
+      ? result.ok === false ? "source_defined_direct_failed" : "source_defined_direct_completed"
+      : result.ok === false ? "source_defined_route_failed" : "source_defined_route_completed",
     route_mode: mode,
     action_intent: actionIntent,
     mapped_tool: toolName,
