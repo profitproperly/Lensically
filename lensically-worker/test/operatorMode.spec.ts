@@ -2366,6 +2366,7 @@ describe("operator mode MCP endpoint", () => {
       "pre_call_route",
       "map_entry",
       "tool_registry",
+      "d1_table_manifest",
     ]));
     expect(mapped.structuredContent.execution_guard_enforcement).toMatchObject({
       mode: "mandatory_execution_map",
