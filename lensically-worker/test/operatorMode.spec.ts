@@ -1889,6 +1889,7 @@ describe("operator mode MCP endpoint", () => {
       universal_workflow_requirements: Array<{ stage: string; required_sections: string[] }>;
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[]; after_explicit_proceed: string };
       open_implementation_backlog: Array<Record<string, unknown>>;
+      runtime: { mcp_version: string; deployment_id: string | null; active_runtime_deployment?: unknown; active_runtime_config_deployment?: unknown };
     }>("getOperatorStartupContext");
         expect(direct.bootstrap_version).toBe("operator-startup-v3");
         expect(direct.collaboration_contract.version).toBe("operator-collaboration-v1");
@@ -1999,6 +2000,9 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(direct.runtime.mcp_version).toBe("1.24.0");
+    expect(Object.prototype.hasOwnProperty.call(direct.runtime, "deployment_id")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_deployment")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_config_deployment")).toBe(true);
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("submit every external action through executeLensicallyIntent");
@@ -2018,8 +2022,12 @@ describe("operator mode MCP endpoint", () => {
 
   it("reuses startup bootstrap through engineeringPrecheck and fallback bridges", async () => {
     const direct = await mcpTool<{ tool_surface: { total_tools: number } }>("getOperatorStartupContext");
-    const precheck = await mcpTool<{ startup_context: { tool_surface: { total_tools: number } }; recent_ops_memory: Array<Record<string, unknown>> }>("engineeringPrecheck");
-    expect(precheck.startup_context.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
+    const precheck = await mcpTool<{ status_kind: string; runtime: { mcp_version: string; deployment_id?: string | null }; tool_surface: { total_tools: number }; recent_ops_memory: Array<Record<string, unknown>>; startup_context?: unknown }>("engineeringPrecheck");
+    expect(precheck.status_kind).toBe("compact_engineering_precheck");
+    expect(precheck.runtime.mcp_version).toBe("1.24.0");
+    expect(precheck.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
+    expect(precheck.startup_context).toBeUndefined();
+    expect(JSON.stringify(precheck).length).toBeLessThan(12000);
 
     const runBridge = await mcpTool<{ executed_tool: string; result: { tool_surface: { total_tools: number } } }>("runEngineeringTool", {
       tool_name: "getOperatorStartupContext",
@@ -2394,6 +2402,7 @@ describe("operator mode MCP endpoint", () => {
     const status = await mcpToolCallRaw<{
       ok: boolean;
       routed_execution: { executed_tool: string };
+      status_kind?: string;
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
       objective: "Report MCP status and verification state.",
@@ -2402,8 +2411,18 @@ describe("operator mode MCP endpoint", () => {
     });
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
+    expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
     expect(status.structuredContent.routed_execution.executed_tool).not.toBe("submit_candidate_draft");
     expect(status.structuredContent.missing_inputs ?? []).not.toEqual(expect.arrayContaining(["brand_key", "run_id", "source_card_id"]));
+
+    const gatewayHealth = await mcpToolCallRaw<{ routed_execution: { executed_tool: string }; status_kind?: string }>("executeLensicallyIntent", {
+      objective: "Check gateway execution health.",
+      intent: "check gateway execution health",
+      inputs: {},
+    });
+    expect(gatewayHealth.isError).not.toBe(true);
+    expect(gatewayHealth.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
+    expect(gatewayHealth.structuredContent.status_kind).toBe("compact_engineering_precheck");
 
     const repair = await mcpToolCallRaw<{
       tool_name: string;

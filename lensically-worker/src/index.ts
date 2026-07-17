@@ -13177,8 +13177,8 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       github_available: branch.ok,
     },
     runtime: {
-      mcp_version: OPERATOR_MCP_VERSION,
-      active_runtime_deployment: lastDeployment ?? null,
+      ...operatorRuntimeMetadata(env),
+      active_runtime_config_deployment: lastDeployment ?? null,
     },
     source_documents: sourceDocuments,
     ops_memory: memories.results ?? [],
@@ -16102,13 +16102,38 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
   }
 
   if (toolName === "engineeringPrecheck") {
-    const startup = await buildOperatorStartupContext(request, env);
+    const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
+    const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
+      ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
+      : undefined;
+    const memories = await env.DB.prepare(
+      `SELECT id, title, applies_when, updated_at
+       FROM operator_ops_memory
+       WHERE active = 1
+       ORDER BY datetime(updated_at) DESC
+       LIMIT 4`,
+    ).all<Record<string, unknown>>();
+    const failures = await env.DB.prepare(
+      `SELECT id, tool_name, likely_cause, created_at
+       FROM operator_mcp_admin_errors
+       ORDER BY datetime(created_at) DESC
+       LIMIT 4`,
+    ).all<Record<string, unknown>>();
     return {
       ok: true,
-      startup_context: startup,
+      status_kind: "compact_engineering_precheck",
+      runtime: operatorRuntimeMetadata(env),
       access: { github_token_status: config.token ? "exists" : "missing", repo: `${config.owner}/${config.repo}`, branch: config.branch },
+      repository: {
+        owner: config.owner,
+        repo: config.repo,
+        branch: config.branch,
+        latest_sha: commit?.sha ?? null,
+        github_status: branch.status,
+        github_available: branch.ok,
+      },
       tool_surface: {
-        total_tools: (startup.tool_surface as Record<string, unknown> | undefined)?.total_tools,
+        total_tools: (await buildOperatorMcpTools(env, true, false)).length,
         engineering_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
         admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
@@ -16123,10 +16148,13 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         ...operatorStartupFallbackRoutes(),
         "Keep workflow dispatch output compact; request full logs only outside this MCP.",
       ],
-      active_workflow_requirements: startup.universal_workflow_requirements,
-      recent_ops_memory: startup.ops_memory,
-      recent_failures: startup.recent_failures,
-      recent_successful_fixes: startup.recent_successful_fixes,
+      recent_ops_memory: memories.results ?? [],
+      recent_failures: failures.results ?? [],
+      payload_limits: {
+        recent_ops_memory_limit: 4,
+        recent_failures_limit: 4,
+        full_startup_context: "not returned by status/precheck; use intent=startup only for fresh-session bootstrap",
+      },
     };
   }
 

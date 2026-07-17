@@ -126,19 +126,19 @@ function procedureForTool(tool: MandatoryExecutionToolDefinition): Record<string
 
 function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] {
   const explicit: Record<string, string[]> = {
-    engineeringPrecheck: ["inspect engineering state", "load engineering context", "engineering precheck", "engineering diagnosis", "diagnose engineering", "mcp status", "operator status", "runtime status"],
+    engineeringPrecheck: ["inspect engineering state", "load engineering context", "engineering precheck", "engineering diagnosis", "diagnose engineering", "mcp status", "operator status", "runtime status", "gateway status", "gateway health", "gateway execution health", "mcp health", "operator health", "current mcp status", "check mcp version", "check current status"],
     getEngineeringAccessState: ["inspect engineering access state", "get engineering access state", "check engineering access", "verify engineering authority"],
-    getRepoStatus: ["inspect repository status", "get repository head", "read current repository sha", "repository sha", "runtime repository alignment", "runtime/repository alignment verification"],
+    getRepoStatus: ["inspect repository status", "get repository head", "read current repository sha", "repository sha", "runtime repository alignment", "runtime/repository alignment verification", "repository runtime alignment", "runtime source alignment", "current repository status"],
     readRepoFile: ["read repository file", "inspect source file", "open repo file", "repository inspection"],
     searchRepoFiles: ["search repository", "find code in repository", "locate source implementation", "repository search"],
-    applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "repair repository", "dry-run patch", "harmless test patch"],
+    applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "repair repository", "repair gateway", "repair mcp", "fix gateway", "fix mcp", "dry-run patch", "harmless test patch"],
     applyRepoTextPatch: ["apply one exact patch", "replace exact repository text", "single file repair"],
     deleteRepoFile: ["delete repository file", "remove repository file"],
-    runMcpTests: ["run mcp tests", "run operator tests", "testing", "test gateway", "run tests"],
-    runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha", "deployment"],
+    runMcpTests: ["run mcp tests", "run operator tests", "testing", "test gateway", "test mcp", "run tests", "run regression tests", "run typecheck"],
+    runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha", "deployment", "deploy worker", "deploy mcp", "release worker", "release mcp"],
     getEngineeringRelease: ["check engineering release", "wait for release completion"],
-    verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version", "post-deployment verification", "deployment verification", "runtime alignment verification", "mcp status verification"],
-    inspectMcpFailure: ["inspect mcp failure", "engineering diagnosis", "diagnose gateway failure", "repair path diagnosis"],
+    verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version", "post-deployment verification", "deployment verification", "runtime alignment verification", "mcp status verification", "verify runtime", "verify worker", "verify current deployment"],
+    inspectMcpFailure: ["inspect mcp failure", "engineering diagnosis", "diagnose gateway failure", "repair path diagnosis", "diagnose mcp", "diagnose operator", "inspect gateway failure", "inspect execution failure"],
     listMcpTools: ["list mcp tools", "inspect internal mcp registry", "bridge cached tool call"],
     createMcpTool: ["create mcp tool", "add internal mcp tool", "register internal mcp tool"],
     readMcpToolDefinition: ["read mcp tool definition", "inspect mcp tool schema"],
@@ -167,9 +167,14 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   const has = (pattern: RegExp) => pattern.test(text);
   if (has(/\bstartup\b/)) return "getOperatorStartupContext";
   if (has(/\bengineering\s+access\b/) || has(/\b(access|authority)\b/) && has(/\b(engineering|github|cloudflare)\b/)) return "getEngineeringAccessState";
-  if (has(/\b(mcp|operator|runtime|gateway)\s+(status|health|state|verification|verify)\b/) || has(/\bstatus\s+(request|check|verification)\b/)) return "engineeringPrecheck";
+  if (
+    has(/\b(mcp|operator|runtime|gateway)\b/) && has(/\b(status|health|version|versions)\b/)
+    || has(/\bstatus\s+(request|check|verification)\b/)
+    || has(/\bcheck\s+(mcp|operator|runtime|gateway)\b/)
+    || has(/\bgateway\s+execution\s+health\b/)
+  ) return "engineeringPrecheck";
   if (has(/\b(runtime|deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
-  if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime)\b/) && has(/\b(alignment|verify|verification|sha|status)\b/)) return "getRepoStatus";
+  if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime|runtime source|source runtime)\b/) && has(/\b(alignment|verify|verification|sha|status|current)\b/)) return "getRepoStatus";
   if (has(/\b(repository|repo|source|file)\b/) && has(/\b(read|inspect|open|status|sha|head)\b/)) {
     if (normalizeText(inputs.path, 1000) || has(/\b(read|open|file|source)\b/)) return "readRepoFile";
     return "getRepoStatus";
@@ -182,8 +187,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(create|add|register)\b/) && has(/\b(mcp|internal)\b/) && has(/\btool\b/)) return "createMcpTool";
   if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bschema\b/)) return "updateMcpToolSchema";
   if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bbehavior\b/)) return "updateMcpToolBehavior";
-  if (has(/\b(engineering|gateway|mcp)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect)\b/)) return "inspectMcpFailure";
-  if (has(/\b(engineering|repository|repo|code|source)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
+  if (has(/\b(engineering|gateway|mcp|operator|execution)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect|broken|timeout|timed out)\b/)) return "inspectMcpFailure";
+  if (has(/\b(engineering|repository|repo|code|source|gateway|mcp|operator)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
   if (has(/\b(test|tests|testing|typecheck|regression)\b/)) return "runMcpTests";
   if (has(/\b(deploy|deployment|release)\b/) && has(/\b(run|perform|execute|ship)\b/)) return "runEngineeringRelease";
   return null;
