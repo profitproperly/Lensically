@@ -8287,14 +8287,11 @@ async function buildOperatorManifestProceedCapsule(
     unresolved_incidents: deliveryReconciliation.unresolved_incidents,
     required_recovery_actions: deliveryReconciliation.required_recovery_actions,
     new_scheduling_blocked: Boolean(blockingIncident),
-    current_engineering_continuation: blockingIncident || engineeringContinuation ? {
-      kind: blockingIncident ? "delivery_incident" : "implementation_backlog",
-      blocking: Boolean(blockingIncident),
+    current_engineering_continuation: blockingIncident ? {
+      kind: "delivery_incident",
+      blocking: true,
       incident: blockingIncident,
-      backlog_item: engineeringContinuation ?? null,
-      next_action: blockingIncident?.required_recovery_action
-        ?? engineeringContinuation?.required_change
-        ?? null,
+      next_action: blockingIncident.required_recovery_action,
     } : null,
     workflow_checkpoint: {
       workflow_session_id: sessionId,
