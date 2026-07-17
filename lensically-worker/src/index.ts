@@ -11628,8 +11628,9 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
 type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
 const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
-  "getOperatorStartupContext",
+    "getOperatorStartupContext",
   "guardLensicallyCall",
+  "routeAndExecuteLensicallyCall",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
