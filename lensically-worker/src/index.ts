@@ -6251,23 +6251,6 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
   ).run();
 
   await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_mcp_backlog_items (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      observed_issue TEXT,
-      expected_behavior TEXT,
-      required_change TEXT,
-      acceptance_test TEXT,
-      priority TEXT NOT NULL DEFAULT 'normal',
-      related_stage TEXT,
-      status TEXT NOT NULL DEFAULT 'open',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      resolved_at TEXT
-    )`,
-  ).run();
-
-  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_mcp_deployments (
       id TEXT PRIMARY KEY,
       version INTEGER NOT NULL,
