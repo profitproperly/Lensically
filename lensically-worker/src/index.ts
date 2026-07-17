@@ -13040,14 +13040,16 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
   return {
     ok: true,
-                bootstrap_version: "operator-startup-v3",
-                                collaboration_contract: OPERATOR_COLLABORATION_CONTRACT,
-    autonomy_contract: OPERATOR_AUTONOMY_CONTRACT,
-    engineering_authority_contract: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
-    continuity_contract: OPERATOR_CONTINUITY_CONTRACT,
-    execution_policy_contract: OPERATOR_EXECUTION_POLICY_CONTRACT,
-    owner_interaction_contract: OPERATOR_OWNER_INTERACTION_CONTRACT,
-    rejection_memory_contract: OPERATOR_REJECTION_MEMORY_CONTRACT,
+    bootstrap_version: "operator-startup-v4",
+    operating_contract: {
+      public_gateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+      router: OPERATOR_REGISTRY_GENERATION,
+      model_tool_choice_allowed: false,
+      d1_route_lookup_required: false,
+      recovery_role: "independent_break_glass_only",
+      account_controls: ["explicit_proceed", "server_side_continuity", "idempotency", "authorization", "content_gates", "scheduler_safety"],
+      engineering_flow: ["bounded_inspection", "coherent_change_set", "focused_validation", "exact_sha_release", "live_verification"],
+    },
     captured_at: new Date().toISOString(),
 
     account_data_loaded: false,
