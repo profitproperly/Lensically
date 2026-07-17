@@ -16939,10 +16939,17 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "listEngineeringAudit") {
     const limit = Math.min(Math.max(Number(args.limit ?? 25), 1), 100);
     const action = normalizeOperatorText(args.action, 120, true);
-    const rows = action
-      ? await env.DB.prepare(`SELECT * FROM operator_engineering_audit WHERE action = ? ORDER BY datetime(created_at) DESC LIMIT ?`).bind(action, limit).all<Record<string, unknown>>()
-      : await env.DB.prepare(`SELECT * FROM operator_engineering_audit ORDER BY datetime(created_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
-    return { ok: true, entries: rows.results ?? [] };
+    try {
+      const rows = action
+        ? await env.DB.prepare(`SELECT * FROM operator_engineering_audit WHERE action = ? ORDER BY datetime(created_at) DESC LIMIT ?`).bind(action, limit).all<Record<string, unknown>>()
+        : await env.DB.prepare(`SELECT * FROM operator_engineering_audit ORDER BY datetime(created_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
+      return { ok: true, entries: rows.results ?? [], audit_table_present: true };
+    } catch (error) {
+      if (/no such table:\s*operator_engineering_audit/i.test(getErrorMessage(error))) {
+        return { ok: true, entries: [], audit_table_present: false };
+      }
+      throw error;
+    }
   }
 
     if (toolName === "listPreCallRoutes") {
