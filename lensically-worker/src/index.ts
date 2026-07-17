@@ -13500,7 +13500,40 @@ async function verifyOperatorExecutionGuard(
   if (payload.intended_tool !== toolName || payload.args_fingerprint !== fingerprint) {
     return { ok: false, error: "execution_guard_mismatch" };
   }
-  return { ok: true };
+    return { ok: true };
+}
+
+type OperatorRoutedGatewayResult = {
+  ok: boolean;
+  error?: string;
+  tool_name?: string;
+  arguments?: Record<string, unknown>;
+  corrections?: OperatorGuardCorrection[];
+  route_trail?: Array<Record<string, unknown>>;
+  validation_errors?: OperatorGuardError[];
+};
+
+async function prepareOperatorRoutedGatewayCall(
+  env: Env,
+  gatewayArgs: Record<string, unknown>,
+): Promise<OperatorRoutedGatewayResult> {
+  const intendedTool = normalizeOperatorText(gatewayArgs.intended_tool, 160);
+  const argumentsJson = normalizeOperatorText(gatewayArgs.arguments_json, 50000) ?? "{}";
+  const parsed = safeParseJsonString(argumentsJson);
+  if (!intendedTool || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "routed_gateway_arguments_invalid" };
+  }
+  if (intendedTool === OPERATOR_ROUTED_EXECUTION_GATEWAY || intendedTool === "guardLensicallyCall" || intendedTool === "getOperatorStartupContext") {
+    return { ok: false, error: "routed_gateway_target_forbidden" };
+  }
+  const availableTools = await buildOperatorMcpTools(env, false, false);
+  let toolName = intendedTool;
+  let args = { ...(parsed as Record<string, unknown>) };
+  delete args.execution_guard;
+  const corrections: OperatorGuardCorrection[] = [];
+  const routeTrail: Array<Record<string, unknown>> = [];
+  const seen = new Set<string>();
+  // OPERATOR_ROUTED_GATEWAY_BODY
 }
 
 async function createOperatorContinuationNonce(env: Env, brandKey: GptBrandKey): Promise<string> {
