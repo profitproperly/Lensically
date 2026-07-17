@@ -24,7 +24,7 @@ const repositoryFileManifest = repositoryFiles.map((absolute) => {
   const generatedRegionNormalized = path === "lensically-worker/src/mandatoryExecutionMap.ts";
   const hashInput = generatedRegionNormalized
     ? Buffer.from(raw.toString("utf8").replace(
-      /\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE[\s\S]*?\/\/ END GENERATED EXECUTION KNOWLEDGE/,
+      /^\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE\r?\n[\s\S]*?\r?\n\/\/ END GENERATED EXECUTION KNOWLEDGE$/m,
       "// BEGIN GENERATED EXECUTION KNOWLEDGE\n<release-generated>\n// END GENERATED EXECUTION KNOWLEDGE",
     ))
     : raw;
