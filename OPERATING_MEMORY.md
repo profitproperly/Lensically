@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: treating D1 manifest completeness as `stored_count >= live_count` could accept a stale dropped-table entry while omitting a different live table. Use: compare the sorted active manifest table names against the sorted live `sqlite_master` table names exactly; rebuild the manifest whenever membership differs and fail policy admission unless the exact sets match. Applies when: migrations, lazy table creation, test resets, or table retirement change the D1 schema.
+
 - Failed: the automatic approved-canary regression activated the correct one-post control, then reread asynchronous Durable Object health after the alarm could already consume the canary and return to paused or expose an unavailable local state. Use: assert the authoritative `activateNextApprovedScheduledPostCanary` receipt for the activation decision; test scheduler health, execution, and return-to-paused behavior in the dedicated scheduler regression. Applies when: testing one-shot scheduler controls whose alarms may run between calls in the Cloudflare test pool.
 
 - Failed: the first execution-library sync combined every source adapter into one compound `UNION ALL` query; D1 returned `too many terms in compound SELECT`, so only static tool and table-manifest sources loaded and every routed action failed closed. Use: preserve complete coverage but execute source adapters in bounded compound-query groups, merge the rows in memory, and regression-test library readiness on the first routed action. Applies when: adding execution-library source adapters or any D1 query with many compound SELECT terms.
