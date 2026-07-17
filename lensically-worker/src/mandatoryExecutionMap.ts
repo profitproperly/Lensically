@@ -705,9 +705,10 @@ async function compileExecutionPolicyLibrary(
   actionIntent: string,
   inputs: Record<string, unknown>,
   tools: MandatoryExecutionToolDefinition[],
+  staticPolicySources: ExecutionPolicyLibrarySource[],
 ): Promise<Record<string, unknown>> {
     await ensureExecutionPolicyLibraryTables(db);
-  const synchronized = await syncExecutionPolicyLibrarySources(db, tools);
+  const synchronized = await syncExecutionPolicyLibrarySources(db, tools, staticPolicySources);
   const sourceReadError = synchronized.sourceReadError;
   const queryTokens = executionLibraryTokens(`${actionIntent} ${stringify(inputs)}`);
   const sources = await readExecutionPolicyLibraryCandidates(db, queryTokens);
