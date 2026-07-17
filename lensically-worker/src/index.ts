@@ -13268,7 +13268,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
 
 const OPERATOR_MCP_VERSION = "1.26.0";
 
-const OPERATOR_REGISTRY_GENERATION = "mandatory-execution-map-v1";
+const OPERATOR_REGISTRY_GENERATION = "mandatory-execution-library-v2";
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   return {
