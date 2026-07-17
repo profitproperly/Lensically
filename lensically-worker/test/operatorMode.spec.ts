@@ -2445,6 +2445,23 @@ describe("operator mode MCP endpoint", () => {
     expect(followedRedirect.structuredContent.routed_execution.executed_tool).toBe("getOperatorStartupContext");
     expect(followedRedirect.structuredContent.routed_execution.route_trail).toContainEqual(expect.objectContaining({ route_key: redirectKey }));
 
+    const releaseRedirect = await mcpToolCallRaw<{
+      error: string;
+      required_tool: string;
+      normalized_arguments: Record<string, unknown>;
+      pre_call_route: { route_key: string };
+    }>("guardLensicallyCall", {
+      intended_tool: "runGitHubWorkflow",
+      arguments_json: JSON.stringify({ workflow_id: "lensically-engineering.yml", ref: "main", task: "worker-deploy" }),
+    });
+    expect(releaseRedirect.isError).toBe(true);
+    expect(releaseRedirect.structuredContent).toMatchObject({
+      error: "pre_call_route_required",
+      required_tool: "runEngineeringRelease",
+      normalized_arguments: { workflow_id: "lensically-engineering.yml", ref: "main" },
+      pre_call_route: { route_key: "workflow_source_validation_before_dispatch" },
+    });
+
     for (const route of [
       {
                 route_key: routeKey, provider: "lensically", tool_name: "listOpsMemory", operation_key: "*",
