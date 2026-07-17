@@ -726,6 +726,15 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   return null;
 }
 
+function inferredArgumentsForOperationalIntent(toolName: string, actionIntent: string): Record<string, unknown> {
+  if (toolName !== "runGitHubWorkflow") return {};
+  const normalized = actionIntent.toLowerCase();
+  if (/\btypecheck\b/.test(normalized)) return { task: "typecheck" };
+  if (/\bgpt\s+memory\s+tests?\b/.test(normalized)) return { task: "gpt-memory-tests" };
+  if (/\boperator\s+tests?\b/.test(normalized) || /\bregression\s+tests?\b/.test(normalized)) return { task: "operator-tests" };
+  return {};
+}
+
 async function ensureMandatoryExecutionMapTables(db: D1Database): Promise<void> {
   await db.prepare(`CREATE TABLE IF NOT EXISTS operator_execution_map_entries (
     id TEXT PRIMARY KEY,
