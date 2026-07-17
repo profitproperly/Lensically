@@ -469,7 +469,15 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url); const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
     try {
-      if (url.pathname === "/health") return json({ status: "ok", ...metadata(env), tool_count: TOOLS.length, timestamp: new Date().toISOString() });
+      if (url.pathname === "/health") return json({
+        status: "ok",
+        ...metadata(env),
+        execution_map_version: MANDATORY_RECOVERY_MAP_VERSION,
+        public_tool_count: PUBLIC_TOOLS.length,
+        internal_tool_count: TOOLS.length,
+        model_tool_choice_allowed: false,
+        timestamp: new Date().toISOString(),
+      });
       if (url.pathname === "/.well-known/oauth-authorization-server" || url.pathname === "/.well-known/openid-configuration") return json({ issuer: url.origin, authorization_endpoint: `${url.origin}/oauth/authorize`, token_endpoint: `${url.origin}/oauth/token`, response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: ["recovery", "offline_access"], code_challenge_methods_supported: ["plain", "S256"] });
       if (url.pathname === "/.well-known/oauth-protected-resource") return json({ resource: `${url.origin}/mcp`, authorization_servers: [url.origin], scopes_supported: ["recovery", "offline_access"] });
       if (url.pathname === "/oauth/authorize") {
