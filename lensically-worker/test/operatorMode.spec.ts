@@ -2333,6 +2333,10 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(startup.isError).not.toBe(true);
     expect(startup.structuredContent.gateway).toMatchObject({ intent: "startup", public_schema_frozen: true });
+    expect(startup.structuredContent.execution_library).toMatchObject({
+      policy_ready: true,
+      consulted_before_execution: true,
+    });
 
     const mapped = await mcpToolCallRaw<{
       ok: boolean;
