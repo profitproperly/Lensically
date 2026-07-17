@@ -113,7 +113,9 @@ function testRequestedBrandKey(toolName: string, args: Record<string, unknown>):
 async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> {
   if (mcpSelectedKey !== brandKey) {
     const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey }>("selectOperatorKey", { brand_key: brandKey });
-    expect(selected.isError, `selectOperatorKey failed: ${JSON.stringify(selected.structuredContent)}`).not.toBe(true);
+    if (selected.isError) {
+      throw new Error(`selectOperatorKey returned MCP isError: ${JSON.stringify(selected.structuredContent)}`);
+    }
     expect(selected.structuredContent.selected_key).toBe(brandKey);
         mcpSelectedKey = brandKey;
     mcpProceedConfirmed = false;
