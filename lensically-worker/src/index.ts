@@ -11836,9 +11836,9 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "inspectMcpFailure",
     title: "Inspect MCP failure",
-    description: "Classify an MCP/tool failure, persist the inspection, and return the likely fix path through schema, behavior, workflow, or gate tools.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, payload: { type: "object", additionalProperties: true }, error_response: { type: "object", additionalProperties: true }, error_text: { type: "string" } }, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: "Classify an MCP or handler failure and return the smallest source-defined repair path without creating a database record.",
+    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, error_response: { type: "object", additionalProperties: true }, error_text: { type: "string" } }, additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
     {
     name: "listMcpTools",
