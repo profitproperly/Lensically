@@ -31631,7 +31631,7 @@ export class ScheduledPostScheduler {
   private async executeOnce(trigger: "alarm" | "cron"): Promise<Record<string, unknown>> {
     const startedAt = new Date().toISOString();
     const previous = await this.getHealth();
-    const control = await this.getControl();
+    let control = await this.getControl();
     let overdueBefore = 0;
     let overdueAfter = 0;
     let processed = { selected_count: 0, attempted_post_ids: [] as number[] };
