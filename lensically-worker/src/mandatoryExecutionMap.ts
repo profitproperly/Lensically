@@ -1364,7 +1364,10 @@ export async function prepareMandatoryExecutionMapCall(
       map_state: "unknown",
     };
   }
-  const compiledExecutionLibrary = await compileExecutionPolicyLibrary(db, actionIntent, inputs, tools);
+  const staticPolicySources = callbacks.readStaticPolicySources
+    ? await callbacks.readStaticPolicySources()
+    : [];
+  const compiledExecutionLibrary = await compileExecutionPolicyLibrary(db, actionIntent, inputs, tools, staticPolicySources);
   const executionLibrary = executionPolicyLibraryReceipt(compiledExecutionLibrary);
   if (compiledExecutionLibrary.policy_ready !== true) {
     return {
