@@ -13071,15 +13071,13 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     },
     tool_surface: {
       total_tools: tools.length,
-      engineering_tools: [...OPERATOR_MCP_ENGINEERING_TOOL_NAMES],
-      admin_tools: [...OPERATOR_MCP_ADMIN_TOOL_NAMES],
+      engineering_tools: activeEngineeringTools,
+      admin_tools: activeAdminTools,
       operator_tools: operatorTools,
-      account_wrapper_tools: accountWrapperTools,
       categories: {
-        engineering: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
-        admin: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
+        engineering: activeEngineeringTools.length,
+        admin: activeAdminTools.length,
         operator: operatorTools.length,
-        account_wrappers: accountWrapperTools.length,
       },
     },
     repository: {
