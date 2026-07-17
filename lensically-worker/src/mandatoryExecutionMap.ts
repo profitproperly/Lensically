@@ -660,6 +660,7 @@ async function readExecutionPolicyLibraryCandidates(
   const alwaysConsultedTypes = [
     "ops_memory",
     "pre_call_route",
+    "pre_call_route_override",
     "workflow_requirement",
     "map_entry",
     "tool_registry",
