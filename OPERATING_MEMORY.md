@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: splitting execution-library source ingestion into bounded compound queries without aliasing each group-leading payload and timestamp caused SQLite `ORDER BY updated_at` failures and would have materialized blank `text` fields. Use: every group-leading SELECT must expose the normalized columns `source_type`, `source_id`, `text`, and `updated_at`; release preflight guards the nontrivial timestamp aliases. Applies when: splitting, reordering, or extending execution-library D1 source queries.
+
 - Failed: after splitting the execution-library compound query, some standalone groups did not alias the first SELECT outputs as `text` and `updated_at`; SQLite rejected `ORDER BY updated_at` and source ingestion failed closed. Use: the first SELECT in every bounded group must explicitly alias all four canonical columns: `source_type`, `source_id`, `text`, and `updated_at`. Applies when: splitting, regrouping, or adding execution-library D1 source queries.
 
 - Failed: splitting the execution-library source adapters into compound groups of 9, 10, 9, and 6 still exceeded D1's compound SELECT limit. Use: every execution-library compound query must contain at most four SELECT terms; merge all bounded group results afterward, and keep a release guard for the grouped implementation. Applies when: adding or regrouping D1-backed execution-library source adapters.
