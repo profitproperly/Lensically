@@ -1973,7 +1973,48 @@ describe("operator mode MCP endpoint", () => {
     expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
   }, 30000);
 
-  it("loads compact non-account startup bootstrap in a fresh session", async () => {
+  it("loads a compact source-defined startup bootstrap", async () => {
+    const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
+    const startup = await mcpTool<{
+      bootstrap_version: string;
+      operating_contract: {
+        public_gateway: string;
+        router: string;
+        model_tool_choice_allowed: boolean;
+        d1_route_lookup_required: boolean;
+        recovery_role: string;
+      };
+      account_data_loaded: boolean;
+      no_account_sections_present: boolean;
+      tool_surface: { total_tools: number; engineering_tools: string[]; admin_tools: string[]; operator_tools: string[] };
+      runtime: { mcp_version: string; registry_generation: string };
+      source_documents: Array<{ path: string; excerpt: string }>;
+      boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
+    }>("getOperatorStartupContext");
+    expect(startup.bootstrap_version).toBe("operator-startup-v4");
+    expect(startup.operating_contract).toMatchObject({
+      public_gateway: "executeLensicallyIntent",
+      router: "static-execution-router-v1",
+      model_tool_choice_allowed: false,
+      d1_route_lookup_required: false,
+      recovery_role: "independent_break_glass_only",
+    });
+    expect(startup.account_data_loaded).toBe(false);
+    expect(startup.no_account_sections_present).toBe(true);
+    expect(startup.tool_surface.total_tools).toBe(registry.tools.length);
+    expect(startup.runtime).toMatchObject({ mcp_version: "1.27.1", registry_generation: "static-execution-router-v1" });
+    expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
+    expect(startup.source_documents.every((document) => document.excerpt.length <= 2500)).toBe(true);
+    expect(startup.boundary.first_key_response_template).toHaveLength(4);
+    expect(startup.boundary.before_proceed_forbidden).toContain("account_state");
+    const serialized = JSON.stringify(startup);
+    expect(serialized).not.toContain("collaboration_contract");
+    expect(serialized).not.toContain("open_implementation_backlog");
+    expect(serialized).not.toContain("active_runtime_config_deployment");
+    expect(serialized.length).toBeLessThan(25000);
+  }, 30000);
+
+  it.skip("retired: historical startup contract payload", async () => {
 
         const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
