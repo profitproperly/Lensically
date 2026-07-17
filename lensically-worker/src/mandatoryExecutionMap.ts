@@ -436,8 +436,8 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
   `).all<Record<string, unknown>>(),
     db.prepare(`
     SELECT 'source_selection' AS source_type, id AS source_id,
-      brand_key || ' ' || source_type || ' ' || source_identity_key || ' ' || post_text || ' ' || metrics_snapshot_json || ' ' || source_snapshot_json || ' ' || COALESCE(disposition, '') || ' ' || COALESCE(disposition_reason, ''),
-      created_at
+      brand_key || ' ' || source_type || ' ' || source_identity_key || ' ' || post_text || ' ' || metrics_snapshot_json || ' ' || source_snapshot_json || ' ' || COALESCE(disposition, '') || ' ' || COALESCE(disposition_reason, '') AS text,
+      created_at AS updated_at
     FROM operator_source_selections
     UNION ALL
     SELECT 'review_batch', id,
