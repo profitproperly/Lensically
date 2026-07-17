@@ -6217,30 +6217,6 @@ const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
 
 async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
   await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_mcp_tool_overrides (
-      tool_name TEXT PRIMARY KEY,
-      disabled INTEGER NOT NULL DEFAULT 0,
-      schema_patch_json TEXT,
-      behavior_patch_json TEXT,
-      description_override TEXT,
-      handler_spec_json TEXT,
-      output_schema_json TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      last_reason TEXT
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_operator_mcp_tool_overrides_touch_updated_at
-     AFTER UPDATE ON operator_mcp_tool_overrides
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE operator_mcp_tool_overrides SET updated_at = CURRENT_TIMESTAMP WHERE tool_name = NEW.tool_name;
-     END`,
-  ).run();
-
-  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_workflow_requirements (
       id TEXT PRIMARY KEY,
       brand_key TEXT,
