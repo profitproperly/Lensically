@@ -232,6 +232,7 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(start|begin|open)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "startRepoFileWrite";
   if (has(/\b(append|add)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+chunk|write\s+chunk|chunk)\b/)) return "appendRepoFileChunk";
   if (has(/\b(commit|finish|complete)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "commitRepoFileWrite";
+  if (has(/\b(delete|remove)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "deleteRepoFile";
   if (has(/\b(create|add)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "createRepoFile";
   if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history)\b/)) return "listGitHubWorkflowRuns";
   if (has(/\b(get|read|inspect|check|wait)\b/) && has(/\b(workflow|github|release)\b/) && has(/\b(run|status|result|completion)\b/)) {
