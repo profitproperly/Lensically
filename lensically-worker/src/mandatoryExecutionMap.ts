@@ -993,6 +993,16 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
     || has(/\bcheck\s+(mcp|operator|runtime|gateway)\b/)
     || has(/\bgateway\s+execution\s+health\b/)
   ) return "engineeringPrecheck";
+  if (has(/\b(list|show)\b/) && has(/\b(repo|repository)\b/) && has(/\b(files|tree)\b/)) return "listRepoFiles";
+  if (has(/\b(start|begin|open)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "startRepoFileWrite";
+  if (has(/\b(append|add)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+chunk|write\s+chunk|chunk)\b/)) return "appendRepoFileChunk";
+  if (has(/\b(commit|finish|complete)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "commitRepoFileWrite";
+  if (has(/\b(create|add)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "createRepoFile";
+  if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history)\b/)) return "listGitHubWorkflowRuns";
+  if (has(/\b(get|read|inspect|check|wait)\b/) && has(/\b(workflow|github|release)\b/) && has(/\b(run|status|result|completion)\b/)) {
+    if (has(/\bengineering\s+release\b/) || has(/\brelease\s+(status|completion|result)\b/)) return "getEngineeringRelease";
+    return "getGitHubWorkflowRun";
+  }
   if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime|runtime source|source runtime)\b/) && has(/\b(alignment|verify|verification|sha|status|current)\b/)) return "getRepoStatus";
   if (has(/\b(deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
   if (has(/\b(repository|repo|source|file)\b/) && has(/\b(read|inspect|open|status|sha|head)\b/)) {
