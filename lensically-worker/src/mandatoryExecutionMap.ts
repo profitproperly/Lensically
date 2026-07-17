@@ -1,5 +1,5 @@
 export const MANDATORY_EXECUTION_MAP_VERSION = "mandatory-execution-library-v2";
-export const EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v1";
+export const EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v2";
 
 // BEGIN GENERATED EXECUTION KNOWLEDGE
 const GENERATED_EXECUTION_KNOWLEDGE: Record<string, string> = {};
