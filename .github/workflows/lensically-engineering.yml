@@ -82,7 +82,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Operator MCP tests
-        id: operator-tests
+        id: operator_tests
         if: ${{ inputs.task == 'operator-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
@@ -90,7 +90,7 @@ jobs:
           npm run test -- --run test/operatorMode.spec.ts --reporter=verbose 2>&1 | tee /tmp/lensically-operator-tests.log
 
       - name: Surface Operator test failure
-        if: ${{ steps.operator-tests.outcome == 'failure' }}
+        if: ${{ steps.operator_tests.outcome == 'failure' }}
         run: |
           echo "Operator MCP tests failed. Bounded diagnostic tail follows."
           tail -n 120 /tmp/lensically-operator-tests.log | while IFS= read -r line; do
@@ -296,7 +296,7 @@ jobs:
           exit 1
 
       - name: GPT memory tests
-        id: gpt-memory-tests
+        id: gpt_memory_tests
         if: ${{ inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
@@ -304,7 +304,7 @@ jobs:
           npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=verbose 2>&1 | tee /tmp/lensically-gpt-memory-tests.log
 
       - name: Surface GPT memory test failure
-        if: ${{ steps.gpt-memory-tests.outcome == 'failure' }}
+        if: ${{ steps.gpt_memory_tests.outcome == 'failure' }}
         run: |
           echo "GPT memory tests failed. Bounded diagnostic tail follows."
           tail -n 120 /tmp/lensically-gpt-memory-tests.log | while IFS= read -r line; do
