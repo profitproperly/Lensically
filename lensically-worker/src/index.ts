@@ -15389,16 +15389,6 @@ async function handleOperatorMcpAdminTool(
     return definition ? { ok: true, tool: definition } : { ok: false, error: "tool_not_found" };
   }
 
-  if (toolName === "disableMcpTool") {
-    const targetTool = normalizeOperatorText(args.tool_name, 160);
-    await env.DB.prepare(
-      `INSERT INTO operator_mcp_tool_overrides (tool_name, disabled, last_reason)
-       VALUES (?, ?, ?)
-       ON CONFLICT(tool_name) DO UPDATE SET disabled = excluded.disabled, last_reason = excluded.last_reason`,
-    ).bind(targetTool, args.disabled === false ? 0 : 1, normalizeOperatorText(args.reason, 1000, true)).run();
-    return { ok: true, tool_name: targetTool, disabled: args.disabled === false ? false : true };
-  }
-
   if (toolName === "runMcpTests") {
     const tools = await buildOperatorMcpTools(env, true);
     const names = new Set(tools.map((tool) => tool.name));
