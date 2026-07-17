@@ -25,6 +25,11 @@ on:
         required: false
         default: ""
         type: string
+      release_sha:
+        description: Exact commit SHA to validate and deploy
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: lensically-engineering-${{ inputs.task || 'recovery-push' }}
