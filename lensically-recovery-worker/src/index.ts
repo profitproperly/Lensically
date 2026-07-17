@@ -422,6 +422,21 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   return { ok: false, error: "unknown_recovery_tool" };
 }
 
+async function signRecoveryEnvelope(env: Env, payload: Record<string, unknown>): Promise<string> {
+  const id = crypto.randomUUID();
+  await env.RECOVERY_SESSIONS.put(`execution-map:permit:${id}`, JSON.stringify(payload), { expirationTtl: 30 * 60 });
+  return id;
+}
+
+async function verifyRecoveryEnvelope(env: Env, value: unknown): Promise<Record<string, unknown> | null> {
+  const id = typeof value === "string" ? value.trim() : "";
+  if (!id) return null;
+  const payload = await env.RECOVERY_SESSIONS.get(`execution-map:permit:${id}`, "json") as Record<string, unknown> | null;
+  if (!payload) return null;
+  const expiresAt = Number(payload.exp ?? 0);
+  return Number.isFinite(expiresAt) && expiresAt >= Math.floor(Date.now() / 1000) ? payload : null;
+}
+
 function base64Url(value: string): string {
   return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
