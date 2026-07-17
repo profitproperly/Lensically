@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one bounded current-head validation proving canonical policies survive initial and forced refresh.
+// Recovery source commits may carry [operator-tests] to trigger one bounded current-head validation of the final canonical policy-refresh contract.
 
 interface Env {
   GITHUB_TOKEN: string;
