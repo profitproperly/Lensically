@@ -17228,6 +17228,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           map_entry: prepared.map_entry ?? null,
           incident: prepared.incident ?? null,
           map_execution: prepared.map_execution ?? null,
+          execution_library: prepared.execution_library ?? null,
           executed_tool: toolName,
           corrections: prepared.corrections ?? [],
           route_trail: prepared.route_trail ?? [],
