@@ -13177,7 +13177,6 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       active_runtime_config_deployment: lastDeployment ?? null,
     },
     source_documents: sourceDocuments,
-    ops_memory: memories.results ?? [],
     recent_failures: failures.results ?? [],
     recent_successful_fixes: (audits.results ?? []).filter((item) => item.result === "ok").slice(0, 8),
     open_implementation_backlog: backlog.results ?? [],
