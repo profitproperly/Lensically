@@ -14753,7 +14753,7 @@ function operatorMcpInstructions(toolCount: number): string {
         "Immediately after getOperatorStartupContext, submit every external action through executeMappedIntent using objective, action_intent, and inputs_json only. The Mandatory Execution Map selects and executes the verified internal procedure; never choose or call an operational tool name directly.",
         "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
 
-                        "After the user selects a key, call routeAndExecuteLensicallyCall with intended_tool=selectOperatorKey and arguments_json containing the canonical brand_key. Reply using only the exact four-line handshake returned by the routed result. Do not submit account-scoped intent yet.",
+                        "After the user selects a key, call executeMappedIntent with action_intent='select operator key' and inputs_json containing the canonical brand_key. Reply using only the exact four-line handshake returned by the mapped result. Do not submit account-scoped intent yet.",
     "Lensically Operator Mode MCP is active.",
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
