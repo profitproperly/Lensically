@@ -13052,8 +13052,7 @@ async function recordEngineeringAudit(env: Env, input: {
   ownerApproval?: string | null;
   metadata?: Record<string, unknown> | null;
 }): Promise<void> {
-  await prepareOperatorMode(env);
-  await env.DB.prepare(
+  void env.DB.prepare(
     `INSERT INTO operator_engineering_audit (
       id, action, files_changed_json, diff_summary, tests_run_json, result, deployment_id,
       rollback_target, owner_approval, metadata_json
@@ -13069,7 +13068,12 @@ async function recordEngineeringAudit(env: Env, input: {
     input.rollbackTarget ?? null,
     input.ownerApproval ?? null,
     normalizeOperatorJson(input.metadata ?? {}, {}),
-  ).run();
+  ).run().catch((error) => {
+    logWorkerEvent("ENGINEERING_AUDIT_WRITE_SKIPPED", {
+      action: input.action,
+      error: getErrorMessage(error),
+    });
+  });
 }
 
 function compactStartupDocument(path: string, file: { ok: boolean; status: number; content: string | null; size: number }): Record<string, unknown> {
