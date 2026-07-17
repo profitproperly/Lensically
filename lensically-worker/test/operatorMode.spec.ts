@@ -3191,15 +3191,10 @@ describe("operator mode MCP endpoint", () => {
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(initialized.serverInfo.version).toBe("1.22.0");
-    expect(listed.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+    expect(listed.tools.map((tool) => tool.name)).toEqual([
       "getOperatorStartupContext",
-      "guardLensicallyCall",
-      "engineeringPrecheck",
-      "searchRepoFiles",
-      "applyRepoTextPatch",
-      "create_source_card",
-      "create_generation_run",
-    ]));
+      "routeAndExecuteLensicallyCall",
+    ]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
 
