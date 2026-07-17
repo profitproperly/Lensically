@@ -536,16 +536,16 @@ export default {
           return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "Recovery actions must enter through the Mandatory Recovery Map." }], isError: true } });
         }
         const prepared = await prepareRecoveryAction(env.RECOVERY_SESSIONS, args, TOOLS as RecoveryMapTool[], {
-          sign: (payload) => signRecoveryEnvelope(env, payload),
-          verify: (token) => verifyRecoveryEnvelope(env, token),
+          sign: (payload) => signRecoveryMapPayload(env, payload),
+          verify: (token) => verifyRecoveryMapPayload(env, token),
         });
         if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
           return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: prepared, content: [{ type: "text", text: `Recovery map could not resolve the action: ${String(prepared.error || "unknown")}` }], isError: true } });
         }
         const underlying = await toolCall(prepared.tool_name, prepared.arguments, env);
         const lifecycle = await finalizeRecoveryAction(env.RECOVERY_SESSIONS, prepared.execution ?? null, prepared.tool_name, prepared.arguments, underlying, {
-          sign: (payload) => signRecoveryEnvelope(env, payload),
-          verify: (token) => verifyRecoveryEnvelope(env, token),
+          sign: (payload) => signRecoveryMapPayload(env, payload),
+          verify: (token) => verifyRecoveryMapPayload(env, token),
         });
         const result = { ...underlying, mandatory_execution_map: lifecycle, mapped_execution: { version: MANDATORY_RECOVERY_MAP_VERSION, action_intent: args.action_intent ?? null, executed_tool: prepared.tool_name, state: prepared.state, entry: prepared.entry ?? null, incident: prepared.incident ?? null, model_tool_choice_allowed: false } };
         return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: result.ok === false ? `Mapped recovery action failed: ${String(result.error || result.status || "unknown")}` : "Mapped recovery action completed." }], isError: result.ok === false } });
