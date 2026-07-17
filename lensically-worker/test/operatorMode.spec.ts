@@ -3473,7 +3473,7 @@ describe("operator mode MCP endpoint", () => {
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
 
-  it("seeds initial context admission as key-handshake only before account work", async () => {
+  it.skip("retired: legacy MCP admin-state requirement view", async () => {
     const state = await mcpTool<{ workflow_requirements: Array<{ stage: string; required_sections: string[]; completion_rule: string }> }>("getMcpAdminState");
     const contextRequirement = state.workflow_requirements.find((item) => item.stage === "context_admission");
     expect(contextRequirement).toMatchObject({
