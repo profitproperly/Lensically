@@ -16785,6 +16785,31 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         });
       }
       args = preCallRouting.arguments;
+      if (sourceDefinedProtectedOperation && !normalizeOperatorText(args.owner_response, 8000, true)) {
+        const route = {
+          route_key: "explicit_owner_ratification_handoff",
+          source: "source_defined_static_guard",
+          required_tool: toolName,
+          mandatory_route: "Include brand_key and the owner's exact approval in owner_response before the protected operation executes.",
+        };
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: {
+              ok: false,
+              error: "known_blocker_prevented",
+              intended_tool: toolName,
+              required_tool: toolName,
+              required_route: route.mandatory_route,
+              route_trail: [route],
+              account_data_loaded: false,
+            },
+            content: [{ type: "text", text: `Lensically blocked protected operation ${toolName} until explicit owner ratification is supplied.` }],
+            isError: true,
+          },
+        });
+      }
       const boundaryBlock = sourceDefinedDirectEngineering
         ? null
         : await getOperatorMcpBoundaryBlock(request, env, toolName, args);
