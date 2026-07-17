@@ -1991,7 +1991,7 @@ describe("operator mode MCP endpoint", () => {
                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(direct.runtime.mcp_version).toBe("1.22.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
-        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("guardLensicallyCall before every Lensically tool");
+        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("submit every operational intent through routeAndExecuteLensicallyCall");
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Do not create owner proposals or numerical tool budgets");
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Call account tools directly with compact typed schemas");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("exact file prefix");
