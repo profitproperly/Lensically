@@ -1026,6 +1026,85 @@ function inferredArgumentsForOperationalIntent(toolName: string, actionIntent: s
   return {};
 }
 
+const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
+  "engineeringPrecheck",
+  "getEngineeringAccessState",
+  "getRepoStatus",
+  "applyRepoPatchSet",
+  "applyRepoTextPatch",
+  "deleteRepoFile",
+  "runMcpTests",
+  "runGitHubWorkflow",
+  "runEngineeringRelease",
+  "getEngineeringRelease",
+  "verifyDeployedMcpVersion",
+  "listEngineeringAudit",
+  "inspectMcpFailure",
+  "listMcpTools",
+  "createMcpTool",
+  "readMcpToolDefinition",
+  "updateMcpToolSchema",
+  "updateMcpToolBehavior",
+]);
+
+function prepareSourceDefinedDirectEngineeringCall(
+  actionIntent: string,
+  objective: string | null,
+  inputs: Record<string, unknown>,
+  tools: MandatoryExecutionToolDefinition[],
+): MandatoryExecutionPrepared | null {
+  const toolName = deterministicToolForOperationalIntent(actionIntent, inputs);
+  if (!toolName || !SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(toolName)) return null;
+  const tool = tools.find((item) => item.name === toolName);
+  if (!tool) return null;
+  const allowed = toolSchemaProperties(tool);
+  const required = toolRequiredProperties(tool);
+  const filteredInputs = Object.fromEntries(Object.entries(inputs).filter(([key]) => allowed.includes(key)));
+  const argumentsObject = { ...inferredArgumentsForOperationalIntent(toolName, actionIntent), ...filteredInputs };
+  const missingInputs = required.filter((key) => !Object.prototype.hasOwnProperty.call(argumentsObject, key));
+  const entry = {
+    id: `source-direct:${toolName}`,
+    action_key: actionKeyForTool(toolName),
+    version: 1,
+    status: "active",
+    task_class: toolCategory(toolName),
+    tool_name: toolName,
+    source_type: "source_defined_direct_engineering",
+    verification_summary: "Recovery-style deterministic engineering path. No D1 execution-library compilation or discovery is permitted before execution.",
+  };
+  if (missingInputs.length) {
+    return {
+      ok: false,
+      error: "mandatory_execution_map_inputs_missing",
+      map_state: "known",
+      map_entry: entry,
+      missing_inputs: missingInputs,
+    };
+  }
+  return {
+    ok: true,
+    tool_name: toolName,
+    arguments: argumentsObject,
+    map_state: "known",
+    map_entry: entry,
+    map_execution: {
+      version: MANDATORY_EXECUTION_MAP_VERSION,
+      mode: "source_defined_direct_engineering",
+      action_intent: actionIntent,
+      action_key: entry.action_key,
+      objective,
+      entry_id: entry.id,
+      entry_version: entry.version,
+      mapped_tool: toolName,
+      requested_inputs: inputs,
+      enforced_arguments: argumentsObject,
+      model_tool_choice_allowed: false,
+      d1_execution_library_bypassed: true,
+      discovery_allowed: false,
+    },
+  };
+}
+
 async function ensureMandatoryExecutionMapTables(db: D1Database): Promise<void> {
   await db.prepare(`CREATE TABLE IF NOT EXISTS operator_execution_map_entries (
     id TEXT PRIMARY KEY,
