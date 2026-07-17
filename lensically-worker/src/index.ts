@@ -16248,12 +16248,14 @@ async function handleOperatorMcpEngineeringTool(
         ...operatorStartupFallbackRoutes(),
         "Keep workflow dispatch output compact; request full logs only outside this MCP.",
       ],
-      recent_ops_memory: memories.results ?? [],
-      recent_failures: failures.results ?? [],
+      direct_engineering_contract: {
+        source_defined: true,
+        d1_bootstrap_required: false,
+        d1_policy_lookup_required: false,
+        model_tool_choice_allowed: false,
+      },
       payload_limits: {
-        recent_ops_memory_limit: 4,
-        recent_failures_limit: 4,
-        full_startup_context: "not returned by status/precheck; use intent=startup only for fresh-session bootstrap",
+        full_startup_context: "not returned by status/precheck; use intent=startup only for deliberate non-engineering bootstrap",
       },
     };
   }
