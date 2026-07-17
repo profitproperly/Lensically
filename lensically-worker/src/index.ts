@@ -31945,9 +31945,11 @@ export class ScheduledPostScheduler {
     const blockConcurrencyWhile = (this.state as DurableObjectState & {
       blockConcurrencyWhile?: <R>(callback: () => Promise<R>) => Promise<R>;
     }).blockConcurrencyWhile;
-    return typeof blockConcurrencyWhile === "function"
-      ? blockConcurrencyWhile.call(this.state, operation)
-      : operation();
+    if (typeof blockConcurrencyWhile === "function") {
+      const result = await blockConcurrencyWhile.call(this.state, operation);
+      return result as T;
+    }
+    return operation();
   }
 
   private async getHealth(): Promise<ScheduledPostSchedulerHealth> {
