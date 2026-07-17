@@ -17023,16 +17023,65 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       });
     }
 
-    if (method === "tools/call") {
-      const toolName = typeof message.params?.name === "string" ? message.params.name : "";
+        if (method === "tools/call") {
+      const requestedToolName = typeof message.params?.name === "string" ? message.params.name : "";
+      const requestedArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
+        ? message.params.arguments as Record<string, unknown>
+        : {};
+      const directEntryAllowed = requestedToolName === "getOperatorStartupContext"
+        || requestedToolName === "guardLensicallyCall"
+        || requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
+      if (!directEntryAllowed) {
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: {
+              ok: false,
+              error: "routed_execution_gateway_required",
+              requested_tool: requestedToolName,
+              required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+              account_data_loaded: false,
+            },
+            content: [{ type: "text", text: "Lensically operational calls must enter through the routed execution gateway." }],
+            isError: true,
+          },
+        });
+      }
+      let toolName = requestedToolName;
+      let rawArgs = requestedArgs;
+      let routedGatewayMetadata: Record<string, unknown> | null = null;
+      if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
+        const prepared = await prepareOperatorRoutedGatewayCall(env, requestedArgs);
+        if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: { ...prepared, required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY, account_data_loaded: false },
+              content: [{ type: "text", text: `Lensically could not resolve the routed operation: ${String(prepared.error ?? "unknown_error")}.` }],
+              isError: true,
+            },
+          });
+        }
+        toolName = prepared.tool_name;
+        rawArgs = {
+          ...prepared.arguments,
+          execution_guard: await createOperatorExecutionGuard(env, toolName, prepared.arguments),
+        };
+        routedGatewayMetadata = {
+          version: "operator-routed-execution-gateway-v1",
+          requested_tool: requestedArgs.intended_tool ?? null,
+          executed_tool: toolName,
+          corrections: prepared.corrections ?? [],
+          route_trail: prepared.route_trail ?? [],
+        };
+      }
       const canonicalTool = buildOperatorMcpBaseTools(false).find((item) => item.name === toolName);
       const tool = canonicalTool ?? (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === toolName);
       if (!tool) {
         return mcpErrorResponse(id, -32602, "Unknown tool");
       }
-      const rawArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
-        ? message.params.arguments as Record<string, unknown>
-        : {};
       const guardCheck = await verifyOperatorExecutionGuard(env, toolName, rawArgs);
       let args: Record<string, unknown>;
       let dispatcherGuardFallback = false;
