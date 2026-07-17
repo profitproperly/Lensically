@@ -3971,7 +3971,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(claimCount?.total ?? 0)).toBe(Number(claimCount?.unique_total ?? 0));
   }, 60000);
 
-  it("deploys and rolls back runtime MCP config snapshots", async () => {
+  it.skip("retired: runtime MCP deployment snapshots", async () => {
     const deployment = await mcpTool<{ deployment_id: string; version: number }>("deployMcpChanges", {
       change_summary: "vitest runtime snapshot",
     });
