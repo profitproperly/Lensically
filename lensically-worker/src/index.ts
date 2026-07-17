@@ -14836,13 +14836,14 @@ async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<
 
 function operatorMcpInstructions(toolCount: number): string {
   return [
-    "Use Lensically Operator Mode as source of truth.",
-    "Before engineering, admin, workflow, or account work in a fresh session, call executeLensicallyIntent with intent='startup' once and use that compact non-account bootstrap as the startup source of truth.",
-    "Do not look for a separate startup or recovery tool. The single callable public surface is executeLensicallyIntent.",
-        "Classify every change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless there is a valid account-specific reason.",
-                                "Follow the Collaboration, Autonomy, Engineering Authority, and Execution Policy Contracts returned by startup-through-gateway. Manifest routine account work and routine engineering are persistently authorized, outcome-bound, and unbudgeted; owner ratification remains only for protected destructive, ownership, credential, scheduler-safety, and irreversible business decisions.",
-    "When a durable decision is made, periodically tell the owner its change_name, primary_system_layer, additional_system_layers, universal_or_account_scope, why it survives new chats, and which secondary memory/audit records will also be written.",
-    "Treat supporting memory as explanation and recovery context, not the sole enforcement mechanism; prefer backend behavior, workflow requirements, MCP contracts, data models, gates, and regression tests.",
+    "Use Lensically Operator Mode as the source of truth.",
+    "The sole public action is executeLensicallyIntent with objective, intent, and inputs.",
+    "The source-defined static router selects one live typed handler. Do not choose internal tools, wrappers, retries, or fallbacks.",
+    "Route selection is database-independent. Dynamic execution libraries, maps, incidents, promotions, phonebook routes, and OpsMemory routing are retired.",
+    "Use intent='startup' once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
+    "After Proceed, restore account continuity from server-side state and preserve idempotency, authorization, content gates, ownership checks, and scheduler safety.",
+    "Routine engineering uses bounded inspection, one coherent change set, focused validation, one exact-SHA release, and compact receipts.",
+    "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
         "Canonical source cards are reusable intellectual property: resolve repeated stable source identities to the current card version, create a new version only when the source interpretation changes, and create a new adaptation plan/run for ordinary new payoffs or experiments.",
         "Startup routes through executeLensicallyIntent with intent='startup'. After startup, submit every external action through executeLensicallyIntent using objective, intent, and inputs only. The Mandatory Execution Map selects and executes the verified internal procedure; never choose or call an operational tool name directly.",
         "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
