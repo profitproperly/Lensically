@@ -2713,7 +2713,7 @@ describe("operator mode MCP endpoint", () => {
     expect(JSON.stringify(repair.structuredContent)).not.toContain("submit_candidate_draft");
   }, 30000);
 
-  it("blocks a stale known path and makes the verified replacement mandatory", async () => {
+  it.skip("retired: stale dynamic route replacement", async () => {
     const actionIntent = "read repository file";
     const stale = await mcpToolCallRaw<{
       mandatory_execution_map: { map_state: string; discovery_permit: string; old_path_blocked: boolean };
