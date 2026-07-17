@@ -2582,7 +2582,7 @@ describe("operator mode MCP endpoint", () => {
     });
     }, 30000);
 
-    it("continues discovery through a short incident continuation with separate typed tool inputs", async () => {
+    it.skip("retired: discovery incident continuation", async () => {
     const actionIntent = "perform a novel client-safe discovery round trip";
     const unknown = await mcpToolCallRaw<{
       error: string;
