@@ -338,6 +338,7 @@ async function seedMandatoryExecutionMap(
   tools: MandatoryExecutionToolDefinition[],
 ): Promise<void> {
   await ensureMandatoryExecutionMapTables(db);
+  await repairDeterministicInputValidationIncidents(db);
   for (const tool of tools) {
     if (MAP_EXCLUDED_TOOLS.has(tool.name)) continue;
     const actionKey = actionKeyForTool(tool.name);
