@@ -135,6 +135,27 @@ async function ensureExecutionPolicyLibraryTables(db: D1Database): Promise<void>
   )`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_execution_library_events
     ON operator_execution_library_events (action_intent, created_at DESC)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS operator_execution_library_sources (
+    source_key TEXT PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    source_scope TEXT NOT NULL DEFAULT 'universal',
+    text TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    active INTEGER NOT NULL DEFAULT 1,
+    source_updated_at TEXT,
+    synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_execution_library_sources_lookup
+    ON operator_execution_library_sources (active, source_type, source_updated_at DESC)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS operator_execution_library_ingestion_state (
+    source_system TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    source_fingerprint TEXT NOT NULL,
+    source_count INTEGER NOT NULL DEFAULT 0,
+    last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (source_system, source_name)
+  )`).run();
 }
 
 async function readExecutionPolicyLibrarySources(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
