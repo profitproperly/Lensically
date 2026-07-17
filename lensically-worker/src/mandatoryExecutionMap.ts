@@ -614,6 +614,30 @@ async function promoteDiscovery(
     actionIntent,
     ...intentAliasesForTool(tool),
   ]));
+  const attempts = await db.prepare(
+    `SELECT tool_name, arguments_json, outcome, result_summary_json, created_at
+     FROM operator_execution_map_attempts
+     WHERE incident_id = ?
+     ORDER BY datetime(created_at) ASC, rowid ASC`,
+  ).bind(String(incident.id)).all<Record<string, unknown>>();
+  const historicalFailures = (attempts.results ?? [])
+    .filter((attempt) => attempt.outcome === "failed")
+    .map((attempt) => ({
+      tool_name: attempt.tool_name,
+      arguments: safeJson(String(attempt.arguments_json ?? "{}"), {}),
+      result: safeJson(String(attempt.result_summary_json ?? "{}"), {}),
+      created_at: attempt.created_at,
+    }));
+  const promotedProcedure = {
+    ...procedureForTool(tool),
+    testimony: {
+      incident_id: incident.id,
+      original_failure_signature: incident.failure_signature ?? null,
+      failed_paths: historicalFailures,
+      verified_successful_tool: tool.name,
+      mandatory_statement: `For this action intent, ${tool.name} is the active verified path until a genuine path failure opens a stale incident.`,
+    },
+  };
   if (failedEntryId) {
     await db.prepare(
       `UPDATE operator_execution_map_entries
