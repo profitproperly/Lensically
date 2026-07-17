@@ -31728,66 +31728,71 @@ async function recoverOverdueScheduledPostRows(
   await ensureScheduledPostsTable(env);
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
-  const dbSession = env.DB.withSession("first-primary");
-  let transactionStarted = false;
-  const retiredPostIds: number[] = [];
-  const rescheduledPostIds: number[] = [];
-  try {
-    await dbSession.prepare("BEGIN TRANSACTION").run();
-    transactionStarted = true;
-    for (const action of normalized) {
-      const row = await dbSession.prepare(
-        `SELECT id, status, scheduled_time, cancelled_at
-         FROM scheduled_posts
-         WHERE id = ?
-         LIMIT 1`,
-      ).bind(action.scheduled_post_id).first<{ id: number; status: string; scheduled_time: string; cancelled_at: string | null }>();
-      if (!row || row.status !== SCHEDULED_POST_STATUS_APPROVED || row.cancelled_at || Date.parse(row.scheduled_time) > nowMs) {
-        throw new Error(`scheduled_post_not_recoverable:${action.scheduled_post_id}`);
-      }
-      if (action.action === "retire") {
-        const updated = await dbSession.prepare(
-          `UPDATE scheduled_posts
-           SET cancelled_at = ?, processing_started_at = NULL,
-               publish_error_message = ?, updated_at = CURRENT_TIMESTAMP
-           WHERE id = ? AND status = ? AND cancelled_at IS NULL AND scheduled_time <= ?`,
-        ).bind(nowIso, `operator_retired_overdue:${reason}`.slice(0, 2000), action.scheduled_post_id, SCHEDULED_POST_STATUS_APPROVED, nowIso).run();
-        if (Number(updated.meta?.changes ?? 0) !== 1) {
-          throw new Error(`scheduled_post_recovery_race:${action.scheduled_post_id}`);
-        }
-        retiredPostIds.push(action.scheduled_post_id);
-        continue;
-      }
+  const retired = normalized.filter((action) => action.action === "retire");
+  const rescheduled = normalized
+    .filter((action) => action.action === "reschedule")
+    .map((action) => {
       const scheduledMs = action.scheduled_time ? Date.parse(action.scheduled_time) : NaN;
       if (!Number.isFinite(scheduledMs) || scheduledMs <= nowMs) {
         throw new Error(`future_reschedule_time_required:${action.scheduled_post_id}`);
       }
-      const rescheduledIso = new Date(scheduledMs).toISOString();
-      const updated = await dbSession.prepare(
-        `UPDATE scheduled_posts
-         SET scheduled_time = ?, cancelled_at = NULL, processing_started_at = NULL,
-             failed_at = NULL, publish_error_message = NULL, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND status = ? AND cancelled_at IS NULL AND scheduled_time <= ?`,
-      ).bind(rescheduledIso, action.scheduled_post_id, SCHEDULED_POST_STATUS_APPROVED, nowIso).run();
-      if (Number(updated.meta?.changes ?? 0) !== 1) {
-        throw new Error(`scheduled_post_recovery_race:${action.scheduled_post_id}`);
-      }
-      rescheduledPostIds.push(action.scheduled_post_id);
-    }
-    await dbSession.prepare("COMMIT").run();
-    transactionStarted = false;
-  } catch (error) {
-    if (transactionStarted) {
-      await dbSession.prepare("ROLLBACK").run().catch(() => undefined);
-    }
-    throw error;
+      return { ...action, scheduled_time: new Date(scheduledMs).toISOString() };
+    });
+  const ids = normalized.map((action) => action.scheduled_post_id);
+  const idPlaceholders = ids.map(() => "?").join(", ");
+  const cancelledExpression = retired.length
+    ? `CASE id ${retired.map(() => "WHEN ? THEN ?").join(" ")} ELSE NULL END`
+    : "NULL";
+  const scheduledExpression = rescheduled.length
+    ? `CASE id ${rescheduled.map(() => "WHEN ? THEN ?").join(" ")} ELSE scheduled_time END`
+    : "scheduled_time";
+  const errorExpression = retired.length
+    ? `CASE id ${retired.map(() => "WHEN ? THEN ?").join(" ")} ELSE NULL END`
+    : "NULL";
+  const bindings: unknown[] = [
+    ...retired.flatMap((action) => [action.scheduled_post_id, nowIso]),
+    ...rescheduled.flatMap((action) => [action.scheduled_post_id, action.scheduled_time]),
+    ...retired.flatMap((action) => [action.scheduled_post_id, `operator_retired_overdue:${reason}`.slice(0, 2000)]),
+    ...ids,
+    SCHEDULED_POST_STATUS_APPROVED,
+    nowIso,
+    ...ids,
+    SCHEDULED_POST_STATUS_APPROVED,
+    nowIso,
+    ids.length,
+  ];
+  const updated = await env.DB.prepare(
+    `UPDATE scheduled_posts
+     SET cancelled_at = ${cancelledExpression},
+         scheduled_time = ${scheduledExpression},
+         processing_started_at = NULL,
+         failed_at = NULL,
+         publish_error_message = ${errorExpression},
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id IN (${idPlaceholders})
+       AND status = ?
+       AND cancelled_at IS NULL
+       AND scheduled_time <= ?
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
+       AND (
+         SELECT COUNT(*)
+         FROM scheduled_posts AS eligible
+         WHERE eligible.id IN (${idPlaceholders})
+           AND eligible.status = ?
+           AND eligible.cancelled_at IS NULL
+           AND eligible.scheduled_time <= ?
+           AND (eligible.published_post_id IS NULL OR length(trim(eligible.published_post_id)) = 0)
+       ) = ?`,
+  ).bind(...bindings).run();
+  if (Number(updated.meta?.changes ?? 0) !== normalized.length) {
+    throw new Error("scheduled_post_recovery_race");
   }
 
   const remaining = await listOverdueScheduledPosts(env, 100);
   return {
-    recovered_post_ids: normalized.map((action) => action.scheduled_post_id),
-    retired_post_ids: retiredPostIds,
-    rescheduled_post_ids: rescheduledPostIds,
+    recovered_post_ids: ids,
+    retired_post_ids: retired.map((action) => action.scheduled_post_id),
+    rescheduled_post_ids: rescheduled.map((action) => action.scheduled_post_id),
     remaining_overdue_post_ids: remaining.map((row) => row.id),
   };
 }
