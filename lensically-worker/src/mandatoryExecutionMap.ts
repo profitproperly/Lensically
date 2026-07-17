@@ -175,6 +175,7 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   searchRepoFiles: ["search repository", "find code in repository", "locate source implementation", "repository search"],
   applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "fix mcp", "fix gateway"],
   applyRepoTextPatch: ["apply one exact patch", "replace exact repository text", "single file repair"],
+  deleteRepoFile: ["delete repository file", "delete repo file", "remove repository file", "remove repo file"],
   runGitHubWorkflow: ["run typecheck", "run operator tests", "run gpt memory tests", "run regression tests"],
   runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy", "deploy worker", "deploy mcp", "release worker", "release mcp"],
   getEngineeringRelease: ["check engineering release", "release status", "wait for release completion"],
