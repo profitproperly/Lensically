@@ -14898,7 +14898,7 @@ async function collectOperatorPreflightSection(
 
 async function createOperatorMcpSnapshot(env: Env): Promise<Record<string, unknown>> {
   await prepareOperatorMode(env);
-  const overrides = await listOperatorMcpOverrides(env);
+  const overrides: Array<Record<string, unknown>> = [];
   const requirements = await env.DB.prepare(
     `SELECT * FROM operator_workflow_requirements ORDER BY stage ASC, brand_key ASC`,
   ).all<Record<string, unknown>>();
