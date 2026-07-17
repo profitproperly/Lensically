@@ -27,8 +27,11 @@ on:
         type: string
 
 concurrency:
-  group: lensically-engineering-${{ inputs.task }}
+  group: lensically-engineering-${{ inputs.task || 'recovery-push' }}
   cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
   worker:
