@@ -17329,7 +17329,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         });
       }
       args = preCallRouting.arguments;
-      const boundaryBlock = await getOperatorMcpBoundaryBlock(request, env, toolName, args);
+      const boundaryBlock = sourceDefinedDirectEngineering
+        ? null
+        : await getOperatorMcpBoundaryBlock(request, env, toolName, args);
       if (boundaryBlock) {
         return mcpJsonResponse({
           jsonrpc: "2.0",
