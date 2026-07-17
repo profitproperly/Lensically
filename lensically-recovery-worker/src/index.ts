@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one bounded validation of compact receipts, prepared tables, seeded startup, and canonical execution policy enforcement.
+// Recovery source commits may carry [operator-tests] to trigger one bounded validation of compact nonempty-source receipts and canonical execution policy enforcement.
 
 interface Env {
   GITHUB_TOKEN: string;
