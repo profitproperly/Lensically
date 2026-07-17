@@ -216,6 +216,8 @@ if (!executionMap.includes("isDeterministicInputValidationFailure")
   errors.push("mandatory_execution_map_input_validation_repair_missing");
 }
 if (!executionMap.includes('runGitHubWorkflow: ["run typecheck"')
+    || !executionMap.includes('runMcpTests: ["run mcp tests"')
+    || !executionMap.includes("run mcp tests?")
     || executionMap.includes('runMcpTests: ["run mcp tests", "run operator tests"')
     || !executionMap.includes("inferredArgumentsForOperationalIntent")
     || !executionMap.includes('return { task: "typecheck" }')
