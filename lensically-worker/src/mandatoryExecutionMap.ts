@@ -592,6 +592,7 @@ async function syncExecutionPolicyLibrarySources(
     library_version: EXECUTION_POLICY_LIBRARY_VERSION,
     generated_sources: generatedSources.map((source) => [source.source_id, source.text]),
     tool_sources: toolSources.map((source) => [source.source_id, source.text]),
+    static_policy_sources: staticPolicySources.map((source) => [source.source_type, source.source_id, source.text]),
   }));
   const staticRefreshDue = await executionLibraryRefreshDue(db, "static_sources", 86400, staticFingerprint);
   const dynamicRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "dynamic_sources", 60);
