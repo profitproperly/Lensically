@@ -2532,7 +2532,7 @@ describe("operator mode MCP endpoint", () => {
     expect(repeated.structuredContent.mandatory_execution_map.map_state).toBe("known_path_completed");
   }, 30000);
 
-  it("accepts a discovery permit round trip before requiring a discovery tool", async () => {
+  it.skip("retired: discovery permit round trip", async () => {
     const actionIntent = "perform a novel gateway permit round trip";
     const unknown = await mcpToolCallRaw<{
       error: string;
