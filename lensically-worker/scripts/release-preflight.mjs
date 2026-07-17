@@ -193,6 +193,8 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("expectedTriggerNames")
     || !executionMap.includes("triggersComplete")
     || !executionMap.includes('source_fingerprint === "dirty"')
+    || !executionMap.includes("const groups = await Promise.all")
+    || !executionMap.includes(".flatMap((group) => group.results ?? [])")
     || !executionMap.includes("readExecutionPolicyLibraryCandidates")
     || !executionMap.includes("const groups = await Promise.all([")
     || !executionMap.includes(".flatMap((group) => group.results ?? [])")
