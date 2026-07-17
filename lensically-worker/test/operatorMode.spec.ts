@@ -2412,6 +2412,37 @@ describe("operator mode MCP endpoint", () => {
     expect(rewarmed.isError).not.toBe(true);
     expect(rewarmed.structuredContent.execution_library.policy_ready).toBe(true);
 
+    await env.DB.prepare(
+      `UPDATE operator_execution_library_sources
+       SET active = 0
+       WHERE source_type = 'd1_table_manifest' AND source_id = 'operator_ops_memory'`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT OR REPLACE INTO operator_execution_library_sources (
+        source_key, source_type, source_id, source_scope, text, metadata_json, active, synced_at
+      ) VALUES ('d1_table_manifest:stale_fixture_table', 'd1_table_manifest', 'stale_fixture_table',
+                'universal', 'stale manifest fixture', '{}', 1, CURRENT_TIMESTAMP)`,
+    ).run();
+    const manifestRepaired = await mcpToolCallRaw<{ execution_library: { policy_ready: boolean; table_manifest_complete: boolean } }>("executeLensicallyIntent", {
+      objective: "Repair an exact D1 manifest membership mismatch.",
+      intent: "inspect engineering access state",
+      inputs: {},
+    });
+    expect(manifestRepaired.isError).not.toBe(true);
+    expect(manifestRepaired.structuredContent.execution_library).toMatchObject({
+      policy_ready: true,
+      table_manifest_complete: true,
+    });
+    const manifestRows = await env.DB.prepare(
+      `SELECT source_id, active FROM operator_execution_library_sources
+       WHERE source_type = 'd1_table_manifest' AND source_id IN ('operator_ops_memory', 'stale_fixture_table')
+       ORDER BY source_id`,
+    ).all<{ source_id: string; active: number }>();
+    expect(manifestRows.results).toEqual([
+      { source_id: "operator_ops_memory", active: 1 },
+      { source_id: "stale_fixture_table", active: 0 },
+    ]);
+
     const memoryId = crypto.randomUUID();
     const marker = `immediate policy refresh marker ${memoryId}`;
     await env.DB.prepare(
