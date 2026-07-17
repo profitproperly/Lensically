@@ -1554,8 +1554,12 @@ export async function finalizeMandatoryExecutionMapCall(
       status: result.status ?? null,
       phase: result.phase ?? null,
       map_mode: mode,
+      result: compactExecutionResultEvidence(result),
     },
   });
+  if (result.ok !== false && shouldRefreshExecutionLibraryAfterTool(toolName)) {
+    await syncExecutionPolicyLibrarySources(db, tools, true);
+  }
 
   if (mode === "mandatory_known_path" && entryId && isReusableExecutionPathFailure(toolName, result)) {
     await db.prepare(
