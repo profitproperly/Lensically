@@ -1854,7 +1854,9 @@ describe("operator mode MCP endpoint", () => {
 
   it("loads compact non-account startup bootstrap in a fresh session", async () => {
 
-    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+        const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["getOperatorStartupContext", "routeAndExecuteLensicallyCall"]);
+    const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     const direct = await mcpTool<{
             bootstrap_version: string;
                         collaboration_contract: { version: string; principles: string[]; durable_change_reporting: { required_fields: string[] }; system_layers: Array<{ key: string }> };
