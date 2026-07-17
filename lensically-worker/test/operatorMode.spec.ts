@@ -785,7 +785,8 @@ describe("operator mode backend spine", () => {
 
     const health = await mcpToolRaw<{ scheduler?: { control: { mode: string; allowed_post_ids: number[] } }; result?: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } } }>("getScheduledPostSchedulerState");
     const schedulerState = health.structuredContent.scheduler ?? health.structuredContent.result?.scheduler;
-    expect(schedulerState?.control).toMatchObject({ mode: "canary", allowed_post_ids: [scheduledPostId] });
+    expect(health.isError, JSON.stringify(health.structuredContent)).not.toBe(true);
+    expect(schedulerState?.control, JSON.stringify(health.structuredContent)).toMatchObject({ mode: "canary", allowed_post_ids: [scheduledPostId] });
     await mcpToolRaw("setScheduledPostSchedulerMode", {
       mode: "paused",
       reason: "reset automatic canary fixture",
