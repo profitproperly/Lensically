@@ -58,8 +58,19 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
 
       - name: Fast release preflight
+        id: release_preflight
         if: ${{ inputs.task == 'worker-deploy' }}
-        run: node scripts/release-preflight.mjs
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/release-preflight.mjs 2>&1 | tee /tmp/lensically-release-preflight.log
+
+      - name: Surface release preflight failure
+        if: ${{ steps.release_preflight.outcome == 'failure' }}
+        run: |
+          diagnostic=$(tail -n 120 /tmp/lensically-release-preflight.log | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=Release preflight failure::$diagnostic"
+          exit 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
