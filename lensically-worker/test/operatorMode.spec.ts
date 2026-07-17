@@ -3346,10 +3346,11 @@ describe("operator mode MCP endpoint", () => {
         expect(scheduled.status).toBe("scheduled");
     expect(scheduled.scheduled_post_id).toBeTruthy();
 
-                const listedTools = await mcpTool<{ tools: Array<{ name: string; inputSchema?: { properties?: Record<string, unknown> } }> }>("listMcpTools");
-    const editScheduledDefinition = listedTools.tools.find((tool) => tool.name === "edit_scheduled_post");
-    expect(editScheduledDefinition).toBeTruthy();
-    expect(editScheduledDefinition?.inputSchema?.properties?.retry_now).toBeTruthy();
+                                const editScheduledDefinition = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", {
+      tool_name: "edit_scheduled_post",
+    });
+    expect(editScheduledDefinition.tool).toBeTruthy();
+    expect(editScheduledDefinition.tool?.inputSchema?.properties?.retry_now).toBeTruthy();
     const beforeEdit = await env.DB.prepare(
       `SELECT scheduled_time FROM scheduled_posts WHERE id = ? LIMIT 1`,
     ).bind(scheduled.scheduled_post_id).first<{ scheduled_time: string }>();
