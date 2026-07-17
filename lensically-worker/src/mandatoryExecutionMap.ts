@@ -365,9 +365,9 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
     ORDER BY updated_at DESC
   `).all<Record<string, unknown>>(),
     db.prepare(`
-    SELECT 'decision_execution', id,
-      decision_id || ' ' || tool_name || ' ' || status || ' ' || COALESCE(result_summary, ''),
-      COALESCE(completed_at, created_at)
+    SELECT 'decision_execution' AS source_type, id AS source_id,
+      decision_id || ' ' || tool_name || ' ' || status || ' ' || COALESCE(result_summary, '') AS text,
+      COALESCE(completed_at, created_at) AS updated_at
     FROM operator_decision_execution_events
     UNION ALL
     SELECT 'repo_write_session', id,
