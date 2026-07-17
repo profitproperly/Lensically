@@ -12512,7 +12512,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ...OPERATOR_MCP_ADMIN_TOOLS,
     ...OPERATOR_MCP_TOOLS,
     ...scopedWrapperTools,
-  ].map(cloneOperatorMcpTool).sort((left, right) => {
+  ].filter((tool) => !RETIRED_INTERNAL_TOOL_NAMES.has(tool.name)).map(cloneOperatorMcpTool).sort((left, right) => {
     const leftPriority = directPriority.get(left.name) ?? 1000;
     const rightPriority = directPriority.get(right.name) ?? 1000;
     return leftPriority - rightPriority;
