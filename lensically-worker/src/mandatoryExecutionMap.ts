@@ -477,7 +477,21 @@ async function compileExecutionPolicyLibrary(
     .filter((item) => item.score >= 5)
     .sort((left, right) => right.score - left.score)
     .slice(0, 60);
-  const authoritativeTypes = new Set(["repository_knowledge", "ops_memory", "pre_call_route", "workflow_requirement", "map_entry", "tool_registry"]);
+  const authoritativeTypes = new Set([
+    "repository_knowledge",
+    "ops_memory",
+    "pre_call_route",
+    "workflow_requirement",
+    "tool_override",
+    "autonomy_profile",
+    "decision_proposal",
+    "production_board",
+    "source_exclusion",
+    "source_card",
+    "gate_policy",
+    "map_entry",
+    "tool_registry",
+  ]);
   const mandatoryRules = matched
     .filter((item) => authoritativeTypes.has(item.source.source_type))
     .slice(0, 30)
