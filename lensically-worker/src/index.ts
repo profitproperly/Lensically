@@ -13037,32 +13037,6 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     getGithubFile(env, "CURRENT_STATE.md"),
     getGithubFile(env, "OPERATING_MEMORY.md"),
   ]);
-  const requirements = (await listOperatorWorkflowRequirements(env, null)).filter((item) => item.brand_key === null).slice(0, 20);
-  const failures = await env.DB.prepare(
-    `SELECT id, tool_name, likely_cause, created_at
-     FROM operator_mcp_admin_errors
-     ORDER BY datetime(created_at) DESC
-     LIMIT 10`,
-  ).all<Record<string, unknown>>();
-  const audits = await env.DB.prepare(
-    `SELECT id, action, files_changed_json, diff_summary, result, created_at
-     FROM operator_engineering_audit
-     ORDER BY datetime(created_at) DESC
-     LIMIT 12`,
-  ).all<Record<string, unknown>>();
-  const backlog = await env.DB.prepare(
-    `SELECT id, title, required_change, acceptance_test, priority, related_stage, created_at
-     FROM operator_mcp_backlog_items
-     WHERE status = 'open'
-     ORDER BY datetime(created_at) DESC
-     LIMIT 20`,
-  ).all<Record<string, unknown>>();
-  const lastDeployment = await env.DB.prepare(
-    `SELECT id, version, status, change_summary, created_at, activated_at, rolled_back_at
-     FROM operator_mcp_deployments
-     ORDER BY version DESC
-     LIMIT 1`,
-  ).first<Record<string, unknown>>();
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
   return {
     ok: true,
