@@ -221,6 +221,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("syncExecutionPolicyLibrarySources")
     || !executionMap.includes("readStaticPolicySources")
     || !executionMap.includes("static_policy_sources")
+    || !executionMap.includes("syncExecutionPolicyLibrarySources(db, tools, staticPolicySources, true)")
     || !executionMap.includes('SELECT \'pre_call_route_override\'')
     || !source.includes("SOURCE_DEFINED_PRE_CALL_ROUTES.map")
     || !source.includes('source_type: "pre_call_route"')
