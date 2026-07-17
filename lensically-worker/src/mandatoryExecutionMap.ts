@@ -484,6 +484,7 @@ async function syncExecutionPolicyLibrarySources(
       dynamicSources = await readExecutionPolicyLibrarySources(db);
       await deactivateExecutionPolicyLibrarySourceTypes(db, dynamicSourceTypes);
       refreshSources.push(...dynamicSources);
+      dynamicRefreshSucceeded = true;
     } catch (error) {
       sourceReadError = error instanceof Error ? error.message : String(error);
     }
