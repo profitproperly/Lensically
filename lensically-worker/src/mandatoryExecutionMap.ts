@@ -1049,7 +1049,7 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "updateMcpToolBehavior",
 ]);
 
-function prepareSourceDefinedDirectEngineeringCall(
+export function prepareSourceDefinedDirectEngineeringCall(
   actionIntent: string,
   objective: string | null,
   inputs: Record<string, unknown>,
