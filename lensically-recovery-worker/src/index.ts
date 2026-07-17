@@ -29,7 +29,7 @@ type Tool = {
   annotations: Record<string, unknown>;
 };
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const JSON_HEADERS = { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store" };
 const TOOLS: Tool[] = [
   { name: "recoveryHealth", title: "Recovery health", description: "Verify the independent recovery plane and the main Lensically health endpoint.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
