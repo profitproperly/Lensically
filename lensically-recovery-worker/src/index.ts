@@ -420,12 +420,13 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState"
       && (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed === false;
     const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
-    const startupLibrary = startupContent?.execution_library as Record<string, unknown> | undefined;
-    const startupPolicySucceeded = mapSummary?.version === "mandatory-execution-library-v2"
-      && mapSummary?.map_state === "known_path_completed"
+    const startupPolicySucceeded = mapSummary?.version === "static-execution-router-v1"
+      && mapSummary?.map_state === "source_defined_route_completed"
+      && mapSummary?.route_mode === "source_defined_static_route"
       && mapSummary?.mandatory_path_followed === true
-      && startupLibrary?.policy_ready === true
-      && startupLibrary?.model_path_choice_allowed === false;
+      && mapSummary?.d1_execution_library_bypassed === true
+      && mapSummary?.discovery_allowed === false
+      && mapSummary?.model_tool_choice_allowed === false;
     return { ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && mappedSurface && directRejected && mappedSucceeded && startupPolicySucceeded, oauth: { authorize: authorize.status, token: tokenResponse.status }, initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null }, tools_list: { status: listed.status, count: tools.length, unique_count: new Set(toolNames).size, names: toolNames }, startup: { status: startup.status, ok: startupContent?.ok === true, mandatory_execution_map: mapSummary ?? null }, direct_operational_call: { status: direct.status, rejected: directRejected, error: directContent?.error ?? null }, mapped_execution_call: { status: mapped.status, ok: mappedSucceeded, executed_tool: (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool ?? null, model_tool_choice_allowed: (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed ?? null } };
   }
   return { ok: false, error: "unknown_recovery_tool" };
