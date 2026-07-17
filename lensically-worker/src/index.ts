@@ -15560,6 +15560,12 @@ async function handleOperatorMcpAdminTool(
     if (toolName === "listMcpTools") {
     const executeTool = normalizeOperatorText(args.execute_tool, 160, true);
     if (executeTool) {
+      return {
+        ok: false,
+        error: "internal_bridge_retired",
+        requested_tool: executeTool,
+        message: "Submit the operation through executeLensicallyIntent; internal bridge execution is retired.",
+      };
       const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
         ? args.arguments as Record<string, unknown>
         : {};
