@@ -408,16 +408,20 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const listed = await mainMcpRequest(origin, token, 2, "tools/list", {});
     const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "getOperatorStartupContext", arguments: {} });
     const direct = await mainMcpRequest(origin, token, 4, "tools/call", { name: "getEngineeringAccessState", arguments: {} });
-    const routed = await mainMcpRequest(origin, token, 5, "tools/call", { name: "routeAndExecuteLensicallyCall", arguments: { intended_tool: "getEngineeringAccessState", arguments_json: "{}" } });
+    const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeMappedIntent", arguments: { objective: "Verify the live mapped execution path.", action_intent: "inspect engineering access state", inputs_json: "{}" } });
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const routedContent = ((routed.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const gatewaySurface = toolNames.length === 2 && toolNames.includes("getOperatorStartupContext") && toolNames.includes("routeAndExecuteLensicallyCall");
-    const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "routeAndExecuteLensicallyCall";
-    const routedSucceeded = routed.status === 200 && routedContent?.ok === true && (routedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState";
-    return { ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && gatewaySurface && directRejected && routedSucceeded, oauth: { authorize: authorize.status, token: tokenResponse.status }, initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null }, tools_list: { status: listed.status, count: tools.length, unique_count: new Set(toolNames).size, names: toolNames }, startup: { status: startup.status, ok: startupContent?.ok === true }, direct_operational_call: { status: direct.status, rejected: directRejected, error: directContent?.error ?? null }, routed_gateway_call: { status: routed.status, ok: routedSucceeded, executed_tool: (routedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool ?? null } };
+    const mappedContent = ((mapped.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    const mappedSurface = toolNames.length === 2 && toolNames.includes("getOperatorStartupContext") && toolNames.includes("executeMappedIntent");
+    const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "executeMappedIntent";
+    const mappedSucceeded = mapped.status === 200
+      && mappedContent?.ok === true
+      && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState"
+      && (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed === false;
+    const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
+    return { ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && mappedSurface && directRejected && mappedSucceeded && mapSummary?.model_tool_choice_allowed === false, oauth: { authorize: authorize.status, token: tokenResponse.status }, initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null }, tools_list: { status: listed.status, count: tools.length, unique_count: new Set(toolNames).size, names: toolNames }, startup: { status: startup.status, ok: startupContent?.ok === true, mandatory_execution_map: mapSummary ?? null }, direct_operational_call: { status: direct.status, rejected: directRejected, error: directContent?.error ?? null }, mapped_execution_call: { status: mapped.status, ok: mappedSucceeded, executed_tool: (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool ?? null, model_tool_choice_allowed: (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed ?? null } };
   }
   return { ok: false, error: "unknown_recovery_tool" };
 }
