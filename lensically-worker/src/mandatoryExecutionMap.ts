@@ -662,10 +662,11 @@ async function compileExecutionPolicyLibrary(
   await db.prepare(
     `INSERT INTO operator_execution_library_events (
       id, action_intent, phase, outcome, mapped_tool, source_keys_json, policy_json, evidence_json
-    ) VALUES (?, ?, 'policy_compiled', 'ready', NULL, ?, ?, '{}')`,
+    ) VALUES (?, ?, 'policy_compiled', ?, NULL, ?, ?, '{}')`,
   ).bind(
     policyEventId,
     actionIntent,
+    policyReady ? "ready" : "not_ready",
     stringify(bundle.matched_source_keys).slice(0, 50000),
     stringify(bundle).slice(0, 50000),
   ).run();
