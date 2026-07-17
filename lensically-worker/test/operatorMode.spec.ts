@@ -1622,14 +1622,19 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(initialized.serverInfo.name).toBe("lensically-operator-mode");
 
-    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    const toolNames = listed.tools.map((tool) => tool.name);
+        const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(listed.tools.map((tool) => tool.name)).toEqual([
+      "getOperatorStartupContext",
+      "routeAndExecuteLensicallyCall",
+    ]);
+    const registry = await mcpTool<{ tools: Array<{ name: string; inputSchema?: Record<string, unknown> }> }>("listMcpTools");
+    const toolNames = registry.tools.map((tool) => tool.name);
         expect(new Set(toolNames).size).toBe(toolNames.length);
-        expect(listed.tools.slice(0, 75).map((tool) => tool.name)).toEqual(expect.arrayContaining([
+        expect(registry.tools.slice(0, 75).map((tool) => tool.name)).toEqual(expect.arrayContaining([
       "setScheduledPostSchedulerMode",
       "runApprovedPostCanary",
     ]));
-    expect(() => JSON.stringify(listed.tools)).not.toThrow();
+    expect(() => JSON.stringify(registry.tools)).not.toThrow();
     expect(toolNames.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(initialized.instructions).toContain("Initial key-selection stop");
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
