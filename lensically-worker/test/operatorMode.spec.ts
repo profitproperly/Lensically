@@ -3531,7 +3531,7 @@ describe("operator mode MCP endpoint", () => {
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
                                                                 expect(payload.mcp_version).toBe("1.27.1");
-    expect(payload.registry_generation).toBe("mandatory-execution-library-v2");
+    expect(payload.registry_generation).toBe("static-execution-router-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
     expect(payload.tools).toBeUndefined();
