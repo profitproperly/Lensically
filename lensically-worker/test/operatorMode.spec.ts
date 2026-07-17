@@ -2317,7 +2317,7 @@ describe("operator mode MCP endpoint", () => {
     expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
   }, 30000);
 
-  it("makes the execution map the only public action path", async () => {
+  it("makes the static router the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
     expect(direct.isError).toBe(true);
     expect(direct.structuredContent).toMatchObject({
@@ -2328,29 +2328,26 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
 
-    const directStartup = await mcpToolCallRaw<{ required_tool: string }>("getOperatorStartupContext", {});
-    expect(directStartup.isError).toBe(true);
-    expect(directStartup.structuredContent.required_tool).toBe("executeLensicallyIntent");
-
-    const startup = await mcpToolCallRaw<{ gateway: { intent: string; public_schema_frozen: boolean }; execution_library: { policy_ready: boolean; consulted_before_execution: boolean }; tool_surface: { total_tools: number } }>("executeLensicallyIntent", {
+    const startup = await mcpToolCallRaw<{
+      gateway: { intent: string; public_schema_frozen: boolean };
+      mandatory_execution_map: { route_mode: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
+    }>("executeLensicallyIntent", {
       objective: "Load startup.",
       intent: "startup",
       inputs: {},
     });
     expect(startup.isError).not.toBe(true);
     expect(startup.structuredContent.gateway).toMatchObject({ intent: "startup", public_schema_frozen: true });
-    expect(startup.structuredContent.execution_library).toMatchObject({
-      policy_ready: true,
-      consulted_before_execution: true,
+    expect(startup.structuredContent.mandatory_execution_map).toMatchObject({
+      route_mode: "source_defined_static_route",
+      d1_execution_library_bypassed: true,
+      discovery_allowed: false,
     });
 
     const mapped = await mcpToolCallRaw<{
       ok: boolean;
-      github: { token_status: string };
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
-      mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean };
-      execution_library: { mandatory: boolean; policy_ready: boolean; consulted_before_execution: boolean; model_path_choice_allowed: boolean; table_manifest_complete: boolean; missing_required_source_types: string[]; consulted_source_types: string[]; source_type_count: number; total_source_count: number };
-      execution_guard_enforcement: { mode: string; model_tool_choice_allowed: boolean };
+      mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean; d1_execution_library_bypassed: boolean };
     }>("executeLensicallyIntent", {
       objective: "Inspect engineering access before repository work.",
       intent: "inspect engineering access state",
@@ -2363,28 +2360,9 @@ describe("operator mode MCP endpoint", () => {
       model_tool_choice_allowed: false,
     });
     expect(mapped.structuredContent.mandatory_execution_map).toMatchObject({
-      map_state: "known_path_completed",
+      map_state: "source_defined_direct_completed",
       mandatory_path_followed: true,
-    });
-    expect(mapped.structuredContent.execution_library).toMatchObject({
-      mandatory: true,
-      policy_ready: true,
-      consulted_before_execution: true,
-      model_path_choice_allowed: false,
-      table_manifest_complete: true,
-      missing_required_source_types: [],
-    });
-    expect(mapped.structuredContent.execution_library.consulted_source_types).toEqual(expect.arrayContaining([
-      "pre_call_route",
-      "map_entry",
-      "tool_registry",
-      "d1_table_manifest",
-    ]));
-    expect(mapped.structuredContent.execution_library.source_type_count).toBeGreaterThan(0);
-    expect(mapped.structuredContent.execution_library.total_source_count).toBeGreaterThan(0);
-    expect(mapped.structuredContent.execution_guard_enforcement).toMatchObject({
-      mode: "mandatory_execution_map",
-      model_tool_choice_allowed: false,
+      d1_execution_library_bypassed: true,
     });
   }, 30000);
 
