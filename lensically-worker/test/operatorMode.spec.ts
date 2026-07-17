@@ -2706,6 +2706,13 @@ describe("operator mode MCP endpoint", () => {
       d1_execution_library_bypassed: true,
       discovery_allowed: false,
     });
+    expect(status.structuredContent.execution_guard_enforcement).toMatchObject({
+      mode: "source_defined_direct_engineering",
+      d1_bootstrap_bypassed: true,
+      d1_pre_call_routing_bypassed: true,
+      d1_execution_events_bypassed: true,
+      d1_autonomy_bypassed: true,
+    });
     expect(status.structuredContent.routed_execution.executed_tool).not.toBe("submit_candidate_draft");
     expect(status.structuredContent.missing_inputs ?? []).not.toEqual(expect.arrayContaining(["brand_key", "run_id", "source_card_id"]));
 
