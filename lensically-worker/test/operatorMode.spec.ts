@@ -2423,11 +2423,18 @@ describe("operator mode MCP endpoint", () => {
       arguments_json: "{}",
     });
     expect(redirected.isError).toBe(true);
-    expect(redirected.structuredContent).toMatchObject({
+        expect(redirected.structuredContent).toMatchObject({
       error: "pre_call_route_required",
       required_tool: "getOperatorStartupContext",
       pre_call_route: { route_key: redirectKey },
     });
+
+    const followedRedirect = await mcpToolRaw<{
+      routed_execution: { executed_tool: string; route_trail: Array<{ route_key: string }> };
+    }>("getEngineeringAccessState", {});
+    expect(followedRedirect.isError).not.toBe(true);
+    expect(followedRedirect.structuredContent.routed_execution.executed_tool).toBe("getOperatorStartupContext");
+    expect(followedRedirect.structuredContent.routed_execution.route_trail).toContainEqual(expect.objectContaining({ route_key: redirectKey }));
 
     for (const route of [
       {
