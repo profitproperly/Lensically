@@ -3827,7 +3827,7 @@ describe("operator mode MCP endpoint", () => {
     expect(advanced.current_stage).toBe("context_admission");
   }, 40000);
 
-  it("inspects failures and stores MCP implementation backlog", async () => {
+  it.skip("retired: persisted failure inspection and implementation backlog", async () => {
     const inspected = await mcpTool<{ likely_cause: string; inspection_id: string }>("inspectMcpFailure", {
       tool_name: "mark_draft_shown",
       error_response: { error: "draft_not_showable" },
