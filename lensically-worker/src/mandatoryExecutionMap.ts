@@ -834,6 +834,7 @@ export async function prepareMandatoryExecutionMapCall(
       map_state: "discovery",
       incident,
       discovery_permit: String(rawInput.permit ?? rawInput.discovery_permit),
+      execution_library: executionLibrary,
       map_execution: {
         version: MANDATORY_EXECUTION_MAP_VERSION,
         mode: "authorized_discovery",
@@ -845,6 +846,7 @@ export async function prepareMandatoryExecutionMapCall(
         mapped_tool: null,
         discovery_tool: tool.name,
         requested_inputs: inputs,
+        execution_library: executionLibrary,
       },
     };
   }
