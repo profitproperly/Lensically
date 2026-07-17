@@ -15405,36 +15405,6 @@ async function handleOperatorMcpAdminTool(
     return { ok: checks.every((check) => check.passed), checks };
   }
 
-  if (toolName === "rollbackMcpChanges") {
-    const deployment = args.deployment_id
-      ? await env.DB.prepare(`SELECT * FROM operator_mcp_deployments WHERE id = ? LIMIT 1`).bind(String(args.deployment_id)).first<Record<string, unknown>>()
-      : await env.DB.prepare(`SELECT * FROM operator_mcp_deployments WHERE version = ? LIMIT 1`).bind(Number(args.version ?? 0)).first<Record<string, unknown>>();
-    if (!deployment) {
-      return { ok: false, error: "deployment_snapshot_not_found" };
-    }
-    const snapshot = safeParseJsonString(String(deployment.snapshot_json ?? "{}")) as Record<string, unknown> | null;
-    const overrides = Array.isArray(snapshot?.tool_overrides) ? snapshot.tool_overrides as Array<Record<string, unknown>> : [];
-    const requirements = Array.isArray(snapshot?.workflow_requirements) ? snapshot.workflow_requirements as Array<Record<string, unknown>> : [];
-    await env.DB.prepare(`DELETE FROM operator_mcp_tool_overrides`).run();
-    for (const row of overrides) {
-      await env.DB.prepare(
-        `INSERT INTO operator_mcp_tool_overrides (
-          tool_name, disabled, schema_patch_json, behavior_patch_json, description_override, handler_spec_json, output_schema_json, last_reason
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(row.tool_name, Number(row.disabled ?? 0), row.schema_patch_json ?? null, row.behavior_patch_json ?? null, row.description_override ?? null, row.handler_spec_json ?? null, row.output_schema_json ?? null, row.last_reason ?? null).run();
-    }
-    await env.DB.prepare(`DELETE FROM operator_workflow_requirements`).run();
-    for (const row of requirements) {
-      await env.DB.prepare(
-        `INSERT INTO operator_workflow_requirements (
-          id, brand_key, stage, required_sections_json, completion_rule, enforcement_type, active, version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(row.id ?? crypto.randomUUID(), row.brand_key ?? null, row.stage, row.required_sections_json, row.completion_rule, row.enforcement_type, Number(row.active ?? 1), Number(row.version ?? 1)).run();
-    }
-    await env.DB.prepare(`UPDATE operator_mcp_deployments SET status = 'rolled_back', rolled_back_at = ? WHERE id = ?`).bind(new Date().toISOString(), deployment.id).run();
-    return { ok: true, rolled_back_to: { id: deployment.id, version: deployment.version }, restored: { tool_overrides: overrides.length, workflow_requirements: requirements.length } };
-  }
-
   if (toolName === "createImplementationBacklogItem") {
     const id = crypto.randomUUID();
     await env.DB.prepare(
