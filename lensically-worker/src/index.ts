@@ -11874,20 +11874,6 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
-    name: "deployMcpChanges",
-    title: "Deploy MCP runtime changes",
-    description: "Activate the current runtime MCP configuration as a versioned deployment snapshot.",
-    inputSchema: { type: "object", properties: { change_summary: { type: "string" } }, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "rollbackMcpChanges",
-    title: "Rollback MCP runtime changes",
-    description: "Restore MCP runtime configuration from a previous deployment snapshot.",
-        inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, version: { type: "integer" }, deployment_id: { type: "string" }, reason: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-  },
-  {
     name: "getWorkflowStatus",
     title: "Get workflow status",
     description: "Inspect the selected account's active operator workflow, context admission, source card, generation, draft, scheduling, and blocker status.",
