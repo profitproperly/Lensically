@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: release preflight returned only exit code 1 through workflow annotations, hiding the exact failed source contract and inviting blind implementation changes. Use: capture preflight output once, surface a bounded failure annotation, and do not change implementation or rerun release until the exact preflight key is visible. Applies when: release preflight, source-contract validation, or generated-knowledge checks fail in GitHub Actions.
+
 - Failed: execution-library compilation ran before Operator table preparation, so a test reset that removed `operator_workflow_requirements` caused the entire dynamic source read to fail even though mandatory static sources were present. Use: call cached `prepareOperatorMode(env)` before `prepareMandatoryExecutionMapCall`; in tests it recreates reset tables on every gateway call, and in production it reuses the environment-scoped preparation promise. Applies when: adding library source tables, changing gateway bootstrap order, or resetting fixture schemas.
 
 - Failed: storing D1 phonebook overrides as `pre_call_route_override` without always consulting and classifying them as authoritative would leave valid override policy in the library but not reliably apply it during policy compilation. Use: canonical `pre_call_route` and D1 `pre_call_route_override` sources are both boosted, always consulted, and eligible as mandatory rules; release preflight enforces the override references. Applies when: changing execution-library candidate retrieval, authoritative source types, or pre-call route overrides.
