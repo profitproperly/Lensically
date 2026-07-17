@@ -185,7 +185,7 @@ jobs:
             cat /tmp/lensically-scheduler-health.json || true
             exit 1
           fi
-          echo "Scheduler activation state verified: paused/canary, or normal with an empty overdue queue."
+          echo "Scheduler activation state verified: operational normal mode with an empty overdue queue."
 
 
   recovery:
