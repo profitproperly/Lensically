@@ -2356,6 +2356,17 @@ describe("operator mode MCP endpoint", () => {
       map_state: "known_path_completed",
       mandatory_path_followed: true,
     });
+    expect(mapped.structuredContent.execution_library).toMatchObject({
+      mandatory: true,
+      consulted_before_execution: true,
+      model_path_choice_allowed: false,
+    });
+    expect(mapped.structuredContent.execution_library.source_coverage.map((item) => item.source_type)).toEqual(expect.arrayContaining([
+      "ops_memory",
+      "pre_call_route",
+      "map_entry",
+      "tool_registry",
+    ]));
     expect(mapped.structuredContent.execution_guard_enforcement).toMatchObject({
       mode: "mandatory_execution_map",
       model_tool_choice_allowed: false,
