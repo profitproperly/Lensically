@@ -3346,7 +3346,7 @@ describe("operator mode MCP endpoint", () => {
         expect(scheduled.status).toBe("scheduled");
     expect(scheduled.scheduled_post_id).toBeTruthy();
 
-        const listedTools = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { properties?: Record<string, unknown> } }> }>("tools/list");
+                const listedTools = await mcpTool<{ tools: Array<{ name: string; inputSchema?: { properties?: Record<string, unknown> } }> }>("listMcpTools");
     const editScheduledDefinition = listedTools.tools.find((tool) => tool.name === "edit_scheduled_post");
     expect(editScheduledDefinition).toBeTruthy();
     expect(editScheduledDefinition?.inputSchema?.properties?.retry_now).toBeTruthy();
