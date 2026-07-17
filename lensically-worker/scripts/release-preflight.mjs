@@ -88,6 +88,15 @@ if (process.argv.includes("--print-crons")) {
 }
 
 const errors = [];
+const executionLibrarySourceBlock = executionMap.match(
+  /async function readExecutionPolicyLibrarySources[\s\S]*?function executionLibraryTextFingerprint/,
+)?.[0] ?? "";
+const executionLibraryGroupSizes = [...executionLibrarySourceBlock.matchAll(
+  /db\.prepare\(`([\s\S]*?)`\)\.all<Record<string, unknown>>\(\)/g,
+)].map((match) => (match[1].match(/\bUNION ALL\b/g)?.length ?? 0) + 1);
+if (executionLibraryGroupSizes.length === 0 || executionLibraryGroupSizes.some((size) => size > 4)) {
+  errors.push("execution_library_compound_group_limit_exceeded");
+}
 const versionMatch = source.match(/const OPERATOR_MCP_VERSION = "([^"]+)";/);
 const version = versionMatch?.[1] ?? null;
 if (!version) {
