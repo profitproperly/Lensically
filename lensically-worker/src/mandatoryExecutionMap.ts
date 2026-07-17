@@ -494,6 +494,7 @@ async function syncExecutionPolicyLibrarySources(
       tableCatalogSources = await readExecutionPolicyLibraryTableCatalog(db);
       await deactivateExecutionPolicyLibrarySourceTypes(db, ["d1_table_manifest"]);
       refreshSources.push(...tableCatalogSources);
+      catalogRefreshSucceeded = true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       sourceReadError = sourceReadError ? `${sourceReadError}; ${message}` : message;
