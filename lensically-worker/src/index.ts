@@ -17581,7 +17581,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         await completeOperatorOperationReceipt(env, idempotencyKey, resultPayload);
       }
       const isError = resultPayload.ok === false;
-      if (!sourceDefinedDirectEngineering) {
+      if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
       }
       return mcpJsonResponse({
