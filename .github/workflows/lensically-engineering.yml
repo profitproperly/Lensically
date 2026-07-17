@@ -32,6 +32,7 @@ concurrency:
 
 jobs:
   worker:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     defaults:
       run:
