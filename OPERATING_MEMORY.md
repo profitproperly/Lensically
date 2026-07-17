@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: the compact receipt regression required `ops_memory` in `consulted_source_types` even when the table contained zero active rows, forcing the test to confuse an available source system with data actually consulted. Use: public `consulted_source_types` lists only nonempty materialized source types; exact D1 table availability remains proven by the table manifest and full internal coverage bundle. Applies when: testing compact execution-library receipts or empty policy stores.
+
 - Failed: returning the full per-source coverage array in every public execution-library receipt pushed compact startup/precheck responses above the 12,000-byte regression limit even though the same complete policy bundle was already persisted in D1. Use: persist full `source_coverage` internally; return only consulted source types, source-type count, total source count, and rule/match counts publicly. Applies when: attaching execution-library evidence to startup, engineering precheck, or any routed result.
 
 - Failed: `startup` deterministically selected `getOperatorStartupContext`, but that internal handler was excluded from Mandatory Execution Map seeding, so a healthy execution library opened unknown-terrain discovery for the required fresh-session bootstrap. Use: exclude only gateway/guard wrappers; seed `getOperatorStartupContext` as the mandatory startup procedure while keeping `executeLensicallyIntent` as the sole public tool. Applies when: changing map exclusions, startup routing, tool-registry seeding, or public schema tests.
