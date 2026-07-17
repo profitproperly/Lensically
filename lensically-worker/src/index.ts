@@ -17140,9 +17140,13 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
-                        const executionPolicy: Record<string, unknown> = {
+                              const routedRouteTrail = Array.isArray(routedGatewayMetadata?.route_trail)
+        ? routedGatewayMetadata.route_trail as Array<Record<string, unknown>>
+        : [];
+      const effectivePreCallRoute = preCallRouting.route ?? routedRouteTrail[routedRouteTrail.length - 1] ?? null;
+      const executionPolicy: Record<string, unknown> = {
         ...buildOperatorExecutionPolicy(toolName, args),
-        pre_call_route: preCallRouting.route,
+        pre_call_route: effectivePreCallRoute,
         pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
       };
       const aliasRetryBlock = await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
