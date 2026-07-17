@@ -123,6 +123,11 @@ const version = versionMatch?.[1] ?? null;
 if (!version) {
   errors.push("operator_mcp_version_missing");
 }
+if (!source.includes("registry_generation")
+    || source.includes('"mandatory-execution-map-v1"')
+    || !source.includes('"mandatory-execution-library-v2"')) {
+  errors.push("operator_health_registry_generation_mismatch");
+}
 
 const versionAssertionLines = tests
   .split(/\r?\n/)
