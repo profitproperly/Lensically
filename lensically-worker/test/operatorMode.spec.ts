@@ -1898,7 +1898,7 @@ describe("operator mode MCP endpoint", () => {
       numerical_tool_budgets: false,
       owner_ratification_required: false,
     });
-        expect(direct.engineering_authority_contract.known_path_rule).toContain("every Lensically tool call must first obtain a signed guardLensicallyCall receipt");
+        expect(direct.engineering_authority_contract.known_path_rule).toContain("every Lensically tool call must first pass through the persistent pre-call route phonebook");
     expect(direct.engineering_authority_contract.recursive_improvement_rule).toContain("stop the active engineering sequence");
     expect(direct.engineering_authority_contract.protected_operations).toEqual(expect.arrayContaining(["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode"]));
         expect(direct.continuity_contract.version).toBe("operator-continuity-v2");
@@ -2366,7 +2366,7 @@ describe("operator mode MCP endpoint", () => {
       ...rawArgs,
       execution_guard: staleGuard.structuredContent.execution_guard,
     });
-    expect(staleExecution.isError).not.toBe(true);
+        expect(staleExecution.isError, JSON.stringify(staleExecution.structuredContent)).not.toBe(true);
     expect(staleExecution.structuredContent.returned_lines).toBe(25);
     expect(staleExecution.structuredContent.execution_policy.pre_call_route.route_key).toBe(routeKey);
 
@@ -3027,20 +3027,23 @@ describe("operator mode MCP endpoint", () => {
     expect(second.isError).not.toBe(true);
     expect(second.structuredContent.ok).toBe(true);
 
-    const protectedAttempt = await mcpToolRaw<{
+        const protectedAttempt = await mcpToolCallRaw<{
       error: string;
-      required_next_tool: string;
-      governed: boolean;
-    }>("deleteRepoFile", {
-      path: "AUTONOMY_PROTECTED_FIXTURE.md",
-      message: "Protected-operation regression fixture.",
-      owner_approval: "No specific protected-operation approval supplied.",
+      required_tool: string;
+      pre_call_route: { route_key: string };
+    }>("guardLensicallyCall", {
+      intended_tool: "deleteRepoFile",
+      arguments_json: JSON.stringify({
+        path: "AUTONOMY_PROTECTED_FIXTURE.md",
+        message: "Protected-operation regression fixture.",
+        owner_approval: "No specific protected-operation approval supplied.",
+      }),
     });
     expect(protectedAttempt.isError).toBe(true);
-        expect(protectedAttempt.structuredContent).toMatchObject({
-      error: "approved_operator_decision_required",
-      required_next_tool: "proposeOperatorDecision",
-      governed: true,
+    expect(protectedAttempt.structuredContent).toMatchObject({
+      error: "known_blocker_prevented",
+      required_tool: "deleteRepoFile",
+      pre_call_route: { route_key: "explicit_owner_ratification_handoff" },
     });
 
     const compactProposal = await mcpToolRaw<{ decision: { id: string; rationale: string; expected_outcome: string; reversibility: string; execution_plan: string } }>("proposeOperatorDecision", {
@@ -3494,7 +3497,11 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(patched.tool?.inputSchema?.properties?.operator_note).toBeTruthy();
 
-    await mcpTool("disableMcpTool", { tool_name: "get_post_results", reason: "vitest hide" });
+        await mcpTool("disableMcpTool", {
+      tool_name: "get_post_results",
+      reason: "vitest hide",
+      owner_response: "Approve disabling get_post_results for this isolated vitest fixture.",
+    });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     expect(listed.tools.some((tool) => tool.name === "get_post_results")).toBe(false);
   }, 30000);
@@ -3687,9 +3694,10 @@ describe("operator mode MCP endpoint", () => {
       reason: "vitest behavior patch",
     });
 
-    const rollback = await mcpTool<{ restored: { workflow_requirements: number } }>("rollbackMcpChanges", {
+        const rollback = await mcpTool<{ restored: { workflow_requirements: number } }>("rollbackMcpChanges", {
       deployment_id: deployment.deployment_id,
       reason: "vitest rollback",
+      owner_response: "Approve rollback of this isolated vitest runtime snapshot.",
     });
     expect(rollback.restored.workflow_requirements).toBeGreaterThan(0);
   }, 30000);
