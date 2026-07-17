@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one bounded current-head validation with source-defined phonebook policies materialized.
+// Recovery source commits may carry [operator-tests] to trigger one bounded current-head validation with source-defined policies preserved through every refresh.
 
 interface Env {
   GITHUB_TOKEN: string;
