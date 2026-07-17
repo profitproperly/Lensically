@@ -40,7 +40,7 @@ permissions:
 
 jobs:
   worker:
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -78,12 +78,12 @@ jobs:
         run: npm ci
 
       - name: Typecheck
-                if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
+        if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
         run: npx tsc --noEmit
 
       - name: Operator MCP tests
         id: operator_tests
-                if: ${{ inputs.task == 'operator-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
+        if: ${{ inputs.task == 'operator-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[operator-tests]')) }}
         continue-on-error: true
         run: |
           set -o pipefail
