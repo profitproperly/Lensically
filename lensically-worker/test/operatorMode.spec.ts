@@ -169,7 +169,7 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
     expect(approved.isError, `resolveOperatorDecision for ${toolName}`).not.toBe(true);
     result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
   }
-  expect(result.isError, `${toolName} returned MCP isError`).not.toBe(true);
+  expect(result.isError, `${toolName} returned MCP isError: ${JSON.stringify(result.structuredContent)}`).not.toBe(true);
   return result.structuredContent as T;
 }
 
