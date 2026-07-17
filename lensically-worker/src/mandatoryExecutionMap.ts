@@ -427,9 +427,11 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       brand_key || ' ' || production_date || ' ' || source_identity_key || ' ' || source_type || ' ' || status || ' ' || COALESCE(disposition_reason, ''),
       updated_at
     FROM operator_daily_source_claims
-    UNION ALL
-    SELECT 'source_exclusion', id,
-      brand_key || ' ' || source_identity_key || ' ' || source_type || ' ' || COALESCE(reason, '') || ' active ' || active,
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'source_exclusion' AS source_type, id AS source_id,
+      brand_key || ' ' || source_identity_key || ' ' || source_type || ' ' || COALESCE(reason, '') || ' active ' || active AS text,
       updated_at
     FROM operator_source_exclusions
     UNION ALL
