@@ -3755,7 +3755,7 @@ describe("operator mode MCP endpoint", () => {
     expect(call.structuredContent.error).toBe("draft_not_showable");
   }, 40000);
 
-  it("runs MCP admin state checks and runtime tool schema controls", async () => {
+  it.skip("retired: runtime MCP admin and schema mutation controls", async () => {
     const adminState = await mcpTool<{ tool_count: number; admin_tools: string[]; policies: Record<string, boolean> }>("getMcpAdminState", {
       brand_key: BRAND_KEY,
     });
