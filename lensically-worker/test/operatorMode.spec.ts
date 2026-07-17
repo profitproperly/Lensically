@@ -2935,22 +2935,22 @@ describe("operator mode MCP endpoint", () => {
 
         const protectedAttempt = await mcpToolCallRaw<{
       error: string;
-      required_tool: string;
-      pre_call_route: { route_key: string };
-    }>("guardLensicallyCall", {
-      intended_tool: "deleteRepoFile",
-      arguments_json: JSON.stringify({
+      route_trail: Array<{ route_key: string }>;
+      map_state: string;
+    }>("executeMappedIntent", {
+      objective: "Attempt one protected repository deletion without owner ratification.",
+      action_intent: "delete repository file",
+      inputs_json: JSON.stringify({
         path: "AUTONOMY_PROTECTED_FIXTURE.md",
         message: "Protected-operation regression fixture.",
         owner_approval: "No specific protected-operation approval supplied.",
       }),
     });
     expect(protectedAttempt.isError).toBe(true);
-    expect(protectedAttempt.structuredContent).toMatchObject({
-      error: "known_blocker_prevented",
-      required_tool: "deleteRepoFile",
-      pre_call_route: { route_key: "explicit_owner_ratification_handoff" },
-    });
+    expect(protectedAttempt.structuredContent.error).toBe("known_blocker_prevented");
+    expect(protectedAttempt.structuredContent.route_trail).toContainEqual(expect.objectContaining({
+      route_key: "explicit_owner_ratification_handoff",
+    }));
 
     const compactProposal = await mcpToolRaw<{ decision: { id: string; rationale: string; expected_outcome: string; reversibility: string; execution_plan: string } }>("proposeOperatorDecision", {
       brand_key: "manifest_mental",
