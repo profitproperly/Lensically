@@ -1126,6 +1126,22 @@ export async function finalizeMandatoryExecutionMapCall(
     mode,
     result,
   });
+  const executionLibrary = mapExecution.execution_library && typeof mapExecution.execution_library === "object" && !Array.isArray(mapExecution.execution_library)
+    ? mapExecution.execution_library as Record<string, unknown>
+    : null;
+  await recordExecutionPolicyLibraryEvent(db, {
+    actionIntent,
+    phase: "result_observed",
+    outcome: result.ok === false ? "failed_recorded_before_repair" : "succeeded",
+    mappedTool: toolName,
+    policy: executionLibrary,
+    evidence: {
+      error: result.error ?? null,
+      status: result.status ?? null,
+      phase: result.phase ?? null,
+      map_mode: mode,
+    },
+  });
 
   if (mode === "mandatory_known_path" && entryId && isReusableExecutionPathFailure(toolName, result)) {
     await db.prepare(
