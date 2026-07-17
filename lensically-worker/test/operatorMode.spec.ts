@@ -2349,17 +2349,18 @@ describe("operator mode MCP endpoint", () => {
       route: { route_key: routeKey, source: "persistent_phonebook" },
     });
 
-        const staleExecution = await mcpToolCallRaw<{
-      ok: boolean;
-      items: Array<unknown>;
-      execution_policy: { pre_call_route: { route_key: string } };
+                const staleExecution = await mcpToolCallRaw<{
+      error: string;
+      required_tool: string;
     }>("listOpsMemory", {
       ...rawArgs,
       execution_guard: staleGuard.structuredContent.execution_guard,
     });
-    expect(staleExecution.isError, JSON.stringify(staleExecution.structuredContent)).not.toBe(true);
-    expect(staleExecution.structuredContent.items.length).toBeLessThanOrEqual(1);
-    expect(staleExecution.structuredContent.execution_policy.pre_call_route.route_key).toBe(routeKey);
+    expect(staleExecution.isError).toBe(true);
+    expect(staleExecution.structuredContent).toMatchObject({
+      error: "routed_execution_gateway_required",
+      required_tool: "routeAndExecuteLensicallyCall",
+    });
 
         const routedGuard = await mcpToolCallRaw<{
       ok: boolean;
