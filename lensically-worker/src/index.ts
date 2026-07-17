@@ -13231,7 +13231,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.23.0";
+const OPERATOR_MCP_VERSION = "1.24.0";
 
 const OPERATOR_REGISTRY_GENERATION = "mandatory-execution-map-v1";
 
@@ -15540,17 +15540,29 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
             ? "vectrix"
             : null;
       if (clientCapAccountBridgeTools.has(canonicalClientCapTool)) {
-        const definition = (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === canonicalClientCapTool);
+        const definition = OPERATOR_MCP_TOOLS.find((item) => item.name === canonicalClientCapTool);
         if (!definition) {
           return { ok: false, error: "client_cap_bridge_tool_not_found", requested_tool: executeTool, canonical_tool: canonicalClientCapTool };
         }
+        const sourceSchema = definition.inputSchema as Record<string, unknown>;
+        const sourceProperties = sourceSchema.properties && typeof sourceSchema.properties === "object" && !Array.isArray(sourceSchema.properties)
+          ? sourceSchema.properties as Record<string, unknown>
+          : {};
+        const bridgeSchema = {
+          ...sourceSchema,
+          properties: {
+            ...sourceProperties,
+            proceed_confirmed: { type: "boolean" },
+          },
+          additionalProperties: false,
+        };
         const clientCapArgs = {
           ...bridgeArgs,
           ...(scopedClientCapBrand ? { brand_key: scopedClientCapBrand } : {}),
         };
         const normalized = normalizeOperatorGuardValue(
           clientCapArgs,
-          definition.inputSchema as Record<string, unknown>,
+          bridgeSchema,
         );
         const normalizedBridgeArgs = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
           ? normalized.value as Record<string, unknown>

@@ -29,7 +29,7 @@ type Tool = {
   annotations: Record<string, unknown>;
 };
 
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const JSON_HEADERS = { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store" };
 const TOOLS: Tool[] = [
   { name: "recoveryHealth", title: "Recovery health", description: "Verify the independent recovery plane and the main Lensically health endpoint.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
@@ -47,10 +47,10 @@ const TOOLS: Tool[] = [
   { name: "startRepoFileWrite", title: "Start repository file write", description: "Start a KV-backed chunked create/replace session for a repository file.", inputSchema: { type: "object", properties: { path: { type: "string" }, mode: { type: "string", enum: ["create", "replace"] }, message: { type: "string" } }, required: ["path", "mode", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
   { name: "appendRepoFileChunk", title: "Append repository file chunk", description: "Append a text chunk to an open recovery write session.", inputSchema: { type: "object", properties: { session_id: { type: "string" }, chunk: { type: "string" } }, required: ["session_id", "chunk"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
   { name: "commitRepoFileWrite", title: "Commit repository file write", description: "Commit a completed recovery write session to GitHub and delete the temporary KV session.", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
-  { name: "runMainMcpSmoke", title: "Run main MCP smoke", description: "Run the live main-MCP OAuth, initialize, two-tool discovery, startup, direct-call rejection, and mandatory execution-map path.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
+  { name: "runMainMcpSmoke", title: "Run main MCP smoke", description: "Run the live main-MCP OAuth, initialize, one-tool discovery, startup, direct-call rejection, and mandatory execution-map path.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
 ];
 
-const PUBLIC_TOOLS: Tool[] = [];
+const PUBLIC_TOOLS: Tool[] = TOOLS;
 
 function json(payload: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(payload), { status, headers: { ...JSON_HEADERS, ...headers } });
@@ -501,14 +501,20 @@ export default {
       if (!env.RECOVERY_MCP_ACCESS_TOKEN || bearer(request) !== env.RECOVERY_MCP_ACCESS_TOKEN) return json({ ok: false, error: "unauthorized" }, 401);
       const message = await request.json().catch(() => null) as { id?: string | number | null; method?: string; params?: Record<string, unknown> } | null;
       if (!message?.method) return json({ jsonrpc: "2.0", id: message?.id ?? null, error: { code: -32600, message: "Invalid Request" } });
-      if (message.method === "initialize") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { protocolVersion: String(message.params?.protocolVersion || "2025-06-18"), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "lensically-recovery", title: "Lensically Recovery Retired", version: VERSION }, instructions: "The separate Lensically Recovery MCP public schema is retired. Use the main Lensically MCP executeLensicallyIntent gateway for recovery, repair, deployment, rollback, health inspection, and smoke-test intents." } });
+      if (message.method === "initialize") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { protocolVersion: String(message.params?.protocolVersion || "2025-06-18"), capabilities: { tools: { listChanged: true } }, serverInfo: { name: "lensically-recovery", title: "Lensically Recovery", version: VERSION }, instructions: "Independent break-glass recovery plane. Use these source-defined recovery tools when the main Lensically MCP gateway is unavailable or cannot repair itself. This service can inspect and patch the repository, dispatch tests/deployments, inspect Cloudflare state, and run main-MCP smoke tests. It does not access Lensically account, generation, or customer data. Protected destructive rollback still requires explicit owner approval." } });
       if (message.method === "notifications/initialized") return new Response(null, { status: 202 });
       if (message.method === "ping") return json({ jsonrpc: "2.0", id: message.id ?? null, result: {} });
       if (message.method === "tools/list") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { tools: PUBLIC_TOOLS } });
       if (message.method === "tools/call") {
         const name = String(message.params?.name || "");
-        const result = { ok: false, error: "recovery_public_schema_retired", requested_tool: name, required_tool: "executeLensicallyIntent", main_mcp_origin: env.MAIN_MCP_ORIGIN || "https://api.lensically.com" };
-        return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "The separate Recovery MCP public schema is retired; use the main Lensically gateway." }], isError: true } });
+        const args = message.params?.arguments && typeof message.params.arguments === "object" ? message.params.arguments as Record<string, unknown> : {};
+        const publicTool = PUBLIC_TOOLS.find((tool) => tool.name === name);
+        if (!publicTool) {
+          const result = { ok: false, error: "recovery_tool_not_found", requested_tool: name, public_tool_count: PUBLIC_TOOLS.length };
+          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "Recovery tool not found." }], isError: true } });
+        }
+        const result = await toolCall(name, args, env);
+        return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: result.ok === false ? `Recovery action failed: ${String(result.error || result.status || "unknown")}` : "Recovery action completed." }], isError: result.ok === false } });
       }
       return json({ jsonrpc: "2.0", id: message.id ?? null, error: { code: -32601, message: "Method not found" } });
     } catch (error) {

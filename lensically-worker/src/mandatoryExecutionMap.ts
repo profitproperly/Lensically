@@ -73,6 +73,10 @@ function stringify(value: unknown): string {
   return JSON.stringify(value ?? null);
 }
 
+function equivalentJson(left: unknown, right: unknown): boolean {
+  return stringify(left) === stringify(right);
+}
+
 function toolCategory(toolName: string): string {
   if (/repo|github|file|patch|commit/i.test(toolName)) return "repository";
   if (/deploy|release|cloudflare|version/i.test(toolName)) return "deployment";
@@ -122,17 +126,24 @@ function procedureForTool(tool: MandatoryExecutionToolDefinition): Record<string
 
 function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] {
   const explicit: Record<string, string[]> = {
-    engineeringPrecheck: ["inspect engineering state", "load engineering context", "engineering precheck"],
-    getEngineeringAccessState: ["inspect engineering access state", "get engineering access state", "check engineering access"],
-    getRepoStatus: ["inspect repository status", "get repository head", "read current repository sha"],
-    readRepoFile: ["read repository file", "inspect source file", "open repo file"],
-    searchRepoFiles: ["search repository", "find code in repository", "locate source implementation"],
-    applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes"],
-    applyRepoTextPatch: ["apply one exact patch", "replace exact repository text"],
+    engineeringPrecheck: ["inspect engineering state", "load engineering context", "engineering precheck", "engineering diagnosis", "diagnose engineering", "mcp status", "operator status", "runtime status"],
+    getEngineeringAccessState: ["inspect engineering access state", "get engineering access state", "check engineering access", "verify engineering authority"],
+    getRepoStatus: ["inspect repository status", "get repository head", "read current repository sha", "repository sha", "runtime repository alignment", "runtime/repository alignment verification"],
+    readRepoFile: ["read repository file", "inspect source file", "open repo file", "repository inspection"],
+    searchRepoFiles: ["search repository", "find code in repository", "locate source implementation", "repository search"],
+    applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "repair repository", "dry-run patch", "harmless test patch"],
+    applyRepoTextPatch: ["apply one exact patch", "replace exact repository text", "single file repair"],
     deleteRepoFile: ["delete repository file", "remove repository file"],
-    runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha"],
+    runMcpTests: ["run mcp tests", "run operator tests", "testing", "test gateway", "run tests"],
+    runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha", "deployment"],
     getEngineeringRelease: ["check engineering release", "wait for release completion"],
-    verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version"],
+    verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version", "post-deployment verification", "deployment verification", "runtime alignment verification", "mcp status verification"],
+    inspectMcpFailure: ["inspect mcp failure", "engineering diagnosis", "diagnose gateway failure", "repair path diagnosis"],
+    listMcpTools: ["list mcp tools", "inspect internal mcp registry", "bridge cached tool call"],
+    createMcpTool: ["create mcp tool", "add internal mcp tool", "register internal mcp tool"],
+    readMcpToolDefinition: ["read mcp tool definition", "inspect mcp tool schema"],
+    updateMcpToolSchema: ["update mcp tool schema", "patch mcp schema"],
+    updateMcpToolBehavior: ["update mcp tool behavior", "patch mcp behavior"],
     getScheduledPostSchedulerState: ["inspect scheduler state", "check publishing scheduler"],
     setScheduledPostSchedulerMode: ["change scheduler mode", "pause scheduler", "activate scheduler"],
     runApprovedPostCanary: ["run publishing canary", "test one scheduled post"],
@@ -149,6 +160,33 @@ function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] 
     tool.description.toLowerCase(),
     ...(explicit[tool.name] ?? []),
   ]));
+}
+
+function deterministicToolForOperationalIntent(actionIntent: string, inputs: Record<string, unknown>): string | null {
+  const text = `${actionIntent} ${normalizeText(inputs.intent_hint, 1000) ?? ""} ${normalizeText(inputs.path, 1000) ?? ""}`.toLowerCase();
+  const has = (pattern: RegExp) => pattern.test(text);
+  if (has(/\bstartup\b/)) return "getOperatorStartupContext";
+  if (has(/\bengineering\s+access\b/) || has(/\b(access|authority)\b/) && has(/\b(engineering|github|cloudflare)\b/)) return "getEngineeringAccessState";
+  if (has(/\b(mcp|operator|runtime|gateway)\s+(status|health|state|verification|verify)\b/) || has(/\bstatus\s+(request|check|verification)\b/)) return "engineeringPrecheck";
+  if (has(/\b(runtime|deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
+  if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime)\b/) && has(/\b(alignment|verify|verification|sha|status)\b/)) return "getRepoStatus";
+  if (has(/\b(repository|repo|source|file)\b/) && has(/\b(read|inspect|open|status|sha|head)\b/)) {
+    if (normalizeText(inputs.path, 1000) || has(/\b(read|open|file|source)\b/)) return "readRepoFile";
+    return "getRepoStatus";
+  }
+  if (has(/\b(search|find|locate)\b/) && has(/\b(repo|repository|code|source|file)\b/)) return "searchRepoFiles";
+  if (has(/\b(list|inspect|show|read)\b/) && has(/\b(mcp|internal)\b/) && has(/\b(tool|tools|registry|schema|definition)\b/)) {
+    if (has(/\b(schema|definition)\b/)) return "readMcpToolDefinition";
+    return "listMcpTools";
+  }
+  if (has(/\b(create|add|register)\b/) && has(/\b(mcp|internal)\b/) && has(/\btool\b/)) return "createMcpTool";
+  if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bschema\b/)) return "updateMcpToolSchema";
+  if (has(/\b(update|patch|change)\b/) && has(/\bmcp\b/) && has(/\btool\b/) && has(/\bbehavior\b/)) return "updateMcpToolBehavior";
+  if (has(/\b(engineering|gateway|mcp)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect)\b/)) return "inspectMcpFailure";
+  if (has(/\b(engineering|repository|repo|code|source)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
+  if (has(/\b(test|tests|testing|typecheck|regression)\b/)) return "runMcpTests";
+  if (has(/\b(deploy|deployment|release)\b/) && has(/\b(run|perform|execute|ship)\b/)) return "runEngineeringRelease";
+  return null;
 }
 
 async function ensureMandatoryExecutionMapTables(db: D1Database): Promise<void> {
@@ -274,7 +312,7 @@ async function seedMandatoryExecutionMap(
     const actionKey = actionKeyForTool(tool.name);
     const existing = await db.prepare(
       `SELECT id FROM operator_execution_map_entries
-       WHERE action_key = ? AND status = 'active'
+       WHERE action_key = ?
        ORDER BY version DESC LIMIT 1`,
     ).bind(actionKey).first<{ id: string }>();
     if (existing?.id) continue;
@@ -324,6 +362,7 @@ async function findActiveMapEntry(
   db: D1Database,
   actionIntent: string,
   actionKey: string | null,
+  inputs: Record<string, unknown>,
 ): Promise<{ entry: Record<string, unknown> | null; candidates: Array<Record<string, unknown>> }> {
   const rows = await db.prepare(
     `SELECT * FROM operator_execution_map_entries
@@ -334,6 +373,11 @@ async function findActiveMapEntry(
   if (actionKey) {
     const exact = entries.find((entry) => String(entry.action_key) === actionKey) ?? null;
     return { entry: exact, candidates: exact ? [exact] : [] };
+  }
+  const deterministicTool = deterministicToolForOperationalIntent(actionIntent, inputs);
+  if (deterministicTool) {
+    const exactTool = entries.find((entry) => String(entry.tool_name) === deterministicTool) ?? null;
+    if (exactTool) return { entry: exactTool, candidates: [exactTool] };
   }
   const ranked = entries
     .map((entry) => ({ entry, score: intentScore(actionIntent, entry) }))
@@ -439,8 +483,46 @@ export async function prepareMandatoryExecutionMapCall(
       && permitPayload.version === MANDATORY_EXECUTION_MAP_VERSION
       && typeof permitPayload.incident_id === "string") {
     const incident = await readOpenIncident(db, permitPayload.incident_id);
+    if (normalizeText(rawInput.incident_id, 160) && normalizeText(rawInput.incident_id, 160) !== String(permitPayload.incident_id)) {
+      return {
+        ok: false,
+        error: "mandatory_execution_map_discovery_mismatch",
+        map_state: "discovery",
+        incident,
+      };
+    }
+    const incidentInputs = incident?.original_inputs && typeof incident.original_inputs === "object" && !Array.isArray(incident.original_inputs)
+      ? incident.original_inputs as Record<string, unknown>
+      : null;
+    const inputsWithoutDiscoveryTool = { ...inputs };
+    delete inputsWithoutDiscoveryTool.discovery_tool;
+    const permitMatchesAction = incident !== null
+      && String(incident.action_intent) === actionIntent
+      && String(permitPayload.action_intent) === actionIntent;
+    const permitMatchesRequest = permitMatchesAction
+      && (!incidentInputs || equivalentJson(incidentInputs, inputsWithoutDiscoveryTool));
     const discoveryTool = normalizeText((inputs as Record<string, unknown> | null)?.discovery_tool, 160)
       ?? normalizeText(rawInput.discovery_tool, 160);
+    if (!discoveryTool && permitMatchesRequest) {
+      return {
+        ok: false,
+        error: "mandatory_execution_map_discovery_tool_required",
+        map_state: "discovery",
+        incident,
+        discovery_permit: String(rawInput.permit ?? rawInput.discovery_permit),
+        map_execution: {
+          version: MANDATORY_EXECUTION_MAP_VERSION,
+          mode: "authorized_discovery",
+          action_intent: actionIntent,
+          action_key: incident?.action_key ?? actionKey,
+          objective,
+          incident_id: String(incident?.id ?? permitPayload.incident_id),
+          requested_inputs: inputsWithoutDiscoveryTool,
+          permit_accepted: true,
+          model_tool_choice_allowed: false,
+        },
+      };
+    }
     const tool = tools.find((item) => item.name === discoveryTool);
     if (!incident || !tool || MAP_EXCLUDED_TOOLS.has(tool.name)) {
       return {
@@ -450,7 +532,7 @@ export async function prepareMandatoryExecutionMapCall(
         incident,
       };
     }
-    if (String(incident.action_intent) !== actionIntent || String(permitPayload.action_intent) !== actionIntent) {
+    if (!permitMatchesAction) {
       return {
         ok: false,
         error: "mandatory_execution_map_discovery_mismatch",
@@ -458,8 +540,7 @@ export async function prepareMandatoryExecutionMapCall(
         incident,
       };
     }
-    const executionInputs = { ...inputs };
-    delete executionInputs.discovery_tool;
+    const executionInputs = inputsWithoutDiscoveryTool;
     const duplicate = await db.prepare(
       `SELECT id FROM operator_execution_map_attempts
        WHERE incident_id = ? AND tool_name = ? AND arguments_json = ?
@@ -512,7 +593,7 @@ export async function prepareMandatoryExecutionMapCall(
     };
   }
 
-  const found = await findActiveMapEntry(db, actionIntent, actionKey);
+  const found = await findActiveMapEntry(db, actionIntent, actionKey, inputs);
   if (!found.entry) {
     const incident = await openMapIncident(db, {
       objective,

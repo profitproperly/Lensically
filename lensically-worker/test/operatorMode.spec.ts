@@ -1998,7 +1998,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.23.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.24.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("submit every external action through executeLensicallyIntent");
@@ -2340,6 +2340,90 @@ describe("operator mode MCP endpoint", () => {
     expect(repeated.structuredContent.mandatory_execution_map.map_state).toBe("known_path_completed");
   }, 30000);
 
+  it("accepts a discovery permit round trip before requiring a discovery tool", async () => {
+    const actionIntent = "perform a novel gateway permit round trip";
+    const unknown = await mcpToolCallRaw<{
+      error: string;
+      incident: { id: string };
+      discovery_permit: string;
+    }>("executeLensicallyIntent", {
+      objective: "Open a permit round-trip incident.",
+      intent: actionIntent,
+      inputs: { limit: 2 },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.structuredContent.error).toBe("mandatory_execution_map_unknown");
+
+    const roundTrip = await mcpToolCallRaw<{
+      error: string;
+      discovery_permit: string;
+      map_execution: { permit_accepted: boolean; incident_id: string; requested_inputs: { limit: number } };
+    }>("executeLensicallyIntent", {
+      objective: "Open a permit round-trip incident.",
+      intent: actionIntent,
+      incident_id: unknown.structuredContent.incident.id,
+      inputs: { limit: 2 },
+      permit: unknown.structuredContent.discovery_permit,
+    });
+    expect(roundTrip.isError).toBe(true);
+    expect(roundTrip.structuredContent.error).toBe("mandatory_execution_map_discovery_tool_required");
+    expect(roundTrip.structuredContent.map_execution).toMatchObject({
+      permit_accepted: true,
+      incident_id: unknown.structuredContent.incident.id,
+      requested_inputs: { limit: 2 },
+    });
+
+    const discovered = await mcpToolCallRaw<{
+      mandatory_execution_map: { map_state: string; mandatory_from_now_on: boolean; active_entry: { tool_name: string } };
+    }>("executeLensicallyIntent", {
+      objective: "Open a permit round-trip incident.",
+      intent: actionIntent,
+      incident_id: unknown.structuredContent.incident.id,
+      inputs: { limit: 2, discovery_tool: "listOpsMemory" },
+      permit: unknown.structuredContent.discovery_permit,
+    });
+    expect(discovered.isError).not.toBe(true);
+    expect(discovered.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "discovery_promoted",
+      mandatory_from_now_on: true,
+      active_entry: { tool_name: "listOpsMemory" },
+    });
+  }, 30000);
+
+  it("routes operational status and engineering intents deterministically away from content procedures", async () => {
+    const status = await mcpToolCallRaw<{
+      ok: boolean;
+      routed_execution: { executed_tool: string };
+      missing_inputs?: string[];
+    }>("executeLensicallyIntent", {
+      objective: "Report MCP status and verification state.",
+      intent: "MCP status verification",
+      inputs: {},
+    });
+    if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
+    expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
+    expect(status.structuredContent.routed_execution.executed_tool).not.toBe("submit_candidate_draft");
+    expect(status.structuredContent.missing_inputs ?? []).not.toEqual(expect.arrayContaining(["brand_key", "run_id", "source_card_id"]));
+
+    const repair = await mcpToolCallRaw<{
+      tool_name: string;
+      error: string;
+      validation_errors?: Array<{ path: string }>;
+    }>("executeLensicallyIntent", {
+      objective: "Dry-run a harmless engineering repair.",
+      intent: "engineering repair dry-run patch",
+      inputs: {
+        dry_run: true,
+        message: "Dry-run gateway repair route",
+        patches: [],
+      },
+    });
+    expect(repair.isError).toBe(true);
+    expect(repair.structuredContent.error).toBe("routed_gateway_payload_invalid");
+    expect(repair.structuredContent.tool_name).toBe("applyRepoPatchSet");
+    expect(JSON.stringify(repair.structuredContent)).not.toContain("submit_candidate_draft");
+  }, 30000);
+
   it("blocks a stale known path and makes the verified replacement mandatory", async () => {
     const actionIntent = "read repository file";
     const stale = await mcpToolCallRaw<{
@@ -2380,7 +2464,7 @@ describe("operator mode MCP endpoint", () => {
       inputs: { limit: 1, discovery_tool: "listOpsMemory" },
       permit: stale.structuredContent.mandatory_execution_map.discovery_permit,
     });
-    expect(replacement.isError).not.toBe(true);
+    expect(replacement.isError, `replacement failed: ${JSON.stringify(replacement.structuredContent)}`).not.toBe(true);
     expect(replacement.structuredContent.mandatory_execution_map).toMatchObject({
       map_state: "discovery_promoted",
       previous_path_superseded: true,
@@ -2401,7 +2485,7 @@ describe("operator mode MCP endpoint", () => {
       intent: actionIntent,
       inputs: { limit: 1 },
     });
-    expect(enforced.isError).not.toBe(true);
+    expect(enforced.isError, `enforced replacement failed: ${JSON.stringify(enforced.structuredContent)}`).not.toBe(true);
     expect(enforced.structuredContent.routed_execution.executed_tool).toBe("listOpsMemory");
     expect(enforced.structuredContent.mandatory_execution_map.map_state).toBe("known_path_completed");
   }, 30000);
@@ -3137,7 +3221,7 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.23.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.24.0");
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
@@ -3199,7 +3283,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-                expect(payload.mcp_version).toBe("1.23.0");
+                expect(payload.mcp_version).toBe("1.24.0");
     expect(payload.registry_generation).toBe("mandatory-execution-map-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
