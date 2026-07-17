@@ -624,7 +624,7 @@ async function syncExecutionPolicyLibrarySources(
     }
   }
   await persistExecutionPolicyLibrarySources(db, refreshSources);
-  if (staticRefreshDue) await markExecutionLibraryRefresh(db, "static_sources", generatedSources.length + toolSources.length, staticFingerprint);
+  if (staticRefreshDue) await markExecutionLibraryRefresh(db, "static_sources", generatedSources.length + toolSources.length + staticPolicySources.length, staticFingerprint);
   if (dynamicRefreshDue && dynamicRefreshSucceeded) await markExecutionLibraryRefresh(db, "dynamic_sources", dynamicSources.length);
   if (catalogRefreshDue && catalogRefreshSucceeded) await markExecutionLibraryRefresh(db, "d1_table_manifest", tableCatalogSources.length);
   const countRows = await db.prepare(
