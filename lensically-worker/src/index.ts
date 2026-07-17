@@ -16536,6 +16536,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
   if (toolName === "runEngineeringRelease") {
     const workflowId = normalizeOperatorText(args.workflow_id, 160, true) ?? "lensically-engineering.yml";
     const ref = normalizeOperatorText(args.ref, 160, true) ?? config.branch;
+    const dispatchRef = config.branch;
     const force = args.force === true;
     const commit = await githubRepoApi(env, `/commits/${encodeURIComponent(ref)}`);
     const commitData = commit.data && typeof commit.data === "object" && !Array.isArray(commit.data)
