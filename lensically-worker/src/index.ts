@@ -13575,6 +13575,12 @@ async function prepareOperatorRoutedGatewayCall(
     {
       signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
       verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
+      readStaticPolicySources: () => SOURCE_DEFINED_PRE_CALL_ROUTES.map((route) => ({
+        source_type: "pre_call_route",
+        source_id: `source:${route.route_key}`,
+        text: JSON.stringify(route),
+        updated_at: null,
+      } satisfies ExecutionPolicyLibrarySource)),
     },
   );
   if (!mapped.ok || !mapped.tool_name || !mapped.arguments) {
