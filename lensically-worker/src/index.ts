@@ -15587,7 +15587,7 @@ async function handleOperatorMcpAdminTool(
         return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
       }
       if (isOperatorMcpAdminToolName(executeTool) && executeTool !== "listMcpTools") {
-        const result = await handleOperatorMcpAdminTool(request, env, executeTool, bridgeArgs);
+        const result = await handleOperatorMcpAdminTool(request, env, executeTool, bridgeArgs, true);
         return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
       }
       const clientCapAccountBridgeTools = new Set([
