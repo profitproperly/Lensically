@@ -913,6 +913,7 @@ export async function prepareMandatoryExecutionMapCall(
       map_state: "known",
       map_entry: found.entry,
       missing_inputs: missingInputs,
+      execution_library: executionLibrary,
     };
   }
   return {
