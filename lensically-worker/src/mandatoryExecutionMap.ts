@@ -210,6 +210,7 @@ async function ensureExecutionPolicyLibraryDirtyTriggers(db: D1Database): Promis
   for (const row of existing.results ?? []) {
     const tableName = String(row.name ?? "").trim();
     if (!tableName) continue;
+    if (!/(ops_memory|pre_call_routes|workflow_requirements|operational_incidents|mcp_tool_overrides|autonomy_profiles|decision_proposals|execution_map_entries|execution_map_incidents|execution_map_promotions|mcp_backlog_items|gpt_strategy_memory|production_board_items|source_exclusions|source_cards|operator_gates)$/.test(tableName)) continue;
     for (const operation of ["INSERT", "UPDATE", "DELETE"] as const) {
       const triggerName = `trg_execution_library_dirty_${machineKey(tableName)}_${operation.toLowerCase()}`;
       statements.push(db.prepare(
