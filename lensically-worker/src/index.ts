@@ -15656,11 +15656,7 @@ async function handleOperatorMcpAdminTool(
         message: "Call account workflow tools directly through typed schemas. Only the strict client-cap recovery allowlist may use this bridge when the current conversation cached an incomplete connector surface.",
       };
     }
-    const staticTools = [
-      ...OPERATOR_MCP_ENGINEERING_TOOLS,
-      ...OPERATOR_MCP_ADMIN_TOOLS,
-      ...OPERATOR_MCP_TOOLS,
-    ];
+    const staticTools = buildOperatorMcpBaseTools(false);
     const compactByName = new Map(staticTools.map((tool) => {
       const requiredFields = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
         ? ((tool.inputSchema as Record<string, unknown>).required as unknown[]).map(String)
