@@ -16380,13 +16380,14 @@ async function handleOperatorMcpEngineeringTool(
     const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
       ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
       : undefined;
-    const audits = await env.DB.prepare(
-      `SELECT action, result, diff_summary, created_at
-       FROM operator_engineering_audit
-       ORDER BY datetime(created_at) DESC
-       LIMIT 5`,
-    ).all<Record<string, unknown>>();
-    return { ok: branch.ok, repo: `${config.owner}/${config.repo}`, branch: config.branch, latest_sha: commit?.sha ?? null, recent_audit: audits.results ?? [] };
+    return {
+      ok: branch.ok,
+      repo: `${config.owner}/${config.repo}`,
+      branch: config.branch,
+      latest_sha: commit?.sha ?? null,
+      github_status: branch.status,
+      direct_engineering_contract: true,
+    };
   }
 
   if (toolName === "applyRepoTextPatch") {
