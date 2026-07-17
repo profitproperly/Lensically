@@ -13534,7 +13534,7 @@ async function prepareOperatorRoutedGatewayCall(
   const routeTrail: Array<Record<string, unknown>> = [];
   const seen = new Set<string>();
     for (let depth = 0; depth < 6; depth += 1) {
-    const routeIdentity = `${toolName}:${stableStringify(args)}`;
+    const routeIdentity = await operatorExecutionFingerprint(toolName, args);
     if (seen.has(routeIdentity)) {
       return { ok: false, error: "routed_gateway_cycle_detected", corrections, route_trail: routeTrail };
     }
