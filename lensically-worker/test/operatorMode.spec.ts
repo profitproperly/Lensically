@@ -2303,27 +2303,11 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(releaseBridge.structuredContent.required_route).toContain("runEngineeringRelease directly");
 
-    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
-    expect(listed.tools.slice(0, 4).map((tool) => tool.name)).toEqual([
+        const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
+    expect(listed.tools.map((tool) => tool.name)).toEqual([
       "getOperatorStartupContext",
-      "guardLensicallyCall",
-      "runEngineeringRelease",
-      "getEngineeringRelease",
+      "routeAndExecuteLensicallyCall",
     ]);
-    for (const criticalTool of [
-      "get_hourly_coverage",
-      "claim_manifest_review_batch",
-      "get_manifest_review_batch",
-      "attach_manifest_review_draft",
-      "schedule_manifest_review_batch",
-      "get_performance_learning",
-      "markOperatorDecisionExecuted",
-      "edit_scheduled_post",
-      "skip_manifest_review_source",
-    ]) {
-      expect(listed.tools.findIndex((tool) => tool.name === criticalTool)).toBeGreaterThanOrEqual(0);
-      expect(listed.tools.findIndex((tool) => tool.name === criticalTool)).toBeLessThan(75);
-    }
   }, 30000);
 
     it("forces verified pre-call routes before token issuance and before stale-token execution", async () => {
