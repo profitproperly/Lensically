@@ -31885,10 +31885,26 @@ export class ScheduledPostScheduler {
       const heartbeatFresh = Number.isFinite(lastCompletedMs)
         ? now - lastCompletedMs <= SCHEDULED_POST_ALARM_INTERVAL_MS * 3
         : false;
+      const currentOverdueCount = await countOverdueScheduledPosts(this.env).catch(() => null);
+      const pausedWithOverdue = control.mode === "paused"
+        && typeof currentOverdueCount === "number"
+        && currentOverdueCount > 0;
+      const healthy = heartbeatFresh && health.last_success !== false && !pausedWithOverdue;
+      const operational = healthy && control.mode === "normal";
       return new Response(JSON.stringify({
         enabled: true,
-        healthy: heartbeatFresh && health.last_success !== false,
+        healthy,
+        operational,
+        publishing_enabled: control.mode !== "paused",
+        blocked_reason: pausedWithOverdue
+          ? "scheduler_paused_with_overdue_posts"
+          : control.mode === "paused"
+            ? "scheduler_paused"
+            : control.mode === "canary"
+              ? "scheduler_canary_mode"
+              : null,
         heartbeat_fresh: heartbeatFresh,
+        current_overdue_count: currentOverdueCount,
         control,
         ...health,
       }), {
