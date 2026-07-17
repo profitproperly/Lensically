@@ -2358,8 +2358,11 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(mapped.structuredContent.execution_library).toMatchObject({
       mandatory: true,
+      policy_ready: true,
       consulted_before_execution: true,
       model_path_choice_allowed: false,
+      table_manifest_complete: true,
+      missing_required_source_types: [],
     });
     expect(mapped.structuredContent.execution_library.source_coverage.map((item) => item.source_type)).toEqual(expect.arrayContaining([
       "ops_memory",
