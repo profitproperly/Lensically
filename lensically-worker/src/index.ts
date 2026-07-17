@@ -15405,18 +15405,6 @@ async function handleOperatorMcpAdminTool(
     return { ok: checks.every((check) => check.passed), checks };
   }
 
-  if (toolName === "deployMcpChanges") {
-    const snapshot = await createOperatorMcpSnapshot(env);
-    const previous = await env.DB.prepare(`SELECT MAX(version) AS version FROM operator_mcp_deployments`).first<{ version: number }>();
-    const version = Number(previous?.version ?? 0) + 1;
-    const id = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO operator_mcp_deployments (id, version, status, change_summary, snapshot_json, activated_at)
-       VALUES (?, ?, 'active', ?, ?, ?)`,
-    ).bind(id, version, normalizeOperatorText(args.change_summary, 2000, true), JSON.stringify(snapshot), new Date().toISOString()).run();
-    return { ok: true, deployment_id: id, version, status: "active", note: "Runtime MCP configuration snapshot activated. Source-code deploy remains outside the Worker runtime." };
-  }
-
   if (toolName === "rollbackMcpChanges") {
     const deployment = args.deployment_id
       ? await env.DB.prepare(`SELECT * FROM operator_mcp_deployments WHERE id = ? LIMIT 1`).bind(String(args.deployment_id)).first<Record<string, unknown>>()
