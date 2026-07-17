@@ -200,14 +200,17 @@ function executionLibrarySqlIdentifier(value: string): string {
 }
 
 async function ensureExecutionPolicyLibraryDirtyTriggers(db: D1Database): Promise<void> {
-  const fingerprint = executionLibraryTextFingerprint(EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES.join("|"));
-  if (!(await executionLibraryRefreshDue(db, "dirty_triggers", 86400, fingerprint))) return;
   const placeholders = EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES.map(() => "?").join(", ");
   const existing = await db.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${placeholders}) ORDER BY name`,
   ).bind(...EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES).all<{ name: string }>();
+  const existingPolicyTables = (existing.results ?? [])
+    .map((row) => String(row.name ?? "").trim())
+    .filter((tableName) => /(ops_memory|pre_call_routes|workflow_requirements|operational_incidents|mcp_tool_overrides|autonomy_profiles|decision_proposals|execution_map_entries|execution_map_incidents|execution_map_promotions|mcp_backlog_items|gpt_strategy_memory|production_board_items|source_exclusions|source_cards|operator_gates)$/.test(tableName));
+  const fingerprint = executionLibraryTextFingerprint(existingPolicyTables.join("|"));
+  if (!(await executionLibraryRefreshDue(db, "dirty_triggers", 86400, fingerprint))) return;
   const statements: D1PreparedStatement[] = [];
-  for (const row of existing.results ?? []) {
+  for (const tableName of existingPolicyTables) {
     const tableName = String(row.name ?? "").trim();
     if (!tableName) continue;
     if (!/(ops_memory|pre_call_routes|workflow_requirements|operational_incidents|mcp_tool_overrides|autonomy_profiles|decision_proposals|execution_map_entries|execution_map_incidents|execution_map_promotions|mcp_backlog_items|gpt_strategy_memory|production_board_items|source_exclusions|source_cards|operator_gates)$/.test(tableName)) continue;
