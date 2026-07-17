@@ -1409,16 +1409,21 @@ export async function prepareMandatoryExecutionMapCall(
         incident,
       };
     }
-    const incidentInputs = incident?.original_inputs && typeof incident.original_inputs === "object" && !Array.isArray(incident.original_inputs)
+        const incidentInputs = incident?.original_inputs && typeof incident.original_inputs === "object" && !Array.isArray(incident.original_inputs)
       ? incident.original_inputs as Record<string, unknown>
       : null;
-    const inputsWithoutDiscoveryTool = { ...inputs };
-    delete inputsWithoutDiscoveryTool.discovery_tool;
+    const requestIdentityInputs = { ...inputs };
+    delete requestIdentityInputs.discovery_tool;
+    const rawDiscoveryInputs = requestIdentityInputs.discovery_inputs;
+    delete requestIdentityInputs.discovery_inputs;
+    const discoveryInputs = rawDiscoveryInputs && typeof rawDiscoveryInputs === "object" && !Array.isArray(rawDiscoveryInputs)
+      ? rawDiscoveryInputs as Record<string, unknown>
+      : null;
     const permitMatchesAction = incident !== null
       && String(incident.action_intent) === actionIntent
       && String(permitPayload.action_intent) === actionIntent;
     const permitMatchesRequest = permitMatchesAction
-      && (!incidentInputs || equivalentJson(incidentInputs, inputsWithoutDiscoveryTool));
+      && (!incidentInputs || equivalentJson(incidentInputs, requestIdentityInputs));
     const discoveryTool = normalizeText((inputs as Record<string, unknown> | null)?.discovery_tool, 160)
       ?? normalizeText(rawInput.discovery_tool, 160);
     if (!discoveryTool && permitMatchesRequest) {
@@ -1435,7 +1440,7 @@ export async function prepareMandatoryExecutionMapCall(
           action_key: incident?.action_key ?? actionKey,
           objective,
           incident_id: String(incident?.id ?? permitPayload.incident_id),
-          requested_inputs: inputsWithoutDiscoveryTool,
+          requested_inputs: requestIdentityInputs,
           permit_accepted: true,
           model_tool_choice_allowed: false,
         },
@@ -1458,7 +1463,7 @@ export async function prepareMandatoryExecutionMapCall(
         incident,
       };
     }
-    const executionInputs = inputsWithoutDiscoveryTool;
+    const executionInputs = discoveryInputs ?? requestIdentityInputs;
     const duplicate = await db.prepare(
       `SELECT id FROM operator_execution_map_attempts
        WHERE incident_id = ? AND tool_name = ? AND arguments_json = ?

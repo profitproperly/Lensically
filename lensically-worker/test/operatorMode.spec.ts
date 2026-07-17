@@ -2090,7 +2090,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.27.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.27.1");
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "deployment_id")).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_deployment")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_config_deployment")).toBe(true);
@@ -2115,7 +2115,7 @@ describe("operator mode MCP endpoint", () => {
     const direct = await mcpTool<{ tool_surface: { total_tools: number } }>("getOperatorStartupContext");
     const precheck = await mcpTool<{ status_kind: string; runtime: { mcp_version: string; deployment_id?: string | null }; tool_surface: { total_tools: number }; recent_ops_memory: Array<Record<string, unknown>>; startup_context?: unknown }>("engineeringPrecheck");
     expect(precheck.status_kind).toBe("compact_engineering_precheck");
-                expect(precheck.runtime.mcp_version).toBe("1.27.0");
+                expect(precheck.runtime.mcp_version).toBe("1.27.1");
     expect(precheck.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
     expect(precheck.startup_context).toBeUndefined();
     expect(JSON.stringify(precheck).length).toBeLessThan(12000);
@@ -2629,7 +2629,7 @@ describe("operator mode MCP endpoint", () => {
     });
     }, 30000);
 
-  it("continues discovery through a short incident continuation when signed permits cannot cross client preflight", async () => {
+    it("continues discovery through a short incident continuation with separate typed tool inputs", async () => {
     const actionIntent = "perform a novel client-safe discovery round trip";
     const unknown = await mcpToolCallRaw<{
       error: string;
@@ -2637,26 +2637,26 @@ describe("operator mode MCP endpoint", () => {
     }>("executeLensicallyIntent", {
       objective: "Open a client-safe discovery incident.",
       intent: actionIntent,
-      inputs: { limit: 3 },
+      inputs: { ticket: "client-safe-discovery" },
     });
     expect(unknown.isError).toBe(true);
     expect(unknown.structuredContent.error).toBe("mandatory_execution_map_unknown");
 
     const roundTrip = await mcpToolCallRaw<{
       error: string;
-      map_execution: { permit_accepted: boolean; incident_id: string; requested_inputs: { limit: number } };
+      map_execution: { permit_accepted: boolean; incident_id: string; requested_inputs: { ticket: string } };
     }>("executeLensicallyIntent", {
       objective: "Continue the client-safe discovery incident.",
       intent: actionIntent,
       continuation_id: unknown.structuredContent.incident.id,
-      inputs: { limit: 3 },
+      inputs: { ticket: "client-safe-discovery" },
     });
     expect(roundTrip.isError).toBe(true);
     expect(roundTrip.structuredContent.error).toBe("mandatory_execution_map_discovery_tool_required");
     expect(roundTrip.structuredContent.map_execution).toMatchObject({
       permit_accepted: true,
       incident_id: unknown.structuredContent.incident.id,
-      requested_inputs: { limit: 3 },
+      requested_inputs: { ticket: "client-safe-discovery" },
     });
 
     const discovered = await mcpToolCallRaw<{
@@ -2665,7 +2665,11 @@ describe("operator mode MCP endpoint", () => {
       objective: "Complete the client-safe discovery incident.",
       intent: actionIntent,
       continuation_id: unknown.structuredContent.incident.id,
-      inputs: { limit: 3, discovery_tool: "listOpsMemory" },
+      inputs: {
+        ticket: "client-safe-discovery",
+        discovery_tool: "listOpsMemory",
+        discovery_inputs: { limit: 3 },
+      },
     });
     expect(discovered.isError).not.toBe(true);
     expect(discovered.structuredContent.mandatory_execution_map).toMatchObject({
@@ -3533,7 +3537,7 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.27.0");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.27.1");
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
@@ -3595,7 +3599,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-                                                                expect(payload.mcp_version).toBe("1.27.0");
+                                                                expect(payload.mcp_version).toBe("1.27.1");
     expect(payload.registry_generation).toBe("mandatory-execution-library-v2");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
