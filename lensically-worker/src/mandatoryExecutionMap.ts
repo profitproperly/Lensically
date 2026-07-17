@@ -516,6 +516,18 @@ function resultFailureSignature(result: Record<string, unknown>): string {
   return stringify(signature).slice(0, 2000);
 }
 
+function isReusableExecutionPathFailure(toolName: string, result: Record<string, unknown>): boolean {
+  if (result.ok !== false) return false;
+  const status = Number(result.status ?? 0);
+  const error = String(result.error ?? result.error_code ?? "").toLowerCase();
+  const phase = String(result.phase ?? "").toLowerCase();
+  if (status >= 500 || [502, 503, 504].includes(Number(result.status_code ?? 0))) return true;
+  if (/transport|timeout|upstream|provider|connection|unavailable|head_changed|find_text_must_match|find_must_match|payload_too_large|client_preflight|schema_stale|unknown_runtime/.test(`${error} ${phase}`)) return true;
+  if (/repo|github|workflow|deploy|cloudflare|file|patch|commit/i.test(toolName)
+      && /not_found|missing|invalid_ref|exact_sha|conflict|rate_limit/.test(error)) return true;
+  return false;
+}
+
 async function recordMapAttempt(
   db: D1Database,
   input: {
