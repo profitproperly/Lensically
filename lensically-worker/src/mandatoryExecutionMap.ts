@@ -599,8 +599,8 @@ async function syncExecutionPolicyLibrarySources(
   const catalogRefreshDue = await executionLibraryRefreshDue(db, "d1_table_manifest", 900);
   const refreshSources: ExecutionPolicyLibrarySource[] = [];
   if (staticRefreshDue) {
-    await deactivateExecutionPolicyLibrarySourceTypes(db, ["repository_knowledge", "tool_registry"]);
-    refreshSources.push(...generatedSources, ...toolSources);
+    await deactivateExecutionPolicyLibrarySourceTypes(db, ["repository_knowledge", "tool_registry", "pre_call_route"]);
+    refreshSources.push(...generatedSources, ...toolSources, ...staticPolicySources);
   }
   if (dynamicRefreshDue) {
     try {
