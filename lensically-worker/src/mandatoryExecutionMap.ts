@@ -83,7 +83,7 @@ function equivalentJson(left: unknown, right: unknown): boolean {
   return stringify(left) === stringify(right);
 }
 
-type ExecutionPolicyLibrarySource = {
+export type ExecutionPolicyLibrarySource = {
   source_type: string;
   source_id: string;
   text: string;
