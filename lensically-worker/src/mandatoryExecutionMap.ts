@@ -323,11 +323,13 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       tool_name || ' ' || operation_class || ' ' || execution_plane || ' ' || decision || ' ' || COALESCE(evidence_json, ''),
       created_at
     FROM operator_execution_events
-    UNION ALL
-    SELECT 'operational_incident', id,
-      incident_key || ' ' || incident_type || ' ' || severity || ' ' || status || ' ' || required_recovery_action || ' ' || COALESCE(publish_error_message, '') || ' ' || COALESCE(evidence_json, ''),
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'operational_incident' AS source_type, id AS source_id,
+      incident_key || ' ' || incident_type || ' ' || severity || ' ' || status || ' ' || required_recovery_action || ' ' || COALESCE(publish_error_message, '') || ' ' || COALESCE(evidence_json, '') AS text,
       updated_at
-        FROM operator_operational_incidents
+    FROM operator_operational_incidents
     UNION ALL
     SELECT 'tool_override', tool_name,
       tool_name || ' disabled ' || disabled || ' ' || COALESCE(schema_patch_json, '') || ' ' || COALESCE(behavior_patch_json, '') || ' ' || COALESCE(description_override, '') || ' ' || COALESCE(handler_spec_json, '') || ' ' || COALESCE(output_schema_json, '') || ' ' || COALESCE(last_reason, ''),
