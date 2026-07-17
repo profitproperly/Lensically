@@ -16064,8 +16064,14 @@ async function handleOperatorMcpAdminTool(
   return { ok: false, error: "admin_tool_not_implemented" };
 }
 
-async function handleOperatorMcpEngineeringTool(request: Request, env: Env, toolName: OperatorMcpEngineeringToolName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  if (toolName !== "guardLensicallyCall") {
+async function handleOperatorMcpEngineeringTool(
+  request: Request,
+  env: Env,
+  toolName: OperatorMcpEngineeringToolName,
+  args: Record<string, unknown>,
+  preparationAlreadyComplete = false,
+): Promise<Record<string, unknown>> {
+  if (toolName !== "guardLensicallyCall" && !preparationAlreadyComplete) {
     await prepareOperatorMode(env);
   }
   const config = githubRepoConfig(env);
