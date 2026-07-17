@@ -323,7 +323,72 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
     SELECT 'strategy_memory', CAST(id AS TEXT),
       kind || ' ' || COALESCE(title, '') || ' ' || body || ' ' || COALESCE(metadata_json, ''),
       updated_at
-    FROM gpt_strategy_memory
+        FROM gpt_strategy_memory
+    UNION ALL
+    SELECT 'workflow_session', id,
+      brand_key || ' ' || workflow_template_key || ' ' || COALESCE(objective, '') || ' ' || status || ' ' || COALESCE(current_stage, '') || ' ' || COALESCE(notes, ''),
+      updated_at
+    FROM operator_workflow_sessions
+    UNION ALL
+    SELECT 'context_admission', id,
+      brand_key || ' ' || admission_scope || ' ' || sections_json || ' partial ' || is_partial || ' ' || COALESCE(notes, ''),
+      created_at
+    FROM operator_context_admissions
+    UNION ALL
+    SELECT 'production_board', id,
+      brand_key || ' ' || item_type || ' ' || COALESCE(lane_key, '') || ' ' || title || ' ' || body || ' ' || COALESCE(evidence_json, '') || ' ' || status || ' ' || COALESCE(created_from, ''),
+      updated_at
+    FROM operator_production_board_items
+    UNION ALL
+    SELECT 'source_selection_batch', id,
+      brand_key || ' ' || selection_method || ' minimum_likes ' || eligibility_min_likes || ' pool ' || qualified_pool_count || ' requested ' || requested_count || ' selected ' || selected_count || ' ' || COALESCE(metadata_json, ''),
+      created_at
+    FROM operator_source_selection_batches
+    UNION ALL
+    SELECT 'source_selection', id,
+      brand_key || ' ' || source_type || ' ' || source_identity_key || ' ' || post_text || ' ' || metrics_snapshot_json || ' ' || source_snapshot_json || ' ' || COALESCE(disposition, '') || ' ' || COALESCE(disposition_reason, ''),
+      created_at
+    FROM operator_source_selections
+    UNION ALL
+    SELECT 'review_batch', id,
+      brand_key || ' ' || production_date || ' ' || timezone || ' size ' || batch_size || ' ' || status,
+      updated_at
+    FROM operator_review_batches
+    UNION ALL
+    SELECT 'daily_source_claim', id,
+      brand_key || ' ' || production_date || ' ' || source_identity_key || ' ' || source_type || ' ' || status || ' ' || COALESCE(disposition_reason, ''),
+      updated_at
+    FROM operator_daily_source_claims
+    UNION ALL
+    SELECT 'source_exclusion', id,
+      brand_key || ' ' || source_identity_key || ' ' || source_type || ' ' || COALESCE(reason, '') || ' active ' || active,
+      updated_at
+    FROM operator_source_exclusions
+    UNION ALL
+    SELECT 'source_card', id,
+      brand_key || ' ' || sequence_label || ' ' || COALESCE(lane_key, '') || ' ' || title || ' ' || status || ' ' || primary_source_json || ' ' || COALESCE(secondary_sources_json, '') || ' ' || COALESCE(anti_sources_json, '') || ' ' || source_mechanism || ' ' || required_product || ' ' || forbidden_surfaces_json || ' ' || COALESCE(danger_surfaces_json, '') || ' ' || COALESCE(current_inventory_constraints_json, '') || ' ' || pass_conditions_json || ' ' || fail_conditions_json || ' ' || COALESCE(recommended_direction, '') || ' ' || COALESCE(transformation_contract_json, ''),
+      updated_at
+    FROM operator_source_cards WHERE is_current = 1
+    UNION ALL
+    SELECT 'gate_policy', id,
+      COALESCE(brand_key, 'global') || ' ' || gate_key || ' ' || display_name || ' ' || description || ' ' || stage_scope || ' ' || gate_type || ' ' || severity || ' ' || evaluator || ' ' || COALESCE(applies_when_json, '') || ' ' || COALESCE(pass_examples_json, '') || ' ' || COALESCE(fail_examples_json, '') || ' ' || COALESCE(source_memory_ids_json, ''),
+      updated_at
+    FROM operator_gates WHERE active = 1
+    UNION ALL
+    SELECT 'gate_result', id,
+      brand_key || ' ' || gate_key || ' ' || result || ' blocking ' || blocking || ' ' || rationale || ' ' || evaluated_by || ' ' || COALESCE(evidence_json, '') || ' ' || COALESCE(repair_guidance, ''),
+      created_at
+    FROM operator_gate_results
+    UNION ALL
+    SELECT 'content_inventory', id,
+      brand_key || ' ' || source_type || ' ' || text || ' ' || COALESCE(first_line, '') || ' ' || COALESCE(opening_phrase, '') || ' ' || COALESCE(realm_entrance_key, '') || ' ' || COALESCE(hook_style, '') || ' ' || COALESCE(lane_key, '') || ' ' || status || ' ' || COALESCE(metadata_json, ''),
+      created_at
+    FROM operator_content_inventory
+    UNION ALL
+    SELECT 'post_metric_snapshot', id,
+      brand_key || ' ' || published_post_id || ' ' || metrics_json,
+      created_at
+    FROM operator_post_metric_snapshots
     ORDER BY updated_at DESC
     LIMIT 1200
   `).all<Record<string, unknown>>();
