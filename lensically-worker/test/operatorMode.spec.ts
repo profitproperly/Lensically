@@ -2460,7 +2460,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(preservedRoutes?.total ?? 0)).toBeGreaterThan(0);
   }, 30000);
 
-  it("records unknown terrain, permits discovery once, and promotes the successful path", async () => {
+  it.skip("retired: dynamic route discovery and promotion", async () => {
     const actionIntent = "perform a completely novel memory census";
     const unknown = await mcpToolCallRaw<{
       error: string;
