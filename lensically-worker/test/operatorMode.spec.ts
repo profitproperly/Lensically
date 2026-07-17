@@ -1639,7 +1639,7 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Initial key-selection stop");
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
-                    expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call confirmOperatorProceed.");
+                    expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, submit intended_tool=confirmOperatorProceed through routeAndExecuteLensicallyCall.");
     expect(initialized.instructions).toContain("automatically restores canonical persisted schedule");
     expect(initialized.instructions).toContain("Never ask resume or start fresh");
         expect(initialized.instructions).toContain("verifies continuity from server-side state");
