@@ -379,7 +379,9 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       action_key || ' ' || task_class || ' ' || tool_name || ' ' || intent_aliases_json || ' ' || procedure_json || ' ' || historical_failures_json,
       updated_at
     FROM operator_execution_map_entries WHERE status = 'active'
-    UNION ALL
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
     SELECT 'map_incident', id,
       action_intent || ' ' || COALESCE(action_key, '') || ' ' || state || ' ' || status || ' ' || COALESCE(failure_signature, ''),
       updated_at
