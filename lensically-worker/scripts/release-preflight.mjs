@@ -76,11 +76,11 @@ if (source.includes('      await prepareOperatorMode(env);\n      const executio
 if (source.includes('      await ensureOperatorMcpAdminTables(env);\n      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);')) {
   errors.push("mcp_dispatcher_schema_initialization_forbidden");
 }
-if (!source.includes('name: "guardLensicallyCall"') || !source.includes('error: "execution_guard_required"') || !source.includes('error: "known_blocker_prevented"')) {
-  errors.push("mandatory_execution_guard_contract_missing");
+if (!source.includes('name: "routeAndExecuteLensicallyCall"') || !source.includes('error: "routed_execution_gateway_required"') || !source.includes('direct_operational_calls_allowed: false')) {
+  errors.push("mandatory_routed_gateway_contract_missing");
 }
-if (!tests.includes('requires a matching guard and normalizes known payload blockers before execution')) {
-  errors.push("mandatory_execution_guard_regression_missing");
+if (!tests.includes('requires the routed gateway and never repairs a direct operational attempt') || !tests.includes('forces verified pre-call routes before operational intent reaches a handler')) {
+  errors.push("mandatory_routed_gateway_regression_missing");
 }
 if (!recoverySource.includes('exact_sha_not_current_branch_head') || !recoverySource.includes('dispatch_ref: dispatchRef') || !recoverySource.includes('verified_head_sha: verifiedHeadSha')) {
   errors.push("recovery_exact_sha_dispatch_guard_missing");
