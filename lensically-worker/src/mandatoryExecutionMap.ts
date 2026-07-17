@@ -15,6 +15,7 @@ export type MandatoryExecutionToolDefinition = {
 export type MandatoryExecutionMapCallbacks = {
   signPermit: (payload: Record<string, unknown>) => Promise<string>;
   verifyPermit: (token: unknown) => Promise<Record<string, unknown> | null>;
+  readStaticPolicySources?: () => Promise<ExecutionPolicyLibrarySource[]> | ExecutionPolicyLibrarySource[];
 };
 
 export type MandatoryExecutionPrepared = {
