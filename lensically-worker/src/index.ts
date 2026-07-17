@@ -1587,7 +1587,8 @@ async function getDueApprovedScheduledPosts(
   const rows = await env.DB.prepare(
     `SELECT id, user_id, threads_user_id, post_text, spoiler_all_text, spoiler_phrases_json
      FROM scheduled_posts
-     WHERE status = ?
+          WHERE status = ?
+       AND cancelled_at IS NULL
        AND scheduled_time <= ?
        AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
        ${allowedClause}
@@ -31599,16 +31600,141 @@ function getScheduledPostSchedulerStub(env: Env) {
   return namespace.get(namespace.idFromName(SCHEDULED_POST_ALARM_OBJECT_NAME));
 }
 
+type OverdueScheduledPostRow = {
+  id: number;
+  threads_user_id: string;
+  post_text: string;
+  scheduled_time: string;
+  publish_error_message: string | null;
+  last_attempted_at: string | null;
+};
+
+type ScheduledPostRecoveryAction = {
+  scheduled_post_id: number;
+  action: "retire" | "reschedule";
+  scheduled_time?: string | null;
+};
+
+async function listOverdueScheduledPosts(
+  env: Env,
+  limit = 50,
+  nowIso = new Date().toISOString(),
+): Promise<OverdueScheduledPostRow[]> {
+  await ensureScheduledPostsTable(env);
+  const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const rows = await env.DB.prepare(
+    `SELECT id, threads_user_id, post_text, scheduled_time, publish_error_message, last_attempted_at
+     FROM scheduled_posts
+     WHERE status = ?
+       AND cancelled_at IS NULL
+       AND scheduled_time <= ?
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
+     ORDER BY scheduled_time ASC, id ASC
+     LIMIT ?`,
+  ).bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, boundedLimit).all<OverdueScheduledPostRow>();
+  return rows.results ?? [];
+}
+
 async function countOverdueScheduledPosts(env: Env): Promise<number> {
   await ensureScheduledPostsTable(env);
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS total
      FROM scheduled_posts
      WHERE status = ?
-       AND scheduled_time <= ?`,
+       AND cancelled_at IS NULL
+       AND scheduled_time <= ?
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)`,
   ).bind(SCHEDULED_POST_STATUS_APPROVED, new Date().toISOString()).first<{ total: number }>();
   return Number(row?.total ?? 0);
 }
+
+async function recoverOverdueScheduledPostRows(
+  env: Env,
+  actions: ScheduledPostRecoveryAction[],
+  reason: string,
+): Promise<{ recovered_post_ids: number[]; retired_post_ids: number[]; rescheduled_post_ids: number[]; remaining_overdue_post_ids: number[] }> {
+  if (!actions.length || actions.length > 25) {
+    throw new Error("recovery_actions_1_to_25_required");
+  }
+  const normalized = actions.map((action) => ({
+    scheduled_post_id: Math.trunc(Number(action.scheduled_post_id)),
+    action: action.action,
+    scheduled_time: typeof action.scheduled_time === "string" ? action.scheduled_time.trim() : null,
+  }));
+  if (normalized.some((action) => !Number.isInteger(action.scheduled_post_id) || action.scheduled_post_id <= 0 || !["retire", "reschedule"].includes(action.action))) {
+    throw new Error("valid_recovery_actions_required");
+  }
+  if (new Set(normalized.map((action) => action.scheduled_post_id)).size !== normalized.length) {
+    throw new Error("duplicate_recovery_post_id");
+  }
+
+  await ensureScheduledPostsTable(env);
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.parse(nowIso);
+  const dbSession = env.DB.withSession("first-primary");
+  let transactionStarted = false;
+  const retiredPostIds: number[] = [];
+  const rescheduledPostIds: number[] = [];
+  try {
+    await dbSession.prepare("BEGIN TRANSACTION").run();
+    transactionStarted = true;
+    for (const action of normalized) {
+      const row = await dbSession.prepare(
+        `SELECT id, status, scheduled_time, cancelled_at
+         FROM scheduled_posts
+         WHERE id = ?
+         LIMIT 1`,
+      ).bind(action.scheduled_post_id).first<{ id: number; status: string; scheduled_time: string; cancelled_at: string | null }>();
+      if (!row || row.status !== SCHEDULED_POST_STATUS_APPROVED || row.cancelled_at || Date.parse(row.scheduled_time) > nowMs) {
+        throw new Error(`scheduled_post_not_recoverable:${action.scheduled_post_id}`);
+      }
+      if (action.action === "retire") {
+        const updated = await dbSession.prepare(
+          `UPDATE scheduled_posts
+           SET cancelled_at = ?, processing_started_at = NULL,
+               publish_error_message = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = ? AND cancelled_at IS NULL AND scheduled_time <= ?`,
+        ).bind(nowIso, `operator_retired_overdue:${reason}`.slice(0, 2000), action.scheduled_post_id, SCHEDULED_POST_STATUS_APPROVED, nowIso).run();
+        if (Number(updated.meta?.changes ?? 0) !== 1) {
+          throw new Error(`scheduled_post_recovery_race:${action.scheduled_post_id}`);
+        }
+        retiredPostIds.push(action.scheduled_post_id);
+        continue;
+      }
+      const scheduledMs = action.scheduled_time ? Date.parse(action.scheduled_time) : NaN;
+      if (!Number.isFinite(scheduledMs) || scheduledMs <= nowMs) {
+        throw new Error(`future_reschedule_time_required:${action.scheduled_post_id}`);
+      }
+      const rescheduledIso = new Date(scheduledMs).toISOString();
+      const updated = await dbSession.prepare(
+        `UPDATE scheduled_posts
+         SET scheduled_time = ?, cancelled_at = NULL, processing_started_at = NULL,
+             failed_at = NULL, publish_error_message = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = ? AND cancelled_at IS NULL AND scheduled_time <= ?`,
+      ).bind(rescheduledIso, action.scheduled_post_id, SCHEDULED_POST_STATUS_APPROVED, nowIso).run();
+      if (Number(updated.meta?.changes ?? 0) !== 1) {
+        throw new Error(`scheduled_post_recovery_race:${action.scheduled_post_id}`);
+      }
+      rescheduledPostIds.push(action.scheduled_post_id);
+    }
+    await dbSession.prepare("COMMIT").run();
+    transactionStarted = false;
+  } catch (error) {
+    if (transactionStarted) {
+      await dbSession.prepare("ROLLBACK").run().catch(() => undefined);
+    }
+    throw error;
+  }
+
+  const remaining = await listOverdueScheduledPosts(env, 100);
+  return {
+    recovered_post_ids: normalized.map((action) => action.scheduled_post_id),
+    retired_post_ids: retiredPostIds,
+    rescheduled_post_ids: rescheduledPostIds,
+    remaining_overdue_post_ids: remaining.map((row) => row.id),
+  };
+}
+
 
 async function ensureScheduledPostAlarm(env: Env): Promise<void> {
   const stub = getScheduledPostSchedulerStub(env);
@@ -31669,11 +31795,14 @@ async function setScheduledPostSchedulerControl(
         reason: control.reason ?? null,
       }),
     });
-  } catch (error) {
+    } catch (error) {
+    if (control.mode === "normal") {
+      throw new Error("scheduler_normal_activation_requires_durable_object");
+    }
     schedulerControlFallback = {
       mode: control.mode,
       allowed_post_ids: control.allowedPostIds ?? [],
-      max_posts: control.mode === "canary" ? 1 : control.mode === "normal" ? 10 : 0,
+      max_posts: control.mode === "canary" ? 1 : 0,
       reason: control.reason ?? null,
       updated_at: new Date().toISOString(),
     };
@@ -31686,10 +31815,34 @@ async function setScheduledPostSchedulerControl(
   }
   const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok || payload?.ok === false) {
-    throw new Error(String(payload?.error ?? `scheduled_post_scheduler_control_failed:${response.status}`));
+    const detail = payload ? JSON.stringify(payload) : `scheduled_post_scheduler_control_failed:${response.status}`;
+    throw new Error(detail);
   }
   return payload ?? { ok: true };
 }
+
+async function recoverScheduledPostSchedulerOverdue(
+  env: Env,
+  actions: ScheduledPostRecoveryAction[],
+  reason: string,
+): Promise<Record<string, unknown>> {
+  const stub = getScheduledPostSchedulerStub(env);
+  if (!stub) {
+    throw new Error("scheduled_post_scheduler_binding_missing");
+  }
+  const response = await stub.fetch("https://scheduled-post-scheduler.internal/recover-overdue", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ actions, reason }),
+  });
+  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || payload?.ok === false) {
+    const detail = payload ? JSON.stringify(payload) : `scheduled_post_scheduler_recovery_failed:${response.status}`;
+    throw new Error(detail);
+  }
+  return payload ?? { ok: true };
+}
+
 
 async function auditScheduledPost(
   env: Env,
@@ -31730,6 +31883,15 @@ async function recordCronSchedulerHeartbeat(
 
 export class ScheduledPostScheduler {
   constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
+
+  private async withExclusiveSchedulerControl<T>(operation: () => Promise<T>): Promise<T> {
+    const blockConcurrencyWhile = (this.state as DurableObjectState & {
+      blockConcurrencyWhile?: <R>(callback: () => Promise<R>) => Promise<R>;
+    }).blockConcurrencyWhile;
+    return typeof blockConcurrencyWhile === "function"
+      ? blockConcurrencyWhile.call(this.state, operation)
+      : operation();
+  }
 
   private async getHealth(): Promise<ScheduledPostSchedulerHealth> {
     return await this.state.storage.get<ScheduledPostSchedulerHealth>("health")
@@ -31880,7 +32042,7 @@ export class ScheduledPostScheduler {
       });
     }
 
-    if (url.pathname === "/control" && request.method === "POST") {
+        if (url.pathname === "/control" && request.method === "POST") {
       const payload = await request.json().catch(() => ({})) as Record<string, unknown>;
       const mode = String(payload.mode ?? "") as ScheduledPostSchedulerMode;
       if (!(["paused", "canary", "normal"] as string[]).includes(mode)) {
@@ -31892,12 +32054,47 @@ export class ScheduledPostScheduler {
       const allowedPostIds = Array.isArray(payload.allowed_post_ids)
         ? payload.allowed_post_ids.map(Number)
         : [];
+      const reason = typeof payload.reason === "string" ? payload.reason.slice(0, 500) : null;
       try {
-        const control = await this.setControl({
-          mode,
-          allowedPostIds,
-          reason: typeof payload.reason === "string" ? payload.reason.slice(0, 500) : null,
-        });
+        if (mode === "normal") {
+          const activation = await this.withExclusiveSchedulerControl(async () => {
+            const overdue = await listOverdueScheduledPosts(this.env, 100);
+            if (overdue.length) {
+              return {
+                ok: false,
+                error: "scheduler_overdue_recovery_required",
+                control: await this.getControl(),
+                overdue_post_ids: overdue.map((row) => row.id),
+                overdue_posts: overdue.map((row) => ({
+                  id: row.id,
+                  threads_user_id: row.threads_user_id,
+                  scheduled_time: row.scheduled_time,
+                  last_attempted_at: row.last_attempted_at,
+                  publish_error_message: row.publish_error_message,
+                })),
+                required_recovery_actions: ["retire", "reschedule"],
+              };
+            }
+            const rechecked = await listOverdueScheduledPosts(this.env, 100);
+            if (rechecked.length) {
+              return {
+                ok: false,
+                error: "scheduler_overdue_recovery_race",
+                control: await this.getControl(),
+                overdue_post_ids: rechecked.map((row) => row.id),
+                required_recovery_actions: ["retire", "reschedule"],
+              };
+            }
+            const control = await this.setControl({ mode, allowedPostIds, reason });
+            await this.scheduleNextAlarm();
+            return { ok: true, control };
+          });
+          return new Response(JSON.stringify(activation), {
+            status: activation.ok ? 200 : 409,
+            headers: { "content-type": "application/json; charset=UTF-8" },
+          });
+        }
+        const control = await this.setControl({ mode, allowedPostIds, reason });
         await this.scheduleNextAlarm();
         return new Response(JSON.stringify({ ok: true, control }), {
           headers: { "content-type": "application/json; charset=UTF-8" },
@@ -31908,6 +32105,40 @@ export class ScheduledPostScheduler {
           headers: { "content-type": "application/json; charset=UTF-8" },
         });
       }
+    }
+
+    if (url.pathname === "/recover-overdue" && request.method === "POST") {
+      const payload = await request.json().catch(() => ({})) as Record<string, unknown>;
+      const reason = typeof payload.reason === "string" ? payload.reason.trim().slice(0, 500) : "";
+      const actions = Array.isArray(payload.actions)
+        ? payload.actions.map((entry) => {
+            const action = entry && typeof entry === "object" && !Array.isArray(entry) ? entry as Record<string, unknown> : {};
+            return {
+              scheduled_post_id: Math.trunc(Number(action.scheduled_post_id)),
+              action: String(action.action ?? "") as "retire" | "reschedule",
+              scheduled_time: typeof action.scheduled_time === "string" ? action.scheduled_time : null,
+            };
+          })
+        : [];
+      const result = await this.withExclusiveSchedulerControl(async () => {
+        const control = await this.getControl();
+        if (control.mode !== "paused") {
+          return { ok: false, error: "scheduler_must_be_paused_for_recovery", control };
+        }
+        if (!reason) {
+          return { ok: false, error: "recovery_reason_required", control };
+        }
+        try {
+          const recovery = await recoverOverdueScheduledPostRows(this.env, actions, reason);
+          return { ok: true, control: await this.getControl(), recovery };
+        } catch (error) {
+          return { ok: false, error: getErrorMessage(error), control: await this.getControl() };
+        }
+      });
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 409,
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
