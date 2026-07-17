@@ -662,7 +662,7 @@ export async function finalizeMandatoryExecutionMapCall(
     result,
   });
 
-  if (mode === "mandatory_known_path" && result.ok === false && entryId) {
+  if (mode === "mandatory_known_path" && entryId && isReusableExecutionPathFailure(toolName, result)) {
     await db.prepare(
       `UPDATE operator_execution_map_entries
        SET status = 'stale', updated_at = CURRENT_TIMESTAMP
