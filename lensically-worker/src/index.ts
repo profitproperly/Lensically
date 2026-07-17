@@ -31179,6 +31179,7 @@ type ScheduledPostSchedulerControl = {
   max_posts: number;
   updated_at: string | null;
   reason: string | null;
+  resume_mode: "paused" | "normal" | null;
 };
 
 const EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL: ScheduledPostSchedulerControl = {
@@ -31187,7 +31188,31 @@ const EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL: ScheduledPostSchedulerControl = {
   max_posts: 0,
   updated_at: null,
   reason: "safe_default",
+  resume_mode: null,
 };
+
+const TEMPORARY_SCHEDULER_PAUSE_MAX_AGE_MS = 5 * 60 * 1000;
+
+function isTemporarySchedulerPauseReason(reason: string | null): boolean {
+  const normalized = reason?.trim().toLowerCase() ?? "";
+  return normalized === "safe_default"
+    || normalized === "canary_attempt_completed"
+    || ((normalized.includes("deploy") || normalized.includes("release")) && normalized.includes("smoke"));
+}
+
+function shouldAutoResumeTemporarySchedulerPause(
+  control: ScheduledPostSchedulerControl,
+  nowMs = Date.now(),
+): boolean {
+  if (control.mode !== "paused" || !isTemporarySchedulerPauseReason(control.reason)) {
+    return false;
+  }
+  if (control.reason === "safe_default" || !control.updated_at) {
+    return true;
+  }
+  const updatedAtMs = Date.parse(control.updated_at);
+  return Number.isFinite(updatedAtMs) && nowMs - updatedAtMs >= TEMPORARY_SCHEDULER_PAUSE_MAX_AGE_MS;
+}
 
 type ScheduledPostSchedulerHealth = {
   armed_at: string | null;
