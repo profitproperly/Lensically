@@ -11867,20 +11867,6 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
-    name: "createMcpTool",
-    title: "Create MCP tool config",
-    description: "Create a runtime MCP tool configuration entry. New code-backed behavior still requires a backend implementation, but schema/behavior can be tracked immediately.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, title: { type: "string" }, description: { type: "string" }, input_schema: { type: "object", additionalProperties: true }, behavior: { type: "object", additionalProperties: true }, handler_spec: { type: "object", additionalProperties: true }, reason: { type: "string" } }, required: ["tool_name", "description", "input_schema"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "disableMcpTool",
-    title: "Disable MCP tool",
-    description: "Disable or re-enable a runtime MCP tool advertisement.",
-        inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, tool_name: { type: "string" }, disabled: { type: "boolean" }, reason: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["tool_name"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-  },
-  {
     name: "runMcpTests",
     title: "Run MCP tests",
     description: "Run built-in MCP configuration and workflow enforcement tests without needing Codex.",
