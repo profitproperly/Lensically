@@ -15669,7 +15669,7 @@ async function handleOperatorMcpAdminTool(
         disabled: false as boolean,
       }] as const;
     }));
-    const overrides = await listOperatorMcpOverrides(env).catch(() => [] as Array<Record<string, unknown>>);
+    const overrides: Array<Record<string, unknown>> = [];
     for (const override of overrides) {
       const name = String(override.tool_name ?? "");
       if (!name) continue;
