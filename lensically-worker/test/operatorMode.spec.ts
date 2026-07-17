@@ -2310,7 +2310,7 @@ describe("operator mode MCP endpoint", () => {
     ]);
   }, 30000);
 
-    it("forces verified pre-call routes before token issuance and before stale-token execution", async () => {
+        it("forces verified pre-call routes before operational intent reaches a handler", async () => {
         const rawArgs = { limit: 50 };
         const staleGuard = await mcpToolCallRaw<{
       ok: boolean;
