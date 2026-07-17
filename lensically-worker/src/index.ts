@@ -25900,10 +25900,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (normalizedPath === "/api/operator/health" && request.method === "GET") {
+      await retireLegacyExecutionInfrastructure(env);
       return operatorMcpOAuthJson({
         status: "ok",
         ...operatorRuntimeMetadata(env),
         live_tool_count: (await buildOperatorMcpTools(env, false, false)).length,
+        retired_execution_infrastructure: true,
         timestamp: new Date().toISOString(),
       });
     }
