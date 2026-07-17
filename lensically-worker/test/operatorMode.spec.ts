@@ -2683,6 +2683,7 @@ describe("operator mode MCP endpoint", () => {
     const status = await mcpToolCallRaw<{
       ok: boolean;
       routed_execution: { executed_tool: string };
+      mandatory_execution_map: { map_state: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
       status_kind?: string;
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
@@ -2693,6 +2694,11 @@ describe("operator mode MCP endpoint", () => {
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
     expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
+    expect(status.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "source_defined_direct_completed",
+      d1_execution_library_bypassed: true,
+      discovery_allowed: false,
+    });
     expect(status.structuredContent.routed_execution.executed_tool).not.toBe("submit_candidate_draft");
     expect(status.structuredContent.missing_inputs ?? []).not.toEqual(expect.arrayContaining(["brand_key", "run_id", "source_card_id"]));
 
