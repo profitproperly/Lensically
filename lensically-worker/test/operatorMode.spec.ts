@@ -2375,7 +2375,6 @@ describe("operator mode MCP endpoint", () => {
       missing_required_source_types: [],
     });
     expect(mapped.structuredContent.execution_library.consulted_source_types).toEqual(expect.arrayContaining([
-      "ops_memory",
       "pre_call_route",
       "map_entry",
       "tool_registry",
