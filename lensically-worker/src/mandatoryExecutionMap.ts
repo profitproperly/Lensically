@@ -306,10 +306,12 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       stage || ' ' || required_sections_json || ' ' || completion_rule || ' ' || enforcement_type,
       updated_at
     FROM operator_workflow_requirements WHERE active = 1
-    UNION ALL
-    SELECT 'admin_error', id,
-      COALESCE(tool_name, '') || ' ' || COALESCE(likely_cause, '') || ' ' || COALESCE(error_response_json, ''),
-      created_at
+    ORDER BY updated_at DESC
+  `).all<Record<string, unknown>>(),
+    db.prepare(`
+    SELECT 'admin_error' AS source_type, id AS source_id,
+      COALESCE(tool_name, '') || ' ' || COALESCE(likely_cause, '') || ' ' || COALESCE(error_response_json, '') AS text,
+      created_at AS updated_at
     FROM operator_mcp_admin_errors
     UNION ALL
     SELECT 'engineering_audit', id,
