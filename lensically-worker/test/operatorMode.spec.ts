@@ -2456,7 +2456,7 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(releaseRedirect.isError).toBe(true);
     expect(releaseRedirect.structuredContent).toMatchObject({
-      error: "pre_call_route_required",
+      error: "known_blocker_prevented",
       required_tool: "runEngineeringRelease",
       normalized_arguments: { workflow_id: "lensically-engineering.yml", ref: "main" },
       pre_call_route: { route_key: "workflow_source_validation_before_dispatch" },
