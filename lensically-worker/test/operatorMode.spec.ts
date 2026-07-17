@@ -2374,13 +2374,15 @@ describe("operator mode MCP endpoint", () => {
       table_manifest_complete: true,
       missing_required_source_types: [],
     });
-    expect(mapped.structuredContent.execution_library.source_coverage.map((item) => item.source_type)).toEqual(expect.arrayContaining([
+    expect(mapped.structuredContent.execution_library.consulted_source_types).toEqual(expect.arrayContaining([
       "ops_memory",
       "pre_call_route",
       "map_entry",
       "tool_registry",
       "d1_table_manifest",
     ]));
+    expect(mapped.structuredContent.execution_library.source_type_count).toBeGreaterThan(0);
+    expect(mapped.structuredContent.execution_library.total_source_count).toBeGreaterThan(0);
     expect(mapped.structuredContent.execution_guard_enforcement).toMatchObject({
       mode: "mandatory_execution_map",
       model_tool_choice_allowed: false,
