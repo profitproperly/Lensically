@@ -1098,11 +1098,13 @@ function prepareSourceDefinedDirectEngineeringCall(
       entry_id: entry.id,
       entry_version: entry.version,
       mapped_tool: toolName,
-      requested_inputs: inputs,
-      enforced_arguments: argumentsObject,
+      input_keys: Object.keys(inputs).sort(),
+      input_character_count: stringify(inputs).length,
+      argument_keys: Object.keys(argumentsObject).sort(),
       model_tool_choice_allowed: false,
       d1_execution_library_bypassed: true,
       discovery_allowed: false,
+      compact_receipt_only: true,
     },
   };
 }
