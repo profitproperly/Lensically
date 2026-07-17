@@ -13350,7 +13350,7 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
     return payload as Record<string, unknown>;
 }
 
-const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v2";
+const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v3";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v1";
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
