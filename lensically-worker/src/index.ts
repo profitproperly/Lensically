@@ -15517,29 +15517,6 @@ async function handleOperatorMcpAdminTool(
         disabled: false as boolean,
       }] as const;
     }));
-    const overrides: Array<Record<string, unknown>> = [];
-    for (const override of overrides) {
-      const name = String(override.tool_name ?? "");
-      if (!name) continue;
-      const disabled = Number(override.disabled ?? 0) === 1;
-      if (disabled && args.include_disabled !== true) {
-        compactByName.delete(name);
-        continue;
-      }
-      const existing = compactByName.get(name);
-      const schemaPatch = safeParseJsonString(String(override.schema_patch_json ?? "null"));
-      const patchRequired = schemaPatch && typeof schemaPatch === "object" && !Array.isArray(schemaPatch)
-        && Array.isArray((schemaPatch as Record<string, unknown>).required)
-        ? ((schemaPatch as Record<string, unknown>).required as unknown[]).map(String)
-        : [];
-      compactByName.set(name, {
-        name,
-        title: existing?.title ?? name,
-        description: String(override.description_override ?? existing?.description ?? `Runtime configured tool ${name}.`),
-        required_fields: patchRequired.length ? patchRequired : existing?.required_fields ?? [],
-        disabled,
-      });
-    }
     return { ok: true, tools: [...compactByName.values()] };
   }
 
