@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: after splitting the execution-library compound query, some standalone groups did not alias the first SELECT outputs as `text` and `updated_at`; SQLite rejected `ORDER BY updated_at` and source ingestion failed closed. Use: the first SELECT in every bounded group must explicitly alias all four canonical columns: `source_type`, `source_id`, `text`, and `updated_at`. Applies when: splitting, regrouping, or adding execution-library D1 source queries.
+
 - Failed: splitting the execution-library source adapters into compound groups of 9, 10, 9, and 6 still exceeded D1's compound SELECT limit. Use: every execution-library compound query must contain at most four SELECT terms; merge all bounded group results afterward, and keep a release guard for the grouped implementation. Applies when: adding or regrouping D1-backed execution-library source adapters.
 
 - Failed: ingesting every execution-library source through one large SQLite `UNION ALL` query hit `too many terms in compound SELECT`, which removed Ops Memory, phonebook routes, and map entries from the compiled policy and correctly failed admission. Use: read the complete source set through several bounded compound queries, merge their results in memory, and keep release preflight guards for the grouped-query structure. Applies when: adding D1-backed source types to the mandatory execution library.
