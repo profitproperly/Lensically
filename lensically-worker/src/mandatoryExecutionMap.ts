@@ -890,11 +890,38 @@ async function seedMandatoryExecutionMap(
     const desiredSuccessRule = stringify({ kind: "mapped_handler_result", path_failure_classifier: "reusable_execution_path_failure_only" });
     const desiredVerificationSummary = `Seeded from the live internal typed tool registry. The map, not the model, selects this tool for the matching action intent. Contract ${MANDATORY_EXECUTION_MAP_VERSION}.`;
     const existing = await db.prepare(
-      `SELECT id FROM operator_execution_map_entries
+      `SELECT id, source_type, status, verification_summary
+       FROM operator_execution_map_entries
        WHERE action_key = ?
        ORDER BY version DESC LIMIT 1`,
-    ).bind(actionKey).first<{ id: string }>();
-    if (existing?.id) continue;
+    ).bind(actionKey).first<Record<string, unknown>>();
+    if (existing?.id) {
+      const sourceDefined = existing.source_type === "tool_registry_seed";
+      const active = existing.status === "active";
+      const currentContract = existing.verification_summary === desiredVerificationSummary;
+      if (sourceDefined && active && !currentContract) {
+        await db.prepare(
+          `UPDATE operator_execution_map_entries
+           SET version = version + 1,
+               task_class = ?, intent_aliases_json = ?, tool_name = ?,
+               allowed_input_keys_json = ?, required_input_keys_json = ?,
+               procedure_json = ?, success_rule_json = ?, verification_summary = ?,
+               verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        ).bind(
+          toolCategory(tool.name),
+          desiredAliases,
+          tool.name,
+          desiredAllowedInputs,
+          desiredRequiredInputs,
+          desiredProcedure,
+          desiredSuccessRule,
+          desiredVerificationSummary,
+          String(existing.id),
+        ).run();
+      }
+      continue;
+    }
     await db.prepare(
       `INSERT INTO operator_execution_map_entries (
         id, action_key, version, status, task_class, intent_aliases_json, tool_name,
