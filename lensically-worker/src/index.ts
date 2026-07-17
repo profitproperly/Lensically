@@ -15725,7 +15725,7 @@ async function handleOperatorMcpAdminTool(
     const bridgeArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
       ? args.arguments as Record<string, unknown>
       : {};
-    const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
+    const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs, true);
     return { ok: result.ok !== false, bridge_tool: "runEngineeringTool", executed_tool: executeTool, result };
   }
 
