@@ -17297,11 +17297,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
             let args: Record<string, unknown> = { ...rawArgs };
       delete args.execution_guard;
-      const sourceDefinedDirectEngineering = routedGatewayMetadata?.map_execution
+      const routedMapExecution = routedGatewayMetadata?.map_execution
         && typeof routedGatewayMetadata.map_execution === "object"
         && !Array.isArray(routedGatewayMetadata.map_execution)
-        && (routedGatewayMetadata.map_execution as Record<string, unknown>).mode === "source_defined_direct_engineering";
-      const preCallRouting = sourceDefinedDirectEngineering
+        ? routedGatewayMetadata.map_execution as Record<string, unknown>
+        : null;
+      const sourceDefinedStaticRoute = routedMapExecution?.d1_execution_library_bypassed === true;
+      const sourceDefinedDirectEngineering = routedMapExecution?.mode === "source_defined_direct_engineering";
+      const preCallRouting = sourceDefinedStaticRoute
         ? { arguments: args, corrections: [], route: null, redirect: false }
         : await resolveOperatorPreCallRouting(env, toolName, args);
       if (preCallRouting.redirect) {
