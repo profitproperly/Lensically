@@ -71,7 +71,7 @@ const generatedKnowledge = {
   "source_defined_execution_procedures": sourceDefinedProcedures,
 };
 const generatedBlock = `// BEGIN GENERATED EXECUTION KNOWLEDGE\nconst GENERATED_EXECUTION_KNOWLEDGE: Record<string, string> = ${JSON.stringify(generatedKnowledge, null, 2)};\n// END GENERATED EXECUTION KNOWLEDGE`;
-const generatedPattern = /\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE[\s\S]*?\/\/ END GENERATED EXECUTION KNOWLEDGE/;
+const generatedPattern = /^\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE\r?\n[\s\S]*?\r?\n\/\/ END GENERATED EXECUTION KNOWLEDGE$/m;
 if (!generatedPattern.test(executionMap)) throw new Error("execution_knowledge_marker_missing");
 executionMap = executionMap.replace(generatedPattern, generatedBlock);
 writeFileSync(resolve(root, "src/mandatoryExecutionMap.ts"), executionMap, "utf8");
