@@ -68,7 +68,7 @@ async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, arg
   });
 }
 
-const MCP_DIRECT_ENTRY_TOOLS = new Set(["getOperatorStartupContext", "executeMappedIntent"]);
+const MCP_DIRECT_ENTRY_TOOLS = new Set(["executeLensicallyIntent"]);
 
 function testActionIntent(toolName: string): string {
   return toolName.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase();
@@ -78,9 +78,17 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
   if (MCP_DIRECT_ENTRY_TOOLS.has(toolName)) {
     return mcpToolCallRaw<T>(toolName, args);
   }
-  return mcpToolCallRaw<T>("executeMappedIntent", {
-    action_intent: testActionIntent(toolName),
-    inputs_json: JSON.stringify(args),
+  if (toolName === "getOperatorStartupContext") {
+    return mcpToolCallRaw<T>("executeLensicallyIntent", {
+      objective: "Load Lensically startup context.",
+      intent: "startup",
+      inputs: {},
+    });
+  }
+  return mcpToolCallRaw<T>("executeLensicallyIntent", {
+    objective: `Execute ${testActionIntent(toolName)}.`,
+    intent: testActionIntent(toolName),
+    inputs: args,
   });
 }
 
@@ -693,16 +701,13 @@ describe("operator mode backend spine", () => {
     ).bind(decisionId).first<{ status: string; tool_name: string }>();
     expect(event).toEqual({ status: "completed", tool_name: "setScheduledPostSchedulerMode" });
 
-    const namespace = (env as unknown as { SCHEDULED_POST_SCHEDULER: DurableObjectNamespace }).SCHEDULED_POST_SCHEDULER;
-    const stub = namespace.get(namespace.idFromName("scheduled-post-publisher"));
-    const health = await (await stub.fetch("https://scheduled-post-scheduler.internal/health")).json() as {
-      control: { mode: string; allowed_post_ids: number[] };
-    };
-    expect(health.control).toMatchObject({ mode: "canary", allowed_post_ids: [scheduledPostId] });
-    await stub.fetch("https://scheduled-post-scheduler.internal/control", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ mode: "paused", reason: "reset automatic canary fixture" }),
+    const health = await mcpToolRaw<{ scheduler?: { control: { mode: string; allowed_post_ids: number[] } }; result?: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } } }>("getScheduledPostSchedulerState");
+    const schedulerState = health.structuredContent.scheduler ?? health.structuredContent.result?.scheduler;
+    expect(schedulerState?.control).toMatchObject({ mode: "canary", allowed_post_ids: [scheduledPostId] });
+    await mcpToolRaw("setScheduledPostSchedulerMode", {
+      mode: "paused",
+      reason: "reset automatic canary fixture",
+      owner_response: "Proceed",
     });
   }, 30000);
 
@@ -1631,10 +1636,7 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.serverInfo.name).toBe("lensically-operator-mode");
 
         const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    expect(listed.tools.map((tool) => tool.name)).toEqual([
-      "getOperatorStartupContext",
-      "executeMappedIntent",
-    ]);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     const registry = await mcpTool<{ tools: Array<{ name: string; inputSchema?: Record<string, unknown> }> }>("listMcpTools");
     const toolNames = registry.tools.map((tool) => tool.name);
         expect(new Set(toolNames).size).toBe(toolNames.length);
@@ -1647,7 +1649,7 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("Initial key-selection stop");
     expect(initialized.instructions).toContain("Selected key: <selected_key>");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${toolNames.length} tools available and usable.`);
-                    expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call executeMappedIntent with action_intent='confirm operator proceed'");
+                    expect(initialized.instructions).toContain("Only after the user explicitly approves proceeding, call executeLensicallyIntent with intent='confirm operator proceed'");
     expect(initialized.instructions).toContain("automatically restores canonical persisted schedule");
     expect(initialized.instructions).toContain("Never ask resume or start fresh");
         expect(initialized.instructions).toContain("verifies continuity from server-side state");
@@ -1845,7 +1847,7 @@ describe("operator mode MCP endpoint", () => {
       reason: "Verify runtime-aware handshake counts.",
     });
         const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    expect(listed.tools.map((tool) => tool.name)).toEqual(["getOperatorStartupContext", "executeMappedIntent"]);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     expect(registry.tools.map((tool) => tool.name)).toContain("runtime_count_fixture");
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
@@ -1863,7 +1865,7 @@ describe("operator mode MCP endpoint", () => {
   it("loads compact non-account startup bootstrap in a fresh session", async () => {
 
         const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    expect(listed.tools.map((tool) => tool.name)).toEqual(["getOperatorStartupContext", "executeMappedIntent"]);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     const direct = await mcpTool<{
             bootstrap_version: string;
@@ -1904,7 +1906,7 @@ describe("operator mode MCP endpoint", () => {
       numerical_tool_budgets: false,
       owner_ratification_required: false,
     });
-                expect(direct.engineering_authority_contract.known_path_rule).toContain("the model can call only executeMappedIntent for operational work");
+                expect(direct.engineering_authority_contract.known_path_rule).toContain("the model can call only executeLensicallyIntent for operational work");
     expect(direct.engineering_authority_contract.recursive_improvement_rule).toContain("stop the active engineering sequence");
     expect(direct.engineering_authority_contract.protected_operations).toEqual(expect.arrayContaining(["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode"]));
         expect(direct.continuity_contract.version).toBe("operator-continuity-v2");
@@ -1999,9 +2001,9 @@ describe("operator mode MCP endpoint", () => {
                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(direct.runtime.mcp_version).toBe("1.23.0");
     expect(direct.source_documents.map((doc) => doc.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(direct.source_documents.every((doc) => doc.excerpt.length <= 6000)).toBe(true);
-        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("submit every external action through executeMappedIntent");
+        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("submit every external action through executeLensicallyIntent");
         expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Do not create owner proposals or numerical tool budgets");
-        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery actions through executeMappedIntent");
+        expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery actions through executeLensicallyIntent");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("exact file prefix");
     expect(direct.mandatory_fallback_execution_routes.join(" ")).toContain("stop, promote the fix");
     expect(direct.boundary.before_proceed_forbidden).toEqual(expect.arrayContaining(["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"]));
@@ -2221,14 +2223,23 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.isError).toBe(true);
     expect(direct.structuredContent).toMatchObject({
       error: "routed_execution_gateway_required",
-      required_tool: "executeMappedIntent",
+      required_tool: "executeLensicallyIntent",
     });
 
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
-    expect(listed.tools.map((tool) => tool.name)).toEqual([
-      "getOperatorStartupContext",
-      "executeMappedIntent",
-    ]);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
+
+    const directStartup = await mcpToolCallRaw<{ required_tool: string }>("getOperatorStartupContext", {});
+    expect(directStartup.isError).toBe(true);
+    expect(directStartup.structuredContent.required_tool).toBe("executeLensicallyIntent");
+
+    const startup = await mcpToolCallRaw<{ gateway: { intent: string; public_schema_frozen: boolean }; tool_surface: { total_tools: number } }>("executeLensicallyIntent", {
+      objective: "Load startup.",
+      intent: "startup",
+      inputs: {},
+    });
+    expect(startup.isError).not.toBe(true);
+    expect(startup.structuredContent.gateway).toMatchObject({ intent: "startup", public_schema_frozen: true });
 
     const mapped = await mcpToolCallRaw<{
       ok: boolean;
@@ -2236,10 +2247,10 @@ describe("operator mode MCP endpoint", () => {
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
       mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean };
       execution_guard_enforcement: { mode: string; model_tool_choice_allowed: boolean };
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Inspect engineering access before repository work.",
-      action_intent: "inspect engineering access state",
-      inputs_json: "{}",
+      intent: "inspect engineering access state",
+      inputs: {},
     });
     expect(mapped.isError).not.toBe(true);
     expect(mapped.structuredContent.ok).toBe(true);
@@ -2264,25 +2275,47 @@ describe("operator mode MCP endpoint", () => {
       map_state: string;
       incident: { id: string };
       discovery_permit: string;
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Test unknown-path promotion.",
-      action_intent: actionIntent,
-      inputs_json: JSON.stringify({ limit: 1 }),
+      intent: actionIntent,
+      inputs: { limit: 1 },
     });
     expect(unknown.isError).toBe(true);
     expect(unknown.structuredContent.error).toBe("mandatory_execution_map_unknown");
     expect(unknown.structuredContent.map_state).toBe("unknown");
     expect(typeof unknown.structuredContent.discovery_permit).toBe("string");
 
+    const failedDiscovery = await mcpToolCallRaw<{
+      mandatory_execution_map: { map_state: string; failed_path_recorded: boolean };
+    }>("executeLensicallyIntent", {
+      objective: "Test unknown-path promotion.",
+      intent: actionIntent,
+      inputs: { path: "missing-file-for-map-discovery.txt", discovery_tool: "readRepoFile" },
+      permit: unknown.structuredContent.discovery_permit,
+    });
+    expect(failedDiscovery.isError).toBe(true);
+    expect(failedDiscovery.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "discovery_continues",
+      failed_path_recorded: true,
+    });
+
+    const duplicateDiscovery = await mcpToolCallRaw<{ error: string }>("executeLensicallyIntent", {
+      objective: "Test unknown-path promotion.",
+      intent: actionIntent,
+      inputs: { path: "missing-file-for-map-discovery.txt", discovery_tool: "readRepoFile" },
+      permit: unknown.structuredContent.discovery_permit,
+    });
+    expect(duplicateDiscovery.isError).toBe(true);
+    expect(duplicateDiscovery.structuredContent.error).toBe("mandatory_execution_map_duplicate_discovery_attempt");
+
     const discovered = await mcpToolCallRaw<{
       ok: boolean;
       mandatory_execution_map: { map_state: string; mandatory_from_now_on: boolean; active_entry: { tool_name: string } };
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Test unknown-path promotion.",
-      action_intent: actionIntent,
-      inputs_json: JSON.stringify({ limit: 1 }),
-      discovery_permit: unknown.structuredContent.discovery_permit,
-      discovery_tool: "listOpsMemory",
+      intent: actionIntent,
+      inputs: { limit: 1, discovery_tool: "listOpsMemory" },
+      permit: unknown.structuredContent.discovery_permit,
     });
     expect(discovered.isError).not.toBe(true);
     expect(discovered.structuredContent.mandatory_execution_map).toMatchObject({
@@ -2294,10 +2327,10 @@ describe("operator mode MCP endpoint", () => {
     const repeated = await mcpToolCallRaw<{
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
       mandatory_execution_map: { map_state: string };
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Repeat the now-known task.",
-      action_intent: actionIntent,
-      inputs_json: JSON.stringify({ limit: 1 }),
+      intent: actionIntent,
+      inputs: { limit: 1 },
     });
     expect(repeated.isError).not.toBe(true);
     expect(repeated.structuredContent.routed_execution).toMatchObject({
@@ -2311,16 +2344,25 @@ describe("operator mode MCP endpoint", () => {
     const actionIntent = "read repository file";
     const stale = await mcpToolCallRaw<{
       mandatory_execution_map: { map_state: string; discovery_permit: string; old_path_blocked: boolean };
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Exercise stale-path replacement.",
-      action_intent: actionIntent,
-      inputs_json: JSON.stringify({ path: "missing-file-for-map-test.txt" }),
+      intent: actionIntent,
+      inputs: { path: "missing-file-for-map-test.txt" },
     });
     expect(stale.isError).toBe(true);
     expect(stale.structuredContent.mandatory_execution_map).toMatchObject({
       map_state: "known_path_became_stale",
       old_path_blocked: true,
     });
+
+    const bypass = await mcpToolCallRaw<{ error: string; discovery_permit: string }>("executeLensicallyIntent", {
+      objective: "Try to bypass stale-path replacement.",
+      intent: actionIntent,
+      inputs: { prefix: "lensically-worker/src", limit: 1 },
+    });
+    expect(bypass.isError).toBe(true);
+    expect(bypass.structuredContent.error).toBe("mandatory_execution_map_open_incident_permit_required");
+    expect(typeof bypass.structuredContent.discovery_permit).toBe("string");
 
     const replacement = await mcpToolCallRaw<{
       mandatory_execution_map: {
@@ -2332,22 +2374,21 @@ describe("operator mode MCP endpoint", () => {
           historical_failures: Array<{ tool_name: string }>;
         };
       };
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Exercise stale-path replacement.",
-      action_intent: actionIntent,
-      inputs_json: JSON.stringify({ prefix: "lensically-worker/src", limit: 1 }),
-      discovery_permit: stale.structuredContent.mandatory_execution_map.discovery_permit,
-      discovery_tool: "listRepoFiles",
+      intent: actionIntent,
+      inputs: { limit: 1, discovery_tool: "listOpsMemory" },
+      permit: stale.structuredContent.mandatory_execution_map.discovery_permit,
     });
     expect(replacement.isError).not.toBe(true);
     expect(replacement.structuredContent.mandatory_execution_map).toMatchObject({
       map_state: "discovery_promoted",
       previous_path_superseded: true,
-      active_entry: { tool_name: "listRepoFiles" },
+      active_entry: { tool_name: "listOpsMemory" },
     });
     const promotedEntry = replacement.structuredContent.mandatory_execution_map.active_entry;
     expect(promotedEntry.procedure.ordered_steps.length).toBeGreaterThan(0);
-    expect(promotedEntry.procedure.testimony.verified_successful_tool).toBe("listRepoFiles");
+    expect(promotedEntry.procedure.testimony.verified_successful_tool).toBe("listOpsMemory");
     expect(promotedEntry.procedure.testimony.mandatory_statement).toContain("active verified path");
     expect(promotedEntry.procedure.testimony.failed_paths).toContainEqual(expect.objectContaining({ tool_name: "readRepoFile" }));
     expect(promotedEntry.historical_failures).toContainEqual(expect.objectContaining({ tool_name: "readRepoFile" }));
@@ -2355,13 +2396,13 @@ describe("operator mode MCP endpoint", () => {
     const enforced = await mcpToolCallRaw<{
       routed_execution: { executed_tool: string };
       mandatory_execution_map: { map_state: string };
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Use the replacement path.",
-      action_intent: actionIntent,
-      inputs_json: JSON.stringify({ prefix: "lensically-worker/src", limit: 1 }),
+      intent: actionIntent,
+      inputs: { limit: 1 },
     });
     expect(enforced.isError).not.toBe(true);
-    expect(enforced.structuredContent.routed_execution.executed_tool).toBe("listRepoFiles");
+    expect(enforced.structuredContent.routed_execution.executed_tool).toBe("listOpsMemory");
     expect(enforced.structuredContent.mandatory_execution_map.map_state).toBe("known_path_completed");
   }, 30000);
 
@@ -2951,14 +2992,14 @@ describe("operator mode MCP endpoint", () => {
       error: string;
       route_trail: Array<{ route_key: string }>;
       map_state: string;
-    }>("executeMappedIntent", {
+    }>("executeLensicallyIntent", {
       objective: "Attempt one protected repository deletion without owner ratification.",
-      action_intent: "delete repository file",
-      inputs_json: JSON.stringify({
+      intent: "delete repository file",
+      inputs: {
         path: "AUTONOMY_PROTECTED_FIXTURE.md",
         message: "Protected-operation regression fixture.",
         owner_approval: "No specific protected-operation approval supplied.",
-      }),
+      },
     });
     expect(protectedAttempt.isError).toBe(true);
     expect(protectedAttempt.structuredContent.error).toBe("known_blocker_prevented");
@@ -3016,11 +3057,13 @@ describe("operator mode MCP endpoint", () => {
     await ensureMcpAccountOpen("manifest_mental");
     const canary = await mcpToolRaw<{
       ok: boolean;
-      result: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } };
+      scheduler?: { control: { mode: string; allowed_post_ids: number[] } };
+      result?: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } };
       autonomy_decision: { governed: boolean; decision_id: string };
-        }>("listMcpTools", {
-      execute_tool: "runApprovedPostCanary",
-      arguments: {
+        }>("executeLensicallyIntent", {
+      objective: "Run approved post canary.",
+      intent: "run approved post canary",
+      inputs: {
         brand_key: "manifest_mental",
         scheduled_post_id: 987654,
         reason: "Protected-operation owner-ratification regression fixture.",
@@ -3029,7 +3072,8 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(canary.isError).not.toBe(true);
     expect(canary.structuredContent.ok).toBe(true);
-    expect(canary.structuredContent.result.scheduler.control).toMatchObject({
+    const canaryScheduler = canary.structuredContent.scheduler ?? canary.structuredContent.result?.scheduler;
+    expect(canaryScheduler?.control).toMatchObject({
       mode: "canary",
       allowed_post_ids: [987654],
     });
@@ -3039,9 +3083,10 @@ describe("operator mode MCP endpoint", () => {
     ).bind(canary.structuredContent.autonomy_decision.decision_id).first<{ status: string; owner_response: string }>();
     expect(decision).toEqual({ status: "executed", owner_response: "Proceed" });
 
-    const paused = await mcpToolRaw<{ ok: boolean; result: { scheduler: { control: { mode: string } } } }>("listMcpTools", {
-      execute_tool: "setScheduledPostSchedulerMode",
-      arguments: {
+    const paused = await mcpToolRaw<{ ok: boolean; scheduler?: { control: { mode: string } }; result?: { scheduler: { control: { mode: string } } } }>("executeLensicallyIntent", {
+      objective: "Pause scheduler after protected canary test.",
+      intent: "set scheduled post scheduler mode",
+      inputs: {
         brand_key: "manifest_mental",
         mode: "paused",
         reason: "Return regression fixture scheduler to safe state.",
@@ -3049,7 +3094,8 @@ describe("operator mode MCP endpoint", () => {
       },
     });
     expect(paused.isError).not.toBe(true);
-    expect(paused.structuredContent.result.scheduler.control.mode).toBe("paused");
+    const pausedScheduler = paused.structuredContent.scheduler ?? paused.structuredContent.result?.scheduler;
+    expect(pausedScheduler?.control.mode).toBe("paused");
   }, 30000);
 
     it("returns a compact tool inventory without recursive payloads", async () => {
@@ -3068,7 +3114,7 @@ describe("operator mode MCP endpoint", () => {
     const response = await fetchFromWorker("/api/operator/mcp", {
       method: "POST",
       headers: AUTH_HEADERS,
-      body: JSON.stringify({ jsonrpc: "2.0", id: 501, method: "tools/call", params: { name: "getOperatorStartupContext", arguments: {} } }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 501, method: "tools/call", params: { name: "executeLensicallyIntent", arguments: { objective: "Load startup.", intent: "startup", inputs: {} } } }),
     });
     const payload = await response.json() as { error?: { code: number; message: string; data?: Record<string, unknown> } };
     expect(response.status).toBe(200);
@@ -3077,7 +3123,7 @@ describe("operator mode MCP endpoint", () => {
     expect(payload.error?.data).toMatchObject({
       ok: false,
       error_code: "operator_mcp_method_failed",
-      phase: "tools_call:getOperatorStartupContext",
+      phase: "tools_call:executeLensicallyIntent",
       retryable: true,
       surface_available: true,
     });
@@ -3092,10 +3138,7 @@ describe("operator mode MCP endpoint", () => {
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(initialized.serverInfo.version).toBe("1.23.0");
-    expect(listed.tools.map((tool) => tool.name)).toEqual([
-      "getOperatorStartupContext",
-      "executeMappedIntent",
-    ]);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
 

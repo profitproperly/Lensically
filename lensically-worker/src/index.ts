@@ -412,7 +412,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
   authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize destructive account data changes, credential ownership changes, account ownership changes, irreversible business decisions, repository file deletion, runtime rollback, tool disabling, or content publication controls.",
   numerical_tool_budgets: false,
   owner_ratification_required: false,
-        known_path_rule: "After startup, the model can call only executeMappedIntent for operational work. Direct operational names are absent from discovery and rejected before lookup. The Mandatory Execution Map selects the active verified procedure from the action intent, permits discovery only for signed unknown or stale incidents, and promotes the verified replacement before the interrupted objective resumes.",
+        known_path_rule: "After startup, the model can call only executeLensicallyIntent for operational work. Direct operational names are absent from discovery and rejected before lookup. The Mandatory Execution Map selects the active verified procedure from the action intent, permits discovery only for signed unknown or stale incidents, and promotes the verified replacement before the interrupted objective resumes.",
   recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
   owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
   protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
@@ -11637,7 +11637,7 @@ type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
     "getOperatorStartupContext",
   "guardLensicallyCall",
-  "executeMappedIntent",
+  "executeLensicallyIntent",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
@@ -11678,7 +11678,7 @@ const REPO_PATH_SCHEMA = {
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "guardLensicallyCall", title: "Guard Lensically call", description: "Mandatory pre-execution guard. Submit the intended tool and its JSON arguments before every Lensically call after startup. Returns normalized safe arguments, the mandatory route, prevented blockers, and a signed execution_guard token required by the dispatcher.", inputSchema: { type: "object", properties: { intended_tool: { type: "string" }, arguments_json: { type: "string", description: "A JSON object containing the exact intended arguments before execution_guard is added." }, operation: { type: "string" } }, required: ["intended_tool", "arguments_json"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-    { name: "executeMappedIntent", title: "Execute mapped intent", description: "Only operational MCP gateway. Submit the action objective and intent, not a tool. The Mandatory Execution Map selects and enforces the proven internal procedure. A discovery_tool is accepted only with a signed permit issued because the map was unknown or became stale.", inputSchema: { type: "object", properties: { objective: { type: "string" }, action_intent: { type: "string", description: "What must be accomplished next. Do not name an internal tool or route." }, action_key: { type: "string", description: "Optional semantic action key already returned by the map." }, inputs_json: { type: "string", description: "JSON object containing only variable inputs for the mapped procedure." }, discovery_permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." }, discovery_tool: { type: "string", description: "Temporary discovery choice; rejected unless discovery_permit is valid." } }, required: ["action_intent", "inputs_json"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    { name: "executeLensicallyIntent", title: "Execute Lensically intent", description: "Permanent Lensically MCP gateway. Submit objective, intent, and variable inputs only. The Mandatory Execution Map selects and enforces the proven internal procedure; future internal capability additions do not require a public schema change.", inputSchema: { type: "object", properties: { objective: { type: "string" }, intent: { type: "string", description: "What must be accomplished next. Use startup for fresh-session bootstrap. Do not name an internal tool or route." }, inputs: { type: "object", description: "Variable inputs for the mapped procedure.", additionalProperties: true }, continuation_id: { type: "string" }, incident_id: { type: "string" }, permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." } }, required: ["objective", "intent", "inputs"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "engineeringPrecheck", title: "Engineering precheck", description: "Load compact source-control, MCP, ops-memory, failure-pattern, gate, requirement, and runtime state before engineering work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "getEngineeringAccessState", title: "Get engineering access state", description: "Report GitHub/Cloudflare engineering access status without exposing secret values.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "listRepoFiles", title: "List repo files", description: "List GitHub repository files from the default branch with optional prefix filtering.", inputSchema: { type: "object", properties: { prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
@@ -13056,10 +13056,10 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-                "After getOperatorStartupContext, submit every external action through executeMappedIntent. Direct operational tool names are absent from discovery and rejected before lookup; the Mandatory Execution Map selects and enforces the active procedure before execution.",
+                "Call executeLensicallyIntent with intent='startup' for fresh-session startup, then submit every external action through executeLensicallyIntent. Direct operational tool names are absent from discovery and rejected before lookup; the Mandatory Execution Map selects and enforces the active procedure before execution.",
     "Routine engineering uses persistent full-discretion outcome-bound authority. Do not create owner proposals or numerical tool budgets for repository, test, deploy, verification, routing, or infrastructure repair work.",
     "Use the canonical execution plane returned by policy: engineering_control for repository/tests/deploys, operator_account for account workflow, and operator_control for universal MCP administration.",
-                                "Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery actions through executeMappedIntent. The Mandatory Execution Map uses the historical procedure registry and internal typed schemas; direct tool, bridge, and fallback selection is not delegated to the model.",
+                                "Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery actions through executeLensicallyIntent. The Mandatory Execution Map uses the historical procedure registry and internal typed schemas; direct tool, bridge, and fallback selection is not delegated to the model.",
     "Governance calls use compact required fields only. Verbose owner-response, evidence, and budget payloads are known client-preflight blockers.",
     "An exact file prefix uses one Git-blob read plus local text search, especially for oversized lensically-worker/src/index.ts. Do not retry empty GitHub code-search results.",
         "YAML changes replace a complete block with explicit relative indentation and are read back before workflow dispatch.",
@@ -13359,7 +13359,7 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
 
 const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
-const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeMappedIntent";
+const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeLensicallyIntent";
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
     "getOperatorStartupContext",
@@ -14746,28 +14746,28 @@ async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<
 function operatorMcpInstructions(toolCount: number): string {
   return [
     "Use Lensically Operator Mode as source of truth.",
-    "Before engineering, admin, workflow, or account work in a fresh session, call getOperatorStartupContext once and use that compact non-account bootstrap as the startup source of truth.",
-    "If getOperatorStartupContext is not directly exposed, use one callable alias only. Do not retry through multiple wrappers that reach the same backend; aliases are not independent recovery routes.",
+    "Before engineering, admin, workflow, or account work in a fresh session, call executeLensicallyIntent with intent='startup' once and use that compact non-account bootstrap as the startup source of truth.",
+    "Do not look for a separate startup or recovery tool. The single callable public surface is executeLensicallyIntent.",
         "Classify every change as universal versus account-scoped before implementation. Universal infrastructure, workflow, schema, bridge, startup, and regression-prevention fixes default to universal unless there is a valid account-specific reason.",
-                                "Follow the Collaboration, Autonomy, Engineering Authority, and Execution Policy Contracts returned by getOperatorStartupContext. Manifest routine account work and routine engineering are persistently authorized, outcome-bound, and unbudgeted; owner ratification remains only for protected destructive, ownership, credential, scheduler-safety, and irreversible business decisions.",
+                                "Follow the Collaboration, Autonomy, Engineering Authority, and Execution Policy Contracts returned by startup-through-gateway. Manifest routine account work and routine engineering are persistently authorized, outcome-bound, and unbudgeted; owner ratification remains only for protected destructive, ownership, credential, scheduler-safety, and irreversible business decisions.",
     "When a durable decision is made, periodically tell the owner its change_name, primary_system_layer, additional_system_layers, universal_or_account_scope, why it survives new chats, and which secondary memory/audit records will also be written.",
     "Treat supporting memory as explanation and recovery context, not the sole enforcement mechanism; prefer backend behavior, workflow requirements, MCP contracts, data models, gates, and regression tests.",
         "Canonical source cards are reusable intellectual property: resolve repeated stable source identities to the current card version, create a new version only when the source interpretation changes, and create a new adaptation plan/run for ordinary new payoffs or experiments.",
-        "Immediately after getOperatorStartupContext, submit every external action through executeMappedIntent using objective, action_intent, and inputs_json only. The Mandatory Execution Map selects and executes the verified internal procedure; never choose or call an operational tool name directly.",
+        "Startup routes through executeLensicallyIntent with intent='startup'. After startup, submit every external action through executeLensicallyIntent using objective, intent, and inputs only. The Mandatory Execution Map selects and executes the verified internal procedure; never choose or call an operational tool name directly.",
         "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
 
-                        "After the user selects a key, call executeMappedIntent with action_intent='select operator key' and inputs_json containing the canonical brand_key. Reply using only the exact four-line handshake returned by the mapped result. Do not submit account-scoped intent yet.",
+                        "After the user selects a key, call executeLensicallyIntent with intent='select operator key' and inputs containing the canonical brand_key. Reply using only the exact four-line handshake returned by the mapped result. Do not submit account-scoped intent yet.",
     "Lensically Operator Mode MCP is active.",
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
     "Proceed to the next step?",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "Only after the user explicitly approves proceeding, call executeMappedIntent with action_intent='confirm operator proceed' and inputs_json containing the selected brand_key. It automatically restores canonical persisted schedule, workflow, day-level source claims, any active review batch, the active autonomy profile, and pending model decisions. Never ask resume or start fresh. Every later account-scoped intent includes proceed_confirmed=true inside inputs_json; Lensically verifies continuity from server-side state. Mutations also reuse the stable operation_id from the continuity capsule.",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "Only after the user explicitly approves proceeding, call executeLensicallyIntent with intent='confirm operator proceed' and inputs containing the selected brand_key. It automatically restores canonical persisted schedule, workflow, day-level source claims, any active review batch, the active autonomy profile, and pending model decisions. Never ask resume or start fresh. Every later account-scoped intent includes proceed_confirmed=true inside inputs; Lensically verifies continuity from server-side state. Mutations also reuse the stable operation_id from the continuity capsule.",
         "Manifest autonomy mode is autonomous_operator with the objective of growing Manifest Mental to 1,000,000 followers. The model chooses and executes routine content, scheduling, analytics, experiments, workflow, and engineering without waiting for owner approval.",
                                 "Routine Manifest account work and routine engineering are autonomous. Do not call proposeOperatorDecision or request owner approval for content generation, approval, scheduling, analytics, experiments, workflow repair, repository edits, tests, deployment, verification, routing, or infrastructure improvements. Only protected destructive, ownership, credential, scheduler-safety, and irreversible mutations remain owner-ratified.",
-                "When the owner explicitly approves a protected operation, include the selected brand_key and the owner's exact approval in owner_response inside the first executeMappedIntent inputs_json. The map persists ratification, executes the mandatory protected procedure once, closes the decision record, and resumes the original objective.",
+                "When the owner explicitly approves a protected operation, include the selected brand_key and the owner's exact approval in owner_response inside the first executeLensicallyIntent inputs. The map persists ratification, executes the mandatory protected procedure once, closes the decision record, and resumes the original objective.",
         "Pending account or business decisions govern their own scope only and do not block routine engineering. Resume approved account work when relevant; otherwise continue engineering automatically through the persistent authority contract.",
-                "Mandatory Execution Map is universal: getOperatorStartupContext is the only direct startup operation. Submit every later external action through executeMappedIntent. Direct operational tool calls are not advertised or executable. The map resolves the action intent, selects the verified procedure, signs the final payload, and only then enters a handler or external provider.",
-                                "Direct operational tool calls are not advertised or executable. Submit objective, action_intent, and inputs_json through executeMappedIntent for account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery work. The map selects the verified procedure from the historical execution dataset. If the path is unknown or stale, discovery is permitted only through a signed incident; the verified solution is promoted before the original objective resumes.",
+                "Mandatory Execution Map is universal: executeLensicallyIntent is the only direct public tool, including startup via intent='startup'. Direct operational tool calls are not advertised or executable. The map resolves the action intent, selects the verified procedure, signs the final payload, and only then enters a handler or external provider.",
+                                "Direct operational tool calls are not advertised or executable. Submit objective, intent, and inputs through executeLensicallyIntent for account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery work. The map selects the verified procedure from the historical execution dataset. If the path is unknown or stale, discovery is permitted only through a signed incident; the verified solution is promoted before the original objective resumes.",
     "Engineering efficiency is mandatory: group related repository changes through applyRepoPatchSet, avoid preliminary full-suite workflow runs, release through runEngineeringRelease exactly once per SHA, and wait through getEngineeringRelease rather than chat-side sleep and polling loops.",
                                 "Serious generation requires locked source cards, submitted candidate drafts, recorded gate results, showable=true, autonomous model approval before scheduling, and account-scoped memory/gates. Every existing content gate remains mandatory.",
                     "Manifest source-adaptation rule: preserve the source mechanism, strongest structural choices, meaning, tone, and payoff while materially rewriting distinctive surface language. Never lightly rearrange or synonym-swap a source into near-verbatim copying. Do not invent unrelated scenes, characters, activities, settings, events, metaphors, or premises.",
@@ -15714,7 +15714,7 @@ async function handleOperatorMcpAdminTool(request: Request, env: Env, toolName: 
     const requirements = await listOperatorWorkflowRequirements(env, null);
     const checks = [
       { name: "all_admin_tools_advertised", passed: OPERATOR_MCP_ADMIN_TOOL_NAMES.every((name) => names.has(name)) },
-            { name: "startup_bootstrap_advertised", passed: names.has("getOperatorStartupContext") },
+      { name: "single_gateway_advertised", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
       { name: "session_handshake_tools_advertised", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
       { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
@@ -16101,7 +16101,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
       tool_block_prevention: [
-        "Call getOperatorStartupContext once at fresh-session startup before engineering/admin/workflow/account work.",
+        "Call executeLensicallyIntent with intent='startup' once at fresh-session startup before engineering/admin/workflow/account work.",
         "Prefer readRepoFile with line bounds before edits.",
                 "Use applyRepoTextPatch only for one isolated replacement.",
         "Use applyRepoPatchSet for related multi-file or multi-replacement work so one commit advances main.",
@@ -16722,36 +16722,39 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         : {};
     };
     let nextLiveId = 3;
-        const callGuardedLiveTool = async (name: string, args: Record<string, unknown>) =>
+        const callGatewayLiveIntent = async (intent: string, args: Record<string, unknown>) =>
       callLiveMcp(nextLiveId++, "tools/call", {
         name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-        arguments: { intended_tool: name, arguments_json: JSON.stringify(args) },
+        arguments: { objective: `Live smoke: ${intent}.`, intent, inputs: args },
       });
 
     const listed = await callLiveMcp(2, "tools/list", {});
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
-    const select = await callGuardedLiveTool("selectOperatorKey", { brand_key: "manifest_mental" });
-    const blocked = await callGuardedLiveTool("getWorkflowStatus", { brand_key: "manifest_mental" });
-    const proceed = await callGuardedLiveTool("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    const startup = await callGatewayLiveIntent("startup", {});
+    const select = await callGatewayLiveIntent("select operator key", { brand_key: "manifest_mental" });
+    const blocked = await callGatewayLiveIntent("get workflow status", { brand_key: "manifest_mental" });
+    const proceed = await callGatewayLiveIntent("confirm operator proceed", { brand_key: "manifest_mental" });
     const proceedContent = structured(proceed.payload);
-    const allowed = await callGuardedLiveTool("getWorkflowStatus", {
+    const allowed = await callGatewayLiveIntent("get workflow status", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
     });
-    const coverage = await callGuardedLiveTool("get_hourly_coverage", {
+    const coverage = await callGatewayLiveIntent("get hourly coverage", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
       timezone: "America/New_York",
     });
 
+    const startupContent = structured(startup.payload);
     const selectContent = structured(select.payload);
     const blockedContent = structured(blocked.payload);
     const allowedContent = structured(allowed.payload);
     const coverageContent = structured(coverage.payload);
     const boundaryTest = {
       selected_key: selectContent.selected_key ?? null,
+      startup_through_gateway: startupContent.gateway && (startupContent.gateway as Record<string, unknown>).intent === "startup",
       handshake: selectContent.handshake ?? null,
       blocked_before_proceed: blockedContent.error === "explicit_proceed_required" && blockedContent.account_data_loaded === false,
       blocked_error: blockedContent.error ?? null,
@@ -16764,12 +16767,14 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
     return {
       ok: response.ok
         && listed.status < 400
+        && startup.status < 400
         && select.status < 400
         && blocked.status < 400
                 && proceed.status < 400
         && allowed.status < 400
         && coverage.status < 400
         && boundaryTest.blocked_before_proceed
+        && boundaryTest.startup_through_gateway
         && boundaryTest.proceed_confirmed
         && boundaryTest.continuity_auto_resolved
         && boundaryTest.calendar_coverage_loaded
@@ -17042,8 +17047,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       return mcpJsonResponse({ jsonrpc: "2.0", id: id ?? null, result: {} });
     }
 
-        if (method === "tools/list") {
-      const tools = (await buildOperatorMcpTools(env, false, false)).filter((tool) => tool.name === "getOperatorStartupContext" || tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY);
+    if (method === "tools/list") {
+      const tools = (await buildOperatorMcpTools(env, false, false)).filter((tool) => tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY);
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
@@ -17058,8 +17063,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       const requestedArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
         ? message.params.arguments as Record<string, unknown>
         : {};
-      const directEntryAllowed = requestedToolName === "getOperatorStartupContext"
-        || requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
+      const directEntryAllowed = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
       if (!directEntryAllowed) {
         return mcpJsonResponse({
           jsonrpc: "2.0",
@@ -17081,6 +17085,26 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       let rawArgs = requestedArgs;
       let routedGatewayMetadata: Record<string, unknown> | null = null;
       if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
+        const gatewayIntent = normalizeOperatorText(requestedArgs.intent ?? requestedArgs.action_intent, 8000, true);
+        if (gatewayIntent === "startup") {
+          const startup = await handleOperatorMcpEngineeringTool(request, env, "getOperatorStartupContext", {});
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: {
+                ...startup,
+                gateway: {
+                  name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+                  intent: "startup",
+                  public_schema_frozen: true,
+                },
+              },
+              content: [{ type: "text", text: "Lensically startup context loaded through the permanent gateway." }],
+              isError: startup.ok === false,
+            },
+          });
+        }
         const prepared = await prepareOperatorRoutedGatewayCall(env, requestedArgs);
         if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
           return mcpJsonResponse({
@@ -17100,7 +17124,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         };
         routedGatewayMetadata = {
           version: MANDATORY_EXECUTION_MAP_VERSION,
-          action_intent: requestedArgs.action_intent ?? null,
+          action_intent: requestedArgs.intent ?? requestedArgs.action_intent ?? null,
           action_key: prepared.map_execution?.action_key ?? requestedArgs.action_key ?? null,
           map_state: prepared.map_state ?? null,
           map_entry: prepared.map_entry ?? null,
@@ -31525,6 +31549,8 @@ const EMPTY_SCHEDULED_POST_SCHEDULER_HEALTH: ScheduledPostSchedulerHealth = {
   last_processed_post_ids: [],
 };
 
+let schedulerControlFallback: ScheduledPostSchedulerControl = { ...EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL };
+
 function getScheduledPostSchedulerStub(env: Env) {
   const namespace = env.SCHEDULED_POST_SCHEDULER;
   if (!namespace) {
@@ -31560,7 +31586,19 @@ async function readScheduledPostSchedulerHealth(env: Env): Promise<Record<string
   if (!stub) {
     return { enabled: false, reason: "durable_object_binding_missing" };
   }
-  const response = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+  let response: Response;
+  try {
+    response = await stub.fetch("https://scheduled-post-scheduler.internal/health");
+  } catch (error) {
+    return {
+      enabled: true,
+      healthy: false,
+      reason: "durable_object_storage_unavailable",
+      error: error instanceof Error ? error.message : String(error),
+      control: schedulerControlFallback,
+      current_overdue_count: await countOverdueScheduledPosts(env).catch(() => null),
+    };
+  }
   if (!response.ok) {
     return { enabled: true, healthy: false, error: `health_read_failed:${response.status}` };
   }
@@ -31580,15 +31618,32 @@ async function setScheduledPostSchedulerControl(
   if (!stub) {
     throw new Error("scheduled_post_scheduler_binding_missing");
   }
-  const response = await stub.fetch("https://scheduled-post-scheduler.internal/control", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
+  let response: Response;
+  try {
+    response = await stub.fetch("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: control.mode,
+        allowed_post_ids: control.allowedPostIds ?? [],
+        reason: control.reason ?? null,
+      }),
+    });
+  } catch (error) {
+    schedulerControlFallback = {
       mode: control.mode,
       allowed_post_ids: control.allowedPostIds ?? [],
+      max_posts: control.mode === "canary" ? 1 : control.mode === "normal" ? 10 : 0,
       reason: control.reason ?? null,
-    }),
-  });
+      updated_at: new Date().toISOString(),
+    };
+    return {
+      ok: true,
+      fallback: "durable_object_storage_unavailable",
+      fallback_error: error instanceof Error ? error.message : String(error),
+      control: schedulerControlFallback,
+    };
+  }
   const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok || payload?.ok === false) {
     throw new Error(String(payload?.error ?? `scheduled_post_scheduler_control_failed:${response.status}`));

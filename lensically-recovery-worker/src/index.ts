@@ -50,10 +50,7 @@ const TOOLS: Tool[] = [
   { name: "runMainMcpSmoke", title: "Run main MCP smoke", description: "Run the live main-MCP OAuth, initialize, two-tool discovery, startup, direct-call rejection, and mandatory execution-map path.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
 ];
 
-const PUBLIC_TOOLS: Tool[] = [
-  { name: "getRecoveryStartupContext", title: "Get recovery startup context", description: "Load recovery-plane health and the mandatory recovery execution-map summary without selecting an operational tool.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
-  { name: "executeMappedRecoveryIntent", title: "Execute mapped recovery intent", description: "Only recovery execution gateway. Submit objective, action intent, and variable inputs. The recovery map selects the mandatory internal procedure. A discovery tool is accepted only with a signed unknown or stale incident permit.", inputSchema: { type: "object", properties: { objective: { type: "string" }, action_intent: { type: "string" }, inputs_json: { type: "string" }, discovery_permit: { type: "string" }, discovery_tool: { type: "string" } }, required: ["action_intent", "inputs_json"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
-];
+const PUBLIC_TOOLS: Tool[] = [];
 
 function json(payload: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(payload), { status, headers: { ...JSON_HEADERS, ...headers } });
@@ -406,16 +403,16 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     if (!tokenResponse.ok || !token) return { ok: false, phase: "oauth_token", status: tokenResponse.status };
     const initialize = await mainMcpRequest(origin, token, 1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "lensically-recovery", version: VERSION } });
     const listed = await mainMcpRequest(origin, token, 2, "tools/list", {});
-    const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "getOperatorStartupContext", arguments: {} });
+    const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "executeLensicallyIntent", arguments: { objective: "Verify live startup.", intent: "startup", inputs: {} } });
     const direct = await mainMcpRequest(origin, token, 4, "tools/call", { name: "getEngineeringAccessState", arguments: {} });
-    const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeMappedIntent", arguments: { objective: "Verify the live mapped execution path.", action_intent: "inspect engineering access state", inputs_json: "{}" } });
+    const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeLensicallyIntent", arguments: { objective: "Verify the live mapped execution path.", intent: "inspect engineering access state", inputs: {} } });
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const mappedContent = ((mapped.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const mappedSurface = toolNames.length === 2 && toolNames.includes("getOperatorStartupContext") && toolNames.includes("executeMappedIntent");
-    const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "executeMappedIntent";
+    const mappedSurface = toolNames.length === 1 && toolNames.includes("executeLensicallyIntent");
+    const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "executeLensicallyIntent";
     const mappedSucceeded = mapped.status === 200
       && mappedContent?.ok === true
       && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState"
@@ -504,36 +501,14 @@ export default {
       if (!env.RECOVERY_MCP_ACCESS_TOKEN || bearer(request) !== env.RECOVERY_MCP_ACCESS_TOKEN) return json({ ok: false, error: "unauthorized" }, 401);
       const message = await request.json().catch(() => null) as { id?: string | number | null; method?: string; params?: Record<string, unknown> } | null;
       if (!message?.method) return json({ jsonrpc: "2.0", id: message?.id ?? null, error: { code: -32600, message: "Invalid Request" } });
-      if (message.method === "initialize") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { protocolVersion: String(message.params?.protocolVersion || "2025-06-18"), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "lensically-recovery", title: "Lensically Recovery", version: VERSION }, instructions: "Independent break-glass recovery plane. Call getRecoveryStartupContext first, then submit every recovery action through executeMappedRecoveryIntent. The model never selects an internal recovery tool when a known procedure exists. Unknown or stale recovery terrain requires a signed discovery incident and automatic promotion before the interrupted objective resumes. This service does not access Lensically account or generation data." } });
+      if (message.method === "initialize") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { protocolVersion: String(message.params?.protocolVersion || "2025-06-18"), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "lensically-recovery", title: "Lensically Recovery Retired", version: VERSION }, instructions: "The separate Lensically Recovery MCP public schema is retired. Use the main Lensically MCP executeLensicallyIntent gateway for recovery, repair, deployment, rollback, health inspection, and smoke-test intents." } });
       if (message.method === "notifications/initialized") return new Response(null, { status: 202 });
       if (message.method === "ping") return json({ jsonrpc: "2.0", id: message.id ?? null, result: {} });
       if (message.method === "tools/list") return json({ jsonrpc: "2.0", id: message.id ?? null, result: { tools: PUBLIC_TOOLS } });
       if (message.method === "tools/call") {
         const name = String(message.params?.name || "");
-        const args = message.params?.arguments && typeof message.params.arguments === "object" ? message.params.arguments as Record<string, unknown> : {};
-        if (name === "getRecoveryStartupContext") {
-          const health = await toolCall("recoveryHealth", {}, env);
-          const result = { ok: health.ok !== false, recovery: metadata(env), health, mandatory_execution_map: await recoveryMapSummary(env.RECOVERY_SESSIONS, TOOLS.length), account_data_loaded: false };
-          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "Recovery startup context loaded." }], isError: false } });
-        }
-        if (name !== "executeMappedRecoveryIntent") {
-          const result = { ok: false, error: "mandatory_recovery_map_required", requested_tool: name, required_tool: "executeMappedRecoveryIntent" };
-          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "Recovery actions must enter through the Mandatory Recovery Map." }], isError: true } });
-        }
-        const prepared = await prepareRecoveryAction(env.RECOVERY_SESSIONS, args, TOOLS as RecoveryMapTool[], {
-          sign: (payload) => signRecoveryMapPayload(env, payload),
-          verify: (token) => verifyRecoveryMapPayload(env, token),
-        });
-        if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
-          return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: prepared, content: [{ type: "text", text: `Recovery map could not resolve the action: ${String(prepared.error || "unknown")}` }], isError: true } });
-        }
-        const underlying = await toolCall(prepared.tool_name, prepared.arguments, env);
-        const lifecycle = await finalizeRecoveryAction(env.RECOVERY_SESSIONS, prepared.execution ?? null, prepared.tool_name, prepared.arguments, underlying, {
-          sign: (payload) => signRecoveryMapPayload(env, payload),
-          verify: (token) => verifyRecoveryMapPayload(env, token),
-        });
-        const result = { ...underlying, mandatory_execution_map: lifecycle, mapped_execution: { version: MANDATORY_RECOVERY_MAP_VERSION, action_intent: args.action_intent ?? null, executed_tool: prepared.tool_name, state: prepared.state, entry: prepared.entry ?? null, incident: prepared.incident ?? null, model_tool_choice_allowed: false } };
-        return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: result.ok === false ? `Mapped recovery action failed: ${String(result.error || result.status || "unknown")}` : "Mapped recovery action completed." }], isError: result.ok === false } });
+        const result = { ok: false, error: "recovery_public_schema_retired", requested_tool: name, required_tool: "executeLensicallyIntent", main_mcp_origin: env.MAIN_MCP_ORIGIN || "https://api.lensically.com" };
+        return json({ jsonrpc: "2.0", id: message.id ?? null, result: { structuredContent: result, content: [{ type: "text", text: "The separate Recovery MCP public schema is retired; use the main Lensically gateway." }], isError: true } });
       }
       return json({ jsonrpc: "2.0", id: message.id ?? null, error: { code: -32601, message: "Method not found" } });
     } catch (error) {

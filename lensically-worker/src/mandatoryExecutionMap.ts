@@ -31,6 +31,7 @@ const MAP_EXCLUDED_TOOLS = new Set([
   "guardLensicallyCall",
   "routeAndExecuteLensicallyCall",
   "executeMappedIntent",
+  "executeLensicallyIntent",
 ]);
 
 const INTENT_STOP_WORDS = new Set([
@@ -122,11 +123,13 @@ function procedureForTool(tool: MandatoryExecutionToolDefinition): Record<string
 function intentAliasesForTool(tool: MandatoryExecutionToolDefinition): string[] {
   const explicit: Record<string, string[]> = {
     engineeringPrecheck: ["inspect engineering state", "load engineering context", "engineering precheck"],
+    getEngineeringAccessState: ["inspect engineering access state", "get engineering access state", "check engineering access"],
     getRepoStatus: ["inspect repository status", "get repository head", "read current repository sha"],
     readRepoFile: ["read repository file", "inspect source file", "open repo file"],
     searchRepoFiles: ["search repository", "find code in repository", "locate source implementation"],
     applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes"],
     applyRepoTextPatch: ["apply one exact patch", "replace exact repository text"],
+    deleteRepoFile: ["delete repository file", "remove repository file"],
     runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy current sha"],
     getEngineeringRelease: ["check engineering release", "wait for release completion"],
     verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version"],
@@ -414,10 +417,12 @@ export async function prepareMandatoryExecutionMapCall(
   callbacks: MandatoryExecutionMapCallbacks,
 ): Promise<MandatoryExecutionPrepared> {
   await seedMandatoryExecutionMap(db, tools);
-  const actionIntent = normalizeText(rawInput.action_intent, 8000);
+  const actionIntent = normalizeText(rawInput.intent, 8000) ?? normalizeText(rawInput.action_intent, 8000);
   const objective = normalizeText(rawInput.objective, 8000);
   const actionKey = normalizeText(rawInput.action_key, 300)?.toLowerCase() ?? null;
-  const parsedInputs = safeJson(normalizeText(rawInput.inputs_json, 50000) ?? "{}", null);
+  const parsedInputs = rawInput.inputs && typeof rawInput.inputs === "object" && !Array.isArray(rawInput.inputs)
+    ? rawInput.inputs
+    : safeJson(normalizeText(rawInput.inputs_json, 50000) ?? "{}", null);
   const inputs = parsedInputs && typeof parsedInputs === "object" && !Array.isArray(parsedInputs)
     ? parsedInputs as Record<string, unknown>
     : null;
@@ -429,12 +434,13 @@ export async function prepareMandatoryExecutionMapCall(
     };
   }
 
-  const permitPayload = await callbacks.verifyPermit(rawInput.discovery_permit);
+  const permitPayload = await callbacks.verifyPermit(rawInput.permit ?? rawInput.discovery_permit);
   if (permitPayload?.kind === "mandatory_execution_map_discovery"
       && permitPayload.version === MANDATORY_EXECUTION_MAP_VERSION
       && typeof permitPayload.incident_id === "string") {
     const incident = await readOpenIncident(db, permitPayload.incident_id);
-    const discoveryTool = normalizeText(rawInput.discovery_tool, 160);
+    const discoveryTool = normalizeText((inputs as Record<string, unknown> | null)?.discovery_tool, 160)
+      ?? normalizeText(rawInput.discovery_tool, 160);
     const tool = tools.find((item) => item.name === discoveryTool);
     if (!incident || !tool || MAP_EXCLUDED_TOOLS.has(tool.name)) {
       return {
@@ -452,13 +458,28 @@ export async function prepareMandatoryExecutionMapCall(
         incident,
       };
     }
+    const executionInputs = { ...inputs };
+    delete executionInputs.discovery_tool;
+    const duplicate = await db.prepare(
+      `SELECT id FROM operator_execution_map_attempts
+       WHERE incident_id = ? AND tool_name = ? AND arguments_json = ?
+       LIMIT 1`,
+    ).bind(String(incident.id), tool.name, stringify(executionInputs).slice(0, 50000)).first<Record<string, unknown>>();
+    if (duplicate) {
+      return {
+        ok: false,
+        error: "mandatory_execution_map_duplicate_discovery_attempt",
+        map_state: "discovery",
+        incident,
+      };
+    }
     return {
       ok: true,
       tool_name: tool.name,
-      arguments: inputs,
+      arguments: executionInputs,
       map_state: "discovery",
       incident,
-      discovery_permit: String(rawInput.discovery_permit),
+      discovery_permit: String(rawInput.permit ?? rawInput.discovery_permit),
       map_execution: {
         version: MANDATORY_EXECUTION_MAP_VERSION,
         mode: "authorized_discovery",
@@ -471,6 +492,23 @@ export async function prepareMandatoryExecutionMapCall(
         discovery_tool: tool.name,
         requested_inputs: inputs,
       },
+    };
+  }
+
+  const openIncident = await db.prepare(
+    `SELECT * FROM operator_execution_map_incidents
+     WHERE status = 'discovery_open' AND action_intent = ?
+     ORDER BY datetime(updated_at) DESC
+     LIMIT 1`,
+  ).bind(actionIntent).first<Record<string, unknown>>();
+  if (openIncident) {
+    const incident = serializeIncident(openIncident);
+    return {
+      ok: false,
+      error: "mandatory_execution_map_open_incident_permit_required",
+      map_state: "unknown",
+      incident,
+      discovery_permit: await createDiscoveryPermit(callbacks, incident),
     };
   }
 
@@ -550,7 +588,7 @@ function isReusableExecutionPathFailure(toolName: string, result: Record<string,
   const error = String(result.error ?? result.error_code ?? "").toLowerCase();
   const phase = String(result.phase ?? "").toLowerCase();
   if (status >= 500 || [502, 503, 504].includes(Number(result.status_code ?? 0))) return true;
-  if (/transport|timeout|upstream|provider|connection|unavailable|head_changed|find_text_must_match|find_must_match|payload_too_large|client_preflight|schema_stale|unknown_runtime/.test(`${error} ${phase}`)) return true;
+  if (/transport|timeout|upstream|provider|connection|unavailable|head_changed|find_text_must_match|find_must_match|payload_too_large|client_preflight|schema_stale|unknown_runtime|repo_file_read_failed/.test(`${error} ${phase}`)) return true;
   if (/repo|github|workflow|deploy|cloudflare|file|patch|commit/i.test(toolName)
       && /not_found|missing|invalid_ref|exact_sha|conflict|rate_limit/.test(error)) return true;
   return false;
@@ -732,6 +770,15 @@ export async function finalizeMandatoryExecutionMapCall(
       inputs: mapExecution.requested_inputs && typeof mapExecution.requested_inputs === "object" && !Array.isArray(mapExecution.requested_inputs)
         ? mapExecution.requested_inputs as Record<string, unknown>
         : args,
+    });
+    await recordMapAttempt(db, {
+      incidentId: String(incident.id),
+      entryId,
+      actionIntent,
+      toolName,
+      args,
+      mode,
+      result,
     });
     return {
       version: MANDATORY_EXECUTION_MAP_VERSION,

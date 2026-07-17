@@ -76,7 +76,9 @@ if (source.includes('      await prepareOperatorMode(env);\n      const executio
 if (source.includes('      await ensureOperatorMcpAdminTables(env);\n      const executionPolicy = buildOperatorExecutionPolicy(toolName, args);')) {
   errors.push("mcp_dispatcher_schema_initialization_forbidden");
 }
-if (!source.includes('name: "executeMappedIntent"')
+if (!source.includes('name: "executeLensicallyIntent"')
+    || !source.includes('required: ["objective", "intent", "inputs"]')
+    || source.includes('filter((tool) => tool.name === "getOperatorStartupContext" || tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY)')
     || !source.includes('prepareMandatoryExecutionMapCall')
     || !source.includes('finalizeMandatoryExecutionMapCall')
     || !source.includes('model_tool_choice_allowed: false')
