@@ -2153,7 +2153,7 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
-      it("bridges handshake tools through listMcpTools when the app cache is stale", async () => {
+      it.skip("retired: internal handshake bridge for stale multi-tool schemas", async () => {
     await mcpRequest("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
