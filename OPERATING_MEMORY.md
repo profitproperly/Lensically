@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: splitting the execution-library source adapters into compound groups of 9, 10, 9, and 6 still exceeded D1's compound SELECT limit. Use: every execution-library compound query must contain at most four SELECT terms; merge all bounded group results afterward, and keep a release guard for the grouped implementation. Applies when: adding or regrouping D1-backed execution-library source adapters.
+
 - Failed: ingesting every execution-library source through one large SQLite `UNION ALL` query hit `too many terms in compound SELECT`, which removed Ops Memory, phonebook routes, and map entries from the compiled policy and correctly failed admission. Use: read the complete source set through several bounded compound queries, merge their results in memory, and keep release preflight guards for the grouped-query structure. Applies when: adding D1-backed source types to the mandatory execution library.
 
 - Failed: leaving a temporary Vitest `.only` modifier in `operatorMode.spec.ts` made the validation workflow skip 62 regressions and fail before producing useful application evidence. Use: focused modifiers are diagnostic-only local edits and must be removed before committing; CI must continue treating any `.only` as a hard failure. Applies when: isolating an Operator regression before a push-triggered or release validation run.
