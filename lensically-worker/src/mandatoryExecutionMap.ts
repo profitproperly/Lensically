@@ -626,15 +626,24 @@ async function compileExecutionPolicyLibrary(
   const forbiddenRules = mandatoryRules
     .filter((item) => /\b(?:never|do not|must not|forbidden|failed:|block)\b/i.test(item.rule))
     .slice(0, 20);
-  const coverage = await readExecutionPolicyLibraryCoverage(db);
+  let coverage = await readExecutionPolicyLibraryCoverage(db);
   const tableCatalog = await db.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
   ).all<{ name: string }>();
-  const coverageByType = new Map(coverage.map((item) => [item.source_type, item.total]));
+  const tableCatalogCount = (tableCatalog.results ?? []).length;
+  let coverageByType = new Map(coverage.map((item) => [item.source_type, item.total]));
+  let tableManifestCount = Number(coverageByType.get("d1_table_manifest") ?? 0);
+  if (tableManifestCount < tableCatalogCount) {
+    const repairedCatalog = await readExecutionPolicyLibraryTableCatalog(db);
+    await deactivateExecutionPolicyLibrarySourceTypes(db, ["d1_table_manifest"]);
+    await persistExecutionPolicyLibrarySources(db, repairedCatalog);
+    await markExecutionLibraryRefresh(db, "d1_table_manifest", repairedCatalog.length);
+    coverage = await readExecutionPolicyLibraryCoverage(db);
+    coverageByType = new Map(coverage.map((item) => [item.source_type, item.total]));
+    tableManifestCount = Number(coverageByType.get("d1_table_manifest") ?? 0);
+  }
   const requiredSourceTypes = ["pre_call_route", "map_entry", "tool_registry", "d1_table_manifest"];
   const missingRequiredSourceTypes = requiredSourceTypes.filter((sourceType) => Number(coverageByType.get(sourceType) ?? 0) === 0);
-  const tableCatalogCount = (tableCatalog.results ?? []).length;
-  const tableManifestCount = Number(coverageByType.get("d1_table_manifest") ?? 0);
   const policyReady = sourceReadError === null
     && missingRequiredSourceTypes.length === 0
     && tableManifestCount >= tableCatalogCount;
