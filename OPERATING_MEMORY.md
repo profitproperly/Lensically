@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: `/api/operator/health` reported the superseded registry generation after the mandatory execution library replaced the old map generation. Use: health metadata must report `mandatory-execution-library-v2`; release preflight rejects the old literal and the health regression verifies the public value. Applies when: renaming or replacing the execution controller generation.
+
 - Failed: routed actions prepared Operator tables before execution-library compilation, then admin/engineering handlers prepared and reseeded them again after compilation in test runtime. The second preparation marked policy sources dirty immediately, forced another full refresh on the next action, and violated the one-preparation execution path. Use: propagate `preparationAlreadyComplete` through routed handlers, admin/engineering bridges, and nested engineering calls; direct non-routed entry points still prepare themselves. Applies when: changing gateway dispatch, handler signatures, bridges, test table resets, or execution-library dirty-state assertions.
 
 - Failed: the compact receipt regression required `ops_memory` in `consulted_source_types` even when the table contained zero active rows, forcing the test to confuse an available source system with data actually consulted. Use: public `consulted_source_types` lists only nonempty materialized source types; exact D1 table availability remains proven by the table manifest and full internal coverage bundle. Applies when: testing compact execution-library receipts or empty policy stores.
