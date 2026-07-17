@@ -1030,6 +1030,8 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "getRepoStatus",
+  "readRepoFile",
+  "searchRepoFiles",
   "applyRepoPatchSet",
   "applyRepoTextPatch",
   "deleteRepoFile",
