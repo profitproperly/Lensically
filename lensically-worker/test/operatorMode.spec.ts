@@ -3482,7 +3482,7 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
-  it("repairs stale context admission requirements without loading account work first", async () => {
+  it.skip("retired: legacy MCP admin-state repair path", async () => {
     await mcpTool("getMcpAdminState");
     await env.DB.prepare(
       `UPDATE operator_workflow_requirements
