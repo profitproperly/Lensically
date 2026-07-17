@@ -2381,6 +2381,49 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
+  it("refreshes policy sources on the next action after a policy write", async () => {
+    const warm = await mcpToolCallRaw<{ execution_library: { policy_ready: boolean } }>("executeLensicallyIntent", {
+      objective: "Initialize the mandatory execution library.",
+      intent: "inspect engineering access state",
+      inputs: {},
+    });
+    expect(warm.isError).not.toBe(true);
+    expect(warm.structuredContent.execution_library.policy_ready).toBe(true);
+
+    const memoryId = crypto.randomUUID();
+    const marker = `immediate policy refresh marker ${memoryId}`;
+    await env.DB.prepare(
+      `INSERT INTO operator_ops_memory (id, title, fix, applies_when, tags_json, active)
+       VALUES (?, ?, ?, ?, '[]', 1)`,
+    ).bind(memoryId, marker, "Use the newly written policy on the next action.", marker).run();
+    const dirty = await env.DB.prepare(
+      `SELECT source_fingerprint FROM operator_execution_library_ingestion_state
+       WHERE source_system = 'refresh' AND source_name = 'dynamic_sources' LIMIT 1`,
+    ).first<{ source_fingerprint: string }>();
+    expect(dirty?.source_fingerprint).toBe("dirty");
+
+    const applied = await mcpToolCallRaw<{ execution_library: { policy_ready: boolean } }>("executeLensicallyIntent", {
+      objective: "Verify the newly written policy is used immediately.",
+      intent: `${marker} gateway status`,
+      inputs: {},
+    });
+    expect(applied.isError).not.toBe(true);
+    expect(applied.structuredContent.execution_library.policy_ready).toBe(true);
+
+    const compiled = await env.DB.prepare(
+      `SELECT policy_json FROM operator_execution_library_events
+       WHERE action_intent = ? AND phase = 'policy_compiled'
+       ORDER BY datetime(created_at) DESC, rowid DESC LIMIT 1`,
+    ).bind(`${marker} gateway status`).first<{ policy_json: string }>();
+    const policy = JSON.parse(String(compiled?.policy_json ?? "{}")) as { matched_source_keys?: string[] };
+    expect(policy.matched_source_keys).toContain(`ops_memory:${memoryId}`);
+    const refreshed = await env.DB.prepare(
+      `SELECT source_fingerprint FROM operator_execution_library_ingestion_state
+       WHERE source_system = 'refresh' AND source_name = 'dynamic_sources' LIMIT 1`,
+    ).first<{ source_fingerprint: string }>();
+    expect(refreshed?.source_fingerprint).not.toBe("dirty");
+  }, 30000);
+
   it("records unknown terrain, permits discovery once, and promotes the successful path", async () => {
     const actionIntent = "perform a completely novel memory census";
     const unknown = await mcpToolCallRaw<{
