@@ -190,6 +190,8 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("executionLibraryRefreshDue")
     || !executionMap.includes("executionLibraryTextFingerprint")
     || !executionMap.includes("ensureExecutionPolicyLibraryDirtyTriggers")
+    || !executionMap.includes("expectedTriggerNames")
+    || !executionMap.includes("triggersComplete")
     || !executionMap.includes('source_fingerprint === "dirty"')
     || !executionMap.includes("readExecutionPolicyLibraryCandidates")
     || !executionMap.includes("const groups = await Promise.all([")
