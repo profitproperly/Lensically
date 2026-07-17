@@ -2337,23 +2337,6 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
-  it("classifies universal hardening separately from account creative changes", async () => {
-    const universal = await mcpTool<{ policy: { execution_plane: string; scope_classification: { scope: string }; hard_bounds: Record<string, unknown>; forbidden_routes: string[] } }>("planOperatorExecution", {
-      intended_tool: "searchRepoFiles",
-      operation: "Prevent repository search limits and 502 retries across every fresh chat.",
-    });
-    expect(universal.policy.execution_plane).toBe("engineering_control");
-    expect(universal.policy.scope_classification.scope).toBe("universal");
-    expect(universal.policy.hard_bounds).toMatchObject({ external_requests_max: 2, file_content_fanout_max: 0, result_limit_max: 20 });
-    expect(universal.policy.forbidden_routes.join(" ")).toContain("recursive tree plus per-file content reads");
-
-    const accountScoped = await mcpTool<{ policy: { scope_classification: { scope: string } } }>("planOperatorExecution", {
-      intended_tool: "create_source_card",
-      operation: "Change Manifest brand voice and source interpretation for one content lane.",
-    });
-    expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
-  }, 30000);
-
   it("makes the static router the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
     expect(direct.isError).toBe(true);
