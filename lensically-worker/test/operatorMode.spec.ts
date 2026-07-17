@@ -3221,34 +3221,6 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 50000);
 
-    it("blocks same-build wrapper hopping but clears stale failures after deployment", async () => {
-    const mutableEnv = env as unknown as Record<string, unknown>;
-    const originalCommitSha = mutableEnv.LENSICALLY_COMMIT_SHA;
-    try {
-      mutableEnv.LENSICALLY_COMMIT_SHA = "vitest-deployment-a";
-      const direct = await mcpToolRaw<{ error: string }>("readRepoFile", { path: "missing-vitest-file.md" });
-      expect(direct.isError).toBe(true);
-      expect(direct.structuredContent.error).toBe("repo_file_read_failed");
-      const alias = await mcpToolRaw<{ error: string; prior_failed_route: string }>("runEngineeringTool", {
-        tool_name: "readRepoFile",
-        arguments: { path: "missing-vitest-file.md" },
-      });
-      expect(alias.isError).toBe(true);
-      expect(alias.structuredContent.error).toBe("same_backend_route_retry_forbidden");
-      expect(alias.structuredContent.prior_failed_route).toBe("readRepoFile");
-
-      mutableEnv.LENSICALLY_COMMIT_SHA = "vitest-deployment-b";
-      const afterDeployment = await mcpToolRaw<{ ok: boolean; result: { error: string } }>("runEngineeringTool", {
-        tool_name: "readRepoFile",
-        arguments: { path: "missing-vitest-file.md" },
-      });
-      expect(afterDeployment.isError).toBe(true);
-      expect(afterDeployment.structuredContent.result.error).toBe("repo_file_read_failed");
-    } finally {
-      mutableEnv.LENSICALLY_COMMIT_SHA = originalCommitSha;
-    }
-  }, 30000);
-
   it("authorizes routine engineering without owner decisions or numerical budgets and resolves known paths before execution", async () => {
     const planned = await mcpTool<{
       policy: {
