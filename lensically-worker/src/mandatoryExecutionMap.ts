@@ -502,8 +502,8 @@ async function syncExecutionPolicyLibrarySources(
   }
   await persistExecutionPolicyLibrarySources(db, refreshSources);
   if (staticRefreshDue) await markExecutionLibraryRefresh(db, "static_sources", generatedSources.length + toolSources.length, staticFingerprint);
-  if (dynamicRefreshDue && sourceReadError === null) await markExecutionLibraryRefresh(db, "dynamic_sources", dynamicSources.length);
-  if (catalogRefreshDue && tableCatalogSources.length) await markExecutionLibraryRefresh(db, "d1_table_manifest", tableCatalogSources.length);
+  if (dynamicRefreshDue && dynamicRefreshSucceeded) await markExecutionLibraryRefresh(db, "dynamic_sources", dynamicSources.length);
+  if (catalogRefreshDue && catalogRefreshSucceeded) await markExecutionLibraryRefresh(db, "d1_table_manifest", tableCatalogSources.length);
   const countRows = await db.prepare(
     `SELECT source_type, COUNT(*) AS total
      FROM operator_execution_library_sources
