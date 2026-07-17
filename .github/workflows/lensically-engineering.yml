@@ -89,7 +89,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          npm run test -- --run test/operatorMode.spec.ts --reporter=verbose --bail=1 -t "qualifies, randomly draws, persists, and source-card-links Manifest sources" 2>&1 | tee /tmp/lensically-operator-tests.log
+          npm run test -- --run test/operatorMode.spec.ts --reporter=verbose --bail=1 2>&1 | tee /tmp/lensically-operator-tests.log
 
       - name: Surface Operator test failure
         if: ${{ steps.operator_tests.outcome == 'failure' }}
