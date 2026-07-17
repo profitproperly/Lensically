@@ -1436,7 +1436,6 @@ export async function prepareMandatoryExecutionMapCall(
   tools: MandatoryExecutionToolDefinition[],
   callbacks: MandatoryExecutionMapCallbacks,
 ): Promise<MandatoryExecutionPrepared> {
-  await seedMandatoryExecutionMap(db, tools);
   const actionIntent = normalizeText(rawInput.intent, 8000) ?? normalizeText(rawInput.action_intent, 8000);
   const objective = normalizeText(rawInput.objective, 8000);
   const actionKey = normalizeText(rawInput.action_key, 300)?.toLowerCase() ?? null;
@@ -1453,6 +1452,10 @@ export async function prepareMandatoryExecutionMapCall(
       map_state: "unknown",
     };
   }
+  const directEngineering = prepareSourceDefinedDirectEngineeringCall(actionIntent, objective, inputs, tools);
+  if (directEngineering) return directEngineering;
+
+  await seedMandatoryExecutionMap(db, tools);
   const staticPolicySources = callbacks.readStaticPolicySources
     ? await callbacks.readStaticPolicySources()
     : [];
