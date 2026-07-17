@@ -17557,11 +17557,17 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         resultPayload.routed_execution = routedGatewayMetadata;
         resultPayload.execution_guard_enforcement = {
           version: OPERATOR_EXECUTION_GUARD_VERSION,
-          mode: "mandatory_execution_map",
+          mode: sourceDefinedDirectEngineering ? "source_defined_direct_engineering" : "mandatory_execution_map",
           normalized_before_execution: true,
           known_path_checked: true,
           direct_operational_calls_allowed: false,
           model_tool_choice_allowed: false,
+          ...(sourceDefinedDirectEngineering ? {
+            d1_bootstrap_bypassed: true,
+            d1_pre_call_routing_bypassed: true,
+            d1_execution_events_bypassed: true,
+            d1_autonomy_bypassed: true,
+          } : {}),
         };
       }
       resultPayload.execution_policy = executionPolicy;
