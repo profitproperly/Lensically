@@ -128,6 +128,21 @@ if (!executionMap.includes("isDeterministicInputValidationFailure")
     || !executionMap.includes("await repairDeterministicInputValidationIncidents(db)")) {
   errors.push("mandatory_execution_map_input_validation_repair_missing");
 }
+if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v1"')
+    || !executionMap.includes("compileExecutionPolicyLibrary")
+    || !executionMap.includes("consulted_before_execution: true")
+    || !executionMap.includes("failed_recorded_before_repair")
+    || !executionMap.includes("mandatory_path_updated_before_resume")
+    || !source.includes("resultPayload.execution_library = routedGatewayMetadata.execution_library")) {
+  errors.push("mandatory_execution_library_contract_missing");
+}
+if (!tests.includes("consulted_before_execution: true")
+    || !tests.includes('"ops_memory"')
+    || !tests.includes('"pre_call_route"')
+    || !tests.includes('"map_entry"')) {
+  errors.push("mandatory_execution_library_regression_missing");
+}
+
 if (!recoverySource.includes('exact_sha_not_current_branch_head') || !recoverySource.includes('dispatch_ref: dispatchRef') || !recoverySource.includes('verified_head_sha: verifiedHeadSha')) {
   errors.push("recovery_exact_sha_dispatch_guard_missing");
 }

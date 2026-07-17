@@ -2084,7 +2084,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.25.1");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.26.0");
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "deployment_id")).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_deployment")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_config_deployment")).toBe(true);
@@ -2109,7 +2109,7 @@ describe("operator mode MCP endpoint", () => {
     const direct = await mcpTool<{ tool_surface: { total_tools: number } }>("getOperatorStartupContext");
     const precheck = await mcpTool<{ status_kind: string; runtime: { mcp_version: string; deployment_id?: string | null }; tool_surface: { total_tools: number }; recent_ops_memory: Array<Record<string, unknown>>; startup_context?: unknown }>("engineeringPrecheck");
     expect(precheck.status_kind).toBe("compact_engineering_precheck");
-        expect(precheck.runtime.mcp_version).toBe("1.25.1");
+        expect(precheck.runtime.mcp_version).toBe("1.26.0");
     expect(precheck.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
     expect(precheck.startup_context).toBeUndefined();
     expect(JSON.stringify(precheck).length).toBeLessThan(12000);
@@ -3344,7 +3344,7 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.25.1");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.26.0");
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
@@ -3406,8 +3406,8 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-                                expect(payload.mcp_version).toBe("1.25.1");
-    expect(payload.registry_generation).toBe("mandatory-execution-map-v1");
+                                expect(payload.mcp_version).toBe("1.26.0");
+    expect(payload.registry_generation).toBe("mandatory-execution-library-v2");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
     expect(payload.tools).toBeUndefined();
