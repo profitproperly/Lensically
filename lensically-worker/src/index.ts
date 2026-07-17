@@ -31648,15 +31648,43 @@ export class ScheduledPostScheduler {
 
     try {
       overdueBefore = await countOverdueScheduledPosts(this.env);
+      if (control.mode === "paused" && overdueBefore > 0 && shouldAutoResumeTemporarySchedulerPause(control)) {
+        const previousReason = control.reason;
+        control = await this.setControl({
+          mode: "normal",
+          reason: `auto_resumed_temporary_pause:${previousReason ?? "unknown"}`.slice(0, 500),
+        });
+        logWorkerEvent("SCHEDULED_POST_SCHEDULER_TEMPORARY_PAUSE_EXPIRED", {
+          trigger,
+          previous_reason: previousReason,
+          overdue_count: overdueBefore,
+        });
+      }
       if (control.mode === "canary") {
         processed = await processDueScheduledPosts(this.env, {
           allowedPostIds: control.allowed_post_ids,
           maxPosts: 1,
         });
         if (processed.selected_count > 0) {
+          const canaryPostId = control.allowed_post_ids[0] ?? null;
+          const canaryPost = canaryPostId
+            ? await this.env.DB.prepare(
+              `SELECT status, published_post_id
+               FROM scheduled_posts
+               WHERE id = ?
+               LIMIT 1`,
+            ).bind(canaryPostId).first<{ status: string; published_post_id: string | null }>()
+            : null;
+          const canarySucceeded = canaryPost?.status === SCHEDULED_POST_STATUS_POSTED
+            && Boolean(canaryPost.published_post_id?.trim());
+          const resumeMode = canarySucceeded ? control.resume_mode ?? "paused" : "paused";
           await this.setControl({
-            mode: "paused",
-            reason: "canary_attempt_completed",
+            mode: resumeMode,
+            reason: canarySucceeded
+              ? resumeMode === "normal"
+                ? "canary_publish_succeeded_resume_normal"
+                : "canary_attempt_completed"
+              : "canary_publish_failed",
           });
         }
       } else if (control.mode === "normal") {
