@@ -13641,6 +13641,16 @@ async function prepareOperatorRoutedGatewayCall(
     args = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
       ? normalized.value as Record<string, unknown>
       : {};
+    if (mapped.map_execution?.mode === "source_defined_direct_engineering") {
+      return {
+        ...mapped,
+        ok: true,
+        tool_name: toolName,
+        arguments: args,
+        corrections,
+        route_trail: [],
+      };
+    }
     const routing = await resolveOperatorPreCallRouting(env, toolName, args);
     corrections.push(...routing.corrections);
     args = routing.arguments;
