@@ -13567,6 +13567,7 @@ async function prepareOperatorRoutedGatewayCall(
   env: Env,
   gatewayArgs: Record<string, unknown>,
 ): Promise<OperatorRoutedGatewayResult> {
+  await prepareOperatorMode(env);
   const availableTools = await buildOperatorMcpTools(env, false, false);
   const mapped = await prepareMandatoryExecutionMapCall(
     env.DB,
