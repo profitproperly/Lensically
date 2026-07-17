@@ -213,6 +213,109 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
   }));
 }
 
+async function compileExecutionPolicyLibrary(
+  db: D1Database,
+  actionIntent: string,
+  inputs: Record<string, unknown>,
+  tools: MandatoryExecutionToolDefinition[],
+): Promise<Record<string, unknown>> {
+  await ensureExecutionPolicyLibraryTables(db);
+  let dynamicSources: ExecutionPolicyLibrarySource[] = [];
+  let sourceReadError: string | null = null;
+  try {
+    dynamicSources = await readExecutionPolicyLibrarySources(db);
+  } catch (error) {
+    sourceReadError = error instanceof Error ? error.message : String(error);
+  }
+  const toolSources = tools
+    .filter((tool) => !MAP_EXCLUDED_TOOLS.has(tool.name))
+    .map((tool) => ({
+      source_type: "tool_registry",
+      source_id: tool.name,
+      text: `${tool.name} ${tool.title} ${tool.description} ${stringify(procedureForTool(tool))}`,
+      updated_at: null,
+    } satisfies ExecutionPolicyLibrarySource));
+  const sources = [...generatedExecutionKnowledgeSources(), ...dynamicSources, ...toolSources];
+  const queryTokens = executionLibraryTokens(`${actionIntent} ${stringify(inputs)}`);
+  const matched = sources
+    .map((source) => ({ source, score: executionLibrarySourceScore(queryTokens, source) }))
+    .filter((item) => item.score >= 5)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 60);
+  const authoritativeTypes = new Set(["repository_knowledge", "ops_memory", "pre_call_route", "workflow_requirement", "map_entry", "tool_registry"]);
+  const mandatoryRules = matched
+    .filter((item) => authoritativeTypes.has(item.source.source_type))
+    .slice(0, 30)
+    .map((item) => ({
+      source_key: `${item.source.source_type}:${item.source.source_id}`,
+      rule: item.source.text.slice(0, 1600),
+      score: Number(item.score.toFixed(2)),
+    }));
+  const forbiddenRules = mandatoryRules
+    .filter((item) => /\b(?:never|do not|must not|forbidden|failed:|block)\b/i.test(item.rule))
+    .slice(0, 20);
+  const coverage = new Map<string, number>();
+  for (const source of sources) coverage.set(source.source_type, (coverage.get(source.source_type) ?? 0) + 1);
+  const tableCatalog = await db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+  ).all<{ name: string }>();
+  const bundle = {
+    version: EXECUTION_POLICY_LIBRARY_VERSION,
+    mandatory: true,
+    consulted_before_execution: true,
+    model_path_choice_allowed: false,
+    action_intent: actionIntent,
+    source_coverage: Array.from(coverage.entries()).map(([source_type, total]) => ({ source_type, total })),
+    d1_table_catalog: (tableCatalog.results ?? []).map((row) => row.name),
+    matched_source_keys: matched.map((item) => `${item.source.source_type}:${item.source.source_id}`),
+    mandatory_rules: mandatoryRules,
+    forbidden_rules: forbiddenRules,
+    source_read_error: sourceReadError,
+    discovery_allowed_only_when: ["no verified path exists", "the exact verified path was followed and failed"],
+    failure_recording_rule: "Record a newly observed failure before discovery or repair. Promote the verified fix before the interrupted objective resumes.",
+  };
+  await db.prepare(
+    `INSERT INTO operator_execution_library_events (
+      id, action_intent, phase, outcome, mapped_tool, source_keys_json, policy_json, evidence_json
+    ) VALUES (?, ?, 'policy_compiled', 'ready', NULL, ?, ?, '{}')`,
+  ).bind(
+    crypto.randomUUID(),
+    actionIntent,
+    stringify(bundle.matched_source_keys).slice(0, 50000),
+    stringify(bundle).slice(0, 50000),
+  ).run();
+  return bundle;
+}
+
+async function recordExecutionPolicyLibraryEvent(
+  db: D1Database,
+  input: {
+    actionIntent: string;
+    phase: string;
+    outcome: string;
+    mappedTool?: string | null;
+    policy?: Record<string, unknown> | null;
+    evidence?: Record<string, unknown> | null;
+  },
+): Promise<void> {
+  await ensureExecutionPolicyLibraryTables(db);
+  const sourceKeys = Array.isArray(input.policy?.matched_source_keys) ? input.policy?.matched_source_keys : [];
+  await db.prepare(
+    `INSERT INTO operator_execution_library_events (
+      id, action_intent, phase, outcome, mapped_tool, source_keys_json, policy_json, evidence_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    input.actionIntent,
+    input.phase,
+    input.outcome,
+    input.mappedTool ?? null,
+    stringify(sourceKeys).slice(0, 50000),
+    stringify(input.policy ?? {}).slice(0, 50000),
+    stringify(input.evidence ?? {}).slice(0, 50000),
+  ).run();
+}
+
 function toolCategory(toolName: string): string {
   if (/repo|github|file|patch|commit/i.test(toolName)) return "repository";
   if (/deploy|release|cloudflare|version/i.test(toolName)) return "deployment";
