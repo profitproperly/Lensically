@@ -12579,51 +12579,8 @@ function createScopedOperatorWrapperTool(
 }
 
 
-async function buildOperatorMcpTools(env: Env, includeDisabled = false, includeScopedWrappers = true): Promise<OperatorMcpToolDefinition[]> {
-  const baseTools = buildOperatorMcpBaseTools(includeScopedWrappers);
-
-  const baseByName = new Map(baseTools.map((tool) => [tool.name, tool]));
-  let overrides: Array<Record<string, unknown>> = [];
-  try {
-    overrides = await listOperatorMcpOverrides(env);
-  } catch {
-    return baseTools;
-  }
-  for (const override of overrides) {
-    const toolName = String(override.tool_name ?? "");
-    if (!toolName) {
-      continue;
-    }
-    const schemaPatch = safeParseJsonString(String(override.schema_patch_json ?? "null"));
-    const behaviorPatch = safeParseJsonString(String(override.behavior_patch_json ?? "null"));
-    const handlerSpec = safeParseJsonString(String(override.handler_spec_json ?? "null"));
-    const existing = baseByName.get(toolName);
-    const configured = existing ?? {
-      name: toolName,
-      title: toolName,
-      description: String(override.description_override ?? `Runtime configured tool ${toolName}.`),
-      inputSchema: { type: "object", properties: {}, additionalProperties: true },
-      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    };
-    if (override.description_override) {
-      configured.description = String(override.description_override);
-    }
-    if (schemaPatch && typeof schemaPatch === "object" && !Array.isArray(schemaPatch)) {
-      configured.inputSchema = mergeOperatorPlainObjects(configured.inputSchema, schemaPatch) as OperatorMcpToolDefinition["inputSchema"];
-    }
-    (configured as unknown as Record<string, unknown>).runtime_config = {
-      disabled: Number(override.disabled ?? 0) === 1,
-      behavior_patch: behaviorPatch,
-      handler_spec: handlerSpec,
-      last_reason: override.last_reason ?? null,
-      updated_at: override.updated_at ?? null,
-    };
-    baseByName.set(toolName, configured);
-  }
-  return [...baseByName.values()].filter((tool) => {
-    const runtimeConfig = (tool as unknown as Record<string, unknown>).runtime_config as Record<string, unknown> | undefined;
-    return includeDisabled || runtimeConfig?.disabled !== true;
-  });
+async function buildOperatorMcpTools(_env: Env, _includeDisabled = false, includeScopedWrappers = true): Promise<OperatorMcpToolDefinition[]> {
+  return buildOperatorMcpBaseTools(includeScopedWrappers);
 }
 
 async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<Record<string, unknown> | null> {
