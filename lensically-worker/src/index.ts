@@ -17387,7 +17387,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
-      if (!sourceDefinedDirectEngineering) {
+      if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
       }
       const idempotencyKey = sourceDefinedDirectEngineering
