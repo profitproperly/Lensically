@@ -17326,14 +17326,30 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           protected_operations_owner_ratified: true,
         };
       }
-            if (routedGatewayMetadata) {
+      if (routedGatewayMetadata) {
+        const mapLifecycle = await finalizeMandatoryExecutionMapCall(
+          env.DB,
+          routedGatewayMetadata.map_execution && typeof routedGatewayMetadata.map_execution === "object" && !Array.isArray(routedGatewayMetadata.map_execution)
+            ? routedGatewayMetadata.map_execution as Record<string, unknown>
+            : null,
+          toolName,
+          args,
+          resultPayload,
+          await buildOperatorMcpTools(env, false, false) as MandatoryExecutionToolDefinition[],
+          {
+            signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
+            verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
+          },
+        );
+        resultPayload.mandatory_execution_map = mapLifecycle;
         resultPayload.routed_execution = routedGatewayMetadata;
         resultPayload.execution_guard_enforcement = {
           version: OPERATOR_EXECUTION_GUARD_VERSION,
-          mode: "mandatory_routed_gateway",
+          mode: "mandatory_execution_map",
           normalized_before_execution: true,
           known_path_checked: true,
           direct_operational_calls_allowed: false,
+          model_tool_choice_allowed: false,
         };
       }
       resultPayload.execution_policy = executionPolicy;
