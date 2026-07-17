@@ -470,8 +470,8 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
   `).all<Record<string, unknown>>(),
     db.prepare(`
     SELECT 'gate_result' AS source_type, id AS source_id,
-      brand_key || ' ' || gate_key || ' ' || result || ' blocking ' || blocking || ' ' || rationale || ' ' || evaluated_by || ' ' || COALESCE(evidence_json, '') || ' ' || COALESCE(repair_guidance, ''),
-      created_at
+      brand_key || ' ' || gate_key || ' ' || result || ' blocking ' || blocking || ' ' || rationale || ' ' || evaluated_by || ' ' || COALESCE(evidence_json, '') || ' ' || COALESCE(repair_guidance, '') AS text,
+      created_at AS updated_at
     FROM operator_gate_results
     UNION ALL
     SELECT 'content_inventory', id,
