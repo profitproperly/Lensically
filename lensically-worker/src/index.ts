@@ -16219,19 +16219,6 @@ async function handleOperatorMcpEngineeringTool(
     const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
       ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
       : undefined;
-    const memories = await env.DB.prepare(
-      `SELECT id, title, applies_when, updated_at
-       FROM operator_ops_memory
-       WHERE active = 1
-       ORDER BY datetime(updated_at) DESC
-       LIMIT 4`,
-    ).all<Record<string, unknown>>();
-    const failures = await env.DB.prepare(
-      `SELECT id, tool_name, likely_cause, created_at
-       FROM operator_mcp_admin_errors
-       ORDER BY datetime(created_at) DESC
-       LIMIT 4`,
-    ).all<Record<string, unknown>>();
     return {
       ok: true,
       status_kind: "compact_engineering_precheck",
