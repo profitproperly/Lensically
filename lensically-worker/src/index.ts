@@ -15329,7 +15329,7 @@ async function handleOperatorMcpAdminTool(
     const errorText = JSON.stringify(args.error_response ?? {}) + " " + String(args.error_text ?? "");
     const lower = errorText.toLowerCase();
     let likelyCause = "unknown_runtime_failure";
-    let recommendedFix = ["Read the tool definition with readMcpToolDefinition, then update schema or behavior if the failure is reproducible."];
+    let recommendedFix = ["Read the active source-defined handler, patch the smallest code or schema boundary, add a focused regression, and release the exact SHA."];
     if (lower.includes("unauthorized") || lower.includes("invalid_client")) {
       likelyCause = "auth_or_oauth_configuration";
       recommendedFix = ["Verify OAuth app configuration and MCP bearer token environment binding."];
