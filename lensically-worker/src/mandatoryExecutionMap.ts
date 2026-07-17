@@ -1194,6 +1194,14 @@ export async function prepareMandatoryExecutionMapCall(
   }
   const compiledExecutionLibrary = await compileExecutionPolicyLibrary(db, actionIntent, inputs, tools);
   const executionLibrary = executionPolicyLibraryReceipt(compiledExecutionLibrary);
+  if (compiledExecutionLibrary.policy_ready !== true) {
+    return {
+      ok: false,
+      error: "execution_policy_library_not_ready",
+      map_state: "unknown",
+      execution_library: executionLibrary,
+    };
+  }
 
   const permitPayload = await callbacks.verifyPermit(rawInput.permit ?? rawInput.discovery_permit);
   if (permitPayload?.kind === "mandatory_execution_map_discovery"
