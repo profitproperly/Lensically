@@ -1715,6 +1715,7 @@ describe("operator mode MCP endpoint", () => {
         expect(new Set(toolNames).size).toBe(toolNames.length);
         expect(registry.tools.slice(0, 75).map((tool) => tool.name)).toEqual(expect.arrayContaining([
       "setScheduledPostSchedulerMode",
+      "recoverOverdueScheduledPosts",
       "runApprovedPostCanary",
     ]));
     expect(() => JSON.stringify(registry.tools)).not.toThrow();
