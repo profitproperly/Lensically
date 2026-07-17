@@ -11862,7 +11862,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "readMcpToolDefinition",
     title: "Read MCP tool definition",
-    description: "Read one MCP tool definition with its active schema, behavior override, and handler notes.",
+    description: "Read one active source-defined MCP handler and its typed input schema.",
     inputSchema: { type: "object", properties: { tool_name: { type: "string" } }, required: ["tool_name"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
