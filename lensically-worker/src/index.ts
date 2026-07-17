@@ -6496,23 +6496,6 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     MANIFEST_AUTONOMY_MODE,
   ).run();
 
-    await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_ops_memory (
-
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      problem TEXT,
-      fix TEXT NOT NULL,
-      applies_when TEXT,
-      tags_json TEXT,
-      active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-
-  await ensureOperatorPreCallRoutesTable(env);
-
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_engineering_audit (
       id TEXT PRIMARY KEY,
