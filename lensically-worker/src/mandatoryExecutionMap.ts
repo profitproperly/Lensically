@@ -460,13 +460,17 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       created_at
     FROM operator_post_metric_snapshots
     ORDER BY updated_at DESC
-  `).all<Record<string, unknown>>();
-  return (rows.results ?? []).map((row) => ({
-    source_type: String(row.source_type ?? "unknown"),
-    source_id: String(row.source_id ?? "unknown"),
-    text: String(row.text ?? ""),
-    updated_at: row.updated_at == null ? null : String(row.updated_at),
-  }));
+  `).all<Record<string, unknown>>(),
+  ]);
+  return groups
+    .flatMap((group) => group.results ?? [])
+    .map((row) => ({
+      source_type: String(row.source_type ?? "unknown"),
+      source_id: String(row.source_id ?? "unknown"),
+      text: String(row.text ?? ""),
+      updated_at: row.updated_at == null ? null : String(row.updated_at),
+    }))
+    .sort((left, right) => String(right.updated_at ?? "").localeCompare(String(left.updated_at ?? "")));
 }
 
 function executionLibraryTextFingerprint(value: string): string {
