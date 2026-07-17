@@ -197,6 +197,10 @@ if (!tests.includes('makes the execution map the only public action path')
 if (tests.includes(".only(") || /operatorMode\.spec\.ts[^\n]*\s-t\s/.test(workflow)) {
   errors.push("focused_operator_test_filter_forbidden");
 }
+if (executionMap.includes('"getOperatorStartupContext",\n  "guardLensicallyCall"')
+    || !executionMap.includes('return "getOperatorStartupContext";')) {
+  errors.push("mandatory_startup_map_route_missing");
+}
 if (!executionMap.includes("isDeterministicInputValidationFailure")
     || !executionMap.includes("result.ok !== false || isDeterministicInputValidationFailure(result)")
     || !executionMap.includes("repairDeterministicInputValidationIncidents")
