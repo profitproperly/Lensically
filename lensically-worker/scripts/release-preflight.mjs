@@ -21,6 +21,7 @@ const repositoryFiles = collectRepositoryFiles(repoRoot);
 const repositoryFileManifest = repositoryFiles.map((absolute) => ({
   path: relative(repoRoot, absolute).replaceAll("\\", "/"),
   size: statSync(absolute).size,
+  sha256: createHash("sha256").update(readFileSync(absolute)).digest("hex"),
 }));
 const repositoryTextKnowledge = Object.fromEntries(repositoryFiles
   .map((absolute) => ({
