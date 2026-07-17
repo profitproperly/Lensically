@@ -933,13 +933,13 @@ async function seedMandatoryExecutionMap(
       crypto.randomUUID(),
       actionKey,
       toolCategory(tool.name),
-      stringify(intentAliasesForTool(tool)),
+      desiredAliases,
       tool.name,
-      stringify(toolSchemaProperties(tool)),
-      stringify(toolRequiredProperties(tool)),
-      stringify(procedureForTool(tool)),
-      stringify({ kind: "mapped_handler_result", path_failure_classifier: "reusable_execution_path_failure_only" }),
-      "Seeded from the live internal typed tool registry. The map, not the model, selects this tool for the matching action intent.",
+      desiredAllowedInputs,
+      desiredRequiredInputs,
+      desiredProcedure,
+      desiredSuccessRule,
+      desiredVerificationSummary,
     ).run();
   }
 }
