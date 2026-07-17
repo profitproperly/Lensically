@@ -400,6 +400,67 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
   }));
 }
 
+async function syncExecutionPolicyLibrarySources(
+  db: D1Database,
+  tools: MandatoryExecutionToolDefinition[],
+): Promise<{ sources: ExecutionPolicyLibrarySource[]; sourceReadError: string | null }> {
+  let sourceReadError: string | null = null;
+  let dynamicSources: ExecutionPolicyLibrarySource[] = [];
+  let tableCatalogSources: ExecutionPolicyLibrarySource[] = [];
+  try {
+    dynamicSources = await readExecutionPolicyLibrarySources(db);
+  } catch (error) {
+    sourceReadError = error instanceof Error ? error.message : String(error);
+  }
+  try {
+    tableCatalogSources = await readExecutionPolicyLibraryTableCatalog(db);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    sourceReadError = sourceReadError ? `${sourceReadError}; ${message}` : message;
+  }
+  const toolSources = tools
+    .filter((tool) => !MAP_EXCLUDED_TOOLS.has(tool.name))
+    .map((tool) => ({
+      source_type: "tool_registry",
+      source_id: tool.name,
+      text: `${tool.name} ${tool.title} ${tool.description} ${stringify(procedureForTool(tool))}`,
+      updated_at: null,
+    } satisfies ExecutionPolicyLibrarySource));
+  await persistExecutionPolicyLibrarySources(db, [
+    ...generatedExecutionKnowledgeSources(),
+    ...dynamicSources,
+    ...tableCatalogSources,
+    ...toolSources,
+  ]);
+  const rows = await db.prepare(
+    `SELECT source_type, source_id, text, source_updated_at AS updated_at
+     FROM operator_execution_library_sources
+     WHERE active = 1
+     ORDER BY COALESCE(source_updated_at, synced_at) DESC
+     LIMIT 5000`,
+  ).all<Record<string, unknown>>();
+  const sources = (rows.results ?? []).map((row) => ({
+    source_type: String(row.source_type ?? "unknown"),
+    source_id: String(row.source_id ?? "unknown"),
+    text: String(row.text ?? ""),
+    updated_at: row.updated_at == null ? null : String(row.updated_at),
+  }));
+  const counts = new Map<string, number>();
+  for (const source of sources) counts.set(source.source_type, (counts.get(source.source_type) ?? 0) + 1);
+  if (counts.size) {
+    await db.batch(Array.from(counts.entries()).map(([sourceType, total]) => db.prepare(
+      `INSERT INTO operator_execution_library_ingestion_state (
+        source_system, source_name, source_fingerprint, source_count, last_synced_at
+      ) VALUES ('execution_library', ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(source_system, source_name) DO UPDATE SET
+        source_fingerprint = excluded.source_fingerprint,
+        source_count = excluded.source_count,
+        last_synced_at = CURRENT_TIMESTAMP`,
+    ).bind(sourceType, `${sourceType}:${total}`, total)));
+  }
+  return { sources, sourceReadError };
+}
+
 async function compileExecutionPolicyLibrary(
   db: D1Database,
   actionIntent: string,
