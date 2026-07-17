@@ -634,20 +634,42 @@ async function recordExecutionPolicyLibraryEvent(
 ): Promise<void> {
   await ensureExecutionPolicyLibraryTables(db);
   const sourceKeys = Array.isArray(input.policy?.matched_source_keys) ? input.policy?.matched_source_keys : [];
-  await db.prepare(
-    `INSERT INTO operator_execution_library_events (
-      id, action_intent, phase, outcome, mapped_tool, source_keys_json, policy_json, evidence_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    input.actionIntent,
-    input.phase,
-    input.outcome,
-    input.mappedTool ?? null,
-    stringify(sourceKeys).slice(0, 50000),
-    stringify(input.policy ?? {}).slice(0, 50000),
-    stringify(input.evidence ?? {}).slice(0, 50000),
-  ).run();
+  const eventId = crypto.randomUUID();
+  const policyJson = stringify(input.policy ?? {}).slice(0, 50000);
+  const evidenceJson = stringify(input.evidence ?? {}).slice(0, 50000);
+  const eventText = `${input.actionIntent} ${input.phase} ${input.outcome} ${input.mappedTool ?? ""} ${policyJson} ${evidenceJson}`.slice(0, 50000);
+  await db.batch([
+    db.prepare(
+      `INSERT INTO operator_execution_library_events (
+        id, action_intent, phase, outcome, mapped_tool, source_keys_json, policy_json, evidence_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      eventId,
+      input.actionIntent,
+      input.phase,
+      input.outcome,
+      input.mappedTool ?? null,
+      stringify(sourceKeys).slice(0, 50000),
+      policyJson,
+      evidenceJson,
+    ),
+    db.prepare(
+      `INSERT INTO operator_execution_library_sources (
+        source_key, source_type, source_id, source_scope, text, metadata_json, active, source_updated_at, synced_at
+      ) VALUES (?, 'execution_library_event', ?, 'universal', ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(source_key) DO UPDATE SET
+        text = excluded.text,
+        metadata_json = excluded.metadata_json,
+        active = 1,
+        source_updated_at = CURRENT_TIMESTAMP,
+        synced_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      `execution_library_event:${eventId}`,
+      eventId,
+      eventText,
+      stringify({ action_intent: input.actionIntent, phase: input.phase, outcome: input.outcome, mapped_tool: input.mappedTool ?? null }),
+    ),
+  ]);
 }
 
 function toolCategory(toolName: string): string {
