@@ -195,6 +195,44 @@ async function ensureExecutionPolicyLibraryTables(db: D1Database): Promise<void>
   )`).run();
 }
 
+function executionLibrarySqlIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+async function ensureExecutionPolicyLibraryDirtyTriggers(db: D1Database): Promise<void> {
+  const fingerprint = executionLibraryTextFingerprint(EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES.join("|"));
+  if (!(await executionLibraryRefreshDue(db, "dirty_triggers", 86400, fingerprint))) return;
+  const placeholders = EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES.map(() => "?").join(", ");
+  const existing = await db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${placeholders}) ORDER BY name`,
+  ).bind(...EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES).all<{ name: string }>();
+  const statements: D1PreparedStatement[] = [];
+  for (const row of existing.results ?? []) {
+    const tableName = String(row.name ?? "").trim();
+    if (!tableName) continue;
+    for (const operation of ["INSERT", "UPDATE", "DELETE"] as const) {
+      const triggerName = `trg_execution_library_dirty_${machineKey(tableName)}_${operation.toLowerCase()}`;
+      statements.push(db.prepare(
+        `CREATE TRIGGER IF NOT EXISTS ${executionLibrarySqlIdentifier(triggerName)}
+         AFTER ${operation} ON ${executionLibrarySqlIdentifier(tableName)}
+         BEGIN
+           INSERT INTO operator_execution_library_ingestion_state (
+             source_system, source_name, source_fingerprint, source_count, last_synced_at
+           ) VALUES ('refresh', 'dynamic_sources', 'dirty', 0, CURRENT_TIMESTAMP)
+           ON CONFLICT(source_system, source_name) DO UPDATE SET
+             source_fingerprint = 'dirty',
+             last_synced_at = CURRENT_TIMESTAMP;
+         END`,
+      ));
+    }
+  }
+  for (let offset = 0; offset < statements.length; offset += 40) {
+    const batch = statements.slice(offset, offset + 40);
+    if (batch.length) await db.batch(batch);
+  }
+  await markExecutionLibraryRefresh(db, "dirty_triggers", statements.length, fingerprint);
+}
+
 async function readExecutionPolicyLibraryTableCatalog(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
   const tables = await db.prepare(
     `SELECT name, COALESCE(sql, '') AS schema_sql
