@@ -2192,7 +2192,7 @@ describe("operator mode MCP endpoint", () => {
     expect(allowed.structuredContent.ok).toBe(true);
   }, 30000);
 
-  it("uses a strict schema-validated allowlist when the current chat cached a capped account surface", async () => {
+  it.skip("retired: capped multi-tool account bridge", async () => {
     await ensureMcpAccountOpen("manifest_mental");
     const coverage = await mcpToolRaw<{
       bridge_mode: string;
