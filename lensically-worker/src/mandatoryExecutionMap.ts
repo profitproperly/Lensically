@@ -227,6 +227,8 @@ function serializeEntry(row: Record<string, unknown>): Record<string, unknown> {
     allowed_input_keys: safeJson(String(row.allowed_input_keys_json ?? "[]"), []),
     required_input_keys: safeJson(String(row.required_input_keys_json ?? "[]"), []),
     forbidden_tools: safeJson(String(row.forbidden_tools_json ?? "[]"), []),
+    procedure: safeJson(String(row.procedure_json ?? "{}"), {}),
+    historical_failures: safeJson(String(row.historical_failures_json ?? "[]"), []),
     success_rule: safeJson(String(row.success_rule_json ?? "{}"), {}),
     source_type: row.source_type,
     source_incident_id: row.source_incident_id ?? null,
