@@ -13575,7 +13575,7 @@ async function prepareOperatorRoutedGatewayCall(
     args = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
       ? normalized.value as Record<string, unknown>
       : {};
-    const routing = await resolveOperatorPreCallRouting(env, toolName, args, gatewayArgs.action_intent);
+    const routing = await resolveOperatorPreCallRouting(env, toolName, args);
     corrections.push(...routing.corrections);
     args = routing.arguments;
     if (routing.route) routeTrail.push(routing.route);
