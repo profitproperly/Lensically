@@ -17096,11 +17096,17 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           execution_guard: await createOperatorExecutionGuard(env, toolName, prepared.arguments),
         };
         routedGatewayMetadata = {
-          version: "operator-routed-execution-gateway-v1",
-          requested_tool: requestedArgs.intended_tool ?? null,
+          version: MANDATORY_EXECUTION_MAP_VERSION,
+          action_intent: requestedArgs.action_intent ?? null,
+          action_key: prepared.map_execution?.action_key ?? requestedArgs.action_key ?? null,
+          map_state: prepared.map_state ?? null,
+          map_entry: prepared.map_entry ?? null,
+          incident: prepared.incident ?? null,
+          map_execution: prepared.map_execution ?? null,
           executed_tool: toolName,
           corrections: prepared.corrections ?? [],
           route_trail: prepared.route_trail ?? [],
+          model_tool_choice_allowed: false,
         };
       }
       const canonicalTool = buildOperatorMcpBaseTools(false).find((item) => item.name === toolName);
