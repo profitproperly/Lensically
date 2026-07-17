@@ -13559,6 +13559,7 @@ type OperatorRoutedGatewayResult = {
   missing_inputs?: string[];
   candidates?: Array<Record<string, unknown>>;
   map_execution?: Record<string, unknown>;
+  execution_library?: Record<string, unknown>;
 };
 
 async function prepareOperatorRoutedGatewayCall(
