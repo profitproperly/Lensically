@@ -41,7 +41,10 @@ const repositoryTextKnowledge = Object.fromEntries(repositoryFiles
     path: relative(repoRoot, absolute).replaceAll("\\", "/"),
     size: statSync(absolute).size,
   }))
-  .filter((file) => file.path !== "lensically-worker/src/mandatoryExecutionMap.ts")
+  .filter((file) => ![
+    "lensically-worker/src/mandatoryExecutionMap.ts",
+    "lensically-worker/scripts/release-preflight.mjs",
+  ].includes(file.path))
   .filter((file) => file.size <= 120000)
   .filter((file) => repositoryKnowledgeExtensions.has(file.path.slice(file.path.lastIndexOf("."))))
   .map((file) => [file.path, readFileSync(file.absolute, "utf8")]));
