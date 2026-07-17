@@ -1206,7 +1206,8 @@ export async function prepareMandatoryExecutionMapCall(
     ? found.entry.fixed_arguments as Record<string, unknown>
     : {};
   const filteredInputs = Object.fromEntries(Object.entries(inputs).filter(([key]) => allowed.includes(key)));
-  const argumentsObject = { ...fixed, ...filteredInputs };
+  const inferredArguments = inferredArgumentsForOperationalIntent(String(found.entry.tool_name), actionIntent);
+  const argumentsObject = { ...fixed, ...inferredArguments, ...filteredInputs };
   const missingInputs = required.filter((key) => !Object.prototype.hasOwnProperty.call(argumentsObject, key));
   if (missingInputs.length) {
     return {
