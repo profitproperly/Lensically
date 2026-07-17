@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: storing D1 phonebook overrides as `pre_call_route_override` without always consulting and classifying them as authoritative would leave valid override policy in the library but not reliably apply it during policy compilation. Use: canonical `pre_call_route` and D1 `pre_call_route_override` sources are both boosted, always consulted, and eligible as mandatory rules; release preflight enforces the override references. Applies when: changing execution-library candidate retrieval, authoritative source types, or pre-call route overrides.
+
 - Failed: after adding source-defined phonebook policies to normal execution-library compilation, the post-action forced refresh still called the old signature and would have refreshed without the canonical routes. Use: every normal or forced library synchronization must receive the same source-defined policy set; release preflight guards the forced-refresh call signature. Applies when: changing execution-library synchronization parameters or refreshing policy after a successful policy-changing tool.
 
 - Failed: requiring `pre_call_route` readiness while reading only the D1 override table made the execution library fail closed whenever that table was empty, even though the canonical phonebook existed in `SOURCE_DEFINED_PRE_CALL_ROUTES`. Use: materialize source-defined routes directly as authoritative `pre_call_route` sources; ingest database rows separately as `pre_call_route_override` so an empty override table cannot erase the manual. Applies when: compiling, refreshing, testing, or migrating the mandatory execution library and pre-call phonebook.
