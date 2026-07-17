@@ -6250,17 +6250,6 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
      ON operator_mcp_sessions (expires_at)`,
   ).run();
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_mcp_admin_errors (
-      id TEXT PRIMARY KEY,
-      tool_name TEXT,
-      payload_json TEXT,
-      error_response_json TEXT,
-      likely_cause TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-
       await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_continuity_refs (
       id TEXT PRIMARY KEY,
