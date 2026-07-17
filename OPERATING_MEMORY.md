@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: release preflight still required empty `ops_memory` to appear in the compact public execution receipt after the receipt was intentionally changed to list only nonempty consulted sources. Use: preflight verifies `consulted_source_types` and mandatory nonempty sources, while complete table availability is proven separately by the exact D1 manifest. Applies when: compacting public policy receipts or changing source-coverage semantics.
+
 - Failed: the plain intent `run mcp tests` fell through to the generic GitHub test route, which required workflow inputs and blocked the internal MCP self-check. Use: seed `run mcp tests` as an explicit `runMcpTests` alias and resolve it deterministically before generic test routing; release preflight enforces the distinction. Applies when: adding or changing test-related intent aliases.
 
 - Failed: `/api/operator/health` reported the superseded registry generation after the mandatory execution library replaced the old map generation. Use: health metadata must report `mandatory-execution-library-v2`; release preflight rejects the old literal and the health regression verifies the public value. Applies when: renaming or replacing the execution controller generation.
