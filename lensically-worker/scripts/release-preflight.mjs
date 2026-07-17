@@ -191,6 +191,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("executionLibraryTextFingerprint")
     || !executionMap.includes("readExecutionPolicyLibraryCandidates")
     || !releasePreflightSource.includes("sha256: createHash")
+    || !releasePreflightSource.includes("generated_region_normalized")
     || !executionMap.includes("execution_policy_library_not_ready")
     || !executionMap.includes("policy_ready: policyReady")
     || !executionMap.includes("table_manifest_complete")
