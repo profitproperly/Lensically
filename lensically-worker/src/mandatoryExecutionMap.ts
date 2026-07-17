@@ -276,8 +276,10 @@ async function compileExecutionPolicyLibrary(
   const tableCatalog = await db.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
   ).all<{ name: string }>();
+  const policyEventId = crypto.randomUUID();
   const bundle = {
     version: EXECUTION_POLICY_LIBRARY_VERSION,
+    policy_event_id: policyEventId,
     mandatory: true,
     consulted_before_execution: true,
     model_path_choice_allowed: false,
