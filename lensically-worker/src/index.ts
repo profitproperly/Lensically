@@ -17460,7 +17460,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           }
         }
       }
-            const autonomyAuthorization = await beginOperatorAutonomyAuthorization(env, toolName, args);
+            const autonomyAuthorization = sourceDefinedDirectEngineering
+        ? {
+            allowed: true,
+            governed: false,
+            engineering_autonomous: true,
+            authority_version: OPERATOR_ENGINEERING_AUTHORITY_VERSION,
+          }
+        : await beginOperatorAutonomyAuthorization(env, toolName, args);
       if (!autonomyAuthorization.allowed) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_autonomy_decision_required");
         const resultPayload = { ok: false, ...autonomyAuthorization, execution_policy: executionPolicy };
