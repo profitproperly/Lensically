@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: first-action library admission required `pre_call_route`, but the persistent phonebook table could legitimately be empty before any custom route was recorded; source-defined mandatory routes existed only inside Worker source and were not classified as first-class phonebook knowledge. Use: ingest source-defined routes directly as `source_defined_pre_call_route` library sources before the first action, accept either source-defined or persistent routes for phonebook readiness, and keep dynamic source-defined routing behavior out of raw persistent-table seeding. Applies when: bootstrapping the first gateway action, changing source-defined routes, or validating phonebook completeness.
+
 - Failed: splitting execution-library source ingestion into bounded compound queries without aliasing each group-leading payload and timestamp caused SQLite `ORDER BY updated_at` failures and would have materialized blank `text` fields. Use: every group-leading SELECT must expose the normalized columns `source_type`, `source_id`, `text`, and `updated_at`; release preflight guards the nontrivial timestamp aliases. Applies when: splitting, reordering, or extending execution-library D1 source queries.
 
 - Failed: after splitting the execution-library compound query, some standalone groups did not alias the first SELECT outputs as `text` and `updated_at`; SQLite rejected `ORDER BY updated_at` and source ingestion failed closed. Use: the first SELECT in every bounded group must explicitly alias all four canonical columns: `source_type`, `source_id`, `text`, and `updated_at`. Applies when: splitting, regrouping, or adding execution-library D1 source queries.
