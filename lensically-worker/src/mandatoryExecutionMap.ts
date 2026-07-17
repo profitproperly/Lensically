@@ -160,6 +160,8 @@ async function ensureMandatoryExecutionMapTables(db: D1Database): Promise<void> 
     allowed_input_keys_json TEXT NOT NULL DEFAULT '[]',
     required_input_keys_json TEXT NOT NULL DEFAULT '[]',
     forbidden_tools_json TEXT NOT NULL DEFAULT '[]',
+    procedure_json TEXT NOT NULL DEFAULT '{}',
+    historical_failures_json TEXT NOT NULL DEFAULT '[]',
     success_rule_json TEXT NOT NULL DEFAULT '{}',
     source_type TEXT NOT NULL DEFAULT 'verified_discovery',
     source_incident_id TEXT,
