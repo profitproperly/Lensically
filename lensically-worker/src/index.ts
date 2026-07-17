@@ -13531,36 +13531,40 @@ async function prepareOperatorRoutedGatewayCall(
   env: Env,
   gatewayArgs: Record<string, unknown>,
 ): Promise<OperatorRoutedGatewayResult> {
-  const intendedTool = normalizeOperatorText(gatewayArgs.intended_tool, 160);
-  const argumentsJson = normalizeOperatorText(gatewayArgs.arguments_json, 50000) ?? "{}";
-  const parsed = safeParseJsonString(argumentsJson);
-  if (!intendedTool || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { ok: false, error: "routed_gateway_arguments_invalid" };
-  }
-  if (intendedTool === OPERATOR_ROUTED_EXECUTION_GATEWAY || intendedTool === "guardLensicallyCall" || intendedTool === "getOperatorStartupContext") {
-    return { ok: false, error: "routed_gateway_target_forbidden" };
-  }
   const availableTools = await buildOperatorMcpTools(env, false, false);
-  let toolName = intendedTool;
-  let args = { ...(parsed as Record<string, unknown>) };
+  const mapped = await prepareMandatoryExecutionMapCall(
+    env.DB,
+    gatewayArgs,
+    availableTools as MandatoryExecutionToolDefinition[],
+    {
+      signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
+      verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
+    },
+  );
+  if (!mapped.ok || !mapped.tool_name || !mapped.arguments) {
+    return mapped;
+  }
+  let toolName = mapped.tool_name;
+  let args = { ...mapped.arguments };
   delete args.execution_guard;
   const corrections: OperatorGuardCorrection[] = [];
   const routeTrail: Array<Record<string, unknown>> = [];
   const seen = new Set<string>();
-    for (let depth = 0; depth < 6; depth += 1) {
+  for (let depth = 0; depth < 6; depth += 1) {
     const routeIdentity = await operatorExecutionFingerprint(toolName, args);
     if (seen.has(routeIdentity)) {
-      return { ok: false, error: "routed_gateway_cycle_detected", corrections, route_trail: routeTrail };
+      return { ...mapped, ok: false, error: "routed_gateway_cycle_detected", corrections, route_trail: routeTrail };
     }
     seen.add(routeIdentity);
     const definition = availableTools.find((tool) => tool.name === toolName);
     if (!definition) {
-      return { ok: false, error: "routed_gateway_unknown_tool", corrections, route_trail: routeTrail };
+      return { ...mapped, ok: false, error: "routed_gateway_unknown_tool", corrections, route_trail: routeTrail };
     }
     const normalized = normalizeOperatorGuardValue(args, definition.inputSchema as Record<string, unknown>);
     corrections.push(...normalized.corrections);
     if (normalized.errors.length) {
       return {
+        ...mapped,
         ok: false,
         error: "routed_gateway_payload_invalid",
         corrections,
@@ -13571,20 +13575,20 @@ async function prepareOperatorRoutedGatewayCall(
     args = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
       ? normalized.value as Record<string, unknown>
       : {};
-    const routing = await resolveOperatorPreCallRouting(env, toolName, args, gatewayArgs.operation);
+    const routing = await resolveOperatorPreCallRouting(env, toolName, args, gatewayArgs.action_intent);
     corrections.push(...routing.corrections);
     args = routing.arguments;
     if (routing.route) routeTrail.push(routing.route);
-        if (!routing.redirect) {
-      return { ok: true, tool_name: toolName, arguments: args, corrections, route_trail: routeTrail };
+    if (!routing.redirect) {
+      return { ...mapped, ok: true, tool_name: toolName, arguments: args, corrections, route_trail: routeTrail };
     }
     const requiredTool = normalizeOperatorText(routing.route?.required_tool, 160, true);
     if (!requiredTool || requiredTool === toolName || requiredTool === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
-      return { ok: false, error: "routed_gateway_redirect_invalid", corrections, route_trail: routeTrail };
+      return { ...mapped, ok: false, error: "routed_gateway_redirect_invalid", corrections, route_trail: routeTrail };
     }
     toolName = requiredTool;
   }
-  return { ok: false, error: "routed_gateway_redirect_limit", corrections, route_trail: routeTrail };
+  return { ...mapped, ok: false, error: "routed_gateway_redirect_limit", corrections, route_trail: routeTrail };
 }
 
 async function createOperatorContinuationNonce(env: Env, brandKey: GptBrandKey): Promise<string> {
