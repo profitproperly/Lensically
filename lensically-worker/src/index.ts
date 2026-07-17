@@ -17571,7 +17571,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         await completeOperatorOperationReceipt(env, idempotencyKey, resultPayload);
       }
       const isError = resultPayload.ok === false;
-      await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
+      if (!sourceDefinedDirectEngineering) {
+        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
+      }
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
