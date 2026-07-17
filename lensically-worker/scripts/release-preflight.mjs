@@ -181,6 +181,18 @@ if (!executionMap.includes('runGitHubWorkflow: ["run typecheck"')
     || !executionMap.includes("desiredVerificationSummary")) {
   errors.push("engineering_validation_route_contract_missing");
 }
+const executionSourceFunction = executionMap.match(
+  /async function readExecutionPolicyLibrarySources[\s\S]*?\n}\n\nfunction executionLibraryTextFingerprint/,
+)?.[0] ?? "";
+const executionSourceQueries = Array.from(
+  executionSourceFunction.matchAll(/db\.prepare\(`([\s\S]*?)`\)\.all<Record<string, unknown>>\(\)/g),
+  (match) => match[1],
+);
+if (!executionSourceQueries.length
+    || executionSourceQueries.some((query) => (query.match(/UNION ALL/g) ?? []).length > 3)) {
+  errors.push("execution_library_compound_query_bound_missing");
+}
+
 if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v2"')
     || !executionMap.includes("operator_execution_library_sources")
     || !executionMap.includes("operator_execution_library_ingestion_state")
