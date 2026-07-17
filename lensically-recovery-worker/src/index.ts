@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one bounded current-head main-worker validation with exact structured failure evidence.
+// Recovery source commits may carry [operator-tests] to trigger one focused current-head main-worker validation with exact account-open failure evidence.
 
 interface Env {
   GITHUB_TOKEN: string;
