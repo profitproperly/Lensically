@@ -17185,25 +17185,6 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       let routedGatewayMetadata: Record<string, unknown> | null = null;
       if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
         const gatewayIntent = normalizeOperatorText(requestedArgs.intent ?? requestedArgs.action_intent, 8000, true);
-        if (gatewayIntent === "startup") {
-          const startup = await handleOperatorMcpEngineeringTool(request, env, "getOperatorStartupContext", {});
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: {
-                ...startup,
-                gateway: {
-                  name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-                  intent: "startup",
-                  public_schema_frozen: true,
-                },
-              },
-              content: [{ type: "text", text: "Lensically startup context loaded through the permanent gateway." }],
-              isError: startup.ok === false,
-            },
-          });
-        }
         const prepared = await prepareOperatorRoutedGatewayCall(env, requestedArgs);
         if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
           return mcpJsonResponse({
