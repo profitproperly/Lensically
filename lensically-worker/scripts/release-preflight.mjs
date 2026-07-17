@@ -133,6 +133,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("consulted_before_execution: true")
     || !executionMap.includes("failed_recorded_before_repair")
     || !executionMap.includes("mandatory_path_updated_before_resume")
+    || !source.includes("execution_library: prepared.execution_library ?? null")
     || !source.includes("resultPayload.execution_library = routedGatewayMetadata.execution_library")) {
   errors.push("mandatory_execution_library_contract_missing");
 }
