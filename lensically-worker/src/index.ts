@@ -17100,7 +17100,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
-      const args: Record<string, unknown> = { ...rawArgs };
+            let args: Record<string, unknown> = { ...rawArgs };
       delete args.execution_guard;
       const preCallRouting = await resolveOperatorPreCallRouting(env, toolName, args);
       if (preCallRouting.redirect) {
