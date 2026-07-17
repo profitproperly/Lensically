@@ -1209,6 +1209,14 @@ export async function finalizeMandatoryExecutionMapCall(
       };
     }
     const entry = await promoteDiscovery(db, incident, tool, actionIntent);
+    await recordExecutionPolicyLibraryEvent(db, {
+      actionIntent,
+      phase: "verified_fix_promoted",
+      outcome: "mandatory_path_updated_before_resume",
+      mappedTool: toolName,
+      policy: executionLibrary,
+      evidence: { incident_id: incident.id, active_entry_id: entry.id, superseded_entry_id: incident.failed_entry_id ?? null },
+    });
     return {
       version: MANDATORY_EXECUTION_MAP_VERSION,
       map_state: "discovery_promoted",
