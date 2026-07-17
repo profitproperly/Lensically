@@ -1836,18 +1836,20 @@ describe("operator mode MCP endpoint", () => {
       handler_spec: { requires_backend_handler: true },
       reason: "Verify runtime-aware handshake counts.",
     });
-    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    expect(listed.tools.map((tool) => tool.name)).toContain("runtime_count_fixture");
+        const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["getOperatorStartupContext", "routeAndExecuteLensicallyCall"]);
+    const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
+    expect(registry.tools.map((tool) => tool.name)).toContain("runtime_count_fixture");
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-    expect(initialized.instructions).toContain(`Full tool surface loaded: ${listed.tools.length} tools available and usable.`);
+    expect(initialized.instructions).toContain(`Full tool surface loaded: ${registry.tools.length} tools available and usable.`);
     const selected = await mcpToolRaw<{ tool_count: number; handshake: string[] }>("selectOperatorKey", { brand_key: "manifest_mental" });
     expect(selected.isError).not.toBe(true);
-    expect(selected.structuredContent.tool_count).toBe(listed.tools.length);
-    expect(selected.structuredContent.handshake[2]).toBe(`Full tool surface loaded: ${listed.tools.length} tools available and usable.`);
+    expect(selected.structuredContent.tool_count).toBe(registry.tools.length);
+    expect(selected.structuredContent.handshake[2]).toBe(`Full tool surface loaded: ${registry.tools.length} tools available and usable.`);
   }, 30000);
 
   it("loads compact non-account startup bootstrap in a fresh session", async () => {
