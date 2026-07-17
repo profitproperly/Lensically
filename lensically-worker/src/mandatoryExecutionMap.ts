@@ -500,6 +500,56 @@ async function syncExecutionPolicyLibrarySources(
   return { sources: [], sourceReadError };
 }
 
+async function readExecutionPolicyLibraryCandidates(
+  db: D1Database,
+  queryTokens: string[],
+): Promise<ExecutionPolicyLibrarySource[]> {
+  const tokens = queryTokens.slice(0, 10);
+  const tokenPredicates = tokens.map(() => "LOWER(text) LIKE ?");
+  const alwaysConsultedTypes = [
+    "ops_memory",
+    "pre_call_route",
+    "workflow_requirement",
+    "map_entry",
+    "tool_registry",
+    "repository_knowledge",
+  ];
+  const whereParts = [
+    `source_type IN (${alwaysConsultedTypes.map(() => "?").join(", ")})`,
+    ...tokenPredicates,
+  ];
+  const rows = await db.prepare(
+    `SELECT source_type, source_id, text, source_updated_at AS updated_at
+     FROM operator_execution_library_sources
+     WHERE active = 1 AND (${whereParts.join(" OR ")})
+     ORDER BY COALESCE(source_updated_at, synced_at) DESC
+     LIMIT 1200`,
+  ).bind(
+    ...alwaysConsultedTypes,
+    ...tokens.map((token) => `%${token.toLowerCase()}%`),
+  ).all<Record<string, unknown>>();
+  return (rows.results ?? []).map((row) => ({
+    source_type: String(row.source_type ?? "unknown"),
+    source_id: String(row.source_id ?? "unknown"),
+    text: String(row.text ?? ""),
+    updated_at: row.updated_at == null ? null : String(row.updated_at),
+  }));
+}
+
+async function readExecutionPolicyLibraryCoverage(db: D1Database): Promise<Array<{ source_type: string; total: number }>> {
+  const rows = await db.prepare(
+    `SELECT source_type, COUNT(*) AS total
+     FROM operator_execution_library_sources
+     WHERE active = 1
+     GROUP BY source_type
+     ORDER BY source_type`,
+  ).all<Record<string, unknown>>();
+  return (rows.results ?? []).map((row) => ({
+    source_type: String(row.source_type ?? "unknown"),
+    total: Number(row.total ?? 0),
+  }));
+}
+
 async function compileExecutionPolicyLibrary(
   db: D1Database,
   actionIntent: string,
