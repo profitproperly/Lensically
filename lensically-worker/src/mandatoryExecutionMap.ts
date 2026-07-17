@@ -565,7 +565,7 @@ async function syncExecutionPolicyLibrarySources(
 ): Promise<{ sources: ExecutionPolicyLibrarySource[]; sourceReadError: string | null }> {
   await ensureExecutionPolicyLibraryDirtyTriggers(db);
   const dynamicSourceTypes = [
-    "ops_memory", "pre_call_route", "workflow_requirement", "admin_error", "engineering_audit",
+    "ops_memory", "pre_call_route_override", "workflow_requirement", "admin_error", "engineering_audit",
     "execution_event", "operational_incident", "tool_override", "mcp_deployment", "continuity_ref",
     "operation_receipt", "autonomy_profile", "decision_proposal", "decision_execution", "repo_write_session",
     "map_entry", "map_incident", "map_attempt", "map_promotion", "backlog", "strategy_memory",
