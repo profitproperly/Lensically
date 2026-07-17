@@ -261,6 +261,32 @@ async function ensureMandatoryExecutionMapTables(db: D1Database): Promise<void> 
   )`).run();
 }
 
+async function repairDeterministicInputValidationIncidents(db: D1Database): Promise<void> {
+  const incidents = await db.prepare(
+    `SELECT id, failed_entry_id, failure_signature
+     FROM operator_execution_map_incidents
+     WHERE status = 'discovery_open' AND state = 'stale' AND failed_entry_id IS NOT NULL
+     ORDER BY datetime(updated_at) ASC`,
+  ).all<Record<string, unknown>>();
+  for (const incident of incidents.results ?? []) {
+    const failureSignature = String(incident.failure_signature ?? "").toLowerCase();
+    if (!/head_changed|find_text_must_match|find_must_match/.test(failureSignature)) continue;
+    const failedEntryId = String(incident.failed_entry_id ?? "");
+    const reactivated = await db.prepare(
+      `UPDATE operator_execution_map_entries
+       SET status = 'active', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = 'stale'`,
+    ).bind(failedEntryId).run();
+    if (Number(reactivated.meta?.changes ?? 0) !== 1) continue;
+    await db.prepare(
+      `UPDATE operator_execution_map_incidents
+       SET status = 'resolved', replacement_entry_id = ?, resolved_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = 'discovery_open'`,
+    ).bind(failedEntryId, String(incident.id)).run();
+  }
+}
+
 function serializeEntry(row: Record<string, unknown>): Record<string, unknown> {
   return {
     id: row.id,
