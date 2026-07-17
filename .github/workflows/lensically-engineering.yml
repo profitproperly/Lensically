@@ -1,4 +1,5 @@
 name: Lensically Engineering
+# [operator-tests] commits provide exact-head validation when client-side dispatch is unavailable.
 # A commit message containing [operator-tests] runs bounded validation when workflow dispatch is client-blocked.
 run-name: Lensically ${{ inputs.task }} · ${{ inputs.release_id || github.sha }}
 
