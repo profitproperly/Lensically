@@ -214,6 +214,10 @@ if (!executionSourceQueries.length
     || executionSourceQueries.some((query) => (query.match(/UNION ALL/g) ?? []).length > 3)) {
   errors.push("execution_library_compound_query_bound_missing");
 }
+const staticPolicyCallbackCount = (source.match(/readStaticPolicySources:/g) ?? []).length;
+if (staticPolicyCallbackCount < 2) {
+  errors.push(`execution_library_static_policy_callbacks_incomplete:${staticPolicyCallbackCount}`);
+}
 
 if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v2"')
     || !executionMap.includes("operator_execution_library_sources")
