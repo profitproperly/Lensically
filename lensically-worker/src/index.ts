@@ -11860,13 +11860,6 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
-    name: "runEngineeringTool",
-    title: "Run engineering tool",
-    description: "Bridge-call a Lensically engineering tool when ChatGPT advertises it but does not expose it as a direct callable tool.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string", description: "One of the Lensically engineering tool names." }, arguments: { type: "object", additionalProperties: true } }, required: ["tool_name"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
     name: "readMcpToolDefinition",
     title: "Read MCP tool definition",
     description: "Read one MCP tool definition with its active schema, behavior override, and handler notes.",
