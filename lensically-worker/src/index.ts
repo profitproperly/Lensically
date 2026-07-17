@@ -13533,7 +13533,35 @@ async function prepareOperatorRoutedGatewayCall(
   const corrections: OperatorGuardCorrection[] = [];
   const routeTrail: Array<Record<string, unknown>> = [];
   const seen = new Set<string>();
-  // OPERATOR_ROUTED_GATEWAY_BODY
+    for (let depth = 0; depth < 6; depth += 1) {
+    const routeIdentity = `${toolName}:${stableStringify(args)}`;
+    if (seen.has(routeIdentity)) {
+      return { ok: false, error: "routed_gateway_cycle_detected", corrections, route_trail: routeTrail };
+    }
+    seen.add(routeIdentity);
+    const definition = availableTools.find((tool) => tool.name === toolName);
+    if (!definition) {
+      return { ok: false, error: "routed_gateway_unknown_tool", corrections, route_trail: routeTrail };
+    }
+    const normalized = normalizeOperatorGuardValue(args, definition.inputSchema as Record<string, unknown>);
+    corrections.push(...normalized.corrections);
+    if (normalized.errors.length) {
+      return {
+        ok: false,
+        error: "routed_gateway_payload_invalid",
+        corrections,
+        route_trail: routeTrail,
+        validation_errors: normalized.errors,
+      };
+    }
+    args = normalized.value && typeof normalized.value === "object" && !Array.isArray(normalized.value)
+      ? normalized.value as Record<string, unknown>
+      : {};
+    const routing = await resolveOperatorPreCallRouting(env, toolName, args, gatewayArgs.operation);
+    corrections.push(...routing.corrections);
+    args = routing.arguments;
+    if (routing.route) routeTrail.push(routing.route);
+    // OPERATOR_ROUTED_GATEWAY_BODY
 }
 
 async function createOperatorContinuationNonce(env: Env, brandKey: GptBrandKey): Promise<string> {
