@@ -149,8 +149,11 @@ function generatedExecutionKnowledgeSources(): ExecutionPolicyLibrarySource[] {
       .map((item) => item.trim())
       .filter(Boolean)
       .slice(0, 1000);
+    const sourceType = document === "source_defined_pre_call_routes"
+      ? "source_defined_pre_call_route"
+      : "repository_knowledge";
     sections.forEach((text, index) => sources.push({
-      source_type: "repository_knowledge",
+      source_type: sourceType,
       source_id: `${document}:${index + 1}`,
       text,
       updated_at: null,
