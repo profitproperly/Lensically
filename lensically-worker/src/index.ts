@@ -16686,18 +16686,11 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         : {};
     };
     let nextLiveId = 3;
-    const callGuardedLiveTool = async (name: string, args: Record<string, unknown>) => {
-      const guard = await callLiveMcp(nextLiveId++, "tools/call", {
-        name: "guardLensicallyCall",
+        const callGuardedLiveTool = async (name: string, args: Record<string, unknown>) =>
+      callLiveMcp(nextLiveId++, "tools/call", {
+        name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
         arguments: { intended_tool: name, arguments_json: JSON.stringify(args) },
       });
-      const guardContent = structured(guard.payload);
-      if (guardContent.ok !== true || typeof guardContent.execution_guard !== "string") return guard;
-      return callLiveMcp(nextLiveId++, "tools/call", {
-        name,
-        arguments: { ...(guardContent.normalized_arguments as Record<string, unknown> ?? args), execution_guard: guardContent.execution_guard },
-      });
-    };
 
     const listed = await callLiveMcp(2, "tools/list", {});
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
