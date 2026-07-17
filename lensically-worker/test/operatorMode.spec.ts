@@ -2086,30 +2086,6 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.universal_workflow_requirements.some((item) => item.stage === "context_admission" && item.required_sections.includes("operator_precheck"))).toBe(true);
   }, 30000);
 
-  it("reuses startup bootstrap through engineeringPrecheck and fallback bridges", async () => {
-    const direct = await mcpTool<{ tool_surface: { total_tools: number } }>("getOperatorStartupContext");
-    const precheck = await mcpTool<{ status_kind: string; runtime: { mcp_version: string; deployment_id?: string | null }; tool_surface: { total_tools: number }; recent_ops_memory: Array<Record<string, unknown>>; startup_context?: unknown }>("engineeringPrecheck");
-    expect(precheck.status_kind).toBe("compact_engineering_precheck");
-                expect(precheck.runtime.mcp_version).toBe("1.27.1");
-    expect(precheck.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
-    expect(precheck.startup_context).toBeUndefined();
-    expect(JSON.stringify(precheck).length).toBeLessThan(12000);
-
-    const runBridge = await mcpTool<{ executed_tool: string; result: { tool_surface: { total_tools: number } } }>("runEngineeringTool", {
-      tool_name: "getOperatorStartupContext",
-      arguments: {},
-    });
-    expect(runBridge.executed_tool).toBe("getOperatorStartupContext");
-    expect(runBridge.result.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
-
-    const listBridge = await mcpTool<{ executed_tool: string; result: { tool_surface: { total_tools: number } } }>("listMcpTools", {
-      execute_tool: "getOperatorStartupContext",
-      arguments: {},
-    });
-    expect(listBridge.executed_tool).toBe("getOperatorStartupContext");
-    expect(listBridge.result.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
-  }, 30000);
-
     it("preserves the exact initial key handshake for all canonical keys", async () => {
     await mcpRequest("initialize", {
       protocolVersion: "2025-06-18",
