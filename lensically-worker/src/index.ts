@@ -17056,7 +17056,6 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         ? message.params.arguments as Record<string, unknown>
         : {};
       const directEntryAllowed = requestedToolName === "getOperatorStartupContext"
-        || requestedToolName === "guardLensicallyCall"
         || requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
       if (!directEntryAllowed) {
         return mcpJsonResponse({
