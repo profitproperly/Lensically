@@ -31805,7 +31805,7 @@ async function recoverOverdueScheduledPostRows(
   const actionChanges = results.slice(1, 1 + normalized.length).map((result) => Number(result.meta?.changes ?? 0));
   const cleanupChanges = Number(results[results.length - 1]?.meta?.changes ?? 0);
   if (claimChanges !== normalized.length || actionChanges.some((changes) => changes !== 1) || cleanupChanges !== normalized.length) {
-    throw new Error("scheduled_post_recovery_race");
+    throw new Error(`scheduled_post_recovery_race:claim=${claimChanges}:actions=${actionChanges.join(",")}:cleanup=${cleanupChanges}:expected=${normalized.length}`);
   }
 
   const remaining = await listOverdueScheduledPosts(env, 100);
