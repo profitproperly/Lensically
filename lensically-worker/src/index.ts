@@ -13568,23 +13568,45 @@ async function prepareOperatorRoutedGatewayCall(
   env: Env,
   gatewayArgs: Record<string, unknown>,
 ): Promise<OperatorRoutedGatewayResult> {
-  await prepareOperatorMode(env);
-  const availableTools = await buildOperatorMcpTools(env, false, false);
-  const mapped = await prepareMandatoryExecutionMapCall(
-    env.DB,
-    gatewayArgs,
-    availableTools as MandatoryExecutionToolDefinition[],
-    {
-      signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
-      verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
-      readStaticPolicySources: () => SOURCE_DEFINED_PRE_CALL_ROUTES.map((route) => ({
-        source_type: "pre_call_route",
-        source_id: `source:${route.route_key}`,
-        text: JSON.stringify(route),
-        updated_at: null,
-      } satisfies ExecutionPolicyLibrarySource)),
-    },
-  );
+  const actionIntent = normalizeOperatorText(gatewayArgs.intent ?? gatewayArgs.action_intent, 8000);
+  const objective = normalizeOperatorText(gatewayArgs.objective, 8000, true);
+  const directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
+    ? gatewayArgs.inputs as Record<string, unknown>
+    : null;
+  const baseTools = buildOperatorMcpBaseTools(false);
+  const directMapped = actionIntent && directInputs
+    ? prepareSourceDefinedDirectEngineeringCall(
+        actionIntent,
+        objective,
+        directInputs,
+        baseTools as MandatoryExecutionToolDefinition[],
+      )
+    : null;
+
+  let availableTools: OperatorMcpToolDefinition[];
+  let mapped: OperatorRoutedGatewayResult;
+  if (directMapped) {
+    availableTools = baseTools;
+    mapped = directMapped;
+  } else {
+    await prepareOperatorMode(env);
+    availableTools = await buildOperatorMcpTools(env, false, false);
+    mapped = await prepareMandatoryExecutionMapCall(
+      env.DB,
+      gatewayArgs,
+      availableTools as MandatoryExecutionToolDefinition[],
+      {
+        signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
+        verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
+        readStaticPolicySources: () => SOURCE_DEFINED_PRE_CALL_ROUTES.map((route) => ({
+          source_type: "pre_call_route",
+          source_id: `source:${route.route_key}`,
+          text: JSON.stringify(route),
+          updated_at: null,
+        } satisfies ExecutionPolicyLibrarySource)),
+      },
+    );
+  }
   if (!mapped.ok || !mapped.tool_name || !mapped.arguments) {
     return mapped;
   }
