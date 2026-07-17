@@ -13096,13 +13096,6 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     getGithubFile(env, "OPERATING_MEMORY.md"),
   ]);
   const requirements = (await listOperatorWorkflowRequirements(env, null)).filter((item) => item.brand_key === null).slice(0, 20);
-  const memories = await env.DB.prepare(
-    `SELECT id, title, fix, applies_when, tags_json, updated_at
-     FROM operator_ops_memory
-     WHERE active = 1
-     ORDER BY datetime(updated_at) DESC
-     LIMIT 12`,
-  ).all<Record<string, unknown>>();
   const failures = await env.DB.prepare(
     `SELECT id, tool_name, likely_cause, created_at
      FROM operator_mcp_admin_errors
