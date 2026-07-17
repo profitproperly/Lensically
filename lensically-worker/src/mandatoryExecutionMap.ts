@@ -90,6 +90,43 @@ type ExecutionPolicyLibrarySource = {
   updated_at: string | null;
 };
 
+const EXECUTION_LIBRARY_DYNAMIC_SOURCE_TABLES = [
+  "operator_ops_memory",
+  "operator_pre_call_routes",
+  "operator_workflow_requirements",
+  "operator_mcp_admin_errors",
+  "operator_engineering_audit",
+  "operator_execution_events",
+  "operator_operational_incidents",
+  "operator_mcp_tool_overrides",
+  "operator_mcp_deployments",
+  "operator_continuity_refs",
+  "operator_operation_receipts",
+  "operator_autonomy_profiles",
+  "operator_decision_proposals",
+  "operator_decision_execution_events",
+  "operator_repo_write_sessions",
+  "operator_execution_map_entries",
+  "operator_execution_map_incidents",
+  "operator_execution_map_attempts",
+  "operator_execution_map_promotions",
+  "operator_mcp_backlog_items",
+  "gpt_strategy_memory",
+  "operator_workflow_sessions",
+  "operator_context_admissions",
+  "operator_production_board_items",
+  "operator_source_selection_batches",
+  "operator_source_selections",
+  "operator_review_batches",
+  "operator_daily_source_claims",
+  "operator_source_exclusions",
+  "operator_source_cards",
+  "operator_gates",
+  "operator_gate_results",
+  "operator_content_inventory",
+  "operator_post_metric_snapshots",
+] as const;
+
 function executionLibraryTokens(value: unknown): string[] {
   return tokenize(typeof value === "string" ? value : stringify(value));
 }
