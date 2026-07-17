@@ -17290,12 +17290,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           protected_operations_owner_ratified: true,
         };
       }
-      if (dispatcherGuardFallback) {
+            if (routedGatewayMetadata) {
+        resultPayload.routed_execution = routedGatewayMetadata;
         resultPayload.execution_guard_enforcement = {
           version: OPERATOR_EXECUTION_GUARD_VERSION,
-          mode: "server_side_dispatcher_fallback",
+          mode: "mandatory_routed_gateway",
           normalized_before_execution: true,
           known_path_checked: true,
+          direct_operational_calls_allowed: false,
         };
       }
       resultPayload.execution_policy = executionPolicy;
