@@ -17372,7 +17372,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             pre_call_route: effectivePreCallRoute,
             pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
           };
-      const aliasRetryBlock = sourceDefinedDirectEngineering
+      const aliasRetryBlock = sourceDefinedStaticRoute
         ? null
         : await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
       if (aliasRetryBlock) {
