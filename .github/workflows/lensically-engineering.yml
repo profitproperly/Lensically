@@ -119,8 +119,25 @@ jobs:
           fi
           echo "Scheduler activation state verified: paused/canary, or normal with an empty overdue queue."
 
+
+  recovery:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lensically-recovery-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lensically-recovery-worker/package-lock.json
+
       - name: Restore recovery dependencies
-        if: ${{ inputs.task == 'worker-deploy' }}
         id: recovery-dependency-cache
         uses: actions/cache@v4
         with:
@@ -128,18 +145,13 @@ jobs:
           key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
 
       - name: Install recovery dependencies
-        if: ${{ inputs.task == 'worker-deploy' && steps.recovery-dependency-cache.outputs.cache-hit != 'true' }}
-        working-directory: lensically-recovery-worker
+        if: ${{ steps.recovery-dependency-cache.outputs.cache-hit != 'true' }}
         run: npm ci
 
       - name: Typecheck recovery worker
-        if: ${{ inputs.task == 'worker-deploy' }}
-        working-directory: lensically-recovery-worker
         run: npx tsc --noEmit
 
       - name: Deploy recovery worker
-        if: ${{ inputs.task == 'worker-deploy' }}
-        working-directory: lensically-recovery-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
