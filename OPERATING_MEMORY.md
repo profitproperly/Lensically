@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: one absent optional D1 source table caused `Promise.all` to reject the entire execution-library refresh, discarding every successful source group and failing all later actions. Use: source groups execute through `Promise.allSettled`; successful groups are retained, missing-table failures are nonfatal because the exact D1 manifest proves the table is absent, and every other query error remains fatal. Applies when: lazy tables, isolated test resets, migrations, or optional source systems are unavailable during execution-library refresh.
+
 - Failed: release preflight returned only exit code 1 through workflow annotations, hiding the exact failed source contract and inviting blind implementation changes. Use: capture preflight output once, surface a bounded failure annotation, and do not change implementation or rerun release until the exact preflight key is visible. Applies when: release preflight, source-contract validation, or generated-knowledge checks fail in GitHub Actions.
 
 - Failed: execution-library compilation ran before Operator table preparation, so a test reset that removed `operator_workflow_requirements` caused the entire dynamic source read to fail even though mandatory static sources were present. Use: call cached `prepareOperatorMode(env)` before `prepareMandatoryExecutionMapCall`; in tests it recreates reset tables on every gateway call, and in production it reuses the environment-scoped preparation promise. Applies when: adding library source tables, changing gateway bootstrap order, or resetting fixture schemas.
