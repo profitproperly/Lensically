@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: returning the full per-source coverage array in every public execution-library receipt pushed compact startup/precheck responses above the 12,000-byte regression limit even though the same complete policy bundle was already persisted in D1. Use: persist full `source_coverage` internally; return only consulted source types, source-type count, total source count, and rule/match counts publicly. Applies when: attaching execution-library evidence to startup, engineering precheck, or any routed result.
+
 - Failed: `startup` deterministically selected `getOperatorStartupContext`, but that internal handler was excluded from Mandatory Execution Map seeding, so a healthy execution library opened unknown-terrain discovery for the required fresh-session bootstrap. Use: exclude only gateway/guard wrappers; seed `getOperatorStartupContext` as the mandatory startup procedure while keeping `executeLensicallyIntent` as the sole public tool. Applies when: changing map exclusions, startup routing, tool-registry seeding, or public schema tests.
 
 - Failed: generated repository knowledge embedded `release-preflight.mjs`, including the same BEGIN/END marker text used to replace and strip the generated block; the unanchored regex could terminate inside the JSON string and keep generated code inside source-contract parsing. Use: anchor generated-block markers to complete source lines, normalize the generated region with the same anchored pattern, and keep the preflight script in the repository manifest by hash without embedding its full text. Applies when: generated knowledge contains files that reference its own marker or parser implementation.
