@@ -2390,6 +2390,28 @@ describe("operator mode MCP endpoint", () => {
     expect(warm.isError).not.toBe(true);
     expect(warm.structuredContent.execution_library.policy_ready).toBe(true);
 
+    await env.DB.prepare(`DROP TABLE operator_ops_memory`).run();
+    await env.DB.prepare(
+      `CREATE TABLE operator_ops_memory (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        problem TEXT,
+        fix TEXT NOT NULL,
+        applies_when TEXT,
+        tags_json TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    const rewarmed = await mcpToolCallRaw<{ execution_library: { policy_ready: boolean } }>("executeLensicallyIntent", {
+      objective: "Restore execution-policy triggers after a policy table reset.",
+      intent: "inspect engineering access state",
+      inputs: {},
+    });
+    expect(rewarmed.isError).not.toBe(true);
+    expect(rewarmed.structuredContent.execution_library.policy_ready).toBe(true);
+
     const memoryId = crypto.randomUUID();
     const marker = `immediate policy refresh marker ${memoryId}`;
     await env.DB.prepare(
