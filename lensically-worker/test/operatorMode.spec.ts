@@ -2357,10 +2357,22 @@ describe("operator mode MCP endpoint", () => {
       execution_guard: staleGuard.structuredContent.execution_guard,
     });
     expect(staleExecution.isError).toBe(true);
-    expect(staleExecution.structuredContent).toMatchObject({
+        expect(staleExecution.structuredContent).toMatchObject({
       error: "routed_execution_gateway_required",
       required_tool: "routeAndExecuteLensicallyCall",
     });
+
+    const routedExecution = await mcpToolRaw<{
+      ok: boolean;
+      items: Array<unknown>;
+      execution_policy: { pre_call_route: { route_key: string } };
+      routed_execution: { executed_tool: string; route_trail: Array<{ route_key: string }> };
+    }>("listOpsMemory", rawArgs);
+    expect(routedExecution.isError, JSON.stringify(routedExecution.structuredContent)).not.toBe(true);
+    expect(routedExecution.structuredContent.items.length).toBeLessThanOrEqual(1);
+    expect(routedExecution.structuredContent.execution_policy.pre_call_route.route_key).toBe(routeKey);
+    expect(routedExecution.structuredContent.routed_execution.executed_tool).toBe("listOpsMemory");
+    expect(routedExecution.structuredContent.routed_execution.route_trail).toContainEqual(expect.objectContaining({ route_key: routeKey }));
 
         const routedGuard = await mcpToolCallRaw<{
       ok: boolean;
