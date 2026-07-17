@@ -88,12 +88,16 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          npm run test -- --run test/operatorMode.spec.ts --reporter=verbose 2>&1 | tee /tmp/lensically-operator-tests.log
+          npm run test -- --run test/operatorMode.spec.ts --reporter=verbose --bail=1 2>&1 | tee /tmp/lensically-operator-tests.log
 
       - name: Surface Operator test failure
         if: ${{ steps.operator_tests.outcome == 'failure' }}
         run: |
-          diagnostic=$(tail -n 120 /tmp/lensically-operator-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
+          failure_lines=$(grep -aE '(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]' /tmp/lensically-operator-tests.log | tail -n 80 || true)
+          if [ -z "$failure_lines" ]; then
+            failure_lines=$(tail -n 80 /tmp/lensically-operator-tests.log)
+          fi
+          diagnostic=$(printf '%s\n' "$failure_lines" | tr '\n' ' ' | sed 's/%/%25/g')
           echo "::error title=Operator MCP test failure::$diagnostic"
           exit 1
 
