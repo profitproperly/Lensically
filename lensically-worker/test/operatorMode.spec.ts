@@ -2319,6 +2319,132 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
+    it("forces verified pre-call routes before token issuance and before stale-token execution", async () => {
+    const rawArgs = { path: "CURRENT_STATE.md", start_line: 1, max_lines: 400 };
+    const staleGuard = await mcpToolCallRaw<{
+      ok: boolean;
+      execution_guard: string;
+      normalized_arguments: Record<string, unknown>;
+    }>("guardLensicallyCall", {
+      intended_tool: "readRepoFile",
+      arguments_json: JSON.stringify(rawArgs),
+    });
+    expect(staleGuard.isError).not.toBe(true);
+    expect(staleGuard.structuredContent.normalized_arguments).toMatchObject(rawArgs);
+
+    const routeKey = "vitest_read_repo_compact_route";
+    const recorded = await mcpToolRaw<{
+      ok: boolean;
+      version: string;
+      route: { route_key: string; source: string };
+    }>("recordPreCallRoute", {
+      route_key: routeKey,
+      provider: "github",
+      tool_name: "readRepoFile",
+      operation_key: "*",
+      match: { path: "CURRENT_STATE.md" },
+      action: "apply",
+      mandatory_route: "Use the verified compact line window.",
+      argument_patch: { max_lines: 25 },
+      allowed_argument_keys: ["path", "max_lines"],
+      reason: "Avoid oversized reads and unnecessary payload.",
+      verification_summary: "Vitest verifies guard and dispatcher enforcement.",
+      priority: 900,
+    });
+    expect(recorded.isError).not.toBe(true);
+    expect(recorded.structuredContent).toMatchObject({
+      ok: true,
+      version: "operator-pre-call-routing-v1",
+      route: { route_key: routeKey, source: "persistent_phonebook" },
+    });
+
+    const staleExecution = await mcpToolCallRaw<{
+      ok: boolean;
+      returned_lines: number;
+      execution_policy: { pre_call_route: { route_key: string } };
+    }>("readRepoFile", {
+      ...rawArgs,
+      execution_guard: staleGuard.structuredContent.execution_guard,
+    });
+    expect(staleExecution.isError).not.toBe(true);
+    expect(staleExecution.structuredContent.returned_lines).toBe(25);
+    expect(staleExecution.structuredContent.execution_policy.pre_call_route.route_key).toBe(routeKey);
+
+    const routedGuard = await mcpToolCallRaw<{
+      ok: boolean;
+      normalized_arguments: Record<string, unknown>;
+      corrections: Array<{ path: string; reason: string }>;
+      pre_call_route: { route_key: string };
+    }>("guardLensicallyCall", {
+      intended_tool: "readRepoFile",
+      arguments_json: JSON.stringify(rawArgs),
+    });
+    expect(routedGuard.isError).not.toBe(true);
+    expect(routedGuard.structuredContent.normalized_arguments).toEqual({ path: "CURRENT_STATE.md", max_lines: 25 });
+    expect(routedGuard.structuredContent.corrections).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "$.start_line", reason: "pre_call_route_removed" }),
+      expect.objectContaining({ path: "$.max_lines", reason: "pre_call_route_patch" }),
+    ]));
+    expect(routedGuard.structuredContent.pre_call_route.route_key).toBe(routeKey);
+
+    const listed = await mcpToolRaw<{
+      version: string;
+      routes: Array<{ route_key: string; source: string }>;
+    }>("listPreCallRoutes", { provider: "github", tool_name: "readRepoFile" });
+    expect(listed.isError).not.toBe(true);
+    expect(listed.structuredContent.version).toBe("operator-pre-call-routing-v1");
+    expect(listed.structuredContent.routes).toContainEqual(expect.objectContaining({
+      route_key: routeKey,
+      source: "persistent_phonebook",
+    }));
+
+    const redirectKey = "vitest_access_state_redirect";
+    await mcpToolRaw("recordPreCallRoute", {
+      route_key: redirectKey,
+      provider: "lensically",
+      tool_name: "getEngineeringAccessState",
+      operation_key: "*",
+      action: "redirect",
+      required_tool: "getOperatorStartupContext",
+      mandatory_route: "Load startup context first.",
+      reason: "Verified test redirect.",
+      verification_summary: "Vitest verifies redirect before execution.",
+      priority: 950,
+    });
+    const redirected = await mcpToolCallRaw<{
+      error: string;
+      required_tool: string;
+      pre_call_route: { route_key: string };
+    }>("guardLensicallyCall", {
+      intended_tool: "getEngineeringAccessState",
+      arguments_json: "{}",
+    });
+    expect(redirected.isError).toBe(true);
+    expect(redirected.structuredContent).toMatchObject({
+      error: "pre_call_route_required",
+      required_tool: "getOperatorStartupContext",
+      pre_call_route: { route_key: redirectKey },
+    });
+
+    for (const route of [
+      {
+        route_key: routeKey, provider: "github", tool_name: "readRepoFile", operation_key: "*",
+        match: { path: "CURRENT_STATE.md" }, action: "apply", mandatory_route: "Use the verified compact line window.",
+        argument_patch: { max_lines: 25 }, allowed_argument_keys: ["path", "max_lines"],
+        reason: "Test cleanup.", verification_summary: "Previously verified.", active: false,
+      },
+      {
+        route_key: redirectKey, provider: "lensically", tool_name: "getEngineeringAccessState", operation_key: "*",
+        action: "redirect", required_tool: "getOperatorStartupContext", mandatory_route: "Load startup context first.",
+        reason: "Test cleanup.", verification_summary: "Previously verified.", active: false,
+      },
+    ]) {
+      const disabled = await mcpToolRaw<{ ok: boolean }>("recordPreCallRoute", route);
+      expect(disabled.isError).not.toBe(true);
+      expect(disabled.structuredContent.ok).toBe(true);
+    }
+  }, 30000);
+
   it("replays interrupted workflow-session creation without duplicates", async () => {
     await ensureMcpAccountOpen(BRAND_KEY);
     const operationId = "vitest-session-create-001";
@@ -3112,7 +3238,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-                expect(payload.mcp_version).toBe("1.20.0");
+                expect(payload.mcp_version).toBe("1.21.0");
     expect(payload.registry_generation).toBe("recursive-engineering-execution-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
