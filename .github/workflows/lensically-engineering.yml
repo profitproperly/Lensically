@@ -173,7 +173,7 @@ jobs:
           scheduler_safe=false
           for attempt in $(seq 1 12); do
             if curl --fail-with-body --silent --show-error "${scheduler_url}" > /tmp/lensically-scheduler-health.json \
-              && jq -e '.enabled == true and ((.control.mode == "paused") or (.control.mode == "canary") or ((.control.mode == "normal") and ((.current_overdue_count | type) == "number") and (.current_overdue_count == 0)))' /tmp/lensically-scheduler-health.json > /dev/null; then
+              && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and ((.current_overdue_count | type) == "number") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
               scheduler_safe=true
               break
             fi
