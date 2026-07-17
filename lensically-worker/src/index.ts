@@ -11867,20 +11867,6 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
-    name: "updateMcpToolSchema",
-    title: "Update MCP tool schema",
-    description: "Patch the advertised MCP input schema for a tool as runtime configuration.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, schema_patch: { type: "object", additionalProperties: true }, reason: { type: "string" } }, required: ["tool_name", "schema_patch"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "updateMcpToolBehavior",
-    title: "Update MCP tool behavior",
-    description: "Persist runtime behavior notes/policy for an MCP tool so regular ChatGPT can patch workflow instructions without code edits.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string" }, behavior_patch: { type: "object", additionalProperties: true }, reason: { type: "string" } }, required: ["tool_name", "behavior_patch"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
     name: "createMcpTool",
     title: "Create MCP tool config",
     description: "Create a runtime MCP tool configuration entry. New code-backed behavior still requires a backend implementation, but schema/behavior can be tracked immediately.",
