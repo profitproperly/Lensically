@@ -1,4 +1,9 @@
-export const MANDATORY_EXECUTION_MAP_VERSION = "mandatory-execution-map-v1";
+export const MANDATORY_EXECUTION_MAP_VERSION = "mandatory-execution-library-v2";
+export const EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v1";
+
+// BEGIN GENERATED EXECUTION KNOWLEDGE
+const GENERATED_EXECUTION_KNOWLEDGE: Record<string, string> = {};
+// END GENERATED EXECUTION KNOWLEDGE
 
 export type MandatoryExecutionToolDefinition = {
   name: string;
