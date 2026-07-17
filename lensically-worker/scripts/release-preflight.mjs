@@ -238,6 +238,12 @@ if (!receiptFunction.includes("consulted_source_types")
     || receiptFunction.includes("source_coverage: coverage")) {
   errors.push("execution_library_compact_receipt_missing");
 }
+const preparationFlagDefinitionCount = (source.match(/preparationAlreadyComplete = false/g) ?? []).length;
+const preparedBridgeCallCount = (source.match(/bridgeArgs, true/g) ?? []).length;
+const routedPreparationPassCount = (source.match(/args, routedGatewayMetadata !== null/g) ?? []).length;
+if (preparationFlagDefinitionCount < 2 || preparedBridgeCallCount < 3 || routedPreparationPassCount < 2) {
+  errors.push(`operator_preparation_reuse_incomplete:${preparationFlagDefinitionCount}:${preparedBridgeCallCount}:${routedPreparationPassCount}`);
+}
 const staticPolicyCallbackCount = (source.match(/readStaticPolicySources:/g) ?? []).length;
 if (staticPolicyCallbackCount < 2) {
   errors.push(`execution_library_static_policy_callbacks_incomplete:${staticPolicyCallbackCount}`);
