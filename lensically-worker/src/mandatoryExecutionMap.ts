@@ -400,23 +400,67 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
   }));
 }
 
+function executionLibraryTimestampMs(value: unknown): number {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return Number.NaN;
+  return Date.parse(text.includes("T") ? text : `${text.replace(" ", "T")}Z`);
+}
+
+async function executionLibraryRefreshDue(
+  db: D1Database,
+  sourceName: string,
+  maximumAgeSeconds: number,
+): Promise<boolean> {
+  const state = await db.prepare(
+    `SELECT last_synced_at FROM operator_execution_library_ingestion_state
+     WHERE source_system = 'refresh' AND source_name = ? LIMIT 1`,
+  ).bind(sourceName).first<{ last_synced_at: string }>();
+  const lastSynced = executionLibraryTimestampMs(state?.last_synced_at);
+  return !Number.isFinite(lastSynced) || Date.now() - lastSynced > maximumAgeSeconds * 1000;
+}
+
+async function markExecutionLibraryRefresh(
+  db: D1Database,
+  sourceName: string,
+  sourceCount: number,
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO operator_execution_library_ingestion_state (
+      source_system, source_name, source_fingerprint, source_count, last_synced_at
+    ) VALUES ('refresh', ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(source_system, source_name) DO UPDATE SET
+      source_fingerprint = excluded.source_fingerprint,
+      source_count = excluded.source_count,
+      last_synced_at = CURRENT_TIMESTAMP`,
+  ).bind(sourceName, `${sourceName}:${sourceCount}`, sourceCount).run();
+}
+
 async function syncExecutionPolicyLibrarySources(
   db: D1Database,
   tools: MandatoryExecutionToolDefinition[],
+  forceDynamic = false,
 ): Promise<{ sources: ExecutionPolicyLibrarySource[]; sourceReadError: string | null }> {
   let sourceReadError: string | null = null;
   let dynamicSources: ExecutionPolicyLibrarySource[] = [];
   let tableCatalogSources: ExecutionPolicyLibrarySource[] = [];
-  try {
-    dynamicSources = await readExecutionPolicyLibrarySources(db);
-  } catch (error) {
-    sourceReadError = error instanceof Error ? error.message : String(error);
+  const dynamicRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "dynamic_sources", 30);
+  const catalogRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "d1_table_manifest", 900);
+  if (dynamicRefreshDue) {
+    try {
+      dynamicSources = await readExecutionPolicyLibrarySources(db);
+      await markExecutionLibraryRefresh(db, "dynamic_sources", dynamicSources.length);
+    } catch (error) {
+      sourceReadError = error instanceof Error ? error.message : String(error);
+    }
   }
-  try {
-    tableCatalogSources = await readExecutionPolicyLibraryTableCatalog(db);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    sourceReadError = sourceReadError ? `${sourceReadError}; ${message}` : message;
+  if (catalogRefreshDue) {
+    try {
+      tableCatalogSources = await readExecutionPolicyLibraryTableCatalog(db);
+      await markExecutionLibraryRefresh(db, "d1_table_manifest", tableCatalogSources.length);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sourceReadError = sourceReadError ? `${sourceReadError}; ${message}` : message;
+    }
   }
   const toolSources = tools
     .filter((tool) => !MAP_EXCLUDED_TOOLS.has(tool.name))
