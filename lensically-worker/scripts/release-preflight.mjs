@@ -5,6 +5,7 @@ const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
+const executionMap = read("src/mandatoryExecutionMap.ts");
 const tests = read("test/operatorMode.spec.ts");
 const workflow = read("../.github/workflows/lensically-engineering.yml");
 const currentState = read("../CURRENT_STATE.md");
