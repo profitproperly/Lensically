@@ -13561,7 +13561,16 @@ async function prepareOperatorRoutedGatewayCall(
     corrections.push(...routing.corrections);
     args = routing.arguments;
     if (routing.route) routeTrail.push(routing.route);
-    // OPERATOR_ROUTED_GATEWAY_BODY
+        if (!routing.redirect) {
+      return { ok: true, tool_name: toolName, arguments: args, corrections, route_trail: routeTrail };
+    }
+    const requiredTool = normalizeOperatorText(routing.route?.required_tool, 160, true);
+    if (!requiredTool || requiredTool === toolName || requiredTool === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
+      return { ok: false, error: "routed_gateway_redirect_invalid", corrections, route_trail: routeTrail };
+    }
+    toolName = requiredTool;
+  }
+  return { ok: false, error: "routed_gateway_redirect_limit", corrections, route_trail: routeTrail };
 }
 
 async function createOperatorContinuationNonce(env: Env, brandKey: GptBrandKey): Promise<string> {
