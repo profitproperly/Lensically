@@ -15944,7 +15944,7 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
         const preCallRouting = await resolveOperatorPreCallRouting(env, intendedTool, normalizedArguments, args.operation);
     const routedArguments = preCallRouting.arguments;
     const corrections = [...normalized.corrections, ...preCallRouting.corrections];
-    const policy = {
+        const policy: Record<string, unknown> = {
       ...buildOperatorExecutionPolicy(intendedTool, routedArguments),
       pre_call_route: preCallRouting.route,
       pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
@@ -17050,7 +17050,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
-            const executionPolicy = {
+                        const executionPolicy: Record<string, unknown> = {
         ...buildOperatorExecutionPolicy(toolName, args),
         pre_call_route: preCallRouting.route,
         pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
