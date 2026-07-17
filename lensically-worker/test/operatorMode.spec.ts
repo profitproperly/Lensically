@@ -2210,12 +2210,12 @@ describe("operator mode MCP endpoint", () => {
       required_tool: "routeAndExecuteLensicallyCall",
     });
 
-    const invalid = await mcpToolCallRaw<{ error: string; validation_errors: Array<{ path: string; error: string }> }>("readRepoFile", {
-      path: "CURRENT_STATE.md",
-      unexpected: true,
+        const invalid = await mcpToolCallRaw<{ error: string; validation_errors: Array<{ path: string; error: string }> }>("routeAndExecuteLensicallyCall", {
+      intended_tool: "readRepoFile",
+      arguments_json: JSON.stringify({ path: "CURRENT_STATE.md", unexpected: true }),
     });
     expect(invalid.isError).toBe(true);
-    expect(invalid.structuredContent.error).toBe("execution_guard_payload_invalid");
+    expect(invalid.structuredContent.error).toBe("routed_gateway_payload_invalid");
     expect(invalid.structuredContent.validation_errors).toContainEqual({
       path: "$.unexpected",
       error: "additional_property_forbidden",
