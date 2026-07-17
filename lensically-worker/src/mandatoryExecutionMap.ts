@@ -1369,6 +1369,18 @@ function isReusableExecutionPathFailure(toolName: string, result: Record<string,
   return false;
 }
 
+function shouldRefreshExecutionLibraryAfterTool(toolName: string): boolean {
+  return /memory|route|requirement|gate|decision|sourcecard|source_card|backlog|override|tool(schema|behavior)|createMcpTool|ops/i.test(toolName);
+}
+
+function compactExecutionResultEvidence(result: Record<string, unknown>): Record<string, unknown> {
+  const omitted = new Set(["execution_library", "routed_execution", "execution_policy", "mandatory_execution_map"]);
+  return Object.fromEntries(Object.entries(result)
+    .filter(([key]) => !omitted.has(key))
+    .slice(0, 40)
+    .map(([key, value]) => [key, typeof value === "string" ? value.slice(0, 4000) : value]));
+}
+
 async function recordMapAttempt(
   db: D1Database,
   input: {
