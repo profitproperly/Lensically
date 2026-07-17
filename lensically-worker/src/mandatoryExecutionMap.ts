@@ -487,8 +487,14 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
     ORDER BY updated_at DESC
   `).all<Record<string, unknown>>(),
   ]);
-  return groups
-    .flatMap((group) => group.results ?? [])
+  const fatalFailures = settledGroups
+    .flatMap((group) => group.status === "rejected" ? [String(group.reason instanceof Error ? group.reason.message : group.reason)] : [])
+    .filter((message) => !/no such table:/i.test(message));
+  if (fatalFailures.length) {
+    throw new Error(fatalFailures.join("; "));
+  }
+  return settledGroups
+    .flatMap((group) => group.status === "fulfilled" ? group.value.results ?? [] : [])
     .map((row) => ({
       source_type: String(row.source_type ?? "unknown"),
       source_id: String(row.source_id ?? "unknown"),
