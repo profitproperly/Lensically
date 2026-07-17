@@ -390,7 +390,6 @@ async function readExecutionPolicyLibrarySources(db: D1Database): Promise<Execut
       created_at
     FROM operator_post_metric_snapshots
     ORDER BY updated_at DESC
-    LIMIT 1200
   `).all<Record<string, unknown>>();
   return (rows.results ?? []).map((row) => ({
     source_type: String(row.source_type ?? "unknown"),
