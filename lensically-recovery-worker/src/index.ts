@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one bounded current-head main-worker validation after the four-term source-query ceiling is release-enforced.
+// Recovery source commits may carry [operator-tests] to trigger one focused current-head validation of the four-term execution-source groups.
 
 interface Env {
   GITHUB_TOKEN: string;
