@@ -31740,51 +31740,71 @@ async function recoverOverdueScheduledPostRows(
     });
   const ids = normalized.map((action) => action.scheduled_post_id);
   const idPlaceholders = ids.map(() => "?").join(", ");
-  const cancelledExpression = retired.length
-    ? `CASE id ${retired.map(() => "WHEN ? THEN ?").join(" ")} ELSE NULL END`
-    : "NULL";
-  const scheduledExpression = rescheduled.length
-    ? `CASE id ${rescheduled.map(() => "WHEN ? THEN ?").join(" ")} ELSE scheduled_time END`
-    : "scheduled_time";
-  const errorExpression = retired.length
-    ? `CASE id ${retired.map(() => "WHEN ? THEN ?").join(" ")} ELSE NULL END`
-    : "NULL";
-  const bindings: unknown[] = [
-    ...retired.flatMap((action) => [action.scheduled_post_id, nowIso]),
-    ...rescheduled.flatMap((action) => [action.scheduled_post_id, action.scheduled_time]),
-    ...retired.flatMap((action) => [action.scheduled_post_id, `operator_retired_overdue:${reason}`.slice(0, 2000)]),
-    ...ids,
-    SCHEDULED_POST_STATUS_APPROVED,
-    nowIso,
-    ...ids,
-    SCHEDULED_POST_STATUS_APPROVED,
-    nowIso,
-    ids.length,
+  const recoveryClaim = `overdue-recovery:${crypto.randomUUID()}`;
+  const statements = [
+    env.DB.prepare(
+      `UPDATE scheduled_posts
+       SET processing_started_at = ?
+       WHERE id IN (${idPlaceholders})
+         AND status = ?
+         AND cancelled_at IS NULL
+         AND scheduled_time <= ?
+         AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)`,
+    ).bind(recoveryClaim, ...ids, SCHEDULED_POST_STATUS_APPROVED, nowIso),
+    ...normalized.map((action) => {
+      const allClaimedClause = `(
+        SELECT COUNT(*)
+        FROM scheduled_posts AS claimed
+        WHERE claimed.id IN (${idPlaceholders})
+          AND claimed.processing_started_at = ?
+      ) = ?`;
+      if (action.action === "retire") {
+        return env.DB.prepare(
+          `UPDATE scheduled_posts
+           SET cancelled_at = ?, failed_at = NULL,
+               publish_error_message = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?
+             AND processing_started_at = ?
+             AND ${allClaimedClause}`,
+        ).bind(
+          nowIso,
+          `operator_retired_overdue:${reason}`.slice(0, 2000),
+          action.scheduled_post_id,
+          recoveryClaim,
+          ...ids,
+          recoveryClaim,
+          ids.length,
+        );
+      }
+      const scheduledTime = rescheduled.find((entry) => entry.scheduled_post_id === action.scheduled_post_id)?.scheduled_time;
+      return env.DB.prepare(
+        `UPDATE scheduled_posts
+         SET scheduled_time = ?, failed_at = NULL,
+             publish_error_message = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?
+           AND processing_started_at = ?
+           AND ${allClaimedClause}`,
+      ).bind(
+        scheduledTime,
+        action.scheduled_post_id,
+        recoveryClaim,
+        ...ids,
+        recoveryClaim,
+        ids.length,
+      );
+    }),
+    env.DB.prepare(
+      `UPDATE scheduled_posts
+       SET processing_started_at = NULL
+       WHERE id IN (${idPlaceholders})
+         AND processing_started_at = ?`,
+    ).bind(...ids, recoveryClaim),
   ];
-  const updated = await env.DB.prepare(
-    `UPDATE scheduled_posts
-     SET cancelled_at = ${cancelledExpression},
-         scheduled_time = ${scheduledExpression},
-         processing_started_at = NULL,
-         failed_at = NULL,
-         publish_error_message = ${errorExpression},
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id IN (${idPlaceholders})
-       AND status = ?
-       AND cancelled_at IS NULL
-       AND scheduled_time <= ?
-       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
-       AND (
-         SELECT COUNT(*)
-         FROM scheduled_posts AS eligible
-         WHERE eligible.id IN (${idPlaceholders})
-           AND eligible.status = ?
-           AND eligible.cancelled_at IS NULL
-           AND eligible.scheduled_time <= ?
-           AND (eligible.published_post_id IS NULL OR length(trim(eligible.published_post_id)) = 0)
-       ) = ?`,
-  ).bind(...bindings).run();
-  if (Number(updated.meta?.changes ?? 0) !== normalized.length) {
+  const results = await env.DB.batch(statements);
+  const claimChanges = Number(results[0]?.meta?.changes ?? 0);
+  const actionChanges = results.slice(1, 1 + normalized.length).map((result) => Number(result.meta?.changes ?? 0));
+  const cleanupChanges = Number(results[results.length - 1]?.meta?.changes ?? 0);
+  if (claimChanges !== normalized.length || actionChanges.some((changes) => changes !== 1) || cleanupChanges !== normalized.length) {
     throw new Error("scheduled_post_recovery_race");
   }
 
