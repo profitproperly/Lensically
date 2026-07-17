@@ -17383,8 +17383,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
-      await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
-      const idempotencyKey = await operatorIdempotencyKey(toolName, args);
+      if (!sourceDefinedDirectEngineering) {
+        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
+      }
+      const idempotencyKey = sourceDefinedDirectEngineering
+        ? null
+        : await operatorIdempotencyKey(toolName, args);
       let receiptFingerprint: string | null = null;
       if (idempotencyKey) {
         const receipt = await beginOperatorOperationReceipt(env, idempotencyKey, toolName, args);
