@@ -273,6 +273,7 @@ if (!tests.includes("consulted_before_execution: true")
     || !tests.includes('scheduler: {\n        control: { mode: "canary", allowed_post_ids: [scheduledPostId] }')
     || !tests.includes("stale_fixture_table")
     || !tests.includes("refreshes policy sources on the next action after a policy write")
+    || !tests.includes("Preserve source-defined phonebook policies during forced refresh.")
     || !tests.includes('"ops_memory"')
     || !tests.includes('"pre_call_route"')
     || !tests.includes('"map_entry"')) {
