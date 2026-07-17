@@ -512,7 +512,6 @@ async function readExecutionPolicyLibraryCandidates(
     "workflow_requirement",
     "map_entry",
     "tool_registry",
-    "repository_knowledge",
   ];
   const whereParts = [
     `source_type IN (${alwaysConsultedTypes.map(() => "?").join(", ")})`,
