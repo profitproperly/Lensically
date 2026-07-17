@@ -865,6 +865,7 @@ export async function prepareMandatoryExecutionMapCall(
       map_state: "unknown",
       incident,
       discovery_permit: await createDiscoveryPermit(callbacks, incident),
+      execution_library: executionLibrary,
     };
   }
 
