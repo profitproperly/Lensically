@@ -879,6 +879,13 @@ export async function prepareMandatoryExecutionMapCall(
       failureSignature: found.candidates.length ? "intent_match_ambiguous" : "no_matching_execution_map_entry",
       inputs,
     });
+    await recordExecutionPolicyLibraryEvent(db, {
+      actionIntent,
+      phase: "path_resolution",
+      outcome: "unknown_or_ambiguous",
+      policy: executionLibrary,
+      evidence: { candidates: found.candidates, incident_id: incident.id },
+    });
     return {
       ok: false,
       error: found.candidates.length ? "mandatory_execution_map_ambiguous" : "mandatory_execution_map_unknown",
@@ -886,6 +893,7 @@ export async function prepareMandatoryExecutionMapCall(
       incident,
       discovery_permit: await createDiscoveryPermit(callbacks, incident),
       candidates: found.candidates,
+      execution_library: executionLibrary,
     };
   }
 
