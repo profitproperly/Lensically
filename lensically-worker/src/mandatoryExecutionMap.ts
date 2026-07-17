@@ -454,28 +454,19 @@ async function syncExecutionPolicyLibrarySources(
   tools: MandatoryExecutionToolDefinition[],
   forceDynamic = false,
 ): Promise<{ sources: ExecutionPolicyLibrarySource[]; sourceReadError: string | null }> {
+  const dynamicSourceTypes = [
+    "ops_memory", "pre_call_route", "workflow_requirement", "admin_error", "engineering_audit",
+    "execution_event", "operational_incident", "tool_override", "mcp_deployment", "continuity_ref",
+    "operation_receipt", "autonomy_profile", "decision_proposal", "decision_execution", "repo_write_session",
+    "map_entry", "map_incident", "map_attempt", "map_promotion", "backlog", "strategy_memory",
+    "workflow_session", "context_admission", "production_board", "source_selection_batch", "source_selection",
+    "review_batch", "daily_source_claim", "source_exclusion", "source_card", "gate_policy", "gate_result",
+    "content_inventory", "post_metric_snapshot",
+  ];
   let sourceReadError: string | null = null;
   let dynamicSources: ExecutionPolicyLibrarySource[] = [];
   let tableCatalogSources: ExecutionPolicyLibrarySource[] = [];
-  const dynamicRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "dynamic_sources", 30);
-  const catalogRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "d1_table_manifest", 900);
-  if (dynamicRefreshDue) {
-    try {
-      dynamicSources = await readExecutionPolicyLibrarySources(db);
-      await markExecutionLibraryRefresh(db, "dynamic_sources", dynamicSources.length);
-    } catch (error) {
-      sourceReadError = error instanceof Error ? error.message : String(error);
-    }
-  }
-  if (catalogRefreshDue) {
-    try {
-      tableCatalogSources = await readExecutionPolicyLibraryTableCatalog(db);
-      await markExecutionLibraryRefresh(db, "d1_table_manifest", tableCatalogSources.length);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      sourceReadError = sourceReadError ? `${sourceReadError}; ${message}` : message;
-    }
-  }
+  const generatedSources = generatedExecutionKnowledgeSources();
   const toolSources = tools
     .filter((tool) => !MAP_EXCLUDED_TOOLS.has(tool.name))
     .map((tool) => ({
@@ -484,12 +475,44 @@ async function syncExecutionPolicyLibrarySources(
       text: `${tool.name} ${tool.title} ${tool.description} ${stringify(procedureForTool(tool))}`,
       updated_at: null,
     } satisfies ExecutionPolicyLibrarySource));
-  await persistExecutionPolicyLibrarySources(db, [
-    ...generatedExecutionKnowledgeSources(),
-    ...dynamicSources,
-    ...tableCatalogSources,
-    ...toolSources,
-  ]);
+  const staticFingerprint = [
+    MANDATORY_EXECUTION_MAP_VERSION,
+    EXECUTION_POLICY_LIBRARY_VERSION,
+    generatedSources.length,
+    generatedSources.reduce((total, source) => total + source.text.length, 0),
+    toolSources.length,
+  ].join(":");
+  const staticRefreshDue = await executionLibraryRefreshDue(db, "static_sources", 86400, staticFingerprint);
+  const dynamicRefreshDue = forceDynamic || await executionLibraryRefreshDue(db, "dynamic_sources", 60);
+  const catalogRefreshDue = await executionLibraryRefreshDue(db, "d1_table_manifest", 900);
+  const refreshSources: ExecutionPolicyLibrarySource[] = [];
+  if (staticRefreshDue) {
+    await deactivateExecutionPolicyLibrarySourceTypes(db, ["repository_knowledge", "tool_registry"]);
+    refreshSources.push(...generatedSources, ...toolSources);
+  }
+  if (dynamicRefreshDue) {
+    try {
+      dynamicSources = await readExecutionPolicyLibrarySources(db);
+      await deactivateExecutionPolicyLibrarySourceTypes(db, dynamicSourceTypes);
+      refreshSources.push(...dynamicSources);
+    } catch (error) {
+      sourceReadError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  if (catalogRefreshDue) {
+    try {
+      tableCatalogSources = await readExecutionPolicyLibraryTableCatalog(db);
+      await deactivateExecutionPolicyLibrarySourceTypes(db, ["d1_table_manifest"]);
+      refreshSources.push(...tableCatalogSources);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sourceReadError = sourceReadError ? `${sourceReadError}; ${message}` : message;
+    }
+  }
+  await persistExecutionPolicyLibrarySources(db, refreshSources);
+  if (staticRefreshDue) await markExecutionLibraryRefresh(db, "static_sources", generatedSources.length + toolSources.length, staticFingerprint);
+  if (dynamicRefreshDue && sourceReadError === null) await markExecutionLibraryRefresh(db, "dynamic_sources", dynamicSources.length);
+  if (catalogRefreshDue && tableCatalogSources.length) await markExecutionLibraryRefresh(db, "d1_table_manifest", tableCatalogSources.length);
   const countRows = await db.prepare(
     `SELECT source_type, COUNT(*) AS total
      FROM operator_execution_library_sources
