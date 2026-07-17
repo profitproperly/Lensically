@@ -2,7 +2,35 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 const root = process.cwd();
+const repoRoot = resolve(root, "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const ignoredRepositoryDirectories = new Set([".git", "node_modules", ".wrangler", "dist", "coverage"]);
+const repositoryKnowledgeExtensions = new Set([".md", ".txt", ".json", ".jsonc", ".yml", ".yaml", ".sql", ".mjs"]);
+function collectRepositoryFiles(directory) {
+  const files = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory() && ignoredRepositoryDirectories.has(entry.name)) continue;
+    const absolute = resolve(directory, entry.name);
+    if (entry.isDirectory()) files.push(...collectRepositoryFiles(absolute));
+    else if (entry.isFile()) files.push(absolute);
+  }
+  return files;
+}
+const repositoryFiles = collectRepositoryFiles(repoRoot);
+const repositoryFileManifest = repositoryFiles.map((absolute) => ({
+  path: relative(repoRoot, absolute).replaceAll("\\", "/"),
+  size: statSync(absolute).size,
+}));
+const repositoryTextKnowledge = Object.fromEntries(repositoryFiles
+  .map((absolute) => ({
+    absolute,
+    path: relative(repoRoot, absolute).replaceAll("\\", "/"),
+    size: statSync(absolute).size,
+  }))
+  .filter((file) => file.path !== "lensically-worker/src/mandatoryExecutionMap.ts")
+  .filter((file) => file.size <= 120000)
+  .filter((file) => repositoryKnowledgeExtensions.has(file.path.slice(file.path.lastIndexOf("."))))
+  .map((file) => [file.path, readFileSync(file.absolute, "utf8")]));
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 let executionMap = read("src/mandatoryExecutionMap.ts");
