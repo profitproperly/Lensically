@@ -31615,6 +31615,7 @@ export class ScheduledPostScheduler {
       max_posts: input.mode === "canary" ? 1 : input.mode === "normal" ? getScheduledPostBatchSize(this.env) : 0,
       updated_at: new Date().toISOString(),
       reason: input.reason ?? null,
+      resume_mode: input.mode === "canary" ? input.resumeMode ?? "paused" : null,
     };
     await this.state.storage.put("control", control);
     return control;
