@@ -291,7 +291,7 @@ async function persistExecutionPolicyLibrarySources(
 }
 
 async function readExecutionPolicyLibrarySources(db: D1Database): Promise<ExecutionPolicyLibrarySource[]> {
-  const groups = await Promise.all([
+  const settledGroups = await Promise.allSettled([
     db.prepare(`
     SELECT 'ops_memory' AS source_type, id AS source_id,
       title || ' ' || COALESCE(problem, '') || ' ' || fix || ' ' || COALESCE(applies_when, '') || ' ' || COALESCE(tags_json, '') AS text,
