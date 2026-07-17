@@ -298,7 +298,7 @@ async function compileExecutionPolicyLibrary(
       id, action_intent, phase, outcome, mapped_tool, source_keys_json, policy_json, evidence_json
     ) VALUES (?, ?, 'policy_compiled', 'ready', NULL, ?, ?, '{}')`,
   ).bind(
-    crypto.randomUUID(),
+    policyEventId,
     actionIntent,
     stringify(bundle.matched_source_keys).slice(0, 50000),
     stringify(bundle).slice(0, 50000),
