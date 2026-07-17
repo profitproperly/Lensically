@@ -2320,34 +2320,34 @@ describe("operator mode MCP endpoint", () => {
   }, 30000);
 
     it("forces verified pre-call routes before token issuance and before stale-token execution", async () => {
-    const rawArgs = { path: "CURRENT_STATE.md", start_line: 1, max_lines: 400 };
-    const staleGuard = await mcpToolCallRaw<{
+        const rawArgs = { limit: 50 };
+        const staleGuard = await mcpToolCallRaw<{
       ok: boolean;
       execution_guard: string;
       normalized_arguments: Record<string, unknown>;
     }>("guardLensicallyCall", {
-      intended_tool: "readRepoFile",
+      intended_tool: "listOpsMemory",
       arguments_json: JSON.stringify(rawArgs),
     });
     expect(staleGuard.isError).not.toBe(true);
     expect(staleGuard.structuredContent.normalized_arguments).toMatchObject(rawArgs);
 
-    const routeKey = "vitest_read_repo_compact_route";
+        const routeKey = "vitest_list_ops_memory_compact_route";
     const recorded = await mcpToolRaw<{
       ok: boolean;
       version: string;
       route: { route_key: string; source: string };
     }>("recordPreCallRoute", {
       route_key: routeKey,
-      provider: "github",
-      tool_name: "readRepoFile",
+            provider: "lensically",
+      tool_name: "listOpsMemory",
       operation_key: "*",
-      match: { path: "CURRENT_STATE.md" },
+      match: { limit: 50 },
       action: "apply",
-      mandatory_route: "Use the verified compact line window.",
-      argument_patch: { max_lines: 25 },
-      allowed_argument_keys: ["path", "max_lines"],
-      reason: "Avoid oversized reads and unnecessary payload.",
+      mandatory_route: "Use the verified compact result limit.",
+      argument_patch: { limit: 1 },
+      allowed_argument_keys: ["limit"],
+      reason: "Avoid oversized memory listings.",
       verification_summary: "Vitest verifies guard and dispatcher enforcement.",
       priority: 900,
     });
@@ -2358,39 +2358,38 @@ describe("operator mode MCP endpoint", () => {
       route: { route_key: routeKey, source: "persistent_phonebook" },
     });
 
-    const staleExecution = await mcpToolCallRaw<{
+        const staleExecution = await mcpToolCallRaw<{
       ok: boolean;
-      returned_lines: number;
+      items: Array<unknown>;
       execution_policy: { pre_call_route: { route_key: string } };
-    }>("readRepoFile", {
+    }>("listOpsMemory", {
       ...rawArgs,
       execution_guard: staleGuard.structuredContent.execution_guard,
     });
-        expect(staleExecution.isError, JSON.stringify(staleExecution.structuredContent)).not.toBe(true);
-    expect(staleExecution.structuredContent.returned_lines).toBe(25);
+    expect(staleExecution.isError, JSON.stringify(staleExecution.structuredContent)).not.toBe(true);
+    expect(staleExecution.structuredContent.items.length).toBeLessThanOrEqual(1);
     expect(staleExecution.structuredContent.execution_policy.pre_call_route.route_key).toBe(routeKey);
 
-    const routedGuard = await mcpToolCallRaw<{
+        const routedGuard = await mcpToolCallRaw<{
       ok: boolean;
       normalized_arguments: Record<string, unknown>;
       corrections: Array<{ path: string; reason: string }>;
       pre_call_route: { route_key: string };
     }>("guardLensicallyCall", {
-      intended_tool: "readRepoFile",
+      intended_tool: "listOpsMemory",
       arguments_json: JSON.stringify(rawArgs),
     });
     expect(routedGuard.isError).not.toBe(true);
-    expect(routedGuard.structuredContent.normalized_arguments).toEqual({ path: "CURRENT_STATE.md", max_lines: 25 });
+    expect(routedGuard.structuredContent.normalized_arguments).toEqual({ limit: 1 });
     expect(routedGuard.structuredContent.corrections).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: "$.start_line", reason: "pre_call_route_removed" }),
-      expect.objectContaining({ path: "$.max_lines", reason: "pre_call_route_patch" }),
+      expect.objectContaining({ path: "$.limit", reason: "pre_call_route_patch" }),
     ]));
     expect(routedGuard.structuredContent.pre_call_route.route_key).toBe(routeKey);
 
     const listed = await mcpToolRaw<{
       version: string;
       routes: Array<{ route_key: string; source: string }>;
-    }>("listPreCallRoutes", { provider: "github", tool_name: "readRepoFile" });
+        }>("listPreCallRoutes", { provider: "lensically", tool_name: "listOpsMemory" });
     expect(listed.isError).not.toBe(true);
     expect(listed.structuredContent.version).toBe("operator-pre-call-routing-v1");
     expect(listed.structuredContent.routes).toContainEqual(expect.objectContaining({
@@ -2428,9 +2427,9 @@ describe("operator mode MCP endpoint", () => {
 
     for (const route of [
       {
-        route_key: routeKey, provider: "github", tool_name: "readRepoFile", operation_key: "*",
-        match: { path: "CURRENT_STATE.md" }, action: "apply", mandatory_route: "Use the verified compact line window.",
-        argument_patch: { max_lines: 25 }, allowed_argument_keys: ["path", "max_lines"],
+                route_key: routeKey, provider: "lensically", tool_name: "listOpsMemory", operation_key: "*",
+        match: { limit: 50 }, action: "apply", mandatory_route: "Use the verified compact result limit.",
+        argument_patch: { limit: 1 }, allowed_argument_keys: ["limit"],
         reason: "Test cleanup.", verification_summary: "Previously verified.", active: false,
       },
       {
