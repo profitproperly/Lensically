@@ -476,23 +476,18 @@ async function syncExecutionPolicyLibrarySources(
     ...tableCatalogSources,
     ...toolSources,
   ]);
-  const rows = await db.prepare(
-    `SELECT source_type, source_id, text, source_updated_at AS updated_at
+  const countRows = await db.prepare(
+    `SELECT source_type, COUNT(*) AS total
      FROM operator_execution_library_sources
      WHERE active = 1
-     ORDER BY COALESCE(source_updated_at, synced_at) DESC
-     LIMIT 5000`,
+     GROUP BY source_type`,
   ).all<Record<string, unknown>>();
-  const sources = (rows.results ?? []).map((row) => ({
+  const counts = (countRows.results ?? []).map((row) => ({
     source_type: String(row.source_type ?? "unknown"),
-    source_id: String(row.source_id ?? "unknown"),
-    text: String(row.text ?? ""),
-    updated_at: row.updated_at == null ? null : String(row.updated_at),
+    total: Number(row.total ?? 0),
   }));
-  const counts = new Map<string, number>();
-  for (const source of sources) counts.set(source.source_type, (counts.get(source.source_type) ?? 0) + 1);
-  if (counts.size) {
-    await db.batch(Array.from(counts.entries()).map(([sourceType, total]) => db.prepare(
+  if (counts.length) {
+    await db.batch(counts.map(({ source_type: sourceType, total }) => db.prepare(
       `INSERT INTO operator_execution_library_ingestion_state (
         source_system, source_name, source_fingerprint, source_count, last_synced_at
       ) VALUES ('execution_library', ?, ?, ?, CURRENT_TIMESTAMP)
@@ -502,7 +497,7 @@ async function syncExecutionPolicyLibrarySources(
         last_synced_at = CURRENT_TIMESTAMP`,
     ).bind(sourceType, `${sourceType}:${total}`, total)));
   }
-  return { sources, sourceReadError };
+  return { sources: [], sourceReadError };
 }
 
 async function compileExecutionPolicyLibrary(
