@@ -17045,7 +17045,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             d1_bootstrap_bypassed: true,
             d1_pre_call_routing_bypassed: true,
             d1_execution_events_bypassed: true,
-            d1_autonomy_bypassed: true,
+            d1_autonomy_bypassed: !sourceDefinedProtectedOperation,
           } : {}),
         };
       }
