@@ -6486,7 +6486,7 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     MANIFEST_AUTONOMY_MODE,
   ).run();
 
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_ops_memory (
 
       id TEXT PRIMARY KEY,
@@ -6500,6 +6500,8 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
+
+  await ensureOperatorPreCallRoutesTable(env);
 
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_engineering_audit (
@@ -11652,8 +11654,10 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "listOpsMemory",
   "readOpsMemory",
   "recordOpsMemory",
-  "updateOpsMemory",
+    "updateOpsMemory",
   "searchOpsMemory",
+  "listPreCallRoutes",
+  "recordPreCallRoute",
 ] as const;
 
 type OperatorMcpEngineeringToolName = typeof OPERATOR_MCP_ENGINEERING_TOOL_NAMES[number];
@@ -11691,7 +11695,9 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "readOpsMemory", title: "Read ops memory", description: "Read one operational fix memory entry.", inputSchema: { type: "object", properties: { memory_id: { type: "string" } }, required: ["memory_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
     { name: "recordOpsMemory", title: "Record ops memory", description: "Record one compact operational fix. Send title and fix only unless a short problem, applies_when, or tag list materially improves reuse.", inputSchema: { type: "object", properties: { title: { type: "string", maxLength: 120 }, problem: { type: "string", maxLength: 600 }, fix: { type: "string", maxLength: 1200 }, applies_when: { type: "string", maxLength: 600 }, tags: { type: "array", maxItems: 8, items: { type: "string", maxLength: 40 } } }, required: ["title", "fix"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "updateOpsMemory", title: "Update ops memory", description: "Update a compact operational fix memory entry.", inputSchema: { type: "object", properties: { memory_id: { type: "string" }, title: { type: "string" }, problem: { type: "string" }, fix: { type: "string" }, applies_when: { type: "string" }, tags: { type: "array", items: { type: "string" } }, active: { type: "boolean" } }, required: ["memory_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "searchOpsMemory", title: "Search ops memory", description: "Search operational fix memory entries by compact text query.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    { name: "searchOpsMemory", title: "Search ops memory", description: "Search operational fix memory entries by compact text query.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "listPreCallRoutes", title: "List pre-call routes", description: "List the persistent and source-defined successful tool-call paths that guardLensicallyCall must consult before execution.", inputSchema: { type: "object", properties: { provider: { type: "string" }, tool_name: { type: "string" }, active: { type: "boolean" }, limit: { type: "integer", minimum: 1, maximum: 200 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "recordPreCallRoute", title: "Record verified pre-call route", description: "Persist one verified successful tool-call path. Matching future calls are rewritten or redirected by guardLensicallyCall and the dispatcher before the tool can execute.", inputSchema: { type: "object", properties: { route_key: { type: "string", maxLength: 160 }, provider: { type: "string", maxLength: 80 }, tool_name: { type: "string", maxLength: 160 }, operation_key: { type: "string", maxLength: 160 }, match: { type: "object", additionalProperties: true }, action: { type: "string", enum: ["apply", "redirect"] }, required_tool: { type: "string", maxLength: 160 }, mandatory_route: { type: "string", maxLength: 1600 }, argument_patch: { type: "object", additionalProperties: true }, allowed_argument_keys: { type: "array", maxItems: 50, items: { type: "string", maxLength: 160 } }, reason: { type: "string", maxLength: 1600 }, verification_summary: { type: "string", maxLength: 1600 }, source_memory_id: { type: "string", maxLength: 160 }, priority: { type: "integer", minimum: 1, maximum: 1000 }, active: { type: "boolean" }, expires_at: { type: "string", maxLength: 80 } }, required: ["route_key", "tool_name", "mandatory_route", "reason", "verification_summary"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
 ];
 
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
@@ -13216,7 +13222,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.20.0";
+const OPERATOR_MCP_VERSION = "1.21.0";
 
 const OPERATOR_REGISTRY_GENERATION = "recursive-engineering-execution-v1";
 
@@ -13342,7 +13348,8 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
     return payload as Record<string, unknown>;
 }
 
-const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v1";
+const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v2";
+const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v1";
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
   "getOperatorStartupContext",
@@ -13950,8 +13957,8 @@ async function recordOperatorExecutionDecision(
 function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
     "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "listRepoFiles", "readRepoFile",
-    "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
-    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "selectOperatorKey", "confirmOperatorProceed",
+        "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
+    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "confirmOperatorProceed\,
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "listMcpTools", "readMcpToolDefinition", "listImplementationBacklogItems", "getWorkflowStatus",
     "list_accounts", "get_account_state", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
     "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results",
