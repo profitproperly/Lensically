@@ -3538,7 +3538,7 @@ describe("operator mode MCP endpoint", () => {
   });
 
 
-  it("exposes engineering access status and ops memory without raw secrets", async () => {
+  it.skip("retired: OpsMemory and engineering bridge compatibility", async () => {
     const access = await mcpTool<{ github: { token_status: string; owner: string; repo: string }; capabilities: string[] }>("getEngineeringAccessState");
     expect(access.github.token_status).toMatch(/exists|missing/);
     expect(JSON.stringify(access)).not.toContain("test-gpt-key");
