@@ -200,6 +200,7 @@ if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy
     || !executionMap.includes("failed_recorded_before_repair")
     || !executionMap.includes("mandatory_path_updated_before_resume")
     || !executionMap.includes("__repository_file_manifest__")
+    || source.includes('if (gatewayIntent === "startup")')
     || !source.includes("execution_library?: Record<string, unknown>")
     || !source.includes("execution_library: prepared.execution_library ?? null")
     || !source.includes("resultPayload.execution_library = routedGatewayMetadata.execution_library")) {
