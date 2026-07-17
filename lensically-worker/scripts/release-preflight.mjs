@@ -105,6 +105,12 @@ if (!tests.includes('makes the execution map the only public action path')
     || !tests.includes('blocks a stale known path and makes the verified replacement mandatory')) {
   errors.push("mandatory_execution_map_regression_missing");
 }
+if (!executionMap.includes("isDeterministicInputValidationFailure")
+    || !executionMap.includes("result.ok !== false || isDeterministicInputValidationFailure(result)")
+    || !executionMap.includes("repairDeterministicInputValidationIncidents")
+    || !executionMap.includes("await repairDeterministicInputValidationIncidents(db)")) {
+  errors.push("mandatory_execution_map_input_validation_repair_missing");
+}
 if (!recoverySource.includes('exact_sha_not_current_branch_head') || !recoverySource.includes('dispatch_ref: dispatchRef') || !recoverySource.includes('verified_head_sha: verifiedHeadSha')) {
   errors.push("recovery_exact_sha_dispatch_guard_missing");
 }
