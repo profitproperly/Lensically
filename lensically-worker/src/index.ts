@@ -13023,11 +13023,10 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const toolNames = tools.map((tool) => tool.name);
   const adminNames = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES);
   const engineeringNames = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES);
-  const accountWrapperTools = ["mm", "om", "vx"].flatMap((prefix) =>
-    OPERATOR_MCP_TOOLS.filter((tool) => tool.name !== "list_accounts").map((tool) => `${prefix}_${tool.name}`)
-  ).slice(0, 80);
+  const activeEngineeringTools = toolNames.filter((name) => engineeringNames.has(name));
+  const activeAdminTools = toolNames.filter((name) => adminNames.has(name));
   const operatorTools = toolNames
-    .filter((name) => !adminNames.has(name) && !engineeringNames.has(name) && !accountWrapperTools.includes(name))
+    .filter((name) => !adminNames.has(name) && !engineeringNames.has(name))
     .slice(0, 80);
   const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
   const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
