@@ -14725,7 +14725,7 @@ function operatorMcpInstructions(toolCount: number): string {
         "Immediately after getOperatorStartupContext, submit every operational intent through routeAndExecuteLensicallyCall. The gateway resolves the persistent phonebook and executes the final verified path internally; never call an operational tool name directly.",
         "Initial key-selection stop: before any account-scoped work, ask the user to choose exactly one canonical key: manifest_mental, opmg_deadman, or vectrix.",
 
-            "After the user selects a key, call selectOperatorKey with that canonical key. If the direct tool is not exposed, call listMcpTools with execute_tool=selectOperatorKey and arguments containing brand_key. Reply using only the exact four-line handshake returned by the tool. Do not call account-scoped tools yet.",
+                        "After the user selects a key, call routeAndExecuteLensicallyCall with intended_tool=selectOperatorKey and arguments_json containing the canonical brand_key. Reply using only the exact four-line handshake returned by the routed result. Do not submit account-scoped intent yet.",
     "Lensically Operator Mode MCP is active.",
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
