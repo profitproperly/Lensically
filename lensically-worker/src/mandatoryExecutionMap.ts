@@ -34,7 +34,6 @@ export type MandatoryExecutionPrepared = {
 };
 
 const MAP_EXCLUDED_TOOLS = new Set([
-  "getOperatorStartupContext",
   "guardLensicallyCall",
   "routeAndExecuteLensicallyCall",
   "executeMappedIntent",
