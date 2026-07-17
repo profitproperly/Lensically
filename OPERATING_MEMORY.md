@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: using exact partial replacements on GitHub Actions YAML after the active route required a complete block replacement caused inherited indentation and invalid workflow syntax. Use: for any YAML workflow change, replace the entire affected block or whole file through a reviewed write session, read the complete result back, and only then allow the triggering commit or dispatch. Never use line-level patching for YAML even when each replacement is exact. Applies when: modifying `.github/workflows/*.yml` conditions, steps, inputs, or shell blocks.
+
 - Failed: composing a broad or verbose `executeLensicallyIntent` request before consulting the compact client-safe route caused OpenAI client preflight to block the action before Lensically received it, immediately repeating a known failure while building the execution library itself. Use: every non-conversational action is admitted through `execution-policy-library-v1` before internal execution; the public request remains only compact objective, intent, and variable inputs, and known operational routes use the shortest established intent alias and typed payload. If client preflight still blocks the request before the Worker, do not resend the same shape; record the exact failure and use the already verified compact alias or independent Recovery route. Applies when: any ChatGPT call is about to invoke `executeLensicallyIntent`, particularly engineering, governance, repository, or recovery work.
 
 
