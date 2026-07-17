@@ -358,9 +358,17 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const initialize = await mainMcpRequest(origin, token, 1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "lensically-recovery", version: VERSION } });
     const listed = await mainMcpRequest(origin, token, 2, "tools/list", {});
     const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "getOperatorStartupContext", arguments: {} });
+    const direct = await mainMcpRequest(origin, token, 4, "tools/call", { name: "getEngineeringAccessState", arguments: {} });
+    const routed = await mainMcpRequest(origin, token, 5, "tools/call", { name: "routeAndExecuteLensicallyCall", arguments: { intended_tool: "getEngineeringAccessState", arguments_json: "{}" } });
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
+    const toolNames = tools.map((tool) => String(tool.name || ""));
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    return { ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true, oauth: { authorize: authorize.status, token: tokenResponse.status }, initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null }, tools_list: { status: listed.status, count: tools.length, unique_count: new Set(tools.map((tool) => String(tool.name || ""))).size }, startup: { status: startup.status, ok: startupContent?.ok === true } };
+    const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    const routedContent = ((routed.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    const gatewaySurface = toolNames.length === 2 && toolNames.includes("getOperatorStartupContext") && toolNames.includes("routeAndExecuteLensicallyCall");
+    const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "routeAndExecuteLensicallyCall";
+    const routedSucceeded = routed.status === 200 && routedContent?.ok === true && (routedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState";
+    return { ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && gatewaySurface && directRejected && routedSucceeded, oauth: { authorize: authorize.status, token: tokenResponse.status }, initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null }, tools_list: { status: listed.status, count: tools.length, unique_count: new Set(toolNames).size, names: toolNames }, startup: { status: startup.status, ok: startupContent?.ok === true }, direct_operational_call: { status: direct.status, rejected: directRejected, error: directContent?.error ?? null }, routed_gateway_call: { status: routed.status, ok: routedSucceeded, executed_tool: (routedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool ?? null } };
   }
   return { ok: false, error: "unknown_recovery_tool" };
 }
