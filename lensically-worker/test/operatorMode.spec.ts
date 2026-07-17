@@ -2097,7 +2097,7 @@ describe("operator mode MCP endpoint", () => {
     const direct = await mcpTool<{ tool_surface: { total_tools: number } }>("getOperatorStartupContext");
     const precheck = await mcpTool<{ status_kind: string; runtime: { mcp_version: string; deployment_id?: string | null }; tool_surface: { total_tools: number }; recent_ops_memory: Array<Record<string, unknown>>; startup_context?: unknown }>("engineeringPrecheck");
     expect(precheck.status_kind).toBe("compact_engineering_precheck");
-    expect(precheck.runtime.mcp_version).toBe("1.24.0");
+        expect(precheck.runtime.mcp_version).toBe("1.25.0");
     expect(precheck.tool_surface.total_tools).toBe(direct.tool_surface.total_tools);
     expect(precheck.startup_context).toBeUndefined();
     expect(JSON.stringify(precheck).length).toBeLessThan(12000);
@@ -3383,7 +3383,7 @@ describe("operator mode MCP endpoint", () => {
     const payload = await response.json() as { status?: string; mcp_version?: string; registry_generation?: string; live_tool_count?: number; timestamp?: string; tools?: unknown };
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
-                expect(payload.mcp_version).toBe("1.24.0");
+                                expect(payload.mcp_version).toBe("1.25.0");
     expect(payload.registry_generation).toBe("mandatory-execution-map-v1");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();

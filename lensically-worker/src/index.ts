@@ -13265,7 +13265,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.24.0";
+const OPERATOR_MCP_VERSION = "1.25.0";
 
 const OPERATOR_REGISTRY_GENERATION = "mandatory-execution-map-v1";
 
