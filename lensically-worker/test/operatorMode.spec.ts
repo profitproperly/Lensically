@@ -1845,7 +1845,7 @@ describe("operator mode MCP endpoint", () => {
       reason: "Verify runtime-aware handshake counts.",
     });
         const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    expect(listed.tools.map((tool) => tool.name)).toEqual(["getOperatorStartupContext", "routeAndExecuteLensicallyCall"]);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(["getOperatorStartupContext", "executeMappedIntent"]);
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     expect(registry.tools.map((tool) => tool.name)).toContain("runtime_count_fixture");
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
