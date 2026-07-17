@@ -13966,11 +13966,21 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
       reason: "Chat-side sleep and repeated two-request job polling waste elapsed time and tool calls.",
     };
   }
-  if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
+  if ((toolName === "runGitHubWorkflow" && normalizeOperatorText(args.task, 80, true) === "worker-deploy") || toolName === "deployBackend") {
     return {
       rule_key: "workflow_source_validation_before_dispatch",
       mandatory_route: "use runEngineeringRelease for normal releases; reserve direct workflow dispatch for isolated diagnostics",
       reason: "Normal releases must not repeat full validation through separate workflow calls.",
+      required_tool: "runEngineeringRelease",
+      allowed_argument_keys: ["workflow_id", "ref"],
+      block_call: true,
+    };
+  }
+  if (toolName === "runGitHubWorkflow") {
+    return {
+      rule_key: "isolated_diagnostic_workflow_dispatch",
+      mandatory_route: "dispatch one isolated diagnostic workflow only when a full release is not intended",
+      reason: "Typecheck and single-suite diagnostics may run directly without creating a deployment release.",
     };
   }
   if (toolName === "verifyDeployedMcpVersion") {
