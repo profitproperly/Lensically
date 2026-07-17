@@ -485,6 +485,7 @@ async function executionLibraryRefreshDue(
     `SELECT source_fingerprint, last_synced_at FROM operator_execution_library_ingestion_state
      WHERE source_system = 'refresh' AND source_name = ? LIMIT 1`,
   ).bind(sourceName).first<{ source_fingerprint: string; last_synced_at: string }>();
+  if (state?.source_fingerprint === "dirty") return true;
   if (expectedFingerprint && state?.source_fingerprint !== expectedFingerprint) return true;
   const lastSynced = executionLibraryTimestampMs(state?.last_synced_at);
   return !Number.isFinite(lastSynced) || Date.now() - lastSynced > maximumAgeSeconds * 1000;
