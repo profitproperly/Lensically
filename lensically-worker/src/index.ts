@@ -16741,7 +16741,8 @@ async function handleOperatorMcpEngineeringTool(request: Request, env: Env, tool
       status: response.status,
       initialize: payload?.result ?? null,
                   transport_mode: "server_side_continuity_state",
-      live_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
+            live_tool_count: (await buildOperatorMcpTools(env, false, false)).length,
+      advertised_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
       boundary_test: boundaryTest,
     };
   }
