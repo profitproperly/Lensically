@@ -595,6 +595,14 @@ async function compileExecutionPolicyLibrary(
   const tableCatalog = await db.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
   ).all<{ name: string }>();
+  const coverageByType = new Map(coverage.map((item) => [item.source_type, item.total]));
+  const requiredSourceTypes = ["pre_call_route", "map_entry", "tool_registry", "d1_table_manifest"];
+  const missingRequiredSourceTypes = requiredSourceTypes.filter((sourceType) => Number(coverageByType.get(sourceType) ?? 0) === 0);
+  const tableCatalogCount = (tableCatalog.results ?? []).length;
+  const tableManifestCount = Number(coverageByType.get("d1_table_manifest") ?? 0);
+  const policyReady = sourceReadError === null
+    && missingRequiredSourceTypes.length === 0
+    && tableManifestCount >= tableCatalogCount;
   const policyEventId = crypto.randomUUID();
   const bundle = {
     version: EXECUTION_POLICY_LIBRARY_VERSION,
