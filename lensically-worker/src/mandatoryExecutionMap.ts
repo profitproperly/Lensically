@@ -722,6 +722,7 @@ async function compileExecutionPolicyLibrary(
     "repository_knowledge",
     "ops_memory",
     "pre_call_route",
+    "pre_call_route_override",
     "workflow_requirement",
     "tool_override",
     "autonomy_profile",
