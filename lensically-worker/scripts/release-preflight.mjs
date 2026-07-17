@@ -76,7 +76,7 @@ const generatedKnowledgeLiteral = JSON.stringify(generatedKnowledge, null, 2)
 const generatedBlock = `// BEGIN GENERATED EXECUTION KNOWLEDGE\nconst GENERATED_EXECUTION_KNOWLEDGE: Record<string, string> = ${generatedKnowledgeLiteral};\n// END GENERATED EXECUTION KNOWLEDGE`;
 const generatedPattern = /^\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE\r?\n[\s\S]*?\r?\n\/\/ END GENERATED EXECUTION KNOWLEDGE$/m;
 if (!generatedPattern.test(executionMap)) throw new Error("execution_knowledge_marker_missing");
-executionMap = executionMap.replace(generatedPattern, generatedBlock);
+executionMap = executionMap.replace(generatedPattern, () => generatedBlock);
 writeFileSync(resolve(root, "src/mandatoryExecutionMap.ts"), executionMap, "utf8");
 const generatedKnowledgeHasRepositoryManifest = generatedBlock.includes('"__repository_file_manifest__"');
 const generatedKnowledgeIsJavaScriptSafe = !/[\u2028\u2029]/.test(generatedKnowledgeLiteral);
