@@ -2491,6 +2491,21 @@ describe("operator mode MCP endpoint", () => {
        WHERE source_system = 'refresh' AND source_name = 'dynamic_sources' LIMIT 1`,
     ).first<{ source_fingerprint: string }>();
     expect(refreshed?.source_fingerprint).not.toBe("dirty");
+
+    const forcedRefresh = await mcpToolCallRaw<{ ok: boolean }>("executeLensicallyIntent", {
+      objective: "Persist a policy-changing memory entry and preserve canonical routes.",
+      intent: "record ops memory",
+      inputs: {
+        title: `forced refresh fixture ${memoryId}`,
+        fix: "Preserve source-defined phonebook policies during forced refresh.",
+      },
+    });
+    expect(forcedRefresh.isError, JSON.stringify(forcedRefresh.structuredContent)).not.toBe(true);
+    const preservedRoutes = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_execution_library_sources
+       WHERE active = 1 AND source_type = 'pre_call_route' AND source_id LIKE 'source:%'`,
+    ).first<{ total: number }>();
+    expect(Number(preservedRoutes?.total ?? 0)).toBeGreaterThan(0);
   }, 30000);
 
   it("records unknown terrain, permits discovery once, and promotes the successful path", async () => {
