@@ -306,6 +306,29 @@ async function compileExecutionPolicyLibrary(
   return bundle;
 }
 
+function executionPolicyLibraryReceipt(bundle: Record<string, unknown>): Record<string, unknown> {
+  const coverage = Array.isArray(bundle.source_coverage) ? bundle.source_coverage as Array<Record<string, unknown>> : [];
+  const matchedSources = Array.isArray(bundle.matched_source_keys) ? bundle.matched_source_keys : [];
+  const mandatoryRules = Array.isArray(bundle.mandatory_rules) ? bundle.mandatory_rules : [];
+  const forbiddenRules = Array.isArray(bundle.forbidden_rules) ? bundle.forbidden_rules : [];
+  return {
+    version: bundle.version,
+    policy_event_id: bundle.policy_event_id,
+    mandatory: bundle.mandatory === true,
+    consulted_before_execution: bundle.consulted_before_execution === true,
+    model_path_choice_allowed: bundle.model_path_choice_allowed === true,
+    action_intent: bundle.action_intent,
+    source_coverage: coverage,
+    consulted_source_types: coverage.filter((item) => Number(item.total ?? 0) > 0).map((item) => String(item.source_type ?? "unknown")),
+    matched_source_count: matchedSources.length,
+    mandatory_rule_count: mandatoryRules.length,
+    forbidden_rule_count: forbiddenRules.length,
+    source_read_error: bundle.source_read_error ?? null,
+    discovery_allowed_only_when: bundle.discovery_allowed_only_when,
+    failure_recording_rule: bundle.failure_recording_rule,
+  };
+}
+
 async function recordExecutionPolicyLibraryEvent(
   db: D1Database,
   input: {
