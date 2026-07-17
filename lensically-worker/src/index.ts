@@ -17529,7 +17529,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           toolName,
           args,
           resultPayload,
-          await buildOperatorMcpTools(env, false, false) as MandatoryExecutionToolDefinition[],
+          (sourceDefinedDirectEngineering
+            ? buildOperatorMcpBaseTools(false)
+            : await buildOperatorMcpTools(env, false, false)) as MandatoryExecutionToolDefinition[],
           {
             signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
             verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
