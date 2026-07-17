@@ -6,7 +6,7 @@ import {
   type RecoveryMapTool,
 } from "./mandatoryRecoveryMap";
 
-// Recovery source commits may carry [operator-tests] to trigger one bounded validation of current head a8b32551 with canonical source and override policies separated.
+// Recovery source commits may carry [operator-tests] to trigger one bounded validation of the final canonical and override policy contract.
 
 interface Env {
   GITHUB_TOKEN: string;
