@@ -2216,277 +2216,139 @@ describe("operator mode MCP endpoint", () => {
     expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
   }, 30000);
 
-        it("requires the routed gateway and never repairs a direct operational attempt", async () => {
-    const unguarded = await mcpToolCallRaw<{
-      error: string;
-      required_tool: string;
-    }>("getEngineeringAccessState", {});
-    expect(unguarded.isError).toBe(true);
-    expect(unguarded.structuredContent).toMatchObject({
+  it("makes the execution map the only public action path", async () => {
+    const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
+    expect(direct.isError).toBe(true);
+    expect(direct.structuredContent).toMatchObject({
       error: "routed_execution_gateway_required",
-      required_tool: "routeAndExecuteLensicallyCall",
+      required_tool: "executeMappedIntent",
     });
 
-        const invalid = await mcpToolCallRaw<{ error: string; validation_errors: Array<{ path: string; error: string }> }>("routeAndExecuteLensicallyCall", {
-      intended_tool: "readRepoFile",
-      arguments_json: JSON.stringify({ path: "CURRENT_STATE.md", unexpected: true }),
-    });
-    expect(invalid.isError).toBe(true);
-    expect(invalid.structuredContent.error).toBe("routed_gateway_payload_invalid");
-    expect(invalid.structuredContent.validation_errors).toContainEqual({
-      path: "$.unexpected",
-      error: "additional_property_forbidden",
-    });
-
-    const guarded = await mcpToolCallRaw<{
-      ok: boolean;
-      execution_guard: string;
-      normalized_arguments: Record<string, unknown>;
-      corrections: Array<{ path: string; from: unknown; to: unknown; reason: string }>;
-    }>("guardLensicallyCall", {
-      intended_tool: "readRepoFile",
-      arguments_json: JSON.stringify({ path: "CURRENT_STATE.md", max_lines: 410 }),
-    });
-    expect(guarded.isError).not.toBe(true);
-    expect(guarded.structuredContent.ok).toBe(true);
-    expect(guarded.structuredContent.normalized_arguments).toMatchObject({ path: "CURRENT_STATE.md", max_lines: 400 });
-    expect(guarded.structuredContent.corrections).toContainEqual({
-      path: "$.max_lines",
-      from: 410,
-      to: 400,
-      reason: "maximum_enforced",
-    });
-
-        expect(typeof guarded.structuredContent.execution_guard).toBe("string");
-
-    const localGuard = await mcpToolCallRaw<{
-      ok: boolean;
-      execution_guard: string;
-      normalized_arguments: Record<string, unknown>;
-    }>("guardLensicallyCall", {
-      intended_tool: "getEngineeringAccessState",
-      arguments_json: "{}",
-    });
-    expect(localGuard.isError).not.toBe(true);
-    expect(localGuard.structuredContent.ok).toBe(true);
-        const directWithGuard = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {
-      ...localGuard.structuredContent.normalized_arguments,
-      execution_guard: localGuard.structuredContent.execution_guard,
-    });
-    expect(directWithGuard.isError).toBe(true);
-    expect(directWithGuard.structuredContent).toMatchObject({
-      error: "routed_execution_gateway_required",
-      required_tool: "routeAndExecuteLensicallyCall",
-    });
-
-    const access = await mcpToolRaw<{
-      ok: boolean;
-      github: { token_status: string };
-      routed_execution: { requested_tool: string; executed_tool: string };
-      execution_guard_enforcement: { mode: string; direct_operational_calls_allowed: boolean };
-    }>("getEngineeringAccessState", {});
-    expect(access.isError).not.toBe(true);
-    expect(access.structuredContent.ok).toBe(true);
-    expect(access.structuredContent.github.token_status).toMatch(/exists|missing/);
-    expect(access.structuredContent.routed_execution).toMatchObject({
-      requested_tool: "getEngineeringAccessState",
-      executed_tool: "getEngineeringAccessState",
-    });
-    expect(access.structuredContent.execution_guard_enforcement).toMatchObject({
-      mode: "mandatory_routed_gateway",
-      direct_operational_calls_allowed: false,
-    });
-
-
-    const sensitive = await mcpToolCallRaw<{ error: string; required_route: string }>("guardLensicallyCall", {
-      intended_tool: "searchRepoFiles",
-      arguments_json: JSON.stringify({ query: "x-openai-subject", prefix: "lensically-worker/src/index.ts", limit: 20 }),
-    });
-        expect(sensitive.isError).toBe(true);
-    expect(sensitive.structuredContent.error).toBe("known_blocker_prevented");
-    expect(sensitive.structuredContent.required_route).toContain("neutral function-name search");
-
-    const releaseBridge = await mcpToolCallRaw<{ error: string; required_route: string; blocker_key: string }>("guardLensicallyCall", {
-      intended_tool: "runEngineeringTool",
-      arguments_json: JSON.stringify({
-        tool_name: "runEngineeringRelease",
-        arguments: { ref: "abc123" },
-      }),
-    });
-    expect(releaseBridge.isError).toBe(true);
-    expect(releaseBridge.structuredContent).toMatchObject({
-      error: "known_blocker_prevented",
-      blocker_key: "release_bridge_client_preflight",
-    });
-    expect(releaseBridge.structuredContent.required_route).toContain("runEngineeringRelease directly");
-
-        const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
+    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
     expect(listed.tools.map((tool) => tool.name)).toEqual([
       "getOperatorStartupContext",
-      "routeAndExecuteLensicallyCall",
+      "executeMappedIntent",
     ]);
+
+    const mapped = await mcpToolCallRaw<{
+      ok: boolean;
+      github: { token_status: string };
+      routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
+      mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean };
+      execution_guard_enforcement: { mode: string; model_tool_choice_allowed: boolean };
+    }>("executeMappedIntent", {
+      objective: "Inspect engineering access before repository work.",
+      action_intent: "inspect engineering access state",
+      inputs_json: "{}",
+    });
+    expect(mapped.isError).not.toBe(true);
+    expect(mapped.structuredContent.ok).toBe(true);
+    expect(mapped.structuredContent.routed_execution).toMatchObject({
+      executed_tool: "getEngineeringAccessState",
+      model_tool_choice_allowed: false,
+    });
+    expect(mapped.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "known_path_completed",
+      mandatory_path_followed: true,
+    });
+    expect(mapped.structuredContent.execution_guard_enforcement).toMatchObject({
+      mode: "mandatory_execution_map",
+      model_tool_choice_allowed: false,
+    });
   }, 30000);
 
-        it("forces verified pre-call routes before operational intent reaches a handler", async () => {
-        const rawArgs = { limit: 50 };
-        const staleGuard = await mcpToolCallRaw<{
-      ok: boolean;
-      execution_guard: string;
-      normalized_arguments: Record<string, unknown>;
-    }>("guardLensicallyCall", {
-      intended_tool: "listOpsMemory",
-      arguments_json: JSON.stringify(rawArgs),
-    });
-    expect(staleGuard.isError).not.toBe(true);
-    expect(staleGuard.structuredContent.normalized_arguments).toMatchObject(rawArgs);
-
-        const routeKey = "vitest_list_ops_memory_compact_route";
-    const recorded = await mcpToolRaw<{
-      ok: boolean;
-      version: string;
-      route: { route_key: string; source: string };
-    }>("recordPreCallRoute", {
-      route_key: routeKey,
-            provider: "lensically",
-      tool_name: "listOpsMemory",
-      operation_key: "*",
-      match: { limit: 50 },
-      action: "apply",
-      mandatory_route: "Use the verified compact result limit.",
-      argument_patch: { limit: 1 },
-      allowed_argument_keys: ["limit"],
-      reason: "Avoid oversized memory listings.",
-      verification_summary: "Vitest verifies guard and dispatcher enforcement.",
-      priority: 900,
-    });
-    expect(recorded.isError).not.toBe(true);
-    expect(recorded.structuredContent).toMatchObject({
-      ok: true,
-      version: "operator-pre-call-routing-v1",
-      route: { route_key: routeKey, source: "persistent_phonebook" },
-    });
-
-                const staleExecution = await mcpToolCallRaw<{
+  it("records unknown terrain, permits discovery once, and promotes the successful path", async () => {
+    const actionIntent = "perform a completely novel memory census";
+    const unknown = await mcpToolCallRaw<{
       error: string;
-      required_tool: string;
-    }>("listOpsMemory", {
-      ...rawArgs,
-      execution_guard: staleGuard.structuredContent.execution_guard,
+      map_state: string;
+      incident: { id: string };
+      discovery_permit: string;
+    }>("executeMappedIntent", {
+      objective: "Test unknown-path promotion.",
+      action_intent: actionIntent,
+      inputs_json: JSON.stringify({ limit: 1 }),
     });
-    expect(staleExecution.isError).toBe(true);
-        expect(staleExecution.structuredContent).toMatchObject({
-      error: "routed_execution_gateway_required",
-      required_tool: "routeAndExecuteLensicallyCall",
-    });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.structuredContent.error).toBe("mandatory_execution_map_unknown");
+    expect(unknown.structuredContent.map_state).toBe("unknown");
+    expect(typeof unknown.structuredContent.discovery_permit).toBe("string");
 
-    const routedExecution = await mcpToolRaw<{
+    const discovered = await mcpToolCallRaw<{
       ok: boolean;
-      items: Array<unknown>;
-      execution_policy: { pre_call_route: { route_key: string } };
-      routed_execution: { executed_tool: string; route_trail: Array<{ route_key: string }> };
-    }>("listOpsMemory", rawArgs);
-    expect(routedExecution.isError, JSON.stringify(routedExecution.structuredContent)).not.toBe(true);
-    expect(routedExecution.structuredContent.items.length).toBeLessThanOrEqual(1);
-    
-    expect(routedExecution.structuredContent.routed_execution.executed_tool).toBe("listOpsMemory");
-    expect(routedExecution.structuredContent.routed_execution.route_trail).toContainEqual(expect.objectContaining({ route_key: routeKey }));
-
-        const routedGuard = await mcpToolCallRaw<{
-      ok: boolean;
-      normalized_arguments: Record<string, unknown>;
-      corrections: Array<{ path: string; reason: string }>;
-      pre_call_route: { route_key: string };
-    }>("guardLensicallyCall", {
-      intended_tool: "listOpsMemory",
-      arguments_json: JSON.stringify(rawArgs),
+      mandatory_execution_map: { map_state: string; mandatory_from_now_on: boolean; active_entry: { tool_name: string } };
+    }>("executeMappedIntent", {
+      objective: "Test unknown-path promotion.",
+      action_intent: actionIntent,
+      inputs_json: JSON.stringify({ limit: 1 }),
+      discovery_permit: unknown.structuredContent.discovery_permit,
+      discovery_tool: "listOpsMemory",
     });
-    expect(routedGuard.isError).not.toBe(true);
-    expect(routedGuard.structuredContent.normalized_arguments).toEqual({ limit: 1 });
-    expect(routedGuard.structuredContent.corrections).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: "$.limit", reason: "pre_call_route_patch" }),
-    ]));
-    expect(routedGuard.structuredContent.pre_call_route.route_key).toBe(routeKey);
-
-    const listed = await mcpToolRaw<{
-      version: string;
-      routes: Array<{ route_key: string; source: string }>;
-        }>("listPreCallRoutes", { provider: "lensically", tool_name: "listOpsMemory" });
-    expect(listed.isError).not.toBe(true);
-    expect(listed.structuredContent.version).toBe("operator-pre-call-routing-v1");
-    expect(listed.structuredContent.routes).toContainEqual(expect.objectContaining({
-      route_key: routeKey,
-      source: "persistent_phonebook",
-    }));
-
-    const redirectKey = "vitest_access_state_redirect";
-    await mcpToolRaw("recordPreCallRoute", {
-      route_key: redirectKey,
-      provider: "lensically",
-      tool_name: "getEngineeringAccessState",
-      operation_key: "*",
-      action: "redirect",
-      required_tool: "getOperatorStartupContext",
-      mandatory_route: "Load startup context first.",
-      reason: "Verified test redirect.",
-      verification_summary: "Vitest verifies redirect before execution.",
-      priority: 950,
-    });
-    const redirected = await mcpToolCallRaw<{
-      error: string;
-      required_tool: string;
-      pre_call_route: { route_key: string };
-    }>("guardLensicallyCall", {
-      intended_tool: "getEngineeringAccessState",
-      arguments_json: "{}",
-    });
-    expect(redirected.isError).toBe(true);
-        expect(redirected.structuredContent).toMatchObject({
-      error: "pre_call_route_required",
-      required_tool: "getOperatorStartupContext",
-      pre_call_route: { route_key: redirectKey },
+    expect(discovered.isError).not.toBe(true);
+    expect(discovered.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "discovery_promoted",
+      mandatory_from_now_on: true,
+      active_entry: { tool_name: "listOpsMemory" },
     });
 
-    const followedRedirect = await mcpToolRaw<{
-      routed_execution: { executed_tool: string; route_trail: Array<{ route_key: string }> };
-    }>("getEngineeringAccessState", {});
-    expect(followedRedirect.isError).not.toBe(true);
-    expect(followedRedirect.structuredContent.routed_execution.executed_tool).toBe("getOperatorStartupContext");
-    expect(followedRedirect.structuredContent.routed_execution.route_trail).toContainEqual(expect.objectContaining({ route_key: redirectKey }));
-
-    const releaseRedirect = await mcpToolCallRaw<{
-      error: string;
-      required_tool: string;
-      normalized_arguments: Record<string, unknown>;
-      pre_call_route: { route_key: string };
-    }>("guardLensicallyCall", {
-      intended_tool: "runGitHubWorkflow",
-      arguments_json: JSON.stringify({ workflow_id: "lensically-engineering.yml", ref: "main", task: "worker-deploy" }),
+    const repeated = await mcpToolCallRaw<{
+      routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
+      mandatory_execution_map: { map_state: string };
+    }>("executeMappedIntent", {
+      objective: "Repeat the now-known task.",
+      action_intent: actionIntent,
+      inputs_json: JSON.stringify({ limit: 1 }),
     });
-    expect(releaseRedirect.isError).toBe(true);
-    expect(releaseRedirect.structuredContent).toMatchObject({
-      error: "known_blocker_prevented",
-      required_tool: "runEngineeringRelease",
-      normalized_arguments: { workflow_id: "lensically-engineering.yml", ref: "main" },
-      pre_call_route: { route_key: "workflow_source_validation_before_dispatch" },
+    expect(repeated.isError).not.toBe(true);
+    expect(repeated.structuredContent.routed_execution).toMatchObject({
+      executed_tool: "listOpsMemory",
+      model_tool_choice_allowed: false,
+    });
+    expect(repeated.structuredContent.mandatory_execution_map.map_state).toBe("known_path_completed");
+  }, 30000);
+
+  it("blocks a stale known path and makes the verified replacement mandatory", async () => {
+    const actionIntent = "read repository file";
+    const stale = await mcpToolCallRaw<{
+      mandatory_execution_map: { map_state: string; discovery_permit: string; old_path_blocked: boolean };
+    }>("executeMappedIntent", {
+      objective: "Exercise stale-path replacement.",
+      action_intent: actionIntent,
+      inputs_json: JSON.stringify({ path: "missing-file-for-map-test.txt" }),
+    });
+    expect(stale.isError).toBe(true);
+    expect(stale.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "known_path_became_stale",
+      old_path_blocked: true,
     });
 
-    for (const route of [
-      {
-                route_key: routeKey, provider: "lensically", tool_name: "listOpsMemory", operation_key: "*",
-        match: { limit: 50 }, action: "apply", mandatory_route: "Use the verified compact result limit.",
-        argument_patch: { limit: 1 }, allowed_argument_keys: ["limit"],
-        reason: "Test cleanup.", verification_summary: "Previously verified.", active: false,
-      },
-      {
-        route_key: redirectKey, provider: "lensically", tool_name: "getEngineeringAccessState", operation_key: "*",
-        action: "redirect", required_tool: "getOperatorStartupContext", mandatory_route: "Load startup context first.",
-        reason: "Test cleanup.", verification_summary: "Previously verified.", active: false,
-      },
-    ]) {
-      const disabled = await mcpToolRaw<{ ok: boolean }>("recordPreCallRoute", route);
-      expect(disabled.isError).not.toBe(true);
-      expect(disabled.structuredContent.ok).toBe(true);
-    }
+    const replacement = await mcpToolCallRaw<{
+      mandatory_execution_map: { map_state: string; previous_path_superseded: boolean; active_entry: { tool_name: string } };
+    }>("executeMappedIntent", {
+      objective: "Exercise stale-path replacement.",
+      action_intent: actionIntent,
+      inputs_json: JSON.stringify({ prefix: "lensically-worker/src", limit: 1 }),
+      discovery_permit: stale.structuredContent.mandatory_execution_map.discovery_permit,
+      discovery_tool: "listRepoFiles",
+    });
+    expect(replacement.isError).not.toBe(true);
+    expect(replacement.structuredContent.mandatory_execution_map).toMatchObject({
+      map_state: "discovery_promoted",
+      previous_path_superseded: true,
+      active_entry: { tool_name: "listRepoFiles" },
+    });
+
+    const enforced = await mcpToolCallRaw<{
+      routed_execution: { executed_tool: string };
+      mandatory_execution_map: { map_state: string };
+    }>("executeMappedIntent", {
+      objective: "Use the replacement path.",
+      action_intent: actionIntent,
+      inputs_json: JSON.stringify({ prefix: "lensically-worker/src", limit: 1 }),
+    });
+    expect(enforced.isError).not.toBe(true);
+    expect(enforced.structuredContent.routed_execution.executed_tool).toBe("listRepoFiles");
+    expect(enforced.structuredContent.mandatory_execution_map.map_state).toBe("known_path_completed");
   }, 30000);
 
   it("replays interrupted workflow-session creation without duplicates", async () => {
