@@ -12993,9 +12993,9 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
   const excerpt = content
     .split(/\r?\n/)
     .filter((line) => line.trim())
-    .slice(0, 80)
+    .slice(0, 40)
     .join("\n")
-    .slice(0, 6000);
+    .slice(0, 2500);
   return {
     path,
     ok: file.ok,
