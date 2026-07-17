@@ -13059,18 +13059,12 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-                "Call executeLensicallyIntent with intent='startup' for fresh-session startup, then submit every external action through executeLensicallyIntent. Direct operational tool names are absent from discovery and rejected before lookup; the Mandatory Execution Map selects and enforces the active procedure before execution.",
-    "Routine engineering uses persistent full-discretion outcome-bound authority. Do not create owner proposals or numerical tool budgets for repository, test, deploy, verification, routing, or infrastructure repair work.",
-    "Use the canonical execution plane returned by policy: engineering_control for repository/tests/deploys, operator_account for account workflow, and operator_control for universal MCP administration.",
-                                "Submit account, engineering, admin, GitHub, Cloudflare, scheduler, and recovery actions through executeLensicallyIntent. The Mandatory Execution Map uses the historical procedure registry and internal typed schemas; direct tool, bridge, and fallback selection is not delegated to the model.",
-    "Governance calls use compact required fields only. Verbose owner-response, evidence, and budget payloads are known client-preflight blockers.",
-    "An exact file prefix uses one Git-blob read plus local text search, especially for oversized lensically-worker/src/index.ts. Do not retry empty GitHub code-search results.",
-        "YAML changes replace a complete block with explicit relative indentation and are read back before workflow dispatch.",
-    "Related edits use applyRepoPatchSet so all replacements validate before one multi-file commit advances main.",
-    "Normal releases use runEngineeringRelease once per exact SHA; successful receipts are reused and getEngineeringRelease performs bounded server-side waiting instead of chat-side polling.",
-    "Deployment verification establishes the new commit/version identity before evaluating newly added custom-domain fields.",
-    "Use the independent Lensically Recovery plane first only for main-MCP health, large-file repair, or deployment-plane failure; do not wait for repeated same-backend failures.",
-    "When a new reusable blocker is solved, stop, promote the fix into policy and regression coverage, verify it, then resume the original objective automatically.",
+    "Submit every external operation through executeLensicallyIntent; direct operational tool calls are rejected.",
+    "The source-defined router selects one typed internal handler before execution. Database route lookup, phonebook overrides, discovery incidents, and model tool choice are disabled.",
+    "Use bounded repository reads and searches. Empty code search automatically falls through to the compact repository fallback.",
+    "Use one atomic patch set for related edits and one exact-SHA engineering release after the final change.",
+    "Keep engineering receipts compact. Never echo patch bodies or full repository files through the client.",
+    "Use the independent Recovery plane only when the main Worker or its deployment plane cannot receive the request.",
   ];
 }
 
