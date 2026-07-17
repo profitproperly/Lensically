@@ -17083,52 +17083,25 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         return mcpErrorResponse(id, -32602, "Unknown tool");
       }
       const guardCheck = await verifyOperatorExecutionGuard(env, toolName, rawArgs);
-      let args: Record<string, unknown>;
-      let dispatcherGuardFallback = false;
-      if (!guardCheck.ok) {
-        const mayUseServerGuard = guardCheck.error === "execution_guard_required"
-          && rawArgs.execution_guard === undefined;
-        if (!mayUseServerGuard) {
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: {
-                ok: false,
-                error: guardCheck.error ?? "execution_guard_required",
-                intended_tool: toolName,
-                required_next_tool: "guardLensicallyCall",
-                account_data_loaded: false,
-              },
-              content: [{ type: "text", text: `Lensically blocked ${toolName} before execution because its supplied execution guard was invalid or mismatched.` }],
-              isError: true,
+            if (!guardCheck.ok) {
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: {
+              ok: false,
+              error: guardCheck.error ?? "execution_guard_required",
+              intended_tool: toolName,
+              required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+              account_data_loaded: false,
             },
-          });
-        }
-        const serverGuard = await handleOperatorMcpEngineeringTool(request, env, "guardLensicallyCall", {
-          intended_tool: toolName,
-          arguments_json: JSON.stringify(rawArgs),
+            content: [{ type: "text", text: `Lensically rejected an operation that was not prepared by the routed execution gateway.` }],
+            isError: true,
+          },
         });
-        if (serverGuard.ok !== true) {
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: serverGuard,
-              content: [{ type: "text", text: `Lensically blocked ${toolName} before execution: ${String(serverGuard.error ?? "execution_guard_failed")}.` }],
-              isError: true,
-            },
-          });
-        }
-        const normalizedArguments = serverGuard.normalized_arguments;
-        args = normalizedArguments && typeof normalizedArguments === "object" && !Array.isArray(normalizedArguments)
-          ? normalizedArguments as Record<string, unknown>
-          : {};
-        dispatcherGuardFallback = true;
-            } else {
-        args = { ...rawArgs };
-        delete args.execution_guard;
       }
+      const args: Record<string, unknown> = { ...rawArgs };
+      delete args.execution_guard;
       const preCallRouting = await resolveOperatorPreCallRouting(env, toolName, args);
       if (preCallRouting.redirect) {
         const requiredTool = normalizeOperatorText(preCallRouting.route?.required_tool, 160, true) ?? toolName;
