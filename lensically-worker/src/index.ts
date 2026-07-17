@@ -14126,7 +14126,7 @@ function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
     "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "listRepoFiles", "readRepoFile",
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
-    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "confirmOperatorProceed\,
+    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "confirmOperatorProceed",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "listMcpTools", "readMcpToolDefinition", "listImplementationBacklogItems", "getWorkflowStatus",
     "list_accounts", "get_account_state", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
     "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results",
