@@ -17368,7 +17368,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             pre_call_route: effectivePreCallRoute,
             pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
           };
-      const aliasRetryBlock = await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
+      const aliasRetryBlock = sourceDefinedDirectEngineering
+        ? null
+        : await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
       if (aliasRetryBlock) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_known_regression");
         return mcpJsonResponse({
