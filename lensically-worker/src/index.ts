@@ -15583,7 +15583,7 @@ async function handleOperatorMcpAdminTool(
         ? args.arguments as Record<string, unknown>
         : {};
             if (isOperatorMcpEngineeringToolName(executeTool)) {
-        const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs);
+        const result = await handleOperatorMcpEngineeringTool(request, env, executeTool, bridgeArgs, true);
         return { ok: result.ok !== false, bridge_tool: "listMcpTools", executed_tool: executeTool, result };
       }
       if (isOperatorMcpAdminToolName(executeTool) && executeTool !== "listMcpTools") {
