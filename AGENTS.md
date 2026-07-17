@@ -1,114 +1,88 @@
 # Lensically Agent Rules
 
-## Start Here
+## Startup
 
-- Read this file at the start of every new chat.
-- Read `OPERATING_MEMORY.md` immediately after this file. Project durable memory is the default source and write target for project-specific facts.
-- Read `C:\Users\brian\.codex\OPERATING_MEMORY.md` before project work for cross-project rules only. Do not write project-specific Lensically facts there.
-- Before project work, run `git status --short`, then `git pull --ff-only origin main` when the worktree is clean. ChatGPT may now edit Lensically through the cloud engineering MCP, so GitHub is the source of truth between Codex sessions. If the worktree is dirty, inspect the changes first and do not overwrite them.
-- Add detailed, replayable entries to project `OPERATING_MEMORY.md` whenever you find a repeated slowdown, bad assumption, credential/deploy trap, failed path, or workflow fix that future Lensically agents should not rediscover. Prefer `Failed: <exact failed path>. Use: <exact working path>. Applies when: <specific context>.` Include required setup, commands, URLs, paths, success signals, stale-state rules, and fallback paths when they matter.
-- Read the repository before editing code.
-- Prefer small, production-safe changes over broad rewrites.
-- Preserve unrelated local changes. Do not reset or overwrite work you did not make.
+- Read `AGENTS.md`, `OPERATING_MEMORY.md`, and `CURRENT_STATE.md` before Lensically work.
+- GitHub `main` is authoritative. Pull current source before local Codex work and preserve unrelated changes.
+- Read the target integration point before editing. Do not restore removed systems because old commits or stale documentation mention them.
 
-## Global Skills
-
-- Do not read every skill at startup. Use skill metadata to choose the relevant skill, then read only that skill's `SKILL.md`.
-- Use `operational-memory` when the task involves repeated mistakes, token/usage efficiency, project memory, workflow fixes, failed commands, deploy traps, reusable lessons, or self-improvement.
-- Use `project-onboard` when the task involves onboarding a repo, Codex optimizer setup, `AGENTS.md` creation, project memory creation, or existing project merge.
-- When a new global skill is created, add its trigger rule here and to the global Project Onboard template so future projects know when to use it from startup.
-
-## Current Reality
-
-- This repo is not a SaaS playbook. Do not describe it that way.
-- Treat stale references to removed product areas, auth flows, OAuth flows, reviewer flows, or old response wrappers as legacy unless the current task explicitly targets them.
-- Do not reintroduce removed routes, copy, docs, or workflows just because old code or docs still mention them.
-
-## Repo Shape
+## Repository Shape
 
 - `lensically-web/` is the frontend.
-- `lensically-worker/` is the backend.
-- `lensically-recovery-worker/` is the independent break-glass MCP control plane used by GPT to repair the main backend when the primary Lensically MCP is unavailable. Keep it small, stateless, source-defined, and separately deployed; never add account, generation, or customer data access to it.
-- Frontend work belongs in `lensically-web/**`.
-- Backend, persistence, and API work belongs in `lensically-worker/**`.
+- `lensically-worker/` is the main backend and Operator MCP.
+- `lensically-recovery-worker/` is the independent break-glass control plane. Keep it small, source-defined, separately deployed, and free of account or customer data.
 
-## Working Rules
+## Execution Contract
 
-- Lensically Operator GPT prioritizes capability continuity and workflow reliability over speed. Slow MCP calls are acceptable when they preserve the full intelligence, context, tools, and write authority needed for the workflow. Do not prevent 502s by stripping useful context, removing canonical capabilities, degrading to read-only behavior, or forcing the owner to segment work. Fix transport limits with caching, aggregation, pagination, resumable operations, idempotency, and structured recovery so a single slow/failing dependency cannot make the entire MCP surface unusable mid-workflow.
-- Lensically Operator GPT plus the private MCP is the primary always-on agent for Lensically engineering and operations, intentionally replacing routine Codex use so Codex's five-hour/weekly subscription limits remain available for MCP repair, browser-only app maintenance, or unrelated projects. Preserve Codex-equivalent MCP intelligence, repository editing, testing, deployment, memory, and workflow authority. Codex is the emergency/bootstrap path, not the normal execution engine. Treat any 502 or unexpected read-only fallback that interrupts an active GPT workflow as a product-blocking reliability defect requiring systemic fault containment and regression coverage.
-- Engineering time is a business resource. Group related exact replacements through `applyRepoPatchSet` so all files validate before one commit advances `main`. For a normal release, do not dispatch separate full typecheck, Operator-test, GPT-memory-test, and deploy workflows. Call `runEngineeringRelease` once for the final SHA, reuse an existing successful receipt, and use `getEngineeringRelease` for bounded server-side waiting. Direct workflow tasks are diagnostic exceptions only.
-- Performance learning uses `performance-evaluator-v1`: fingerprint published content, compare only age-matched 6/12/24/48/72-hour post metrics, aggregate repeated feature evidence, require sample-size confidence, and feed the latest learning brief into generation. Threads follower totals are account-level trajectory data only. Never attribute follower movement to an individual post, posting day, batch, surrounding window, or posting period, and never use follower-day association in post ranking, hypotheses, tag performance, or generation guidance.
+- `executeLensicallyIntent` is the sole public main-MCP tool. Its public schema remains `objective`, `intent`, and `inputs`, with only existing optional continuation fields.
+- `static-execution-router-v1` selects one live typed internal handler from source-defined intent aliases. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
+- Direct internal tool calls are rejected.
+- Recovery is used only when the main Worker or deployment plane cannot receive or complete a repair. It is not an ordinary fallback for a healthy main path.
+- Account workflows retain explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety after routing.
 
-- Lensically is multi-account by default. Before making an account-specific rule, gate, workflow requirement, wrapper, tool bridge, schema change, or generation-policy change, classify it through the execution policy. Infrastructure, transport, continuity, routing, state-machine, MCP, schema, idempotency, and regression-prevention changes default universal. Selected-account voice, creative interpretation, strategy, source, cadence, or content changes remain account scoped. State the resolved scope in the handoff.
-- Required behavior is policy as code. Authority order is backend enforcement, canonical workflow state, execution policy, MCP contract, database configuration, startup documentation, supporting memory, then conversation context. Memory stores rationale and history; it never counts as implementation or enforcement.
-- `executeLensicallyIntent` is the only permanent public ChatGPT-facing Lensically MCP tool. Its public schema is frozen: `objective`, `intent`, `inputs`, optional `continuation_id`, optional `incident_id`, and optional `permit`. Startup uses `intent=startup`; do not expose or restore a separate startup tool.
-- For main Operator MCP work, fresh sessions call `executeLensicallyIntent` with `intent=startup`, then continue using `executeLensicallyIntent` for key selection, continuity, engineering, admin, account, GitHub, Cloudflare, scheduler, publishing, deployment, repair, rollback, smoke tests, and main-plane recovery work. The Mandatory Execution Map, verified-route phonebook, and internal handlers select the execution plane, route, payload structure, sequence, retry policy, and recovery path. Direct operational and direct guard calls are rejected before lookup. The separate Lensically Recovery app remains an independent break-glass plane with source-defined direct tools and must not depend on the main Operator gateway.
-- Fresh MCP key selection is map-controlled: submit action intent `select operator key`, show only the exact four-line handshake returned by the mapped execution, wait for explicit owner approval, then submit action intent `confirm operator proceed`. The mapped procedure restores canonical persisted schedule, workflow, production-day source claims, active review batches, the active account-autonomy profile, and pending owner-ratified account decisions; never ask resume or start fresh. Later account-scoped action inputs include `proceed_confirmed=true` and a stable `operation_id` for mutations. Routine repository work, testing, workflow repair, deployment, runtime verification, routing, MCP infrastructure, and universal engineering improvements run under `operator-engineering-authority-v1`: full-discretion, outcome-bound, and without owner proposals or numerical tool budgets. Account content, scheduling, strategy, destructive data actions, ownership changes, and irreversible business decisions remain separately protected. For Manifest, hourly coverage remains a hard operating constraint. Approved content decisions may claim qualified sources without replacement, silently create/reuse and lock source cards, generate and gate drafts, then show only Post 1–4 with Source and Generated post. Approved items schedule into the earliest open hourly slots in item order, and times are reported only after persistence succeeds. Conversation memory is not accepted as workflow or decision state, and no generated continuity handle is passed between actions.
-- `mandatory-execution-map-v1` is executable policy, not advisory prose. Every action must resolve to an active entry or a signed discovery incident. Known paths are mandatory and model execution choice is disabled. Lower-level pre-call routes may further constrain a mapped tool but cannot replace the map.
-- When an unknown or stale path is encountered in the main Operator MCP, stop the active objective, record every discovery attempt, verify the successful replacement, promote it into a new active map version, supersede the old path when applicable, and only then resume automatically. Main-plane recovery intents are mapped, not model-selected fallbacks; the separate Recovery app remains a source-defined independent control plane. The same solved failure appearing twice is a system regression.
-- Keep routine client preflight, payload compaction, alias selection, retry mechanics, and routing friction in telemetry and audit history. Owner-facing engineering updates report `Completed:`, `Showing now:`, and `Next action:`; surface a blocker only when owner action is genuinely required.
-- Find the existing integration point before adding new code.
-- Reuse existing helpers and patterns where they still reflect the current product.
-- Keep changes narrow.
-- If you trip on a command, shell syntax, quoting, escaping, credential path, missing tool/package, stale assumption, wrong deploy path, or user-corrected persistent fact, store the reusable fix in global or project memory before final.
-- Do not invent placeholder UI, fake navigation, or dead controls.
-- Do not hardcode secrets or environment-specific URLs.
-- Do not edit `PROJECT_CONTEXT.md` unless the user explicitly asks.
-- ChatGPT has private Lensically engineering MCP authority to edit the GitHub repo, dispatch GitHub Actions, and trigger backend deploys. Treat remote changes as expected; pull before judging current source state.
+## Engineering Default
 
-## Git Rules
+- Implementation tasks default to complete execution unless the owner explicitly requests discussion only.
+- Routine engineering target is under ten minutes when the underlying platform operation permits it.
+- Use bounded inspection, one coherent change set, focused validation, one exact-SHA release, and one live verification pass.
+- Do not create a new framework, registry, memory system, map, or control layer when a direct source-defined route can enforce the requirement.
+- Do not preserve obsolete infrastructure for sentimental reasons. Git history is the archive.
+- Use one atomic patch set for related replacements when practical. Use a chunked write for large whole-file replacements.
+- If the client blocks a payload before Lensically receives it, do not resend the same payload. Reduce or split it.
+- Keep responses and receipts compact. Never echo large patch bodies, repository files, database rows, or logs through the client.
+- Do not tell the owner to run checks, push, or deploy. Perform the available work directly.
 
-- Check `git status` before staging or committing.
-- Inspect any target file that already has local edits before changing it.
-- Stage only the files for the current task.
-- Never use `git add .` or `git add -A`.
-- Never reset or discard unrelated changes without explicit approval.
+## Repository and Git
 
-## Execution Default
+- Check the current repository head before mutations.
+- Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
+- Known exact files should be read once and searched locally. Broader search is bounded and automatically falls back from empty code search to repository-tree path matching.
+- Exact text replacements must match once. A stale head or ambiguous anchor requires refreshed source and corrected input, not a new route.
+- YAML workflow changes require complete-block or whole-file replacement, correct indentation, and readback before dispatch.
+- Stage only task files in local Codex workflows. Never discard unrelated changes.
+- Never print credentials or secret values.
 
-Unless the user says `talk only` or explicitly opts out, implementation tasks default to:
+## Validation and Release
 
-1. make the code change
-2. batch related edits into a coherent work set before expensive checks
-3. run focused checks during development only when they unblock debugging or reduce meaningful risk
-4. run the relevant final checks yourself once the coherent work set is complete
-5. commit the task files
-6. push to `origin`
-7. deploy the affected runtime once after final verification
+- Normal backend release order is preflight, TypeScript validation, focused Operator release gate, GPT-memory tests, deployment, cron verification, and scheduler safety verification.
+- Full Operator tests are diagnostic and run separately when broad account behavior changed or focused checks are insufficient.
+- Normal releases dispatch on the configured branch and pass the exact intended commit through `release_sha`. Checkout must equal that SHA.
+- Avoid separate full validation and deployment workflows for one coherent change.
+- Use bounded workflow status reads. Detailed failure diagnostics are read only after a terminal failure.
+- Version changes require synchronized runtime constants, exact assertions, and current-state documentation. Do not bump versions for cleanup alone.
 
-For long goals, use checkpoint commits: when a coherent safe milestone is reached, or the user says limits are close / asks to checkpoint, run only targeted checks needed for that milestone, commit and push the safe state, and deploy only if that milestone is independently useful or required for the next step.
+## Account and Content Rules
 
-## Verification And Deploys
+- Lensically is multi-account by default. Infrastructure, gateway, schema, workflow, continuity, idempotency, release, and regression-prevention fixes default to universal unless a real account-specific reason exists.
+- Canonical brand keys are `manifest_mental`, `opmg_deadman`, and `vectrix`.
+- Fresh Operator sessions use the fixed key handshake and load no account state before explicit Proceed.
+- After Proceed, restore workflow state from persisted schedule, sessions, source claims, and active review records. Conversation memory is not workflow state.
+- State-changing account operations use semantic idempotency so interrupted calls replay the existing result.
+- Source, source-card, generation, draft, scheduling, and published-result lineage must remain intact.
+- Required behavior belongs in code, typed schemas, gates, and focused tests. Documentation and memory explain the rule but do not enforce it.
 
-- Prefer one final verification/deploy pass per coherent work set. Avoid repeated full tests, frontend builds, Chrome schema refreshes, and Cloudflare deploys inside the same larger task unless a focused check or live deploy is needed to diagnose a blocker.
-- During larger goals, avoid refreshing the Lensically Operator GPT schema after each intermediate GPT action change. Batch schema/instruction refreshes at the end, unless the GPT needs the new action immediately for the next step or the user asks for a checkpoint that should be usable from the GPT.
-- When the Lensically Operator GPT OpenAPI schema or GPT-facing action behavior changes, refresh the Custom GPT action schema before final handoff unless blocked. Use the Chrome extension browser path first; do not claim schema refresh is unavailable until the Chrome extension skill/browser-client path has been attempted and any blocker is captured in `OPERATING_MEMORY.md`.
-- If `lensically-web/**` changed, run frontend checks and deploy the frontend once at the end if runtime code changed.
-- If `lensically-worker/**` changed, run backend checks and deploy the worker once at the end if runtime code changed.
-- Local agent work is multi-account by default. Do not add brand-specific agent runtimes unless the user explicitly asks for a one-off experiment.
-- For browser tasks, use both browser surfaces when available: use the Chrome extension browser for the user's real logged-in/live tab state, and use the Codex in-app browser for isolated verification, local app checks, and clean repro when relevant.
-- If `lensically-worker/src/index.ts` changed, include the backend auth/API smoke coverage used by this repo.
-- Scheduled publishing uses both Cloudflare Cron and a Durable Object alarm, but both must obey one persisted scheduler mode: `paused`, `canary`, or `normal`. New or missing control state defaults to `paused`. Canary mode requires exactly one scheduled-post ID, attempts at most that one record, and returns to `paused`. Deployments must fail when mode is `normal` and the live overdue count is nonzero; never validate scheduler infrastructure by exposing the full overdue queue.
-- Do not tell the user to run checks, push, or deploy. The agent does that work.
-- The usage meter is for learning/planning, not a stop sign. If runtime code changed, still shoot for deployment after final relevant checks. Only skip/defer deployment when credentials are unavailable, checks fail, the deploy command cannot run, or the user explicitly opts out.
-- In the final handoff, state what you ran and what you deployed.
+## Scheduler and Learning Safety
 
-## Response Rules
+- Cron and the Durable Object alarm obey one persisted scheduler mode: `paused`, `canary`, or `normal`.
+- Missing scheduler control defaults to paused. Canary permits exactly one scheduled entry and returns to paused after one attempt.
+- Normal activation is blocked while overdue approved or posting records exist. Recovery is explicit, bounded, and transactional.
+- Insights collection keeps the newest-40 policy and the four America/New_York collection windows.
+- Performance learning uses age-matched 6, 12, 18, and 24-hour checkpoints; 24 hours is final.
+- Account follower totals are trajectory data only. Never attribute follower movement to a post, day, batch, window, or posting period.
 
-- Do not use `CODEX RESPONSE`.
-- Do not use `Run These Now`.
-- Do not tell the user to run `x`, `y`, or `z`.
-- Use a plain handoff: what changed, what was verified/deployed, and any remaining risk.
+## Documentation
 
-## Documentation Rules
+- `CURRENT_STATE.md` contains only live architecture and current behavior.
+- `OPERATING_MEMORY.md` contains only active reusable rules and verified traps.
+- Historical attempts, superseded versions, and retired frameworks belong in Git history and bounded engineering audit records.
+- Remove stale instructions instead of layering new guidance above them.
+- Update these files only when active architecture or normal operating behavior changes.
 
-- Update `AGENTS.md` when workflow rules or default behavior change.
-- Update `CURRENT_STATE.md` only when product reality or normal workflow meaningfully changes.
-- Treat `AGENTS.md` and `OPERATING_MEMORY.md` as living files. Move durable workflow rules into `AGENTS.md`; store reusable facts, traps, fixes, tool limitations, and cost notes in `OPERATING_MEMORY.md`.
-- Remove stale guidance instead of layering new text on top of bad old text.
+## Handoff and Safety
 
-## Safety
-
-- If the correct integration point is unclear, stop and ask instead of guessing.
-- For destructive or high-risk changes, verify adjacent flows that could regress.
-- Treat strict TypeScript null safety as required.
+- Owner-facing engineering updates state what completed, what is being checked, and the next action. Surface a blocker only when owner action is genuinely required.
+- Final handoffs state what changed, what was verified, what was deployed, and any remaining external risk.
+- Preserve strict TypeScript safety.
+- Destructive or irreversible business actions require the existing owner-ratified protections.
+- Do not invent placeholder UI, fake navigation, dead controls, or environment-specific secrets.
+- When the correct integration point is genuinely unknown and a wrong guess could damage business state, investigate the repository and runtime first; do not improvise a parallel system.
