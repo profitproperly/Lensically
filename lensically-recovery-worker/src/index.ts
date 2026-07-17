@@ -267,10 +267,46 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   }
   if (name === "getGitHubWorkflowRun") {
     const id = Math.trunc(Number(args.run_id));
-    const [run, jobs] = await Promise.all([github(env, `/repos/${config.owner}/${config.repo}/actions/runs/${id}`), github(env, `/repos/${config.owner}/${config.repo}/actions/runs/${id}/jobs?per_page=20`)]);
+    const [run, jobs] = await Promise.all([
+      github(env, `/repos/${config.owner}/${config.repo}/actions/runs/${id}`),
+      github(env, `/repos/${config.owner}/${config.repo}/actions/runs/${id}/jobs?per_page=20`),
+    ]);
     const runData = run.data as Record<string, unknown> | null;
-    const jobRows = Array.isArray((jobs.data as Record<string, unknown> | null)?.jobs) ? (jobs.data as { jobs: Array<Record<string, unknown>> }).jobs : [];
-    return { ok: run.ok && jobs.ok, run: { id: runData?.id, status: runData?.status, conclusion: runData?.conclusion, head_sha: runData?.head_sha, html_url: runData?.html_url, created_at: runData?.created_at, updated_at: runData?.updated_at }, jobs: jobRows.map((job) => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion, html_url: job.html_url })) };
+    const jobRows = Array.isArray((jobs.data as Record<string, unknown> | null)?.jobs)
+      ? (jobs.data as { jobs: Array<Record<string, unknown>> }).jobs
+      : [];
+    const serializedJobs = [];
+    for (const job of jobRows) {
+      const jobId = Math.trunc(Number(job.id));
+      const failed = job.conclusion === "failure" || job.conclusion === "timed_out" || job.conclusion === "cancelled";
+      const annotations = failed && jobId > 0
+        ? await github(env, `/repos/${config.owner}/${config.repo}/check-runs/${jobId}/annotations?per_page=50`)
+        : null;
+      const annotationRows = Array.isArray(annotations?.data) ? annotations.data as Array<Record<string, unknown>> : [];
+      serializedJobs.push({
+        id: job.id,
+        name: job.name,
+        status: job.status,
+        conclusion: job.conclusion,
+        html_url: job.html_url,
+        steps: Array.isArray(job.steps)
+          ? (job.steps as Array<Record<string, unknown>>).map((step) => ({ name: step.name, status: step.status, conclusion: step.conclusion, number: step.number }))
+          : [],
+        failure_annotations: annotationRows.slice(0, 50).map((annotation) => ({
+          path: annotation.path ?? null,
+          start_line: annotation.start_line ?? null,
+          end_line: annotation.end_line ?? null,
+          title: annotation.title ?? null,
+          message: annotation.message ?? null,
+          raw_details: typeof annotation.raw_details === "string" ? annotation.raw_details.slice(0, 8000) : null,
+        })),
+      });
+    }
+    return {
+      ok: run.ok && jobs.ok,
+      run: { id: runData?.id, status: runData?.status, conclusion: runData?.conclusion, head_sha: runData?.head_sha, html_url: runData?.html_url, created_at: runData?.created_at, updated_at: runData?.updated_at },
+      jobs: serializedJobs,
+    };
   }
   if (name === "verifyMainMcp") {
     const origin = env.MAIN_MCP_ORIGIN || "https://api.lensically.com";
