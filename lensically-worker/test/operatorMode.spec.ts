@@ -772,6 +772,9 @@ describe("operator mode backend spine", () => {
       activated: true,
       decision_id: decisionId,
       scheduled_post_id: scheduledPostId,
+      scheduler: {
+        control: { mode: "canary", allowed_post_ids: [scheduledPostId] },
+      },
     });
     const decision = await env.DB.prepare(
       `SELECT status, outcome_summary FROM operator_decision_proposals WHERE id = ?`,
