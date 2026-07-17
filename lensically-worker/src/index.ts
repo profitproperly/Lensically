@@ -13666,6 +13666,158 @@ function operatorUsesAutonomousEngineeringAuthority(toolName: string, args: Reco
   return operatorChangeScope(args.change_description ?? args.operation, toolName).scope === "universal";
 }
 
+const SOURCE_DEFINED_PRE_CALL_ROUTES = [
+  { route_key: "client_sensitive_literal_search", provider: "github", tool_name: "searchRepoFiles", operation_key: "sensitive_literal_search", action: "redirect", mandatory_route: "Use a neutral function-name search or a bounded named-file read; never send credential-shaped literals through client preflight." },
+  { route_key: "named_large_file_local_search", provider: "github", tool_name: "searchRepoFiles", operation_key: "named_file_search", action: "apply", mandatory_route: "Read the named Git blob once and search its content locally." },
+  { route_key: "explicit_owner_ratification_handoff", provider: "lensically", tool_name: "*", operation_key: "protected_operation", action: "redirect", mandatory_route: "Include brand_key and the owner's exact approval in owner_response on the first protected call." },
+  { route_key: "compact_governance_payload", provider: "lensically", tool_name: "*", operation_key: "compact_governance", action: "apply", mandatory_route: "Send only the compact required governance fields." },
+  { route_key: "yaml_whole_block_indent_safe_patch", provider: "github", tool_name: "*", operation_key: "yaml_patch", action: "apply", mandatory_route: "Replace a complete YAML block with explicit relative indentation and read it back before dispatch." },
+  { route_key: "atomic_patch_exact_head_revalidation", provider: "github", tool_name: "applyRepoPatchSet", operation_key: "apply_repo_patch_set", action: "apply", mandatory_route: "Read the latest head, validate all exact replacements together, and commit once with that expected SHA. If the head changes, reload and revalidate instead of retrying the stale SHA." },
+  { route_key: "split_oversized_atomic_patch_payload", provider: "chatgpt_client", tool_name: "applyRepoPatchSet", operation_key: "oversized_patch_payload", action: "apply", mandatory_route: "Split an oversized implementation into bounded atomic patch groups, using the latest expected SHA for every group. Never resend the rejected oversized payload." },
+  { route_key: "single_exact_sha_release", provider: "github", tool_name: "runEngineeringRelease", operation_key: "run_engineering_release", action: "apply", mandatory_route: "Use one exact-SHA validate-and-deploy release and reuse its receipt." },
+  { route_key: "bounded_server_side_release_wait", provider: "github", tool_name: "getEngineeringRelease", operation_key: "get_engineering_release", action: "apply", mandatory_route: "Wait on the exact release run server-side instead of chat-side polling." },
+  { route_key: "workflow_source_validation_before_dispatch", provider: "github", tool_name: "*", operation_key: "workflow_dispatch", action: "apply", mandatory_route: "Use runEngineeringRelease for normal releases; direct workflow dispatch is diagnostic only." },
+  { route_key: "deployment_identity_before_new_fields", provider: "cloudflare", tool_name: "verifyDeployedMcpVersion", operation_key: "verify_deployed_mcp_version", action: "apply", mandatory_route: "Verify deployed commit and version identity before evaluating new runtime fields." },
+  { route_key: "bounded_same_run_poll", provider: "github", tool_name: "getGitHubWorkflowRun", operation_key: "get_github_workflow_run", action: "apply", mandatory_route: "Poll the same run no faster than five seconds and fetch detailed logs only after failure completes." },
+  { route_key: "callable_alias_is_not_recovery", provider: "lensically", tool_name: "*", operation_key: "bridge_call", action: "redirect", mandatory_route: "Use one callable alias only when the direct schema is absent; never wrapper-hop after a backend failure." },
+] as const;
+
+function operatorPreCallProvider(toolName: string): string {
+  if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "runEngineeringRelease", "getEngineeringRelease", "deployBackend"].includes(toolName)) return "github";
+  if (["verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
+  if (["schedule_approved_draft", "schedule_manifest_review_batch", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
+  return "lensically";
+}
+
+function normalizeOperatorPreCallKey(value: unknown, fallback = "*"): string {
+  const text = normalizeOperatorText(value, 160, true);
+  if (!text || text === "*") return fallback;
+  return normalizeOperatorMachineKey(text, fallback);
+}
+
+function operatorPreCallOperationKey(toolName: string, args: Record<string, unknown>, operationHint?: unknown): string {
+  const explicit = normalizeOperatorText(operationHint, 240, true);
+  if (explicit) return normalizeOperatorMachineKey(explicit, normalizeOperatorMachineKey(toolName, "tool_call"));
+  if (toolName === "searchRepoFiles") {
+    const query = normalizeOperatorText(args.query, 4000, true) ?? "";
+    const prefix = sanitizeRepoPath(args.prefix ?? "");
+    if (/(?:x-openai|authorization|bearer\s|client[_ -]?secret|access[_ -]?token)/i.test(query)) return "sensitive_literal_search";
+    if (prefix && /\.[a-z0-9]+$/i.test(prefix)) return "named_file_search";
+    return "repository_search";
+  }
+  if (MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(toolName)) return "protected_operation";
+  if (["proposeOperatorDecision", "resolveOperatorDecision", "markOperatorDecisionExecuted"].includes(toolName)) return "compact_governance";
+  const path = sanitizeRepoPath(args.path ?? "");
+  const yamlPatch = toolName === "applyRepoPatchSet" && Array.isArray(args.patches)
+    && (args.patches as Array<Record<string, unknown>>).some((patch) => /\.ya?ml$/i.test(sanitizeRepoPath(patch.path)));
+  if ((toolName === "applyRepoTextPatch" && /\.ya?ml$/i.test(path)) || yamlPatch) return "yaml_patch";
+  if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") return "workflow_dispatch";
+  if (toolName === "listMcpTools" || toolName === "runEngineeringTool") return "bridge_call";
+  return normalizeOperatorMachineKey(toolName, "tool_call");
+}
+
+function operatorPreCallValueMatches(actual: unknown, expected: unknown): boolean {
+  if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+    const rule = expected as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(rule, "$exists")) return Boolean(rule.$exists) === (actual !== undefined);
+    if (typeof rule.$regex === "string") {
+      try { return new RegExp(rule.$regex, typeof rule.$flags === "string" ? rule.$flags : undefined).test(String(actual ?? "")); }
+      catch { return false; }
+    }
+    if (Array.isArray(rule.$in)) return rule.$in.some((item) => Object.is(item, actual));
+    if (!actual || typeof actual !== "object" || Array.isArray(actual)) return false;
+    return Object.entries(rule).every(([key, value]) => operatorPreCallValueMatches((actual as Record<string, unknown>)[key], value));
+  }
+  if (Array.isArray(expected)) return Array.isArray(actual) && expected.length === actual.length && expected.every((item, index) => operatorPreCallValueMatches(actual[index], item));
+  return Object.is(actual, expected);
+}
+
+async function ensureOperatorPreCallRoutesTable(env: Env): Promise<void> {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS operator_pre_call_routes (
+    id TEXT PRIMARY KEY, route_key TEXT NOT NULL UNIQUE, provider TEXT NOT NULL DEFAULT 'lensically',
+    tool_name TEXT NOT NULL, operation_key TEXT NOT NULL DEFAULT '*', match_json TEXT NOT NULL DEFAULT '{}',
+    action TEXT NOT NULL DEFAULT 'apply', required_tool TEXT, mandatory_route TEXT NOT NULL,
+    argument_patch_json TEXT NOT NULL DEFAULT '{}', allowed_argument_keys_json TEXT, reason TEXT NOT NULL,
+    verification_summary TEXT NOT NULL, source_memory_id TEXT, priority INTEGER NOT NULL DEFAULT 100,
+    active INTEGER NOT NULL DEFAULT 1, expires_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_pre_call_routes_lookup
+    ON operator_pre_call_routes (active, provider, tool_name, operation_key, priority DESC, updated_at DESC)`).run();
+}
+
+function serializeOperatorPreCallRoute(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id, route_key: row.route_key, provider: row.provider, tool_name: row.tool_name,
+    operation_key: row.operation_key, match: safeParseJsonString(String(row.match_json ?? "{}")) ?? {},
+    action: row.action, required_tool: row.required_tool ?? null, mandatory_route: row.mandatory_route,
+    argument_patch: safeParseJsonString(String(row.argument_patch_json ?? "{}")) ?? {},
+    allowed_argument_keys: safeParseJsonString(String(row.allowed_argument_keys_json ?? "null")),
+    reason: row.reason, verification_summary: row.verification_summary, source_memory_id: row.source_memory_id ?? null,
+    priority: Number(row.priority ?? 100), active: Number(row.active ?? 0) === 1, expires_at: row.expires_at ?? null,
+    created_at: row.created_at, updated_at: row.updated_at, source: "persistent_phonebook", version: OPERATOR_PRE_CALL_ROUTING_VERSION,
+  };
+}
+
+async function findOperatorPreCallRoute(env: Env, toolName: string, args: Record<string, unknown>, operationHint?: unknown): Promise<Record<string, unknown> | null> {
+  const provider = operatorPreCallProvider(toolName);
+  const operationKey = operatorPreCallOperationKey(toolName, args, operationHint);
+  const query = () => env.DB.prepare(`SELECT * FROM operator_pre_call_routes
+    WHERE active = 1 AND (expires_at IS NULL OR datetime(expires_at) > CURRENT_TIMESTAMP)
+      AND (provider = ? OR provider = '*') AND (tool_name = ? OR tool_name = '*')
+      AND (operation_key = ? OR operation_key = '*')
+    ORDER BY priority DESC, CASE WHEN provider = ? THEN 0 ELSE 1 END,
+      CASE WHEN tool_name = ? THEN 0 ELSE 1 END, CASE WHEN operation_key = ? THEN 0 ELSE 1 END,
+      datetime(updated_at) DESC LIMIT 50`).bind(provider, toolName, operationKey, provider, toolName, operationKey).all<Record<string, unknown>>();
+  let rows;
+  try { rows = await query(); }
+  catch (error) {
+    if (!getErrorMessage(error).includes("no such table: operator_pre_call_routes")) throw error;
+    await ensureOperatorPreCallRoutesTable(env);
+    rows = await query();
+  }
+  const matched = (rows.results ?? []).find((row) => operatorPreCallValueMatches(args, safeParseJsonString(String(row.match_json ?? "{}")) ?? {}));
+  return matched ? serializeOperatorPreCallRoute(matched) : null;
+}
+
+function sourceDefinedOperatorPreCallRoute(toolName: string, args: Record<string, unknown>): Record<string, unknown> | null {
+  const knownPath = resolveOperatorKnownPath(toolName, args);
+  if (knownPath.rule_key === "canonical_first_execution") return null;
+  return {
+    id: `source:${String(knownPath.rule_key)}`, route_key: knownPath.rule_key,
+    provider: operatorPreCallProvider(toolName), tool_name: toolName,
+    operation_key: operatorPreCallOperationKey(toolName, args),
+    action: knownPath.block_call === true ? "redirect" : "apply", required_tool: knownPath.required_tool ?? null,
+    mandatory_route: knownPath.mandatory_route, argument_patch: knownPath.argument_patch ?? {},
+    allowed_argument_keys: knownPath.allowed_argument_keys ?? null, reason: knownPath.reason,
+    verification_summary: "Source-defined route covered by Operator regression tests.", source: "source_defined",
+    version: OPERATOR_PRE_CALL_ROUTING_VERSION, error: knownPath.block_call === true ? "known_blocker_prevented" : null,
+  };
+}
+
+function applyOperatorPreCallRouteArguments(args: Record<string, unknown>, route: Record<string, unknown>): { arguments: Record<string, unknown>; corrections: OperatorGuardCorrection[] } {
+  const next = { ...args };
+  const corrections: OperatorGuardCorrection[] = [];
+  const allowed = Array.isArray(route.allowed_argument_keys) ? route.allowed_argument_keys.map(String) : null;
+  if (allowed) for (const key of Object.keys(next)) if (!allowed.includes(key)) {
+    corrections.push({ path: `$.${key}`, from: next[key], to: undefined, reason: "pre_call_route_removed" });
+    delete next[key];
+  }
+  const patch = route.argument_patch && typeof route.argument_patch === "object" && !Array.isArray(route.argument_patch) ? route.argument_patch as Record<string, unknown> : {};
+  for (const [key, value] of Object.entries(patch)) if (!Object.is(next[key], value)) {
+    corrections.push({ path: `$.${key}`, from: next[key], to: value, reason: "pre_call_route_patch" });
+    next[key] = value;
+  }
+  return { arguments: next, corrections };
+}
+
+async function resolveOperatorPreCallRouting(env: Env, toolName: string, args: Record<string, unknown>, operationHint?: unknown): Promise<{ arguments: Record<string, unknown>; corrections: OperatorGuardCorrection[]; route: Record<string, unknown> | null; redirect: boolean }> {
+  const route = await findOperatorPreCallRoute(env, toolName, args, operationHint) ?? sourceDefinedOperatorPreCallRoute(toolName, args);
+  if (!route) return { arguments: args, corrections: [], route: null, redirect: false };
+  const applied = applyOperatorPreCallRouteArguments(args, route);
+  const requiredTool = normalizeOperatorText(route.required_tool, 160, true);
+  return { ...applied, route, redirect: route.action === "redirect" || (requiredTool !== null && requiredTool !== toolName) };
+}
+
 function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
   const prefix = sanitizeRepoPath(args.prefix ?? "");
   const path = sanitizeRepoPath(args.path ?? "");
@@ -13686,28 +13838,44 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
       reason: "GitHub code search does not reliably index oversized source files; do not retry empty code-search results or fan out across files.",
     };
   }
-    if (MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(toolName)) {
+        if (MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(toolName)) {
+    const ownerResponse = normalizeOperatorText(args.owner_response, 4000, true);
     return {
       rule_key: "explicit_owner_ratification_handoff",
-      mandatory_route: "after the owner explicitly approves, include brand_key and the exact owner message in owner_response on the first protected call; persist ratification and execute once. Do not make a knowingly blocked attempt and do not switch to recovery",
-      reason: "An owner approval already given in the conversation must become durable authorization before execution rather than producing an avoidable block.",
+      mandatory_route: "after owner approval, include brand_key and the exact owner message in owner_response on the first protected call",
+      reason: "Owner approval must become durable authorization before execution.",
+      required_tool: toolName,
+      block_call: !ownerResponse,
     };
   }
-  if (["proposeOperatorDecision", "resolveOperatorDecision", "markOperatorDecisionExecuted"].includes(toolName)) {
+    if (["proposeOperatorDecision", "resolveOperatorDecision", "markOperatorDecisionExecuted"].includes(toolName)) {
+    const allowedArgumentKeys = toolName === "proposeOperatorDecision"
+      ? ["brand_key", "decision_key", "category", "title", "decision", "authorized_tools", "supersedes_decision_id"]
+      : toolName === "resolveOperatorDecision"
+        ? ["brand_key", "decision_id", "resolution", "owner_response", "revision_request"]
+        : ["brand_key", "decision_id", "outcome_summary", "result_evidence"];
     return {
       rule_key: "compact_governance_payload",
       mandatory_route: "send only required compact fields and use a safe account-key alias when client preflight rejects the canonical surface",
       reason: "Verbose governance payloads are known to trigger client-side preflight blocks before reaching Lensically.",
+      allowed_argument_keys: allowedArgumentKeys,
     };
   }
     const patchSetTouchesYaml = toolName === "applyRepoPatchSet"
     && Array.isArray(args.patches)
     && (args.patches as Array<Record<string, unknown>>).some((patch) => /\.ya?ml$/i.test(sanitizeRepoPath(patch.path)));
-  if ((toolName === "applyRepoTextPatch" && /\.ya?ml$/i.test(path)) || patchSetTouchesYaml) {
+    if ((toolName === "applyRepoTextPatch" && /\.ya?ml$/i.test(path)) || patchSetTouchesYaml) {
     return {
       rule_key: "yaml_whole_block_indent_safe_patch",
       mandatory_route: "replace a complete YAML block with explicit relative indentation, then read back the file before dispatch",
       reason: "Partial multiline replacements can inherit first-line indentation and create parser failures.",
+    };
+  }
+  if (toolName === "applyRepoPatchSet") {
+    return {
+      rule_key: "atomic_patch_exact_head_revalidation",
+      mandatory_route: "read the latest head, validate all exact replacements together, and commit once with that expected SHA; on head_changed reload and revalidate",
+      reason: "Optimistic concurrency preserves unrelated commits without abandoning atomic validation.",
     };
   }
   if (toolName === "runEngineeringRelease") {
