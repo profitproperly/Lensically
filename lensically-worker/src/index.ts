@@ -17453,7 +17453,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         resultPayload.execution_library = routedGatewayMetadata.execution_library ?? null;
         resultPayload.gateway = {
           name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-          intent: routedGatewayMetadata.action_intent ?? gatewayIntent ?? null,
+          intent: routedGatewayMetadata.action_intent ?? null,
           public_schema_frozen: true,
         };
         resultPayload.routed_execution = routedGatewayMetadata;
