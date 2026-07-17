@@ -14751,23 +14751,6 @@ async function collectOperatorPreflightSection(
   }
 }
 
-async function createOperatorMcpSnapshot(env: Env): Promise<Record<string, unknown>> {
-  await prepareOperatorMode(env);
-  const overrides: Array<Record<string, unknown>> = [];
-  const requirements = await env.DB.prepare(
-    `SELECT * FROM operator_workflow_requirements ORDER BY stage ASC, brand_key ASC`,
-  ).all<Record<string, unknown>>();
-  const gates = await env.DB.prepare(
-    `SELECT * FROM operator_gates ORDER BY stage_scope ASC, gate_key ASC`,
-  ).all<Record<string, unknown>>();
-  return {
-    captured_at: new Date().toISOString(),
-    tool_overrides: overrides,
-    workflow_requirements: requirements.results ?? [],
-    gates: gates.results ?? [],
-  };
-}
-
 function operatorKeyHandshakeLines(toolCount: number, brandKey: GptBrandKey): string[] {
   return [
     "Lensically Operator Mode MCP is active.",
