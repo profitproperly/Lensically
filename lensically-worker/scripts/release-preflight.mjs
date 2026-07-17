@@ -18,11 +18,23 @@ function collectRepositoryFiles(directory) {
   return files;
 }
 const repositoryFiles = collectRepositoryFiles(repoRoot);
-const repositoryFileManifest = repositoryFiles.map((absolute) => ({
-  path: relative(repoRoot, absolute).replaceAll("\\", "/"),
-  size: statSync(absolute).size,
-  sha256: createHash("sha256").update(readFileSync(absolute)).digest("hex"),
-}));
+const repositoryFileManifest = repositoryFiles.map((absolute) => {
+  const path = relative(repoRoot, absolute).replaceAll("\\", "/");
+  const raw = readFileSync(absolute);
+  const generatedRegionNormalized = path === "lensically-worker/src/mandatoryExecutionMap.ts";
+  const hashInput = generatedRegionNormalized
+    ? Buffer.from(raw.toString("utf8").replace(
+      /\/\/ BEGIN GENERATED EXECUTION KNOWLEDGE[\s\S]*?\/\/ END GENERATED EXECUTION KNOWLEDGE/,
+      "// BEGIN GENERATED EXECUTION KNOWLEDGE\n<release-generated>\n// END GENERATED EXECUTION KNOWLEDGE",
+    ))
+    : raw;
+  return {
+    path,
+    size: raw.length,
+    sha256: createHash("sha256").update(hashInput).digest("hex"),
+    generated_region_normalized: generatedRegionNormalized,
+  };
+});
 const repositoryTextKnowledge = Object.fromEntries(repositoryFiles
   .map((absolute) => ({
     absolute,
