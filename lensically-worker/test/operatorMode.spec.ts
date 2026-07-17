@@ -2199,17 +2199,15 @@ describe("operator mode MCP endpoint", () => {
     expect(accountScoped.policy.scope_classification.scope).toBe("account_scoped");
   }, 30000);
 
-    it("requires a matching guard and normalizes known payload blockers before execution through client preflight or the server-side dispatcher fallback", async () => {
+        it("requires the routed gateway and never repairs a direct operational attempt", async () => {
     const unguarded = await mcpToolCallRaw<{
-      ok: boolean;
-      execution_guard_enforcement: { mode: string; normalized_before_execution: boolean; known_path_checked: boolean };
+      error: string;
+      required_tool: string;
     }>("getEngineeringAccessState", {});
-    expect(unguarded.isError).not.toBe(true);
-    expect(unguarded.structuredContent.ok).toBe(true);
-    expect(unguarded.structuredContent.execution_guard_enforcement).toMatchObject({
-      mode: "server_side_dispatcher_fallback",
-      normalized_before_execution: true,
-      known_path_checked: true,
+    expect(unguarded.isError).toBe(true);
+    expect(unguarded.structuredContent).toMatchObject({
+      error: "routed_execution_gateway_required",
+      required_tool: "routeAndExecuteLensicallyCall",
     });
 
     const invalid = await mcpToolCallRaw<{ error: string; validation_errors: Array<{ path: string; error: string }> }>("readRepoFile", {
