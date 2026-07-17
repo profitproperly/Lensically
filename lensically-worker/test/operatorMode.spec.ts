@@ -730,6 +730,13 @@ describe("operator mode backend spine", () => {
     const normalPayload = await normalActivation.json() as { control: { mode: string } };
     expect(normalPayload.control.mode).toBe("normal");
     expect(exclusiveControlCount).toBeGreaterThanOrEqual(3);
+
+    const teardownPause = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "paused", reason: "scheduler regression teardown" }),
+    }));
+    expect(teardownPause.ok).toBe(true);
     }, 30000);
 
   it("automatically consumes an approved scheduled-post canary decision", async () => {
