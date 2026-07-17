@@ -31591,14 +31591,17 @@ export class ScheduledPostScheduler {
   }
 
   private async getControl(): Promise<ScheduledPostSchedulerControl> {
-    return await this.state.storage.get<ScheduledPostSchedulerControl>("control")
-      ?? { ...EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL };
+    const stored = await this.state.storage.get<ScheduledPostSchedulerControl>("control");
+    return stored
+      ? { ...stored, resume_mode: stored.resume_mode ?? null }
+      : { ...EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL };
   }
 
   private async setControl(input: {
     mode: ScheduledPostSchedulerMode;
     allowedPostIds?: number[];
     reason?: string | null;
+    resumeMode?: "paused" | "normal" | null;
   }): Promise<ScheduledPostSchedulerControl> {
     const allowedPostIds = Array.from(new Set(
       (input.allowedPostIds ?? []).filter((postId) => Number.isInteger(postId) && postId > 0),
