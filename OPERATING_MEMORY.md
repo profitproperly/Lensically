@@ -4,6 +4,8 @@ Read this after `AGENTS.md` at the start of every Lensically chat. Keep entries 
 
 ## Global Memory
 
+- Failed: the plain intent `run mcp tests` fell through to the generic GitHub test route, which required workflow inputs and blocked the internal MCP self-check. Use: seed `run mcp tests` as an explicit `runMcpTests` alias and resolve it deterministically before generic test routing; release preflight enforces the distinction. Applies when: adding or changing test-related intent aliases.
+
 - Failed: `/api/operator/health` reported the superseded registry generation after the mandatory execution library replaced the old map generation. Use: health metadata must report `mandatory-execution-library-v2`; release preflight rejects the old literal and the health regression verifies the public value. Applies when: renaming or replacing the execution controller generation.
 
 - Failed: routed actions prepared Operator tables before execution-library compilation, then admin/engineering handlers prepared and reseeded them again after compilation in test runtime. The second preparation marked policy sources dirty immediately, forced another full refresh on the next action, and violated the one-preparation execution path. Use: propagate `preparationAlreadyComplete` through routed handlers, admin/engineering bridges, and nested engineering calls; direct non-routed entry points still prepare themselves. Applies when: changing gateway dispatch, handler signatures, bridges, test table resets, or execution-library dirty-state assertions.
