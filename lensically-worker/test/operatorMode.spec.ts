@@ -1633,7 +1633,7 @@ describe("operator mode MCP endpoint", () => {
         const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     expect(listed.tools.map((tool) => tool.name)).toEqual([
       "getOperatorStartupContext",
-      "routeAndExecuteLensicallyCall",
+      "executeMappedIntent",
     ]);
     const registry = await mcpTool<{ tools: Array<{ name: string; inputSchema?: Record<string, unknown> }> }>("listMcpTools");
     const toolNames = registry.tools.map((tool) => tool.name);
