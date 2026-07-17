@@ -158,6 +158,14 @@ if (!executionMap.includes("isDeterministicInputValidationFailure")
     || !executionMap.includes("await repairDeterministicInputValidationIncidents(db)")) {
   errors.push("mandatory_execution_map_input_validation_repair_missing");
 }
+if (!executionMap.includes('runGitHubWorkflow: ["run typecheck"')
+    || executionMap.includes('runMcpTests: ["run mcp tests", "run operator tests"')
+    || !executionMap.includes("inferredArgumentsForOperationalIntent")
+    || !executionMap.includes('return { task: "typecheck" }')
+    || !executionMap.includes('existing.source_type === "tool_registry_seed"')
+    || !executionMap.includes("desiredVerificationSummary")) {
+  errors.push("engineering_validation_route_contract_missing");
+}
 if (!executionMap.includes('EXECUTION_POLICY_LIBRARY_VERSION = "execution-policy-library-v2"')
     || !executionMap.includes("operator_execution_library_sources")
     || !executionMap.includes("operator_execution_library_ingestion_state")
