@@ -1896,7 +1896,7 @@ describe("operator mode MCP endpoint", () => {
       numerical_tool_budgets: false,
       owner_ratification_required: false,
     });
-        expect(direct.engineering_authority_contract.known_path_rule).toContain("every Lensically tool call must first pass through the persistent pre-call route phonebook");
+                expect(direct.engineering_authority_contract.known_path_rule).toContain("the model can call only routeAndExecuteLensicallyCall for operational work");
     expect(direct.engineering_authority_contract.recursive_improvement_rule).toContain("stop the active engineering sequence");
     expect(direct.engineering_authority_contract.protected_operations).toEqual(expect.arrayContaining(["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode"]));
         expect(direct.continuity_contract.version).toBe("operator-continuity-v2");
