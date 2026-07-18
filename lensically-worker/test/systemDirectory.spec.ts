@@ -316,6 +316,7 @@ describe("System Directory foundation", () => {
       "public_mcp_tool_inventory_request",
       "public_startup_receipt_wording",
       "public_startup_bootstrap_shape",
+      "public_operator_context_shape",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
