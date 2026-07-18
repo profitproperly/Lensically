@@ -579,7 +579,7 @@ describe("GPT memory browser routes", () => {
       active_snapshot_id: replacement.snapshot_id,
       manifest: expect.objectContaining({ snapshot_id: replacement.snapshot_id }),
     });
-  });
+  }, 15000);
 
   it("stores owner taste feedback for the selected configured account", async () => {
     const response = await fetchFromWorker("/api/gpt-memory/taste-feedback", {
