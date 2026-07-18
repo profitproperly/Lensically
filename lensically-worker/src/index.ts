@@ -15428,7 +15428,7 @@ function operatorMcpInstructions(toolCount: number): string {
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
     "Proceed to the next step?",
-    "After explicit Proceed, account calls include the selected brand key and proceed_confirmed=true. Continuity and mutation identity come from server state.",
+    "After explicit Proceed, account calls include the selected brand key and proceed_confirmed=true. Proceed authorizes diagnosis and discussion only; an approved Growth Mission unlocks account mutation.",
     "Content generation preserves source lineage, requires passing backend gates, and schedules only approved drafts.",
     "Protected destructive, ownership, credential, scheduler-safety, and irreversible operations retain owner-ratified controls.",
     "Scheduler safety and overdue recovery remain backend-enforced.",
