@@ -87,10 +87,10 @@ if (!source.includes("const sourceDefinedStaticRoute = routedMapExecution?.d1_ex
   errors.push("static_route_runtime_bypass_missing");
 }
 
-if (!workflow.includes("run-name: Lensically engineering · ${{ github.sha }}")) errors.push("workflow_run_name_missing");
+if (!workflow.includes("run-name: Lensically ${{ inputs.task }} · ${{ inputs.release_id || github.sha }}")) errors.push("workflow_run_name_missing");
 if (!workflow.includes("cancel-in-progress: true")) errors.push("workflow_concurrency_cancellation_missing");
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
-if (workflow.includes("release_id:")) errors.push("obsolete_workflow_release_id_present");
+if (!workflow.includes("release_id:")) errors.push("workflow_release_id_missing");
 if (!workflow.includes("release_sha:")) errors.push("workflow_release_sha_missing");
 if (!workflow.includes("- name: System Directory tests")
     || !workflow.includes("inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy'")) {
