@@ -650,6 +650,9 @@ export async function finalizeMandatoryExecutionMapCall(
   const actionIntent = normalizeText(mapExecution.action_intent, 8000) ?? "unknown action";
   const mode = normalizeText(mapExecution.mode, 80) ?? "source_defined_static_route";
   const directEngineering = mode === "source_defined_direct_engineering";
+  const explicitContradiction = result.contradiction === true || result.contract_contradiction === true || result.status === "contradiction";
+  const effectiveFailure = result.ok === false || explicitContradiction;
+  const defectGeneralization = directEngineering && effectiveFailure ? classifyDefectForGeneralization(actionIntent, result) : null;
   return {
     version: MANDATORY_EXECUTION_MAP_VERSION,
     map_state: directEngineering
