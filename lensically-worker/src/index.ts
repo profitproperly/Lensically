@@ -521,15 +521,15 @@ const OPERATOR_AUTONOMY_CONTRACT = {
   version: OPERATOR_AUTONOMY_CONTRACT_VERSION,
   infrastructure_scope: "universal",
   active_account_scope: "manifest_mental",
-  active_mode: MANIFEST_AUTONOMY_MODE,
+  active_mode: MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE,
   objective: MANIFEST_AUTONOMY_OBJECTIVE,
-  model_role: "The model owns routine Manifest problem selection, content decisions, source selection, generation, approval, scheduling, analytics, experiments, workflow sequencing, and routine engineering execution.",
-  owner_role: "The owner monitors the operation and may intervene at any time. Owner ratification remains required only for protected destructive actions, credential or ownership changes, scheduler safety mode, and irreversible business decisions.",
-  approval_policy: "Routine Manifest account operations and routine engineering are autonomous. Existing content gates, source fidelity, duplicate prevention, idempotency, schedule safety, and protected-operation controls remain mandatory.",
-  proposal_policy: "Persist proposals only for protected destructive, ownership, credential, scheduler safety, or irreversible business decisions. Routine account and engineering work executes without per-tool budgets.",
-  fresh_chat_rule: "After startup and Manifest continuity restoration, immediately resume autonomous account operation and autonomous engineering through mandatory known paths. Do not wait for routine owner approval.",
+  model_role: "The model proactively owns diagnosis, prioritization, planning, research, preparation, experimentation design, workflow navigation, and routine engineering. It arrives with a recommendation and a prepared next step.",
+  owner_role: "The owner discusses, revises, and approves the active growth plan and consequential account execution while the model carries the operational and engineering burden.",
+  approval_policy: "Proceed authorizes account-state restoration and a Growth Mission Brief only. Account mutations require an approved current mission plan and the established owner checkpoint. Routine engineering remains autonomous.",
+  proposal_policy: "The model creates the Growth Mission Brief, identifies the current bottleneck, recommends objectives and experiments, and asks the owner to discuss, revise, or approve. It never asks the owner to invent the next routine action.",
+  fresh_chat_rule: "After startup and Manifest continuity restoration, open a new guided growth discussion cycle. Present the diagnostic and proposed plan before content creation, approval, scheduling, publishing, deletion, or exclusion.",
   decision_categories: ["strategy", "content", "scheduling", "analytics", "experiment", "workflow", "engineering", "risk"],
-  training_exit_rule: "The owner explicitly ended the owner-ratified training phase and transferred routine Manifest operation to the model.",
+  training_exit_rule: "Full autonomous account execution remains a future explicit mode change. Guided owner approval is the active training and collaboration mode.",
 } as const;
 
 const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
