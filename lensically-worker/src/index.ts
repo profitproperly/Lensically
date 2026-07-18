@@ -595,6 +595,7 @@ const OPERATOR_CONTINUITY_CONTRACT = {
   ],
     capsule_sections: [
     "autonomy_governance",
+    "growth_mission_brief",
     "workflow_checkpoint",
     "calendar_coverage",
     "active_review_batch",
