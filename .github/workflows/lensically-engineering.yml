@@ -13,9 +13,10 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: Engineering task to run
-                required: true
+                description: Engineering task to run
+        required: true
         default: typecheck
+
         type: choice
 
         options:
