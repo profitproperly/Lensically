@@ -424,12 +424,17 @@ function compactOperatorPayloadValue(
     ));
   }
   if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
-    const returnedEntries = entries.slice(0, limits.objectKeys);
+    const entries = Object.entries(value as Record<string, unknown>).map(([key, entry], index) => ({ key, entry, index }));
+    const prioritizedEntries = [...entries].sort((left, right) => {
+      const leftRank = OPERATOR_PAYLOAD_PRIORITY_RANK.get(left.key) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = OPERATOR_PAYLOAD_PRIORITY_RANK.get(right.key) ?? Number.MAX_SAFE_INTEGER;
+      return leftRank - rightRank || left.index - right.index;
+    });
+    const returnedEntries = prioritizedEntries.slice(0, limits.objectKeys);
     if (entries.length > returnedEntries.length) {
       truncations.push({ path, total_count: entries.length, returned_count: returnedEntries.length, next_offset: returnedEntries.length });
     }
-    return Object.fromEntries(returnedEntries.map(([key, entry]) => [
+    return Object.fromEntries(returnedEntries.map(({ key, entry }) => [
       key,
       compactOperatorPayloadValue(entry, path ? `${path}.${key}` : key, limits, truncations, depth + 1),
     ]));
