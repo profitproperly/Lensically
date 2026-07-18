@@ -15792,6 +15792,7 @@ async function handleOperatorMcpAdminTool(
     const brand = await resolveOperatorBrandFromPayload(env, args);
     if (!brand) return { ok: false, error: "brand_unavailable" };
     const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
+    const growthMission = await readOperatorGrowthMission(env, brand.brand_key);
     const statuses = Array.isArray(args.statuses) ? args.statuses.map(String) : [];
     const decisions = await listOperatorDecisionProposals(env, brand.brand_key, statuses, Number(args.limit ?? 20));
     const eventRows = await env.DB.prepare(
