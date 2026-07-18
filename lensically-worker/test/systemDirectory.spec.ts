@@ -264,6 +264,66 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("routes complete Lensically UI surface reads through one canonical paginated handler", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "read_lensically_ui_surface",
+      title: "Read Lensically UI surface",
+      description: "Read Dashboard, Followers, Insights, Post Archive, or Saved Patterns.",
+      inputSchema: {
+        type: "object",
+        properties: { brand_key: { type: "string" }, surface: { type: "string" }, page: { type: "number" }, limit: { type: "number" } },
+        required: ["brand_key", "surface"],
+      },
+    }];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { intent: "list saved patterns", objective: "Read the complete Saved Patterns surface.", inputs: { brand_key: "manifest_mental", page: 2, limit: 100 } },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "read_lensically_ui_surface",
+      arguments: { brand_key: "manifest_mental", surface: "saved_patterns", page: 2, limit: 100 },
+    });
+  });
+
+  it("retires stale Manifest review batches while preserving source records", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "discard_manifest_review_batch",
+        title: "Discard Manifest review batch",
+        description: "Retire one stale review batch while preserving source records.",
+        inputSchema: {
+          type: "object",
+          properties: { brand_key: { type: "string" }, review_batch_id: { type: "string" }, reason: { type: "string" } },
+          required: ["brand_key", "reason"],
+        },
+      },
+      {
+        name: "get_manifest_review_batch",
+        title: "Get Manifest review batch",
+        description: "Read one review batch.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        intent: "scrap manifest review batch",
+        objective: "Retire the stale batch without deleting its Saved Pattern records.",
+        inputs: { brand_key: "manifest_mental", review_batch_id: "batch-1", reason: "Owner scrapped old inventory." },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "discard_manifest_review_batch",
+      arguments: { brand_key: "manifest_mental", review_batch_id: "batch-1", reason: "Owner scrapped old inventory." },
+    });
+  });
+
   it("resolves Operator tests without an obsolete workflow identifier", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "runGitHubWorkflow",
