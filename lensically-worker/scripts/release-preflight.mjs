@@ -137,6 +137,20 @@ if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-rou
   errors.push("static_execution_router_contract_missing");
 }
 
+if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v1"')
+    || !router.includes("WINNING_PATH_PROMOTIONS")
+    || !router.includes("resolvePromotedWinningPath")
+    || !router.includes("evaluatePreventableIncidentClosure")
+    || !router.includes("promoted_winning_path_external_surface_required")
+    || !systemDirectoryTests.includes("promotes multi-stage architecture work to implementation before release")
+    || !systemDirectoryTests.includes("routes large repository mutations to the promoted Recovery path")
+    || !systemDirectoryTests.includes("blocks incident closure until the winning path is promoted and enforced")
+    || !systemDirectoryTests.includes("keeps Operator MCP version metadata single-source")
+    || !clientSafety.includes('public_large_repository_mutation_payload')
+    || !clientSafety.includes('recovery_repository_mutation')) {
+  errors.push("winning_path_promotion_contract_missing");
+}
+
 if (router.includes("operator_execution_library_sources")
     || router.includes("operator_execution_map_entries")
     || router.includes("operator_execution_map_incidents")
