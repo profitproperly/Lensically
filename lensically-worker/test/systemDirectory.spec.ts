@@ -1,6 +1,6 @@
 
 import { describe, expect, it } from "vitest";
-import { classifyDefectForGeneralization, finalizeMandatoryExecutionMapCall, prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
+import { classifyDefectForGeneralization, evaluatePreventableIncidentClosure, finalizeMandatoryExecutionMapCall, prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, resolvePromotedWinningPath, validateWinningPathPromotions, WINNING_PATH_PROMOTIONS, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
       assertClientSafetyRegistry,
   buildClientSafeGatewayRequest,
