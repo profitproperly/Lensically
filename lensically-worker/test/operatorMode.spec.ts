@@ -2241,7 +2241,7 @@ describe("operator mode MCP endpoint", () => {
     expect(startup.account_data_loaded).toBe(false);
     expect(startup.no_account_sections_present).toBe(true);
     expect(startup.tool_surface.total_tools).toBe(registry.tools.length);
-    expect(startup.runtime).toMatchObject({ mcp_version: "1.28.0", registry_generation: "static-execution-router-v1" });
+    expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v1" });
     expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
     expect(startup.source_documents.every((document) => document.excerpt.length <= 2500)).toBe(true);
     expect(startup.boundary.first_key_response_template).toHaveLength(4);
