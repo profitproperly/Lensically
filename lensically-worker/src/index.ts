@@ -2204,18 +2204,14 @@ async function processScheduledPost(
       provider_response_body: publishOutcome.providerResponseBody ?? null,
       linked_threads_user_id: publishOutcome.accountThreadsUserId,
     });
-    await transitionScheduledPostStatus(
+    await quarantineScheduledPostPublishAttempt(
       env,
       post.id,
-      SCHEDULED_POST_STATUS_POSTING,
-      SCHEDULED_POST_STATUS_APPROVED,
-      {
-        publishErrorMessage: buildPublishErrorStorageValue(
-          publishOutcome.errorCode,
-          publishOutcome.status,
-          publishOutcome.providerErrorMessage,
-        ),
-      },
+      buildPublishErrorStorageValue(
+        publishOutcome.errorCode,
+        publishOutcome.status,
+        publishOutcome.providerErrorMessage,
+      ),
     );
     return;
   }
