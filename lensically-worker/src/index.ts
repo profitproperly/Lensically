@@ -497,6 +497,65 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
     objectKeys = Math.max(32, Math.floor(objectKeys / 2));
   }
 
+  const continuityCapsule = payload.continuity_capsule;
+  if (continuityCapsule && typeof continuityCapsule === "object" && !Array.isArray(continuityCapsule)) {
+    const criticalTopLevelKeys = [
+      "ok",
+      "error",
+      "status",
+      "brand_key",
+      "selected_key",
+      "proceeded",
+      "proceed_confirmed",
+      "account_data_loaded",
+      "continuity_loaded",
+      "continuation_choice_required",
+      "continuation_choice",
+      "continuity_state_expires_in_seconds",
+      "continuity_capsule",
+      "account_execution_locked_until_growth_plan_approval",
+      "required_next_owner_action",
+      "next_call_requirement",
+    ];
+    const criticalPayload = Object.fromEntries(
+      criticalTopLevelKeys
+        .filter((key) => Object.prototype.hasOwnProperty.call(payload, key))
+        .map((key) => [key, payload[key]]),
+    );
+    let criticalArrayItems = 8;
+    let criticalStringChars = 600;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const truncations: OperatorPayloadTruncation[] = [];
+      const compactedCritical = compactOperatorPayloadValue(
+        criticalPayload,
+        "",
+        { arrayItems: criticalArrayItems, stringChars: criticalStringChars, objectKeys: 64, maxDepth: 7 },
+        truncations,
+      ) as Record<string, unknown>;
+      const boundedCritical = {
+        ...compactedCritical,
+        payload_contract: {
+          server_bounded: true,
+          model_payload_sizing: false,
+          byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+          original_bytes: originalBytes,
+          returned_bytes: 0,
+          truncated: true,
+          continuity_receipt_preserved: true,
+          fallback_summary: true,
+          truncated_paths: truncations.slice(0, 40),
+        },
+      };
+      const contract = boundedCritical.payload_contract as Record<string, unknown>;
+      contract.returned_bytes = operatorPayloadBytes(boundedCritical);
+      if (Number(contract.returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
+        return boundedCritical;
+      }
+      criticalArrayItems = Math.max(1, Math.floor(criticalArrayItems / 2));
+      criticalStringChars = Math.max(120, Math.floor(criticalStringChars / 2));
+    }
+  }
+
   return {
     ok: payload.ok !== false,
     error: payload.error ?? null,
