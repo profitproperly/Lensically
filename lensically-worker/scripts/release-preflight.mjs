@@ -262,4 +262,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`[release-preflight] ok version=${version} crons=${crons.length} static_router=true canonical_version_assertions=${canonicalVersionAssertionLines.length}`);
+console.log(`[release-preflight] ok version=${version} crons=${crons.length} static_router=true canonical_version_assertions=${canonicalVersionAssertionEntries.length}`);
