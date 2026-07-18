@@ -143,7 +143,7 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
                         callArgs = { ...args, proceed_confirmed: true };
   }
   let result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
-  if (result.isError && result.structuredContent.error === "growth_mission_approval_required") {
+  if (result.isError && result.structuredContent.error === "approved_growth_mission_required") {
     const growthBrand = requestedBrand ?? "manifest_mental";
     const approvedMission = await mcpToolRaw<Record<string, unknown>>("updateGrowthMission", {
       brand_key: growthBrand,
