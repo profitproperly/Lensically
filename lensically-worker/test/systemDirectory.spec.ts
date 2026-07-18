@@ -137,18 +137,9 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
-          it("builds Worker releases through the zero-input server-defaulted workflow route", () => {
-    const request = buildClientSafeGatewayRequest("worker_release_dispatch");
-    expect(request).toEqual({
-      objective: "Run the current main workflow.",
-      intent: "run main workflow",
-      inputs: {},
-    });
-    expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
-    expect(JSON.stringify(request)).not.toContain("workflow_id");
-    expect(JSON.stringify(request)).not.toContain("worker-deploy");
-    expect(JSON.stringify(request)).not.toContain("release_sha");
-    expect(JSON.stringify(request)).not.toContain("ref");
+                    it("routes deployment exclusively through the Recovery surface", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
+    expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
   });
 
   it("rejects internal handler names and reserved routing keys before public calls", () => {
@@ -174,7 +165,8 @@ describe("System Directory foundation", () => {
             "public_full_workflow_dispatch_shape",
             "public_worker_release_task_value",
             "public_database_schema_search_terms",
-      "public_repeated_identical_status_poll",
+            "public_repeated_identical_status_poll",
+      "public_zero_input_main_workflow_request",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
@@ -234,7 +226,7 @@ describe("System Directory foundation", () => {
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-                  prevented_client_block_count: 8,
+                        prevented_client_block_count: 9;
       safe_request_profile_count: 7,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
