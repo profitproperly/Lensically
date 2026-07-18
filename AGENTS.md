@@ -33,6 +33,16 @@
 - Keep responses and receipts compact. Never echo large patch bodies, repository files, database rows, or logs through the client.
 - Do not tell the owner to run checks, push, or deploy. Perform the available work directly.
 
+## Autonomous Capability Lifecycle
+
+- `lensically-worker/src/systemDirectory/capabilityLifecycle.json` is the mandatory source of truth for capability creation and extension.
+- Resolve the System Directory first. Reuse an existing canonical capability when it can complete the objective correctly.
+- When a required capability is missing, the model must create and store the declaration, Directory entry, one canonical typed handler, one static route, focused regression, minimum validation scope, exact-head release plan, and live-verification statement itself.
+- Routine capability work does not require an owner prompt or owner-written specification. The model completes the lifecycle automatically and reports the result after live verification.
+- Compatibility bridges, duplicate handlers, parallel registries, and memory-only capability declarations are forbidden.
+- A capability is incomplete until focused validation passes, the exact verified head is released, live startup or runtime verification succeeds, and current architecture documentation is updated when behavior changed.
+- Release preflight and fast validation fail closed when a new tool or System Directory entry lacks a complete lifecycle declaration.
+
 ## Repository and Git
 
 - Check the current repository head before mutations.
