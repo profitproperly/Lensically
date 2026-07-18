@@ -326,6 +326,7 @@ describe("System Directory foundation", () => {
       "public_repository_status_request",
       "recovery_full_gateway_description_patch",
       "recovery_exact_sha_deploy_dispatch",
+      "recovery_exact_sha_validation_dispatch",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
