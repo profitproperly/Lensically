@@ -7078,8 +7078,8 @@ async function buildOperatorGrowthDiagnostic(
             COALESCE(quotes, 0) AS quotes, COALESCE(shares, 0) AS shares
      FROM threads_posts_archive
      WHERE threads_user_id = ?
-       AND datetime(post_timestamp) >= datetime('now', '-30 days')
-     ORDER BY likes DESC, engagement_total DESC, datetime(post_timestamp) DESC
+       AND datetime(substr(post_timestamp, 1, 19)) >= datetime('now', '-30 days')
+     ORDER BY likes DESC, engagement_total DESC, datetime(substr(post_timestamp, 1, 19)) DESC
      LIMIT 5`,
   ).bind(brand.profile.threads_user_id).all<Record<string, unknown>>();
   const currentFollowers = latestFollower ? Number(latestFollower.followers_count ?? 0) : null;
