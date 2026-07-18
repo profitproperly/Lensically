@@ -82,6 +82,24 @@ const INTENT_STOP_WORDS = new Set([
   "is", "it", "me", "of", "on", "or", "our", "please", "read", "run", "that", "the", "this", "to", "use", "we", "with", "want",
 ]);
 
+type IntentOperationClass = "read" | "mutation" | "unknown";
+
+function classifyIntentOperation(value: unknown): IntentOperationClass {
+  const text = normalizeText(value, 12000)?.toLowerCase() ?? "";
+  if (!text) return "unknown";
+  if (/\b(create|add|update|revise|approve|activate|pause|change|patch|fix|implement|delete|remove|discard|clear|retire|schedule|publish|submit|attach|skip|recover|prepare|start|advance|set|mark|promote|save|execute|claim|draw)\b/.test(text)) {
+    return "mutation";
+  }
+  if (/\b(get|list|read|show|inspect|audit|verify|calculate|rank|find|compare|report|status|health)\b/.test(text)) {
+    return "read";
+  }
+  return "unknown";
+}
+
+function operationClassesCompatible(requested: IntentOperationClass, candidate: IntentOperationClass): boolean {
+  return requested !== "unknown" && candidate !== "unknown" && requested === candidate;
+}
+
 function normalizeText(value: unknown, maxLength = 8000): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
