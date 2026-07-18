@@ -55,7 +55,7 @@ const version = source.match(/(?:export\s+)?const OPERATOR_MCP_VERSION = "([^"]+
 const versionAssertionEntries = tests
   .split(/\r?\n/)
   .map((line, index) => ({ line, line_number: index + 1 }))
-  .filter((entry) => /runtime\.mcp_version|serverInfo\.version|payload\.mcp_version/.test(entry.line));
+  .filter((entry) => entry.line.includes("expect(") && /mcp_version|serverInfo\.version/.test(entry.line));
 const literalVersionAssertionEntries = versionAssertionEntries.filter((entry) => /["'][0-9]+\.[0-9]+\.[0-9]+["']/.test(entry.line));
 const canonicalVersionAssertionEntries = versionAssertionEntries.filter((entry) => entry.line.includes("OPERATOR_MCP_VERSION"));
 
