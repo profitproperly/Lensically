@@ -54,7 +54,6 @@ const ROUTER_EXCLUDED_TOOLS = new Set([
 ]);
 
 const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
-  "getOperatorStartupContext",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "getRepoStatus",
