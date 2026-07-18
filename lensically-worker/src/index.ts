@@ -607,7 +607,7 @@ const OPERATOR_CONTINUITY_CONTRACT = {
     "execution_policy",
     "idempotency",
   ],
-  rule: "A fresh chat automatically resumes canonical persisted schedule and production state after the four-line handshake is approved. It must never ask the owner to choose resume or start fresh, and it may not reconstruct workflow position from conversation memory.",
+  rule: "A fresh chat restores canonical persisted schedule and production state after the four-line handshake is approved, then opens the Growth Mission discussion before account execution. It must never ask the owner to choose resume or start fresh, and it may not reconstruct workflow position from conversation memory.",
 } as const;
 
 const OPERATOR_EXECUTION_POLICY_CONTRACT = {
