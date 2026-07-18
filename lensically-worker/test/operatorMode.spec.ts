@@ -3567,14 +3567,21 @@ describe("operator mode MCP endpoint", () => {
     expect(pausedScheduler?.control.mode).toBe("paused");
   }, 30000);
 
-    it("returns a compact tool inventory without recursive payloads", async () => {
-    const listed = await mcpTool<{ tools: Array<{ name: string; required_fields: string[]; disabled: boolean }> }>("listMcpTools", {
+  it("returns a compact tool inventory without recursive payloads", async () => {
+    const listed = await mcpTool<{
+      total_tools: number;
+      tools: Array<{ name: string }>;
+      definition_intent: string;
+    }>("listMcpTools", {
       include_disabled: true,
     });
     expect(listed.tools.length).toBeGreaterThan(0);
+    expect(listed.total_tools).toBe(listed.tools.length);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
-    expect(listed.tools.every((tool) => Array.isArray(tool.required_fields))).toBe(true);
+    expect(listed.tools.every((tool) => Object.keys(tool).length === 1 && typeof tool.name === "string")).toBe(true);
+    expect(listed.definition_intent).toBe("read capability definition");
     expect(JSON.stringify(listed)).not.toContain("inputSchema");
+    expect(JSON.stringify(listed)).not.toContain("required_fields");
   });
 
   it.skip("retired: startup depended on database bootstrap failures", async () => {
