@@ -16,6 +16,7 @@ const INTERNAL_HANDLER_IDENTIFIER = /^[a-z][a-z0-9]*(?:[A-Z][A-Za-z0-9]*){2,}$/;
 const INTERNAL_ACTION_KEY = /^(?:system|repository|deployment|workflow|scheduling|content|intelligence)\.[a-z0-9_]+$/;
 const TYPED_ONLY_ACCOUNT_IDENTIFIERS = ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"] as const;
 const GATEWAY_INTERNAL_FREE_TEXT = ["internal handler", "internal capability", "camelcase tool", "action key", "execution guard", "public gateway schema"] as const;
+const DATABASE_SCHEMA_FREE_TEXT = ["table initialization", "table initializer", "database schema", "schema migration"] as const;
 
 export const CLIENT_SAFETY_POLICIES: readonly ClientSafetyPolicy[] = [
   { id: "single_public_gateway_frozen", summary: "Keep one stable public action and add internal capabilities behind the unchanged gateway schema.", enforcement_locations: ["lensically-worker/src/index.ts", "lensically-worker/src/mandatoryExecutionMap.ts"] },
@@ -55,7 +56,8 @@ export const PREVENTED_CLIENT_BLOCKS: readonly PreventedClientBlock[] = [
   { id: "public_account_alias_enumeration", observed_on: "2026-07-18", status: "live", blocked_shape: "A free-text repository-search input enumerated compact account-key aliases.", cause: "OpenAI client preflight rejected account-key tokens outside the typed brand_key field.", safe_profile_id: "account_key_selection", regression_test_id: "keeps account identifiers inside typed brand key fields", source_locations: [CLIENT_SAFETY_CANONICAL_LOCATION, "lensically-worker/test/systemDirectory.spec.ts"] },
     { id: "public_gateway_internal_search_terms", observed_on: "2026-07-18", status: "live", blocked_shape: "A public repository-search query contained gateway-internal terminology and schema language.", cause: "OpenAI client preflight rejected the engineering search before Lensically received it.", safe_profile_id: "repository_file_read", regression_test_id: "rejects gateway-internal terminology in public free-text searches", source_locations: [CLIENT_SAFETY_CANONICAL_LOCATION, "lensically-worker/test/systemDirectory.spec.ts"] },
     { id: "public_full_workflow_dispatch_shape", observed_on: "2026-07-18", status: "live", blocked_shape: "A public Worker workflow request included workflow_id, task, and ref together.", cause: "OpenAI client preflight rejected the previously accepted full dispatch shape before Lensically received it.", safe_profile_id: "worker_release_dispatch", regression_test_id: "builds Worker releases through the zero-input server-defaulted workflow route", source_locations: [CLIENT_SAFETY_CANONICAL_LOCATION, "lensically-worker/test/systemDirectory.spec.ts"] },
-  { id: "public_worker_release_task_value", observed_on: "2026-07-18", status: "live", blocked_shape: "A public workflow request contained the Worker release task value even without workflow or branch fields.", cause: "OpenAI client preflight rejected the task-only request before Lensically received it.", safe_profile_id: "worker_release_dispatch", regression_test_id: "builds Worker releases through the zero-input server-defaulted workflow route", source_locations: [CLIENT_SAFETY_CANONICAL_LOCATION, "lensically-worker/test/systemDirectory.spec.ts"] },
+    { id: "public_worker_release_task_value", observed_on: "2026-07-18", status: "live", blocked_shape: "A public workflow request contained the Worker release task value even without workflow or branch fields.", cause: "OpenAI client preflight rejected the task-only request before Lensically received it.", safe_profile_id: "worker_release_dispatch", regression_test_id: "builds Worker releases through the zero-input server-defaulted workflow route", source_locations: [CLIENT_SAFETY_CANONICAL_LOCATION, "lensically-worker/test/systemDirectory.spec.ts"] },
+  { id: "public_database_schema_search_terms", observed_on: "2026-07-18", status: "live", blocked_shape: "A public repository-search query contained database table initialization or schema-migration terminology.", cause: "OpenAI client preflight rejected the engineering search before Lensically received it.", safe_profile_id: "repository_file_read", regression_test_id: "rejects database-schema terminology in public free-text searches", source_locations: [CLIENT_SAFETY_CANONICAL_LOCATION, "lensically-worker/test/systemDirectory.spec.ts"] },
 ];
 
 export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProfileId, ClientSafeRequestProfile>> = {
@@ -74,13 +76,15 @@ export const CLIENT_SAFETY_STARTUP_INSTRUCTION = `Client safety source of truth:
 
 function containsTypedOnlyAccountIdentifier(value: string): boolean { const normalized = value.toLowerCase(); return TYPED_ONLY_ACCOUNT_IDENTIFIERS.some((identifier) => normalized.includes(identifier)); }
 function containsGatewayInternalFreeText(value: string): boolean { const normalized = value.toLowerCase(); return GATEWAY_INTERNAL_FREE_TEXT.some((phrase) => normalized.includes(phrase)); }
+function containsDatabaseSchemaFreeText(value: string): boolean { const normalized = value.toLowerCase(); return DATABASE_SCHEMA_FREE_TEXT.some((phrase) => normalized.includes(phrase)); }
 function inspectValue(value: unknown, path: string, violations: string[]): void {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (INTERNAL_HANDLER_IDENTIFIER.test(trimmed)) violations.push(`internal_handler_identifier:${path}`);
     if (INTERNAL_ACTION_KEY.test(trimmed)) violations.push(`internal_action_key:${path}`);
     if (path !== "inputs.brand_key" && containsTypedOnlyAccountIdentifier(trimmed)) violations.push(`typed_account_identifier_outside_brand_key:${path}`);
-    if (containsGatewayInternalFreeText(trimmed)) violations.push(`gateway_internal_free_text:${path}`);
+        if (containsGatewayInternalFreeText(trimmed)) violations.push(`gateway_internal_free_text:${path}`);
+    if (containsDatabaseSchemaFreeText(trimmed)) violations.push(`database_schema_free_text:${path}`);
     return;
   }
   if (Array.isArray(value)) { value.forEach((item, index) => inspectValue(item, `${path}[${index}]`, violations)); return; }
