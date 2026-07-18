@@ -9098,11 +9098,20 @@ async function buildOperatorContinuityCapsule(
   const activeReviewBatch = activeReviewRow?.id
     ? await serializeManifestReviewBatch(env, brand, activeReviewRow.id)
     : null;
-  const next = brand.brand_key === "manifest_mental"
+  const operationalNext = brand.brand_key === "manifest_mental"
     ? activeReviewBatch
       ? { action: "resume_review_batch", owner_checkpoint: "four_post_review_batch", canonical_tool: "get_manifest_review_batch", last_completed_action: "canonical_review_batch_restored" }
       : { action: "confirm_fill_calendar_day", owner_checkpoint: "calendar_coverage_confirmation", canonical_tool: "get_hourly_coverage", last_completed_action: "calendar_coverage_inspected" }
     : legacyNext;
+  const growthMissionBrief = await openOperatorGrowthMissionDiscussion(env, brand, {
+    calendarCoverage,
+    activeReviewBatch,
+    workflowSession: session,
+    operationalNext,
+  });
+  const next = brand.brand_key === "manifest_mental"
+    ? { action: "discuss_growth_mission_brief", owner_checkpoint: "growth_mission_brief", canonical_tool: "getGrowthMission", last_completed_action: "growth_diagnostic_prepared" }
+    : operationalNext;
   const nextArtifactId = String(activeReviewRow?.id ?? (calendarCoverage.earliest_incomplete_date as string | null) ?? nextSelection?.id ?? draft?.id ?? sourceCard?.id ?? sourceBatch?.id ?? sessionId ?? "none");
   const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${nextArtifactId}`;
   const policy = buildOperatorExecutionPolicy(next.canonical_tool, {
