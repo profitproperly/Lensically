@@ -32128,6 +32128,7 @@ function getScheduledPostSchedulerStub(env: Env) {
 
 type OverdueScheduledPostRow = {
   id: number;
+  status: string;
   threads_user_id: string;
   post_text: string;
   scheduled_time: string;
