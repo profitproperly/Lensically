@@ -61,6 +61,16 @@ jobs:
             --field release_id="${RELEASE_SHA:0:12}" \
             --field release_sha="${RELEASE_SHA}"
 
+  verified-operator-shards-marker:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-operator-shards]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch deterministic Operator shards
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run lensically-engineering.yml --ref main --field task=operator-tests
+
   worker:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' }}
     runs-on: ubuntu-latest
