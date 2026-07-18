@@ -15480,16 +15480,7 @@ async function handleOperatorMcpAdminTool(
     };
   }
 
-    if (toolName === "listMcpTools") {
-    const executeTool = normalizeOperatorText(args.execute_tool, 160, true);
-    if (executeTool) {
-      return {
-        ok: false,
-        error: "internal_bridge_retired",
-        requested_tool: executeTool,
-        message: "Submit the operation through executeLensicallyIntent; internal bridge execution is retired.",
-      };
-    }
+  if (toolName === "listMcpTools") {
     const staticTools = buildOperatorMcpBaseTools(false);
     const compactByName = new Map(staticTools.map((tool) => {
       const requiredFields = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
