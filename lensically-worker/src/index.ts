@@ -14948,6 +14948,8 @@ async function beginOperatorAutonomyAuthorization(
     engineering_autonomous?: boolean;
   account_autonomous?: boolean;
   guided_plan_approved?: boolean;
+  account_execution_locked?: boolean;
+  growth_mission_status?: string;
   growth_mission?: Record<string, unknown> | null;
   authority_version?: string;
   decision_id?: string;
