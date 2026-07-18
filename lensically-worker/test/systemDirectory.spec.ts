@@ -388,7 +388,8 @@ describe("System Directory foundation", () => {
     expect(prepared.ok).toBe(true);
     expect(prepared.tool_name).toBe("getOperatorStartupContext");
     expect(prepared.arguments).toEqual({});
-    expect(prepared.map_execution?.mode).toBe("source_defined_direct_engineering");
+    expect(prepared.map_execution?.mode).toBe("source_defined_static_route");
+    expect(prepared.map_execution?.system_directory).toMatchObject({ entry_id: "operating.startup", route_applied: false });
   });
 
       it("reads terminal workflow failures through Recovery", () => {
