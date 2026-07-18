@@ -3681,11 +3681,33 @@ describe("operator mode MCP endpoint", () => {
         autonomy_governance: {
           profile: { mode: string; objective: string };
         };
+        growth_mission_brief: { status: string; discussion_contract: { execution_locked: boolean } };
+        account_execution: { unlocked: boolean; discussion_required: boolean };
       };
     }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
     expect(reconfirmed.isError).not.toBe(true);
-    expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.mode).toBe("autonomous_operator");
+    expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.mode).toBe("ai_led_owner_ratified");
     expect(reconfirmed.structuredContent.continuity_capsule.autonomy_governance.profile.objective).toContain("1,000,000 followers");
+    expect(reconfirmed.structuredContent.continuity_capsule.growth_mission_brief).toMatchObject({
+      status: "discussion",
+      discussion_contract: { execution_locked: true },
+    });
+    expect(reconfirmed.structuredContent.continuity_capsule.account_execution).toMatchObject({
+      unlocked: false,
+      discussion_required: true,
+    });
+
+    const relocked = await mcpToolRaw<{ error: string; required_next_tool: string }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "current_belief",
+      body: "The next Proceed must require a fresh guided plan approval.",
+      proceed_confirmed: true,
+    });
+    expect(relocked.isError).toBe(true);
+    expect(relocked.structuredContent).toMatchObject({
+      error: "approved_growth_mission_required",
+      required_next_tool: "updateGrowthMission",
+    });
     }, 40000);
 
   it("persists explicit owner ratification before the first protected scheduler call", async () => {
