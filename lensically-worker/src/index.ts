@@ -529,17 +529,43 @@ function compactOperatorContinuityReviewBatch(value: unknown): unknown {
 function compactOperatorContinuityCapsule(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const capsule = value as Record<string, unknown>;
-  const {
-    active_review_batch: activeReviewBatch,
-    completed_review_batch: completedReviewBatch,
-    unresolved_incidents: unresolvedIncidents,
-    required_recovery_actions: requiredRecoveryActions,
-    ...capsuleSummary
-  } = capsule;
+  const activeReviewBatch = capsule.active_review_batch;
+  const completedReviewBatch = capsule.completed_review_batch;
+  const unresolvedIncidents = capsule.unresolved_incidents;
+  const requiredRecoveryActions = capsule.required_recovery_actions;
+  const capsuleKeys = [
+    "version",
+    "choice",
+    "brand_key",
+    "account_data_loaded",
+    "canonical_state_source",
+    "continuity_mode",
+    "continuity_diagnostics",
+    "autonomy_governance",
+    "growth_mission_brief",
+    "account_execution",
+    "calendar_coverage",
+    "new_scheduling_blocked",
+    "scheduling_block_reason",
+    "current_engineering_continuation",
+    "workflow_checkpoint",
+    "active_artifact_ids",
+    "source_batch_progress",
+    "next_artifact",
+    "current_source_card",
+    "current_draft",
+    "current_scheduled_post",
+    "execution_policy",
+    "idempotency",
+    "runtime_identity",
+  ];
+  const capsuleSummary = Object.fromEntries(capsuleKeys
+    .filter((key) => Object.prototype.hasOwnProperty.call(capsule, key))
+    .map((key) => [key, capsule[key]]));
   const compactedSummary = compactOperatorPayloadValue(
     capsuleSummary,
     "continuity_capsule",
-    { arrayItems: 8, stringChars: 600, objectKeys: 64, maxDepth: 7 },
+    { arrayItems: 8, stringChars: 500, objectKeys: 48, maxDepth: 6 },
     [],
   ) as Record<string, unknown>;
   return {
