@@ -77,7 +77,18 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
 
       - name: Capability lifecycle gate
-        run: node scripts/release-preflight.mjs --capability-lifecycle-only
+        id: capability_lifecycle_gate
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/release-preflight.mjs --capability-lifecycle-only 2>&1 | tee /tmp/lensically-capability-lifecycle.log
+
+      - name: Surface capability lifecycle failure
+        if: ${{ steps.capability_lifecycle_gate.outcome == 'failure' }}
+        run: |
+          diagnostic=$(tail -n 120 /tmp/lensically-capability-lifecycle.log | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=Capability lifecycle failure::$diagnostic"
+          exit 1
 
       - name: Fast release preflight
         id: release_preflight
