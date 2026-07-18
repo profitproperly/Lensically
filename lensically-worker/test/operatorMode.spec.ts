@@ -739,6 +739,43 @@ describe("operator mode backend spine", () => {
     expect(normalPayload.control.mode).toBe("normal");
     expect(exclusiveControlCount).toBeGreaterThanOrEqual(3);
 
+    const stalePause = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "paused", reason: "Preserve scheduler paused during deployment smoke." }),
+    }));
+    expect(stalePause.ok).toBe(true);
+    const staleControl = values.get("control") as Record<string, unknown>;
+    values.set("control", {
+      ...staleControl,
+      updated_at: "2000-01-01T00:00:00.000Z",
+    });
+    const staleInsert = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'missing-account', 'Stale deployment pause target', 'approved', '2000-01-01T00:02:00.000Z')`,
+    ).run();
+    const stalePostId = Number(staleInsert.meta?.last_row_id ?? 0);
+
+    await scheduler.alarm();
+
+    const autoResumed = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
+      control: { mode: string; reason: string | null };
+      operational: boolean;
+      current_overdue_count: number;
+    };
+    expect(autoResumed.control.mode).toBe("normal");
+    expect(autoResumed.control.reason).toContain("auto_resumed_temporary_pause");
+    expect(autoResumed.operational).toBe(true);
+    expect(autoResumed.current_overdue_count).toBeGreaterThanOrEqual(1);
+    const staleRow = await env.DB.prepare(
+      `SELECT last_attempted_at, publish_error_message FROM scheduled_posts WHERE id = ?`,
+    ).bind(stalePostId).first<{ last_attempted_at: string | null; publish_error_message: string | null }>();
+    expect(staleRow?.last_attempted_at).toBeTruthy();
+    expect(staleRow?.publish_error_message).toContain("threads_account_not_connected");
+    await env.DB.prepare(
+      `UPDATE scheduled_posts SET cancelled_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(stalePostId).run();
+
     const teardownPause = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
       method: "POST",
       headers: { "content-type": "application/json" },
