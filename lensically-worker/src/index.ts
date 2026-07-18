@@ -11679,35 +11679,23 @@ const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
 };
 
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
-
-
   "get_monthly_growth_review",
-    "selectOperatorKey",
+  "selectOperatorKey",
   "confirmOperatorProceed",
   "resolveContinuationContext",
-      "planOperatorExecution",
-  "getMcpAdminState",
   "getOperatorDecisionState",
-    "proposeOperatorDecision",
+  "proposeOperatorDecision",
   "resolveOperatorDecision",
   "markOperatorDecisionExecuted",
-        "getScheduledPostSchedulerState",
+  "getScheduledPostSchedulerState",
   "setScheduledPostSchedulerMode",
   "recoverOverdueScheduledPosts",
   "runApprovedPostCanary",
   "auditScheduledPost",
-
   "inspectMcpFailure",
   "listMcpTools",
-  "runEngineeringTool",
   "readMcpToolDefinition",
-  "updateMcpToolSchema",
-  "updateMcpToolBehavior",
-  "createMcpTool",
-  "disableMcpTool",
   "runMcpTests",
-  "deployMcpChanges",
-  "rollbackMcpChanges",
   "getWorkflowStatus",
   "updateWorkflowRequirement",
   "advanceWorkflowStage",
@@ -11715,24 +11703,19 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
   "updateGate",
   "runGateSuite",
   "submitAndGateDraft",
-  "createImplementationBacklogItem",
-  "listImplementationBacklogItems",
-  "markImplementationBacklogItemResolved",
 ] as const;
 
-type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
+type OperatorMcpAdminToolName = string;
 
 const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
-    "getOperatorStartupContext",
-  "guardLensicallyCall",
+  "getOperatorStartupContext",
   "executeLensicallyIntent",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
   "readRepoFile",
-  "searchRepoFiles",
   "getRepoStatus",
-    "applyRepoTextPatch",
+  "applyRepoTextPatch",
   "applyRepoPatchSet",
   "startRepoFileWrite",
   "appendRepoFileChunk",
@@ -11740,23 +11723,13 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "createRepoFile",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
-    "runGitHubWorkflow",
+  "runGitHubWorkflow",
   "getGitHubWorkflowRun",
-  "runEngineeringRelease",
-  "getEngineeringRelease",
-  "deployBackend",
   "verifyDeployedMcpVersion",
   "listEngineeringAudit",
-  "listOpsMemory",
-  "readOpsMemory",
-  "recordOpsMemory",
-    "updateOpsMemory",
-  "searchOpsMemory",
-  "listPreCallRoutes",
-  "recordPreCallRoute",
 ] as const;
 
-type OperatorMcpEngineeringToolName = typeof OPERATOR_MCP_ENGINEERING_TOOL_NAMES[number];
+type OperatorMcpEngineeringToolName = string;
 
 const REPO_PATH_SCHEMA = {
   type: "string",
@@ -11765,13 +11738,13 @@ const REPO_PATH_SCHEMA = {
 
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "guardLensicallyCall", title: "Guard Lensically call", description: "Mandatory pre-execution guard. Submit the intended tool and its JSON arguments before every Lensically call after startup. Returns normalized safe arguments, the mandatory route, prevented blockers, and a signed execution_guard token required by the dispatcher.", inputSchema: { type: "object", properties: { intended_tool: { type: "string" }, arguments_json: { type: "string", description: "A JSON object containing the exact intended arguments before execution_guard is added." }, operation: { type: "string" } }, required: ["intended_tool", "arguments_json"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  
     { name: "executeLensicallyIntent", title: "Execute Lensically intent", description: CLIENT_SAFETY_GATEWAY_DESCRIPTION, inputSchema: { type: "object", properties: { objective: { type: "string" }, intent: { type: "string", description: "What must be accomplished next. Use startup for fresh-session bootstrap. Do not name an internal tool or route." }, inputs: { type: "object", description: "Variable inputs for the mapped procedure.", additionalProperties: true }, continuation_id: { type: "string" }, incident_id: { type: "string" }, permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." } }, required: ["objective", "intent", "inputs"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "engineeringPrecheck", title: "Engineering precheck", description: "Load compact source-control, MCP, ops-memory, failure-pattern, gate, requirement, and runtime state before engineering work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "getEngineeringAccessState", title: "Get engineering access state", description: "Report GitHub/Cloudflare engineering access status without exposing secret values.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "listRepoFiles", title: "List repo files", description: "List GitHub repository files from the default branch with optional prefix filtering.", inputSchema: { type: "object", properties: { prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "readRepoFile", title: "Read repo file", description: "Read one GitHub repository file from the default branch, with optional line bounds.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, start_line: { type: "integer", minimum: 1 }, max_lines: { type: "integer", minimum: 1, maximum: 400 } }, required: ["path"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "searchRepoFiles", title: "Search repo files", description: "Search repository files by path and optional text query. Returns compact matches.", inputSchema: { type: "object", properties: { query: { type: "string" }, prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  
   { name: "getRepoStatus", title: "Get repo status", description: "Read the configured GitHub repo, branch, latest commit SHA, and recent engineering audit state.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
     { name: "applyRepoTextPatch", title: "Apply repo text patch", description: "Apply one exact find/replace patch to a GitHub repo file and commit directly to the configured branch.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "find", "replace", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "applyRepoPatchSet", title: "Apply atomic repo patch set", description: "Apply up to 20 exact replacements across multiple GitHub repo files and create one commit only after every replacement validates.", inputSchema: { type: "object", properties: { patches: { type: "array", minItems: 1, maxItems: 20, items: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"], additionalProperties: false } }, message: { type: "string" }, summary: { type: "string" }, expected_head_sha: { type: "string" }, dry_run: { type: "boolean" } }, required: ["patches", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -11781,20 +11754,12 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner. Include owner_response with the owner's exact approval so authorization is persisted before execution.", inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
   { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "runGitHubWorkflow", title: "Run GitHub workflow", description: "Dispatch a configured GitHub Actions workflow for test/build/deploy tasks.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, ref: { type: "string" }, task: { type: "string", enum: ["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"] } }, required: ["workflow_id", "task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    { name: "runGitHubWorkflow", title: "Run GitHub validation workflow", description: "Dispatch one configured non-deployment validation task. Worker deployment is Recovery-only.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-tests", "gpt-memory-tests"] } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "getGitHubWorkflowRun", title: "Get GitHub workflow run", description: "Read one GitHub Actions workflow run and its compact job status.", inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "runEngineeringRelease", title: "Run engineering release", description: "Reuse or dispatch one exact-SHA validate-and-deploy workflow and return the exact GitHub run identity.", inputSchema: { type: "object", properties: { workflow_id: { type: "string", default: "lensically-engineering.yml" }, ref: { type: "string" }, force: { type: "boolean" } }, additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "getEngineeringRelease", title: "Get engineering release", description: "Wait a bounded interval on one exact GitHub release run and return compact terminal or current status without chat-side polling loops.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, wait_seconds: { type: "integer", minimum: 0, maximum: 55 } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "deployBackend", title: "Deploy backend", description: "Trigger the Lensically backend deploy workflow from GitHub Actions.", inputSchema: { type: "object", properties: { workflow_id: { type: "string", default: "lensically-engineering.yml" }, ref: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  
   { name: "verifyDeployedMcpVersion", title: "Verify deployed MCP version", description: "Verify the live deployed Lensically MCP endpoint version and tool count.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "listEngineeringAudit", title: "List engineering audit", description: "List compact audit entries for source edits, workflow dispatches, deploys, and memory updates.", inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 }, action: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "listOpsMemory", title: "List ops memory", description: "List compact operational fix memory entries.", inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 }, tag: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "readOpsMemory", title: "Read ops memory", description: "Read one operational fix memory entry.", inputSchema: { type: "object", properties: { memory_id: { type: "string" } }, required: ["memory_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-    { name: "recordOpsMemory", title: "Record ops memory", description: "Record one compact operational fix. Send title and fix only unless a short problem, applies_when, or tag list materially improves reuse.", inputSchema: { type: "object", properties: { title: { type: "string", maxLength: 120 }, problem: { type: "string", maxLength: 600 }, fix: { type: "string", maxLength: 1200 }, applies_when: { type: "string", maxLength: 600 }, tags: { type: "array", maxItems: 8, items: { type: "string", maxLength: 40 } } }, required: ["title", "fix"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "updateOpsMemory", title: "Update ops memory", description: "Update a compact operational fix memory entry.", inputSchema: { type: "object", properties: { memory_id: { type: "string" }, title: { type: "string" }, problem: { type: "string" }, fix: { type: "string" }, applies_when: { type: "string" }, tags: { type: "array", items: { type: "string" } }, active: { type: "boolean" } }, required: ["memory_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-    { name: "searchOpsMemory", title: "Search ops memory", description: "Search operational fix memory entries by compact text query.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "listPreCallRoutes", title: "List pre-call routes", description: "List the persistent and source-defined successful tool-call paths that guardLensicallyCall must consult before execution.", inputSchema: { type: "object", properties: { provider: { type: "string" }, tool_name: { type: "string" }, active: { type: "boolean" }, limit: { type: "integer", minimum: 1, maximum: 200 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "recordPreCallRoute", title: "Record verified pre-call route", description: "Persist one verified successful tool-call path. Matching future calls are rewritten or redirected by guardLensicallyCall and the dispatcher before the tool can execute.", inputSchema: { type: "object", properties: { route_key: { type: "string", maxLength: 160 }, provider: { type: "string", maxLength: 80 }, tool_name: { type: "string", maxLength: 160 }, operation_key: { type: "string", maxLength: 160 }, match: { type: "object", additionalProperties: true }, action: { type: "string", enum: ["apply", "redirect"] }, required_tool: { type: "string", maxLength: 160 }, mandatory_route: { type: "string", maxLength: 1600 }, argument_patch: { type: "object", additionalProperties: true }, allowed_argument_keys: { type: "array", maxItems: 50, items: { type: "string", maxLength: 160 } }, reason: { type: "string", maxLength: 1600 }, verification_summary: { type: "string", maxLength: 1600 }, source_memory_id: { type: "string", maxLength: 160 }, priority: { type: "integer", minimum: 1, maximum: 1000 }, active: { type: "boolean" }, expires_at: { type: "string", maxLength: 80 } }, required: ["route_key", "tool_name", "mandatory_route", "reason", "verification_summary"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  
 ];
 
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
@@ -11828,32 +11793,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
-    name: "planOperatorExecution",
-    title: "Plan operator execution",
-    description: "Classify an intended Lensically action before execution. Returns universal-versus-account scope, the canonical execution plane, safe route, hard bounds, known-forbidden routes, and idempotency guidance. The same policy is enforced automatically by the MCP dispatcher.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        brand_key: BRAND_KEY_SCHEMA,
-        intended_tool: { type: "string" },
-        operation: { type: "string" },
-        change_description: { type: "string" },
-        workflow_session_id: { type: "string" },
-      },
-      required: ["operation"],
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "getMcpAdminState",
-    title: "Get MCP admin state",
-
-    description: "Read the runtime MCP admin state, enforcement policies, workflow requirements, active gates, recent failures, and deployment snapshot status.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  },
+  
     {
     name: "getOperatorDecisionState",
     title: "Get operator decision state",
