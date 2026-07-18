@@ -159,5 +159,17 @@
       "reuse_existing_handler"
     ]
   },
-  "declarations": []
+  "declarations": [
+    {
+      "capability_id": "engineering.autonomous_capability_lifecycle",
+      "directory_entry_id": "engineering.capability_lifecycle",
+      "canonical_handler": "readRepoFile",
+      "route_intent": "read repository file",
+      "implementation_mode": "reuse_existing_handler",
+      "focused_regression": "enforces the autonomous capability lifecycle for every future capability",
+      "release_scope": "system-directory-tests",
+      "live_verification": "Mandatory startup reports the lifecycle version, canonical manifest, autonomous execution rule, and completion sequence from the exact deployed head.",
+      "compatibility_bridge": false
+    }
+  ]
 }
