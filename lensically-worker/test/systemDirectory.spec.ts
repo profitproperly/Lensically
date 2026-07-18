@@ -232,6 +232,38 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("fails closed instead of rewriting an unknown stale-batch discard into a read", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "list_source_candidates",
+        title: "List source candidates",
+        description: "Read bounded source candidates.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+      {
+        name: "get_manifest_review_batch",
+        title: "Get manifest review batch",
+        description: "Read the current review batch.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        intent: "discard the stale active review batch",
+        objective: "Retire the obsolete batch without deleting its saved-pattern sources.",
+        inputs: { brand_key: "manifest_mental" },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: false,
+      error: "static_router_unknown_intent",
+      map_state: "unknown",
+    });
+  });
+
   it("resolves Operator tests without an obsolete workflow identifier", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "runGitHubWorkflow",
