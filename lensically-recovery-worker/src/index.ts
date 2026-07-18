@@ -274,7 +274,10 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       }
       dispatchRef = config.branch;
     }
-    const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: dispatchRef, inputs: { task } }) });
+    const inputs = task === "worker-deploy" && verifiedHeadSha
+      ? { task, release_id: verifiedHeadSha.slice(0, 12), release_sha: verifiedHeadSha }
+      : { task };
+    const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: dispatchRef, inputs }) });
     return { ok: result.ok, status: result.status, task, dispatched: result.status === 204, requested_ref: requestedRef, dispatch_ref: dispatchRef, verified_head_sha: verifiedHeadSha };
   }
   if (name === "getGitHubWorkflowRun") {
