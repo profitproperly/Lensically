@@ -15212,16 +15212,6 @@ async function handleOperatorMcpAdminTool(
     };
   }
 
-  if (toolName === "planOperatorExecution") {
-    const intendedTool = normalizeOperatorText(args.intended_tool, 160, true) ?? normalizeOperatorText(args.operation, 160, true) ?? "unknown_operation";
-    const policy = buildOperatorExecutionPolicy(intendedTool, args);
-    return {
-      ok: true,
-      policy,
-      enforcement: "The MCP dispatcher applies this policy before execution; this tool exposes the decision for audit or planning.",
-    };
-  }
-
     if (toolName === "getOperatorDecisionState") {
     const brand = await resolveOperatorBrandFromPayload(env, args);
     if (!brand) return { ok: false, error: "brand_unavailable" };
