@@ -32150,15 +32150,15 @@ async function listOverdueScheduledPosts(
   await ensureScheduledPostsTable(env);
   const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
   const rows = await env.DB.prepare(
-    `SELECT id, threads_user_id, post_text, scheduled_time, publish_error_message, last_attempted_at
+    `SELECT id, status, threads_user_id, post_text, scheduled_time, publish_error_message, last_attempted_at
      FROM scheduled_posts
-     WHERE status = ?
+     WHERE status IN (?, ?)
        AND cancelled_at IS NULL
        AND scheduled_time <= ?
        AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
      ORDER BY scheduled_time ASC, id ASC
      LIMIT ?`,
-  ).bind(SCHEDULED_POST_STATUS_APPROVED, nowIso, boundedLimit).all<OverdueScheduledPostRow>();
+  ).bind(SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING, nowIso, boundedLimit).all<OverdueScheduledPostRow>();
   return rows.results ?? [];
 }
 
