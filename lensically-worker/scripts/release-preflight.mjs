@@ -103,6 +103,14 @@ if (!source.includes("const dispatchRef = config.branch;")
   errors.push("main_release_exact_sha_dispatch_guard_missing");
 }
 
+if (!source.includes('name: "get_monthly_growth_review"')
+    || !source.includes("OPERATOR_MCP_MAX_STRUCTURED_BYTES = 24_000")
+    || !source.includes("enforceOperatorPayloadBudget(resultPayload)")
+    || !router.includes('return "get_monthly_growth_review"')
+    || !tests.includes("routes the exact monthly growth question to one bounded analytics response")) {
+  errors.push("bounded_monthly_growth_contract_missing");
+}
+
 if (!tests.includes("routes operational status and engineering intents deterministically away from content procedures")) {
   errors.push("static_router_engineering_regression_missing");
 }
