@@ -128,7 +128,27 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
-    it("rejects internal handler names and reserved routing keys before public calls", () => {
+      it("builds Worker releases through the accepted configured workflow route", () => {
+    const request = buildClientSafeGatewayRequest("worker_release_dispatch", {
+      workflow_id: "lensically-engineering.yml",
+      task: "worker-deploy",
+      ref: "main",
+    });
+    expect(request).toEqual({
+      objective: "Run the configured Worker workflow for the current verified main head.",
+      intent: "run regression tests",
+      inputs: {
+        workflow_id: "lensically-engineering.yml",
+        task: "worker-deploy",
+        ref: "main",
+      },
+    });
+    expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
+    expect(JSON.stringify(request)).not.toContain("release_sha");
+    expect(JSON.stringify(request)).not.toContain("runEngineeringRelease");
+  });
+
+  it("rejects internal handler names and reserved routing keys before public calls", () => {
     expect(inspectClientSafeGatewayRequest({
       objective: "Read one internal definition.",
       intent: "read capability definition",

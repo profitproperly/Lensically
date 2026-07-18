@@ -2,7 +2,8 @@ export const CLIENT_SAFE_REQUEST_REGISTRY_VERSION = "client-safe-requests-v1";
 
 export type ClientSafeRequestProfileId =
   | "workflow_run_list"
-  | "workflow_run_status"
+    | "workflow_run_status"
+  | "worker_release_dispatch"
   | "capability_definition";
 
 export type ClientSafeGatewayRequest = {
@@ -43,12 +44,19 @@ export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProf
     allowed_input_keys: ["limit"],
     max_input_characters: 80,
   },
-  workflow_run_status: {
+    workflow_run_status: {
     id: "workflow_run_status",
     objective: "Read one workflow run and return compact status and step results.",
     intent: "get github workflow run",
     allowed_input_keys: ["run_id", "wait_seconds"],
     max_input_characters: 120,
+  },
+  worker_release_dispatch: {
+    id: "worker_release_dispatch",
+    objective: "Run the configured Worker workflow for the current verified main head.",
+    intent: "run regression tests",
+    allowed_input_keys: ["workflow_id", "task", "ref"],
+    max_input_characters: 180,
   },
   capability_definition: {
     id: "capability_definition",
