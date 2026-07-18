@@ -11735,7 +11735,7 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "listEngineeringAudit",
 ] as const;
 
-type OperatorMcpEngineeringToolName = string;
+type OperatorMcpEngineeringToolName = typeof OPERATOR_MCP_ENGINEERING_TOOL_NAMES[number];
 
 const REPO_PATH_SCHEMA = {
   type: "string",
