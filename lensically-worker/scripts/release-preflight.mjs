@@ -209,6 +209,22 @@ if (!source.includes('name: "get_monthly_growth_review"')
   errors.push("bounded_monthly_growth_contract_missing");
 }
 
+if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "guided-growth-mission-v1"')
+    || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_missions")
+    || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")
+    || !source.includes('name: "getGrowthMission"')
+    || !source.includes('name: "updateGrowthMission"')
+    || !source.includes('error: "growth_mission_approval_required"')
+    || !source.includes("account_mutation_requires_approved_plan: true")
+    || !source.includes("full_auto_requires_explicit_owner_mode_change: true")
+    || !router.includes('return "getGrowthMission"')
+    || !router.includes('return "updateGrowthMission"')
+    || !tests.includes("routes the persisted Growth Mission Brief for guided owner discussion")
+    || !tests.includes("routes owner-approved Growth Mission updates without enabling full auto implicitly")
+    || !tests.includes("opens a guided Growth Mission discussion after Proceed and blocks account mutations until approval")) {
+  errors.push("guided_growth_mission_contract_missing");
+}
+
 if (!tests.includes("routes operational status and engineering intents deterministically away from content procedures")) {
   errors.push("static_router_engineering_regression_missing");
 }
