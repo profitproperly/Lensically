@@ -765,6 +765,12 @@ const GPT_BRAND_ACCOUNT_ALIASES: Record<GptBrandKey, string> = {
   opmg_deadman: "deadman",
 };
 
+const TEST_THREADS_USER_IDS: Readonly<Record<string, string>> = {
+  "manifest-mental": "35758578720393972",
+  vectrix: "vectrix",
+  deadman: "deadman",
+};
+
 const GPT_STRATEGY_MEMORY_KINDS = new Set<string>([
   "winner",
   "loser",
@@ -908,13 +914,13 @@ async function resolveConfiguredThreadsAccount(
     };
   }
 
-  if (hasTestRuntimeTokens(env)) {
-        return {
+    if (hasTestRuntimeTokens(env)) {
+    return {
       ...account,
       accessToken: `test-token-${account.id}`,
       expiresAt: null,
       createdAt: null,
-      threadsUserId: null,
+      threadsUserId: TEST_THREADS_USER_IDS[account.id] ?? account.id,
     };
   }
 
