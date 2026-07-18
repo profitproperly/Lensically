@@ -73,6 +73,8 @@
 - Scheduler modes are `paused`, `canary`, and `normal`. Missing control defaults to `paused`.
 - Canary authorizes exactly one scheduled entry and returns to paused after one attempt.
 - Normal activation is blocked while overdue approved or posting records exist. Recovery is explicit, bounded, and transactional.
+- An external publish attempt never returns automatically to `approved`. Failed, stale, or ambiguous attempts remain quarantined in `posting`; normalized SQLite datetime comparisons prevent active attempts from being reclaimed, and only explicit reconciliation may retire or reschedule them.
+- A returned Threads post identifier is authoritative and finalizes the scheduled row even when a concurrent local state transition has already changed it.
 - Published state is authoritative only when the scheduled row is `posted` and has a nonempty Threads identifier.
 
 ## Insights and Learning
