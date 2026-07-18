@@ -16144,52 +16144,6 @@ async function handleOperatorMcpEngineeringTool(
     return { ok: result.ok, status: result.status, path };
   }
 
-  if (toolName === "getEngineeringRelease") {
-    const runId = Number(args.run_id);
-    const waitSeconds = Math.min(Math.max(Number(args.wait_seconds ?? 0), 0), 55);
-    if (!Number.isFinite(runId)) {
-      return { ok: false, error: "run_id_required" };
-    }
-    const startedAt = Date.now();
-    let runResult: { ok: boolean; status: number; data: unknown };
-    let runData: Record<string, unknown> = {};
-    do {
-      runResult = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
-      runData = runResult.data && typeof runResult.data === "object" && !Array.isArray(runResult.data)
-        ? runResult.data as Record<string, unknown>
-        : {};
-      if (!runResult.ok || runData.status === "completed" || Date.now() - startedAt >= waitSeconds * 1000) break;
-      await new Promise<void>((resolve) => setTimeout(resolve, 5000));
-    } while (true);
-
-    const waitedSeconds = Math.round((Date.now() - startedAt) / 1000);
-    if (runData.status === "completed") {
-      const detailed = await handleOperatorMcpEngineeringTool(request, env, "getGitHubWorkflowRun", { run_id: runId }, true);
-      return {
-        ...detailed,
-        terminal: true,
-        waited_seconds: waitedSeconds,
-        release_complete: runData.conclusion === "success",
-      };
-    }
-    return {
-      ok: runResult.ok,
-      status: runResult.status,
-      terminal: false,
-      waited_seconds: waitedSeconds,
-      release_complete: false,
-      run: {
-        id: runData.id,
-        name: runData.name,
-        display_title: runData.display_title,
-        status: runData.status,
-        conclusion: runData.conclusion,
-        head_sha: runData.head_sha,
-        html_url: runData.html_url,
-      },
-    };
-  }
-
   if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
     const workflowId = normalizeOperatorText(args.workflow_id, 160, true) ?? "lensically-engineering.yml";
         const requestedTask = normalizeOperatorText(args.task, 160, true) ?? "typecheck";
