@@ -227,6 +227,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (/^startup$/.test(text.trim()) || has(/\boperator\s+startup\b/) || has(/\bload\s+operator\s+context\b/)) return "getOperatorStartupContext";
   if (has(/\bselect\b/) && has(/\b(key|brand)\b/)) return "selectOperatorKey";
   if (has(/\b(confirm|continue|proceed)\b/) && has(/\b(operator|workflow|step|proceed)\b/)) return "confirmOperatorProceed";
+  if (has(/\b(update|revise|approve|activate|pause|change)\b/) && has(/\b(growth\s+mission|growth\s+plan|mission\s+brief)\b/)) return "updateGrowthMission";
+  if (has(/\b(get|read|show|current|review|discuss)\b/) && has(/\b(growth\s+mission|growth\s+plan|mission\s+brief)\b/)) return "getGrowthMission";
   if (has(/\bworkflow\s+status\b/) || has(/\bcurrent\s+workflow\s+state\b/)) return "getWorkflowStatus";
   if (has(/\bhourly\s+coverage\b/) || has(/\bcalendar\s+coverage\b/) || has(/\bopen\s+(schedule\s+)?slots\b/)) return "get_hourly_coverage";
   if (has(/\bengineering\s+access\b/) || has(/\b(access|authority)\b/) && has(/\b(engineering|github|cloudflare)\b/)) return "getEngineeringAccessState";
