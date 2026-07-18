@@ -382,10 +382,17 @@ function prepareStaticCall(
   tools: MandatoryExecutionToolDefinition[],
   engineeringOnly = false,
 ): MandatoryExecutionPrepared | null {
-    const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
-  const resolvedIntent = systemDirectory?.route_intent ?? actionIntent;
-  const resolvedInputs = { ...(systemDirectory?.default_inputs ?? {}), ...inputs };
-  const resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
+      const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
+  let resolvedIntent = systemDirectory?.route_intent ?? actionIntent;
+  let resolvedInputs = { ...(systemDirectory?.default_inputs ?? {}), ...inputs };
+  let resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
+  let directoryRouteApplied = Boolean(systemDirectory?.route_intent && resolved.tool);
+  if (!resolved.tool && systemDirectory?.route_intent && systemDirectory.route_intent !== actionIntent) {
+    resolvedIntent = actionIntent;
+    resolvedInputs = inputs;
+    resolved = resolveStaticTool(actionIntent, actionKey, inputs, tools);
+    directoryRouteApplied = false;
+  }
   if (!resolved.tool) return null;
   if (engineeringOnly && !SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(resolved.tool.name)) return null;
   const allowed = toolSchemaProperties(resolved.tool);
@@ -421,7 +428,7 @@ function prepareStaticCall(
       resolved_action_intent: resolvedIntent,
       action_key: entry.action_key,
       objective,
-      system_directory: systemDirectory,
+            system_directory: systemDirectory ? { ...systemDirectory, route_applied: directoryRouteApplied } : null,
       entry_id: entry.id,
       entry_version: entry.version,
       mapped_tool: resolved.tool.name,

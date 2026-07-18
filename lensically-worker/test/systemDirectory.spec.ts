@@ -321,6 +321,26 @@ describe("System Directory foundation", () => {
     });
   });
 
+    it("falls back to the original semantic route when a directory hint target is unavailable", () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "readMcpToolDefinition",
+      title: "Read capability definition",
+      description: "Read one compact internal capability definition.",
+      inputSchema: { type: "object", properties: { tool_name: { type: "string" } }, required: ["tool_name"] },
+    }];
+    expect(prepareSourceDefinedDirectEngineeringCall(
+      "read capability definition",
+      "Read the compact workflow activity capability definition.",
+      { capability: "workflow activity listing" },
+      tools,
+    )).toMatchObject({
+      ok: true,
+      tool_name: "readMcpToolDefinition",
+      arguments: { tool_name: "listGitHubWorkflowRuns" },
+      map_execution: { system_directory: { route_applied: false } },
+    });
+  });
+
   it("infers the internal workflow-list capability from semantic public language", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "readMcpToolDefinition",
