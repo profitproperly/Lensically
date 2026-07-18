@@ -16144,24 +16144,22 @@ async function handleOperatorMcpEngineeringTool(
     return { ok: result.ok, status: result.status, path };
   }
 
-  if (toolName === "runGitHubWorkflow" || toolName === "deployBackend") {
-    const workflowId = normalizeOperatorText(args.workflow_id, 160, true) ?? "lensically-engineering.yml";
-        const requestedTask = normalizeOperatorText(args.task, 160, true) ?? "typecheck";
-    const hyphenatedTask = requestedTask.replace(/_/g, "-");
-    const allowedWorkflowTasks = new Set(["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"]);
-    const task = toolName === "deployBackend"
-      ? "worker-deploy"
-      : allowedWorkflowTasks.has(hyphenatedTask)
-        ? hyphenatedTask
-        : "typecheck";
-    const ref = normalizeOperatorText(args.ref, 160, true) ?? config.branch;
+  if (toolName === "runGitHubWorkflow") {
+    const requestedTask = normalizeOperatorText(args.task, 160, true) ?? "typecheck";
+    const task = requestedTask.replace(/_/g, "-");
+    const allowedWorkflowTasks = new Set(["typecheck", "operator-tests", "gpt-memory-tests"]);
+    if (!allowedWorkflowTasks.has(task)) {
+      return { ok: false, error: "validation_task_required", allowed_tasks: [...allowedWorkflowTasks] };
+    }
+    const workflowId = "lensically-validation.yml";
+    const ref = config.branch;
     const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ref, inputs: { task } }),
     });
-    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched ${workflowId} task ${task}.`, testsRun: [{ workflow_id: workflowId, task }], result: result.ok ? "ok" : "failed", metadata: { status: result.status } });
-    return { ok: result.ok, status: result.status, workflow_id: workflowId, task, ref };
+    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched validation task ${task}.`, testsRun: [{ workflow_id: workflowId, task }], result: result.ok ? "ok" : "failed", metadata: { status: result.status } });
+    return { ok: result.ok, status: result.status, task };
   }
 
   if (toolName === "listGitHubWorkflowRuns") {
