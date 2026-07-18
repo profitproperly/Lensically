@@ -665,8 +665,9 @@ export async function finalizeMandatoryExecutionMapCall(
     model_tool_choice_allowed: false,
     d1_execution_library_bypassed: true,
     discovery_allowed: false,
-    objective_may_resume: result.ok !== false,
-    failure: result.ok === false ? {
+    objective_may_resume: !effectiveFailure,
+    ...(defectGeneralization ? { defect_generalization_gate: defectGeneralization } : {}),
+    failure: effectiveFailure ? {
       error: result.error ?? null,
       status: result.status ?? null,
       phase: result.phase ?? null,
