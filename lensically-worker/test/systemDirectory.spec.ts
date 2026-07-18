@@ -966,6 +966,22 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("promotes uncertain scheduled publishing to quarantine instead of retry", () => {
+    const path = resolvePromotedWinningPath(
+      "repair the scheduler retry after a duplicate post",
+      "Prevent another double post when the posting state is uncertain.",
+      {},
+    );
+    expect(path).toMatchObject({
+      id: "scheduled_publish_unknown_state_quarantine",
+      defect_class: "known_recurrence",
+      scope: "universal",
+      winning_path: { surface: "runtime_guard" },
+    });
+    expect(path?.losing_path).toContain("Return a scheduled post to approved");
+    expect(path?.winning_path.procedure.join(" ")).toContain("explicit reconciliation");
+  });
+
   it("keeps Operator MCP version metadata single-source", () => {
     const path = WINNING_PATH_PROMOTIONS.find((promotion) => promotion.id === "operator_mcp_version_single_source");
     expect(path).toMatchObject({
