@@ -222,7 +222,7 @@ if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "guided-growth-mis
     || !source.includes("full_auto_requires_explicit_owner_mode_change: true")
     || !router.includes('return "getGrowthMission"')
     || !router.includes('return "updateGrowthMission"')
-    || !tests.includes("routes the persisted Growth Mission Brief for guided owner discussion")
+    || !systemDirectoryTests.includes("routes the persisted Growth Mission Brief for guided owner discussion")
     || !tests.includes("routes owner-approved Growth Mission updates without enabling full auto implicitly")
     || !tests.includes("opens a guided Growth Mission discussion after Proceed and blocks account mutations until approval")) {
   errors.push("guided_growth_mission_contract_missing");
