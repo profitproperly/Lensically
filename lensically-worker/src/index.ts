@@ -7094,6 +7094,7 @@ async function updateOperatorGrowthMission(
       focus_accounts: [brandKey],
       growth_mission_contract: OPERATOR_GROWTH_MISSION_VERSION,
       growth_plan_status: status,
+      full_auto_owner_authorized: executionMode === MANIFEST_AUTONOMY_MODE,
       owner_ratification_required: executionMode !== MANIFEST_AUTONOMY_MODE,
       routine_account_operations_autonomous: executionMode === MANIFEST_AUTONOMY_MODE,
       account_mutations_require_approved_growth_plan: true,
