@@ -355,8 +355,9 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     ).run();
-    for (let index = 1; index <= 24; index += 1) {
-      await env.DB.prepare(
+        await env.DB.batch(Array.from({ length: 24 }, (_, offset) => {
+      const index = offset + 1;
+      return env.DB.prepare(
         `INSERT INTO external_patterns (
           app_user_id, account_id, platform, source_url, post_id, post_text,
           likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
@@ -366,8 +367,8 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
         `helper-${index}`,
         `Manifest helper source ${index}`,
         1000 + index,
-      ).run();
-    }
+      );
+    }));
     const draw = await operatorTool<{ selections: Array<{ source_selection_id: string }> }>("draw_source_candidate_batch", {
       brand_key: brandKey,
       workflow_session_id: session.workflow_session_id,
@@ -1826,8 +1827,8 @@ describe("operator mode backend spine", () => {
     }
   }, 40000);
 
-    it("caps each source-card generation run for every brand", async () => {
-    await Promise.all(ALL_BRAND_KEYS.map(async (brandKey) => {
+      it("caps each source-card generation run for every brand", async () => {
+    for (const brandKey of ALL_BRAND_KEYS) {
       const { sourceCardId, runId } = await createLockedSourceCard([], brandKey);
       for (const text of [
         "A clean system gives the first good idea somewhere useful to land.",
@@ -1862,7 +1863,7 @@ describe("operator mode backend spine", () => {
       expect(blocked.status, brandKey).toBe(400);
       expect(blockedData.error).toBe("lensically_saved_workflow_required");
       expect(blockedData.existing_draft_count).toBe(2);
-    }));
+    }
   }, 40000);
 
   it("keeps account-specific gates scoped to their brand", async () => {
