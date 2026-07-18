@@ -112,7 +112,7 @@ if (!workflow.includes('.healthy == true and .operational == true and .heartbeat
 if (!source.includes("Worker deployment is Recovery-only")
     || !clientSafety.includes('intent: "recovery deployment dispatch"')
     || !clientSafety.includes('surface: "recovery_plane"')
-    || !recoverySource.includes("const dispatchRef = config.branch;")
+    || !recoverySource.includes("dispatchRef = config.branch;")
     || !recoverySource.includes("release_id: verifiedHeadSha.slice(0, 12)")
     || !recoverySource.includes("release_sha: verifiedHeadSha")
     || !recoverySource.includes("ref: dispatchRef")) {
