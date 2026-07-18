@@ -16,6 +16,7 @@ const INTERNAL_HANDLER_IDENTIFIER = /^[a-z][a-z0-9]*(?:[A-Z][A-Za-z0-9]*){2,}$/;
 const INTERNAL_ACTION_KEY = /^(?:system|repository|deployment|workflow|scheduling|content|intelligence)\.[a-z0-9_]+$/;
 const TYPED_ONLY_ACCOUNT_IDENTIFIERS = ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"] as const;
 const GATEWAY_INTERNAL_FREE_TEXT = ["internal handler", "internal capability", "camelcase tool", "action key", "execution guard", "public gateway schema"] as const;
+// Database-structure diagnosis uses bounded known-file reads instead of public free-text repository searches.
 const DATABASE_SCHEMA_FREE_TEXT = ["table initialization", "table initializer", "database schema", "schema migration"] as const;
 
 export const CLIENT_SAFETY_POLICIES: readonly ClientSafetyPolicy[] = [
