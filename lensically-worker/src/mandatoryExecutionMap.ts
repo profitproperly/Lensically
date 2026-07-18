@@ -668,9 +668,14 @@ export async function finalizeMandatoryExecutionMapCall(
     objective_may_resume: !effectiveFailure,
     ...(defectGeneralization ? { defect_generalization_gate: defectGeneralization } : {}),
     failure: effectiveFailure ? {
-      error: result.error ?? null,
+      error: result.error ?? (explicitContradiction ? "explicit_contradiction" : null),
       status: result.status ?? null,
       phase: result.phase ?? null,
+      ...(defectGeneralization ? {
+        defect_class: defectGeneralization.defect_class,
+        sibling_scan_required: defectGeneralization.sibling_scan_required,
+        prevention_disposition: defectGeneralization.prevention_disposition,
+      } : {}),
     } : null,
   };
 }
