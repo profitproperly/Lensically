@@ -306,7 +306,7 @@ describe("System Directory foundation", () => {
   });
 
   it("requires the complete autonomous capability sequence", () => {
-    const lifecycle = JSON.parse(readFileSync(new URL("../src/systemDirectory/capabilityLifecycle.json", import.meta.url), "utf8")) as { required_sequence: string[] };
+    const lifecycle = LENSICALLY_CAPABILITY_LIFECYCLE;
     expect(lifecycle.required_sequence).toEqual(expect.arrayContaining([
       "resolve_existing_directory_capability",
       "reuse_existing_capability_when_sufficient",
