@@ -85,7 +85,7 @@
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
 - Normal implementation flow is bounded inspection, one coherent change set, focused validation, one exact-SHA release, and live health and smoke verification.
 - The deployment workflow runs preflight, TypeScript validation, mandatory System Directory tests, the focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
-- Full Operator tests are diagnostic and run separately when broader regression investigation is required.
+- Full Operator diagnostics run as eight deterministic GitHub matrix shards. Every active Operator test title is assigned to exactly one shard, shards execute in parallel, and the former single-job monolith is forbidden by release preflight.
 - Worker releases use the source-controlled verified-release marker. GitHub converts the marker commit into an internal exact-SHA workflow dispatch; checkout must match that SHA before validation or deployment. Workflow jobs cannot self-commit diagnostics back to `main`.
 - Routine engineering should complete in under ten minutes whenever the underlying platform operation permits it. Extra frameworks, duplicated registries, repeated polling, and separate validation and deployment loops are not acceptable defaults.
 
