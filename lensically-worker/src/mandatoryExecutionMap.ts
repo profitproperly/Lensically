@@ -264,6 +264,7 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(engineering|execution|policy)\s+audit\b/) || has(/\baudit\s+(entries|records|history)\b/)) return "listEngineeringAudit";
   if (has(/\b(engineering|gateway|mcp|operator|execution)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect|broken|timeout|timed out)\b/)) return "inspectMcpFailure";
   if (has(/\b(engineering|repository|repo|code|source|gateway|mcp|operator)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
+    if (has(/\brun\b/) && has(/\bmain\b/) && has(/\bworkflow\b/)) return "runGitHubWorkflow";
   if (has(/\btypecheck\b/) || has(/\boperator\s+tests?\b/) || has(/\bgpt\s+memory\s+tests?\b/) || has(/\bregression\s+tests?\b/)) return "runGitHubWorkflow";
   if (has(/\b(run mcp tests?|mcp self checks?|built-in mcp checks?|gateway configuration|mcp configuration)\b/)) return "runMcpTests";
   if (has(/\b(deploy|deployment|release)\b/) && has(/\b(run|perform|execute|ship|deploy|release)\b/)) return "runEngineeringRelease";
@@ -312,7 +313,8 @@ function inferredArgumentsForOperationalIntent(
     if (/\b(public|request)\b/.test(normalized) && /\b(gateway|action)\b/.test(normalized)) return { tool_name: "executeLensicallyIntent" };
     return {};
   }
-  if (toolName !== "runGitHubWorkflow") return {};
+    if (toolName !== "runGitHubWorkflow") return {};
+  if (/\brun\b/.test(normalized) && /\bmain\b/.test(normalized) && /\bworkflow\b/.test(normalized)) return { task: "worker-deploy" };
   if (/\btypecheck\b/.test(normalized)) return { task: "typecheck" };
   if (/\bgpt\s+memory\s+tests?\b/.test(normalized)) return { task: "gpt-memory-tests" };
   if (/\boperator\s+tests?\b/.test(normalized) || /\bregression\s+tests?\b/.test(normalized)) return { task: "operator-tests" };

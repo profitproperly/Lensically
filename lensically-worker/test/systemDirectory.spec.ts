@@ -136,15 +136,16 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
-        it("builds Worker releases through the minimal server-defaulted workflow route", () => {
-    const request = buildClientSafeGatewayRequest("worker_release_dispatch", { task: "worker-deploy" });
+          it("builds Worker releases through the zero-input server-defaulted workflow route", () => {
+    const request = buildClientSafeGatewayRequest("worker_release_dispatch");
     expect(request).toEqual({
-      objective: "Run the current main validation workflow.",
-      intent: "run regression tests",
-      inputs: { task: "worker-deploy" },
+      objective: "Run the current main workflow.",
+      intent: "run main workflow",
+      inputs: {},
     });
     expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
     expect(JSON.stringify(request)).not.toContain("workflow_id");
+    expect(JSON.stringify(request)).not.toContain("worker-deploy");
     expect(JSON.stringify(request)).not.toContain("release_sha");
     expect(JSON.stringify(request)).not.toContain("ref");
   });
@@ -169,7 +170,8 @@ describe("System Directory foundation", () => {
       "public_release_intent_or_exact_identifier",
       "public_account_alias_enumeration",
             "public_gateway_internal_search_terms",
-      "public_full_workflow_dispatch_shape",
+            "public_full_workflow_dispatch_shape",
+      "public_worker_release_task_value",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
@@ -208,6 +210,29 @@ describe("System Directory foundation", () => {
   it("fails closed when the centralized registry is inconsistent", () => {
     expect(validateClientSafetyRegistry()).toEqual({ ok: true, errors: [] });
     expect(() => assertClientSafetyRegistry()).not.toThrow();
+  });
+
+    it("infers the configured Worker release task from the zero-input semantic profile", () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "runGitHubWorkflow",
+      title: "Run workflow",
+      description: "Run one configured workflow task.",
+      inputSchema: {
+        type: "object",
+        properties: { task: { type: "string" } },
+        required: ["task"],
+      },
+    }];
+    expect(prepareSourceDefinedDirectEngineeringCall(
+      "run main workflow",
+      "Run the current main workflow.",
+      {},
+      tools,
+    )).toMatchObject({
+      ok: true,
+      tool_name: "runGitHubWorkflow",
+      arguments: { task: "worker-deploy" },
+    });
   });
 
   it("infers the internal workflow-list capability from semantic public language", () => {
