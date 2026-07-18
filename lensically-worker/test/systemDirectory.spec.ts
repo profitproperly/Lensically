@@ -425,6 +425,12 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("recovery_exact_patch", { path: ".github/workflows/lensically-engineering.yml" })).toThrow("client_safe_request_external_surface:recovery_exact_patch");
   });
 
+  it("uses task-only validation dispatches and reserves exact SHA for deployment", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.validation_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: ["task"] });
+    expect(() => buildClientSafeGatewayRequest("validation_dispatch", { task: "operator-tests" })).toThrow("client_safe_request_external_surface:validation_dispatch");
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "recovery_exact_sha_validation_dispatch")?.safe_profile_id).toBe("validation_dispatch");
+  });
+
   it("uses compact recent activity after one workflow-status read", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_repeated_identical_status_poll");
     expect(incident?.safe_profile_id).toBe("workflow_run_list");
