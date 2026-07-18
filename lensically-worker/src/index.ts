@@ -14238,7 +14238,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-const OPERATOR_MCP_VERSION = "1.27.1";
+const OPERATOR_MCP_VERSION = "1.28.0";
 
 const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";
 
