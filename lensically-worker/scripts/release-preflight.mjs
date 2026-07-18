@@ -99,6 +99,15 @@ if (!workflow.includes("- name: System Directory tests")
 if (!workflow.includes("worker:\n    if: ${{ github.event_name == 'workflow_dispatch' }}")) {
   errors.push("worker_job_must_be_dispatch_only");
 }
+if (!workflow.includes("# verified-release-marker:")
+    || !workflow.includes("verified-release-marker:")
+    || !workflow.includes("[verified-worker-release]")
+    || !workflow.includes("gh workflow run lensically-engineering.yml")
+    || !workflow.includes("--field task=worker-deploy")
+    || !workflow.includes('--field release_sha="${RELEASE_SHA}"')
+    || !workflow.includes("actions: write")) {
+  errors.push("verified_release_marker_dispatch_missing");
+}
 if (workflow.includes("git push origin HEAD:main") || workflow.includes("RECOVERY_TYPECHECK_LOG.txt")) {
   errors.push("workflow_self_commit_forbidden");
 }
