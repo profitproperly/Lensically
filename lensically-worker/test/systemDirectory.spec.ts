@@ -202,6 +202,35 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("preserves exact source-candidate reads instead of rewriting them into draws", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "list_source_candidates",
+        title: "List source candidates",
+        description: "Read bounded source candidates.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+      {
+        name: "draw_source_candidate_batch",
+        title: "Draw source candidate batch",
+        description: "Persist a source draw.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" }, workflow_session_id: { type: "string" } }, required: ["brand_key", "workflow_session_id"] },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { intent: "list source candidates", objective: "Execute list source candidates.", inputs: { brand_key: "manifest_mental" } },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "list_source_candidates",
+      arguments: { brand_key: "manifest_mental" },
+      map_execution: { system_directory: { entry_id: "content.sources", route_applied: false } },
+    });
+  });
+
   it("resolves Operator tests without an obsolete workflow identifier", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "runGitHubWorkflow",
