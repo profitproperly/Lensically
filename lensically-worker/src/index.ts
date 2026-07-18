@@ -366,6 +366,24 @@ type OperatorPayloadTruncation = {
   next_offset: number;
 };
 
+const OPERATOR_PAYLOAD_PRIORITY_KEYS = [
+  "ok",
+  "error",
+  "status",
+  "brand_key",
+  "continuity_capsule",
+  "continuity_mode",
+  "workflow_checkpoint",
+  "growth_mission_brief",
+  "account_execution",
+  "next_call_requirement",
+  "required_next_owner_action",
+  "payload_contract",
+] as const;
+const OPERATOR_PAYLOAD_PRIORITY_RANK = new Map<string, number>(
+  OPERATOR_PAYLOAD_PRIORITY_KEYS.map((key, index) => [key, index]),
+);
+
 function operatorPayloadBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value ?? null)).byteLength;
 }
