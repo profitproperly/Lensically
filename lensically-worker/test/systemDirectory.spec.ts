@@ -10,6 +10,7 @@ import {
   CLIENT_SAFETY_LEGACY_MIGRATIONS,
   CLIENT_SAFETY_POLICIES,
     createSystemDirectoryIndex,
+    LENSICALLY_CAPABILITY_LIFECYCLE,
     LENSICALLY_SYSTEM_DIRECTORY_ENTRIES,
   getClientSafetyRegistrySummary,
   getLensicallySystemDirectorySummary,
