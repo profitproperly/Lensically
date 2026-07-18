@@ -138,7 +138,7 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
 async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
   const requestedBrand = testRequestedBrandKey(toolName, args);
   let callArgs = args;
-  if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && toolName !== "resolveContinuationContext") {
+  if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") {
     await ensureMcpAccountOpen(requestedBrand);
                         callArgs = { ...args, proceed_confirmed: true };
   }
