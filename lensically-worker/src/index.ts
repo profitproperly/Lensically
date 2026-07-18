@@ -14805,7 +14805,7 @@ function operatorMcpInstructions(toolCount: number): string {
     CLIENT_SAFETY_STARTUP_INSTRUCTION,
     "The source-defined static router selects one live typed handler. Do not choose internal tools, wrappers, retries, or fallbacks.",
     "Route selection is database-independent. Dynamic execution libraries, maps, incidents, promotions, phonebook routes, and OpsMemory routing are retired.",
-    "Use intent='startup' once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
+    "Use intent='load operator context' once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
     "After Proceed, restore account continuity from server-side state and preserve idempotency, authorization, content gates, ownership checks, and scheduler safety.",
     "Routine engineering uses bounded inspection, one coherent change set, focused validation, one exact-SHA release, and compact receipts.",
     "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
