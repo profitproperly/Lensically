@@ -44,6 +44,25 @@ export type PreventableIncidentClosureInput = {
 
 export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
   {
+    id: "scheduled_publish_unknown_state_quarantine",
+    status: "active",
+    priority: 300,
+    defect_class: "known_recurrence",
+    matching_conditions: {
+      any_terms: ["duplicate post", "double post", "publish retry", "scheduler retry", "status transition", "posting state"],
+    },
+    losing_path: "Return a scheduled post to approved after an external publish attempt, infer staleness through raw timestamp-string comparison, or retry while the provider result is uncertain.",
+    winning_path: {
+      surface: "runtime_guard",
+      procedure: ["Acquire the approved-to-posting claim atomically.", "Compare processing timestamps through SQLite datetime normalization.", "Keep failed or stale external attempts quarantined in posting.", "Treat a returned Threads post ID as authoritative.", "Require explicit reconciliation before any new publish attempt."],
+    },
+    evidence: ["Cloudflare telemetry showed scheduled posts 579 and 580 claimed by fetch and alarm invocations seconds apart.", "One concurrent attempt published successfully while the sibling failed its local posting-to-posted transition.", "The stale cutoff used ISO text against SQLite CURRENT_TIMESTAMP text, immediately reopening active posting rows."],
+    scope: "universal",
+    enforcement_point: "Scheduled-post state machine, normalized stale-state guard, and focused Operator regressions.",
+    regression_test_id: "never reopens stale posting rows after an external publish attempt",
+    supersession_rule: "A replacement must preserve at-most-once external publication and require positive reconciliation evidence before retrying an uncertain attempt.",
+  },
+  {
     id: "large_repository_mutation_recovery",
     status: "active",
     priority: 200,
