@@ -387,9 +387,13 @@ describe("System Directory foundation", () => {
   });
 
   it("routes owner-approved Growth Mission updates without enabling full auto implicitly", async () => {
-    expect(resolveLensicallySystemDirectory("Approve the guided growth plan after our discussion.")).toMatchObject({
-      entry_id: "strategy.growth_mission_update",
+    expect(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "strategy.growth_mission_update")).toMatchObject({
+      id: "strategy.growth_mission_update",
       route_intent: "update growth mission",
+      hard_gates: expect.arrayContaining([
+        "Approval or activation requires the owner's exact response.",
+        "Full autonomous account execution requires an explicit owner-authorized execution-mode change.",
+      ]),
     });
     const tools: MandatoryExecutionToolDefinition[] = [
       {
