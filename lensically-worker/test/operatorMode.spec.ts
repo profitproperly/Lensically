@@ -3522,27 +3522,101 @@ describe("operator mode MCP endpoint", () => {
       it("runs Manifest mutations only after Guided Growth Mission approval and locks again on the next Proceed", async () => {
     await ensureMcpAccountOpen("manifest_mental");
 
+    const blocked = await mcpToolRaw<{ error: string; required_next_tool: string }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "current_belief",
+      body: "Blocked before Guided Growth Mission approval.",
+      proceed_confirmed: true,
+    });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent).toMatchObject({
+      error: "approved_growth_mission_required",
+      required_next_tool: "updateGrowthMission",
+    });
+
+    const mission = await mcpToolRaw<{
+      growth_mission: { status: string; execution_mode: string; mission: Record<string, unknown>; diagnostic: Record<string, unknown> };
+    }>("getGrowthMission", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+    });
+    expect(mission.isError).not.toBe(true);
+    expect(mission.structuredContent.growth_mission).toMatchObject({
+      status: "discussion",
+      execution_mode: "guided_owner_approval",
+    });
+    expect(mission.structuredContent.growth_mission.mission.permanent_mission).toContain("1,000,000 followers");
+    expect(mission.structuredContent.growth_mission.diagnostic.diagnosed_bottleneck).toBeTruthy();
+
+    const missingApproval = await mcpToolRaw<{ error: string }>("updateGrowthMission", {
+      brand_key: "manifest_mental",
+      status: "approved",
+      execution_mode: "guided_owner_approval",
+      mission_patch: {
+        current_bottleneck: "test_fixture_execution",
+        primary_objective: "Validate guided account execution.",
+        recommended_next_action: "Run the requested isolated regression fixture.",
+      },
+      proceed_confirmed: true,
+    });
+    expect(missingApproval.isError).toBe(true);
+    expect(missingApproval.structuredContent.error).toBe("owner_response_required_for_growth_plan_approval");
+
+    const approvedMission = await mcpToolRaw<{
+      account_execution_unlocked: boolean;
+      full_auto_enabled: boolean;
+      growth_mission: { status: string; execution_mode: string };
+    }>("updateGrowthMission", {
+      brand_key: "manifest_mental",
+      status: "approved",
+      execution_mode: "guided_owner_approval",
+      mission_patch: {
+        permanent_mission: "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.",
+        target_followers: 1000000,
+        current_bottleneck: "test_fixture_execution",
+        primary_objective: "Validate guided account execution.",
+        recommended_next_action: "Run the requested isolated regression fixture.",
+      },
+      owner_response: "I approve this guided growth plan for the current cycle.",
+      change_summary: "Approve the isolated Guided Growth Mission fixture.",
+      proceed_confirmed: true,
+    });
+    expect(approvedMission.isError).not.toBe(true);
+    expect(approvedMission.structuredContent).toMatchObject({
+      account_execution_unlocked: true,
+      full_auto_enabled: false,
+      growth_mission: { status: "approved", execution_mode: "guided_owner_approval" },
+    });
+
     const first = await mcpToolRaw<{
       ok: boolean;
-      account_authority: { mode: string; owner_ratification_required: boolean; protected_operations_owner_ratified: boolean };
+      account_authority: {
+        mode: string;
+        growth_plan_status: string;
+        owner_ratification_required: boolean;
+        routine_account_operations_autonomous: boolean;
+        execution_within_approved_plan: boolean;
+      };
     }>("save_strategy_memory", {
       brand_key: "manifest_mental",
       kind: "current_belief",
-            body: "First autonomous Manifest mutation fixture.",
+      body: "First guided Manifest mutation fixture.",
       proceed_confirmed: true,
     });
     expect(first.isError).not.toBe(true);
     expect(first.structuredContent.ok).toBe(true);
     expect(first.structuredContent.account_authority).toMatchObject({
-      mode: "autonomous_operator",
-      owner_ratification_required: false,
-      protected_operations_owner_ratified: true,
+      mode: "guided_owner_approval",
+      growth_plan_status: "approved",
+      owner_ratification_required: true,
+      routine_account_operations_autonomous: false,
+      execution_within_approved_plan: true,
     });
 
     const second = await mcpToolRaw<{ ok: boolean }>("save_strategy_memory", {
       brand_key: "manifest_mental",
       kind: "current_belief",
-            body: "Second autonomous Manifest mutation fixture.",
+      body: "Second guided Manifest mutation fixture.",
       proceed_confirmed: true,
     });
     expect(second.isError).not.toBe(true);
