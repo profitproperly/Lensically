@@ -424,8 +424,16 @@ function prepareStaticCall(
   const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
   const exactOperationalIntent = deterministicToolForOperationalIntent(actionIntent, inputs);
   const exactSourceDefinedIntent = exactSourceDefinedToolForIntent(actionIntent, tools);
-  const directoryMayRoute = !actionKey && !exactOperationalIntent && !exactSourceDefinedIntent;
-  let resolvedIntent = directoryMayRoute ? systemDirectory?.route_intent ?? actionIntent : actionIntent;
+  const directoryIntent = systemDirectory?.route_intent ?? null;
+  const directoryMayRoute = Boolean(
+    !actionKey
+    && !exactOperationalIntent
+    && !exactSourceDefinedIntent
+    && directoryIntent
+    && (systemDirectory?.confidence ?? 0) >= 0.75
+    && operationClassesCompatible(classifyIntentOperation(actionIntent), classifyIntentOperation(directoryIntent)),
+  );
+  let resolvedIntent = directoryMayRoute ? directoryIntent ?? actionIntent : actionIntent;
   let resolvedInputs = directoryMayRoute ? { ...(systemDirectory?.default_inputs ?? {}), ...inputs } : inputs;
   let resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
   let directoryRouteApplied = Boolean(directoryMayRoute && systemDirectory?.route_intent && resolved.tool);
