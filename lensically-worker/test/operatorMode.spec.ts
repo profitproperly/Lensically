@@ -627,7 +627,7 @@ describe("operator mode backend spine", () => {
     });
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent).toMatchObject({
-      error: "growth_mission_approval_required",
+      error: "approved_growth_mission_required",
       account_execution_locked: true,
       growth_mission_status: "discussion",
       required_next_tool: "updateGrowthMission",
