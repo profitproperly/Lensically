@@ -1797,18 +1797,77 @@ async function transitionScheduledPostStatus(
 }
 
 
-async function recoverStalePostingScheduledPosts(env: Env): Promise<void> {
-  const staleCutoffIso = new Date(Date.now() - SCHEDULED_POST_STALE_POSTING_WINDOW_MS).toISOString();
-  await env.DB.prepare(
+export async function quarantineScheduledPostPublishAttempt(
+  env: Env,
+  postId: number,
+  publishErrorMessage: string,
+): Promise<boolean> {
+  const result = await env.DB.prepare(
+    `UPDATE scheduled_posts
+     SET
+       publish_error_message = ?,
+       processing_started_at = COALESCE(processing_started_at, CURRENT_TIMESTAMP)
+     WHERE id = ?
+       AND status = ?
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)`,
+  )
+    .bind(publishErrorMessage, postId, SCHEDULED_POST_STATUS_POSTING)
+    .run();
+  return Number(result.meta?.changes ?? 0) > 0;
+}
+
+export async function finalizeScheduledPostPublished(
+  env: Env,
+  postId: number,
+  publishRequestId: string,
+  publishedPostId: string,
+): Promise<boolean> {
+  const result = await env.DB.prepare(
     `UPDATE scheduled_posts
      SET
        status = ?,
-       publish_error_message = 'publish_interrupted_retry',
+       publish_request_id = ?,
+       published_post_id = ?,
+       publish_error_message = NULL,
+       published_at = COALESCE(published_at, CURRENT_TIMESTAMP),
        processing_started_at = NULL
-     WHERE status = ?
-       AND (processing_started_at IS NULL OR processing_started_at <= ?)`,
+     WHERE id = ?`,
   )
-    .bind(SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING, staleCutoffIso)
+    .bind(
+      SCHEDULED_POST_STATUS_POSTED,
+      publishRequestId,
+      publishedPostId,
+      postId,
+    )
+    .run();
+  const changed = Number(result.meta?.changes ?? 0) > 0;
+  if (changed && await doesTableExist(env, "gpt_generation_drafts")) {
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'published', published_post_id = ?
+       WHERE scheduled_post_id = ?`,
+    ).bind(publishedPostId, postId).run();
+  }
+  return changed;
+}
+
+export async function recoverStalePostingScheduledPosts(env: Env): Promise<void> {
+  const staleCutoffIso = new Date(Date.now() - SCHEDULED_POST_STALE_POSTING_WINDOW_MS).toISOString();
+  await env.DB.prepare(
+    `UPDATE scheduled_posts
+     SET publish_error_message = CASE
+       WHEN publish_error_message IS NULL OR length(trim(publish_error_message)) = 0
+         THEN 'publish_state_unknown_reconciliation_required'
+       ELSE publish_error_message
+     END
+     WHERE status = ?
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
+       AND (
+         processing_started_at IS NULL
+         OR datetime(processing_started_at) <= datetime(?)
+       )`,
+  )
+    .bind(SCHEDULED_POST_STATUS_POSTING, staleCutoffIso)
     .run();
 }
 
