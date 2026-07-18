@@ -183,8 +183,10 @@ if (!workflow.includes("operator-test-shards:")
     || !workflow.includes("name: Operator shard ${{ matrix.shard }}/8")
     || !workflow.includes("shard: [1, 2, 3, 4, 5, 6, 7, 8]")
     || !workflow.includes('node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8')
-    || !operatorShardRunner.includes("uniqueActiveTitles")
-    || !operatorShardRunner.includes("index % shardCount === shardNumber - 1")
+    || !operatorShardRunner.includes("titleDefinitionCounts")
+    || !operatorShardRunner.includes("shardAssignments")
+    || !operatorShardRunner.includes("assignedTitles.length !== weightedTitles.length")
+    || !operatorShardRunner.includes("selectedAssignment = shardAssignments[shardNumber - 1]")
     || !operatorShardRunner.includes("--testNamePattern=")) {
   errors.push("parallel_operator_test_shards_missing");
 }
