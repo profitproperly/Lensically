@@ -11,6 +11,7 @@ const clientSafety = read("src/systemDirectory/clientSafeRequests.ts");
 const tests = read("test/operatorMode.spec.ts");
 const workflow = read("../.github/workflows/lensically-engineering.yml");
 const currentState = read("../CURRENT_STATE.md");
+const recoverySource = read("../lensically-recovery-worker/src/index.ts");
 
 const cronMatch = wrangler.match(/"crons"\s*:\s*(\[[\s\S]*?\])/);
 if (!cronMatch) throw new Error("wrangler_crons_missing");
