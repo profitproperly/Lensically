@@ -154,6 +154,42 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("classifies account-selection requests under continuity rather than validation", () => {
+    expect(resolveLensicallySystemDirectory("Execute select operator key. select operator key")).toMatchObject({
+      entry_id: "accounts.continuity",
+      plane: "accounts",
+    });
+  });
+
+  it("never lets a directory hint replace an exact deterministic intent", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "selectOperatorKey",
+        title: "Select operator key",
+        description: "Select one account key.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+      {
+        name: "runGitHubWorkflow",
+        title: "Run workflow",
+        description: "Run one configured validation task.",
+        inputSchema: { type: "object", properties: { task: { type: "string" } }, required: ["task"] },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { intent: "select operator key", objective: "Execute select operator key.", inputs: { brand_key: "manifest_mental" } },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "selectOperatorKey",
+      arguments: { brand_key: "manifest_mental" },
+      map_execution: { system_directory: { entry_id: "accounts.continuity", route_applied: false } },
+    });
+  });
+
   it("resolves Operator tests without an obsolete workflow identifier", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "runGitHubWorkflow",
