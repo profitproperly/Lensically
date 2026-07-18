@@ -2217,16 +2217,26 @@ async function processScheduledPost(
   }
 
   const { publishResult } = publishOutcome;
-  const posted = await transitionScheduledPostStatus(
-    env,
-    post.id,
-    SCHEDULED_POST_STATUS_POSTING,
-    SCHEDULED_POST_STATUS_POSTED,
-    {
-      publishRequestId: publishResult.publishRequestId,
-      publishedPostId: publishResult.publishedPostId,
-    },
-  );
+  let posted = false;
+  try {
+    posted = await finalizeScheduledPostPublished(
+      env,
+      post.id,
+      publishResult.publishRequestId,
+      publishResult.publishedPostId,
+    );
+  } catch (error) {
+    logWorkerEvent("SCHEDULED_POST_PUBLISH_FAILURE", {
+      scheduled_post_id: post.id,
+      user_id: post.user_id,
+      threads_user_id: post.threads_user_id,
+      error_code: "published_state_persistence_exception",
+      publish_request_id: publishResult.publishRequestId,
+      published_post_id: publishResult.publishedPostId,
+      error: getErrorMessage(error),
+    });
+    return;
+  }
   if (posted) {
     logWorkerEvent("SCHEDULED_POST_PUBLISH_SUCCESS", {
       scheduled_post_id: post.id,
@@ -2242,17 +2252,10 @@ async function processScheduledPost(
     scheduled_post_id: post.id,
     user_id: post.user_id,
     threads_user_id: post.threads_user_id,
-    error_code: "status_transition_failed",
-    from_status: SCHEDULED_POST_STATUS_POSTING,
-    to_status: SCHEDULED_POST_STATUS_POSTED,
+    error_code: "published_state_persistence_failed",
+    publish_request_id: publishResult.publishRequestId,
+    published_post_id: publishResult.publishedPostId,
   });
-  await transitionScheduledPostStatus(
-    env,
-    post.id,
-    SCHEDULED_POST_STATUS_POSTING,
-    SCHEDULED_POST_STATUS_APPROVED,
-    { publishErrorMessage: "status_transition_failed" },
-  );
 }
 
 async function processDueScheduledPosts(
