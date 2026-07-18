@@ -170,6 +170,28 @@
       "release_scope": "system-directory-tests",
       "live_verification": "Mandatory startup reports the lifecycle version, canonical manifest, autonomous execution rule, and completion sequence from the exact deployed head.",
       "compatibility_bridge": false
+    },
+    {
+      "capability_id": "strategy.read_growth_mission",
+      "directory_entry_id": "strategy.growth_mission_read",
+      "canonical_handler": "getGrowthMission",
+      "route_intent": "get growth mission",
+      "implementation_mode": "new_handler",
+      "focused_regression": "routes the persisted Growth Mission Brief for guided owner discussion",
+      "release_scope": "system-directory-tests",
+      "live_verification": "After Proceed, the exact deployed Worker returns the persistent guided Growth Mission Brief with its diagnostic, proposed plan, discussion status, and locked account-execution boundary.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "strategy.update_growth_mission",
+      "directory_entry_id": "strategy.growth_mission_update",
+      "canonical_handler": "updateGrowthMission",
+      "route_intent": "update growth mission",
+      "implementation_mode": "new_handler",
+      "focused_regression": "routes owner-approved Growth Mission updates without enabling full auto implicitly",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Worker persists owner-model plan revisions, unlocks guided account execution only after explicit approval, and enables autonomous account mode only with an explicit owner response.",
+      "compatibility_bridge": false
     }
   ]
 }
