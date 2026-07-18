@@ -3371,8 +3371,8 @@ describe("operator mode MCP endpoint", () => {
     expect(continued.structuredContent.continuity_capsule.active_review_batch).toBeNull();
     expect(continued.structuredContent.continuity_capsule.completed_review_batch.review_batch_id).toBe(batch.review_batch_id);
     expect(continued.structuredContent.continuity_capsule.workflow_checkpoint).toMatchObject({
-      next_pending_action: "confirm_fill_calendar_day",
-      canonical_next_tool: "get_hourly_coverage",
+      next_pending_action: "discuss_growth_mission_brief",
+      canonical_next_tool: "getGrowthMission",
     });
 
     const nextBatch = await operatorTool<{ review_batch_id: string; reused_existing?: boolean }>("claim_manifest_review_batch", {
