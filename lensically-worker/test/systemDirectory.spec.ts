@@ -173,7 +173,8 @@ describe("System Directory foundation", () => {
             "public_gateway_internal_search_terms",
             "public_full_workflow_dispatch_shape",
             "public_worker_release_task_value",
-      "public_database_schema_search_terms",
+            "public_database_schema_search_terms",
+      "public_repeated_identical_status_poll",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
@@ -209,9 +210,15 @@ describe("System Directory foundation", () => {
     expect(buildClientSafeGatewayRequest("repository_file_read", { path: "lensically-worker/src/index.ts", start_line: 1, max_characters: 8000 })).toMatchObject({ intent: "read repository file" });
   });
 
-  it("rejects database-schema terminology in public free-text searches", () => {
+    it("rejects database-schema terminology in public free-text searches", () => {
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "locate the table initialization and schema migration", max_results: 5 })).toThrow("client_safe_request_violation");
     expect(inspectClientSafeGatewayRequest({ objective: "Locate source behavior.", intent: "search repository", inputs: { query: "database schema migration" } })).toMatchObject({ safe: false });
+  });
+
+  it("uses compact recent activity after one workflow-status read", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_repeated_identical_status_poll");
+    expect(incident?.safe_profile_id).toBe("workflow_run_list");
+    expect(buildClientSafeGatewayRequest("workflow_run_list", { limit: 4 })).toMatchObject({ intent: "list github workflow runs" });
   });
 
     it("fails closed when the centralized registry is inconsistent", () => {
@@ -227,7 +234,7 @@ describe("System Directory foundation", () => {
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-            prevented_client_block_count: 7,
+                  prevented_client_block_count: 8,
       safe_request_profile_count: 7,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
