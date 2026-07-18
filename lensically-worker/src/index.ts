@@ -11599,6 +11599,7 @@ const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
 const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
 
 
+  "get_monthly_growth_review",
     "selectOperatorKey",
   "confirmOperatorProceed",
   "resolveContinuationContext",
