@@ -69,7 +69,7 @@ export const PREVENTED_CLIENT_BLOCKS: readonly PreventedClientBlock[] = [
 ];
 
 export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProfileId, ClientSafeRequestProfile>> = {
-  startup_context: { id: "startup_context", objective: "Load the compact non-account startup bootstrap.", intent: "startup", allowed_input_keys: [], max_input_characters: 2 },
+  startup_context: { id: "startup_context", objective: "Load operator context.", intent: "load operator context", allowed_input_keys: [], max_input_characters: 2 },
   workflow_run_list: { id: "workflow_run_list", objective: "List recent workflow activity with compact run metadata.", intent: "list github workflow runs", allowed_input_keys: ["limit"], max_input_characters: 80 },
     workflow_run_status: { id: "workflow_run_status", objective: "Read one active workflow run and return compact status and step results.", intent: "get github workflow run", allowed_input_keys: ["run_id", "wait_seconds"], max_input_characters: 120 },
   recovery_workflow_status: { id: "recovery_workflow_status", objective: "Read terminal workflow status and failure annotations through the independent control surface.", intent: "recovery workflow status", allowed_input_keys: ["run_id"], max_input_characters: 80, surface: "recovery_plane" },
