@@ -346,6 +346,18 @@ function availableTools(tools: MandatoryExecutionToolDefinition[]): MandatoryExe
   return tools.filter((tool) => !ROUTER_EXCLUDED_TOOLS.has(tool.name));
 }
 
+function exactSourceDefinedToolForIntent(
+  actionIntent: string,
+  tools: MandatoryExecutionToolDefinition[],
+): MandatoryExecutionToolDefinition | null {
+  const normalizedIntent = actionIntent.toLowerCase().trim();
+  if (!normalizedIntent) return null;
+  return availableTools(tools).find((tool) =>
+    aliasesForTool(tool).some((alias) => alias.toLowerCase().trim() === normalizedIntent)
+    || machineKey(actionIntent, "") === machineKey(tool.name, ""),
+  ) ?? null;
+}
+
 function resolveStaticTool(
   actionIntent: string,
   actionKey: string | null,
