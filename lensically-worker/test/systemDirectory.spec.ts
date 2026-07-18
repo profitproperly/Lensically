@@ -359,6 +359,15 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
   });
 
+  it("uses the mandatory startup receipt for active capability counts", () => {
+    expect(buildClientSafeGatewayRequest("startup_context")).toEqual({
+      objective: "Load the compact non-account startup receipt.",
+      intent: "startup",
+      inputs: {},
+    });
+    expect(getLensicallySystemDirectorySummary()).toMatchObject({ pre_router_resolution: true });
+  });
+
       it("reads terminal workflow failures through Recovery", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_workflow_status).toMatchObject({ surface: "recovery_plane" });
     expect(() => buildClientSafeGatewayRequest("recovery_workflow_status", { run_id: 1 })).toThrow("client_safe_request_external_surface:recovery_workflow_status");
