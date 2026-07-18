@@ -295,15 +295,21 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   return null;
 }
 
-function inferredArgumentsForOperationalIntent(toolName: string, actionIntent: string): Record<string, unknown> {
-  const normalized = actionIntent.toLowerCase();
+function inferredArgumentsForOperationalIntent(
+  toolName: string,
+  actionIntent: string,
+  inputs: Record<string, unknown>,
+): Record<string, unknown> {
+  const capability = normalizeText(inputs.capability, 500) ?? "";
+  const normalized = `${actionIntent} ${capability}`.toLowerCase();
   if (toolName === "readMcpToolDefinition") {
-    if (/\b(workflow|github)\b/.test(normalized) && /\b(runs|history|activity|listing)\b/.test(normalized)) {
-      return { tool_name: "listGitHubWorkflowRuns" };
-    }
-    if (/\b(workflow|github)\b/.test(normalized) && /\b(run status|single run|completion|result)\b/.test(normalized)) {
-      return { tool_name: "getGitHubWorkflowRun" };
-    }
+    if (/\b(workflow|github)\b/.test(normalized) && /\b(runs|history|activity|listing)\b/.test(normalized)) return { tool_name: "listGitHubWorkflowRuns" };
+    if (/\b(workflow|github)\b/.test(normalized) && /\b(run status|single run|completion|result)\b/.test(normalized)) return { tool_name: "getGitHubWorkflowRun" };
+    if (/\b(account|brand)\b/.test(normalized) && /\b(key|alias|selection)\b/.test(normalized)) return { tool_name: "selectOperatorKey" };
+    if (/\b(repository|source)\b/.test(normalized) && /\b(search|find|locate)\b/.test(normalized)) return { tool_name: "searchRepoFiles" };
+    if (/\b(repository|source)\b/.test(normalized) && /\b(file|read|open)\b/.test(normalized)) return { tool_name: "readRepoFile" };
+    if (/\b(worker|engineering)\b/.test(normalized) && /\b(workflow|validation|dispatch)\b/.test(normalized)) return { tool_name: "runGitHubWorkflow" };
+    if (/\b(public|request)\b/.test(normalized) && /\b(gateway|action)\b/.test(normalized)) return { tool_name: "executeLensicallyIntent" };
     return {};
   }
   if (toolName !== "runGitHubWorkflow") return {};
@@ -385,7 +391,7 @@ function prepareStaticCall(
   const allowed = toolSchemaProperties(resolved.tool);
   const required = toolRequiredProperties(resolved.tool);
   const filteredInputs = Object.fromEntries(Object.entries(inputs).filter(([key]) => allowed.includes(key)));
-  const argumentsObject = { ...inferredArgumentsForOperationalIntent(resolved.tool.name, actionIntent), ...filteredInputs };
+    const argumentsObject = { ...inferredArgumentsForOperationalIntent(resolved.tool.name, actionIntent, inputs), ...filteredInputs };
   const missingInputs = required.filter((key) => !Object.prototype.hasOwnProperty.call(argumentsObject, key));
   const mode = SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(resolved.tool.name)
     ? "source_defined_direct_engineering"

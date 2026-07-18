@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { prepareSourceDefinedDirectEngineeringCall, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
-    buildClientSafeGatewayRequest,
+      assertClientSafetyRegistry,
+  buildClientSafeGatewayRequest,
+  CLIENT_BLOCK_INTAKE_CONTRACT,
   CLIENT_SAFE_REQUEST_PROFILES,
+  CLIENT_SAFETY_CANONICAL_LOCATION,
+  CLIENT_SAFETY_LEGACY_MIGRATIONS,
+  CLIENT_SAFETY_POLICIES,
   createSystemDirectoryIndex,
-    inspectClientSafeGatewayRequest,
+  inspectClientSafeGatewayRequest,
   PREVENTED_CLIENT_BLOCKS,
   resolveSystemDirectory,
+  validateClientSafetyRegistry,
   type SystemDirectoryEntry,
 } from "../src/systemDirectory";
 
@@ -164,15 +170,50 @@ describe("System Directory foundation", () => {
     });
   });
 
-    it("keeps a permanent unique registry of prevented client-block signatures", () => {
+      it("keeps one permanent registry for every known prevented client-block signature", () => {
     expect(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).toEqual([
       "public_internal_handler_identifier",
       "public_release_intent_or_exact_identifier",
+      "public_account_alias_enumeration",
+      "public_gateway_internal_search_terms",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
+      expect(incident.status).toBe("live");
+      expect(incident.regression_test_id).toBeTruthy();
+      expect(incident.source_locations).toContain(CLIENT_SAFETY_CANONICAL_LOCATION);
       expect(CLIENT_SAFE_REQUEST_PROFILES[incident.safe_profile_id]).toBeDefined();
     }
+  });
+
+  it("migrates every known legacy client-safety rule into a canonical registry policy", () => {
+    expect(CLIENT_SAFETY_LEGACY_MIGRATIONS.length).toBeGreaterThanOrEqual(8);
+    const policyIds = new Set(CLIENT_SAFETY_POLICIES.map((policy) => policy.id));
+    for (const migration of CLIENT_SAFETY_LEGACY_MIGRATIONS) {
+      expect(migration.status).toBe("migrated");
+      expect(migration.former_locations.length).toBeGreaterThan(0);
+      expect(policyIds.has(migration.canonical_policy_id)).toBe(true);
+    }
+  });
+
+  it("requires future models to complete client-block intake before resuming work", () => {
+    expect(CLIENT_BLOCK_INTAKE_CONTRACT).toMatchObject({ mandatory: true, canonical_location: CLIENT_SAFETY_CANONICAL_LOCATION, trigger: "any_client_side_rejection_before_gateway_response", resume_allowed_only_after: "registry_validation_and_live_deployment" });
+    expect(CLIENT_BLOCK_INTAKE_CONTRACT.sequence).toEqual(["stop_current_objective", "do_not_retry_identical_payload", "add_or_update_registry_incident", "add_or_update_safe_request_profile", "add_regression_test", "run_focused_validation", "deploy_updated_public_contract", "resume_original_objective"]);
+  });
+
+  it("keeps account identifiers inside typed brand key fields", () => {
+    expect(buildClientSafeGatewayRequest("account_key_selection", { brand_key: "manifestmental" })).toEqual({ objective: "Select one account using the typed brand key field.", intent: "select operator key", inputs: { brand_key: "manifestmental" } });
+    expect(inspectClientSafeGatewayRequest({ objective: "Search account aliases.", intent: "search repository", inputs: { query: "manifestmental and opmgdeadman" } })).toMatchObject({ safe: false });
+  });
+
+  it("rejects gateway-internal terminology in public free-text searches", () => {
+    expect(() => buildClientSafeGatewayRequest("repository_search", { query: "find the internal handler and action key", max_results: 5 })).toThrow("client_safe_request_violation");
+    expect(buildClientSafeGatewayRequest("repository_file_read", { path: "lensically-worker/src/index.ts", start_line: 1, max_characters: 8000 })).toMatchObject({ intent: "read repository file" });
+  });
+
+  it("fails closed when the centralized registry is inconsistent", () => {
+    expect(validateClientSafetyRegistry()).toEqual({ ok: true, errors: [] });
+    expect(() => assertClientSafetyRegistry()).not.toThrow();
   });
 
   it("infers the internal workflow-list capability from semantic public language", () => {
@@ -186,10 +227,10 @@ describe("System Directory foundation", () => {
         required: ["tool_name"],
       },
     }];
-    const prepared = prepareSourceDefinedDirectEngineeringCall(
-      "read workflow activity capability definition",
+        const prepared = prepareSourceDefinedDirectEngineeringCall(
+      "read capability definition",
       "Read the compact workflow activity capability definition.",
-      {},
+      { capability: "workflow activity listing" },
       tools,
     );
     expect(prepared).toMatchObject({
