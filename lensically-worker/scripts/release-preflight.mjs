@@ -173,8 +173,20 @@ if (!workflow.includes("- name: System Directory tests")
     || !workflow.includes("inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy'")) {
   errors.push("system_directory_release_gate_missing");
 }
-if (!workflow.includes("worker:\n    if: ${{ github.event_name == 'workflow_dispatch' }}")) {
-  errors.push("worker_job_must_be_dispatch_only");
+if (!workflow.includes("worker:\n    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' }}")) {
+  errors.push("worker_job_must_exclude_parallel_operator_tests");
+}
+if (!workflow.includes("operator-test-shards:")
+    || !workflow.includes("name: Operator shard ${{ matrix.shard }}/8")
+    || !workflow.includes("shard: [1, 2, 3, 4, 5, 6, 7, 8]")
+    || !workflow.includes('node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8')
+    || !operatorShardRunner.includes("uniqueActiveTitles")
+    || !operatorShardRunner.includes("index % shardCount === shardNumber - 1")
+    || !operatorShardRunner.includes("--testNamePattern=")) {
+  errors.push("parallel_operator_test_shards_missing");
+}
+if (workflow.includes("Full Operator MCP tests") || workflow.includes("/tmp/lensically-operator-tests.log")) {
+  errors.push("serial_operator_test_monolith_forbidden");
 }
 if (!workflow.includes("# verified-release-marker:")
     || !workflow.includes("verified-release-marker:")
