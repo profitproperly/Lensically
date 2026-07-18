@@ -435,6 +435,81 @@ describe("operator mode backend spine", () => {
     expect(shouldAutoArmScheduledPostAlarm(new Request(`${workerOrigin}/api/operator/health`), env)).toBe(true);
   });
 
+  it("never reopens stale posting rows after an external publish attempt", async () => {
+    await env.DB.prepare(
+      `CREATE TABLE scheduled_posts (
+        id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL,
+        publish_request_id TEXT,
+        published_post_id TEXT,
+        publish_error_message TEXT,
+        published_at TEXT,
+        processing_started_at TEXT
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO scheduled_posts (id, status, processing_started_at)
+       VALUES
+         (1, 'posting', datetime('now', '-10 minutes')),
+         (2, 'posting', CURRENT_TIMESTAMP)`,
+    ).run();
+
+    await recoverStalePostingScheduledPosts(env);
+
+    const stale = await env.DB.prepare(
+      `SELECT status, publish_error_message FROM scheduled_posts WHERE id = 1`,
+    ).first<{ status: string; publish_error_message: string | null }>();
+    const fresh = await env.DB.prepare(
+      `SELECT status, publish_error_message FROM scheduled_posts WHERE id = 2`,
+    ).first<{ status: string; publish_error_message: string | null }>();
+    expect(stale).toMatchObject({
+      status: "posting",
+      publish_error_message: "publish_state_unknown_reconciliation_required",
+    });
+    expect(fresh).toMatchObject({ status: "posting", publish_error_message: null });
+  });
+
+  it("quarantines uncertain attempts and treats returned Threads ids as authoritative", async () => {
+    await env.DB.prepare(
+      `CREATE TABLE scheduled_posts (
+        id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL,
+        publish_request_id TEXT,
+        published_post_id TEXT,
+        publish_error_message TEXT,
+        published_at TEXT,
+        processing_started_at TEXT
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO scheduled_posts (id, status, processing_started_at)
+       VALUES (3, 'posting', CURRENT_TIMESTAMP)`,
+    ).run();
+
+    expect(await quarantineScheduledPostPublishAttempt(env, 3, "threads_publish_commit_exception")).toBe(true);
+    const quarantined = await env.DB.prepare(
+      `SELECT status, publish_error_message FROM scheduled_posts WHERE id = 3`,
+    ).first<{ status: string; publish_error_message: string | null }>();
+    expect(quarantined).toMatchObject({
+      status: "posting",
+      publish_error_message: "threads_publish_commit_exception",
+    });
+
+    await env.DB.prepare(`UPDATE scheduled_posts SET status = 'approved' WHERE id = 3`).run();
+    expect(await finalizeScheduledPostPublished(env, 3, "request-3", "thread-3")).toBe(true);
+    const finalized = await env.DB.prepare(
+      `SELECT status, publish_request_id, published_post_id, publish_error_message, published_at
+       FROM scheduled_posts WHERE id = 3`,
+    ).first<Record<string, unknown>>();
+    expect(finalized).toMatchObject({
+      status: "posted",
+      publish_request_id: "request-3",
+      published_post_id: "thread-3",
+      publish_error_message: null,
+    });
+    expect(finalized?.published_at).toBeTruthy();
+  });
+
   it("admits Insights collection at four Eastern-time windows across daylight-saving changes", () => {
     for (const timestamp of [
       "2026-07-15T04:00:00.000Z",
