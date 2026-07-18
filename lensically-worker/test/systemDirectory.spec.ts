@@ -372,6 +372,20 @@ describe("System Directory foundation", () => {
     expect(getLensicallySystemDirectorySummary()).toMatchObject({ pre_router_resolution: true });
   });
 
+  it("routes load operator context to the startup handler", () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "getOperatorStartupContext",
+      title: "Get operator startup context",
+      description: "Load compact non-account operator context.",
+      inputSchema: { type: "object", properties: {} },
+    }];
+    expect(prepareSourceDefinedDirectEngineeringCall("load operator context", "Load operator context.", {}, tools)).toMatchObject({
+      ok: true,
+      tool_name: "getOperatorStartupContext",
+      arguments: {},
+    });
+  });
+
       it("reads terminal workflow failures through Recovery", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_workflow_status).toMatchObject({ surface: "recovery_plane" });
     expect(() => buildClientSafeGatewayRequest("recovery_workflow_status", { run_id: 1 })).toThrow("client_safe_request_external_surface:recovery_workflow_status");
