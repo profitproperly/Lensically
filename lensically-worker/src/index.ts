@@ -12260,6 +12260,24 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
+    name: "get_monthly_growth_review",
+    title: "Get monthly growth review",
+    description: "Return one compact, date-bounded account follower trajectory and the strongest posts published in the same period. The server fixes the response size; post-level follower attribution is forbidden.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        date_from: { type: "string", description: "Inclusive YYYY-MM-DD date." },
+        date_to: { type: "string", description: "Inclusive YYYY-MM-DD date." },
+        timezone: { type: "string", default: "America/New_York" },
+        top_limit: { type: "integer", minimum: 1, maximum: 10, default: 5 },
+      },
+      required: ["brand_key", "date_from", "date_to"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
     name: "get_performance_learning",
     title: "Get performance learning",
     description: "Read the latest maturity-normalized post evidence, hypotheses, fatigue signals, and generation learning brief. Follower totals remain account-level only and are never attributed to posts or posting periods.",
