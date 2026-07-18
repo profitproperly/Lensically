@@ -6566,9 +6566,11 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
      SET mode = ?, objective = ?, model_role = ?, owner_role = ?, approval_policy = ?,
          operating_constraints_json = ?, active = 1, version = version + 1,
          updated_at = CURRENT_TIMESTAMP
-     WHERE brand_key = ? AND mode <> ?`,
+     WHERE brand_key = ? AND (
+       mode <> ? OR objective <> ? OR approval_policy <> ? OR operating_constraints_json <> ?
+     )`,
   ).bind(
-    MANIFEST_AUTONOMY_MODE,
+    MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE,
     MANIFEST_AUTONOMY_OBJECTIVE,
     OPERATOR_AUTONOMY_CONTRACT.model_role,
     OPERATOR_AUTONOMY_CONTRACT.owner_role,
@@ -6578,14 +6580,31 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       hourly_coverage_required: true,
       target_schedule_buffer_hours: 48,
       text_only_threads: true,
-      owner_ratification_required: false,
-      routine_account_operations_autonomous: true,
+      owner_ratification_required: true,
+      routine_account_operations_autonomous: false,
+      growth_mission_brief_required_after_proceed: true,
+      account_mutations_require_approved_growth_plan: true,
       owner_monitoring_and_intervention_enabled: true,
       protected_operations_owner_ratified: true,
       read_only_investigation_autonomous: true,
     }),
     "manifest_mental",
-    MANIFEST_AUTONOMY_MODE,
+    MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE,
+    MANIFEST_AUTONOMY_OBJECTIVE,
+    OPERATOR_AUTONOMY_CONTRACT.approval_policy,
+    JSON.stringify({
+      focus_accounts: ["manifest_mental"],
+      hourly_coverage_required: true,
+      target_schedule_buffer_hours: 48,
+      text_only_threads: true,
+      owner_ratification_required: true,
+      routine_account_operations_autonomous: false,
+      growth_mission_brief_required_after_proceed: true,
+      account_mutations_require_approved_growth_plan: true,
+      owner_monitoring_and_intervention_enabled: true,
+      protected_operations_owner_ratified: true,
+      read_only_investigation_autonomous: true,
+    }),
   ).run();
 
   await env.DB.prepare(
