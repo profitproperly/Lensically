@@ -12875,6 +12875,42 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: "read_lensically_ui_surface",
+    title: "Read Lensically UI surface",
+    description: "Read the same authoritative account data used by Lensically Dashboard, Followers, Insights, Post Archive, or Saved Patterns. Every paginated record remains reachable through page, cursor, limit, and order inputs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        surface: { type: "string", enum: ["dashboard", "followers", "insights", "post_archive", "saved_patterns"] },
+        order: { type: "string", enum: ["recent", "top", "newest", "likes"] },
+        page: { type: "integer", minimum: 1, default: 1 },
+        limit: { type: "integer", minimum: 1, maximum: 200, default: 100 },
+        cursor: { type: "string" },
+        cursor_depth: { type: "integer", minimum: 1, maximum: 250 },
+      },
+      required: ["brand_key", "surface"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "discard_manifest_review_batch",
+    title: "Discard Manifest review batch",
+    description: "Retire one stale Manifest review batch so continuity cannot resume it. Preserve all underlying Saved Pattern, archive, source-lineage, and analytics records for future independent use.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        review_batch_id: { type: "string" },
+        reason: { type: "string" },
+      },
+      required: ["brand_key", "reason"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
     {
     name: "get_hourly_coverage",
     title: "Get hourly publishing coverage",
