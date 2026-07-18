@@ -7069,7 +7069,7 @@ async function buildOperatorGrowthDiagnostic(
             COALESCE(SUM(CASE WHEN likes >= 1000 THEN 1 ELSE 0 END), 0) AS thousand_like_posts
      FROM threads_posts_archive
      WHERE threads_user_id = ?
-       AND datetime(post_timestamp) >= datetime('now', '-30 days')`,
+       AND datetime(substr(post_timestamp, 1, 19)) >= datetime('now', '-30 days')`,
   ).bind(brand.profile.threads_user_id).first<Record<string, unknown>>();
   const topPosts = await env.DB.prepare(
     `SELECT post_id, post_text, post_timestamp, post_permalink,
