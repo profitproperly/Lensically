@@ -9,6 +9,7 @@ import {
   CLIENT_SAFETY_LEGACY_MIGRATIONS,
   CLIENT_SAFETY_POLICIES,
   createSystemDirectoryIndex,
+    getClientSafetyRegistrySummary,
   inspectClientSafeGatewayRequest,
   PREVENTED_CLIENT_BLOCKS,
   resolveSystemDirectory,
@@ -207,9 +208,25 @@ describe("System Directory foundation", () => {
     expect(buildClientSafeGatewayRequest("repository_file_read", { path: "lensically-worker/src/index.ts", start_line: 1, max_characters: 8000 })).toMatchObject({ intent: "read repository file" });
   });
 
-  it("fails closed when the centralized registry is inconsistent", () => {
+    it("fails closed when the centralized registry is inconsistent", () => {
     expect(validateClientSafetyRegistry()).toEqual({ ok: true, errors: [] });
     expect(() => assertClientSafetyRegistry()).not.toThrow();
+  });
+
+  it("returns the mandatory client-safety receipt for every startup response", () => {
+    expect(getClientSafetyRegistrySummary()).toMatchObject({
+      registry_version: "client-safe-requests-v2",
+      canonical_location: "lensically-worker/src/systemDirectory/clientSafeRequests.ts",
+      registry_valid: true,
+      intake_contract_version: "client-block-intake-v1",
+      intake_mandatory: true,
+      resume_allowed_only_after: "registry_validation_and_live_deployment",
+      prevented_client_block_count: 6,
+      safe_request_profile_count: 7,
+      universal_policy_count: 8,
+      migrated_legacy_rule_count: 8,
+    });
+    expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("resume_original_objective");
   });
 
     it("infers the configured Worker release task from the zero-input semantic profile", () => {

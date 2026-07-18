@@ -22,8 +22,9 @@ import {
 import {
   assertClientSafetyRegistry,
   CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
-  CLIENT_SAFETY_GATEWAY_DESCRIPTION,
+    CLIENT_SAFETY_GATEWAY_DESCRIPTION,
   CLIENT_SAFETY_STARTUP_INSTRUCTION,
+  getClientSafetyRegistrySummary,
 } from "./systemDirectory";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
@@ -15960,10 +15961,11 @@ async function handleOperatorMcpEngineeringTool(
 
     if (toolName === "getOperatorStartupContext") {
     const startup = await buildOperatorStartupContext(request, env);
-    startup.mandatory_execution_map = await getMandatoryExecutionMapSummary(
+        startup.mandatory_execution_map = await getMandatoryExecutionMapSummary(
       env.DB,
       await buildOperatorMcpTools(env, false, false) as MandatoryExecutionToolDefinition[],
     );
+    startup.client_safety = getClientSafetyRegistrySummary();
     return startup;
   }
 

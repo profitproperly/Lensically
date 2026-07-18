@@ -147,3 +147,22 @@ export function validateClientSafetyRegistry(): { ok: boolean; errors: string[] 
 
 export function assertClientSafetyRegistry(): void { const validation = validateClientSafetyRegistry(); if (!validation.ok) throw new Error(`client_safety_registry_invalid:${validation.errors.join(",")}`); }
 
+export function getClientSafetyRegistrySummary(): Record<string, unknown> {
+  const validation = validateClientSafetyRegistry();
+  return {
+    registry_version: CLIENT_SAFE_REQUEST_REGISTRY_VERSION,
+    canonical_location: CLIENT_SAFETY_CANONICAL_LOCATION,
+    registry_valid: validation.ok,
+    validation_errors: validation.errors,
+    intake_contract_version: CLIENT_BLOCK_INTAKE_CONTRACT_VERSION,
+    intake_mandatory: CLIENT_BLOCK_INTAKE_CONTRACT.mandatory,
+    resume_allowed_only_after: CLIENT_BLOCK_INTAKE_CONTRACT.resume_allowed_only_after,
+    required_sequence: [...CLIENT_BLOCK_INTAKE_CONTRACT.sequence],
+    prevented_client_block_count: PREVENTED_CLIENT_BLOCKS.length,
+    safe_request_profile_count: Object.keys(CLIENT_SAFE_REQUEST_PROFILES).length,
+    universal_policy_count: CLIENT_SAFETY_POLICIES.length,
+    migrated_legacy_rule_count: CLIENT_SAFETY_LEGACY_MIGRATIONS.length,
+  };
+}
+
+
