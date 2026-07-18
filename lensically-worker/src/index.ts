@@ -9210,7 +9210,10 @@ async function buildOperatorContinuityCapsule(
     workflowSession: session,
     operationalNext,
   });
-  const next = brand.brand_key === "manifest_mental"
+  const growthDiscussionContract = growthMissionBrief.discussion_contract && typeof growthMissionBrief.discussion_contract === "object"
+    ? growthMissionBrief.discussion_contract as Record<string, unknown>
+    : null;
+  const next = brand.brand_key === "manifest_mental" && growthDiscussionContract?.execution_locked !== false
     ? { action: "discuss_growth_mission_brief", owner_checkpoint: "growth_mission_brief", canonical_tool: "getGrowthMission", last_completed_action: "growth_diagnostic_prepared" }
     : operationalNext;
   const nextArtifactId = String(activeReviewRow?.id ?? (calendarCoverage.earliest_incomplete_date as string | null) ?? nextSelection?.id ?? draft?.id ?? sourceCard?.id ?? sourceBatch?.id ?? sessionId ?? "none");
