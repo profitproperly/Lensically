@@ -7002,18 +7002,20 @@ async function openOperatorGrowthMissionDiscussion(
   ).bind(brand.brand_key).first<Record<string, unknown>>();
   return {
     version: OPERATOR_GROWTH_MISSION_VERSION,
-    status: "discussion",
+    status: cycleStatus,
     current_mission: currentMission,
     diagnostic,
     proposed_plan: proposedPlan,
     persisted_mission: serializeOperatorGrowthMission(row ?? null),
     discussion_contract: {
-      execution_locked: true,
-      no_account_mutation_before_approval: true,
+      execution_locked: !fullAutoAlreadyAuthorized,
+      no_account_mutation_before_approval: !fullAutoAlreadyAuthorized,
       engineering_remains_autonomous: true,
-      model_behavior: "Present a concise diagnosis, proposed focus, evidence, risks, and recommendation. Brainstorm with the owner and revise the persisted mission from the discussion.",
-      owner_action: "Discuss, revise, or approve the proposed plan.",
-      approval_intent: "update growth mission",
+      model_behavior: fullAutoAlreadyAuthorized
+        ? "Use the refreshed diagnostic to continue the owner-authorized autonomous mission while preserving all safety and performance-learning gates."
+        : "Present a concise diagnosis, proposed focus, evidence, risks, and recommendation. Brainstorm with the owner and revise the persisted mission from the discussion.",
+      owner_action: fullAutoAlreadyAuthorized ? null : "Discuss, revise, or approve the proposed plan.",
+      approval_intent: fullAutoAlreadyAuthorized ? null : "update growth mission",
     },
   };
 }
