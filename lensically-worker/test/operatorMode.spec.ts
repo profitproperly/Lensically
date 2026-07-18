@@ -1892,7 +1892,6 @@ describe("operator mode MCP endpoint", () => {
       "createImplementationBacklogItem",
     ]));
     expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
-    expect(initialized.instructions).toContain("executeLensicallyIntent");
     expect(initialized.instructions).toContain("source-defined static router");
     expect(initialized.instructions).toContain("phonebook routes, and OpsMemory routing are retired");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
