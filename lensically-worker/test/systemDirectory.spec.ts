@@ -291,6 +291,15 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch.allowed_input_keys).toEqual([]);
   });
 
+  it("uses a verified source-control marker when Recovery deployment actions are blocked", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_task_only_deploy_dispatch");
+    expect(incident?.safe_profile_id).toBe("verified_release_marker");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.verified_release_marker).toMatchObject({
+      surface: "recovery_plane",
+      allowed_input_keys: ["path", "find", "replace", "message"],
+    });
+  });
+
   it("rejects internal handler names and reserved routing keys before public calls", () => {
     expect(inspectClientSafeGatewayRequest({
       objective: "Read one internal definition.",
