@@ -395,9 +395,21 @@ describe("System Directory foundation", () => {
     expect(directory?.route_applied).toBe(false);
   });
 
-      it("reads terminal workflow failures through Recovery", () => {
+  it("reads terminal workflow failures through Recovery", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_workflow_status).toMatchObject({ surface: "recovery_plane" });
     expect(() => buildClientSafeGatewayRequest("recovery_workflow_status", { run_id: 1 })).toThrow("client_safe_request_external_surface:recovery_workflow_status");
+  });
+
+  it("reads repository status through Recovery after a main-gateway block", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_repo_status).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
+    expect(() => buildClientSafeGatewayRequest("recovery_repo_status")).toThrow("client_safe_request_external_surface:recovery_repo_status");
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_repository_status_request")?.safe_profile_id).toBe("recovery_repo_status");
+  });
+
+  it("uses phrase-level Recovery patches for long public contract text", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_full_gateway_description_patch");
+    expect(incident?.safe_profile_id).toBe("recovery_exact_patch");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_exact_patch).toMatchObject({ surface: "recovery_plane" });
   });
 
   it("uses an exact Recovery text patch when a chunk commit is client-blocked", () => {
