@@ -1,5 +1,4 @@
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
