@@ -162,6 +162,8 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   getOperatorStartupContext: ["load operator context", "startup", "operator startup", "fresh session startup", "load startup context"],
   selectOperatorKey: ["select operator key", "select key", "choose brand key", "set brand key"],
   confirmOperatorProceed: ["confirm operator proceed", "confirm proceed", "proceed to next step", "continue operator workflow"],
+  getGrowthMission: ["get growth mission", "show growth mission", "growth mission brief", "current growth plan", "read growth plan"],
+  updateGrowthMission: ["update growth mission", "revise growth mission", "approve growth mission", "update growth plan", "revise growth plan", "approve growth plan"],
   getWorkflowStatus: ["get workflow status", "workflow status", "resume workflow state", "current workflow state"],
   engineeringPrecheck: ["engineering precheck", "mcp status", "operator status", "runtime status", "gateway status", "gateway health", "mcp health"],
   getEngineeringAccessState: ["engineering access state", "check engineering access", "verify engineering authority"],
