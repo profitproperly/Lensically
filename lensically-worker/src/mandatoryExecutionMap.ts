@@ -716,11 +716,11 @@ function prepareStaticCall(
     && (systemDirectory?.confidence ?? 0) >= directoryConfidenceFloor
     && operationClassesCompatible(classifyIntentOperation(actionIntent), classifyIntentOperation(directoryIntent)),
   );
-  let resolvedIntent = directoryMayRoute ? directoryIntent ?? actionIntent : actionIntent;
+  let resolvedIntent = promotedRouteIntent ?? (directoryMayRoute ? directoryIntent ?? actionIntent : actionIntent);
   let resolvedInputs = directoryMayRoute ? { ...(systemDirectory?.default_inputs ?? {}), ...inputs } : inputs;
   let resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
   let directoryRouteApplied = Boolean(directoryMayRoute && systemDirectory?.route_intent && resolved.tool);
-  if (!resolved.tool && systemDirectory?.route_intent && systemDirectory.route_intent !== actionIntent) {
+  if (!resolved.tool && !promotedRouteIntent && systemDirectory?.route_intent && systemDirectory.route_intent !== actionIntent) {
     resolvedIntent = actionIntent;
     resolvedInputs = inputs;
     resolved = resolveStaticTool(actionIntent, actionKey, inputs, tools);
