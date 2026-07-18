@@ -881,9 +881,14 @@ export async function getMandatoryExecutionMapSummary(
   tools: MandatoryExecutionToolDefinition[],
 ): Promise<Record<string, unknown>> {
   const usable = availableTools(tools);
+  const winningPathValidation = validateWinningPathPromotions();
   return {
     version: MANDATORY_EXECUTION_MAP_VERSION,
-    enforcement: "Every external action is resolved from source-defined intent aliases and live typed schemas. Database routing, discovery, incidents, promotions, and model tool choice are disabled.",
+    winning_path_promotion_version: WINNING_PATH_PROMOTION_VERSION,
+    winning_path_registry_valid: winningPathValidation.ok,
+    winning_path_registry_errors: winningPathValidation.errors,
+    active_winning_path_count: WINNING_PATH_PROMOTIONS.filter((promotion) => promotion.status === "active").length,
+    enforcement: "Every external action is resolved from source-defined intent aliases, promoted winning paths, and live typed schemas. Known losing paths are prohibited before execution; unknown terrain remains available for bounded discovery.",
     route_source: "source_control",
     active_internal_actions: usable.length,
     direct_engineering_actions: usable.filter((tool) => SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(tool.name)).length,
