@@ -15810,13 +15810,16 @@ async function handleOperatorMcpAdminTool(
             contract: OPERATOR_AUTONOMY_CONTRACT,
       engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
       profile,
+      growth_mission: growthMission,
       decisions,
       execution_counts: eventRows.results ?? [],
-            next_behavior: decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
-        ? "Present only the pending protected or irreversible decision; routine Manifest account work and routine engineering continue autonomously outside that scope."
-        : String(profile?.mode ?? "") === MANIFEST_AUTONOMY_MODE
-          ? "Resume autonomous Manifest content, scheduling, analytics, experiments, workflow, and engineering through mandatory known paths."
-          : "Routine engineering proceeds autonomously; originate a proposal only for decisions still governed by the active profile.",
+      next_behavior: ["discussion", "paused"].includes(String(growthMission?.status ?? "discussion"))
+        ? "Present the current Growth Mission Brief, brainstorm with the owner, and persist revisions. Account mutations remain locked until the owner approves or activates the guided plan."
+        : decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
+          ? "Present the pending protected or irreversible decision while keeping routine work inside the approved Growth Mission."
+          : String(profile?.mode ?? "") === MANIFEST_AUTONOMY_MODE
+            ? "Resume owner-authorized full autonomous Manifest operation through mandatory known paths."
+            : "Execute proactively within the approved Guided Growth Mission and retain owner checkpoints for consequential account actions; routine engineering remains autonomous.",
     };
   }
 
