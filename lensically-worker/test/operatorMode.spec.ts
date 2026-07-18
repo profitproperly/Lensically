@@ -3808,7 +3808,7 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(initialized.serverInfo.version).toBe("1.27.1");
+    expect(initialized.serverInfo.version).toBe(OPERATOR_MCP_VERSION);
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
   });
