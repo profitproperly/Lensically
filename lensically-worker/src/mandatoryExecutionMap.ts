@@ -3,8 +3,157 @@ import { resolveLensicallySystemDirectory } from "./systemDirectory";
 export const MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v1";
 export const EXECUTION_POLICY_LIBRARY_VERSION = "retired";
 export const DEFECT_GENERALIZATION_GATE_VERSION = "defect-generalization-gate-v1";
+export const WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v1";
 
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
+export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
+export type WinningPathPromotion = {
+  id: string;
+  status: "active" | "superseded";
+  priority: number;
+  defect_class: DefectClass;
+  matching_conditions: {
+    all_terms?: string[];
+    any_terms?: string[];
+    min_input_characters?: number;
+  };
+  losing_path: string;
+  winning_path: {
+    surface: WinningPathSurface;
+    route_intent?: string;
+    procedure: string[];
+  };
+  evidence: string[];
+  scope: "isolated" | "component" | "account" | "universal";
+  enforcement_point: string;
+  regression_test_id: string;
+  supersedes?: string;
+  supersession_rule: string;
+};
+
+export type PreventableIncidentClosureInput = {
+  cause_classified?: boolean;
+  winning_path_proven?: boolean;
+  scope_determined?: boolean;
+  winning_path_promoted?: boolean;
+  losing_path_prohibited?: boolean;
+  enforcement_installed?: boolean;
+  regression_passed?: boolean;
+  original_objective_completed?: boolean;
+};
+
+export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
+  {
+    id: "large_repository_mutation_recovery",
+    status: "active",
+    priority: 200,
+    defect_class: "contract_drift",
+    matching_conditions: {
+      any_terms: ["implement", "implementation", "patch", "repair", "architecture", "repository"],
+      min_input_characters: 3000,
+    },
+    losing_path: "Submit one large repository-mutation specification through the public gateway.",
+    winning_path: {
+      surface: "recovery_plane",
+      procedure: ["Inspect bounded known source.", "Apply compact phrase-level exact patches.", "Run focused validation.", "Release the exact tested head."],
+    },
+    evidence: ["The public implementation payload was rejected before the gateway received it.", "Bounded Recovery inspection and exact patches were accepted."],
+    scope: "universal",
+    enforcement_point: "Mandatory Execution Map pre-action resolution and client-safe request registry.",
+    regression_test_id: "routes large repository mutations to the promoted Recovery path",
+    supersession_rule: "Replace only after a newer verified request profile completes the same operation with less risk or cost.",
+  },
+  {
+    id: "multi_stage_engineering_implementation_first",
+    status: "active",
+    priority: 100,
+    defect_class: "contract_drift",
+    matching_conditions: {
+      all_terms: ["architecture"],
+      any_terms: ["release", "deploy", "verify", "validation"],
+    },
+    losing_path: "Route a multi-stage engineering objective directly to final verification or leave it unknown.",
+    winning_path: {
+      surface: "main_gateway",
+      route_intent: "apply implementation",
+      procedure: ["Implement first.", "Run focused validation.", "Release the exact tested head.", "Verify production."],
+    },
+    evidence: ["The broad end-to-end implementation objective was not classified.", "The deterministic implementation route is the required first stage."],
+    scope: "universal",
+    enforcement_point: "Mandatory Execution Map pre-action resolution.",
+    regression_test_id: "promotes multi-stage architecture work to implementation before release",
+    supersession_rule: "A replacement must preserve implementation-before-verification ordering and pass the same regression.",
+  },
+  {
+    id: "operator_mcp_version_single_source",
+    status: "active",
+    priority: 100,
+    defect_class: "duplicated_assumption",
+    matching_conditions: {
+      all_terms: ["operator", "version"],
+      any_terms: ["release", "bump", "deploy", "metadata"],
+    },
+    losing_path: "Maintain the Operator MCP semantic version independently in source code and architecture documentation.",
+    winning_path: {
+      surface: "source_control",
+      procedure: ["Write the version only in OPERATOR_MCP_VERSION.", "Keep architecture documentation versionless.", "Verify artifact, runtime version, deployment commit, and exact release head."],
+    },
+    evidence: ["A manually duplicated CURRENT_STATE version caused a release-preflight failure."],
+    scope: "universal",
+    enforcement_point: "Release preflight.",
+    regression_test_id: "keeps Operator MCP version metadata single-source",
+    supersession_rule: "Any replacement must retain one writable version source and fail closed on runtime or artifact mismatch.",
+  },
+];
+
+const PREVENTABLE_INCIDENT_CLOSURE_STEPS = [
+  "cause_classified",
+  "winning_path_proven",
+  "scope_determined",
+  "winning_path_promoted",
+  "losing_path_prohibited",
+  "enforcement_installed",
+  "regression_passed",
+  "original_objective_completed",
+] as const;
+
+function winningPathContextText(actionIntent: string, objective: string | null, inputs: Record<string, unknown>): string {
+  return `${objective ?? ""} ${actionIntent} ${JSON.stringify(inputs)}`.toLowerCase();
+}
+
+export function validateWinningPathPromotions(promotions: readonly WinningPathPromotion[] = WINNING_PATH_PROMOTIONS): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const ids = promotions.map((promotion) => promotion.id);
+  if (new Set(ids).size !== ids.length) errors.push("duplicate_winning_path_id");
+  const idSet = new Set(ids);
+  for (const promotion of promotions) {
+    if (!promotion.losing_path.trim() || !promotion.winning_path.procedure.length || !promotion.evidence.length) errors.push(`winning_path_incomplete:${promotion.id}`);
+    if (!promotion.enforcement_point.trim() || !promotion.regression_test_id.trim() || !promotion.supersession_rule.trim()) errors.push(`winning_path_enforcement_incomplete:${promotion.id}`);
+    if (promotion.supersedes && !idSet.has(promotion.supersedes)) errors.push(`winning_path_supersedes_unknown:${promotion.id}:${promotion.supersedes}`);
+    if (!promotion.matching_conditions.all_terms?.length && !promotion.matching_conditions.any_terms?.length && promotion.matching_conditions.min_input_characters === undefined) errors.push(`winning_path_match_missing:${promotion.id}`);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+export function resolvePromotedWinningPath(actionIntent: string, objective: string | null, inputs: Record<string, unknown>): WinningPathPromotion | null {
+  const text = winningPathContextText(actionIntent, objective, inputs);
+  const inputCharacters = JSON.stringify(inputs).length;
+  return [...WINNING_PATH_PROMOTIONS]
+    .filter((promotion) => promotion.status === "active")
+    .filter((promotion) => {
+      const conditions = promotion.matching_conditions;
+      if (conditions.min_input_characters !== undefined && inputCharacters < conditions.min_input_characters) return false;
+      if (conditions.all_terms?.some((term) => !text.includes(term.toLowerCase()))) return false;
+      if (conditions.any_terms?.length && !conditions.any_terms.some((term) => text.includes(term.toLowerCase()))) return false;
+      return true;
+    })
+    .sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id))[0] ?? null;
+}
+
+export function evaluatePreventableIncidentClosure(input: PreventableIncidentClosureInput): { closure_allowed: boolean; missing_steps: string[] } {
+  const missingSteps = PREVENTABLE_INCIDENT_CLOSURE_STEPS.filter((step) => input[step] !== true);
+  return { closure_allowed: missingSteps.length === 0, missing_steps: missingSteps };
+}
 export type DefectGeneralizationResult = {
   version: typeof DEFECT_GENERALIZATION_GATE_VERSION;
   activated: true;
