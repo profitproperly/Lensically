@@ -666,9 +666,41 @@ function prepareStaticCall(
   tools: MandatoryExecutionToolDefinition[],
   engineeringOnly = false,
 ): MandatoryExecutionPrepared | null {
+  const winningPathValidation = validateWinningPathPromotions();
+  if (!winningPathValidation.ok) {
+    return {
+      ok: false,
+      error: "winning_path_registry_invalid",
+      map_state: "unknown",
+      candidates: winningPathValidation.errors.map((error) => ({ error })),
+    };
+  }
+  const promotedWinningPath = resolvePromotedWinningPath(actionIntent, objective, inputs);
+  if (promotedWinningPath?.winning_path.surface === "recovery_plane") {
+    return {
+      ok: false,
+      error: "promoted_winning_path_external_surface_required",
+      map_state: "known",
+      map_entry: promotedWinningPath,
+      map_execution: {
+        version: MANDATORY_EXECUTION_MAP_VERSION,
+        winning_path_version: WINNING_PATH_PROMOTION_VERSION,
+        winning_path_id: promotedWinningPath.id,
+        winning_path_surface: promotedWinningPath.winning_path.surface,
+        losing_path_prohibited: true,
+        objective,
+        action_intent: actionIntent,
+        input_character_count: stringify(inputs).length,
+      },
+    };
+  }
+  const promotedRouteIntent = promotedWinningPath?.winning_path.surface === "main_gateway"
+    ? promotedWinningPath.winning_path.route_intent ?? null
+    : null;
   const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
-  const exactOperationalIntent = deterministicToolForOperationalIntent(actionIntent, inputs);
-  const exactSourceDefinedIntent = exactSourceDefinedToolForIntent(actionIntent, tools);
+  const effectiveActionIntent = promotedRouteIntent ?? actionIntent;
+  const exactOperationalIntent = deterministicToolForOperationalIntent(effectiveActionIntent, inputs);
+  const exactSourceDefinedIntent = exactSourceDefinedToolForIntent(effectiveActionIntent, tools);
   const directoryIntent = systemDirectory?.route_intent ?? null;
   const directoryHasBoundedDefaults = Boolean(
     systemDirectory?.default_inputs
