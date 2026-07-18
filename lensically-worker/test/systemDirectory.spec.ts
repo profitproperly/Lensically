@@ -234,7 +234,8 @@ describe("System Directory foundation", () => {
             "public_repeated_identical_status_poll",
             "public_zero_input_main_workflow_request",
             "public_policy_repository_search_terms",
-      "recovery_chunk_commit_session_identifier",
+            "recovery_chunk_commit_session_identifier",
+      "public_terminal_workflow_failure_detail_request",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
@@ -280,7 +281,12 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
   });
 
-    it("uses an exact Recovery text patch when a chunk commit is client-blocked", () => {
+      it("reads terminal workflow failures through Recovery", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_workflow_status).toMatchObject({ surface: "recovery_plane" });
+    expect(() => buildClientSafeGatewayRequest("recovery_workflow_status", { run_id: 1 })).toThrow("client_safe_request_external_surface:recovery_workflow_status");
+  });
+
+  it("uses an exact Recovery text patch when a chunk commit is client-blocked", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_exact_patch).toMatchObject({ surface: "recovery_plane" });
     expect(() => buildClientSafeGatewayRequest("recovery_exact_patch", { path: ".github/workflows/lensically-engineering.yml" })).toThrow("client_safe_request_external_surface:recovery_exact_patch");
   });
@@ -304,8 +310,8 @@ describe("System Directory foundation", () => {
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-                                          prevented_client_block_count: 11,
-      safe_request_profile_count: 8,
+                                                prevented_client_block_count: 12,
+      safe_request_profile_count: 9,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
