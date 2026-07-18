@@ -21,6 +21,15 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Related edits should use one atomic patch set when practical. If the client blocks an oversized payload before it reaches Lensically, do not resend the same shape; divide it into compact exact patches or a chunked write session.
 - Keep public receipts compact. Never echo full patch bodies, repository files, generated knowledge, or large database records through the client.
 
+## Autonomous Capability Lifecycle
+
+- The canonical manifest is `lensically-worker/src/systemDirectory/capabilityLifecycle.json`.
+- Resolve and reuse an existing capability first. Create a new capability only when the current Directory and typed handlers cannot complete the objective correctly.
+- For a missing capability, the model performs the entire lifecycle autonomously: declaration, Directory registration, one canonical typed handler, one static route, focused regression, smallest valid test scope, exact-head release, live verification, and architecture-document update when needed.
+- Routine capability engineering does not wait for owner instructions, approval, file writing, test execution, deployment, or memory recording. Existing protected destructive and irreversible business controls still apply.
+- New tools and new Directory entries are rejected by validation unless the lifecycle declaration is complete. Compatibility bridges and duplicate implementation paths are forbidden.
+- The task remains incomplete until the deployed startup/runtime receipt proves the capability is live on the intended commit.
+
 ## Repository Operations
 
 - GitHub `main` is authoritative. Read the current head before mutations.
