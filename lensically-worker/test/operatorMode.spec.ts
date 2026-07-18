@@ -983,8 +983,8 @@ describe("operator mode backend spine", () => {
         threads_user_id, post_id, post_text, post_timestamp, post_permalink,
         views, likes, replies, reposts, quotes, shares, engagement_total
       ) VALUES
-        ('manifest-mental', 'archive-1500', 'Archive winner', '2026-07-10T12:00:00Z', 'https://www.threads.com/@manifestmental/post/archive-1500', 10000, 1500, 5, 2, 0, 1, 1508),
-        ('manifest-mental', 'archive-900', 'Archive below threshold', '2026-07-11T12:00:00Z', 'https://www.threads.com/@manifestmental/post/archive-900', 50000, 900, 2000, 100, 0, 50, 3050)`,
+        ('35758578720393972', 'archive-1500', 'Archive winner', '2026-07-10T12:00:00Z', 'https://www.threads.com/@manifestmental/post/archive-1500', 10000, 1500, 5, 2, 0, 1, 1508),
+        ('35758578720393972', 'archive-900', 'Archive below threshold', '2026-07-11T12:00:00Z', 'https://www.threads.com/@manifestmental/post/archive-900', 50000, 900, 2000, 100, 0, 50, 3050)`,
     ).run();
     for (let index = 1; index <= 26; index += 1) {
       await env.DB.prepare(
