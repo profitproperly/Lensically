@@ -14977,17 +14977,10 @@ function operatorMcpToolNameRequiresProceed(toolName: string): boolean {
 }
 
 function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, unknown>): boolean {
-  if (toolName === "listMcpTools") {
-    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
-    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    return nestedTool ? operatorMcpCallRequiresProceed(nestedTool, nestedArgs) : false;
-  }
   if (operatorMcpToolNameRequiresProceed(toolName)) {
     return true;
   }
-  if (toolName === "getMcpAdminState" || toolName === "updateWorkflowRequirement") {
+  if (toolName === "updateWorkflowRequirement") {
     return requestedMcpBrandKey(toolName, args) !== null;
   }
   return false;
