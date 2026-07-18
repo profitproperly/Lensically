@@ -257,10 +257,10 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   if (name === "runGitHubWorkflow") {
     const task = String(args.task || "");
     if (!["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"].includes(task)) return { ok: false, error: "invalid_workflow_task" };
-    const requestedRef = String(args.ref || config.branch).trim();
-    let dispatchRef = requestedRef;
+    const requestedRef = String(args.ref || "").trim();
+    let dispatchRef = requestedRef || config.branch;
     let verifiedHeadSha: string | null = null;
-    if (/^[a-f0-9]{40}$/i.test(requestedRef)) {
+    if (task === "worker-deploy") {
       const branchRef = await github(env, `/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(config.branch)}`);
       const branchData = branchRef.data && typeof branchRef.data === "object" && !Array.isArray(branchRef.data)
         ? branchRef.data as Record<string, unknown>
@@ -269,13 +269,16 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         ? branchData.object as Record<string, unknown>
         : {};
       verifiedHeadSha = typeof objectData.sha === "string" ? objectData.sha : null;
-      if (!branchRef.ok || verifiedHeadSha !== requestedRef) {
+      if (!branchRef.ok || !verifiedHeadSha) {
+        return { ok: false, error: "current_branch_head_unavailable", branch: config.branch, status: branchRef.status };
+      }
+      if (/^[a-f0-9]{40}$/i.test(requestedRef) && requestedRef !== verifiedHeadSha) {
         return { ok: false, error: "exact_sha_not_current_branch_head", requested_ref: requestedRef, branch: config.branch, current_head_sha: verifiedHeadSha, status: branchRef.status };
       }
       dispatchRef = config.branch;
     }
-    const inputs = task === "worker-deploy" && verifiedHeadSha
-      ? { task, release_id: verifiedHeadSha.slice(0, 12), release_sha: verifiedHeadSha }
+    const inputs = task === "worker-deploy"
+      ? { task, release_id: verifiedHeadSha!.slice(0, 12), release_sha: verifiedHeadSha }
       : { task };
     const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: dispatchRef, inputs }) });
     return { ok: result.ok, status: result.status, task, dispatched: result.status === 204, requested_ref: requestedRef, dispatch_ref: dispatchRef, verified_head_sha: verifiedHeadSha };
