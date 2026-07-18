@@ -10,6 +10,9 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Route selection must remain D1-independent. Do not reintroduce execution-library compilation, dynamic maps, route incidents, promotions, phonebook overrides, OpsMemory routing, or execution-event recording.
 - Direct internal tool calls are rejected. Known-file reads and normal account work stay on the main gateway; free-text source discovery, terminal workflow diagnostics, deployment, and break-glass repair use Recovery.
 - Preserve account protections after routing: selected brand, explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety.
+- Manifest uses `guided-growth-mission-v1`. After Proceed, restore account state and produce the persistent Growth Mission Brief: mission, follower target, diagnostic, current bottleneck, primary objective, supporting objectives, experiments, evidence, risks, and recommended next action.
+- Proceed authorizes diagnosis and discussion only. Keep account mutations locked while the mission is `discussion` or `paused`; unlock guided execution only when the owner explicitly approves or activates the plan.
+- Routine engineering remains autonomous. `autonomous_operator` is a separate explicit owner-authorized execution mode and must survive fresh chats once deliberately enabled.
 
 ## Engineering Speed
 
