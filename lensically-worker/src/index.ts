@@ -646,7 +646,7 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
       if (Number(contract.returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
         return boundedCritical;
       }
-      criticalArrayItems = Math.max(1, Math.floor(criticalArrayItems / 2));
+      criticalArrayItems = Math.max(MANIFEST_REVIEW_BATCH_SIZE, Math.floor(criticalArrayItems / 2));
       criticalStringChars = Math.max(120, Math.floor(criticalStringChars / 2));
     }
   }
