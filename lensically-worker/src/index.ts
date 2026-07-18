@@ -7059,7 +7059,11 @@ async function updateOperatorGrowthMission(
   const patch = args.mission_patch && typeof args.mission_patch === "object" && !Array.isArray(args.mission_patch)
     ? args.mission_patch as Record<string, unknown>
     : {};
-  const mission = { ...parseOperatorGrowthMissionJson(existingRow.mission_json), ...patch, execution_mode: executionMode };
+  const mission: Record<string, unknown> = {
+    ...parseOperatorGrowthMissionJson(existingRow.mission_json),
+    ...patch,
+    execution_mode: executionMode,
+  };
   if (["approved", "active"].includes(status)) {
     for (const requiredField of ["permanent_mission", "target_followers", "current_bottleneck", "primary_objective", "recommended_next_action"]) {
       if (mission[requiredField] === null || mission[requiredField] === undefined || mission[requiredField] === "") {
