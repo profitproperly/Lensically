@@ -32167,11 +32167,11 @@ async function countOverdueScheduledPosts(env: Env): Promise<number> {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS total
      FROM scheduled_posts
-     WHERE status = ?
+     WHERE status IN (?, ?)
        AND cancelled_at IS NULL
        AND scheduled_time <= ?
        AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)`,
-  ).bind(SCHEDULED_POST_STATUS_APPROVED, new Date().toISOString()).first<{ total: number }>();
+  ).bind(SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING, new Date().toISOString()).first<{ total: number }>();
   return Number(row?.total ?? 0);
 }
 
