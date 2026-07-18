@@ -317,6 +317,8 @@ describe("System Directory foundation", () => {
       "public_startup_receipt_wording",
       "public_startup_bootstrap_shape",
       "public_operator_context_shape",
+      "public_repository_status_request",
+      "recovery_full_gateway_description_patch",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
