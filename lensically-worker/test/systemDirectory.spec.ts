@@ -136,24 +136,17 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
-      it("builds Worker releases through the accepted configured workflow route", () => {
-    const request = buildClientSafeGatewayRequest("worker_release_dispatch", {
-      workflow_id: "lensically-engineering.yml",
-      task: "worker-deploy",
-      ref: "main",
-    });
+        it("builds Worker releases through the minimal server-defaulted workflow route", () => {
+    const request = buildClientSafeGatewayRequest("worker_release_dispatch", { task: "worker-deploy" });
     expect(request).toEqual({
-      objective: "Run the configured Worker workflow for the current verified main head.",
+      objective: "Run the current main validation workflow.",
       intent: "run regression tests",
-      inputs: {
-        workflow_id: "lensically-engineering.yml",
-        task: "worker-deploy",
-        ref: "main",
-      },
+      inputs: { task: "worker-deploy" },
     });
     expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
+    expect(JSON.stringify(request)).not.toContain("workflow_id");
     expect(JSON.stringify(request)).not.toContain("release_sha");
-    expect(JSON.stringify(request)).not.toContain("runEngineeringRelease");
+    expect(JSON.stringify(request)).not.toContain("ref");
   });
 
   it("rejects internal handler names and reserved routing keys before public calls", () => {
@@ -175,7 +168,8 @@ describe("System Directory foundation", () => {
       "public_internal_handler_identifier",
       "public_release_intent_or_exact_identifier",
       "public_account_alias_enumeration",
-      "public_gateway_internal_search_terms",
+            "public_gateway_internal_search_terms",
+      "public_full_workflow_dispatch_shape",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
