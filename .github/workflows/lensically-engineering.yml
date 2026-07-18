@@ -2,7 +2,7 @@ name: Lensically Engineering
 # [operator-tests] exact-head fallback runs focused Operator diagnostics before the final full regression suite.
 # [system-directory-tests] exact-head fallback runs isolated System Directory validation.
 # verified-release-marker: release-9
-# verified-operator-shards-marker: shards-4
+# verified-operator-shards-marker: shards-5
 run-name: Lensically ${{ inputs.task }} · ${{ inputs.release_id || github.sha }}
 
 on:
