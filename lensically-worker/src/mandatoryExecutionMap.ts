@@ -396,7 +396,8 @@ function prepareStaticCall(
 ): MandatoryExecutionPrepared | null {
   const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
   const exactOperationalIntent = deterministicToolForOperationalIntent(actionIntent, inputs);
-  const directoryMayRoute = !actionKey && !exactOperationalIntent;
+  const exactSourceDefinedIntent = exactSourceDefinedToolForIntent(actionIntent, tools);
+  const directoryMayRoute = !actionKey && !exactOperationalIntent && !exactSourceDefinedIntent;
   let resolvedIntent = directoryMayRoute ? systemDirectory?.route_intent ?? actionIntent : actionIntent;
   let resolvedInputs = directoryMayRoute ? { ...(systemDirectory?.default_inputs ?? {}), ...inputs } : inputs;
   let resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
