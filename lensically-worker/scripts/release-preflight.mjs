@@ -229,6 +229,15 @@ if (!workflow.includes('.healthy == true and .operational == true and .heartbeat
     || workflow.includes('(.control.mode == "paused") or')) {
   errors.push("scheduler_release_gate_must_require_operational_normal_mode");
 }
+if (!source.includes("quarantineScheduledPostPublishAttempt")
+    || !source.includes("finalizeScheduledPostPublished")
+    || !source.includes("datetime(processing_started_at) <= datetime(?)")
+    || !source.includes("WHERE status IN (?, ?)")
+    || source.includes("publish_interrupted_retry")
+    || !tests.includes("never reopens stale posting rows after an external publish attempt")
+    || !tests.includes("quarantines uncertain attempts and treats returned Threads ids as authoritative")) {
+  errors.push("scheduled_publish_unknown_state_quarantine_missing");
+}
 if (!source.includes("Worker deployment is Recovery-only")
     || !clientSafety.includes('verified_release_marker')
     || !clientSafety.includes('recovery_task_only_deploy_dispatch')
