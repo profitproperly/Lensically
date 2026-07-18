@@ -310,6 +310,10 @@ describe("System Directory foundation", () => {
         live_verification_required: true,
       },
     });
+  });
+
+  it("requires the complete autonomous capability sequence", () => {
+    const lifecycle = JSON.parse(readFileSync(new URL("../src/systemDirectory/capabilityLifecycle.json", import.meta.url), "utf8")) as { required_sequence: string[] };
     expect(lifecycle.required_sequence).toEqual(expect.arrayContaining([
       "resolve_existing_directory_capability",
       "reuse_existing_capability_when_sufficient",
@@ -322,6 +326,10 @@ describe("System Directory foundation", () => {
       "release_exact_verified_head",
       "verify_live_capability",
     ]));
+  });
+
+  it("stores the bootstrap lifecycle declaration in the canonical manifest", () => {
+    const lifecycle = JSON.parse(readFileSync(new URL("../src/systemDirectory/capabilityLifecycle.json", import.meta.url), "utf8")) as { declarations: Array<Record<string, unknown>> };
     expect(lifecycle.declarations).toContainEqual(expect.objectContaining({
       capability_id: "engineering.autonomous_capability_lifecycle",
       directory_entry_id: "engineering.capability_lifecycle",
