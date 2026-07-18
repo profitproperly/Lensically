@@ -1,4 +1,8 @@
+import capabilityLifecycleManifest from "./capabilityLifecycle.json";
+
 export * from "./clientSafeRequests";
+
+export const LENSICALLY_CAPABILITY_LIFECYCLE = capabilityLifecycleManifest;
 
 export const LENSICALLY_SYSTEM_DIRECTORY_VERSION = "lensically-system-directory-v1";
 export const LENSICALLY_SYSTEM_DIRECTORY_CANONICAL_LOCATION = "lensically-worker/src/systemDirectory/index.ts";
