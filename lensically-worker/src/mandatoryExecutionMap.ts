@@ -2,6 +2,80 @@ import { resolveLensicallySystemDirectory } from "./systemDirectory";
 
 export const MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v1";
 export const EXECUTION_POLICY_LIBRARY_VERSION = "retired";
+export const DEFECT_GENERALIZATION_GATE_VERSION = "defect-generalization-gate-v1";
+
+export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
+export type DefectGeneralizationResult = {
+  version: typeof DEFECT_GENERALIZATION_GATE_VERSION;
+  activated: true;
+  defect_class: DefectClass;
+  sibling_scan_required: boolean;
+  prevention_disposition: "bounded_local_fix" | "bounded_external_handling" | "targeted_sibling_scan_required_before_local_fix";
+  local_fix_closure_allowed: boolean;
+  evidence: string[];
+};
+
+const GENERALIZABLE_DEFECT_CLASSES = new Set<DefectClass>([
+  "duplicated_assumption",
+  "contract_drift",
+  "architectural_drift",
+  "known_recurrence",
+]);
+
+function defectEvidenceText(actionIntent: string, result: Record<string, unknown>): string {
+  return JSON.stringify({
+    action_intent: actionIntent,
+    error: result.error ?? null,
+    status: result.status ?? null,
+    phase: result.phase ?? null,
+    likely_cause: result.likely_cause ?? null,
+    recommended_fix_path: result.recommended_fix_path ?? null,
+    contradiction: result.contradiction ?? result.contract_contradiction ?? null,
+  }).toLowerCase();
+}
+
+export function classifyDefectForGeneralization(
+  actionIntent: string,
+  result: Record<string, unknown>,
+): DefectGeneralizationResult {
+  const text = defectEvidenceText(actionIntent, result);
+  const evidence: string[] = [];
+  let defectClass: DefectClass = "isolated";
+
+  if (/\b(recurr|again|same failure|known failure|previously|keeps happening|repeat(?:ed|ing)?)\b/.test(text)) {
+    defectClass = "known_recurrence";
+    evidence.push("recurrence_signal");
+  } else if (/\b(stale|hard[- ]?coded|literal|duplicate|duplicated|multiple copies|canonical source|single source of truth)\b/.test(text)) {
+    defectClass = "duplicated_assumption";
+    evidence.push("shared_assumption_signal");
+  } else if (/\b(obsolete|legacy|architecture|architectural|preflight|algorithm|boundary|structural drift)\b/.test(text)) {
+    defectClass = "architectural_drift";
+    evidence.push("architecture_drift_signal");
+  } else if (/\b(schema|contract|assertion|expectation|mismatch|misroute|wrong route|unknown intent|client[- ]side rejection|contradiction)\b/.test(text)) {
+    defectClass = "contract_drift";
+    evidence.push("contract_drift_signal");
+  } else if (/\b(timeout|timed out|rate limit|network|upstream|502|503|504|temporar(?:y|ily)|unavailable)\b/.test(text)) {
+    defectClass = "external_transient";
+    evidence.push("external_transient_signal");
+  } else {
+    evidence.push("bounded_isolated_signal");
+  }
+
+  const siblingScanRequired = GENERALIZABLE_DEFECT_CLASSES.has(defectClass);
+  return {
+    version: DEFECT_GENERALIZATION_GATE_VERSION,
+    activated: true,
+    defect_class: defectClass,
+    sibling_scan_required: siblingScanRequired,
+    prevention_disposition: siblingScanRequired
+      ? "targeted_sibling_scan_required_before_local_fix"
+      : defectClass === "external_transient"
+        ? "bounded_external_handling"
+        : "bounded_local_fix",
+    local_fix_closure_allowed: !siblingScanRequired,
+    evidence,
+  };
+}
 
 export type MandatoryExecutionToolDefinition = {
   name: string;
