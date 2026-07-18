@@ -281,6 +281,14 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\bschedule\b/) && has(/\bapproved\b/) && has(/\b(draft|post)\b/)) return "schedule_approved_draft";
   if (has(/\b(list|show|get)\b/) && has(/\bscheduled\s+posts?\b/)) return "list_scheduled_posts";
   if (has(/\b(edit|update|retry)\b/) && has(/\bscheduled\s+post\b/)) return "edit_scheduled_post";
+  if (
+    has(/\b(month|monthly|this month|date range|period)\b/)
+    && (
+      has(/\bfollowers?\b/) && has(/\b(growth|grown|gained|gain|trajectory)\b/)
+      || has(/\b(best|top|strongest|winning|performed well)\s+posts?\b/)
+      || has(/\bposts?\b/) && has(/\bperformance\b/)
+    )
+  ) return "get_monthly_growth_review";
   if (has(/\bperformance\s+learning\b/) || has(/\baccount\s+learning\b/)) return "get_performance_learning";
   return null;
 }
