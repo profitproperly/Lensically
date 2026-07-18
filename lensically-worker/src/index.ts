@@ -15758,8 +15758,8 @@ async function handleOperatorMcpAdminTool(
       continuation_choice: "resume_existing_workflow",
       continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
-      account_execution_locked_until_growth_plan_approval: brandKey === "manifest_mental",
-      required_next_owner_action: brandKey === "manifest_mental"
+      account_execution_locked_until_growth_plan_approval: accountExecutionLocked,
+      required_next_owner_action: accountExecutionLocked
         ? "Discuss, revise, or approve the Growth Mission Brief."
         : null,
       next_call_requirement: {
