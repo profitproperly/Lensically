@@ -3662,11 +3662,12 @@ describe("operator mode MCP endpoint", () => {
             brand_key: "manifest_mental",
       proceed_confirmed: true,
     });
-    expect(state.profile.mode).toBe("autonomous_operator");
+    expect(state.profile.mode).toBe("ai_led_owner_ratified");
     expect(state.profile.objective).toContain("1,000,000 followers");
     expect(state.profile.operating_constraints).toMatchObject({
-      owner_ratification_required: false,
-      routine_account_operations_autonomous: true,
+      owner_ratification_required: true,
+      routine_account_operations_autonomous: false,
+      account_mutations_require_approved_growth_plan: true,
       protected_operations_owner_ratified: true,
     });
 
