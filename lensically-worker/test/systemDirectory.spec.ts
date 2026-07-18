@@ -286,6 +286,64 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
   });
 
+  it("enforces the autonomous capability lifecycle for every future capability", () => {
+    const lifecycle = JSON.parse(readFileSync(new URL("../src/systemDirectory/capabilityLifecycle.json", import.meta.url), "utf8")) as {
+      version: string;
+      canonical_location: string;
+      mandatory: boolean;
+      required_sequence: string[];
+      rules: Record<string, unknown>;
+      declarations: Array<Record<string, unknown>>;
+    };
+    expect(lifecycle).toMatchObject({
+      version: "lensically-capability-lifecycle-v1",
+      canonical_location: "lensically-worker/src/systemDirectory/capabilityLifecycle.json",
+      mandatory: true,
+      rules: {
+        model_executes_automatically: true,
+        owner_prompt_required: false,
+        create_only_when_existing_capability_insufficient: true,
+        one_canonical_handler_per_capability: true,
+        compatibility_bridges_forbidden: true,
+        focused_regression_required: true,
+        release_scope_required: true,
+        live_verification_required: true,
+      },
+    });
+    expect(lifecycle.required_sequence).toEqual(expect.arrayContaining([
+      "resolve_existing_directory_capability",
+      "reuse_existing_capability_when_sufficient",
+      "declare_capability_when_missing",
+      "add_or_update_system_directory_entry",
+      "implement_one_canonical_typed_handler",
+      "add_one_static_route",
+      "add_focused_regression",
+      "run_focused_validation",
+      "release_exact_verified_head",
+      "verify_live_capability",
+    ]));
+    expect(lifecycle.declarations).toContainEqual(expect.objectContaining({
+      capability_id: "engineering.autonomous_capability_lifecycle",
+      directory_entry_id: "engineering.capability_lifecycle",
+      canonical_handler: "readRepoFile",
+      route_intent: "read repository file",
+      implementation_mode: "reuse_existing_handler",
+      release_scope: "system-directory-tests",
+      compatibility_bridge: false,
+    }));
+    expect(resolveLensicallySystemDirectory("Create and register a missing capability.")).toMatchObject({
+      entry_id: "engineering.capability_lifecycle",
+      route_intent: "read repository file",
+    });
+    expect(getLensicallySystemDirectorySummary()).toMatchObject({
+      capability_lifecycle_version: "lensically-capability-lifecycle-v1",
+      capability_lifecycle_location: "lensically-worker/src/systemDirectory/capabilityLifecycle.json",
+      capability_lifecycle_mandatory: true,
+      model_executes_capability_lifecycle_automatically: true,
+      owner_prompt_required_for_routine_capability_work: false,
+    });
+  });
+
   it("dispatches the verified current head without an exact SHA in the Recovery payload", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_exact_sha_deploy_dispatch");
     expect(incident?.safe_profile_id).toBe("worker_release_dispatch");
