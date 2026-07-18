@@ -191,6 +191,21 @@ export function resolveSystemDirectory(
 
 export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[] = [
   {
+    id: "operating.startup",
+    title: "Operator startup context",
+    plane: "operating_knowledge",
+    system_of_record: "getOperatorStartupContext and the mandatory startup documents",
+    primary_surfaces: ["startup receipt", "Operator startup", "client-safety receipt"],
+    objects: ["operator startup", "startup context", "load operator context", "fresh session bootstrap"],
+    keywords: ["startup", "load operator context", "startup receipt", "fresh session"],
+    capabilities: ["load non-account startup context", "report the active tool surface", "verify the client-safety registry"],
+    payload: { action_size: "bounded_read", max_response_bytes: 24000 },
+    route_intent: "load operator context",
+    related_entry_ids: ["operating.current_state", "operating.rules", "accounts.continuity"],
+    recommended_next_planes: ["accounts", "engineering"],
+    hard_gates: ["Startup cannot load account data before explicit Proceed."],
+  },
+  {
     id: "operating.current_state",
     title: "Current state and implementation backlog",
     plane: "operating_knowledge",
