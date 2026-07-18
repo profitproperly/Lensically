@@ -314,6 +314,7 @@ describe("System Directory foundation", () => {
             "recovery_chunk_commit_session_identifier",
       "public_terminal_workflow_failure_detail_request",
       "public_mcp_tool_inventory_request",
+      "public_startup_receipt_wording",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
