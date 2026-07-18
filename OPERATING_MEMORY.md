@@ -46,7 +46,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Validation and Deployment
 
 - Normal release order: dependency-free preflight, `npx tsc --noEmit`, mandatory System Directory tests, focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
-- Full Operator tests are diagnostic. Run them separately when a change affects broad account behavior or when the focused gate cannot identify the regression.
+- Full Operator diagnostics run as eight deterministic parallel shards. Do not restore the serial single-file workflow; every active test title must remain assigned to exactly one shard and any shard failure must fail the overall run.
 - Recovery dispatches releases using the configured branch plus the exact commit in `release_sha`. Checkout must equal that SHA before validation and deployment; the main gateway never dispatches deployment.
 - A superseded or cancelled workflow is not an implementation failure when a newer run for the same intended commit is authoritative.
 - Version changes require synchronized runtime constants, exact test assertions, and `CURRENT_STATE.md`. Do not bump versions for architecture cleanup unless the public/runtime contract requires it.
