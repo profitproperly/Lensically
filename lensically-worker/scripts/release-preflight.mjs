@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Validates the source-controlled verified release marker before deployment.
+// Validates the source-controlled verified release marker before deployment. [system-directory-tests]
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
