@@ -616,6 +616,18 @@ describe("System Directory foundation", () => {
     expect(buildClientSafeGatewayRequest("workflow_run_list", { limit: 4 })).toMatchObject({ intent: "list github workflow runs" });
   });
 
+  it("uses Recovery workflow activity when strategy-contract wording blocks the main list", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_growth_mission_workflow_list_wording");
+    expect(incident?.safe_profile_id).toBe("recovery_workflow_run_list");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_workflow_run_list).toMatchObject({
+      surface: "recovery_plane",
+      allowed_input_keys: ["limit"],
+    });
+    expect(() => buildClientSafeGatewayRequest("recovery_workflow_run_list", { limit: 3 })).toThrow(
+      "client_safe_request_external_surface:recovery_workflow_run_list",
+    );
+  });
+
     it("fails closed when the centralized registry is inconsistent", () => {
     expect(validateClientSafetyRegistry()).toEqual({ ok: true, errors: [] });
     expect(() => assertClientSafetyRegistry()).not.toThrow();
