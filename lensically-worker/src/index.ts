@@ -463,13 +463,25 @@ function compactOperatorPayloadValue(
 function compactOperatorContinuityReviewBatch(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value ?? null;
   const batch = value as Record<string, unknown>;
-  const { items: rawItems, ...batchSummary } = batch;
-  const compactedSummary = compactOperatorPayloadValue(
-    batchSummary,
-    "continuity_capsule.review_batch",
-    { arrayItems: 4, stringChars: 500, objectKeys: 40, maxDepth: 5 },
-    [],
-  ) as Record<string, unknown>;
+  const rawItems = batch.items;
+  const batchKeys = [
+    "review_batch_id",
+    "id",
+    "brand_key",
+    "workflow_session_id",
+    "source_batch_id",
+    "production_date",
+    "timezone",
+    "status",
+    "item_count",
+    "reused_existing",
+    "source_batch_reused",
+    "created_at",
+    "updated_at",
+  ];
+  const compactedSummary = Object.fromEntries(batchKeys
+    .filter((key) => Object.prototype.hasOwnProperty.call(batch, key))
+    .map((key) => [key, batch[key]]));
   const itemKeys = [
     "review_item_id",
     "sequence",
