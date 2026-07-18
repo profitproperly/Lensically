@@ -587,7 +587,7 @@ describe("System Directory foundation", () => {
     expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_repository_status_request")?.safe_profile_id).toBe("recovery_repo_status");
   });
 
-  it("uses phrase-level Recovery patches for long public contract text", () => {
+  it("uses phrase-level Recovery patches for long source-contract text", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_full_gateway_description_patch");
     expect(incident?.safe_profile_id).toBe("recovery_exact_patch");
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_exact_patch).toMatchObject({ surface: "recovery_plane" });
