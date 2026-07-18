@@ -612,7 +612,10 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
     const criticalPayload = Object.fromEntries(
       criticalTopLevelKeys
         .filter((key) => Object.prototype.hasOwnProperty.call(payload, key))
-        .map((key) => [key, payload[key]]),
+        .map((key) => [
+          key,
+          key === "continuity_capsule" ? compactOperatorContinuityCapsule(payload[key]) : payload[key],
+        ]),
     );
     let criticalArrayItems = 8;
     let criticalStringChars = 600;
