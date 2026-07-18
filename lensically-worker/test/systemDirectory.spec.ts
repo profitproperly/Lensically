@@ -957,6 +957,15 @@ describe("System Directory foundation", () => {
     expect(resolvePromotedWinningPath("explore a new account workflow", "No proven route exists yet.", {})).toBeNull();
   });
 
+  it("records the bounded integration-test timeout winning path", () => {
+    expect(WINNING_PATH_PROMOTIONS.find((promotion) => promotion.id === "bounded_integration_test_timeout")).toMatchObject({
+      defect_class: "contract_drift",
+      scope: "component",
+      winning_path: { surface: "source_control" },
+      enforcement_point: "Focused integration test definition and deterministic shard regression.",
+    });
+  });
+
   it("keeps Operator MCP version metadata single-source", () => {
     const path = WINNING_PATH_PROMOTIONS.find((promotion) => promotion.id === "operator_mcp_version_single_source");
     expect(path).toMatchObject({
