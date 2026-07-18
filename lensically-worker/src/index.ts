@@ -6568,9 +6568,11 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
      SET mode = ?, objective = ?, model_role = ?, owner_role = ?, approval_policy = ?,
          operating_constraints_json = ?, active = 1, version = version + 1,
          updated_at = CURRENT_TIMESTAMP
-     WHERE brand_key = ? AND (
-       mode <> ? OR objective <> ? OR approval_policy <> ? OR operating_constraints_json <> ?
-     )`,
+     WHERE brand_key = ?
+       AND COALESCE(json_extract(operating_constraints_json, '$.full_auto_owner_authorized'), 0) <> 1
+       AND (
+         mode <> ? OR objective <> ? OR approval_policy <> ? OR operating_constraints_json <> ?
+       )`,
   ).bind(
     MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE,
     MANIFEST_AUTONOMY_OBJECTIVE,
