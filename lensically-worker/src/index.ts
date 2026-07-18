@@ -8729,6 +8729,73 @@ async function reconcileOperatorDeliveryIncidents(
   };
 }
 
+async function inspectOperatorDeliveryIncidents(
+  env: Env,
+  brand: GptResolvedBrand,
+  timezone: string,
+): Promise<{
+  unresolved_incidents: Record<string, unknown>[];
+  required_recovery_actions: Record<string, unknown>[];
+}> {
+  await ensureScheduledPostsTable(env);
+  const nowIso = new Date().toISOString();
+  const overdueRows = await env.DB.prepare(
+    `SELECT id, status, scheduled_time, published_post_id, publish_error_message,
+            last_attempted_at, processing_started_at
+     FROM scheduled_posts
+     WHERE threads_user_id = ?
+       AND scheduled_time < ?
+       AND status IN (?, ?)
+       AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)
+     ORDER BY scheduled_time ASC, id ASC
+     LIMIT 100`,
+  ).bind(
+    brand.profile.threads_user_id,
+    nowIso,
+    SCHEDULED_POST_STATUS_APPROVED,
+    SCHEDULED_POST_STATUS_POSTING,
+  ).all<OperatorScheduledDeliveryRow>();
+  const unresolvedIncidents = (overdueRows.results ?? []).map((row) => {
+    const classification = classifyOperatorScheduledDelivery(row);
+    const scheduledMs = Date.parse(row.scheduled_time);
+    const productionDate = Number.isFinite(scheduledMs)
+      ? operatorLocalDateTimeParts(new Date(scheduledMs), timezone).date
+      : null;
+    return {
+      id: `scheduled_post_delivery:${row.id}`,
+      incident_key: `scheduled_post_delivery:${row.id}`,
+      incident_type: "scheduled_post_delivery",
+      severity: "critical",
+      status: "observed",
+      scheduled_post_id: Number(row.id),
+      production_date: productionDate,
+      scheduled_time: row.scheduled_time,
+      observed_status: row.status,
+      delivery_state: classification.delivery_state,
+      published_post_id: row.published_post_id,
+      publish_error_message: row.publish_error_message,
+      last_attempted_at: row.last_attempted_at,
+      required_recovery_action: classification.required_recovery_action,
+      evidence: {
+        source_of_truth: "scheduled_posts",
+        threads_user_id: brand.profile.threads_user_id,
+        processing_started_at: row.processing_started_at,
+        inspected_at: nowIso,
+      },
+    };
+  });
+  return {
+    unresolved_incidents: unresolvedIncidents,
+    required_recovery_actions: unresolvedIncidents.map((incident) => ({
+      incident_id: incident.id,
+      incident_key: incident.incident_key,
+      scheduled_post_id: incident.scheduled_post_id,
+      action: incident.required_recovery_action,
+      verification_required: "authoritative Threads publication success or explicit verified terminal resolution",
+    })),
+  };
+}
+
 async function buildOperatorManifestProceedCapsule(
   request: Request,
   env: Env,
@@ -15536,31 +15603,8 @@ async function getOperatorMcpBoundaryBlock(
       account_data_loaded: false,
       continuity_workflow_session_id: tokenSession,
       requested_workflow_session_id: requestedSession,
-      message: "The call targets a different workflow than the current server-side continuity capsule.",
+            message: "The call targets a different workflow than the current server-side continuity capsule.",
     };
-  }
-  if (
-    requestedBrand === "manifest_mental"
-    && operatorToolMutatesState(toolName)
-    && !isOperatorMcpEngineeringToolName(toolName)
-    && !GROWTH_MISSION_DISCUSSION_EXEMPT_TOOLS.has(toolName)
-  ) {
-    const growthMission = await readOperatorGrowthMission(env, requestedBrand);
-    const missionStatus = normalizeOperatorText(growthMission?.status, 40, true);
-    if (!growthMission || !["approved", "active"].includes(missionStatus ?? "")) {
-      return {
-        ok: false,
-        error: "growth_mission_approval_required",
-        selected_key: requestedBrand,
-        account_data_loaded: true,
-        account_execution_locked: true,
-        growth_mission_status: missionStatus ?? "missing",
-        required_next_tool: "updateGrowthMission",
-        required_next_intent: "update growth mission",
-        allowed_before_approval: ["read account state", "analyze performance", "discuss growth plan", "revise growth mission", "routine engineering"],
-        message: "Proceed opened the Growth Mission discussion. Discuss, revise, and explicitly approve the current plan before any account mutation.",
-      };
-    }
   }
   return null;
 }
