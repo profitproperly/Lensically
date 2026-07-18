@@ -362,14 +362,12 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
   });
 
-  it("uses the mandatory startup receipt for active capability counts", () => {
-    expect(buildClientSafeGatewayRequest("startup_context")).toEqual({
-      objective: "Load operator context.",
-      intent: "load operator context",
-      inputs: {},
-    });
+  it("keeps startup-context retrieval on Recovery", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.startup_context).toMatchObject({ surface: "recovery_plane" });
+    expect(() => buildClientSafeGatewayRequest("startup_context")).toThrow("client_safe_request_external_surface:startup_context");
     expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_startup_receipt_wording")?.safe_profile_id).toBe("startup_context");
     expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_startup_bootstrap_shape")?.safe_profile_id).toBe("startup_context");
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_operator_context_shape")?.safe_profile_id).toBe("startup_context");
     expect(getLensicallySystemDirectorySummary()).toMatchObject({ pre_router_resolution: true });
   });
 
