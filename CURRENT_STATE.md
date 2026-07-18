@@ -16,6 +16,9 @@
 - Route selection does not read D1, compile policy, scan repository knowledge, create incidents, promote routes, or consult OpsMemory or a phonebook.
 - Known engineering operations execute through the direct source-defined lane before account bootstrap. Known-file reads, patches, tests, and workflow activity use compact main-gateway requests; free-text source discovery, terminal workflow diagnostics, and deployment use Recovery.
 - Related repository edits use one atomic patch set when practical. Normal releases use one exact-SHA validate-and-deploy workflow.
+- The mandatory autonomous capability lifecycle is source-controlled in `lensically-worker/src/systemDirectory/capabilityLifecycle.json`. Future models resolve and reuse existing capabilities first; when a capability is missing, they create and store its declaration, Directory entry, canonical typed handler, static route, focused regression, validation scope, exact-head release plan, and live-verification contract without routine owner prompting.
+- Fast validation and release preflight fail closed when a new tool or Directory entry lacks a complete lifecycle declaration. Compatibility bridges and duplicate implementation paths are forbidden.
+- Mandatory startup reports the lifecycle version, canonical location, autonomous execution rule, and required completion sequence.
 - Account workflow calls still retain the controls that protect real business state: selected account, explicit Proceed boundary, server-side continuity, idempotency, authorization, content gates, scheduling ownership, and scheduler safety.
 
 ## Retired Execution Infrastructure
