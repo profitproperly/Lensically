@@ -16630,8 +16630,8 @@ async function handleOperatorMcpAdminTool(
          COALESCE(engagement_total, 0) AS engagement_total
        FROM threads_posts_archive
        WHERE threads_user_id = ?
-         AND datetime(post_timestamp) >= datetime(?)
-         AND datetime(post_timestamp) < datetime(?)
+         AND datetime(substr(post_timestamp, 1, 19)) >= datetime(substr(?, 1, 19))
+         AND datetime(substr(post_timestamp, 1, 19)) < datetime(substr(?, 1, 19))
        ORDER BY engagement_total DESC, likes DESC, views DESC
        LIMIT 250`,
     ).bind(
