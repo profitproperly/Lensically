@@ -14857,6 +14857,8 @@ function operatorToolMutatesState(toolName: string): boolean {
 }
 
 const OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS = new Set<string>([
+  "getGrowthMission",
+  "updateGrowthMission",
   "getOperatorDecisionState",
   "proposeOperatorDecision",
   "resolveOperatorDecision",
