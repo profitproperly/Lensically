@@ -483,9 +483,8 @@ export async function publishTextToThreads({
     };
   }
 
-  const boundedPublishAttempts = Number.isFinite(publishMaxAttempts) && publishMaxAttempts > 0
-    ? Math.floor(publishMaxAttempts)
-    : DEFAULT_PUBLISH_MAX_ATTEMPTS;
+    void publishMaxAttempts;
+  const boundedPublishAttempts = 1;
 
   let commitFailure: {
     errorCode: ThreadsPublishErrorCode;
