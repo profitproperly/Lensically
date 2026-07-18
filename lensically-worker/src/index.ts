@@ -6982,7 +6982,7 @@ async function openOperatorGrowthMissionDiscussion(
   const proposedPlan = {
     permanent_mission: currentMission.permanent_mission ?? MANIFEST_AUTONOMY_OBJECTIVE,
     target_followers: currentMission.target_followers ?? (brand.brand_key === "manifest_mental" ? 1_000_000 : null),
-    execution_mode: MANIFEST_GUIDED_EXECUTION_MODE,
+    execution_mode: cycleExecutionMode,
     growth_phase: diagnostic.growth_phase,
     current_bottleneck: diagnostic.diagnosed_bottleneck,
     primary_objective: diagnostic.recommended_primary_objective,
