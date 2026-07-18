@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Validates the source-controlled verified release marker and fail-closed autonomous capability lifecycle before deployment.
+// Validates the verified release marker, fail-closed capability lifecycle, and Guided Growth Mission before deployment.
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
