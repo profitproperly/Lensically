@@ -341,6 +341,7 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history|activity)\b/)) return "listGitHubWorkflowRuns";
     if (has(/\b(get|read|inspect|check|wait)\b/) && has(/\b(workflow|github)\b/) && has(/\b(run|status|result|completion)\b/)) return "getGitHubWorkflowRun";
   if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime|runtime source|source runtime)\b/) && has(/\b(alignment|verify|verification|sha|status|current)\b/)) return "getRepoStatus";
+  if (has(/\b(engineering|repository|repo|code|source|gateway|mcp|operator)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
   if (has(/\b(deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
   
   if (has(/\b(repository|repo|source|file)\b/) && has(/\b(read|inspect|open|status|sha|head)\b/)) {
