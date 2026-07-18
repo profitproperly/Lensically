@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { prepareSourceDefinedDirectEngineeringCall, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
   buildClientSafeGatewayRequest,
   createSystemDirectoryIndex,
@@ -127,7 +128,7 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
-  it("rejects internal handler names and reserved routing keys before public calls", () => {
+    it("rejects internal handler names and reserved routing keys before public calls", () => {
     expect(inspectClientSafeGatewayRequest({
       objective: "Read one internal definition.",
       intent: "read capability definition",
@@ -138,6 +139,30 @@ describe("System Directory foundation", () => {
         "forbidden_public_input_key:tool_name",
         "internal_handler_identifier:inputs.tool_name",
       ],
+    });
+  });
+
+  it("infers the internal workflow-list capability from semantic public language", () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "readMcpToolDefinition",
+      title: "Read capability definition",
+      description: "Read one compact internal capability definition.",
+      inputSchema: {
+        type: "object",
+        properties: { tool_name: { type: "string" } },
+        required: ["tool_name"],
+      },
+    }];
+    const prepared = prepareSourceDefinedDirectEngineeringCall(
+      "read workflow activity capability definition",
+      "Read the compact workflow activity capability definition.",
+      {},
+      tools,
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "readMcpToolDefinition",
+      arguments: { tool_name: "listGitHubWorkflowRuns" },
     });
   });
 });

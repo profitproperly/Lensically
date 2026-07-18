@@ -39,7 +39,7 @@ const scopes = {
     "authorization",
     "startup",
   ],
-  engineering: [
+    engineering: [
     "engineering",
     "repository",
     "deployment",
@@ -48,6 +48,7 @@ const scopes = {
     "router",
     "tool surface",
   ],
+  "system-directory": null,
   full: null,
 };
 
@@ -62,8 +63,8 @@ const args = [
   "run",
   "test",
   "--",
-  "--run",
-  "test/operatorMode.spec.ts",
+    "--run",
+  scope === "system-directory" ? "test/systemDirectory.spec.ts" : "test/operatorMode.spec.ts",
   "--reporter=dot",
   "--bail=1",
 ];

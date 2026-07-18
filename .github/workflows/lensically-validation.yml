@@ -1,7 +1,7 @@
 name: Lensically Validation
 # Fast routine validation. This workflow never deploys either Worker.
 # Push markers: [operator-smoke], [operator-analytics], [operator-scheduler],
-# [operator-content], [operator-accounts], [operator-engineering], [operator-full], [gpt-memory-tests].
+# [operator-content], [operator-accounts], [operator-engineering], [system-directory-tests], [operator-full], [gpt-memory-tests].
 run-name: Lensically validation · ${{ inputs.task || github.sha }}
 
 on:
@@ -19,7 +19,8 @@ on:
           - operator-scheduler
           - operator-content
           - operator-accounts
-          - operator-engineering
+                    - operator-engineering
+          - system-directory-tests
           - operator-full-tests
           - gpt-memory-tests
   push:
@@ -46,7 +47,8 @@ jobs:
         contains(github.event.head_commit.message, '[operator-scheduler]') ||
         contains(github.event.head_commit.message, '[operator-content]') ||
         contains(github.event.head_commit.message, '[operator-accounts]') ||
-        contains(github.event.head_commit.message, '[operator-engineering]') ||
+                contains(github.event.head_commit.message, '[operator-engineering]') ||
+        contains(github.event.head_commit.message, '[system-directory-tests]') ||
         contains(github.event.head_commit.message, '[operator-full]') ||
         contains(github.event.head_commit.message, '[gpt-memory-tests]')
       }}
@@ -93,7 +95,8 @@ jobs:
               operator-scheduler) scope="scheduler" ;;
               operator-content) scope="content" ;;
               operator-accounts) scope="accounts" ;;
-              operator-engineering) scope="engineering" ;;
+                            operator-engineering) scope="engineering" ;;
+              system-directory-tests) scope="system-directory" ;;
               operator-full-tests) scope="full" ;;
               gpt-memory-tests) scope="gpt-memory" ;;
               *) echo "Unknown validation task: ${DISPATCH_TASK}"; exit 2 ;;
@@ -108,8 +111,10 @@ jobs:
             scope="content"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-accounts]"* ]]; then
             scope="accounts"
-          elif [[ "${COMMIT_MESSAGE}" == *"[operator-engineering]"* ]]; then
+                    elif [[ "${COMMIT_MESSAGE}" == *"[operator-engineering]"* ]]; then
             scope="engineering"
+          elif [[ "${COMMIT_MESSAGE}" == *"[system-directory-tests]"* ]]; then
+            scope="system-directory"
           elif [[ "${COMMIT_MESSAGE}" == *"[gpt-memory-tests]"* ]]; then
             scope="gpt-memory"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-smoke]"* ]]; then
