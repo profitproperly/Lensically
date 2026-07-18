@@ -559,10 +559,21 @@ describe("operator mode backend spine", () => {
       post_performance?: { by_views?: Array<{ id: string }> };
       mandatory_execution_map?: { mapped_tool?: string };
     };
-    expect(payload.mandatory_execution_map?.mapped_tool).toBe("get_monthly_growth_review");
-    expect(payload.threads_user_id).toBe("35758578720393972");
-    expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
-    expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
+        const monthlyDiagnostic = {
+      is_error: result.isError === true,
+      route: payload.mandatory_execution_map?.mapped_tool ?? null,
+      threads_user_id: payload.threads_user_id ?? null,
+      follower_growth: payload.follower_growth ?? null,
+      top_post_id: payload.post_performance?.by_views?.[0]?.id ?? null,
+    };
+    const monthlyCorrect = monthlyDiagnostic.is_error === false
+      && monthlyDiagnostic.route === "get_monthly_growth_review"
+      && monthlyDiagnostic.threads_user_id === "35758578720393972"
+      && monthlyDiagnostic.follower_growth?.starting_followers === 100
+      && monthlyDiagnostic.follower_growth?.current_followers === 145
+      && monthlyDiagnostic.follower_growth?.net_growth === 45
+      && monthlyDiagnostic.top_post_id === "july-winner";
+    if (!monthlyCorrect) throw new Error(`monthly_diagnostic:${JSON.stringify(monthlyDiagnostic)}`);
     expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
   });
 
