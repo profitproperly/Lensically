@@ -344,6 +344,121 @@ const MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE = "ai_led_owner_ratified";
 const MANIFEST_AUTONOMY_MODE = "autonomous_operator";
 const OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 const OPERATOR_CONTINUATION_NONCE_TTL_SECONDS = 60 * 15;
+const OPERATOR_MCP_MAX_STRUCTURED_BYTES = 24_000;
+
+type OperatorPayloadTruncation = {
+  path: string;
+  total_count: number;
+  returned_count: number;
+  next_offset: number;
+};
+
+function operatorPayloadBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value ?? null)).byteLength;
+}
+
+function compactOperatorPayloadValue(
+  value: unknown,
+  path: string,
+  limits: { arrayItems: number; stringChars: number; objectKeys: number; maxDepth: number },
+  truncations: OperatorPayloadTruncation[],
+  depth = 0,
+): unknown {
+  if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") {
+    return value ?? null;
+  }
+  if (typeof value === "string") {
+    if (value.length <= limits.stringChars) return value;
+    truncations.push({ path, total_count: value.length, returned_count: limits.stringChars, next_offset: limits.stringChars });
+    return value.slice(0, limits.stringChars);
+  }
+  if (depth >= limits.maxDepth) {
+    if (Array.isArray(value)) {
+      truncations.push({ path, total_count: value.length, returned_count: 0, next_offset: 0 });
+      return [];
+    }
+    return { compacted: true };
+  }
+  if (Array.isArray(value)) {
+    const returned = value.slice(0, limits.arrayItems);
+    if (value.length > returned.length) {
+      truncations.push({ path, total_count: value.length, returned_count: returned.length, next_offset: returned.length });
+    }
+    return returned.map((entry, index) => compactOperatorPayloadValue(
+      entry,
+      `${path}[${index}]`,
+      limits,
+      truncations,
+      depth + 1,
+    ));
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    const returnedEntries = entries.slice(0, limits.objectKeys);
+    if (entries.length > returnedEntries.length) {
+      truncations.push({ path, total_count: entries.length, returned_count: returnedEntries.length, next_offset: returnedEntries.length });
+    }
+    return Object.fromEntries(returnedEntries.map(([key, entry]) => [
+      key,
+      compactOperatorPayloadValue(entry, path ? `${path}.${key}` : key, limits, truncations, depth + 1),
+    ]));
+  }
+  return String(value).slice(0, limits.stringChars);
+}
+
+function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<string, unknown> {
+  const originalBytes = operatorPayloadBytes(payload);
+  if (originalBytes <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) return payload;
+
+  let arrayItems = 20;
+  let stringChars = 1200;
+  let objectKeys = 60;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const truncations: OperatorPayloadTruncation[] = [];
+    const compacted = compactOperatorPayloadValue(
+      payload,
+      "",
+      { arrayItems, stringChars, objectKeys, maxDepth: 5 },
+      truncations,
+    ) as Record<string, unknown>;
+    const bounded = {
+      ...compacted,
+      payload_contract: {
+        server_bounded: true,
+        model_payload_sizing: false,
+        byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+        original_bytes: originalBytes,
+        returned_bytes: 0,
+        truncated: true,
+        truncated_paths: truncations.slice(0, 40),
+      },
+    };
+    const contract = bounded.payload_contract as Record<string, unknown>;
+    contract.returned_bytes = operatorPayloadBytes(bounded);
+    if (Number(contract.returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
+      return bounded;
+    }
+    arrayItems = Math.max(1, Math.floor(arrayItems / 2));
+    stringChars = Math.max(160, Math.floor(stringChars / 2));
+    objectKeys = Math.max(12, Math.floor(objectKeys / 2));
+  }
+
+  return {
+    ok: payload.ok !== false,
+    error: payload.error ?? null,
+    status: payload.status ?? null,
+    brand_key: payload.brand_key ?? null,
+    payload_contract: {
+      server_bounded: true,
+      model_payload_sizing: false,
+      byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+      original_bytes: originalBytes,
+      truncated: true,
+      fallback_summary: true,
+      available_top_level_fields: Object.keys(payload).slice(0, 60),
+    },
+  };
+}
 
 function operatorClientSafeBrandKey(brandKey: GptBrandKey): string {
   if (brandKey === "manifest_mental") return "manifestmental";
