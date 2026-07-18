@@ -14992,14 +14992,7 @@ function operatorMcpProceedConfirmed(_toolName: string, args: Record<string, unk
 
 
 
-function operatorMcpLegacyContinuityCredential(toolName: string, args: Record<string, unknown>): unknown {
-  if (toolName === "listMcpTools") {
-    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
-    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    return nestedTool ? operatorMcpLegacyContinuityCredential(nestedTool, nestedArgs) : null;
-  }
+function operatorMcpLegacyContinuityCredential(args: Record<string, unknown>): unknown {
   return args.continuity_ref ?? args.continuity_token;
 }
 
