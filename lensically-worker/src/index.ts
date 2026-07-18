@@ -17333,6 +17333,17 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           owner_ratification_required: false,
           numerical_tool_budget_applies: false,
         };
+      } else if (autonomyAuthorization.guided_plan_approved) {
+        resultPayload.account_authority = {
+          mode: MANIFEST_GUIDED_EXECUTION_MODE,
+          version: autonomyAuthorization.authority_version,
+          objective: MANIFEST_AUTONOMY_OBJECTIVE,
+          growth_plan_status: autonomyAuthorization.growth_mission?.status ?? null,
+          owner_ratification_required: true,
+          routine_account_operations_autonomous: false,
+          execution_within_approved_plan: true,
+          protected_operations_owner_ratified: true,
+        };
       } else if (autonomyAuthorization.account_autonomous) {
         resultPayload.account_authority = {
           mode: MANIFEST_AUTONOMY_MODE,
