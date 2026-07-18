@@ -15405,6 +15405,130 @@ async function handleOperatorMcpAdminTool(
     ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sessionId, brand.brand_key).first<Record<string, unknown>>()
     : await getActiveOperatorSession(env, brand.brand_key);
 
+  if (toolName === "get_monthly_growth_review") {
+    const dateFrom = normalizeOperatorText(args.date_from, 10);
+    const dateTo = normalizeOperatorText(args.date_to, 10);
+    const requestedTimezone = normalizeOperatorText(args.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    const timezone = isValidIanaTimezone(requestedTimezone) ? requestedTimezone : WORKSPACE_DEFAULT_TIMEZONE;
+    const topLimitRaw = Math.trunc(Number(args.top_limit ?? 5));
+    const topLimit = Number.isInteger(topLimitRaw) ? Math.min(Math.max(topLimitRaw, 1), 10) : 5;
+    if (!dateFrom || !dateTo || !isValidIsoDate(dateFrom) || !isValidIsoDate(dateTo) || dateFrom > dateTo) {
+      return { ok: false, error: "valid_inclusive_date_range_required" };
+    }
+    const endExclusiveDate = addDaysToIsoDate(dateTo, 1);
+    const startUtc = convertLocalDateTimeToUtcIso(dateFrom, "00:00", timezone);
+    const endUtcExclusive = endExclusiveDate
+      ? convertLocalDateTimeToUtcIso(endExclusiveDate, "00:00", timezone)
+      : null;
+    if (!startUtc || !endUtcExclusive) {
+      return { ok: false, error: "date_range_timezone_conversion_failed" };
+    }
+
+    await ensureThreadsFollowerSnapshotsTable(env);
+    await ensureThreadsPostsArchiveTable(env);
+    const followerResult = await env.DB.prepare(
+      `SELECT snapshot_date, followers_count, baseline_followers_count, captured_at
+       FROM threads_follower_snapshots
+       WHERE threads_user_id = ?
+         AND snapshot_date >= ?
+         AND snapshot_date <= ?
+       ORDER BY snapshot_date ASC
+       LIMIT 62`,
+    ).bind(brand.profile.threads_user_id, dateFrom, dateTo).all<ThreadsFollowerSnapshotRow>();
+    const followerRows = followerResult.results ?? [];
+    const followerTrajectory = followerRows.map((row, index) => {
+      const previous = index > 0 ? followerRows[index - 1] : null;
+      const followers = Number(row.followers_count ?? 0);
+      const baseline = row.baseline_followers_count === null || row.baseline_followers_count === undefined
+        ? null
+        : Number(row.baseline_followers_count);
+      const gain = baseline !== null
+        ? followers - baseline
+        : previous
+          ? followers - Number(previous.followers_count ?? 0)
+          : 0;
+      return {
+        date: row.snapshot_date,
+        followers,
+        gain,
+        captured_at: row.captured_at,
+      };
+    });
+    const firstFollowerRow = followerRows[0] ?? null;
+    const lastFollowerRow = followerRows[followerRows.length - 1] ?? null;
+    const startingFollowers = firstFollowerRow
+      ? Number(firstFollowerRow.baseline_followers_count ?? firstFollowerRow.followers_count ?? 0)
+      : null;
+    const currentFollowers = lastFollowerRow ? Number(lastFollowerRow.followers_count ?? 0) : null;
+    const netGrowth = startingFollowers !== null && currentFollowers !== null
+      ? currentFollowers - startingFollowers
+      : null;
+    const growthPercent = startingFollowers && netGrowth !== null
+      ? Number(((netGrowth / startingFollowers) * 100).toFixed(2))
+      : null;
+
+    const postResult = await env.DB.prepare(
+      `SELECT post_id, post_text, post_timestamp, post_permalink,
+              views, likes, replies, reposts, quotes, shares, engagement_total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ?
+         AND datetime(post_timestamp) >= datetime(?)
+         AND datetime(post_timestamp) < datetime(?)
+       ORDER BY engagement_total DESC, likes DESC, views DESC
+       LIMIT 250`,
+    ).bind(brand.profile.threads_user_id, startUtc, endUtcExclusive).all<Record<string, unknown>>();
+    const posts = (postResult.results ?? []).map((row) => ({
+      id: String(row.post_id ?? ""),
+      text: String(row.post_text ?? "").replace(/\s+/g, " ").trim().slice(0, 280),
+      published_at: row.post_timestamp ?? null,
+      permalink: row.post_permalink ?? null,
+      views: Number(row.views ?? 0),
+      likes: Number(row.likes ?? 0),
+      replies: Number(row.replies ?? 0),
+      reposts: Number(row.reposts ?? 0),
+      quotes: Number(row.quotes ?? 0),
+      shares: Number(row.shares ?? 0),
+      engagement_total: Number(row.engagement_total ?? 0),
+    }));
+    const rank = (metric: "views" | "likes" | "replies" | "reposts" | "engagement_total") =>
+      [...posts]
+        .sort((left, right) => right[metric] - left[metric] || right.engagement_total - left.engagement_total)
+        .slice(0, topLimit);
+
+    return {
+      ok: true,
+      brand_key: brand.brand_key,
+      period: { date_from: dateFrom, date_to: dateTo, timezone },
+      follower_growth: {
+        starting_followers: startingFollowers,
+        current_followers: currentFollowers,
+        net_growth: netGrowth,
+        growth_percent: growthPercent,
+        snapshot_days: followerTrajectory.length,
+        trajectory: followerTrajectory,
+      },
+      post_performance: {
+        posts_in_period: posts.length,
+        top_limit: topLimit,
+        by_views: rank("views"),
+        by_likes: rank("likes"),
+        by_replies: rank("replies"),
+        by_reposts: rank("reposts"),
+        by_engagement: rank("engagement_total"),
+      },
+      follower_attribution_policy: {
+        account_level_only: true,
+        post_level_attribution: "forbidden",
+      },
+      payload_contract: {
+        server_bounded: true,
+        max_posts_scanned: 250,
+        max_ranked_posts_per_metric: 10,
+        model_payload_sizing: false,
+      },
+    };
+  }
+
       if (toolName === "prepareFullPreflight") {
     let preflightPhase = "session";
     try {
