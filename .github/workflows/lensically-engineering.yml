@@ -17,8 +17,8 @@ on:
         required: true
         default: typecheck
         type: choice
-        options:
-                    - typecheck
+                options:
+          - typecheck
           - system-directory-tests
           - operator-tests
           - gpt-memory-tests
@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   worker:
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[operator-tests]') || contains(github.event.head_commit.message, '[system-directory-tests]'))) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[operator-tests]') || contains(github.event.head_commit.message, '[system-directory-tests]'))) }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -91,7 +91,8 @@ jobs:
         if: ${{ steps.worker-dependency-cache.outputs.cache-hit != 'true' }}
         run: npm ci
 
-            - name: Typecheck
+            
+      - name: Typecheck
         if: ${{ inputs.task == 'typecheck' || inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[operator-tests]') || contains(github.event.head_commit.message, '[system-directory-tests]'))) }}
         run: npx tsc --noEmit
 
