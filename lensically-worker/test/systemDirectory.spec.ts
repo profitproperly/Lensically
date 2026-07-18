@@ -322,7 +322,7 @@ describe("System Directory foundation", () => {
   });
 
   it("stores the bootstrap lifecycle declaration in the canonical manifest", () => {
-    const lifecycle = JSON.parse(readFileSync(new URL("../src/systemDirectory/capabilityLifecycle.json", import.meta.url), "utf8")) as { declarations: Array<Record<string, unknown>> };
+    const lifecycle = LENSICALLY_CAPABILITY_LIFECYCLE;
     expect(lifecycle.declarations).toContainEqual(expect.objectContaining({
       capability_id: "engineering.autonomous_capability_lifecycle",
       directory_entry_id: "engineering.capability_lifecycle",
