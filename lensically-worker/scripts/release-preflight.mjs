@@ -92,7 +92,10 @@ if (!validationWorkflow.includes("node scripts/release-preflight.mjs --capabilit
 if (!workflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) lifecycleErrors.push("capability_lifecycle_engineering_gate_missing");
 
 if (lifecycleErrors.length > 0) {
-  for (const error of lifecycleErrors) console.error(`[capability-lifecycle] ${error}`);
+  for (const error of lifecycleErrors) {
+    console.error(`[capability-lifecycle] ${error}`);
+    console.error(`::error title=Capability lifecycle gate::${error}`);
+  }
   process.exit(1);
 }
 if (process.argv.includes("--capability-lifecycle-only")) {
