@@ -15740,6 +15740,13 @@ async function handleOperatorMcpAdminTool(
       },
     });
     const capsule = await buildOperatorProceedCapsule(request, env, brand, session, "resume_existing_workflow");
+    const growthMissionBrief = capsule.growth_mission_brief && typeof capsule.growth_mission_brief === "object"
+      ? capsule.growth_mission_brief as Record<string, unknown>
+      : null;
+    const discussionContract = growthMissionBrief?.discussion_contract && typeof growthMissionBrief.discussion_contract === "object"
+      ? growthMissionBrief.discussion_contract as Record<string, unknown>
+      : null;
+    const accountExecutionLocked = brandKey === "manifest_mental" && discussionContract?.execution_locked !== false;
     return {
       ok: true,
       selected_key: brandKey,
