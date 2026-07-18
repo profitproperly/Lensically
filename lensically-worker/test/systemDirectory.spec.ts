@@ -286,6 +286,7 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
   });
 
+  // Canonical regression required by capabilityLifecycle.json.
   it("enforces the autonomous capability lifecycle for every future capability", () => {
     const lifecycle = LENSICALLY_CAPABILITY_LIFECYCLE;
     expect(lifecycle).toMatchObject({
