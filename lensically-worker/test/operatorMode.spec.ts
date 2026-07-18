@@ -462,6 +462,82 @@ describe("operator mode backend spine", () => {
         expect(broken.anomalyReason).toContain("shares_exceeds_views");
   });
 
+  it("routes the exact monthly growth question to one bounded analytics response", async () => {
+    await env.DB.prepare(`DROP TABLE IF EXISTS threads_follower_snapshots`).run();
+    await env.DB.prepare(
+      `CREATE TABLE threads_follower_snapshots (
+        threads_user_id TEXT NOT NULL,
+        snapshot_date TEXT NOT NULL,
+        followers_count INTEGER NOT NULL,
+        baseline_followers_count INTEGER,
+        captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (threads_user_id, snapshot_date)
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO threads_follower_snapshots (
+        threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at
+      ) VALUES
+        ('35758578720393972', '2026-07-01', 105, 100, '2026-07-01T12:00:00Z'),
+        ('35758578720393972', '2026-07-17', 145, 140, '2026-07-17T12:00:00Z')`,
+    ).run();
+    await env.DB.prepare(
+      `CREATE TABLE threads_posts_archive (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT NOT NULL,
+        post_text TEXT,
+        post_timestamp TEXT,
+        post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        engagement_total INTEGER NOT NULL DEFAULT 0,
+        source_rank INTEGER NOT NULL DEFAULT 0,
+        first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (threads_user_id, post_id)
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink,
+        views, likes, replies, reposts, quotes, shares, engagement_total
+      ) VALUES
+        ('35758578720393972', 'july-winner', 'July winner', '2026-07-10T16:00:00Z', 'https://threads.net/july-winner', 5000, 900, 40, 30, 5, 2, 977),
+        ('35758578720393972', 'july-second', 'July second', '2026-07-12T16:00:00Z', 'https://threads.net/july-second', 3000, 400, 80, 10, 2, 1, 493)`,
+    ).run();
+
+    await ensureMcpAccountOpen("manifest_mental");
+    const result = await mcpToolRaw<Record<string, unknown>>("executeLensicallyIntent", {
+      objective: "Review this month's follower growth and strongest posts.",
+      intent: "How many followers have we grown this month and which posts have done well this month?",
+      inputs: {
+        brand_key: "manifest_mental",
+        proceed_confirmed: true,
+        date_from: "2026-07-01",
+        date_to: "2026-07-17",
+        timezone: "America/New_York",
+        top_limit: 5,
+      },
+    });
+    expect(result.isError).not.toBe(true);
+    const payload = result.structuredContent as {
+      follower_growth?: { starting_followers?: number; current_followers?: number; net_growth?: number };
+      post_performance?: { by_views?: Array<{ id: string }> };
+      mandatory_execution_map?: { mapped_tool?: string };
+    };
+    expect(payload.mandatory_execution_map?.mapped_tool).toBe("get_monthly_growth_review");
+    expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
+    expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
+    expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
+  });
+
   it("fingerprints content and evaluates age-matched post performance without follower attribution", () => {
     const fingerprint = buildOperatorPostFingerprint({
       text: "Trust what your intuition keeps telling you. BELIEVE IT.",
