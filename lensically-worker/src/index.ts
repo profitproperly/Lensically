@@ -12432,6 +12432,37 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
+    name: "schedule_owner_approved_batch",
+    title: "Schedule owner-approved post batch",
+    description: "Schedule up to 12 posts exactly as explicitly approved by the owner. This is a bounded manual scheduling path for already-reviewed text and does not generate, revise, or infer content.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        owner_approval: { type: "string" },
+        timezone: { type: "string" },
+        posts: {
+          type: "array",
+          minItems: 1,
+          maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              text: { type: "string" },
+              date: { type: "string" },
+              time: { type: "string" },
+            },
+            required: ["text", "date", "time"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["brand_key", "owner_approval", "posts"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
     name: "schedule_approved_draft",
     title: "Schedule approved draft",
     description: "Use this to schedule a draft only after it has been approved. This fails for candidate, shown, rejected, or self-rejected drafts.",
