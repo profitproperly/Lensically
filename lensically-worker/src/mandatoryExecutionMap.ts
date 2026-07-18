@@ -85,6 +85,26 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     supersession_rule: "A replacement must preserve implementation-before-verification ordering and pass the same regression.",
   },
   {
+    id: "bounded_integration_test_timeout",
+    status: "active",
+    priority: 100,
+    defect_class: "contract_drift",
+    matching_conditions: {
+      all_terms: ["test", "timeout"],
+      any_terms: ["integration", "database", "d1", "workflow"],
+    },
+    losing_path: "Rely on the five-second unit-test default for a bounded integration regression with database setup and MCP execution.",
+    winning_path: {
+      surface: "source_control",
+      procedure: ["Keep the production behavior unchanged.", "Assign a bounded timeout to the specific integration regression.", "Do not raise the global test timeout.", "Re-run the deterministic shard."],
+    },
+    evidence: ["The monthly-growth integration regression completed beyond the five-second default while neighboring shard tests passed."],
+    scope: "component",
+    enforcement_point: "Focused integration test definition and deterministic shard regression.",
+    regression_test_id: "records the bounded integration-test timeout winning path",
+    supersession_rule: "Remove the explicit timeout only after the test is measurably optimized below the default across repeated deterministic runs.",
+  },
+  {
     id: "operator_mcp_version_single_source",
     status: "active",
     priority: 100,
