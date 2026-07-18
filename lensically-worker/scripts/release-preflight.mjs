@@ -104,7 +104,7 @@ if (process.argv.includes("--capability-lifecycle-only")) {
   process.exit(0);
 }
 
-const version = source.match(/const OPERATOR_MCP_VERSION = "([^"]+)";/)?.[1] ?? null;
+const version = source.match(/(?:export\s+)?const OPERATOR_MCP_VERSION = "([^"]+)";/)?.[1] ?? null;
 if (!version) errors.push("operator_mcp_version_missing");
 if (version && !currentState.includes(`Operator MCP v${version}`)) {
   errors.push(`current_state_version_mismatch:${version}`);
@@ -113,13 +113,13 @@ if (version && !currentState.includes(`Operator MCP v${version}`)) {
 const versionAssertionLines = tests
   .split(/\r?\n/)
   .filter((line) => /runtime\.mcp_version|serverInfo\.version|payload\.mcp_version/.test(line));
-const assertedVersions = versionAssertionLines
-  .map((line) => line.match(/\.toBe\("([0-9]+\.[0-9]+\.[0-9]+)"\)/)?.[1] ?? null)
-  .filter((value) => value !== null);
-if (assertedVersions.length < 3) {
-  errors.push(`operator_version_assertions_incomplete:${assertedVersions.length}`);
-} else if (version && assertedVersions.some((asserted) => asserted !== version)) {
-  errors.push(`operator_version_assertion_mismatch:runtime=${version}:tests=${[...new Set(assertedVersions)].join(",")}`);
+const literalVersionAssertionLines = versionAssertionLines.filter((line) => /["'][0-9]+\.[0-9]+\.[0-9]+["']/.test(line));
+const canonicalVersionAssertionLines = versionAssertionLines.filter((line) => line.includes("OPERATOR_MCP_VERSION"));
+if (literalVersionAssertionLines.length > 0) {
+  errors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionLines.length}`);
+}
+if (canonicalVersionAssertionLines.length < 3) {
+  errors.push(`operator_canonical_version_assertions_incomplete:${canonicalVersionAssertionLines.length}`);
 }
 
 if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";')
