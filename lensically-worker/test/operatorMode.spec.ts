@@ -226,6 +226,8 @@ async function resetTables(): Promise<void> {
     "operator_execution_map_entries",
     "operator_decision_execution_events",
     "operator_decision_proposals",
+    "operator_growth_mission_revisions",
+    "operator_growth_missions",
     "operator_autonomy_profiles",
     "operator_operation_receipts",
     "operator_continuity_refs",
