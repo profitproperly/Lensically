@@ -656,8 +656,8 @@ export async function finalizeMandatoryExecutionMapCall(
   return {
     version: MANDATORY_EXECUTION_MAP_VERSION,
     map_state: directEngineering
-      ? result.ok === false ? "source_defined_direct_failed" : "source_defined_direct_completed"
-      : result.ok === false ? "source_defined_route_failed" : "source_defined_route_completed",
+      ? effectiveFailure ? "source_defined_direct_failed" : "source_defined_direct_completed"
+      : effectiveFailure ? "source_defined_route_failed" : "source_defined_route_completed",
     route_mode: mode,
     action_intent: actionIntent,
     mapped_tool: toolName,
