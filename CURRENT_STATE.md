@@ -9,7 +9,7 @@
 
 ## Operator MCP
 
-- Operator MCP v1.28.0 is exposed at `/api/operator/mcp` with OAuth and one permanent public tool: `executeLensicallyIntent`.
+- Operator MCP v1.28.1 is exposed at `/api/operator/mcp` with OAuth and one permanent public tool: `executeLensicallyIntent`.
 - Operator UI parity reads use one canonical paginated handler for the same Dashboard, Followers, live Insights, Post Archive, and Saved Patterns services used by the web UI. Stale Manifest review batches have a separate canonical retirement action that preserves all underlying sources, analytics, and lineage.
 - The public request contains `objective`, `intent`, and `inputs`. Direct internal tool calls are rejected.
 - The source-controlled System Directory resolves the relevant Lensically system, authoritative location, bounded payload profile, related systems, and narrow hard gates before `static-execution-router-v1` selects one internal typed handler.
