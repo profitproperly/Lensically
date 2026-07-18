@@ -11689,7 +11689,6 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
   "get_monthly_growth_review",
   "selectOperatorKey",
   "confirmOperatorProceed",
-  "resolveContinuationContext",
   "getOperatorDecisionState",
   "proposeOperatorDecision",
   "resolveOperatorDecision",
