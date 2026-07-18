@@ -192,6 +192,28 @@
       "release_scope": "system-directory-tests",
       "live_verification": "The exact deployed Worker persists owner-model plan revisions, unlocks guided account execution only after explicit approval, and enables autonomous account mode only with an explicit owner response.",
       "compatibility_bridge": false
+    },
+    {
+      "capability_id": "product.read_ui_surface",
+      "directory_entry_id": "product.ui_surface_parity",
+      "canonical_handler": "read_lensically_ui_surface",
+      "route_intent": "read lensically ui surface",
+      "implementation_mode": "new_handler",
+      "focused_regression": "routes complete Lensically UI surface reads through one canonical paginated handler",
+      "release_scope": "operator-accounts",
+      "live_verification": "The deployed Worker returns the same Dashboard, Followers, live Insights, Post Archive, and Saved Patterns data used by the web UI, with bounded pagination or cursor continuation.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "content.retire_review_batch",
+      "directory_entry_id": "content.review_batch_retirement",
+      "canonical_handler": "discard_manifest_review_batch",
+      "route_intent": "discard manifest review batch",
+      "implementation_mode": "new_handler",
+      "focused_regression": "retires stale Manifest review batches while preserving source records",
+      "release_scope": "operator-content",
+      "live_verification": "The deployed Worker retires the selected stale review batch, removes it from active continuity, and reports that Saved Pattern, archive, analytics, and lineage records remain preserved.",
+      "compatibility_bridge": false
     }
   ]
 }
