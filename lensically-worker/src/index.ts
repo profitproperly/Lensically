@@ -15475,6 +15475,15 @@ function operatorMcpLegacyContinuityCredential(args: Record<string, unknown>): u
   return args.continuity_ref ?? args.continuity_token;
 }
 
+const GROWTH_MISSION_DISCUSSION_EXEMPT_TOOLS = new Set<string>([
+  "getGrowthMission",
+  "updateGrowthMission",
+  "prepareFullPreflight",
+  "admit_context",
+  "start_workflow_session",
+  "proposeOperatorDecision",
+  "resolveOperatorDecision",
+]);
 
 async function getOperatorMcpBoundaryBlock(
   _request: Request,
