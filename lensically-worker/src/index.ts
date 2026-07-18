@@ -8840,12 +8840,12 @@ async function buildOperatorManifestProceedCapsule(
   const skippedCount = reviewItems.filter((item) => ["skipped", "rejected"].includes(String(item.status ?? ""))).length;
   const unresolvedCount = Math.max(reviewItems.length - scheduledCount - skippedCount, 0);
     const resumableReviewBatch = activeReviewBatch && unresolvedCount > 0 ? activeReviewBatch : null;
-  const next = blockingIncident
+  const operationalNext = blockingIncident
     ? {
       action: "resolve_delivery_incident",
       owner_checkpoint: "production_incident_recovery",
       canonical_tool: "list_scheduled_posts",
-      last_completed_action: "unresolved_delivery_incident_restored",
+      last_completed_action: "unresolved_delivery_incident_observed",
     }
     : resumableReviewBatch
       ? {
@@ -8860,6 +8860,18 @@ async function buildOperatorManifestProceedCapsule(
         canonical_tool: "get_hourly_coverage",
         last_completed_action: activeReviewBatch ? "terminal_review_batch_detected" : "calendar_coverage_inspected",
       };
+  const growthMissionBrief = await openOperatorGrowthMissionDiscussion(env, brand, {
+    calendarCoverage,
+    activeReviewBatch: resumableReviewBatch,
+    workflowSession: session,
+    operationalNext,
+  });
+  const next = {
+    action: "discuss_growth_mission_brief",
+    owner_checkpoint: "growth_mission_brief",
+    canonical_tool: "getGrowthMission",
+    last_completed_action: "growth_diagnostic_prepared",
+  };
   const nextArtifactId = String(
     (blockingIncident ? blockingIncident.id : null)
     ?? (resumableReviewBatch ? activeReviewRow?.id : null)
