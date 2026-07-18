@@ -10,14 +10,15 @@
 
 - `lensically-web/` is the frontend.
 - `lensically-worker/` is the main backend and Operator MCP.
-- `lensically-recovery-worker/` is the independent break-glass control plane. Keep it small, source-defined, separately deployed, and free of account or customer data.
+- `lensically-recovery-worker/` is the independent engineering control plane for free-text source discovery, exact repair patches, terminal workflow diagnostics, and Worker deployment. Keep it small, source-defined, separately deployed, and free of account or customer data.
 
 ## Execution Contract
 
 - `executeLensicallyIntent` is the sole public main-MCP tool. Its public schema remains `objective`, `intent`, and `inputs`, with only existing optional continuation fields.
-- `static-execution-router-v1` selects one live typed internal handler from source-defined intent aliases. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
+- The source-controlled System Directory resolves the relevant Lensically system, source of truth, payload bounds, and adjacent systems before `static-execution-router-v1` selects one live typed handler.
+- Exact deterministic and exact source-defined intents always keep precedence over broader Directory hints. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
 - Direct internal tool calls are rejected.
-- Recovery is used only when the main Worker or deployment plane cannot receive or complete a repair. It is not an ordinary fallback for a healthy main path.
+- Known-file reads and normal account operations stay on the main gateway. Free-text repository discovery, terminal failure diagnostics, and deployment use Recovery because those public main-gateway payload classes are client-blocked. Recovery is also the break-glass plane when the main Worker is unreachable.
 - Account workflows retain explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety after routing.
 
 ## Engineering Default
@@ -36,7 +37,7 @@
 
 - Check the current repository head before mutations.
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
-- Known exact files should be read once and searched locally. Broader search is bounded and automatically falls back from empty code search to repository-tree path matching.
+- Known exact files should be read once through the main bounded file-read route and searched locally. Free-text or unknown-location repository discovery uses Recovery; do not send it through the main public gateway.
 - Exact text replacements must match once. A stale head or ambiguous anchor requires refreshed source and corrected input, not a new route.
 - YAML workflow changes require complete-block or whole-file replacement, correct indentation, and readback before dispatch.
 - Stage only task files in local Codex workflows. Never discard unrelated changes.
@@ -44,9 +45,9 @@
 
 ## Validation and Release
 
-- Normal backend release order is preflight, TypeScript validation, focused Operator release gate, GPT-memory tests, deployment, cron verification, and scheduler safety verification.
+- Normal backend release order is preflight, TypeScript validation, mandatory System Directory tests, focused Operator release gate, GPT-memory tests, deployment, cron verification, and scheduler safety verification.
 - Full Operator tests are diagnostic and run separately when broad account behavior changed or focused checks are insufficient.
-- Normal releases dispatch on the configured branch and pass the exact intended commit through `release_sha`. Checkout must equal that SHA.
+- Recovery dispatches releases on the configured branch with the exact intended commit in `release_sha`; checkout must equal that SHA. The main gateway does not dispatch deployments.
 - Avoid separate full validation and deployment workflows for one coherent change.
 - Use bounded workflow status reads. Detailed failure diagnostics are read only after a terminal failure.
 - Version changes require synchronized runtime constants, exact assertions, and current-state documentation. Do not bump versions for cleanup alone.

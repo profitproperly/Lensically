@@ -5,9 +5,10 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Execution Architecture
 
 - Every main-MCP operation enters through the sole public tool `executeLensicallyIntent`.
-- The source-defined static router selects one live typed internal handler. The model does not choose tools, wrappers, retries, or fallbacks.
+- The source-controlled System Directory resolves the relevant system, system of record, payload bounds, and adjacent systems before the static router selects one live typed handler.
+- Exact deterministic and exact source-defined intents keep precedence over broader Directory guidance. The model does not choose tools, wrappers, retries, or fallbacks.
 - Route selection must remain D1-independent. Do not reintroduce execution-library compilation, dynamic maps, route incidents, promotions, phonebook overrides, OpsMemory routing, or execution-event recording.
-- Direct internal tool calls are rejected. Recovery is not a model-selected fallback; it is an independent break-glass plane used only when the main Worker or deployment plane cannot receive or complete the repair.
+- Direct internal tool calls are rejected. Known-file reads and normal account work stay on the main gateway; free-text source discovery, terminal workflow diagnostics, deployment, and break-glass repair use Recovery.
 - Preserve account protections after routing: selected brand, explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety.
 
 ## Engineering Speed
@@ -24,17 +25,17 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 - GitHub `main` is authoritative. Read the current head before mutations.
 - Large Worker files use Git blob, tree, commit, and ref APIs. Do not use the GitHub Contents API for oversized files.
-- For a known exact file, read that blob once and search locally. Do not repeat empty GitHub code searches.
-- Broader repository search is bounded: one code-search request followed by the compact tree-path fallback when search is empty or unavailable.
+- For a known exact file, use one bounded main-gateway read and search the returned text locally.
+- Free-text or unknown-location repository discovery uses Recovery. Do not submit repository-search payloads through the main public gateway.
 - Exact replacements must match once. If the head changed or the anchor is ambiguous, reload current source and correct the variable input; the tool route is still valid.
 - YAML workflow changes require a complete reviewed block or whole-file replacement with correct indentation and readback before dispatch.
 - Never expose tokens or secret values while diagnosing GitHub, Cloudflare, OAuth, or deployment configuration.
 
 ## Validation and Deployment
 
-- Normal release order: dependency-free preflight, `npx tsc --noEmit`, focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
+- Normal release order: dependency-free preflight, `npx tsc --noEmit`, mandatory System Directory tests, focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
 - Full Operator tests are diagnostic. Run them separately when a change affects broad account behavior or when the focused gate cannot identify the regression.
-- Release dispatch uses the configured branch plus the exact commit in `release_sha`. Checkout must equal that SHA before validation and deployment.
+- Recovery dispatches releases using the configured branch plus the exact commit in `release_sha`. Checkout must equal that SHA before validation and deployment; the main gateway never dispatches deployment.
 - A superseded or cancelled workflow is not an implementation failure when a newer run for the same intended commit is authoritative.
 - Version changes require synchronized runtime constants, exact test assertions, and `CURRENT_STATE.md`. Do not bump versions for architecture cleanup unless the public/runtime contract requires it.
 - Live completion requires health on the exact commit, OAuth and initialize success, one-tool discovery, direct-call rejection, mapped execution success, and the expected registry generation.
@@ -70,7 +71,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Recovery and Client Boundaries
 
 - Recovery remains independently deployed and source-defined. It must not depend on the main gateway, main D1 preparation, account data, or Operator routing.
-- A transport failure before the Worker receives a request cannot be repaired by code inside that Worker. Use Recovery when the main path is unreachable; otherwise keep work on the main source-defined route.
+- Use Recovery for registered control-plane classes: free-text repository discovery, terminal workflow failure diagnostics, exact repair when the main client blocks the payload, verified Worker deployment, and main-path break-glass recovery. Keep known-file reads and normal account work on the main source-defined route.
 - ChatGPT may cache a public MCP schema after a deployment. Server smoke proves the live schema; the installed app may still require an explicit Refresh when the public tool schema itself changes.
 - The public main schema is frozen at one tool. Internal handler additions and implementation changes should not require a ChatGPT app schema refresh.
 - Keep client payloads narrow enough to pass preflight: compact intent and typed variable inputs only.

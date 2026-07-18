@@ -11,10 +11,10 @@
 
 - Operator MCP v1.27.1 is exposed at `/api/operator/mcp` with OAuth and one permanent public tool: `executeLensicallyIntent`.
 - The public request contains `objective`, `intent`, and `inputs`. Direct internal tool calls are rejected.
-- `static-execution-router-v1` selects one internal typed handler from source-defined aliases and the live schema. The model cannot choose the tool, wrapper, retry path, or fallback.
+- The source-controlled System Directory resolves the relevant Lensically system, authoritative location, bounded payload profile, related systems, and narrow hard gates before `static-execution-router-v1` selects one internal typed handler.
+- Exact deterministic and exact source-defined intents keep precedence over broader Directory guidance, preventing read requests from being rewritten into mutations. The model cannot choose the tool, wrapper, retry path, or fallback.
 - Route selection does not read D1, compile policy, scan repository knowledge, create incidents, promote routes, or consult OpsMemory or a phonebook.
-- Known engineering operations execute through the direct source-defined lane before account bootstrap. Repository reads, searches, patches, tests, releases, workflow status, and deployment verification use compact requests and receipts.
-- Empty GitHub code search falls through automatically to the bounded repository fallback. Exact large-file searches use one named blob read and local text matching.
+- Known engineering operations execute through the direct source-defined lane before account bootstrap. Known-file reads, patches, tests, and workflow activity use compact main-gateway requests; free-text source discovery, terminal workflow diagnostics, and deployment use Recovery.
 - Related repository edits use one atomic patch set when practical. Normal releases use one exact-SHA validate-and-deploy workflow.
 - Account workflow calls still retain the controls that protect real business state: selected account, explicit Proceed boundary, server-side continuity, idempotency, authorization, content gates, scheduling ownership, and scheduler safety.
 
@@ -36,9 +36,9 @@
 
 ## Recovery Plane
 
-- `lensically-recovery-worker/` is an independent break-glass Worker and ChatGPT app.
-- Recovery has direct source-defined GitHub and Cloudflare controls for health checks, repository reads/searches/patches, chunked writes, workflow dispatch/status, deployment inspection, telemetry, rollback, and main-MCP smoke testing.
-- Recovery must remain separate from the main Worker, D1, account workflows, and Operator router. It is used only when the main Worker or deployment plane cannot receive or complete the repair.
+- `lensically-recovery-worker/` is an independent engineering control Worker and ChatGPT app.
+- Recovery has direct source-defined GitHub and Cloudflare controls for free-text source discovery, exact patches, terminal workflow diagnostics, verified deployment dispatch, health checks, deployment inspection, telemetry, rollback, and main-MCP smoke testing.
+- Recovery remains separate from the main Worker, D1, account workflows, and Operator router. It is the canonical surface for registered client-blocked engineering classes and the break-glass plane when the main Worker cannot receive or complete a repair.
 
 ## Account Workflow
 
@@ -72,9 +72,9 @@
 - GitHub `main` is the repository source of truth.
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
 - Normal implementation flow is bounded inspection, one coherent change set, focused validation, one exact-SHA release, and live health and smoke verification.
-- The deployment workflow runs preflight, TypeScript validation, the focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
+- The deployment workflow runs preflight, TypeScript validation, mandatory System Directory tests, the focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
 - Full Operator tests are diagnostic and run separately when broader regression investigation is required.
-- Releases dispatch on the configured branch while passing the exact commit through `release_sha`; checkout must match that SHA before validation or deployment.
+- Recovery dispatches releases on the configured branch while passing the exact commit through `release_sha`; checkout must match that SHA before validation or deployment. Workflow jobs cannot self-commit diagnostics back to `main`.
 - Routine engineering should complete in under ten minutes whenever the underlying platform operation permits it. Extra frameworks, duplicated registries, repeated polling, and separate validation and deployment loops are not acceptable defaults.
 
 ## Deployment Targets
