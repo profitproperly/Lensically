@@ -474,12 +474,26 @@ describe("operator mode backend spine", () => {
         PRIMARY KEY (threads_user_id, snapshot_date)
       )`,
     ).run();
-    await env.DB.prepare(
+        await env.DB.prepare(
       `INSERT INTO threads_follower_snapshots (
         threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at
       ) VALUES
         ('35758578720393972', '2026-07-01', 105, 100, '2026-07-01T12:00:00Z'),
         ('35758578720393972', '2026-07-17', 145, 140, '2026-07-17T12:00:00Z')`,
+    ).run();
+    await env.DB.prepare(`DROP TABLE IF EXISTS threads_accounts`).run();
+    await env.DB.prepare(
+      `CREATE TABLE threads_accounts (
+        threads_user_id TEXT PRIMARY KEY,
+        access_token TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        configured_account_id TEXT
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at, configured_account_id)
+       VALUES ('35758578720393972', 'test-token-manifest', 0, 0, 'manifest-mental')`,
     ).run();
     await env.DB.prepare(
       `CREATE TABLE threads_posts_archive (

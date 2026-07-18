@@ -122,6 +122,7 @@ type ResolvedConfiguredThreadsAccount = ConfiguredThreadsAccount & {
   accessToken: string;
   expiresAt: number | null;
   createdAt: number | null;
+  threadsUserId: string | null;
 };
 
 type ConfiguredThreadsAccountProfile = {
@@ -872,12 +873,13 @@ async function resolveConfiguredThreadsAccount(
 ): Promise<ResolvedConfiguredThreadsAccount | null> {
   await ensureThreadsAccountsTable(env);
 
-  const storedAccount = await env.DB.prepare(
-    `SELECT access_token, expires_at, created_at
+    const storedAccount = await env.DB.prepare(
+    `SELECT threads_user_id, access_token, expires_at, created_at
      FROM threads_accounts
      WHERE configured_account_id = ?
      LIMIT 1`,
   ).bind(account.id).first<{
+    threads_user_id: string | null;
     access_token: string | null;
     expires_at: number | string | null;
     created_at: number | string | null;
@@ -887,29 +889,32 @@ async function resolveConfiguredThreadsAccount(
   if (storedAccessToken) {
     return {
       ...account,
-      accessToken: storedAccessToken,
+            accessToken: storedAccessToken,
       expiresAt: Number(storedAccount?.expires_at ?? 0) || 0,
       createdAt: Number(storedAccount?.created_at ?? 0) || 0,
+      threadsUserId: storedAccount?.threads_user_id?.trim() || null,
     };
   }
 
     
   const bootstrapAccessToken = env[account.tokenEnv];
   if (typeof bootstrapAccessToken === "string" && bootstrapAccessToken.trim()) {
-    return {
+        return {
       ...account,
       accessToken: bootstrapAccessToken.trim(),
       expiresAt: null,
       createdAt: null,
+      threadsUserId: null,
     };
   }
 
   if (hasTestRuntimeTokens(env)) {
-    return {
+        return {
       ...account,
       accessToken: `test-token-${account.id}`,
       expiresAt: null,
       createdAt: null,
+      threadsUserId: null,
     };
   }
 
@@ -936,7 +941,7 @@ function configuredThreadsAccountFallbackPayload(
   index: number,
 ): ConfiguredThreadsAccountProfile {
   return {
-    threads_user_id: account.id,
+        threads_user_id: account.threadsUserId ?? account.id,
     is_active: index === 0,
     created_at: 0,
     username: account.username,
@@ -15692,33 +15697,27 @@ async function handleOperatorMcpAdminTool(
       ? Number(((netGrowth / startingFollowers) * 100).toFixed(2))
       : null;
 
-    const postResult = await env.DB.prepare(
+        const postResult = await env.DB.prepare(
       `SELECT
-         COALESCE(a.post_id, s.published_post_id) AS post_id,
-         COALESCE(a.post_text, s.post_text) AS post_text,
-         COALESCE(a.post_timestamp, s.published_at, s.scheduled_time) AS post_timestamp,
-         a.post_permalink,
-         COALESCE(a.views, 0) AS views,
-         COALESCE(a.likes, 0) AS likes,
-         COALESCE(a.replies, 0) AS replies,
-         COALESCE(a.reposts, 0) AS reposts,
-         COALESCE(a.quotes, 0) AS quotes,
-         COALESCE(a.shares, 0) AS shares,
-         COALESCE(a.engagement_total, 0) AS engagement_total
-       FROM scheduled_posts s
-       LEFT JOIN threads_posts_archive a
-         ON a.threads_user_id = s.threads_user_id
-        AND a.post_id = s.published_post_id
-       WHERE s.threads_user_id = ?
-         AND s.status = ?
-         AND s.published_post_id IS NOT NULL
-         AND datetime(COALESCE(s.published_at, s.scheduled_time)) >= datetime(?)
-         AND datetime(COALESCE(s.published_at, s.scheduled_time)) < datetime(?)
+         post_id,
+         post_text,
+         post_timestamp,
+         post_permalink,
+         COALESCE(views, 0) AS views,
+         COALESCE(likes, 0) AS likes,
+         COALESCE(replies, 0) AS replies,
+         COALESCE(reposts, 0) AS reposts,
+         COALESCE(quotes, 0) AS quotes,
+         COALESCE(shares, 0) AS shares,
+         COALESCE(engagement_total, 0) AS engagement_total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ?
+         AND datetime(post_timestamp) >= datetime(?)
+         AND datetime(post_timestamp) < datetime(?)
        ORDER BY engagement_total DESC, likes DESC, views DESC
        LIMIT 250`,
     ).bind(
       brand.profile.threads_user_id,
-      SCHEDULED_POST_STATUS_POSTED,
       startUtc,
       endUtcExclusive,
     ).all<Record<string, unknown>>();
