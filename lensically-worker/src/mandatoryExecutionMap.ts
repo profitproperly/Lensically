@@ -222,7 +222,7 @@ function aliasesForTool(tool: MandatoryExecutionToolDefinition): string[] {
 function deterministicToolForOperationalIntent(actionIntent: string, inputs: Record<string, unknown>): string | null {
   const text = `${actionIntent} ${normalizeText(inputs.intent_hint, 1000) ?? ""} ${normalizeText(inputs.path, 1000) ?? ""}`.toLowerCase();
   const has = (pattern: RegExp) => pattern.test(text);
-  if (/^startup$/.test(text.trim()) || has(/\boperator\s+startup\b/)) return "getOperatorStartupContext";
+  if (/^startup$/.test(text.trim()) || has(/\boperator\s+startup\b/) || has(/\bload\s+operator\s+context\b/)) return "getOperatorStartupContext";
   if (has(/\bselect\b/) && has(/\b(key|brand)\b/)) return "selectOperatorKey";
   if (has(/\b(confirm|continue|proceed)\b/) && has(/\b(operator|workflow|step|proceed)\b/)) return "confirmOperatorProceed";
   if (has(/\bworkflow\s+status\b/) || has(/\bcurrent\s+workflow\s+state\b/)) return "getWorkflowStatus";
