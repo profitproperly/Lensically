@@ -539,12 +539,14 @@ describe("operator mode backend spine", () => {
       },
     });
     expect(result.isError).not.toBe(true);
-    const payload = result.structuredContent as {
+        const payload = result.structuredContent as {
+      threads_user_id?: string;
       follower_growth?: { starting_followers?: number; current_followers?: number; net_growth?: number };
       post_performance?: { by_views?: Array<{ id: string }> };
       mandatory_execution_map?: { mapped_tool?: string };
     };
     expect(payload.mandatory_execution_map?.mapped_tool).toBe("get_monthly_growth_review");
+    expect(payload.threads_user_id).toBe("35758578720393972");
     expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
     expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
     expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);

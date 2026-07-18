@@ -15740,9 +15740,10 @@ async function handleOperatorMcpAdminTool(
         .sort((left, right) => right[metric] - left[metric] || right.engagement_total - left.engagement_total)
         .slice(0, topLimit);
 
-    return {
+        return {
       ok: true,
       brand_key: brand.brand_key,
+      threads_user_id: brand.profile.threads_user_id,
       period: { date_from: dateFrom, date_to: dateTo, timezone },
       follower_growth: {
         starting_followers: startingFollowers,
