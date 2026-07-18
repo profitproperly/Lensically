@@ -460,6 +460,95 @@ function compactOperatorPayloadValue(
   return String(value).slice(0, limits.stringChars);
 }
 
+function compactOperatorContinuityReviewBatch(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value ?? null;
+  const batch = value as Record<string, unknown>;
+  const { items: rawItems, ...batchSummary } = batch;
+  const compactedSummary = compactOperatorPayloadValue(
+    batchSummary,
+    "continuity_capsule.review_batch",
+    { arrayItems: 4, stringChars: 500, objectKeys: 40, maxDepth: 5 },
+    [],
+  ) as Record<string, unknown>;
+  const itemKeys = [
+    "review_item_id",
+    "sequence",
+    "draw_order",
+    "source_batch_id",
+    "source_selection_id",
+    "source_identity_key",
+    "source_type",
+    "internal_source_id",
+    "threads_post_id",
+    "canonical_source_url",
+    "source_text",
+    "source_metrics",
+    "source_card_id",
+    "generation_run_id",
+    "draft_id",
+    "draft_status",
+    "generated_post",
+    "scheduled_post_id",
+    "scheduled_time",
+    "scheduled_status",
+    "status",
+    "showable",
+  ];
+  const items = Array.isArray(rawItems)
+    ? rawItems.slice(0, MANIFEST_REVIEW_BATCH_SIZE).map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+        const item = entry as Record<string, unknown>;
+        return Object.fromEntries(itemKeys
+          .filter((key) => Object.prototype.hasOwnProperty.call(item, key))
+          .map((key) => [
+            key,
+            compactOperatorPayloadValue(
+              item[key],
+              `continuity_capsule.review_batch.items.${key}`,
+              { arrayItems: 4, stringChars: 500, objectKeys: 24, maxDepth: 4 },
+              [],
+            ),
+          ]));
+      })
+    : [];
+  return { ...compactedSummary, items };
+}
+
+function compactOperatorContinuityCapsule(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const capsule = value as Record<string, unknown>;
+  const {
+    active_review_batch: activeReviewBatch,
+    completed_review_batch: completedReviewBatch,
+    unresolved_incidents: unresolvedIncidents,
+    required_recovery_actions: requiredRecoveryActions,
+    ...capsuleSummary
+  } = capsule;
+  const compactedSummary = compactOperatorPayloadValue(
+    capsuleSummary,
+    "continuity_capsule",
+    { arrayItems: 8, stringChars: 600, objectKeys: 64, maxDepth: 7 },
+    [],
+  ) as Record<string, unknown>;
+  return {
+    ...compactedSummary,
+    active_review_batch: compactOperatorContinuityReviewBatch(activeReviewBatch),
+    completed_review_batch: compactOperatorContinuityReviewBatch(completedReviewBatch),
+    unresolved_incidents: compactOperatorPayloadValue(
+      unresolvedIncidents ?? [],
+      "continuity_capsule.unresolved_incidents",
+      { arrayItems: 8, stringChars: 500, objectKeys: 32, maxDepth: 5 },
+      [],
+    ),
+    required_recovery_actions: compactOperatorPayloadValue(
+      requiredRecoveryActions ?? [],
+      "continuity_capsule.required_recovery_actions",
+      { arrayItems: 8, stringChars: 500, objectKeys: 32, maxDepth: 5 },
+      [],
+    ),
+  };
+}
+
 function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<string, unknown> {
   const originalBytes = operatorPayloadBytes(payload);
   if (originalBytes <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) return payload;
