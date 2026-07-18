@@ -63,8 +63,10 @@ if (!version) lifecycleErrors.push("operator_mcp_version_missing");
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
 }
-if (canonicalVersionAssertionEntries.length < 4) {
-  lifecycleErrors.push(`operator_canonical_version_assertions_incomplete:${canonicalVersionAssertionEntries.length}`);
+if (versionAssertionEntries.length === 0) {
+  lifecycleErrors.push("operator_version_assertions_missing");
+} else if (canonicalVersionAssertionEntries.length !== versionAssertionEntries.length) {
+  lifecycleErrors.push(`operator_canonical_version_assertions_incomplete:${canonicalVersionAssertionEntries.length}:${versionAssertionEntries.length}`);
 }
 
 if (capabilityLifecycle?.version !== "lensically-capability-lifecycle-v1") lifecycleErrors.push("capability_lifecycle_version_invalid");
