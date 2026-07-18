@@ -588,6 +588,78 @@ describe("operator mode backend spine", () => {
     expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
   });
 
+  it("opens a guided Growth Mission discussion after Proceed and blocks account mutations until approval", async () => {
+    const selected = await mcpToolRaw<{ selected_key: string }>("selectOperatorKey", { brand_key: "manifest_mental" });
+    expect(selected.isError).not.toBe(true);
+    expect(selected.structuredContent.selected_key).toBe("manifest_mental");
+
+    const proceeded = await mcpToolRaw<{
+      account_execution_locked_until_growth_plan_approval: boolean;
+      required_next_owner_action: string;
+      continuity_capsule: {
+        growth_mission_brief: {
+          version: string;
+          status: string;
+          proposed_plan: { target_followers: number; execution_mode: string };
+          discussion_contract: { execution_locked: boolean; no_account_mutation_before_approval: boolean };
+        };
+        workflow_checkpoint: { next_pending_action: string; next_owner_checkpoint: string };
+      };
+    }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    expect(proceeded.isError).not.toBe(true);
+    expect(proceeded.structuredContent.account_execution_locked_until_growth_plan_approval).toBe(true);
+    expect(proceeded.structuredContent.required_next_owner_action).toContain("Growth Mission Brief");
+    expect(proceeded.structuredContent.continuity_capsule.growth_mission_brief).toMatchObject({
+      version: "guided-growth-mission-v1",
+      status: "discussion",
+      proposed_plan: { target_followers: 1000000, execution_mode: "guided_owner_approval" },
+      discussion_contract: { execution_locked: true, no_account_mutation_before_approval: true },
+    });
+    expect(proceeded.structuredContent.continuity_capsule.workflow_checkpoint).toMatchObject({
+      next_pending_action: "discuss_growth_mission_brief",
+      next_owner_checkpoint: "growth_mission_brief",
+    });
+
+    const blocked = await mcpToolRaw<Record<string, unknown>>("approve_draft", {
+      brand_key: "manifest_mental",
+      draft_id: "not-yet-authorized",
+      proceed_confirmed: true,
+    });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.structuredContent).toMatchObject({
+      error: "growth_mission_approval_required",
+      account_execution_locked: true,
+      growth_mission_status: "discussion",
+      required_next_tool: "updateGrowthMission",
+    });
+
+    const approved = await mcpToolRaw<{
+      account_execution_unlocked: boolean;
+      full_auto_enabled: boolean;
+      growth_mission: { status: string; execution_mode: string };
+    }>("updateGrowthMission", {
+      brand_key: "manifest_mental",
+      status: "approved",
+      execution_mode: "guided_owner_approval",
+      mission_patch: {
+        permanent_mission: "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.",
+        target_followers: 1000000,
+        current_bottleneck: "evidence_led_growth_focus",
+        primary_objective: "Increase the share of posts outperforming the recent account baseline.",
+        recommended_next_action: "Prepare the first owner-reviewed execution batch.",
+      },
+      owner_response: "I approve this guided plan, not full auto.",
+      change_summary: "Approved Guided Growth Mission v1.",
+      proceed_confirmed: true,
+    });
+    expect(approved.isError).not.toBe(true);
+    expect(approved.structuredContent).toMatchObject({
+      account_execution_unlocked: true,
+      full_auto_enabled: false,
+      growth_mission: { status: "approved", execution_mode: "guided_owner_approval" },
+    });
+  });
+
   it("fingerprints content and evaluates age-matched post performance without follower attribution", () => {
     const fingerprint = buildOperatorPostFingerprint({
       text: "Trust what your intuition keeps telling you. BELIEVE IT.",
