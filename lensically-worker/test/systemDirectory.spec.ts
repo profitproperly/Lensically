@@ -773,6 +773,98 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("keeps successful known-path engineering work outside the defect gate", async () => {
+    const finalized = await finalizeMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { action_intent: "apply implementation", mode: "source_defined_direct_engineering" },
+      "applyRepoPatchSet",
+      {},
+      { ok: true },
+      [],
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(finalized).toMatchObject({ objective_may_resume: true, failure: null });
+    expect(finalized).not.toHaveProperty("defect_generalization_gate");
+  });
+
+  it("requires a targeted sibling scan for stale duplicated assumptions", () => {
+    expect(classifyDefectForGeneralization("repair version validation", {
+      ok: false,
+      error: "stale hardcoded version literal in an assertion",
+    })).toMatchObject({
+      defect_class: "duplicated_assumption",
+      sibling_scan_required: true,
+      prevention_disposition: "targeted_sibling_scan_required_before_local_fix",
+      local_fix_closure_allowed: false,
+    });
+  });
+
+  it("keeps isolated and external failures bounded", () => {
+    expect(classifyDefectForGeneralization("repair one parser branch", { ok: false, error: "single malformed fixture" })).toMatchObject({
+      defect_class: "isolated",
+      sibling_scan_required: false,
+      prevention_disposition: "bounded_local_fix",
+    });
+    expect(classifyDefectForGeneralization("check validation", { ok: false, error: "temporary upstream timeout" })).toMatchObject({
+      defect_class: "external_transient",
+      sibling_scan_required: false,
+      prevention_disposition: "bounded_external_handling",
+    });
+  });
+
+  it("blocks resume when an engineering result contains an explicit contract contradiction", async () => {
+    const finalized = await finalizeMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { action_intent: "verify engineering contract", mode: "source_defined_direct_engineering" },
+      "inspectMcpFailure",
+      {},
+      { ok: true, contradiction: true, error: "schema mismatch" },
+      [],
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(finalized).toMatchObject({
+      map_state: "source_defined_direct_failed",
+      objective_may_resume: false,
+      defect_generalization_gate: {
+        defect_class: "contract_drift",
+        sibling_scan_required: true,
+        prevention_disposition: "targeted_sibling_scan_required_before_local_fix",
+      },
+      failure: {
+        defect_class: "contract_drift",
+        sibling_scan_required: true,
+      },
+    });
+  });
+
+  it("routes multi-stage engineering requests to implementation before final verification", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "applyRepoPatchSet",
+        title: "Apply implementation",
+        description: "Apply one coherent repository change set.",
+        inputSchema: { type: "object", properties: { patches: { type: "array" } }, required: ["patches"] },
+      },
+      {
+        name: "verifyDeployedMcpVersion",
+        title: "Verify live deployment",
+        description: "Verify the deployed MCP version.",
+        inputSchema: { type: "object", properties: {} },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        intent: "implement the gateway change, release it, and verify live deployment",
+        objective: "Complete the engineering change from implementation through verification.",
+        inputs: { patches: [] },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({ ok: true, tool_name: "applyRepoPatchSet", arguments: { patches: [] } });
+  });
+
   it("infers the internal workflow-list capability from semantic public language", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "readMcpToolDefinition",
