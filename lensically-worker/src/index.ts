@@ -13678,7 +13678,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       model_tool_choice_allowed: false,
       d1_route_lookup_required: false,
       recovery_role: "independent_break_glass_only",
-      account_controls: ["explicit_proceed", "server_side_continuity", "idempotency", "authorization", "content_gates", "scheduler_safety"],
+      account_controls: ["explicit_proceed", "guided_growth_mission", "owner_plan_approval", "server_side_continuity", "idempotency", "authorization", "content_gates", "scheduler_safety"],
       engineering_flow: ["bounded_inspection", "coherent_change_set", "focused_validation", "exact_sha_release", "live_verification"],
     },
     captured_at: new Date().toISOString(),
