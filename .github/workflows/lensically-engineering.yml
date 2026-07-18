@@ -259,7 +259,22 @@ jobs:
         run: npm ci
 
       - name: Run deterministic Operator shard
-        run: node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
+        id: operator_shard
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8 2>&1 | tee /tmp/lensically-operator-shard.log
+
+      - name: Surface deterministic Operator shard failure
+        if: ${{ steps.operator_shard.outcome == 'failure' }}
+        run: |
+          failure_lines=$(grep -aE 'Operator shard|^- |(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]|Internal MCP error|D1_ERROR' /tmp/lensically-operator-shard.log | tail -n 120 || true)
+          if [ -z "$failure_lines" ]; then
+            failure_lines=$(tail -n 120 /tmp/lensically-operator-shard.log)
+          fi
+          diagnostic=$(printf '%s\n' "$failure_lines" | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=Operator shard ${{ matrix.shard }}/8 failure::$diagnostic"
+          exit 1
 
   recovery:
     if: ${{ github.event_name == 'push' }}
