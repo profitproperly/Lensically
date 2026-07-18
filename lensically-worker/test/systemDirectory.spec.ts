@@ -865,6 +865,107 @@ describe("System Directory foundation", () => {
     expect(prepared).toMatchObject({ ok: true, tool_name: "applyRepoPatchSet", arguments: { patches: [] } });
   });
 
+  it("promotes multi-stage architecture work to implementation before release", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "applyRepoPatchSet",
+      title: "Apply implementation",
+      description: "Apply one coherent repository change set.",
+      inputSchema: { type: "object", properties: { patches: { type: "array" } }, required: ["patches"] },
+    }];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        objective: "Implement, validate, release, and live-verify the approved architecture.",
+        intent: "Apply the approved prevention architecture end to end and complete the production release.",
+        inputs: { patches: [] },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "applyRepoPatchSet",
+      map_execution: {
+        winning_path_promotion: {
+          id: "multi_stage_engineering_implementation_first",
+          losing_path_prohibited: true,
+          surface: "main_gateway",
+        },
+      },
+    });
+  });
+
+  it("routes large repository mutations to the promoted Recovery path", async () => {
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        objective: "Implement the repository architecture correction.",
+        intent: "Apply the approved repository implementation.",
+        inputs: { specification: "x".repeat(3200) },
+      },
+      [],
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: false,
+      error: "promoted_winning_path_external_surface_required",
+      map_state: "known",
+      map_entry: { id: "large_repository_mutation_recovery" },
+      map_execution: {
+        winning_path_id: "large_repository_mutation_recovery",
+        winning_path_surface: "recovery_plane",
+        losing_path_prohibited: true,
+      },
+    });
+  });
+
+  it("blocks incident closure until the winning path is promoted and enforced", () => {
+    expect(evaluatePreventableIncidentClosure({
+      cause_classified: true,
+      winning_path_proven: true,
+      scope_determined: true,
+      original_objective_completed: true,
+    })).toEqual({
+      closure_allowed: false,
+      missing_steps: ["winning_path_promoted", "losing_path_prohibited", "enforcement_installed", "regression_passed"],
+    });
+    expect(evaluatePreventableIncidentClosure({
+      cause_classified: true,
+      winning_path_proven: true,
+      scope_determined: true,
+      winning_path_promoted: true,
+      losing_path_prohibited: true,
+      enforcement_installed: true,
+      regression_passed: true,
+      original_objective_completed: true,
+    })).toEqual({ closure_allowed: true, missing_steps: [] });
+  });
+
+  it("validates active winning paths and preserves superseded history", () => {
+    expect(validateWinningPathPromotions()).toEqual({ ok: true, errors: [] });
+    const original = WINNING_PATH_PROMOTIONS[0];
+    expect(validateWinningPathPromotions([
+      { ...original, id: "older_path", status: "superseded" },
+      { ...original, id: "newer_path", supersedes: "older_path" },
+    ])).toEqual({ ok: true, errors: [] });
+  });
+
+  it("keeps unknown, isolated, and transient terrain available for bounded discovery", () => {
+    expect(resolvePromotedWinningPath("repair one malformed fixture", "Handle one isolated parser branch.", {})).toBeNull();
+    expect(resolvePromotedWinningPath("check temporary upstream timeout", "Retry bounded external validation.", {})).toBeNull();
+    expect(resolvePromotedWinningPath("explore a new account workflow", "No proven route exists yet.", {})).toBeNull();
+  });
+
+  it("keeps Operator MCP version metadata single-source", () => {
+    const path = WINNING_PATH_PROMOTIONS.find((promotion) => promotion.id === "operator_mcp_version_single_source");
+    expect(path).toMatchObject({
+      defect_class: "duplicated_assumption",
+      winning_path: { surface: "source_control" },
+      enforcement_point: "Release preflight.",
+    });
+    expect(path?.winning_path.procedure.join(" ")).toContain("OPERATOR_MCP_VERSION");
+  });
+
   it("infers the internal workflow-list capability from semantic public language", () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "readMcpToolDefinition",
