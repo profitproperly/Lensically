@@ -51,6 +51,21 @@ const directoryEntryIds = Array.from(new Set(Array.from(directorySection.matchAl
 const declaredCapabilityIds = new Set();
 const declaredDirectoryIds = new Set();
 const declaredNewHandlers = new Set();
+const version = source.match(/(?:export\s+)?const OPERATOR_MCP_VERSION = "([^"]+)";/)?.[1] ?? null;
+const versionAssertionEntries = tests
+  .split(/\r?\n/)
+  .map((line, index) => ({ line, line_number: index + 1 }))
+  .filter((entry) => /runtime\.mcp_version|serverInfo\.version|payload\.mcp_version/.test(entry.line));
+const literalVersionAssertionEntries = versionAssertionEntries.filter((entry) => /["'][0-9]+\.[0-9]+\.[0-9]+["']/.test(entry.line));
+const canonicalVersionAssertionEntries = versionAssertionEntries.filter((entry) => entry.line.includes("OPERATOR_MCP_VERSION"));
+
+if (!version) lifecycleErrors.push("operator_mcp_version_missing");
+if (literalVersionAssertionEntries.length > 0) {
+  lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
+}
+if (canonicalVersionAssertionEntries.length < 3) {
+  lifecycleErrors.push(`operator_canonical_version_assertions_incomplete:${canonicalVersionAssertionEntries.length}`);
+}
 
 if (capabilityLifecycle?.version !== "lensically-capability-lifecycle-v1") lifecycleErrors.push("capability_lifecycle_version_invalid");
 if (capabilityLifecycle?.canonical_location !== "lensically-worker/src/systemDirectory/capabilityLifecycle.json") lifecycleErrors.push("capability_lifecycle_location_invalid");
