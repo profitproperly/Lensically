@@ -15,8 +15,8 @@ on:
       task:
         description: Engineering task to run
         required: true
-        default: typecheck
-                type: choice
+                default: typecheck
+        type: choice
         options:
           - typecheck
           - system-directory-tests
