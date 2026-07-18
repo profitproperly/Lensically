@@ -111,8 +111,12 @@ if (!workflow.includes('.healthy == true and .operational == true and .heartbeat
 }
 if (!source.includes("Worker deployment is Recovery-only")
     || !clientSafety.includes('intent: "recovery deployment dispatch"')
-    || !clientSafety.includes('surface: "recovery_plane"')) {
-  errors.push("recovery_only_release_contract_missing");
+    || !clientSafety.includes('surface: "recovery_plane"')
+    || !recoverySource.includes("const dispatchRef = config.branch;")
+    || !recoverySource.includes("release_id: verifiedHeadSha.slice(0, 12)")
+    || !recoverySource.includes("release_sha: verifiedHeadSha")
+    || !recoverySource.includes("ref: dispatchRef")) {
+  errors.push("recovery_only_exact_sha_release_contract_missing");
 }
 
 if (!source.includes('name: "get_monthly_growth_review"')
