@@ -166,7 +166,8 @@ describe("System Directory foundation", () => {
             "public_worker_release_task_value",
             "public_database_schema_search_terms",
             "public_repeated_identical_status_poll",
-      "public_zero_input_main_workflow_request",
+            "public_zero_input_main_workflow_request",
+      "public_policy_repository_search_terms",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
@@ -197,14 +198,19 @@ describe("System Directory foundation", () => {
     expect(inspectClientSafeGatewayRequest({ objective: "Search account aliases.", intent: "search repository", inputs: { query: "manifestmental and opmgdeadman" } })).toMatchObject({ safe: false });
   });
 
-    it("rejects gateway-internal terminology in public free-text searches", () => {
-    expect(() => buildClientSafeGatewayRequest("repository_search", { query: "find the internal handler and action key", max_results: 5 })).toThrow("client_safe_request_violation");
+      it("rejects gateway-internal terminology in public free-text searches", () => {
+    expect(inspectClientSafeGatewayRequest({ objective: "Locate source behavior.", intent: "search repository", inputs: { query: "find the internal handler and action key", max_results: 5 } })).toMatchObject({ safe: false });
     expect(buildClientSafeGatewayRequest("repository_file_read", { path: "lensically-worker/src/index.ts", start_line: 1, max_characters: 8000 })).toMatchObject({ intent: "read repository file" });
   });
 
-    it("rejects database-schema terminology in public free-text searches", () => {
-    expect(() => buildClientSafeGatewayRequest("repository_search", { query: "locate the table initialization and schema migration", max_results: 5 })).toThrow("client_safe_request_violation");
+      it("rejects database-schema terminology in public free-text searches", () => {
+    expect(inspectClientSafeGatewayRequest({ objective: "Locate source behavior.", intent: "search repository", inputs: { query: "locate the table initialization and schema migration", max_results: 5 } })).toMatchObject({ safe: false });
     expect(inspectClientSafeGatewayRequest({ objective: "Locate source behavior.", intent: "search repository", inputs: { query: "database schema migration" } })).toMatchObject({ safe: false });
+  });
+
+  it("routes free-text source discovery exclusively through Recovery", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_search).toMatchObject({ surface: "recovery_plane" });
+    expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
   });
 
   it("uses compact recent activity after one workflow-status read", () => {
@@ -226,7 +232,7 @@ describe("System Directory foundation", () => {
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-                              prevented_client_block_count: 9,
+                                    prevented_client_block_count: 10,
       safe_request_profile_count: 7,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
