@@ -189,9 +189,9 @@ export function resolveSystemDirectory(
   const query = normalize(rawQuery);
   if (!query) return null;
   const ranked = index.entries
-    .map((entry) => ({ entry, score: entryScore(query, entry) }))
+    .map((entry) => ({ entry, score: entryScore(query, entry), exact_priority: exactPhrasePriority(query, entry) }))
     .filter((candidate) => candidate.score >= minimumScore)
-    .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
+    .sort((left, right) => right.exact_priority - left.exact_priority || right.score - left.score || left.entry.id.localeCompare(right.entry.id));
   const winner = ranked[0];
   if (!winner) return null;
   const runnerUp = ranked[1]?.score ?? 0;
