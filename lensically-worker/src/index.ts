@@ -8804,7 +8804,7 @@ async function buildOperatorManifestProceedCapsule(
   choice: OperatorContinuationChoice,
 ): Promise<Record<string, unknown>> {
   const sessionId = normalizeOperatorText(session?.id, 120, true);
-  const deliveryReconciliation = await reconcileOperatorDeliveryIncidents(
+  const deliveryReconciliation = await inspectOperatorDeliveryIncidents(
     env,
     brand,
     WORKSPACE_DEFAULT_TIMEZONE,
