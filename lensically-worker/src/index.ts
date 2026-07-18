@@ -8930,7 +8930,8 @@ async function buildOperatorManifestProceedCapsule(
     completed_review_batch: activeReviewBatch && !resumableReviewBatch ? activeReviewBatch : null,
     unresolved_incidents: deliveryReconciliation.unresolved_incidents,
     required_recovery_actions: deliveryReconciliation.required_recovery_actions,
-    new_scheduling_blocked: Boolean(blockingIncident),
+    new_scheduling_blocked: true,
+    scheduling_block_reason: blockingIncident ? "delivery_incident_and_growth_plan_approval_required" : "growth_plan_approval_required",
     current_engineering_continuation: blockingIncident ? {
       kind: "delivery_incident",
       blocking: true,
