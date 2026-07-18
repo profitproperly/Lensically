@@ -268,10 +268,7 @@ jobs:
       - name: Surface deterministic Operator shard failure
         if: ${{ steps.operator_shard.outcome == 'failure' }}
         run: |
-          failure_lines=$(grep -aE 'Operator shard|^- |(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]|Internal MCP error|D1_ERROR' /tmp/lensically-operator-shard.log | tail -n 120 || true)
-          if [ -z "$failure_lines" ]; then
-            failure_lines=$(tail -n 120 /tmp/lensically-operator-shard.log)
-          fi
+          failure_lines=$(tail -n 140 /tmp/lensically-operator-shard.log)
           diagnostic=$(printf '%s\n' "$failure_lines" | tr '\n' ' ' | sed 's/%/%25/g')
           echo "::error title=Operator shard ${{ matrix.shard }}/8 failure::$diagnostic"
           exit 1
