@@ -220,6 +220,47 @@ jobs:
           fi
           echo "Scheduler activation state verified: operational normal mode with an empty overdue queue."
 
+  operator-test-shards:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests' }}
+    name: Operator shard ${{ matrix.shard }}/8
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lensically-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Capability lifecycle gate
+        run: node scripts/release-preflight.mjs --capability-lifecycle-only
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lensically-worker/package-lock.json
+
+      - name: Restore worker dependencies
+        id: operator-shard-dependency-cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+      - name: Install worker dependencies
+        if: ${{ steps.operator-shard-dependency-cache.outputs.cache-hit != 'true' }}
+        run: npm ci
+
+      - name: Run deterministic Operator shard
+        run: node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
+
   recovery:
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
