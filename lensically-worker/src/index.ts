@@ -14916,6 +14916,8 @@ async function beginOperatorAutonomyAuthorization(
   governed: boolean;
     engineering_autonomous?: boolean;
   account_autonomous?: boolean;
+  guided_plan_approved?: boolean;
+  growth_mission?: Record<string, unknown> | null;
   authority_version?: string;
   decision_id?: string;
   decision_title?: string;
