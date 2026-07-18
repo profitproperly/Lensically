@@ -150,6 +150,29 @@ function entryScore(query: string, entry: SystemDirectoryEntry): number {
   return score;
 }
 
+function exactPhrasePriority(query: string, entry: SystemDirectoryEntry): number {
+  const groups: Array<{ phrases: string[]; weight: number }> = [
+    { phrases: entry.route_intent ? [entry.route_intent] : [], weight: 10 },
+    { phrases: entry.objects, weight: 9 },
+    { phrases: [entry.title], weight: 8 },
+    { phrases: entry.primary_surfaces, weight: 7 },
+    { phrases: entry.keywords, weight: 6 },
+    { phrases: entry.capabilities, weight: 5 },
+  ];
+  let best = 0;
+  for (const group of groups) {
+    for (const phrase of group.phrases) {
+      const normalizedPhrase = normalize(phrase);
+      const phraseTokenCount = tokens(normalizedPhrase).size;
+      if (phraseTokenCount < 2) continue;
+      if (query === normalizedPhrase || query.includes(normalizedPhrase)) {
+        best = Math.max(best, group.weight * 100 + phraseTokenCount);
+      }
+    }
+  }
+  return best;
+}
+
 function inferredCapability(query: string, entry: SystemDirectoryEntry): string | null {
   return entry.capabilities
     .map((capability) => ({ capability, score: phraseScore(query, capability, 3) }))
