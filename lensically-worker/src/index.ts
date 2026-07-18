@@ -32661,6 +32661,7 @@ export class ScheduledPostScheduler {
                 overdue_post_ids: overdue.map((row) => row.id),
                 overdue_posts: overdue.map((row) => ({
                   id: row.id,
+                  status: row.status,
                   threads_user_id: row.threads_user_id,
                   scheduled_time: row.scheduled_time,
                   last_attempted_at: row.last_attempted_at,
