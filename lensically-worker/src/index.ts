@@ -12502,6 +12502,7 @@ const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
   "markImplementationBacklogItemResolved",
   "planOperatorExecution",
   "getMcpAdminState",
+  "resolveContinuationContext",
 ]);
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
