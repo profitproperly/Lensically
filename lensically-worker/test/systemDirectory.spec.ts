@@ -352,6 +352,96 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("routes the persisted Growth Mission Brief for guided owner discussion", async () => {
+    expect(resolveLensicallySystemDirectory("Show the current Growth Mission Brief so we can discuss the plan.")).toMatchObject({
+      entry_id: "strategy.growth_mission_read",
+      route_intent: "get growth mission",
+      hard_gates: ["Proceed opens planning and discussion; it does not authorize account mutations."],
+    });
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "getGrowthMission",
+        title: "Get Growth Mission Brief",
+        description: "Read the persistent guided growth mission.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+      {
+        name: "updateGrowthMission",
+        title: "Update Growth Mission Brief",
+        description: "Revise or approve the guided growth mission.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" }, status: { type: "string" }, owner_response: { type: "string" } }, required: ["brand_key"] },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { intent: "get growth mission", objective: "Discuss the current evidence-led plan.", inputs: { brand_key: "manifest_mental" } },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "getGrowthMission",
+      arguments: { brand_key: "manifest_mental" },
+      map_execution: { system_directory: { entry_id: "strategy.growth_mission_read", route_applied: false } },
+    });
+  });
+
+  it("routes owner-approved Growth Mission updates without enabling full auto implicitly", async () => {
+    expect(resolveLensicallySystemDirectory("Approve the guided growth plan after our discussion.")).toMatchObject({
+      entry_id: "strategy.growth_mission_update",
+      route_intent: "update growth mission",
+    });
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "getGrowthMission",
+        title: "Get Growth Mission Brief",
+        description: "Read the persistent guided growth mission.",
+        inputSchema: { type: "object", properties: { brand_key: { type: "string" } }, required: ["brand_key"] },
+      },
+      {
+        name: "updateGrowthMission",
+        title: "Update Growth Mission Brief",
+        description: "Revise or approve the guided growth mission.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            brand_key: { type: "string" },
+            status: { type: "string" },
+            execution_mode: { type: "string" },
+            owner_response: { type: "string" },
+          },
+          required: ["brand_key"],
+        },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        intent: "approve growth plan",
+        objective: "Persist the plan we finished discussing without switching to full auto.",
+        inputs: {
+          brand_key: "manifest_mental",
+          status: "approved",
+          execution_mode: "guided_owner_approval",
+          owner_response: "I approve this guided plan.",
+        },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "updateGrowthMission",
+      arguments: {
+        brand_key: "manifest_mental",
+        status: "approved",
+        execution_mode: "guided_owner_approval",
+        owner_response: "I approve this guided plan.",
+      },
+    });
+    expect(prepared.arguments?.execution_mode).not.toBe("autonomous_operator");
+  });
+
   it("dispatches the verified current head without an exact SHA in the Recovery payload", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_exact_sha_deploy_dispatch");
     expect(incident?.safe_profile_id).toBe("worker_release_dispatch");
