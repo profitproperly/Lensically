@@ -709,6 +709,7 @@ function prepareStaticCall(
   const directoryConfidenceFloor = engineeringOnly && directoryHasBoundedDefaults ? 0.5 : 0.75;
   const directoryMayRoute = Boolean(
     !actionKey
+    && !promotedRouteIntent
     && !exactOperationalIntent
     && !exactSourceDefinedIntent
     && directoryIntent
