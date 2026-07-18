@@ -287,14 +287,7 @@ describe("System Directory foundation", () => {
   });
 
   it("enforces the autonomous capability lifecycle for every future capability", () => {
-    const lifecycle = JSON.parse(readFileSync(new URL("../src/systemDirectory/capabilityLifecycle.json", import.meta.url), "utf8")) as {
-      version: string;
-      canonical_location: string;
-      mandatory: boolean;
-      required_sequence: string[];
-      rules: Record<string, unknown>;
-      declarations: Array<Record<string, unknown>>;
-    };
+    const lifecycle = LENSICALLY_CAPABILITY_LIFECYCLE;
     expect(lifecycle).toMatchObject({
       version: "lensically-capability-lifecycle-v1",
       canonical_location: "lensically-worker/src/systemDirectory/capabilityLifecycle.json",
