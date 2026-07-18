@@ -3519,7 +3519,7 @@ describe("operator mode MCP endpoint", () => {
     expect(incident).toBeNull();
   }, 50000);
 
-      it("runs routine Manifest mutations autonomously while preserving protected operations", async () => {
+      it("runs Manifest mutations only after Guided Growth Mission approval and locks again on the next Proceed", async () => {
     await ensureMcpAccountOpen("manifest_mental");
 
     const first = await mcpToolRaw<{
