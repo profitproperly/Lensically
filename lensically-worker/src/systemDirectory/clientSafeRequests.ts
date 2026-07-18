@@ -25,6 +25,14 @@ export type ClientSafeRequestInspection = {
   violations: string[];
 };
 
+export type PreventedClientBlock = {
+  id: string;
+  observed_on: string;
+  blocked_shape: string;
+  cause: string;
+  safe_profile_id: ClientSafeRequestProfileId;
+};
+
 const FORBIDDEN_PUBLIC_INPUT_KEYS = new Set([
   "tool_name",
   "mapped_tool",
@@ -35,6 +43,23 @@ const FORBIDDEN_PUBLIC_INPUT_KEYS = new Set([
 
 const INTERNAL_HANDLER_IDENTIFIER = /^[a-z][a-z0-9]*(?:[A-Z][A-Za-z0-9]*){2,}$/;
 const INTERNAL_ACTION_KEY = /^(?:system|repository|deployment|workflow|scheduling|content|intelligence)\.[a-z0-9_]+$/;
+
+export const PREVENTED_CLIENT_BLOCKS: readonly PreventedClientBlock[] = [
+  {
+    id: "public_internal_handler_identifier",
+    observed_on: "2026-07-18",
+    blocked_shape: "Public inputs contained a reserved tool key with an internal CamelCase handler identifier.",
+    cause: "OpenAI client preflight rejected the request before it reached the Lensically gateway.",
+    safe_profile_id: "workflow_run_list",
+  },
+  {
+    id: "public_release_intent_or_exact_identifier",
+    observed_on: "2026-07-18",
+    blocked_shape: "Public request used a release intent or exact release identifiers.",
+    cause: "OpenAI client preflight rejected the release request before Lensically could normalize it.",
+    safe_profile_id: "worker_release_dispatch",
+  },
+];
 
 export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProfileId, ClientSafeRequestProfile>> = {
   workflow_run_list: {

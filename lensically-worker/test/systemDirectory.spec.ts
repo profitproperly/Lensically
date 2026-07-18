@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { prepareSourceDefinedDirectEngineeringCall, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
-  buildClientSafeGatewayRequest,
+    buildClientSafeGatewayRequest,
+  CLIENT_SAFE_REQUEST_PROFILES,
   createSystemDirectoryIndex,
-  inspectClientSafeGatewayRequest,
+    inspectClientSafeGatewayRequest,
+  PREVENTED_CLIENT_BLOCKS,
   resolveSystemDirectory,
   type SystemDirectoryEntry,
 } from "../src/systemDirectory";
@@ -160,6 +162,17 @@ describe("System Directory foundation", () => {
         "internal_handler_identifier:inputs.tool_name",
       ],
     });
+  });
+
+    it("keeps a permanent unique registry of prevented client-block signatures", () => {
+    expect(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).toEqual([
+      "public_internal_handler_identifier",
+      "public_release_intent_or_exact_identifier",
+    ]);
+    expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
+    for (const incident of PREVENTED_CLIENT_BLOCKS) {
+      expect(CLIENT_SAFE_REQUEST_PROFILES[incident.safe_profile_id]).toBeDefined();
+    }
   });
 
   it("infers the internal workflow-list capability from semantic public language", () => {
