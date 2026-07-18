@@ -3519,7 +3519,7 @@ describe("operator mode MCP endpoint", () => {
     expect(incident).toBeNull();
   }, 50000);
 
-      it("runs Manifest mutations only after Guided Growth Mission approval and locks again on the next Proceed", async () => {
+      it("runs Manifest account mutations only after Guided Growth Mission approval and locks again on the next Proceed", async () => {
     await ensureMcpAccountOpen("manifest_mental");
 
     const blocked = await mcpToolRaw<{ error: string; required_next_tool: string }>("save_strategy_memory", {
