@@ -324,6 +324,14 @@ function inferredArgumentsForOperationalIntent(
 ): Record<string, unknown> {
   const capability = normalizeText(inputs.capability, 500) ?? "";
   const normalized = `${actionIntent} ${capability}`.toLowerCase();
+  if (toolName === "read_lensically_ui_surface") {
+    if (/\bsaved\s+patterns?\b/.test(normalized)) return { surface: "saved_patterns" };
+    if (/\bpost\s+archive\b/.test(normalized)) return { surface: "post_archive" };
+    if (/\b(live\s+insights|insights\s+posts?)\b/.test(normalized)) return { surface: "insights" };
+    if (/\bfollower\s+history\b/.test(normalized)) return { surface: "followers" };
+    if (/\bdashboard\b/.test(normalized)) return { surface: "dashboard" };
+    return {};
+  }
   if (toolName === "readMcpToolDefinition") {
     if (/\b(workflow|github)\b/.test(normalized) && /\b(runs|history|activity|listing)\b/.test(normalized)) return { tool_name: "listGitHubWorkflowRuns" };
     if (/\b(workflow|github)\b/.test(normalized) && /\b(run status|single run|completion|result)\b/.test(normalized)) return { tool_name: "getGitHubWorkflowRun" };
