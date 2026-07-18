@@ -385,12 +385,10 @@ describe("System Directory foundation", () => {
       tools,
       { signPermit: async () => "", verifyPermit: async () => null },
     );
-    expect(prepared).toMatchObject({
-      ok: true,
-      tool_name: "getOperatorStartupContext",
-      arguments: {},
-      map_execution: { mode: "source_defined_static_route" },
-    });
+    expect(prepared.ok).toBe(true);
+    expect(prepared.tool_name).toBe("getOperatorStartupContext");
+    expect(prepared.arguments).toEqual({});
+    expect(prepared.map_execution?.mode).toBe("source_defined_static_route");
   });
 
       it("reads terminal workflow failures through Recovery", () => {
