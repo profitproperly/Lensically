@@ -15381,19 +15381,12 @@ async function handleOperatorMcpAdminTool(
 
   if (toolName === "listMcpTools") {
     const staticTools = buildOperatorMcpBaseTools(false);
-    const compactByName = new Map(staticTools.map((tool) => {
-      const requiredFields = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
-        ? ((tool.inputSchema as Record<string, unknown>).required as unknown[]).map(String)
-        : [];
-      return [tool.name, {
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        required_fields: requiredFields,
-        disabled: false as boolean,
-      }] as const;
-    }));
-    return { ok: true, tools: [...compactByName.values()] };
+    return {
+      ok: true,
+      total_tools: staticTools.length,
+      tools: staticTools.map((tool) => ({ name: tool.name })),
+      definition_intent: "read capability definition",
+    };
   }
 
   if (toolName === "readMcpToolDefinition") {
