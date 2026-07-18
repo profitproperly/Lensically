@@ -11784,23 +11784,6 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
     {
-    name: "resolveContinuationContext",
-    title: "Resolve continuation context",
-                description: "Backward-compatible continuity read. confirmOperatorProceed now auto-resolves canonical persisted continuity; this tool may be called without continuation_choice and defaults to resume_existing_workflow.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        brand_key: BRAND_KEY_SCHEMA,
-        continuation_choice: { type: "string", enum: ["resume_existing_workflow", "start_fresh_workflow"], description: "Optional legacy override. Omit for canonical automatic resume." },
-        workflow_session_id: { type: "string", description: "Optional explicit persisted session to resume." },
-      },
-      required: ["brand_key"],
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  
-    {
     name: "getOperatorDecisionState",
     title: "Get operator decision state",
     description: "Read the active autonomy profile and persisted model-originated decisions for one account. Fresh chats should use this after continuity loads when an autonomy profile is active.",
