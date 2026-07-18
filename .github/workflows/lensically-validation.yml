@@ -1,0 +1,161 @@
+name: Lensically Validation
+# Fast routine validation. This workflow never deploys either Worker.
+# Push markers: [operator-smoke], [operator-analytics], [operator-scheduler],
+# [operator-content], [operator-accounts], [operator-engineering], [operator-full], [gpt-memory-tests].
+run-name: Lensically validation · ${{ inputs.task || github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Validation scope
+        required: true
+        default: operator-tests
+        type: choice
+        options:
+          - typecheck
+          - operator-tests
+          - operator-analytics
+          - operator-scheduler
+          - operator-content
+          - operator-accounts
+          - operator-engineering
+          - operator-full-tests
+          - gpt-memory-tests
+  push:
+    branches:
+      - main
+    paths:
+      - "lensically-worker/**"
+      - ".github/workflows/lensically-validation.yml"
+
+concurrency:
+  group: lensically-validation-${{ inputs.task || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.head_commit.message, '[operator-smoke]') ||
+        contains(github.event.head_commit.message, '[operator-analytics]') ||
+        contains(github.event.head_commit.message, '[operator-scheduler]') ||
+        contains(github.event.head_commit.message, '[operator-content]') ||
+        contains(github.event.head_commit.message, '[operator-accounts]') ||
+        contains(github.event.head_commit.message, '[operator-engineering]') ||
+        contains(github.event.head_commit.message, '[operator-full]') ||
+        contains(github.event.head_commit.message, '[gpt-memory-tests]')
+      }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lensically-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lensically-worker/package-lock.json
+
+      - name: Restore worker dependencies
+        id: worker-dependency-cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+      - name: Install worker dependencies
+        if: ${{ steps.worker-dependency-cache.outputs.cache-hit != 'true' }}
+        run: npm ci
+
+      - name: Resolve validation scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TASK: ${{ inputs.task }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          scope=""
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            case "${DISPATCH_TASK}" in
+              typecheck) scope="typecheck" ;;
+              operator-tests) scope="smoke" ;;
+              operator-analytics) scope="analytics" ;;
+              operator-scheduler) scope="scheduler" ;;
+              operator-content) scope="content" ;;
+              operator-accounts) scope="accounts" ;;
+              operator-engineering) scope="engineering" ;;
+              operator-full-tests) scope="full" ;;
+              gpt-memory-tests) scope="gpt-memory" ;;
+              *) echo "Unknown validation task: ${DISPATCH_TASK}"; exit 2 ;;
+            esac
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-full]"* ]]; then
+            scope="full"
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-analytics]"* ]]; then
+            scope="analytics"
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-scheduler]"* ]]; then
+            scope="scheduler"
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-content]"* ]]; then
+            scope="content"
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-accounts]"* ]]; then
+            scope="accounts"
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-engineering]"* ]]; then
+            scope="engineering"
+          elif [[ "${COMMIT_MESSAGE}" == *"[gpt-memory-tests]"* ]]; then
+            scope="gpt-memory"
+          elif [[ "${COMMIT_MESSAGE}" == *"[operator-smoke]"* ]]; then
+            scope="smoke"
+          else
+            echo "No validation marker found."
+            exit 2
+          fi
+          echo "scope=${scope}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved validation scope: ${scope}"
+
+      - name: Typecheck Worker
+        run: npx tsc --noEmit
+
+      - name: Run scoped Operator validation
+        id: operator_validation
+        if: ${{ steps.scope.outputs.scope != 'typecheck' && steps.scope.outputs.scope != 'gpt-memory' }}
+        continue-on-error: true
+        env:
+          VALIDATION_SCOPE: ${{ steps.scope.outputs.scope }}
+        run: |
+          set -o pipefail
+          node scripts/run-operator-validation.mjs "${VALIDATION_SCOPE}" 2>&1 | tee /tmp/lensically-operator-validation.log
+
+      - name: Surface scoped Operator failure
+        if: ${{ steps.operator_validation.outcome == 'failure' }}
+        run: |
+          failure_lines=$(grep -aE '(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]' /tmp/lensically-operator-validation.log | tail -n 80 || true)
+          if [ -z "${failure_lines}" ]; then
+            failure_lines=$(tail -n 80 /tmp/lensically-operator-validation.log)
+          fi
+          diagnostic=$(printf '%s\n' "${failure_lines}" | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=Scoped Operator validation failure::${diagnostic}"
+          exit 1
+
+      - name: Run GPT memory tests
+        id: gpt_memory_tests
+        if: ${{ steps.scope.outputs.scope == 'gpt-memory' }}
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-gpt-memory-tests.log
+
+      - name: Surface GPT memory failure
+        if: ${{ steps.gpt_memory_tests.outcome == 'failure' }}
+        run: |
+          diagnostic=$(tail -n 100 /tmp/lensically-gpt-memory-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
+          echo "::error title=GPT memory validation failure::${diagnostic}"
+          exit 1
