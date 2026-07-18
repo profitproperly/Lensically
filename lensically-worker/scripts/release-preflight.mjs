@@ -121,8 +121,11 @@ if (process.argv.includes("--capability-lifecycle-only")) {
   process.exit(0);
 }
 
-if (version && !currentState.includes(`Operator MCP v${version}`)) {
-  errors.push(`current_state_version_mismatch:${version}`);
+if (!currentState.includes("Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/index.ts`")) {
+  errors.push("current_state_canonical_version_reference_missing");
+}
+if (/Operator MCP v\d+\.\d+\.\d+/.test(currentState)) {
+  errors.push("current_state_manual_version_literal_forbidden");
 }
 
 if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";')
