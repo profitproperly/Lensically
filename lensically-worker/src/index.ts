@@ -8891,11 +8891,13 @@ async function buildOperatorManifestProceedCapsule(
     brand_key: brand.brand_key,
     account_data_loaded: true,
     canonical_state_source: "database",
-    continuity_mode: "bounded_manifest_proceed",
-        continuity_diagnostics: {
+    continuity_mode: "guided_growth_diagnostic",
+    continuity_diagnostics: {
       legacy_source_reconciliation_deferred: true,
-      mutation_free_capsule_build: false,
-      delivery_reconciliation_executed: true,
+      mutation_free_account_inspection: true,
+      delivery_reconciliation_executed: false,
+      delivery_state_inspected_read_only: true,
+      growth_mission_discussion_opened: true,
       calendar_horizon_days: 3,
     },
     autonomy_governance: autonomyProfile ? {
