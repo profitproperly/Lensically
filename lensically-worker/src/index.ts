@@ -553,40 +553,43 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
   const originalBytes = operatorPayloadBytes(payload);
   if (originalBytes <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) return payload;
 
-  let arrayItems = 20;
-  let stringChars = 1200;
-  let objectKeys = 60;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const truncations: OperatorPayloadTruncation[] = [];
-    const compacted = compactOperatorPayloadValue(
-      payload,
-      "",
-      { arrayItems, stringChars, objectKeys, maxDepth: 5 },
-      truncations,
-    ) as Record<string, unknown>;
-    const bounded = {
-      ...compacted,
-      payload_contract: {
-        server_bounded: true,
-        model_payload_sizing: false,
-        byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
-        original_bytes: originalBytes,
-        returned_bytes: 0,
-        truncated: true,
-        truncated_paths: truncations.slice(0, 40),
-      },
-    };
-    const contract = bounded.payload_contract as Record<string, unknown>;
-    contract.returned_bytes = operatorPayloadBytes(bounded);
-    if (Number(contract.returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
-      return bounded;
+  const continuityCapsule = payload.continuity_capsule;
+  if (!continuityCapsule || typeof continuityCapsule !== "object" || Array.isArray(continuityCapsule)) {
+    let arrayItems = 20;
+    let stringChars = 1200;
+    let objectKeys = 60;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const truncations: OperatorPayloadTruncation[] = [];
+      const compacted = compactOperatorPayloadValue(
+        payload,
+        "",
+        { arrayItems, stringChars, objectKeys, maxDepth: 5 },
+        truncations,
+      ) as Record<string, unknown>;
+      const bounded = {
+        ...compacted,
+        payload_contract: {
+          server_bounded: true,
+          model_payload_sizing: false,
+          byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+          original_bytes: originalBytes,
+          returned_bytes: 0,
+          truncated: true,
+          truncated_paths: truncations.slice(0, 40),
+        },
+      };
+      const contract = bounded.payload_contract as Record<string, unknown>;
+      contract.returned_bytes = operatorPayloadBytes(bounded);
+      if (Number(contract.returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
+        return bounded;
+      }
+      arrayItems = Math.max(1, Math.floor(arrayItems / 2));
+      stringChars = Math.max(160, Math.floor(stringChars / 2));
+      objectKeys = Math.max(32, Math.floor(objectKeys / 2));
     }
-    arrayItems = Math.max(1, Math.floor(arrayItems / 2));
-    stringChars = Math.max(160, Math.floor(stringChars / 2));
-    objectKeys = Math.max(32, Math.floor(objectKeys / 2));
   }
 
-  const continuityCapsule = payload.continuity_capsule;
+
   if (continuityCapsule && typeof continuityCapsule === "object" && !Array.isArray(continuityCapsule)) {
     const criticalTopLevelKeys = [
       "ok",
