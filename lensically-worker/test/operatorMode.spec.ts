@@ -3411,10 +3411,10 @@ describe("operator mode MCP endpoint", () => {
     }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
     expect(proceeded.isError).not.toBe(true);
     const capsule = proceeded.structuredContent.continuity_capsule;
-    expect(capsule.continuity_mode).toBe("bounded_manifest_proceed");
+    expect(capsule.continuity_mode).toBe("guided_growth_diagnostic");
     expect(capsule.workflow_checkpoint.workflow_session_id).toBe(session.workflow_session_id);
-    expect(capsule.workflow_checkpoint.next_pending_action).toBe("resume_review_batch");
-    expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("get_manifest_review_batch");
+    expect(capsule.workflow_checkpoint.next_pending_action).toBe("discuss_growth_mission_brief");
+    expect(capsule.workflow_checkpoint.canonical_next_tool).toBe("getGrowthMission");
     expect(capsule.active_review_batch.review_batch_id).toBe(batch.review_batch_id);
     expect(capsule.active_review_batch.items.map((item) => item.source_identity_key)).toEqual(batch.items.map((item) => item.source_identity_key));
     const sourceBatchCount = await env.DB.prepare(`SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE workflow_session_id = ?`).bind(session.workflow_session_id).first<{ total: number }>();
