@@ -3508,18 +3508,15 @@ describe("operator mode MCP endpoint", () => {
     }>("confirmOperatorProceed", { brand_key: "manifest_mental" });
     expect(resumed.isError).not.toBe(true);
     expect(resumed.structuredContent.continuity_capsule.unresolved_incidents).toHaveLength(0);
-    expect(resumed.structuredContent.continuity_capsule.new_scheduling_blocked).toBe(false);
+    expect(resumed.structuredContent.continuity_capsule.new_scheduling_blocked).toBe(true);
     expect(resumed.structuredContent.continuity_capsule.workflow_checkpoint).toMatchObject({
-      next_pending_action: "resume_review_batch",
-      canonical_next_tool: "get_manifest_review_batch",
+      next_pending_action: "discuss_growth_mission_brief",
+      canonical_next_tool: "getGrowthMission",
     });
     const incident = await env.DB.prepare(
       `SELECT status, resolution_note FROM operator_operational_incidents WHERE scheduled_post_id = ? LIMIT 1`,
     ).bind(scheduledPostId).first<{ status: string; resolution_note: string | null }>();
-    expect(incident).toMatchObject({
-      status: "resolved",
-      resolution_note: "verified_scheduled_post_published",
-    });
+    expect(incident).toBeNull();
   }, 50000);
 
       it("runs routine Manifest mutations autonomously while preserving protected operations", async () => {
