@@ -31195,8 +31195,7 @@ const TEMPORARY_SCHEDULER_PAUSE_MAX_AGE_MS = 5 * 60 * 1000;
 
 function isTemporarySchedulerPauseReason(reason: string | null): boolean {
   const normalized = reason?.trim().toLowerCase() ?? "";
-  return normalized === "safe_default"
-    || normalized === "canary_attempt_completed"
+  return normalized === "canary_attempt_completed"
     || ((normalized.includes("deploy") || normalized.includes("release")) && normalized.includes("smoke"));
 }
 
