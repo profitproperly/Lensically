@@ -197,6 +197,15 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   schedule_approved_draft: ["schedule approved draft", "schedule approved post"],
   list_scheduled_posts: ["list scheduled posts", "scheduled posts", "scheduled calendar"],
   edit_scheduled_post: ["edit scheduled post", "update scheduled post", "retry scheduled post"],
+  get_monthly_growth_review: [
+    "get monthly growth review",
+    "monthly growth review",
+    "follower growth this month",
+    "followers grown this month",
+    "best posts this month",
+    "top posts this month",
+    "monthly follower growth and top posts",
+  ],
   get_performance_learning: ["get performance learning", "performance learning", "account learning"],
 };
 
