@@ -363,11 +363,12 @@ describe("System Directory foundation", () => {
 
   it("uses the mandatory startup receipt for active capability counts", () => {
     expect(buildClientSafeGatewayRequest("startup_context")).toEqual({
-      objective: "Load the compact non-account startup bootstrap.",
-      intent: "startup",
+      objective: "Load operator context.",
+      intent: "load operator context",
       inputs: {},
     });
     expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_startup_receipt_wording")?.safe_profile_id).toBe("startup_context");
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_startup_bootstrap_shape")?.safe_profile_id).toBe("startup_context");
     expect(getLensicallySystemDirectorySummary()).toMatchObject({ pre_router_resolution: true });
   });
 
