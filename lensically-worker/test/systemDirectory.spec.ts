@@ -389,7 +389,9 @@ describe("System Directory foundation", () => {
     expect(prepared.tool_name).toBe("getOperatorStartupContext");
     expect(prepared.arguments).toEqual({});
     expect(prepared.map_execution?.mode).toBe("source_defined_static_route");
-    expect(prepared.map_execution?.system_directory).toMatchObject({ entry_id: "operating.startup", route_applied: true });
+    const directory = prepared.map_execution?.system_directory as Record<string, unknown> | undefined;
+    expect(directory?.entry_id).toBe("operating.startup");
+    expect(directory?.route_applied).toBe(true);
   });
 
       it("reads terminal workflow failures through Recovery", () => {
