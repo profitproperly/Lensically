@@ -14986,14 +14986,7 @@ function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, u
   return false;
 }
 
-function operatorMcpProceedConfirmed(toolName: string, args: Record<string, unknown>): boolean {
-  if (toolName === "listMcpTools") {
-    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
-    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    return nestedTool ? operatorMcpProceedConfirmed(nestedTool, nestedArgs) : false;
-  }
+function operatorMcpProceedConfirmed(_toolName: string, args: Record<string, unknown>): boolean {
   return args.proceed_confirmed === true;
 }
 
