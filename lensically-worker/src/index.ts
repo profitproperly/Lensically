@@ -14963,13 +14963,6 @@ function requestedMcpBrandKey(toolName: string, args: Record<string, unknown>): 
   if (directBrand) {
     return directBrand;
   }
-  if (toolName === "listMcpTools") {
-    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
-    const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-      ? args.arguments as Record<string, unknown>
-      : {};
-    return nestedTool ? requestedMcpBrandKey(nestedTool, nestedArgs) : null;
-  }
   return null;
 }
 
