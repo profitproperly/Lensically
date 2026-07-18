@@ -91,6 +91,16 @@ if (!workflow.includes("cancel-in-progress: true")) errors.push("workflow_concur
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
 if (workflow.includes("release_id:")) errors.push("obsolete_workflow_release_id_present");
 if (!workflow.includes("release_sha:")) errors.push("workflow_release_sha_missing");
+if (!workflow.includes("- name: System Directory tests")
+    || !workflow.includes("inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy'")) {
+  errors.push("system_directory_release_gate_missing");
+}
+if (!workflow.includes("worker:\n    if: ${{ github.event_name == 'workflow_dispatch' }}")) {
+  errors.push("worker_job_must_be_dispatch_only");
+}
+if (workflow.includes("git push origin HEAD:main") || workflow.includes("RECOVERY_TYPECHECK_LOG.txt")) {
+  errors.push("workflow_self_commit_forbidden");
+}
 if (!workflow.includes('ref: ${{ inputs.release_sha || github.sha }}')) errors.push("workflow_exact_sha_checkout_missing");
 if (!workflow.includes('test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"')) errors.push("workflow_exact_sha_verification_missing");
 if (!workflow.includes('.healthy == true and .operational == true and .heartbeat_fresh == true')
