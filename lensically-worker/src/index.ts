@@ -15600,7 +15600,11 @@ async function handleOperatorMcpAdminTool(
       continuation_choice: "resume_existing_workflow",
       continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
-            next_call_requirement: {
+      account_execution_locked_until_growth_plan_approval: brandKey === "manifest_mental",
+      required_next_owner_action: brandKey === "manifest_mental"
+        ? "Discuss, revise, or approve the Growth Mission Brief."
+        : null,
+      next_call_requirement: {
         brand_key: operatorClientSafeBrandKey(brandKey),
         proceed_confirmed: true,
         operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
@@ -15608,7 +15612,22 @@ async function handleOperatorMcpAdminTool(
     };
   }
 
-    if (toolName === "getOperatorDecisionState") {
+  if (toolName === "getGrowthMission") {
+    const brandKey = normalizeGptBrandKey(args.brand_key);
+    if (!brandKey) return { ok: false, error: "invalid_brand_key" };
+    const mission = await readOperatorGrowthMission(env, brandKey);
+    return mission
+      ? { ok: true, growth_mission: mission }
+      : { ok: false, error: "growth_mission_unavailable" };
+  }
+
+  if (toolName === "updateGrowthMission") {
+    const brandKey = normalizeGptBrandKey(args.brand_key);
+    if (!brandKey) return { ok: false, error: "invalid_brand_key" };
+    return updateOperatorGrowthMission(env, brandKey, args);
+  }
+
+  if (toolName === "getOperatorDecisionState") {
     const brand = await resolveOperatorBrandFromPayload(env, args);
     if (!brand) return { ok: false, error: "brand_unavailable" };
     const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
