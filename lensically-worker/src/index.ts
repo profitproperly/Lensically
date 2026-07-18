@@ -14968,6 +14968,33 @@ async function beginOperatorAutonomyAuthorization(
 
   const profileMode = String(profileRow.mode);
   const brandKey = String(profileRow.brand_key);
+  if (profileMode === MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE && !MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(canonicalTool)) {
+    const growthMission = await readOperatorGrowthMission(env, brandKey as GptBrandKey);
+    const growthMissionStatus = String(growthMission?.status ?? "discussion");
+    if (["approved", "active"].includes(growthMissionStatus)) {
+      return {
+        allowed: true,
+        governed: false,
+        account_autonomous: false,
+        guided_plan_approved: true,
+        growth_mission: growthMission,
+        authority_version: OPERATOR_GROWTH_MISSION_VERSION,
+        brand_key: brandKey,
+      };
+    }
+    return {
+      allowed: false,
+      governed: true,
+      account_autonomous: false,
+      guided_plan_approved: false,
+      growth_mission: growthMission,
+      authority_version: OPERATOR_GROWTH_MISSION_VERSION,
+      brand_key: brandKey,
+      error: "approved_growth_mission_required",
+      required_next_tool: "updateGrowthMission",
+      pending_decisions: [],
+    };
+  }
   if (profileMode === MANIFEST_AUTONOMY_MODE && !MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(canonicalTool)) {
     return {
       allowed: true,
