@@ -9139,6 +9139,7 @@ async function buildOperatorContinuityCapsule(
         ? "Resume the pending owner-ratified account or business decision when relevant; routine engineering remains autonomous."
         : "Proceed autonomously with routine engineering through mandatory known paths. Propose only owner-ratified account, business, destructive, or irreversible decisions.",
     } : null,
+    growth_mission_brief: growthMissionBrief,
     calendar_coverage: calendarCoverage,
     active_review_batch: activeReviewBatch,
     workflow_checkpoint: {
