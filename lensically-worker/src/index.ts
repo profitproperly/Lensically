@@ -937,7 +937,7 @@ async function getConfiguredThreadsAccountById(
 }
 
 function configuredThreadsAccountFallbackPayload(
-  account: ConfiguredThreadsAccount,
+  account: ResolvedConfiguredThreadsAccount,
   index: number,
 ): ConfiguredThreadsAccountProfile {
   return {
