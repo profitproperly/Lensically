@@ -143,6 +143,26 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
                         callArgs = { ...args, proceed_confirmed: true };
   }
   let result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
+  if (result.isError && result.structuredContent.error === "growth_mission_approval_required") {
+    const growthBrand = requestedBrand ?? "manifest_mental";
+    const approvedMission = await mcpToolRaw<Record<string, unknown>>("updateGrowthMission", {
+      brand_key: growthBrand,
+      status: "approved",
+      execution_mode: "guided_owner_approval",
+      mission_patch: {
+        permanent_mission: "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.",
+        target_followers: 1000000,
+        current_bottleneck: "test_fixture_execution",
+        primary_objective: "Preserve existing regression coverage under the guided approval boundary.",
+        recommended_next_action: "Run the requested isolated regression fixture.",
+      },
+      owner_response: "Approved automatically by the isolated test harness.",
+      change_summary: "Test-only guided plan approval.",
+      proceed_confirmed: true,
+    });
+    expect(approvedMission.isError, `updateGrowthMission for ${toolName}`).not.toBe(true);
+    result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
+  }
   if (result.isError && result.structuredContent.error === "approved_operator_decision_required") {
     const governanceBrand = requestedBrand ?? "manifest_mental";
     const decisionKey = `vitest_auto_${toolName.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${crypto.randomUUID()}`;
