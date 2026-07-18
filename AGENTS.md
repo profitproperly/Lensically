@@ -20,6 +20,8 @@
 - Direct internal tool calls are rejected.
 - Known-file reads and normal account operations stay on the main gateway. Free-text repository discovery, terminal failure diagnostics, and deployment use Recovery because those public main-gateway payload classes are client-blocked. Recovery is also the break-glass plane when the main Worker is unreachable.
 - Account workflows retain explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety after routing.
+- For Manifest, Proceed restores state and opens `guided-growth-mission-v1`: the model presents a preemptive diagnostic and proposed plan, then discusses and revises it with the owner. Proceed alone never authorizes account mutation.
+- Account execution requires the current persistent Growth Mission to be approved or active. Routine engineering remains autonomous. Full autonomous account mode requires an explicit owner-authorized mode change and must never be inferred from ordinary approval language.
 
 ## Engineering Default
 
