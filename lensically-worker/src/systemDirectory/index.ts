@@ -1,5 +1,8 @@
 export * from "./clientSafeRequests";
 
+export const LENSICALLY_SYSTEM_DIRECTORY_VERSION = "lensically-system-directory-v1";
+export const LENSICALLY_SYSTEM_DIRECTORY_CANONICAL_LOCATION = "lensically-worker/src/systemDirectory/index.ts";
+
 export type SystemDirectoryPlane =
   | "product"
   | "publishing"
@@ -409,4 +412,21 @@ export const LENSICALLY_SYSTEM_DIRECTORY_INDEX = createSystemDirectoryIndex([...
 export function resolveLensicallySystemDirectory(rawQuery: string): SystemDirectoryDirective | null {
   return resolveSystemDirectory(rawQuery, LENSICALLY_SYSTEM_DIRECTORY_INDEX);
 }
+
+export function getLensicallySystemDirectorySummary(): Record<string, unknown> {
+  const planes = Array.from(new Set(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.map((entry) => entry.plane))).sort();
+  const routeDefaultCount = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.filter((entry) => entry.route_intent || entry.default_inputs).length;
+  return {
+    version: LENSICALLY_SYSTEM_DIRECTORY_VERSION,
+    canonical_location: LENSICALLY_SYSTEM_DIRECTORY_CANONICAL_LOCATION,
+    entry_count: LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.length,
+    planes,
+    plane_count: planes.length,
+    pre_router_resolution: true,
+    compact_directive_only: true,
+    advisory_fallback_to_original_intent: true,
+    route_default_count: routeDefaultCount,
+  };
+}
+
 

@@ -10,8 +10,9 @@ import {
   CLIENT_SAFETY_LEGACY_MIGRATIONS,
   CLIENT_SAFETY_POLICIES,
     createSystemDirectoryIndex,
-  LENSICALLY_SYSTEM_DIRECTORY_ENTRIES,
+    LENSICALLY_SYSTEM_DIRECTORY_ENTRIES,
   getClientSafetyRegistrySummary,
+  getLensicallySystemDirectorySummary,
   inspectClientSafeGatewayRequest,
   PREVENTED_CLIENT_BLOCKS,
     resolveLensicallySystemDirectory,
@@ -135,6 +136,17 @@ describe("System Directory foundation", () => {
     expect(deployment?.hard_gates).toEqual(expect.arrayContaining([
       "Recovery dispatch requires a verified repository head and passing validation.",
     ]));
+  });
+
+    it("exposes one compact startup receipt for the production directory", () => {
+    expect(getLensicallySystemDirectorySummary()).toMatchObject({
+      version: "lensically-system-directory-v1",
+      canonical_location: "lensically-worker/src/systemDirectory/index.ts",
+      entry_count: LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.length,
+      pre_router_resolution: true,
+      compact_directive_only: true,
+      advisory_fallback_to_original_intent: true,
+    });
   });
 
   it("ships a validated production catalog across every major Lensically plane", () => {

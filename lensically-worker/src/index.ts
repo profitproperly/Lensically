@@ -23,8 +23,9 @@ import {
   assertClientSafetyRegistry,
   CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
     CLIENT_SAFETY_GATEWAY_DESCRIPTION,
-  CLIENT_SAFETY_STARTUP_INSTRUCTION,
+    CLIENT_SAFETY_STARTUP_INSTRUCTION,
   getClientSafetyRegistrySummary,
+  getLensicallySystemDirectorySummary,
 } from "./systemDirectory";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
@@ -15903,7 +15904,8 @@ async function handleOperatorMcpEngineeringTool(
       env.DB,
       await buildOperatorMcpTools(env, false, false) as MandatoryExecutionToolDefinition[],
     );
-    startup.client_safety = getClientSafetyRegistrySummary();
+        startup.client_safety = getClientSafetyRegistrySummary();
+    startup.system_directory = getLensicallySystemDirectorySummary();
     return startup;
   }
 
