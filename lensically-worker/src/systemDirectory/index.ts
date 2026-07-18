@@ -316,7 +316,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     keywords: ["draw sources", "source candidates", "saved pattern", "build source card", "1000 likes"],
     capabilities: ["draw source candidate batch", "read candidate batch", "create source card"],
     payload: { action_size: "bounded_read", max_results: 24, max_response_bytes: 22000, required_inputs: ["brand_key"] },
-    route_intent: "draw source candidate batch",
+    route_intent: "list source candidates",
     related_entry_ids: ["content.production", "workflows.production_state"],
     recommended_next_planes: ["content_production"],
   },
