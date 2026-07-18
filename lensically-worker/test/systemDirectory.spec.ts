@@ -297,26 +297,12 @@ describe("System Directory foundation", () => {
     expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("resume_original_objective");
   });
 
-    it("infers the configured Worker release task from the zero-input semantic profile", () => {
-    const tools: MandatoryExecutionToolDefinition[] = [{
-      name: "runGitHubWorkflow",
-      title: "Run workflow",
-      description: "Run one configured workflow task.",
-      inputSchema: {
-        type: "object",
-        properties: { task: { type: "string" } },
-        required: ["task"],
-      },
-    }];
-    expect(prepareSourceDefinedDirectEngineeringCall(
-      "run main workflow",
-      "Run the current main workflow.",
-      {},
-      tools,
-    )).toMatchObject({
-      ok: true,
-      tool_name: "runGitHubWorkflow",
-      arguments: { task: "worker-deploy" },
+      it("keeps Worker deployment outside the main router", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane" });
+    expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({
+      entry_id: "deployment.main_worker",
+      recommended_next_planes: ["recovery"],
+      hard_gates: expect.arrayContaining(["Deployment requests never use the main public gateway."]),
     });
   });
 
