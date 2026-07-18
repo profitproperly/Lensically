@@ -6541,7 +6541,7 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)`,
   ).bind(
     "manifest_mental",
-    MANIFEST_AUTONOMY_MODE,
+    MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE,
     MANIFEST_AUTONOMY_OBJECTIVE,
     OPERATOR_AUTONOMY_CONTRACT.model_role,
     OPERATOR_AUTONOMY_CONTRACT.owner_role,
