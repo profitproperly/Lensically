@@ -32216,11 +32216,11 @@ async function recoverOverdueScheduledPostRows(
       `UPDATE scheduled_posts
        SET processing_started_at = ?
        WHERE id IN (${idPlaceholders})
-         AND status = ?
+         AND status IN (?, ?)
          AND cancelled_at IS NULL
          AND scheduled_time <= ?
          AND (published_post_id IS NULL OR length(trim(published_post_id)) = 0)`,
-    ).bind(recoveryClaim, ...ids, SCHEDULED_POST_STATUS_APPROVED, nowIso),
+    ).bind(recoveryClaim, ...ids, SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING, nowIso),
     ...normalized.map((action) => {
       const allClaimedClause = `(
         SELECT COUNT(*)
