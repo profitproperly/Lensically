@@ -513,7 +513,19 @@ describe("operator mode backend spine", () => {
         ('35758578720393972', 'july-second', 'July second', '2026-07-12T16:00:00Z', 'https://threads.net/july-second', 3000, 400, 80, 10, 2, 1, 493)`,
     ).run();
 
+    
+    const beforeProceedSnapshots = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM threads_follower_snapshots WHERE threads_user_id = ?`,
+    ).bind("35758578720393972").first<{ total: number }>();
+    expect(Number(beforeProceedSnapshots?.total ?? 0)).toBe(2);
+
     await ensureMcpAccountOpen("manifest_mental");
+
+    const afterProceedSnapshots = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM threads_follower_snapshots WHERE threads_user_id = ?`,
+    ).bind("35758578720393972").first<{ total: number }>();
+    expect(Number(afterProceedSnapshots?.total ?? 0)).toBe(2);
+
     const result = await mcpToolRaw<Record<string, unknown>>("executeLensicallyIntent", {
       objective: "Review this month's follower growth and strongest posts.",
       intent: "How many followers have we grown this month and which posts have done well this month?",
