@@ -159,7 +159,7 @@ function sourceDefinedEntry(tool: MandatoryExecutionToolDefinition, mode: string
 }
 
 const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
-  getOperatorStartupContext: ["startup", "operator startup", "fresh session startup", "load startup context"],
+  getOperatorStartupContext: ["load operator context", "startup", "operator startup", "fresh session startup", "load startup context"],
   selectOperatorKey: ["select operator key", "select key", "choose brand key", "set brand key"],
   confirmOperatorProceed: ["confirm operator proceed", "confirm proceed", "proceed to next step", "continue operator workflow"],
   getWorkflowStatus: ["get workflow status", "workflow status", "resume workflow state", "current workflow state"],
