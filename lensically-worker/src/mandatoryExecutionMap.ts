@@ -59,8 +59,7 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "getRepoStatus",
   "listRepoFiles",
   "readRepoFile",
-  "searchRepoFiles",
-  "applyRepoPatchSet",
+    "applyRepoPatchSet",
   "applyRepoTextPatch",
   "startRepoFileWrite",
   "appendRepoFileChunk",
@@ -71,9 +70,7 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "runGitHubWorkflow",
   "listGitHubWorkflowRuns",
   "getGitHubWorkflowRun",
-  "runEngineeringRelease",
-  "getEngineeringRelease",
-  "verifyDeployedMcpVersion",
+    "verifyDeployedMcpVersion",
   "listEngineeringAudit",
   "inspectMcpFailure",
   "listMcpTools",
@@ -171,13 +168,12 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   getRepoStatus: ["repository status", "repo status", "repository head", "current repository sha", "repository runtime alignment"],
   listRepoFiles: ["list repository files", "list repo files", "repository tree"],
   readRepoFile: ["read repository file", "inspect source file", "open repo file"],
-  searchRepoFiles: ["search repository", "find code in repository", "locate source implementation", "repository search"],
+  
   applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "fix mcp", "fix gateway"],
   applyRepoTextPatch: ["apply one exact patch", "replace exact repository text", "single file repair"],
   deleteRepoFile: ["delete repository file", "delete repo file", "remove repository file", "remove repo file"],
   runGitHubWorkflow: ["run typecheck", "run operator tests", "run gpt memory tests", "run regression tests"],
-  runEngineeringRelease: ["test and deploy release", "run engineering release", "validate and deploy", "deploy worker", "deploy mcp", "release worker", "release mcp"],
-  getEngineeringRelease: ["check engineering release", "release status", "wait for release completion"],
+  
   verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version", "post deployment verification"],
   listEngineeringAudit: ["list engineering audit", "read engineering audit", "inspect execution audit"],
   inspectMcpFailure: ["inspect mcp failure", "diagnose gateway failure", "diagnose mcp", "inspect execution failure"],
@@ -245,13 +241,10 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
     if (has(/\b(create|add)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "createRepoFile";
   if (has(/\b(read|inspect|show)\b/) && has(/\b(capability|schema|definition)\b/)) return "readMcpToolDefinition";
   if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history|activity)\b/)) return "listGitHubWorkflowRuns";
-  if (has(/\b(get|read|inspect|check|wait)\b/) && has(/\b(workflow|github|release)\b/) && has(/\b(run|status|result|completion)\b/)) {
-    if (has(/\bengineering\s+release\b/) || has(/\brelease\s+(status|completion|result)\b/)) return "getEngineeringRelease";
-    return "getGitHubWorkflowRun";
-  }
+    if (has(/\b(get|read|inspect|check|wait)\b/) && has(/\b(workflow|github)\b/) && has(/\b(run|status|result|completion)\b/)) return "getGitHubWorkflowRun";
   if (has(/\b(runtime\/repository|repository\/runtime|runtime repository|repository runtime|repo runtime|runtime source|source runtime)\b/) && has(/\b(alignment|verify|verification|sha|status|current)\b/)) return "getRepoStatus";
   if (has(/\b(deployed|deployment|post[- ]?deployment|live)\b/) && has(/\b(verify|verification|alignment|mcp|version)\b/)) return "verifyDeployedMcpVersion";
-  if (has(/\b(search|find|locate)\b/) && has(/\b(repo|repository|code|source|file)\b/)) return "searchRepoFiles";
+  
   if (has(/\b(repository|repo|source|file)\b/) && has(/\b(read|inspect|open|status|sha|head)\b/)) {
     if (normalizeText(inputs.path, 1000) || has(/\b(read|open|file|source)\b/)) return "readRepoFile";
     return "getRepoStatus";
@@ -266,10 +259,10 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(engineering|execution|policy)\s+audit\b/) || has(/\baudit\s+(entries|records|history)\b/)) return "listEngineeringAudit";
   if (has(/\b(engineering|gateway|mcp|operator|execution)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect|broken|timeout|timed out)\b/)) return "inspectMcpFailure";
   if (has(/\b(engineering|repository|repo|code|source|gateway|mcp|operator)\b/) && has(/\b(repair|patch|fix|implement|change|dry[- ]?run)\b/)) return "applyRepoPatchSet";
-    if (has(/\brun\b/) && has(/\bmain\b/) && has(/\bworkflow\b/)) return "runGitHubWorkflow";
+    
   if (has(/\btypecheck\b/) || has(/\boperator\s+tests?\b/) || has(/\bgpt\s+memory\s+tests?\b/) || has(/\bregression\s+tests?\b/)) return "runGitHubWorkflow";
   if (has(/\b(run mcp tests?|mcp self checks?|built-in mcp checks?|gateway configuration|mcp configuration)\b/)) return "runMcpTests";
-  if (has(/\b(deploy|deployment|release)\b/) && has(/\b(run|perform|execute|ship|deploy|release)\b/)) return "runEngineeringRelease";
+  
   if (has(/\bclaim\b/) && has(/\bmanifest\b/) && has(/\breview\s+batch\b/)) return "claim_manifest_review_batch";
   if (has(/\b(get|read|show)\b/) && has(/\bmanifest\b/) && has(/\breview\s+batch\b/)) return "get_manifest_review_batch";
   if (has(/\battach\b/) && has(/\bdraft\b/) && has(/\breview\s+batch\b/)) return "attach_manifest_review_draft";
@@ -309,14 +302,14 @@ function inferredArgumentsForOperationalIntent(
     if (/\b(workflow|github)\b/.test(normalized) && /\b(runs|history|activity|listing)\b/.test(normalized)) return { tool_name: "listGitHubWorkflowRuns" };
     if (/\b(workflow|github)\b/.test(normalized) && /\b(run status|single run|completion|result)\b/.test(normalized)) return { tool_name: "getGitHubWorkflowRun" };
     if (/\b(account|brand)\b/.test(normalized) && /\b(key|alias|selection)\b/.test(normalized)) return { tool_name: "selectOperatorKey" };
-    if (/\b(repository|source)\b/.test(normalized) && /\b(search|find|locate)\b/.test(normalized)) return { tool_name: "searchRepoFiles" };
+    
     if (/\b(repository|source)\b/.test(normalized) && /\b(file|read|open)\b/.test(normalized)) return { tool_name: "readRepoFile" };
-    if (/\b(worker|engineering)\b/.test(normalized) && /\b(workflow|validation|dispatch)\b/.test(normalized)) return { tool_name: "runGitHubWorkflow" };
+    
     if (/\b(public|request)\b/.test(normalized) && /\b(gateway|action)\b/.test(normalized)) return { tool_name: "executeLensicallyIntent" };
     return {};
   }
     if (toolName !== "runGitHubWorkflow") return {};
-  if (/\brun\b/.test(normalized) && /\bmain\b/.test(normalized) && /\bworkflow\b/.test(normalized)) return { task: "worker-deploy" };
+  
   if (/\btypecheck\b/.test(normalized)) return { task: "typecheck" };
   if (/\bgpt\s+memory\s+tests?\b/.test(normalized)) return { task: "gpt-memory-tests" };
   if (/\boperator\s+tests?\b/.test(normalized) || /\bregression\s+tests?\b/.test(normalized)) return { task: "operator-tests" };
