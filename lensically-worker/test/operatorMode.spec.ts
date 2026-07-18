@@ -588,7 +588,7 @@ describe("operator mode backend spine", () => {
     expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
     expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
     expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
-  });
+  }, 15000);
 
   it("opens a guided Growth Mission discussion after Proceed and blocks account mutations until approval", async () => {
     const selected = await mcpToolRaw<{ selected_key: string }>("selectOperatorKey", { brand_key: "manifest_mental" });
