@@ -15536,8 +15536,31 @@ async function getOperatorMcpBoundaryBlock(
       account_data_loaded: false,
       continuity_workflow_session_id: tokenSession,
       requested_workflow_session_id: requestedSession,
-            message: "The call targets a different workflow than the current server-side continuity capsule.",
+      message: "The call targets a different workflow than the current server-side continuity capsule.",
     };
+  }
+  if (
+    requestedBrand === "manifest_mental"
+    && operatorToolMutatesState(toolName)
+    && !isOperatorMcpEngineeringToolName(toolName)
+    && !GROWTH_MISSION_DISCUSSION_EXEMPT_TOOLS.has(toolName)
+  ) {
+    const growthMission = await readOperatorGrowthMission(env, requestedBrand);
+    const missionStatus = normalizeOperatorText(growthMission?.status, 40, true);
+    if (!growthMission || !["approved", "active"].includes(missionStatus ?? "")) {
+      return {
+        ok: false,
+        error: "growth_mission_approval_required",
+        selected_key: requestedBrand,
+        account_data_loaded: true,
+        account_execution_locked: true,
+        growth_mission_status: missionStatus ?? "missing",
+        required_next_tool: "updateGrowthMission",
+        required_next_intent: "update growth mission",
+        allowed_before_approval: ["read account state", "analyze performance", "discuss growth plan", "revise growth mission", "routine engineering"],
+        message: "Proceed opened the Growth Mission discussion. Discuss, revise, and explicitly approve the current plan before any account mutation.",
+      };
+    }
   }
   return null;
 }
