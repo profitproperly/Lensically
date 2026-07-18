@@ -10161,6 +10161,187 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
+  if (toolName === "read_lensically_ui_surface") {
+    const surface = normalizeOperatorText(payload.surface, 40, true);
+    const page = Math.max(Math.trunc(Number(payload.page ?? 1)), 1);
+    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 100)), 1), 200);
+    const account = await getThreadsAccountForAppUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id);
+    if (!account?.threads_user_id) {
+      return operatorJsonResponse({ success: false, error: "threads_account_not_connected" }, 404);
+    }
+
+    if (surface === "dashboard") {
+      if (!account.access_token) {
+        return operatorJsonResponse({ success: false, error: "threads_access_token_missing" }, 400);
+      }
+      return operatorJsonResponse({
+        success: true,
+        surface,
+        brand_key: brand.brand_key,
+        data: await buildThreadsDashboardPayload(env, account),
+      });
+    }
+
+    if (surface === "followers") {
+      await refreshCurrentThreadsFollowerSnapshot(env, account, THREADS_INSIGHTS_TIME_ZONE);
+      const offset = (page - 1) * limit;
+      const totalCount = await countThreadsFollowerSnapshots(env, account.threads_user_id);
+      const snapshotRows = await listThreadsFollowerSnapshotsPage(env, account.threads_user_id, limit + 1, offset);
+      const rows = snapshotRows.slice(0, limit).map((row, index) => {
+        const olderSnapshot = snapshotRows[index + 1] ?? null;
+        const startOfDayFollowers = row.baseline_followers_count ?? row.followers_count;
+        return {
+          date: row.snapshot_date,
+          start_of_day_followers: startOfDayFollowers,
+          gap_carry: olderSnapshot ? startOfDayFollowers - olderSnapshot.followers_count : 0,
+          latest_followers: row.followers_count,
+          net_change: olderSnapshot ? row.followers_count - olderSnapshot.followers_count : row.followers_count - startOfDayFollowers,
+          updated_at: row.captured_at,
+        };
+      });
+      return operatorJsonResponse({
+        success: true,
+        surface,
+        brand_key: brand.brand_key,
+        rows,
+        total_count: totalCount,
+        page,
+        page_size: limit,
+        total_pages: Math.max(1, Math.ceil(totalCount / limit)),
+        timezone: THREADS_INSIGHTS_TIME_ZONE,
+      });
+    }
+
+    if (surface === "insights") {
+      if (!account.access_token) {
+        return operatorJsonResponse({ success: false, error: "threads_access_token_missing" }, 400);
+      }
+      const cursor = normalizeOperatorText(payload.cursor, 2000, true);
+      const requestedDepth = Math.trunc(Number(payload.cursor_depth ?? (cursor ? 2 : 1)));
+      const cursorDepth = Math.min(Math.max(requestedDepth, 1), MAX_THREADS_POST_CURSOR_DEPTH);
+      const postsPage = await fetchThreadsPostsPageWithInsights(env, account.access_token, account.threads_user_id, cursor);
+      if (!postsPage) {
+        return operatorJsonResponse({ success: false, error: "threads_insights_upstream_failed" }, 502);
+      }
+      const hasMore = postsPage.hasMore && cursorDepth < MAX_THREADS_POST_CURSOR_DEPTH;
+      const nextCursor = cursorDepth < MAX_THREADS_POST_CURSOR_DEPTH ? postsPage.nextCursor : null;
+      await upsertThreadsPostsArchive(env, account.threads_user_id, postsPage.posts);
+      if (!cursor) {
+        await replaceThreadsPostsCache(env, account.threads_user_id, postsPage.posts, {
+          threads_user_id: account.threads_user_id,
+          next_cursor: nextCursor,
+          has_more: hasMore,
+        });
+      }
+      return operatorJsonResponse({
+        success: true,
+        surface,
+        brand_key: brand.brand_key,
+        posts: postsPage.posts,
+        next_cursor: nextCursor,
+        has_more: hasMore,
+        cursor_depth: cursorDepth,
+      });
+    }
+
+    if (surface === "post_archive") {
+      const order = payload.order === "top" ? "top" : "recent";
+      const offset = (page - 1) * limit;
+      const archive = await listArchivedThreadsPosts(env, account.threads_user_id, order, limit, offset);
+      return operatorJsonResponse({
+        success: true,
+        surface,
+        brand_key: brand.brand_key,
+        posts: archive.posts,
+        total_count: archive.totalCount,
+        order,
+        page,
+        page_size: limit,
+        total_pages: Math.max(1, Math.ceil(archive.totalCount / limit)),
+      });
+    }
+
+    if (surface === "saved_patterns") {
+      const order = payload.order === "likes" ? "likes" : "newest";
+      if (!await doesTableExist(env, "external_patterns")) {
+        return operatorJsonResponse({ success: true, surface, brand_key: brand.brand_key, patterns: [], total_count: 0, order, page, page_size: limit, total_pages: 1 });
+      }
+      const offset = (page - 1) * limit;
+      const totalRow = await env.DB.prepare(
+        `SELECT COUNT(*) AS total_count FROM external_patterns WHERE app_user_id = ? AND account_id = ?`,
+      ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total_count: number | string }>();
+      const orderSql = order === "likes"
+        ? "likes DESC, datetime(updated_at) DESC, id DESC"
+        : "datetime(updated_at) DESC, id DESC";
+      const rows = await env.DB.prepare(
+        `SELECT id, author_handle, author_display_name, source_url, post_text, likes, replies, reposts, shares, views, posted_at, updated_at
+         FROM external_patterns
+         WHERE app_user_id = ? AND account_id = ?
+         ORDER BY ${orderSql}
+         LIMIT ? OFFSET ?`,
+      ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, limit, offset).all<Record<string, unknown>>();
+      const totalCount = Number(totalRow?.total_count ?? 0);
+      return operatorJsonResponse({
+        success: true,
+        surface,
+        brand_key: brand.brand_key,
+        patterns: rows.results ?? [],
+        total_count: totalCount,
+        order,
+        page,
+        page_size: limit,
+        total_pages: Math.max(1, Math.ceil(totalCount / limit)),
+      });
+    }
+
+    return operatorJsonResponse({ success: false, error: "unsupported_lensically_ui_surface", surface }, 400);
+  }
+
+  if (toolName === "discard_manifest_review_batch") {
+    if (brand.brand_key !== "manifest_mental") {
+      return operatorJsonResponse({ success: false, error: "review_batch_not_configured_for_brand" }, 400);
+    }
+    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120, true);
+    const reason = normalizeOperatorText(payload.reason, 2000);
+    if (!reason) {
+      return operatorJsonResponse({ success: false, error: "discard_reason_required" }, 400);
+    }
+    const batch = reviewBatchId
+      ? await env.DB.prepare(
+          `SELECT id, workflow_session_id, source_batch_id, production_date, status
+           FROM operator_review_batches WHERE id = ? AND brand_key = ? LIMIT 1`,
+        ).bind(reviewBatchId, brand.brand_key).first<Record<string, unknown>>()
+      : await env.DB.prepare(
+          `SELECT id, workflow_session_id, source_batch_id, production_date, status
+           FROM operator_review_batches
+           WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
+           ORDER BY datetime(updated_at) DESC LIMIT 1`,
+        ).bind(brand.brand_key).first<Record<string, unknown>>();
+    if (!batch) {
+      return operatorJsonResponse({ success: true, brand_key: brand.brand_key, retired: false, reason: "no_active_review_batch", source_records_preserved: true });
+    }
+    const priorStatus = String(batch.status ?? "");
+    if (!["retired", "completed"].includes(priorStatus)) {
+      await env.DB.prepare(
+        `UPDATE operator_review_batches SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
+      ).bind(String(batch.id), brand.brand_key).run();
+    }
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      review_batch_id: batch.id,
+      workflow_session_id: batch.workflow_session_id ?? null,
+      source_batch_id: batch.source_batch_id ?? null,
+      production_date: batch.production_date ?? null,
+      previous_status: priorStatus,
+      status: "retired",
+      retired: priorStatus !== "retired",
+      source_records_preserved: true,
+      source_lineage_preserved: true,
+      reason,
+    });
+  }
+
     if (toolName === "get_hourly_coverage") {
     const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
     const startDate = normalizeOperatorText(payload.start_date, 20, true);
