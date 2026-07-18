@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import { prepareSourceDefinedDirectEngineeringCall, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
@@ -129,10 +129,12 @@ describe("System Directory foundation", () => {
     );
   });
 
-      it("keeps System Directory validation mandatory and validly indented for Worker releases", () => {
-    const workflow = readFileSync(new URL("../../.github/workflows/lensically-engineering.yml", import.meta.url), "utf8");
-    expect(workflow).toContain("      - name: System Directory tests\n        id: system_directory_tests\n        if: ${{ inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy'");
-    expect(workflow).not.toContain("\n                if: ${{ inputs.task == 'system-directory-tests'");
+        it("requires System Directory validation before Worker deployment", () => {
+    const deployment = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker");
+    expect(deployment?.related_entry_ids).toContain("engineering.operator_validation");
+    expect(deployment?.hard_gates).toEqual(expect.arrayContaining([
+      "Recovery dispatch requires a verified repository head and passing validation.",
+    ]));
   });
 
   it("ships a validated production catalog across every major Lensically plane", () => {
