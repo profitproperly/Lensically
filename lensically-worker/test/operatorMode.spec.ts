@@ -3479,8 +3479,8 @@ describe("operator mode MCP endpoint", () => {
       published_coverage_excludes_unresolved_delivery: true,
     });
     expect(blockedCapsule.workflow_checkpoint).toMatchObject({
-      next_pending_action: "resolve_delivery_incident",
-      canonical_next_tool: "list_scheduled_posts",
+      next_pending_action: "discuss_growth_mission_brief",
+      canonical_next_tool: "getGrowthMission",
     });
 
     const listed = await operatorTool<{
