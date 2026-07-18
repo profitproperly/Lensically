@@ -441,12 +441,17 @@ function prepareStaticCall(
   const exactOperationalIntent = deterministicToolForOperationalIntent(actionIntent, inputs);
   const exactSourceDefinedIntent = exactSourceDefinedToolForIntent(actionIntent, tools);
   const directoryIntent = systemDirectory?.route_intent ?? null;
+  const directoryHasBoundedDefaults = Boolean(
+    systemDirectory?.default_inputs
+    && Object.keys(systemDirectory.default_inputs).length > 0,
+  );
+  const directoryConfidenceFloor = engineeringOnly && directoryHasBoundedDefaults ? 0.5 : 0.75;
   const directoryMayRoute = Boolean(
     !actionKey
     && !exactOperationalIntent
     && !exactSourceDefinedIntent
     && directoryIntent
-    && (systemDirectory?.confidence ?? 0) >= 0.75
+    && (systemDirectory?.confidence ?? 0) >= directoryConfidenceFloor
     && operationClassesCompatible(classifyIntentOperation(actionIntent), classifyIntentOperation(directoryIntent)),
   );
   let resolvedIntent = directoryMayRoute ? directoryIntent ?? actionIntent : actionIntent;
