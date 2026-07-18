@@ -6,8 +6,11 @@ import worker, {
   buildOperatorMaturityObservation,
   buildOperatorPostFingerprint,
   evaluateThreadsPostMetricsForLearning,
+  finalizeScheduledPostPublished,
   isSixHourInsightsRefreshWindow,
   OPERATOR_MCP_VERSION,
+  quarantineScheduledPostPublishAttempt,
+  recoverStalePostingScheduledPosts,
   OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
   shouldAutoArmScheduledPostAlarm,
 
