@@ -1043,6 +1043,8 @@ describe("operator mode backend spine", () => {
         post_text TEXT,
         post_timestamp TEXT,
         post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
         views INTEGER NOT NULL DEFAULT 0,
         likes INTEGER NOT NULL DEFAULT 0,
         replies INTEGER NOT NULL DEFAULT 0,
@@ -1050,6 +1052,10 @@ describe("operator mode backend spine", () => {
         quotes INTEGER NOT NULL DEFAULT 0,
         shares INTEGER NOT NULL DEFAULT 0,
         engagement_total INTEGER NOT NULL DEFAULT 0,
+        source_rank INTEGER NOT NULL DEFAULT 0,
+        first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (threads_user_id, post_id)
       )`,
     ).run();
