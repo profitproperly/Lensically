@@ -404,6 +404,10 @@ function resolveStaticTool(
     const exact = usable.find((tool) => [machineKey(tool.name), machineKey(publicToolName(tool.name)), machineKey(actionKeyForTool(tool.name))].includes(normalizedActionKey));
     if (exact) return { tool: exact, candidates: [{ tool_name: exact.name, score: 1000 }] };
   }
+  const exactSourceDefined = exactSourceDefinedToolForIntent(actionIntent, usable);
+  if (exactSourceDefined) {
+    return { tool: exactSourceDefined, candidates: [{ tool_name: exactSourceDefined.name, score: 950 }] };
+  }
   const deterministic = deterministicToolForOperationalIntent(actionIntent, inputs);
   if (deterministic) {
     const exact = usable.find((tool) => tool.name === deterministic)
