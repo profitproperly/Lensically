@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildClientSafeGatewayRequest,
   createSystemDirectoryIndex,
+  inspectClientSafeGatewayRequest,
   resolveSystemDirectory,
   type SystemDirectoryEntry,
 } from "../src/systemDirectory";
@@ -107,10 +109,35 @@ describe("System Directory foundation", () => {
     expect(resolveSystemDirectory("zzqv unrelated phrase", createSystemDirectoryIndex(entries))).toBeNull();
   });
 
-  it("rejects duplicate and incomplete entries", () => {
+    it("rejects duplicate and incomplete entries", () => {
     expect(() => createSystemDirectoryIndex([...entries, entries[0]])).toThrow("system_directory_duplicate_entry");
     expect(() => createSystemDirectoryIndex([{ ...entries[0], id: "broken", primary_surfaces: [] }])).toThrow(
       "system_directory_entry_incomplete:broken",
     );
+  });
+
+  it("builds workflow lookups without exposing internal handler identifiers", () => {
+    const request = buildClientSafeGatewayRequest("workflow_run_list", { limit: 5 });
+    expect(request).toEqual({
+      objective: "List recent workflow activity with compact run metadata.",
+      intent: "list github workflow runs",
+      inputs: { limit: 5 },
+    });
+    expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
+    expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
+  });
+
+  it("rejects internal handler names and reserved routing keys before public calls", () => {
+    expect(inspectClientSafeGatewayRequest({
+      objective: "Read one internal definition.",
+      intent: "read capability definition",
+      inputs: { tool_name: "listGitHubWorkflowRuns" },
+    })).toEqual({
+      safe: false,
+      violations: [
+        "forbidden_public_input_key:tool_name",
+        "internal_handler_identifier:inputs.tool_name",
+      ],
+    });
   });
 });

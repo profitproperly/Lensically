@@ -179,7 +179,8 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   verifyDeployedMcpVersion: ["verify live deployment", "verify deployed mcp", "confirm live version", "post deployment verification"],
   listEngineeringAudit: ["list engineering audit", "read engineering audit", "inspect execution audit"],
   inspectMcpFailure: ["inspect mcp failure", "diagnose gateway failure", "diagnose mcp", "inspect execution failure"],
-  listMcpTools: ["list mcp tools", "inspect internal mcp registry"],
+    listMcpTools: ["list mcp tools", "inspect internal mcp registry"],
+  readMcpToolDefinition: ["read capability definition", "inspect capability definition", "read capability schema"],
   get_hourly_coverage: ["get hourly coverage", "hourly coverage", "open schedule slots", "calendar coverage"],
   claim_manifest_review_batch: ["claim manifest review batch", "claim review batch"],
   get_manifest_review_batch: ["get manifest review batch", "read manifest review batch", "show review batch"],
@@ -239,8 +240,9 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(append|add)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+chunk|write\s+chunk|chunk)\b/)) return "appendRepoFileChunk";
   if (has(/\b(commit|finish|complete)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "commitRepoFileWrite";
   if (has(/\b(delete|remove)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "deleteRepoFile";
-  if (has(/\b(create|add)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "createRepoFile";
-  if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history)\b/)) return "listGitHubWorkflowRuns";
+    if (has(/\b(create|add)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "createRepoFile";
+  if (has(/\b(read|inspect|show)\b/) && has(/\b(capability|schema|definition)\b/)) return "readMcpToolDefinition";
+  if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history|activity)\b/)) return "listGitHubWorkflowRuns";
   if (has(/\b(get|read|inspect|check|wait)\b/) && has(/\b(workflow|github|release)\b/) && has(/\b(run|status|result|completion)\b/)) {
     if (has(/\bengineering\s+release\b/) || has(/\brelease\s+(status|completion|result)\b/)) return "getEngineeringRelease";
     return "getGitHubWorkflowRun";
@@ -294,8 +296,17 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
 }
 
 function inferredArgumentsForOperationalIntent(toolName: string, actionIntent: string): Record<string, unknown> {
-  if (toolName !== "runGitHubWorkflow") return {};
   const normalized = actionIntent.toLowerCase();
+  if (toolName === "readMcpToolDefinition") {
+    if (/\b(workflow|github)\b/.test(normalized) && /\b(runs|history|activity|listing)\b/.test(normalized)) {
+      return { tool_name: "listGitHubWorkflowRuns" };
+    }
+    if (/\b(workflow|github)\b/.test(normalized) && /\b(run status|single run|completion|result)\b/.test(normalized)) {
+      return { tool_name: "getGitHubWorkflowRun" };
+    }
+    return {};
+  }
+  if (toolName !== "runGitHubWorkflow") return {};
   if (/\btypecheck\b/.test(normalized)) return { task: "typecheck" };
   if (/\bgpt\s+memory\s+tests?\b/.test(normalized)) return { task: "gpt-memory-tests" };
   if (/\boperator\s+tests?\b/.test(normalized) || /\bregression\s+tests?\b/.test(normalized)) return { task: "operator-tests" };
