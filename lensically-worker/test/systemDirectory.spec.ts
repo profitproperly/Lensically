@@ -372,17 +372,24 @@ describe("System Directory foundation", () => {
     expect(getLensicallySystemDirectorySummary()).toMatchObject({ pre_router_resolution: true });
   });
 
-  it("routes load operator context to the startup handler", () => {
+  it("routes load operator context to the startup handler", async () => {
     const tools: MandatoryExecutionToolDefinition[] = [{
       name: "getOperatorStartupContext",
       title: "Get operator startup context",
       description: "Load compact non-account operator context.",
       inputSchema: { type: "object", properties: {} },
     }];
-    expect(prepareSourceDefinedDirectEngineeringCall("load operator context", "Load operator context.", {}, tools)).toMatchObject({
+    const prepared = await prepareMandatoryExecutionMapCall(
+      {} as D1Database,
+      { objective: "Load operator context.", intent: "load operator context", inputs: {} },
+      tools,
+      { signPermit: async () => "", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
       ok: true,
       tool_name: "getOperatorStartupContext",
       arguments: {},
+      map_execution: { mode: "source_defined_static_route" },
     });
   });
 
