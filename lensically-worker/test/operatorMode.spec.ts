@@ -1826,8 +1826,8 @@ describe("operator mode backend spine", () => {
     }
   }, 40000);
 
-  it("caps each source-card generation run for every brand", async () => {
-    for (const brandKey of ALL_BRAND_KEYS) {
+    it("caps each source-card generation run for every brand", async () => {
+    await Promise.all(ALL_BRAND_KEYS.map(async (brandKey) => {
       const { sourceCardId, runId } = await createLockedSourceCard([], brandKey);
       for (const text of [
         "A clean system gives the first good idea somewhere useful to land.",
@@ -1838,13 +1838,12 @@ describe("operator mode backend spine", () => {
           run_id: runId,
           source_card_id: sourceCardId,
           text,
-                    draft_analysis: {
+          draft_analysis: {
             opening_phrase: text.split(" ").slice(0, 4).join(" "),
             realm_entrance_key: text.slice(0, 12),
             lane_key: "systems",
             audience_reward_delivered: brandKey === "manifest_mental" ? true : undefined,
           },
-
         });
         expect(draft.draft_id).toBeTruthy();
       }
@@ -1863,7 +1862,7 @@ describe("operator mode backend spine", () => {
       expect(blocked.status, brandKey).toBe(400);
       expect(blockedData.error).toBe("lensically_saved_workflow_required");
       expect(blockedData.existing_draft_count).toBe(2);
-    }
+    }));
   }, 40000);
 
   it("keeps account-specific gates scoped to their brand", async () => {
