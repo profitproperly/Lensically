@@ -15022,6 +15022,8 @@ async function beginOperatorAutonomyAuthorization(
       authority_version: OPERATOR_GROWTH_MISSION_VERSION,
       brand_key: brandKey,
       error: "approved_growth_mission_required",
+      account_execution_locked: true,
+      growth_mission_status: growthMissionStatus,
       required_next_tool: "updateGrowthMission",
       pending_decisions: [],
     };
