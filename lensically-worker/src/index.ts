@@ -11234,6 +11234,76 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
+  if (toolName === "schedule_owner_approved_batch") {
+    const ownerApproval = normalizeOperatorText(payload.owner_approval, 4000);
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    const rawPosts = Array.isArray(payload.posts) ? payload.posts.slice(0, 12) : [];
+    if (!ownerApproval || !rawPosts.length) {
+      return operatorJsonResponse({ success: false, error: "owner_approval_and_posts_required" }, 400);
+    }
+    const scheduledItems: Array<Record<string, unknown>> = [];
+    for (let index = 0; index < rawPosts.length; index += 1) {
+      const rawPost = rawPosts[index];
+      const post = rawPost && typeof rawPost === "object" && !Array.isArray(rawPost)
+        ? rawPost as Record<string, unknown>
+        : {};
+      const text = normalizeOperatorText(post.text, 20000);
+      const date = normalizeOperatorText(post.date, 20);
+      const time = normalizeOperatorText(post.time, 20);
+      if (!text || !date || !time || !isValidIsoDate(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+        return operatorJsonResponse({
+          success: false,
+          error: "valid_text_date_and_time_required",
+          failed_index: index,
+          scheduled_count: scheduledItems.length,
+          scheduled_items: scheduledItems,
+        }, 400);
+      }
+      const scheduled = await createScheduledPostForAppUser(
+        env,
+        WORKSPACE_APP_USER_ID,
+        brand.profile.threads_user_id,
+        text,
+        date,
+        time,
+        timezone,
+      );
+      if (!scheduled.success || !scheduled.scheduledPostId) {
+        return operatorJsonResponse({
+          success: false,
+          error: scheduled.error ?? "schedule_failed",
+          failed_index: index,
+          scheduled_count: scheduledItems.length,
+          scheduled_items: scheduledItems,
+        }, 400);
+      }
+      scheduledItems.push({
+        index,
+        scheduled_post_id: scheduled.scheduledPostId,
+        date,
+        time,
+      });
+    }
+    await saveGptStrategyMemory(env, {
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      kind: "scheduled_batch",
+      title: "Owner-approved direct scheduling batch",
+      body: `Scheduled ${scheduledItems.length} owner-approved posts. Approval: ${ownerApproval}`,
+      metadataJson: normalizeOperatorJson({
+        source: "schedule_owner_approved_batch",
+        scheduled_post_ids: scheduledItems.map((item) => item.scheduled_post_id),
+        timezone,
+      }, {}),
+    });
+    return operatorJsonResponse({
+      success: true,
+      scheduled_count: scheduledItems.length,
+      scheduled_items: scheduledItems,
+      timezone,
+    });
+  }
+
   if (toolName === "schedule_approved_draft") {
     const draftId = normalizeOperatorText(payload.draft_id, 120);
     const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
