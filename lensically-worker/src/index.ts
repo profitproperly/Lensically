@@ -6943,17 +6943,26 @@ async function openOperatorGrowthMissionDiscussion(
   const currentMission = existingRow
     ? parseOperatorGrowthMissionJson(existingRow.mission_json)
     : defaultOperatorGrowthMission(brand.brand_key);
+  const fullAutoAlreadyAuthorized = existingRow?.execution_mode === MANIFEST_AUTONOMY_MODE;
+  const cycleStatus: OperatorGrowthMissionStatus = fullAutoAlreadyAuthorized ? "active" : "discussion";
+  const cycleExecutionMode = fullAutoAlreadyAuthorized ? MANIFEST_AUTONOMY_MODE : MANIFEST_GUIDED_EXECUTION_MODE;
   if (existingRow) {
     await env.DB.prepare(
       `UPDATE operator_growth_missions
-       SET contract_version = ?, status = 'discussion', execution_mode = ?, diagnostic_json = ?,
-           owner_response = NULL, approved_at = NULL, last_diagnostic_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
+       SET contract_version = ?, status = ?, execution_mode = ?, diagnostic_json = ?,
+           owner_response = CASE WHEN ? = ? THEN owner_response ELSE NULL END,
+           approved_at = CASE WHEN ? = ? THEN COALESCE(approved_at, CURRENT_TIMESTAMP) ELSE NULL END,
+           last_diagnostic_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE brand_key = ?`,
     ).bind(
       OPERATOR_GROWTH_MISSION_VERSION,
-      MANIFEST_GUIDED_EXECUTION_MODE,
+      cycleStatus,
+      cycleExecutionMode,
       JSON.stringify(diagnostic),
+      cycleExecutionMode,
+      MANIFEST_AUTONOMY_MODE,
+      cycleExecutionMode,
+      MANIFEST_AUTONOMY_MODE,
       brand.brand_key,
     ).run();
   } else {
