@@ -641,6 +641,7 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
 
     owner_visible_checkpoints: [
     "initial_key_proceed",
+    "growth_mission_brief",
     "owner_ratified_account_decision",
     "meaningful_engineering_outcome",
     "true_owner_required_blocker",
