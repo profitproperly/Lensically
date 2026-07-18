@@ -484,6 +484,21 @@ export function getLensicallySystemDirectorySummary(): Record<string, unknown> {
     compact_directive_only: true,
     advisory_fallback_to_original_intent: true,
     route_default_count: routeDefaultCount,
+    capability_lifecycle_version: "lensically-capability-lifecycle-v1",
+    capability_lifecycle_location: "lensically-worker/src/systemDirectory/capabilityLifecycle.json",
+    capability_lifecycle_mandatory: true,
+    model_executes_capability_lifecycle_automatically: true,
+    owner_prompt_required_for_routine_capability_work: false,
+    new_capability_completion_requires: [
+      "directory_resolution",
+      "capability_declaration",
+      "one_canonical_handler",
+      "one_static_route",
+      "focused_regression",
+      "minimum_validation_scope",
+      "exact_head_release",
+      "live_verification",
+    ],
   };
 }
 
