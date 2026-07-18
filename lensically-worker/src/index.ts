@@ -12490,7 +12490,7 @@ function cloneOperatorMcpTool(tool: OperatorMcpToolDefinition): OperatorMcpToolD
   return JSON.parse(JSON.stringify(tool)) as OperatorMcpToolDefinition;
 }
 
-const RETIRED_INTERNAL_TOOL_NAMES = new Set([
+const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
   "guardLensicallyCall",
   "routeAndExecuteLensicallyCall",
   "executeMappedIntent",
@@ -12529,12 +12529,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
   ] : [];
     const directPriority = new Map([
-    ["getOperatorStartupContext", 0],
-    ["guardLensicallyCall", 1],
-    ["runEngineeringRelease", 2],
-    ["getEngineeringRelease", 3],
-    ["selectOperatorKey", 4],
-    ["confirmOperatorProceed", 5],
+        ["getOperatorStartupContext", 0],
+    ["selectOperatorKey", 1],
+    ["confirmOperatorProceed", 2],
                 ["getScheduledPostSchedulerState", 6],
     ["auditScheduledPost", 7],
         ["setScheduledPostSchedulerMode", 8],
@@ -12555,7 +12552,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ...OPERATOR_MCP_ADMIN_TOOLS,
     ...OPERATOR_MCP_TOOLS,
     ...scopedWrapperTools,
-  ].filter((tool) => !RETIRED_INTERNAL_TOOL_NAMES.has(tool.name)).map(cloneOperatorMcpTool).sort((left, right) => {
+    ].map(cloneOperatorMcpTool).sort((left, right) => {
     const leftPriority = directPriority.get(left.name) ?? 1000;
     const rightPriority = directPriority.get(right.name) ?? 1000;
     return leftPriority - rightPriority;
@@ -12566,7 +12563,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       ? { ...(schema.properties as Record<string, unknown>) }
       : {};
         const acceptsBrandContext = Object.prototype.hasOwnProperty.call(properties, "brand_key");
-    if (operatorMcpToolNameRequiresProceed(tool.name) || acceptsBrandContext || tool.name === "getMcpAdminState" || tool.name === "updateWorkflowRequirement") {
+        if (operatorMcpToolNameRequiresProceed(tool.name) || acceptsBrandContext || tool.name === "updateWorkflowRequirement") {
       properties.proceed_confirmed = {
         type: "boolean",
         description: "Set true only after the user explicitly approves proceeding from the four-line key handshake.",
@@ -12576,12 +12573,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
         description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
       };
     }
-    if (!OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS.has(tool.name)) {
-      properties.execution_guard = {
-        type: "string",
-        description: "Signed token returned by guardLensicallyCall for this exact tool and normalized argument payload. Required before execution.",
-      };
-    }
+    
     tool.inputSchema = { ...schema, properties };
   }
   return tools;
@@ -15556,7 +15548,7 @@ async function handleOperatorMcpAdminTool(
     const requirements = await listOperatorWorkflowRequirements(env, null);
     const checks = [
       { name: "single_gateway_registered", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
-      { name: "retired_internal_tools_absent", passed: [...RETIRED_INTERNAL_TOOL_NAMES].every((name) => !names.has(name)) },
+            { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
       { name: "session_handshake_tools_registered", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
       { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
