@@ -280,9 +280,15 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
-                    it("routes deployment exclusively through the Recovery surface", () => {
+  it("routes deployment exclusively through the Recovery surface", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
     expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
+  });
+
+  it("dispatches the verified current head without an exact SHA in the Recovery payload", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_exact_sha_deploy_dispatch");
+    expect(incident?.safe_profile_id).toBe("worker_release_dispatch");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch.allowed_input_keys).toEqual([]);
   });
 
   it("rejects internal handler names and reserved routing keys before public calls", () => {
