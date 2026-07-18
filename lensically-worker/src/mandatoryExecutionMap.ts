@@ -23,15 +23,21 @@ const GENERALIZABLE_DEFECT_CLASSES = new Set<DefectClass>([
 ]);
 
 function defectEvidenceText(actionIntent: string, result: Record<string, unknown>): string {
-  return JSON.stringify({
-    action_intent: actionIntent,
-    error: result.error ?? null,
-    status: result.status ?? null,
-    phase: result.phase ?? null,
-    likely_cause: result.likely_cause ?? null,
-    recommended_fix_path: result.recommended_fix_path ?? null,
-    contradiction: result.contradiction ?? result.contract_contradiction ?? null,
-  }).toLowerCase();
+  const values: unknown[] = [
+    actionIntent,
+    result.error,
+    result.status,
+    result.phase,
+    result.likely_cause,
+    result.recommended_fix_path,
+    result.contradiction === true || result.contract_contradiction === true ? "explicit contradiction" : null,
+  ];
+  return values
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .filter((value): value is string | number => typeof value === "string" || typeof value === "number")
+    .map((value) => String(value))
+    .join(" ")
+    .toLowerCase();
 }
 
 export function classifyDefectForGeneralization(
