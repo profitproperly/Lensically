@@ -8905,11 +8905,16 @@ async function buildOperatorManifestProceedCapsule(
       profile: autonomyProfile,
       pending_decisions: pendingDecisions,
       engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
-      next_behavior: pendingDecisions.length
-        ? "Resume the pending owner-ratified account or business decision when relevant; routine engineering remains autonomous."
-        : "Proceed autonomously with routine engineering through mandatory known paths. Propose only owner-ratified account, business, destructive, or irreversible decisions.",
+      next_behavior: "Present the Growth Mission Brief, diagnose the current bottleneck, and brainstorm with the owner. Routine engineering remains autonomous; account mutations remain locked until the owner approves the current plan.",
     } : null,
-        calendar_coverage: {
+    growth_mission_brief: growthMissionBrief,
+    account_execution: {
+      unlocked: false,
+      discussion_required: true,
+      required_next_tool: "updateGrowthMission",
+      approval_scope: "current_guided_growth_cycle",
+    },
+    calendar_coverage: {
       ...calendarCoverage,
       unresolved_delivery_count: deliveryReconciliation.unresolved_incidents.length,
       unresolved_delivery_slots: deliveryReconciliation.unresolved_incidents.map((incident) => ({
