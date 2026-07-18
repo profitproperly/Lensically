@@ -6740,6 +6740,374 @@ async function getOperatorAutonomyProfile(env: Env, brandKey: GptBrandKey): Prom
   return serializeOperatorAutonomyProfile(row ?? null);
 }
 
+function parseOperatorGrowthMissionJson(value: unknown): Record<string, unknown> {
+  const parsed = safeParseJsonString(String(value ?? "{}"));
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {};
+}
+
+function defaultOperatorGrowthMission(brandKey: GptBrandKey): Record<string, unknown> {
+  return {
+    permanent_mission: brandKey === "manifest_mental"
+      ? MANIFEST_AUTONOMY_OBJECTIVE
+      : `Grow ${brandKey} through evidence-led content and reliable account operation.`,
+    target_followers: brandKey === "manifest_mental" ? 1_000_000 : null,
+    execution_mode: MANIFEST_GUIDED_EXECUTION_MODE,
+    growth_phase: "diagnostic_and_planning",
+    current_bottleneck: "awaiting_current_diagnostic",
+    primary_objective: "Agree on the current evidence-led growth focus before account execution.",
+    supporting_objectives: [],
+    active_experiments: [],
+    proven_patterns: [],
+    fatigued_patterns: [],
+    risks: ["Do not trade audience trust or brand identity for short-term volume."],
+    recommended_next_action: "Discuss, revise, or approve the current Growth Mission Brief.",
+    owner_notes: null,
+  };
+}
+
+function serializeOperatorGrowthMission(row: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!row) return null;
+  return {
+    brand_key: row.brand_key,
+    contract_version: row.contract_version,
+    version: Number(row.version ?? 1),
+    status: row.status,
+    execution_mode: row.execution_mode,
+    mission: parseOperatorGrowthMissionJson(row.mission_json),
+    diagnostic: parseOperatorGrowthMissionJson(row.diagnostic_json),
+    owner_response: row.owner_response ?? null,
+    change_summary: row.change_summary ?? null,
+    approved_at: row.approved_at ?? null,
+    last_diagnostic_at: row.last_diagnostic_at ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function readOperatorGrowthMission(env: Env, brandKey: GptBrandKey): Promise<Record<string, unknown> | null> {
+  await ensureOperatorMcpAdminTables(env);
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_growth_missions WHERE brand_key = ? LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+  return serializeOperatorGrowthMission(row ?? null);
+}
+
+async function recordOperatorGrowthMissionRevision(env: Env, row: Record<string, unknown>): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO operator_growth_mission_revisions (
+      id, brand_key, mission_version, status, execution_mode, mission_json, diagnostic_json,
+      owner_response, change_summary
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    row.brand_key,
+    Number(row.version ?? 1),
+    String(row.status ?? "discussion"),
+    String(row.execution_mode ?? MANIFEST_GUIDED_EXECUTION_MODE),
+    String(row.mission_json ?? "{}"),
+    String(row.diagnostic_json ?? "{}"),
+    row.owner_response ?? null,
+    row.change_summary ?? null,
+  ).run();
+}
+
+async function buildOperatorGrowthDiagnostic(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    calendarCoverage: Record<string, unknown>;
+    activeReviewBatch: Record<string, unknown> | null;
+    workflowSession: Record<string, unknown> | null;
+    operationalNext: Record<string, unknown>;
+  },
+): Promise<Record<string, unknown>> {
+  await ensureThreadsFollowerSnapshotsTable(env);
+  await ensureThreadsPostsArchiveTable(env);
+  const latestFollower = await env.DB.prepare(
+    `SELECT snapshot_date, followers_count, captured_at
+     FROM threads_follower_snapshots
+     WHERE threads_user_id = ?
+     ORDER BY snapshot_date DESC, datetime(captured_at) DESC
+     LIMIT 1`,
+  ).bind(brand.profile.threads_user_id).first<Record<string, unknown>>();
+  const recentSummary = await env.DB.prepare(
+    `SELECT COUNT(*) AS total_posts,
+            COALESCE(AVG(likes), 0) AS average_likes,
+            COALESCE(MAX(likes), 0) AS maximum_likes,
+            COALESCE(SUM(CASE WHEN likes >= 1000 THEN 1 ELSE 0 END), 0) AS thousand_like_posts
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?
+       AND datetime(post_timestamp) >= datetime('now', '-30 days')`,
+  ).bind(brand.profile.threads_user_id).first<Record<string, unknown>>();
+  const topPosts = await env.DB.prepare(
+    `SELECT post_id, post_text, post_timestamp, post_permalink,
+            COALESCE(views, 0) AS views, COALESCE(likes, 0) AS likes,
+            COALESCE(replies, 0) AS replies, COALESCE(reposts, 0) AS reposts,
+            COALESCE(quotes, 0) AS quotes, COALESCE(shares, 0) AS shares
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?
+       AND datetime(post_timestamp) >= datetime('now', '-30 days')
+     ORDER BY likes DESC, engagement_total DESC, datetime(post_timestamp) DESC
+     LIMIT 5`,
+  ).bind(brand.profile.threads_user_id).all<Record<string, unknown>>();
+  const currentFollowers = latestFollower ? Number(latestFollower.followers_count ?? 0) : null;
+  const targetFollowers = brand.brand_key === "manifest_mental" ? 1_000_000 : null;
+  const totalPosts = Number(recentSummary?.total_posts ?? 0);
+  const thousandLikePosts = Number(recentSummary?.thousand_like_posts ?? 0);
+  const winnerRate = totalPosts > 0 ? Number((thousandLikePosts / totalPosts).toFixed(4)) : null;
+  const earliestIncompleteDate = normalizeOperatorText(input.calendarCoverage.earliest_incomplete_date, 20, true);
+  let currentBottleneck = "winner_replication_and_experimentation";
+  let primaryObjective = "Increase the share of posts outperforming the recent account baseline while preserving variety and audience trust.";
+  if (input.activeReviewBatch) {
+    currentBottleneck = "owner_review_backlog";
+    primaryObjective = "Resolve the active review batch before creating additional production inventory.";
+  } else if (earliestIncompleteDate) {
+    currentBottleneck = "calendar_coverage_gap";
+    primaryObjective = `Build an approved plan for the earliest incomplete production day, ${earliestIncompleteDate}.`;
+  } else if (totalPosts < 24) {
+    currentBottleneck = "insufficient_recent_performance_sample";
+    primaryObjective = "Create a controlled evidence sample without overcommitting to weak early signals.";
+  } else if (winnerRate !== null && winnerRate < 0.1) {
+    currentBottleneck = "low_thousand_like_hit_rate";
+    primaryObjective = "Raise the percentage of posts reaching 1,000 likes by testing and reusing the strongest supported mechanisms.";
+  }
+  const growthPhase = currentFollowers === null
+    ? "baseline_collection"
+    : currentFollowers < 10_000
+      ? "foundation"
+      : currentFollowers < 100_000
+        ? "repeatable_growth"
+        : currentFollowers < 500_000
+          ? "scale"
+          : "million_follower_push";
+  return {
+    generated_at: new Date().toISOString(),
+    diagnostic_window_days: 30,
+    current_followers: currentFollowers,
+    target_followers: targetFollowers,
+    followers_remaining: currentFollowers !== null && targetFollowers !== null
+      ? Math.max(targetFollowers - currentFollowers, 0)
+      : null,
+    target_progress_percent: currentFollowers !== null && targetFollowers
+      ? Number(((currentFollowers / targetFollowers) * 100).toFixed(4))
+      : null,
+    latest_follower_snapshot: latestFollower ?? null,
+    growth_phase: growthPhase,
+    recent_performance: {
+      total_posts: totalPosts,
+      average_likes: Number(Number(recentSummary?.average_likes ?? 0).toFixed(2)),
+      maximum_likes: Number(recentSummary?.maximum_likes ?? 0),
+      thousand_like_posts: thousandLikePosts,
+      thousand_like_hit_rate: winnerRate,
+      top_posts: topPosts.results ?? [],
+    },
+    calendar_coverage: input.calendarCoverage,
+    active_review_batch: input.activeReviewBatch,
+    workflow_state: {
+      workflow_session_id: input.workflowSession?.id ?? null,
+      current_stage: input.workflowSession?.current_stage ?? null,
+      status: input.workflowSession?.status ?? null,
+      operational_next_after_plan_approval: input.operationalNext,
+    },
+    diagnosed_bottleneck: currentBottleneck,
+    recommended_primary_objective: primaryObjective,
+    evidence_limits: [
+      "Follower totals are account-level trajectory data and are not attributed to individual posts.",
+      "Thirty-day performance is directional evidence; weak samples remain provisional.",
+    ],
+  };
+}
+
+async function openOperatorGrowthMissionDiscussion(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    calendarCoverage: Record<string, unknown>;
+    activeReviewBatch: Record<string, unknown> | null;
+    workflowSession: Record<string, unknown> | null;
+    operationalNext: Record<string, unknown>;
+  },
+): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const diagnostic = await buildOperatorGrowthDiagnostic(env, brand, input);
+  const existingRow = await env.DB.prepare(
+    `SELECT * FROM operator_growth_missions WHERE brand_key = ? LIMIT 1`,
+  ).bind(brand.brand_key).first<Record<string, unknown>>();
+  if (existingRow && ["approved", "active", "paused"].includes(String(existingRow.status))) {
+    await recordOperatorGrowthMissionRevision(env, existingRow);
+  }
+  const currentMission = existingRow
+    ? parseOperatorGrowthMissionJson(existingRow.mission_json)
+    : defaultOperatorGrowthMission(brand.brand_key);
+  if (existingRow) {
+    await env.DB.prepare(
+      `UPDATE operator_growth_missions
+       SET contract_version = ?, status = 'discussion', execution_mode = ?, diagnostic_json = ?,
+           owner_response = NULL, approved_at = NULL, last_diagnostic_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE brand_key = ?`,
+    ).bind(
+      OPERATOR_GROWTH_MISSION_VERSION,
+      MANIFEST_GUIDED_EXECUTION_MODE,
+      JSON.stringify(diagnostic),
+      brand.brand_key,
+    ).run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO operator_growth_missions (
+        brand_key, contract_version, version, status, execution_mode, mission_json,
+        diagnostic_json, last_diagnostic_at
+      ) VALUES (?, ?, 1, 'discussion', ?, ?, ?, CURRENT_TIMESTAMP)`,
+    ).bind(
+      brand.brand_key,
+      OPERATOR_GROWTH_MISSION_VERSION,
+      MANIFEST_GUIDED_EXECUTION_MODE,
+      JSON.stringify(currentMission),
+      JSON.stringify(diagnostic),
+    ).run();
+  }
+  const proposedPlan = {
+    permanent_mission: currentMission.permanent_mission ?? MANIFEST_AUTONOMY_OBJECTIVE,
+    target_followers: currentMission.target_followers ?? (brand.brand_key === "manifest_mental" ? 1_000_000 : null),
+    execution_mode: MANIFEST_GUIDED_EXECUTION_MODE,
+    growth_phase: diagnostic.growth_phase,
+    current_bottleneck: diagnostic.diagnosed_bottleneck,
+    primary_objective: diagnostic.recommended_primary_objective,
+    supporting_objectives: [
+      "Maintain reliable coverage without semantic duplicates.",
+      "Turn performance evidence into specific source, hook, topic, and experiment decisions.",
+      "Preserve audience trust, brand identity, content quality, and account safety.",
+    ],
+    active_experiments: Array.isArray(currentMission.active_experiments) ? currentMission.active_experiments : [],
+    proven_patterns: Array.isArray(currentMission.proven_patterns) ? currentMission.proven_patterns : [],
+    fatigued_patterns: Array.isArray(currentMission.fatigued_patterns) ? currentMission.fatigued_patterns : [],
+    risks: Array.isArray(currentMission.risks) ? currentMission.risks : [],
+    recommended_next_action: "Discuss this brief with the owner, revise it from the conversation, and obtain explicit plan approval before account execution.",
+  };
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_growth_missions WHERE brand_key = ? LIMIT 1`,
+  ).bind(brand.brand_key).first<Record<string, unknown>>();
+  return {
+    version: OPERATOR_GROWTH_MISSION_VERSION,
+    status: "discussion",
+    current_mission: currentMission,
+    diagnostic,
+    proposed_plan: proposedPlan,
+    persisted_mission: serializeOperatorGrowthMission(row ?? null),
+    discussion_contract: {
+      execution_locked: true,
+      no_account_mutation_before_approval: true,
+      engineering_remains_autonomous: true,
+      model_behavior: "Present a concise diagnosis, proposed focus, evidence, risks, and recommendation. Brainstorm with the owner and revise the persisted mission from the discussion.",
+      owner_action: "Discuss, revise, or approve the proposed plan.",
+      approval_intent: "update growth mission",
+    },
+  };
+}
+
+async function updateOperatorGrowthMission(
+  env: Env,
+  brandKey: GptBrandKey,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  let existingRow = await env.DB.prepare(
+    `SELECT * FROM operator_growth_missions WHERE brand_key = ? LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
+  if (!existingRow) {
+    const defaultMission = defaultOperatorGrowthMission(brandKey);
+    await env.DB.prepare(
+      `INSERT INTO operator_growth_missions (
+        brand_key, contract_version, version, status, execution_mode, mission_json, diagnostic_json
+      ) VALUES (?, ?, 1, 'discussion', ?, ?, '{}')`,
+    ).bind(brandKey, OPERATOR_GROWTH_MISSION_VERSION, MANIFEST_GUIDED_EXECUTION_MODE, JSON.stringify(defaultMission)).run();
+    existingRow = await env.DB.prepare(
+      `SELECT * FROM operator_growth_missions WHERE brand_key = ? LIMIT 1`,
+    ).bind(brandKey).first<Record<string, unknown>>();
+  }
+  if (!existingRow) return { ok: false, error: "growth_mission_unavailable" };
+  const requestedStatus = normalizeOperatorText(args.status, 40, true) as OperatorGrowthMissionStatus | null;
+  const status: OperatorGrowthMissionStatus = requestedStatus && OPERATOR_GROWTH_MISSION_STATUSES.has(requestedStatus)
+    ? requestedStatus
+    : "discussion";
+  const requestedMode = normalizeOperatorText(args.execution_mode, 80, true);
+  const executionMode = requestedMode === MANIFEST_AUTONOMY_MODE
+    ? MANIFEST_AUTONOMY_MODE
+    : MANIFEST_GUIDED_EXECUTION_MODE;
+  const ownerResponse = normalizeOperatorText(args.owner_response, 8000, true);
+  if (["approved", "active"].includes(status) && !ownerResponse) {
+    return { ok: false, error: "owner_response_required_for_growth_plan_approval" };
+  }
+  if (executionMode === MANIFEST_AUTONOMY_MODE && !ownerResponse) {
+    return { ok: false, error: "explicit_owner_response_required_for_full_auto_mode" };
+  }
+  const patch = args.mission_patch && typeof args.mission_patch === "object" && !Array.isArray(args.mission_patch)
+    ? args.mission_patch as Record<string, unknown>
+    : {};
+  const mission = { ...parseOperatorGrowthMissionJson(existingRow.mission_json), ...patch, execution_mode: executionMode };
+  if (["approved", "active"].includes(status)) {
+    for (const requiredField of ["permanent_mission", "target_followers", "current_bottleneck", "primary_objective", "recommended_next_action"]) {
+      if (mission[requiredField] === null || mission[requiredField] === undefined || mission[requiredField] === "") {
+        return { ok: false, error: "growth_mission_required_field_missing", field: requiredField };
+      }
+    }
+  }
+  await recordOperatorGrowthMissionRevision(env, existingRow);
+  const changeSummary = normalizeOperatorText(args.change_summary, 1200, true);
+  await env.DB.prepare(
+    `UPDATE operator_growth_missions
+     SET contract_version = ?, version = version + 1, status = ?, execution_mode = ?,
+         mission_json = ?, owner_response = ?, change_summary = ?,
+         approved_at = CASE WHEN ? IN ('approved', 'active') THEN CURRENT_TIMESTAMP ELSE NULL END,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE brand_key = ?`,
+  ).bind(
+    OPERATOR_GROWTH_MISSION_VERSION,
+    status,
+    executionMode,
+    JSON.stringify(mission),
+    ownerResponse,
+    changeSummary,
+    status,
+    brandKey,
+  ).run();
+  const autonomyMode = executionMode === MANIFEST_AUTONOMY_MODE
+    ? MANIFEST_AUTONOMY_MODE
+    : MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE;
+  await env.DB.prepare(
+    `UPDATE operator_autonomy_profiles
+     SET mode = ?, objective = ?, model_role = ?, owner_role = ?, approval_policy = ?,
+         operating_constraints_json = ?, active = 1, version = version + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE brand_key = ?`,
+  ).bind(
+    autonomyMode,
+    normalizeOperatorText(mission.permanent_mission, 4000, true) ?? MANIFEST_AUTONOMY_OBJECTIVE,
+    OPERATOR_AUTONOMY_CONTRACT.model_role,
+    OPERATOR_AUTONOMY_CONTRACT.owner_role,
+    OPERATOR_AUTONOMY_CONTRACT.approval_policy,
+    JSON.stringify({
+      focus_accounts: [brandKey],
+      growth_mission_contract: OPERATOR_GROWTH_MISSION_VERSION,
+      growth_plan_status: status,
+      owner_ratification_required: executionMode !== MANIFEST_AUTONOMY_MODE,
+      routine_account_operations_autonomous: executionMode === MANIFEST_AUTONOMY_MODE,
+      account_mutations_require_approved_growth_plan: true,
+      read_only_investigation_autonomous: true,
+      routine_engineering_autonomous: true,
+    }),
+    brandKey,
+  ).run();
+  return {
+    ok: true,
+    growth_mission: await readOperatorGrowthMission(env, brandKey),
+    account_execution_unlocked: ["approved", "active"].includes(status),
+    full_auto_enabled: executionMode === MANIFEST_AUTONOMY_MODE,
+  };
+}
+
 async function listOperatorDecisionProposals(
   env: Env,
   brandKey: GptBrandKey,
