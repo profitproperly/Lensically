@@ -15884,7 +15884,7 @@ async function handleOperatorMcpEngineeringTool(
   args: Record<string, unknown>,
   preparationAlreadyComplete = false,
 ): Promise<Record<string, unknown>> {
-  if (toolName !== "guardLensicallyCall" && !preparationAlreadyComplete) {
+  if (!preparationAlreadyComplete) {
     await prepareOperatorMode(env);
   }
   const config = githubRepoConfig(env);
