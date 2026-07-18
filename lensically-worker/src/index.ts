@@ -485,7 +485,7 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
     }
     arrayItems = Math.max(1, Math.floor(arrayItems / 2));
     stringChars = Math.max(160, Math.floor(stringChars / 2));
-    objectKeys = Math.max(12, Math.floor(objectKeys / 2));
+    objectKeys = Math.max(32, Math.floor(objectKeys / 2));
   }
 
   return {
