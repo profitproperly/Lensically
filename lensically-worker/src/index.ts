@@ -15029,7 +15029,7 @@ async function getOperatorMcpBoundaryBlock(
   const serverContinuity = requestedBrand
     ? await readLatestOperatorContinuityState(env, "continuity_context", requestedBrand)
     : null;
-  const legacyCredential = operatorMcpLegacyContinuityCredential(toolName, args);
+  const legacyCredential = operatorMcpLegacyContinuityCredential(args);
   const legacyReference = serverContinuity ? null : await readOperatorContinuityReference(env, legacyCredential, "continuity_context", requestedBrand);
   const legacyContinuity = serverContinuity || legacyReference ? null : await verifyOperatorContinuityToken(env, legacyCredential, requestedBrand);
   const continuity = serverContinuity ?? legacyReference ?? legacyContinuity;
