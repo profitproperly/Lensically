@@ -7,6 +7,7 @@ import worker, {
   buildOperatorPostFingerprint,
   evaluateThreadsPostMetricsForLearning,
   isSixHourInsightsRefreshWindow,
+  OPERATOR_MCP_VERSION,
   OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
   shouldAutoArmScheduledPostAlarm,
 
