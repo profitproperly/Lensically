@@ -331,10 +331,16 @@ describe("System Directory foundation", () => {
       release_scope: "system-directory-tests",
       compatibility_bridge: false,
     }));
+  });
+
+  it("routes missing capability requests to the autonomous capability lifecycle", () => {
     expect(resolveLensicallySystemDirectory("Create and register a missing capability.")).toMatchObject({
       entry_id: "engineering.capability_lifecycle",
       route_intent: "read repository file",
     });
+  });
+
+  it("exposes the autonomous capability lifecycle in mandatory startup", () => {
     expect(getLensicallySystemDirectorySummary()).toMatchObject({
       capability_lifecycle_version: "lensically-capability-lifecycle-v1",
       capability_lifecycle_location: "lensically-worker/src/systemDirectory/capabilityLifecycle.json",
