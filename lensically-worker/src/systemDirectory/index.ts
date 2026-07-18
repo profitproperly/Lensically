@@ -333,7 +333,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     system_of_record: "operator_growth_missions and immutable operator_growth_mission_revisions",
     primary_surfaces: ["Growth Mission approval", "plan revision", "guided autonomy mode"],
     objects: ["approve growth plan", "revise mission", "activate plan", "pause plan", "full-auto mode change"],
-    keywords: ["approve growth mission", "revise growth plan", "update mission", "activate plan", "pause plan", "enable full auto"],
+    keywords: ["approve the guided growth plan", "approve growth plan", "approve growth mission", "revise growth plan", "update mission", "activate plan", "pause plan", "enable full auto"],
     capabilities: ["persist owner-model brainstorming", "revise active objectives", "approve account execution plan", "explicitly change execution mode"],
     payload: { action_size: "bounded_mutation", max_response_bytes: 18000, required_inputs: ["brand_key"] },
     route_intent: "update growth mission",
