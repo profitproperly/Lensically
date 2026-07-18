@@ -17307,6 +17307,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         };
       }
       resultPayload.execution_policy = executionPolicy;
+      resultPayload = enforceOperatorPayloadBudget(resultPayload);
       if (idempotencyKey) {
         resultPayload.idempotency = {
           version: OPERATOR_IDEMPOTENCY_VERSION,
