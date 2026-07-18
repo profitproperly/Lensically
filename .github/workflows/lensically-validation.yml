@@ -142,7 +142,7 @@ jobs:
       - name: Surface scoped Operator failure
         if: ${{ steps.operator_validation.outcome == 'failure' }}
         run: |
-          failure_lines=$(grep -aE '(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]' /tmp/lensically-operator-validation.log | tail -n 80 || true)
+                    failure_lines=$(grep -aE 'monthly_diagnostic:|(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]' /tmp/lensically-operator-validation.log | tail -n 80 || true)
           if [ -z "${failure_lines}" ]; then
             failure_lines=$(tail -n 80 /tmp/lensically-operator-validation.log)
           fi

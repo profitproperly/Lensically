@@ -566,12 +566,13 @@ describe("operator mode backend spine", () => {
       follower_growth: payload.follower_growth ?? null,
       top_post_id: payload.post_performance?.by_views?.[0]?.id ?? null,
     };
-    const monthlyCorrect = monthlyDiagnostic.is_error === false
+        const monthlyCorrect = monthlyDiagnostic.is_error === false
       && monthlyDiagnostic.route === "get_monthly_growth_review"
       && monthlyDiagnostic.threads_user_id === "35758578720393972"
       && monthlyDiagnostic.follower_growth?.starting_followers === 100
       && monthlyDiagnostic.follower_growth?.current_followers === 145
-      && monthlyDiagnostic.follower_growth?.net_growth === 45;
+      && monthlyDiagnostic.follower_growth?.net_growth === 45
+      && monthlyDiagnostic.top_post_id === "july-winner";
     if (!monthlyCorrect) throw new Error(`monthly_diagnostic:${JSON.stringify(monthlyDiagnostic)}`);
     expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
   });
