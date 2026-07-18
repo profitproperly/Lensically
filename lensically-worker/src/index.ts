@@ -31206,8 +31206,8 @@ function shouldAutoResumeTemporarySchedulerPause(
   if (control.mode !== "paused" || !isTemporarySchedulerPauseReason(control.reason)) {
     return false;
   }
-  if (control.reason === "safe_default" || !control.updated_at) {
-    return true;
+  if (!control.updated_at) {
+    return false;
   }
   const updatedAtMs = Date.parse(control.updated_at);
   return Number.isFinite(updatedAtMs) && nowMs - updatedAtMs >= TEMPORARY_SCHEDULER_PAUSE_MAX_AGE_MS;
