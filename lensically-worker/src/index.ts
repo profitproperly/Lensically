@@ -533,41 +533,36 @@ function compactOperatorContinuityCapsule(value: unknown): Record<string, unknow
   const completedReviewBatch = capsule.completed_review_batch;
   const unresolvedIncidents = capsule.unresolved_incidents;
   const requiredRecoveryActions = capsule.required_recovery_actions;
-  const capsuleKeys = [
-    "version",
-    "choice",
-    "brand_key",
-    "account_data_loaded",
-    "canonical_state_source",
-    "continuity_mode",
-    "continuity_diagnostics",
-    "autonomy_governance",
-    "growth_mission_brief",
-    "account_execution",
-    "calendar_coverage",
-    "new_scheduling_blocked",
-    "scheduling_block_reason",
-    "current_engineering_continuation",
-    "workflow_checkpoint",
-    "active_artifact_ids",
-    "source_batch_progress",
-    "next_artifact",
-    "current_source_card",
-    "current_draft",
-    "current_scheduled_post",
-    "execution_policy",
-    "idempotency",
-    "runtime_identity",
-  ];
-  const capsuleSummary = Object.fromEntries(capsuleKeys
-    .filter((key) => Object.prototype.hasOwnProperty.call(capsule, key))
-    .map((key) => [key, capsule[key]]));
-  const compactedSummary = compactOperatorPayloadValue(
-    capsuleSummary,
-    "continuity_capsule",
-    { arrayItems: 8, stringChars: 500, objectKeys: 48, maxDepth: 6 },
-    [],
-  ) as Record<string, unknown>;
+  const compactField = (
+    key: string,
+    fieldValue: unknown,
+    limits: { arrayItems: number; stringChars: number; objectKeys: number; maxDepth: number },
+  ) => compactOperatorPayloadValue(fieldValue, `continuity_capsule.${key}`, limits, []);
+  const compactedSummary: Record<string, unknown> = {
+    version: capsule.version ?? null,
+    choice: capsule.choice ?? null,
+    brand_key: capsule.brand_key ?? null,
+    account_data_loaded: capsule.account_data_loaded ?? null,
+    canonical_state_source: capsule.canonical_state_source ?? null,
+    continuity_mode: capsule.continuity_mode ?? null,
+    continuity_diagnostics: compactField("continuity_diagnostics", capsule.continuity_diagnostics, { arrayItems: 4, stringChars: 260, objectKeys: 24, maxDepth: 4 }),
+    autonomy_governance: compactField("autonomy_governance", capsule.autonomy_governance, { arrayItems: 2, stringChars: 280, objectKeys: 24, maxDepth: 4 }),
+    growth_mission_brief: compactField("growth_mission_brief", capsule.growth_mission_brief, { arrayItems: 3, stringChars: 320, objectKeys: 28, maxDepth: 5 }),
+    account_execution: compactField("account_execution", capsule.account_execution, { arrayItems: 4, stringChars: 260, objectKeys: 24, maxDepth: 4 }),
+    calendar_coverage: compactField("calendar_coverage", capsule.calendar_coverage, { arrayItems: 8, stringChars: 240, objectKeys: 32, maxDepth: 4 }),
+    new_scheduling_blocked: capsule.new_scheduling_blocked ?? null,
+    scheduling_block_reason: capsule.scheduling_block_reason ?? null,
+    current_engineering_continuation: compactField("current_engineering_continuation", capsule.current_engineering_continuation, { arrayItems: 4, stringChars: 260, objectKeys: 24, maxDepth: 4 }),
+    workflow_checkpoint: compactField("workflow_checkpoint", capsule.workflow_checkpoint, { arrayItems: 4, stringChars: 300, objectKeys: 24, maxDepth: 4 }),
+    active_artifact_ids: compactField("active_artifact_ids", capsule.active_artifact_ids, { arrayItems: 4, stringChars: 240, objectKeys: 24, maxDepth: 4 }),
+    source_batch_progress: compactField("source_batch_progress", capsule.source_batch_progress, { arrayItems: 4, stringChars: 240, objectKeys: 24, maxDepth: 4 }),
+    next_artifact: compactField("next_artifact", capsule.next_artifact, { arrayItems: 4, stringChars: 320, objectKeys: 24, maxDepth: 4 }),
+    current_source_card: compactField("current_source_card", capsule.current_source_card, { arrayItems: 2, stringChars: 240, objectKeys: 16, maxDepth: 3 }),
+    current_draft: compactField("current_draft", capsule.current_draft, { arrayItems: 2, stringChars: 320, objectKeys: 16, maxDepth: 3 }),
+    current_scheduled_post: compactField("current_scheduled_post", capsule.current_scheduled_post, { arrayItems: 2, stringChars: 240, objectKeys: 16, maxDepth: 3 }),
+    idempotency: compactField("idempotency", capsule.idempotency, { arrayItems: 2, stringChars: 240, objectKeys: 16, maxDepth: 3 }),
+    runtime_identity: compactField("runtime_identity", capsule.runtime_identity, { arrayItems: 2, stringChars: 240, objectKeys: 16, maxDepth: 3 }),
+  };
   return {
     ...compactedSummary,
     active_review_batch: compactOperatorContinuityReviewBatch(activeReviewBatch),
