@@ -32249,12 +32249,13 @@ async function recoverOverdueScheduledPostRows(
       const scheduledTime = rescheduled.find((entry) => entry.scheduled_post_id === action.scheduled_post_id)?.scheduled_time;
       return env.DB.prepare(
         `UPDATE scheduled_posts
-         SET scheduled_time = ?, failed_at = NULL,
+         SET status = ?, scheduled_time = ?, failed_at = NULL,
              publish_error_message = NULL, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?
            AND processing_started_at = ?
            AND ${allClaimedClause}`,
       ).bind(
+        SCHEDULED_POST_STATUS_APPROVED,
         scheduledTime,
         action.scheduled_post_id,
         recoveryClaim,
