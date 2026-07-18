@@ -382,11 +382,13 @@ function prepareStaticCall(
   tools: MandatoryExecutionToolDefinition[],
   engineeringOnly = false,
 ): MandatoryExecutionPrepared | null {
-      const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
-  let resolvedIntent = systemDirectory?.route_intent ?? actionIntent;
-  let resolvedInputs = { ...(systemDirectory?.default_inputs ?? {}), ...inputs };
+  const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
+  const exactOperationalIntent = deterministicToolForOperationalIntent(actionIntent, inputs);
+  const directoryMayRoute = !actionKey && !exactOperationalIntent;
+  let resolvedIntent = directoryMayRoute ? systemDirectory?.route_intent ?? actionIntent : actionIntent;
+  let resolvedInputs = directoryMayRoute ? { ...(systemDirectory?.default_inputs ?? {}), ...inputs } : inputs;
   let resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
-  let directoryRouteApplied = Boolean(systemDirectory?.route_intent && resolved.tool);
+  let directoryRouteApplied = Boolean(directoryMayRoute && systemDirectory?.route_intent && resolved.tool);
   if (!resolved.tool && systemDirectory?.route_intent && systemDirectory.route_intent !== actionIntent) {
     resolvedIntent = actionIntent;
     resolvedInputs = inputs;
