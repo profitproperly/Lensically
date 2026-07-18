@@ -129,6 +129,9 @@ jobs:
       - name: Typecheck Worker
         run: npx tsc --noEmit
 
+      - name: Capability lifecycle gate
+        run: node scripts/release-preflight.mjs --capability-lifecycle-only
+
       - name: Run scoped Operator validation
         id: operator_validation
         if: ${{ steps.scope.outputs.scope != 'typecheck' && steps.scope.outputs.scope != 'gpt-memory' }}
