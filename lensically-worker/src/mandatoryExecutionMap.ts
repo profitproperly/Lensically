@@ -398,9 +398,14 @@ function resolveStaticTool(
       ?? usable.find((tool) => publicToolName(tool.name) === deterministic);
     if (exact) return { tool: exact, candidates: [{ tool_name: exact.name, score: 900 }] };
   }
+  const requestedOperationClass = classifyIntentOperation(actionIntent);
   const ranked = usable
-    .map((tool) => ({ tool, score: routeScore(actionIntent, tool, inputs) }))
-    .filter((item) => item.score >= 8)
+    .map((tool) => ({
+      tool,
+      score: routeScore(actionIntent, tool, inputs),
+      operation_class: classifyIntentOperation(`${tool.name} ${tool.title}`),
+    }))
+    .filter((item) => item.score >= 30 && operationClassesCompatible(requestedOperationClass, item.operation_class))
     .sort((left, right) => right.score - left.score || left.tool.name.localeCompare(right.tool.name));
   return {
     tool: ranked[0]?.tool ?? null,
