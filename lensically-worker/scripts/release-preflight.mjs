@@ -119,13 +119,13 @@ if (!workflow.includes('.healthy == true and .operational == true and .heartbeat
   errors.push("scheduler_release_gate_must_require_operational_normal_mode");
 }
 if (!source.includes("Worker deployment is Recovery-only")
-    || !clientSafety.includes('intent: "recovery deployment dispatch"')
+    || !clientSafety.includes('verified_release_marker')
+    || !clientSafety.includes('recovery_task_only_deploy_dispatch')
     || !clientSafety.includes('surface: "recovery_plane"')
-    || !recoverySource.includes("dispatchRef = config.branch;")
-    || !recoverySource.includes("release_id: verifiedHeadSha.slice(0, 12)")
-    || !recoverySource.includes("release_sha: verifiedHeadSha")
-    || !recoverySource.includes("ref: dispatchRef")) {
-  errors.push("recovery_only_exact_sha_release_contract_missing");
+    || !workflow.includes("gh workflow run lensically-engineering.yml")
+    || !workflow.includes("--field release_id=\"${RELEASE_SHA:0:12}\"")
+    || !workflow.includes("--field release_sha=\"${RELEASE_SHA}\"")) {
+  errors.push("verified_release_marker_contract_missing");
 }
 
 if (!source.includes('name: "get_monthly_growth_review"')
