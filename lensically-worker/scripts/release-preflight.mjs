@@ -214,7 +214,7 @@ if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "guided-growth-mis
     || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")
     || !source.includes('name: "getGrowthMission"')
     || !source.includes('name: "updateGrowthMission"')
-    || !source.includes('error: "growth_mission_approval_required"')
+    || !source.includes('error: "approved_growth_mission_required"')
     || !source.includes("account_mutation_requires_approved_plan: true")
     || !source.includes("full_auto_requires_explicit_owner_mode_change: true")
     || !router.includes('return "getGrowthMission"')
