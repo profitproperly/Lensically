@@ -9,8 +9,13 @@ const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const router = read("src/mandatoryExecutionMap.ts");
 const clientSafety = read("src/systemDirectory/clientSafeRequests.ts");
+const systemDirectorySource = read("src/systemDirectory/index.ts");
+const systemDirectoryTests = read("test/systemDirectory.spec.ts");
+const gptMemoryTests = read("test/gptMemoryRoutes.spec.ts");
+const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifecycle.json"));
 const tests = read("test/operatorMode.spec.ts");
 const workflow = read("../.github/workflows/lensically-engineering.yml");
+const validationWorkflow = read("../.github/workflows/lensically-validation.yml");
 const currentState = read("../CURRENT_STATE.md");
 const recoverySource = read("../lensically-recovery-worker/src/index.ts");
 
