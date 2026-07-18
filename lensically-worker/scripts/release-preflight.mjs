@@ -14,6 +14,7 @@ const systemDirectoryTests = read("test/systemDirectory.spec.ts");
 const gptMemoryTests = read("test/gptMemoryRoutes.spec.ts");
 const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifecycle.json"));
 const tests = read("test/operatorMode.spec.ts");
+const systemDirectoryTests = read("test/systemDirectory.spec.ts");
 const workflow = read("../.github/workflows/lensically-engineering.yml");
 const validationWorkflow = read("../.github/workflows/lensically-validation.yml");
 const currentState = read("../CURRENT_STATE.md");
