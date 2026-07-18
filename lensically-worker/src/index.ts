@@ -6426,6 +6426,42 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
   ).run();
 
   await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_growth_missions (
+      brand_key TEXT PRIMARY KEY,
+      contract_version TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'discussion',
+      execution_mode TEXT NOT NULL DEFAULT 'guided_owner_approval',
+      mission_json TEXT NOT NULL,
+      diagnostic_json TEXT NOT NULL DEFAULT '{}',
+      owner_response TEXT,
+      change_summary TEXT,
+      approved_at TEXT,
+      last_diagnostic_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      mission_version INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      execution_mode TEXT NOT NULL,
+      mission_json TEXT NOT NULL,
+      diagnostic_json TEXT NOT NULL,
+      owner_response TEXT,
+      change_summary TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_growth_mission_revisions_brand
+     ON operator_growth_mission_revisions (brand_key, mission_version DESC, created_at DESC)`,
+  ).run();
+
+  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_autonomy_profiles (
       brand_key TEXT PRIMARY KEY,
       mode TEXT NOT NULL,
