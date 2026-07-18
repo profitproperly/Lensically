@@ -6549,15 +6549,17 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     JSON.stringify({
       focus_accounts: ["manifest_mental"],
       hourly_coverage_required: true,
-            target_schedule_buffer_hours: 48,
+      target_schedule_buffer_hours: 48,
       text_only_threads: true,
-      owner_ratification_required: false,
-      routine_account_operations_autonomous: true,
+      owner_ratification_required: true,
+      routine_account_operations_autonomous: false,
+      growth_mission_brief_required_after_proceed: true,
+      account_mutations_require_approved_growth_plan: true,
       owner_monitoring_and_intervention_enabled: true,
       protected_operations_owner_ratified: true,
       read_only_investigation_autonomous: true,
     }),
-    ).run();
+  ).run();
 
   await env.DB.prepare(
     `UPDATE operator_autonomy_profiles
