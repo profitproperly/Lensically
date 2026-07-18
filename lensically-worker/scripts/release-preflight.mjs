@@ -98,10 +98,10 @@ if (!workflow.includes('.healthy == true and .operational == true and .heartbeat
     || workflow.includes('(.control.mode == "paused") or')) {
   errors.push("scheduler_release_gate_must_require_operational_normal_mode");
 }
-if (!source.includes("const dispatchRef = config.branch;")
-    || !source.includes("release_sha: headSha")
-    || !source.includes("ref: dispatchRef")) {
-  errors.push("main_release_exact_sha_dispatch_guard_missing");
+if (!source.includes("Worker deployment is Recovery-only")
+    || !clientSafety.includes('intent: "recovery deployment dispatch"')
+    || !clientSafety.includes('surface: "recovery_plane"')) {
+  errors.push("recovery_only_release_contract_missing");
 }
 
 if (!source.includes('name: "get_monthly_growth_review"')
