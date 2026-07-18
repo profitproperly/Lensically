@@ -231,7 +231,8 @@ describe("System Directory foundation", () => {
             "public_database_schema_search_terms",
             "public_repeated_identical_status_poll",
             "public_zero_input_main_workflow_request",
-      "public_policy_repository_search_terms",
+            "public_policy_repository_search_terms",
+      "recovery_chunk_commit_session_identifier",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
@@ -277,6 +278,11 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
   });
 
+    it("uses an exact Recovery text patch when a chunk commit is client-blocked", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_exact_patch).toMatchObject({ surface: "recovery_plane" });
+    expect(() => buildClientSafeGatewayRequest("recovery_exact_patch", { path: ".github/workflows/lensically-engineering.yml" })).toThrow("client_safe_request_external_surface:recovery_exact_patch");
+  });
+
   it("uses compact recent activity after one workflow-status read", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_repeated_identical_status_poll");
     expect(incident?.safe_profile_id).toBe("workflow_run_list");
@@ -296,8 +302,8 @@ describe("System Directory foundation", () => {
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-                                    prevented_client_block_count: 10,
-      safe_request_profile_count: 7,
+                                          prevented_client_block_count: 11,
+      safe_request_profile_count: 8,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
