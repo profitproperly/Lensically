@@ -294,7 +294,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     system_of_record: "capabilityLifecycle.json, System Directory, release preflight, focused regressions, and live startup verification",
     primary_surfaces: ["capability lifecycle manifest", "System Directory", "release preflight", "startup receipt"],
     objects: ["new capability", "capability declaration", "new typed handler", "new static route", "feature implementation"],
-    keywords: ["create capability", "add capability", "new feature", "register capability", "implement missing function"],
+    keywords: ["create and register a missing capability", "create capability", "add capability", "new feature", "register capability", "implement missing function"],
     capabilities: ["reuse an existing capability", "create and register a missing capability", "validate and release a capability autonomously"],
     payload: { action_size: "bounded_read", max_response_bytes: 18000, required_inputs: ["path"] },
     route_intent: "read repository file",
