@@ -92,6 +92,7 @@ export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProf
     repository_search: { id: "repository_search", objective: "Discover source locations through the independent control surface.", intent: "recovery source discovery", allowed_input_keys: ["query", "path_prefix", "max_results"], max_input_characters: 1200, surface: "recovery_plane" },
     repository_file_read: { id: "repository_file_read", objective: "Read one known source file using a bounded line range.", intent: "read repository file", allowed_input_keys: ["path", "start_line", "max_characters"], max_input_characters: 600 },
   recovery_exact_patch: { id: "recovery_exact_patch", objective: "Apply one exact source-controlled replacement through the independent control surface.", intent: "recovery exact text patch", allowed_input_keys: ["path", "find", "replace", "message"], max_input_characters: 12000, surface: "recovery_plane" },
+  recovery_repository_mutation: { id: "recovery_repository_mutation", objective: "Implement one bounded repository change through the independent control surface.", intent: "recovery repository mutation", allowed_input_keys: ["path", "find", "replace", "message"], max_input_characters: 12000, surface: "recovery_plane" },
   account_key_selection: { id: "account_key_selection", objective: "Select one account using the typed brand key field.", intent: "select operator key", allowed_input_keys: ["brand_key"], max_input_characters: 100 },
 };
 
