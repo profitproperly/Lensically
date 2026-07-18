@@ -8,10 +8,12 @@ import {
   CLIENT_SAFETY_CANONICAL_LOCATION,
   CLIENT_SAFETY_LEGACY_MIGRATIONS,
   CLIENT_SAFETY_POLICIES,
-  createSystemDirectoryIndex,
-    getClientSafetyRegistrySummary,
+    createSystemDirectoryIndex,
+  LENSICALLY_SYSTEM_DIRECTORY_ENTRIES,
+  getClientSafetyRegistrySummary,
   inspectClientSafeGatewayRequest,
   PREVENTED_CLIENT_BLOCKS,
+    resolveLensicallySystemDirectory,
   resolveSystemDirectory,
   validateClientSafetyRegistry,
   type SystemDirectoryEntry,
@@ -124,6 +126,61 @@ describe("System Directory foundation", () => {
     expect(() => createSystemDirectoryIndex([{ ...entries[0], id: "broken", primary_surfaces: [] }])).toThrow(
       "system_directory_entry_incomplete:broken",
     );
+  });
+
+    it("ships a validated production catalog across every major Lensically plane", () => {
+    expect(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.length).toBeGreaterThanOrEqual(15);
+    const planes = new Set(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.map((entry) => entry.plane));
+    for (const plane of ["product", "publishing", "content_production", "analytics", "workflows", "accounts", "operating_knowledge", "engineering", "deployment", "recovery"]) {
+      expect(planes.has(plane as SystemDirectoryEntry["plane"])).toBe(true);
+    }
+    expect(() => createSystemDirectoryIndex([...LENSICALLY_SYSTEM_DIRECTORY_ENTRIES])).not.toThrow();
+  });
+
+  it("resolves implementation backlog questions to the bounded current-state source", () => {
+    expect(resolveLensicallySystemDirectory("List implementation backlog items and remaining cleanup.")).toMatchObject({
+      entry_id: "operating.current_state",
+      route_intent: "read repository file",
+      default_inputs: { path: "CURRENT_STATE.md", start_line: 1, max_characters: 14000 },
+    });
+  });
+
+  it("resolves Operator tests without an obsolete workflow identifier", () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "runGitHubWorkflow",
+      title: "Run workflow",
+      description: "Run one configured validation task.",
+      inputSchema: { type: "object", properties: { task: { type: "string" } }, required: ["task"] },
+    }];
+    expect(prepareSourceDefinedDirectEngineeringCall("run operator tests", "Run the Operator regression scope.", {}, tools)).toMatchObject({
+      ok: true,
+      tool_name: "runGitHubWorkflow",
+      arguments: { task: "operator-tests" },
+    });
+  });
+
+  it("uses the directory before routing implementation-backlog reads", () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "readRepoFile",
+      title: "Read repository file",
+      description: "Read one bounded known source file.",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" }, start_line: { type: "number" }, max_characters: { type: "number" } },
+        required: ["path"],
+      },
+    }];
+    expect(prepareSourceDefinedDirectEngineeringCall("list implementation backlog items", "Show remaining implementation work.", {}, tools)).toMatchObject({
+      ok: true,
+      tool_name: "readRepoFile",
+      arguments: { path: "CURRENT_STATE.md", start_line: 1, max_characters: 14000 },
+      map_execution: { system_directory: { entry_id: "operating.current_state" } },
+    });
+  });
+
+  it("directs monthly analytics and deployment to their authoritative systems", () => {
+    expect(resolveLensicallySystemDirectory("How many followers have we grown this month and which posts performed best?")).toMatchObject({ entry_id: "analytics.monthly_growth", route_intent: "get monthly growth review" });
+    expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({ entry_id: "deployment.main_worker", recommended_next_planes: ["recovery"] });
   });
 
   it("builds workflow lookups without exposing internal handler identifiers", () => {

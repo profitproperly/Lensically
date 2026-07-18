@@ -1,3 +1,5 @@
+import { resolveLensicallySystemDirectory } from "./systemDirectory";
+
 export const MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v1";
 export const EXECUTION_POLICY_LIBRARY_VERSION = "retired";
 
@@ -387,13 +389,16 @@ function prepareStaticCall(
   tools: MandatoryExecutionToolDefinition[],
   engineeringOnly = false,
 ): MandatoryExecutionPrepared | null {
-  const resolved = resolveStaticTool(actionIntent, actionKey, inputs, tools);
+    const systemDirectory = resolveLensicallySystemDirectory(`${objective ?? ""} ${actionIntent}`);
+  const resolvedIntent = systemDirectory?.route_intent ?? actionIntent;
+  const resolvedInputs = { ...(systemDirectory?.default_inputs ?? {}), ...inputs };
+  const resolved = resolveStaticTool(resolvedIntent, actionKey, resolvedInputs, tools);
   if (!resolved.tool) return null;
   if (engineeringOnly && !SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(resolved.tool.name)) return null;
   const allowed = toolSchemaProperties(resolved.tool);
   const required = toolRequiredProperties(resolved.tool);
-  const filteredInputs = Object.fromEntries(Object.entries(inputs).filter(([key]) => allowed.includes(key)));
-    const argumentsObject = { ...inferredArgumentsForOperationalIntent(resolved.tool.name, actionIntent, inputs), ...filteredInputs };
+    const filteredInputs = Object.fromEntries(Object.entries(resolvedInputs).filter(([key]) => allowed.includes(key)));
+  const argumentsObject = { ...inferredArgumentsForOperationalIntent(resolved.tool.name, resolvedIntent, resolvedInputs), ...filteredInputs };
   const missingInputs = required.filter((key) => !Object.prototype.hasOwnProperty.call(argumentsObject, key));
   const mode = SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(resolved.tool.name)
     ? "source_defined_direct_engineering"
@@ -419,9 +424,11 @@ function prepareStaticCall(
     map_execution: {
       version: MANDATORY_EXECUTION_MAP_VERSION,
       mode,
-      action_intent: actionIntent,
+            action_intent: actionIntent,
+      resolved_action_intent: resolvedIntent,
       action_key: entry.action_key,
       objective,
+      system_directory: systemDirectory,
       entry_id: entry.id,
       entry_version: entry.version,
       mapped_tool: resolved.tool.name,
