@@ -2390,7 +2390,7 @@ describe("operator mode MCP endpoint", () => {
     expect(direct.no_account_sections_present).toBe(true);
     expect(direct.repository.repo).toBe("Lensically");
     expect(direct.repository.branch).toBe("main");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(direct.runtime.mcp_version).toBe("1.27.1");
+    expect(direct.runtime.mcp_version).toBe(OPERATOR_MCP_VERSION);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "deployment_id")).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_deployment")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(direct.runtime, "active_runtime_config_deployment")).toBe(true);
