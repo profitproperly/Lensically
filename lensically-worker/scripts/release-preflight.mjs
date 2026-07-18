@@ -96,7 +96,7 @@ if (lifecycleErrors.length > 0) {
     console.error(`[capability-lifecycle] ${error}`);
     console.error(`::error title=Capability lifecycle gate::${error}`);
   }
-  process.exit(1);
+  throw new Error(`capability_lifecycle_invalid:${lifecycleErrors.join("|")}`);
 }
 if (process.argv.includes("--capability-lifecycle-only")) {
   console.log(`[capability-lifecycle] ok declarations=${lifecycleDeclarations.length} tools=${toolDefinitionNames.length} directory_entries=${directoryEntryIds.length}`);
