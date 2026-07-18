@@ -15584,15 +15584,35 @@ async function handleOperatorMcpAdminTool(
       : null;
 
     const postResult = await env.DB.prepare(
-      `SELECT post_id, post_text, post_timestamp, post_permalink,
-              views, likes, replies, reposts, quotes, shares, engagement_total
-       FROM threads_posts_archive
-       WHERE threads_user_id = ?
-         AND datetime(post_timestamp) >= datetime(?)
-         AND datetime(post_timestamp) < datetime(?)
+      `SELECT
+         COALESCE(a.post_id, s.published_post_id) AS post_id,
+         COALESCE(a.post_text, s.post_text) AS post_text,
+         COALESCE(a.post_timestamp, s.published_at, s.scheduled_time) AS post_timestamp,
+         a.post_permalink,
+         COALESCE(a.views, 0) AS views,
+         COALESCE(a.likes, 0) AS likes,
+         COALESCE(a.replies, 0) AS replies,
+         COALESCE(a.reposts, 0) AS reposts,
+         COALESCE(a.quotes, 0) AS quotes,
+         COALESCE(a.shares, 0) AS shares,
+         COALESCE(a.engagement_total, 0) AS engagement_total
+       FROM scheduled_posts s
+       LEFT JOIN threads_posts_archive a
+         ON a.threads_user_id = s.threads_user_id
+        AND a.post_id = s.published_post_id
+       WHERE s.threads_user_id = ?
+         AND s.status = ?
+         AND s.published_post_id IS NOT NULL
+         AND datetime(COALESCE(s.published_at, s.scheduled_time)) >= datetime(?)
+         AND datetime(COALESCE(s.published_at, s.scheduled_time)) < datetime(?)
        ORDER BY engagement_total DESC, likes DESC, views DESC
        LIMIT 250`,
-    ).bind(brand.profile.threads_user_id, startUtc, endUtcExclusive).all<Record<string, unknown>>();
+    ).bind(
+      brand.profile.threads_user_id,
+      SCHEDULED_POST_STATUS_POSTED,
+      startUtc,
+      endUtcExclusive,
+    ).all<Record<string, unknown>>();
     const posts = (postResult.results ?? []).map((row) => ({
       id: String(row.post_id ?? ""),
       text: String(row.post_text ?? "").replace(/\s+/g, " ").trim().slice(0, 280),
