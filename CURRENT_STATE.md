@@ -21,6 +21,15 @@
 - Mandatory startup reports the lifecycle version, canonical location, autonomous execution rule, and required completion sequence.
 - Account workflow calls still retain the controls that protect real business state: selected account, explicit Proceed boundary, server-side continuity, idempotency, authorization, content gates, scheduling ownership, and scheduler safety.
 
+## Guided Growth Mission
+
+- Manifest's permanent mission is to reach 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.
+- `guided-growth-mission-v1` is persisted in `operator_growth_missions`; every prior approved or active version is retained in `operator_growth_mission_revisions`.
+- After the key handshake and explicit Proceed, Lensically restores canonical account state, calculates a bounded evidence diagnostic, identifies the current bottleneck, proposes a primary objective and supporting plan, and presents the Growth Mission Brief for owner-model discussion.
+- Proceed does not authorize account mutation. Content creation, draft decisions, source deletion or exclusion, scheduling, publishing, and other account mutations remain locked while the mission is in `discussion` or `paused`.
+- The owner may revise or approve the proposed plan at any time. An approved or active guided plan unlocks account execution while preserving established owner checkpoints.
+- Routine engineering remains autonomous. Full autonomous account execution is a separate explicit owner-authorized mode change and is never inferred from normal plan approval.
+
 ## Retired Execution Infrastructure
 
 - The D1 execution library, dynamic execution map, discovery incidents, route promotions, pre-call phonebook, OpsMemory execution store, and execution-event history are retired.
