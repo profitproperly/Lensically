@@ -21,7 +21,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Use bounded source inspection, one coherent change set, focused validation, one exact-SHA release, and one live verification pass.
 - Do not run separate full validation and deployment loops for a normal change.
 - Do not poll rapidly from chat. Use bounded server-side workflow status reads and inspect detailed logs only after a terminal failure.
-- Related edits should use one atomic patch set when practical. If the client blocks an oversized payload before it reaches Lensically, do not resend the same shape; divide it into compact exact patches or a chunked write session.
+- Related edits should use one atomic patch set when practical. If the client blocks an oversized payload before it reaches Lensically, do not resend the same shape; divide it into compact exact replacements through the registered Recovery patch path. Do not fall back to client-blocked chunked write-session calls.
 - Keep public receipts compact. Never echo full patch bodies, repository files, generated knowledge, or large database records through the client.
 
 ## Autonomous Capability Lifecycle
