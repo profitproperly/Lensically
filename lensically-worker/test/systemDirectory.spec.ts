@@ -471,17 +471,18 @@ describe("System Directory foundation", () => {
     }));
   });
 
-  it("records and forbids cached freehand gateway schemas", () => {
+  it("keeps new clients profile-only while routing cached gateway schemas", () => {
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("registered profile_id");
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("Freehand objective, intent");
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).not.toContain("Submit objective, intent");
     expect(CLIENT_SAFETY_POLICIES).toContainEqual(expect.objectContaining({
       id: "stale_schema_prevention",
-      summary: expect.stringContaining("prohibited from calling the main gateway"),
+      summary: expect.stringContaining("bounded server-side compatibility compiler"),
     }));
     expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
       id: "public_cached_freehand_gateway_schema",
       safe_profile_id: "startup_context",
+      regression_test_id: "routes a known cached freehand action through the mandatory execution map",
     }));
   });
 
