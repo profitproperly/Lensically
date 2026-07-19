@@ -16035,7 +16035,24 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const classification: HardeningClassification = rule ? "prevention_breach" : "novel_failure";
   const severity: HardeningSeverity = boundary === "efficiency" ? "P2" : rule ? "P0" : "P1";
   const signature = await sha256OperatorText(JSON.stringify({ boundary, profile, category, fingerprint }));
-  /* HARDENING_INTAKE_BODY */
+    const existing = await env.DB.prepare(
+    `SELECT * FROM operator_hardening_incidents WHERE signature = ? AND state <> 'closed' LIMIT 1`,
+  ).bind(signature).first<Record<string, unknown>>();
+  if (existing) {
+    return { ok: true, created: false, incident: serializeHardeningIncident(existing), normal_work_blocked: ["P0", "P1"].includes(String(existing.severity)) };
+  }
+  const id = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_hardening_incidents (
+      id, signature, boundary, severity, classification, state, affected_scope,
+      blocked_profile_id, request_fingerprint, expected_json, observed_json, resume_capsule_json
+    ) VALUES (?, ?, ?, ?, ?, 'detected', ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id, signature, boundary, severity, classification, severity === "P2" ? "safe_checkpoint" : "objective",
+    profile, fingerprint, normalizeOperatorJson(args.expected_outcome ?? null, null),
+    normalizeOperatorJson(args.observed_outcome ?? null, null), normalizeOperatorJson(args.resume_capsule ?? null, null),
+  ).run();
+  /* HARDENING_INTAKE_EVENT */
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
