@@ -2671,12 +2671,22 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
 
+    const freehand = await mcpToolCallRaw<{ error: string; freehand_gateway_payload_allowed: boolean }>("executeLensicallyIntent", {
+      objective: "Load startup.",
+      intent: "startup",
+      inputs: {},
+    });
+    expect(freehand.isError).toBe(true);
+    expect(freehand.structuredContent).toMatchObject({
+      error: "registered_profile_id_required",
+      freehand_gateway_payload_allowed: false,
+    });
+
     const startup = await mcpToolCallRaw<{
       gateway: { intent: string; public_schema_frozen: boolean };
       mandatory_execution_map: { route_mode: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
     }>("executeLensicallyIntent", {
-      objective: "Load startup.",
-      intent: "startup",
+      profile_id: "startup",
       inputs: {},
     });
     expect(startup.isError).not.toBe(true);
@@ -2692,8 +2702,7 @@ describe("operator mode MCP endpoint", () => {
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
       mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean; d1_execution_library_bypassed: boolean };
     }>("executeLensicallyIntent", {
-      objective: "Inspect engineering access before repository work.",
-      intent: "inspect engineering access state",
+      profile_id: "get_engineering_access_state",
       inputs: {},
     });
     expect(mapped.isError).not.toBe(true);
