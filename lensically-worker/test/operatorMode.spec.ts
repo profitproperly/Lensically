@@ -2473,10 +2473,12 @@ describe("operator mode MCP endpoint", () => {
 
                 const patchSetTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { patches?: { maxItems?: number } } } } }>("readMcpToolDefinition", { tool_name: "applyRepoPatchSet" });
     const releaseTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { force?: { type?: string } } } } }>("readMcpToolDefinition", { tool_name: "runEngineeringRelease" });
-    const releaseStatusTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getEngineeringRelease" });
+        const releaseStatusTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getEngineeringRelease" });
+    const workflowWatchTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getGitHubWorkflowRun" });
     expect(patchSetTool.tool?.inputSchema?.properties?.patches?.maxItems).toBe(20);
     expect(releaseTool.tool?.inputSchema?.properties?.force?.type).toBe("boolean");
-    expect(releaseStatusTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(55);
+        expect(releaseStatusTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(55);
+    expect(workflowWatchTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(60);
 
         expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
