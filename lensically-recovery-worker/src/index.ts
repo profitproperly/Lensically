@@ -96,9 +96,43 @@ async function writeRecoverySession(env: Env, session: RecoveryWriteSession): Pr
   await env.RECOVERY_SESSIONS.put(`write:${session.id}`, JSON.stringify(session), { expirationTtl: 24 * 60 * 60 });
 }
 
-async function mainMcpRequest(origin: string, token: string, id: number, method: string, params: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> | null }> {
-  const response = await fetch(`${origin}/api/operator/mcp`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id, method, params }) });
-  return { status: response.status, body: await response.json().catch(() => null) as Record<string, unknown> | null };
+async function mainMcpRequest(
+  origin: string,
+  token: string,
+  id: number,
+  method: string,
+  params: Record<string, unknown>,
+  sessionId?: string,
+): Promise<{
+  status: number;
+  body: Record<string, unknown> | null;
+  headers: {
+    mcp_session_id: string | null;
+    deployment_id: string | null;
+    commit_sha: string | null;
+    execution_kernel: string | null;
+  };
+}> {
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+  };
+  if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+  const response = await fetch(`${origin}/api/operator/mcp`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+  });
+  return {
+    status: response.status,
+    body: await response.json().catch(() => null) as Record<string, unknown> | null,
+    headers: {
+      mcp_session_id: response.headers.get("mcp-session-id"),
+      deployment_id: response.headers.get("x-lensically-deployment-id"),
+      commit_sha: response.headers.get("x-lensically-commit-sha"),
+      execution_kernel: response.headers.get("x-lensically-execution-kernel"),
+    },
+  };
 }
 
 function base64ToText(value: string): string {
