@@ -14859,27 +14859,32 @@ function resolveOperatorAccountLifecycleProfile(
   if (!brandKey && /\b(?:opmg[_ -]?deadman|deadman)\b/.test(lifecycleText)) brandKey = "opmg_deadman";
   if (!brandKey && /\bvectrix\b/.test(lifecycleText)) brandKey = "vectrix";
   const suppliedProfileId = normalizeOperatorMachineKey(gatewayArgs.profile_id ?? rawInputs.profile_id, "");
-  const proceedRequested = suppliedProfileId === "account_proceed"
-    || suppliedProfileId === "confirm_operator_proceed"
-    || /\b(confirm|proceed)\b/.test(lifecycleText);
-  if (brandKey && proceedRequested) {
-    return { profile_id: "account_proceed", inputs: { brand_key: brandKey } };
-  }
+  const lifecycleIntentText = [gatewayArgs.intent, inputs.intent]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .trim()
+    .toLowerCase();
   const inputKeys = Object.keys(inputs);
   const onlyBrandInput = !suppliedProfileId
     && inputKeys.length > 0
     && inputKeys.every((key) => key === "brand_key" || key === "key");
+  const explicitProceedProfile = suppliedProfileId === "account_proceed"
+    || suppliedProfileId === "confirm_operator_proceed";
+  const explicitProceedIntent = /^(?:confirm operator proceed|confirm proceed|proceed to next step|proceed)$/.test(lifecycleIntentText);
+  if (brandKey && (explicitProceedProfile || onlyBrandInput && explicitProceedIntent)) {
+    return { profile_id: "account_proceed", inputs: { brand_key: brandKey } };
+  }
   const keySelectionRequested = suppliedProfileId === "startup"
     || suppliedProfileId === "account_key_selection"
     || suppliedProfileId === "select_operator_key"
     || inputs.key !== undefined
     || gatewayArgs.key !== undefined
-    || onlyBrandInput
-    || /\b(key|select|handshake|account initialization|initialize account|initialise account)\b/.test(lifecycleText);
+    || onlyBrandInput;
   if (brandKey && keySelectionRequested) {
     return { profile_id: "account_key_selection", inputs: { brand_key: brandKey } };
   }
-  if (/\b(startup|bootstrap|initialize|initialise)\b/.test(lifecycleText) && Object.keys(inputs).length === 0) {
+  const explicitStartupIntent = /^(?:startup|operator startup|load operator context|fresh session startup|load startup context)$/.test(lifecycleIntentText);
+  if (explicitStartupIntent && Object.keys(inputs).length === 0) {
     return { profile_id: "startup", inputs: {} };
   }
   return null;
