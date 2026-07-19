@@ -17480,26 +17480,26 @@ async function handleOperatorMcpEngineeringTool(
         : {};
     };
     let nextLiveId = 3;
-        const callGatewayLiveIntent = async (intent: string, args: Record<string, unknown>) =>
+    const callGatewayLiveProfile = async (profileId: string, args: Record<string, unknown>) =>
       callLiveMcp(nextLiveId++, "tools/call", {
         name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-        arguments: { objective: `Live smoke: ${intent}.`, intent, inputs: args },
+        arguments: { profile_id: profileId, inputs: args },
       });
 
     const listed = await callLiveMcp(2, "tools/list", {});
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
-    const startup = await callGatewayLiveIntent("startup", {});
-    const select = await callGatewayLiveIntent("select operator key", { brand_key: "manifest_mental" });
-    const blocked = await callGatewayLiveIntent("get workflow status", { brand_key: "manifest_mental" });
-    const proceed = await callGatewayLiveIntent("confirm operator proceed", { brand_key: "manifest_mental" });
+    const startup = await callGatewayLiveProfile("startup", {});
+    const select = await callGatewayLiveProfile("account_key_selection", { brand_key: "manifest_mental" });
+    const blocked = await callGatewayLiveProfile("get_workflow_status", { brand_key: "manifest_mental" });
+    const proceed = await callGatewayLiveProfile("confirm_operator_proceed", { brand_key: "manifest_mental" });
     const proceedContent = structured(proceed.payload);
-    const allowed = await callGatewayLiveIntent("get workflow status", {
+    const allowed = await callGatewayLiveProfile("get_workflow_status", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
     });
-    const coverage = await callGatewayLiveIntent("get hourly coverage", {
+    const coverage = await callGatewayLiveProfile("get_hourly_coverage", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
       timezone: "America/New_York",
