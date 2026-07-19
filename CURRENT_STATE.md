@@ -70,9 +70,9 @@
 
 - `/schedule` is the Create Post surface. `/scheduled-posts` manages upcoming entries and supports edit, retry, single removal, and controlled bulk removal.
 - Publishing uses Cloudflare Cron and a Durable Object alarm behind one persisted scheduler control.
-- Scheduler modes are `paused`, `canary`, and `normal`. Missing control defaults to `paused`.
-- Canary authorizes exactly one scheduled entry and returns to paused after one attempt.
-- Normal activation is blocked while overdue approved or posting records exist. Recovery is explicit, bounded, and transactional.
+- Automatic delivery is the default. Missing control initializes as `normal`; `paused` is reserved for explicit emergency maintenance, and `canary` is reserved for one-post diagnostics.
+- A quarantined `posting` row is isolated from the automatic selector, which continues processing due `approved` rows. One uncertain post can never pause unrelated scheduled inventory.
+- Normal activation is blocked only by overdue `approved` rows that could backfill unexpectedly. Quarantined-row recovery is explicit, bounded, transactional, and can run while automatic delivery continues.
 - An external publish attempt never returns automatically to `approved`. Failed, stale, or ambiguous attempts remain quarantined in `posting`; normalized SQLite datetime comparisons prevent active attempts from being reclaimed, and only explicit reconciliation may retire or reschedule them.
 - A returned Threads post identifier is authoritative and finalizes the scheduled row even when a concurrent local state transition has already changed it.
 - Published state is authoritative only when the scheduled row is `posted` and has a nonempty Threads identifier.
