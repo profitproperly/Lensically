@@ -17881,6 +17881,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       const requestedArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
         ? message.params.arguments as Record<string, unknown>
         : {};
+      const gatewayAccountDataLoaded = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY
+        ? await operatorGatewayAccountDataLoaded(env, requestedArgs)
+        : false;
       const directEntryAllowed = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
       if (!directEntryAllowed) {
         return mcpJsonResponse({
