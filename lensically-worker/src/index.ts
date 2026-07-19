@@ -18620,7 +18620,12 @@ async function handleOperatorMcpEngineeringTool(
         }
         content = content.replace(patch.find, patch.replace);
       }
-      nextFiles.push({ path: entry.path, content });
+            nextFiles.push({ path: entry.path, content });
+    }
+    const originalByPath = new Map(loaded.map((entry) => [entry.path, String(entry.file.content ?? "")]));
+    const changedFiles = nextFiles.filter((entry) => originalByPath.get(entry.path) !== entry.content);
+    if (changedFiles.length === 0) {
+      return { ok: true, no_change: true, no_commit_created: true, patch_count: normalizedPatches.length, files_changed: [], reason: "patch_set_produced_identical_content" };
     }
 
     const diffSummary = normalizeOperatorText(args.summary, 1000, true)
