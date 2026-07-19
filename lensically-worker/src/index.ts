@@ -17977,7 +17977,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
               error: guardCheck.error ?? "execution_guard_required",
               intended_tool: toolName,
               required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-              account_data_loaded: false,
+              account_data_loaded: gatewayAccountDataLoaded,
             },
             content: [{ type: "text", text: `Lensically rejected an operation that was not prepared by the routed execution gateway.` }],
             isError: true,
