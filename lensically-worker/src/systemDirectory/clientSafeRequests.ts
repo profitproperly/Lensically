@@ -101,6 +101,7 @@ export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProf
   scheduled_post_audit: { id: "scheduled_post_audit", objective: "Audit one scheduled post.", intent: "audit scheduled post", allowed_input_keys: ["brand_key", "scheduled_post_id", "operation_id", "proceed_confirmed"], max_input_characters: 300 },
   protected_scheduler_recovery: { id: "protected_scheduler_recovery", objective: "Recover scheduled posts.", intent: "recover overdue scheduled posts", allowed_input_keys: ["brand_key", "actions", "reason", "owner_response"], max_input_characters: 1200 },
   account_key_selection: { id: "account_key_selection", objective: "Select one account using the typed brand key field.", intent: "select operator key", allowed_input_keys: ["brand_key"], max_input_characters: 100 },
+  account_proceed: { id: "account_proceed", objective: "Confirm the owner's Proceed for the selected account.", intent: "confirm operator proceed", allowed_input_keys: ["brand_key"], max_input_characters: 100 },
 };
 
 export const CLIENT_SAFETY_BRAND_KEY_DESCRIPTION = `Lensically account key. Required for account-scoped requests. Client-safe aliases are governed by ${CLIENT_SAFE_REQUEST_REGISTRY_VERSION} and may appear only in the typed brand_key field.`;
