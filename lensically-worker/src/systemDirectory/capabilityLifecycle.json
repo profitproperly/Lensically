@@ -63,6 +63,7 @@
       "list_source_candidates",
       "delete_saved_pattern_source",
       "draw_source_candidate_batch",
+      "audit_published_post_lineage",
       "recover_published_post_lineage",
       "get_source_candidate_batch",
       "create_source_card",
