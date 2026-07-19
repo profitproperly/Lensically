@@ -1258,6 +1258,25 @@ describe("operator mode backend spine", () => {
       },
     });
 
+    const auditAfter = await operatorTool<{
+      complete_count: number;
+      incomplete_count: number;
+      posts: Array<{
+        published_post_id: string;
+        complete: boolean;
+        missing_stages: string[];
+        lineage: { linked_metric_snapshot_count: number };
+      }>;
+    }>("audit_published_post_lineage", {
+      brand_key: "manifest_mental",
+      minimum_likes: 1000,
+      days: 90,
+      limit: 10,
+    });
+    const completeWinner = auditAfter.posts.find((post) => post.published_post_id === publishedPostId);
+    expect(completeWinner).toMatchObject({ complete: true, missing_stages: [] });
+    expect(completeWinner?.lineage.linked_metric_snapshot_count).toBeGreaterThan(0);
+
     const results = await operatorTool<{
       metrics: { likes: number };
       lineage: {
