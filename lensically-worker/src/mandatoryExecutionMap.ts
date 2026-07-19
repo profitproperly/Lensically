@@ -456,6 +456,7 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   getEngineeringAccessState: ["engineering access state", "check engineering access", "verify engineering authority"],
   getRepoStatus: ["repository status", "repo status", "repository head", "current repository sha", "repository runtime alignment"],
   listRepoFiles: ["list repository files", "list repo files", "repository tree"],
+  searchRepoFiles: ["search repository files", "search repo files", "find repository text", "find source text", "search known source file"],
   readRepoFile: ["read repository file", "inspect source file", "open repo file"],
   
   applyRepoPatchSet: ["apply implementation", "patch repository", "apply code changes", "implement repository changes", "engineering repair", "fix mcp", "fix gateway"],
