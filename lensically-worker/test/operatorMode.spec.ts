@@ -2390,7 +2390,8 @@ describe("operator mode MCP endpoint", () => {
     expect(startup.execution_kernel).toMatchObject({
       name: "Execution Kernel",
       version: "lensically-execution-kernel-v1",
-      public_contract: "objective_intent_inputs_v1",
+      public_contract: "profile_id_inputs_v1",
+      legacy_freehand_compatibility: true,
       deployment_fresh_sessions: true,
     });
     expect(new Set(names).size).toBe(names.length);
