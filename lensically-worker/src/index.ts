@@ -16069,6 +16069,30 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   };
 }
 
+async function getHardeningStatus(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const incidentId = normalizeOperatorText(args.incident_id, 120, true);
+  const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+  const result = incidentId
+    ? await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ? LIMIT 1`).bind(incidentId).all<Record<string, unknown>>()
+    : await env.DB.prepare(`SELECT * FROM operator_hardening_incidents ORDER BY CASE WHEN state = 'closed' THEN 1 ELSE 0 END, datetime(updated_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
+  const incidents = (result.results ?? []).map(serializeHardeningIncident);
+  const events = incidentId
+    ? (await env.DB.prepare(`SELECT * FROM operator_hardening_incident_events WHERE incident_id = ? ORDER BY datetime(created_at) ASC`).bind(incidentId).all<Record<string, unknown>>()).results ?? []
+    : [];
+  const activeBlocking = incidents.find((incident) => incident.state !== "closed" && (incident.severity === "P0" || incident.severity === "P1"))
+    ?? (!incidentId ? await getActiveBlockingHardeningIncident(env) : null);
+  return {
+    ok: true,
+    version: CONTINUOUS_HARDENING_VERSION,
+    incidents,
+    events,
+    normal_work_blocked: Boolean(activeBlocking),
+    blocking_incident: activeBlocking,
+    required_action: activeBlocking ? "advance the blocking incident through verified closure before resuming normal work" : null,
+  };
+}
+
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_execution_events (
