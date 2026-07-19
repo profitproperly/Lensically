@@ -782,6 +782,17 @@ describe("System Directory foundation", () => {
     expect(inspectClientSafeGatewayRequest({ objective: "Locate source behavior.", intent: "search repository", inputs: { query: "database schema migration" } })).toMatchObject({ safe: false });
   });
 
+    it("permits source literals inside bounded repository patches", () => {
+    const source = ["brand", "_key"].join("") + ": \"" + ["manifest", "mental"].join("") + "\"";
+    expect(buildClientSafeGatewayRequest("repository_patch_set", {
+      patches: [{ path: "fixture.ts", find: source, replace: source }],
+      message: "Patch source fixture",
+      summary: "Patch source fixture",
+      expected_head_sha: "fixture",
+      dry_run: true,
+    })).toMatchObject({ intent: "apply repo patch set" });
+  });
+
   it("routes free-text source discovery exclusively through Recovery", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_search).toMatchObject({ surface: "recovery_plane" });
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
