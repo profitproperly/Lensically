@@ -302,6 +302,13 @@ if (false && !source.includes("Worker deployment is triggered by a verified sour
         || !validationWorkflow.includes("Run verified release supporting gates")
     || !workflow.includes("--field release_id=\"${RELEASE_SHA:0:12}\"")
     || !workflow.includes("--field release_sha=\"${RELEASE_SHA}\"")) {
+    errors.push("verified_release_marker_contract_missing");
+}
+if (!clientSafety.includes('Main repository patch path')
+    || !systemDirectoryTests.includes("routes deployment through the Main verified source marker")
+    || !validationWorkflow.includes("Run verified release supporting gates")
+    || !validationWorkflow.includes("Deploy verified Worker head")
+    || !validationWorkflow.includes("Verify deployed scheduler health")) {
   errors.push("verified_release_marker_contract_missing");
 }
 
