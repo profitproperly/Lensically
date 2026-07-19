@@ -301,12 +301,13 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     return { ok: result.ok, status: result.status, runs: runs.map((run) => ({ id: run.id, status: run.status, conclusion: run.conclusion, head_sha: run.head_sha, html_url: run.html_url, created_at: run.created_at })) };
   }
   if (name === "runGitHubWorkflow") {
-    const task = String(args.task || "");
-    if (!["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"].includes(task)) return { ok: false, error: "invalid_workflow_task" };
+    const publicTask = String(args.task || "");
+    if (!["typecheck", "operator-tests", "gpt-memory-tests", "release"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };
+    const workflowTask = publicTask === "release" ? "worker-deploy" : publicTask;
     const requestedRef = String(args.ref || "").trim();
     let dispatchRef = requestedRef || config.branch;
     let verifiedHeadSha: string | null = null;
-    if (task === "worker-deploy") {
+    if (workflowTask === "worker-deploy") {
       const branchRef = await github(env, `/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(config.branch)}`);
       const branchData = branchRef.data && typeof branchRef.data === "object" && !Array.isArray(branchRef.data)
         ? branchRef.data as Record<string, unknown>
@@ -323,11 +324,11 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       }
       dispatchRef = config.branch;
     }
-    const inputs = task === "worker-deploy"
-      ? { task, release_id: verifiedHeadSha!.slice(0, 12), release_sha: verifiedHeadSha }
-      : { task };
+    const inputs = workflowTask === "worker-deploy"
+      ? { task: workflowTask, release_id: verifiedHeadSha!.slice(0, 12), release_sha: verifiedHeadSha }
+      : { task: workflowTask };
     const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: dispatchRef, inputs }) });
-    return { ok: result.ok, status: result.status, task, dispatched: result.status === 204, requested_ref: requestedRef, dispatch_ref: dispatchRef, verified_head_sha: verifiedHeadSha };
+    return { ok: result.ok, status: result.status, task: publicTask, workflow_task: workflowTask, dispatched: result.status === 204, requested_ref: requestedRef, dispatch_ref: dispatchRef, verified_head_sha: verifiedHeadSha };
   }
   if (name === "getGitHubWorkflowRun") {
     const id = Math.trunc(Number(args.run_id));
