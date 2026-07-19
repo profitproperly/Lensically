@@ -41,6 +41,7 @@ describe("Threads publish readiness", () => {
       accessToken: "token",
       threadsUserId: "user-1",
       text: "Ready before publish.",
+      autoPublishText: false,
       readinessMaxChecks: 3,
       readinessDelayMs: 0,
     });
