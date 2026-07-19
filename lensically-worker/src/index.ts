@@ -18854,9 +18854,18 @@ async function handleOperatorMcpEngineeringTool(
           "x-github-api-version": "2022-11-28",
         },
       });
-      const logText = await logResponse.text().catch(() => "");
-      const compactLog = logText.replace(/\r/g, "").split("\n").filter((line) => line.trim()).slice(-140).join("\n");
-      failed_log_excerpt = compactLog.length > 10000 ? compactLog.slice(-10000) : compactLog;
+            const logText = await logResponse.text().catch(() => "");
+      const contentType = logResponse.headers.get("content-type");
+      if (logResponse.ok && !/^\s*<\?xml|<Error>/i.test(logText)) {
+        const compactLog = logText.replace(/\r/g, "").split("\n").filter((line) => line.trim()).slice(-140).join("\n");
+        failed_log_excerpt = compactLog.length > 10000 ? compactLog.slice(-10000) : compactLog;
+      } else {
+        failed_log_unavailable = {
+          status: logResponse.status,
+          content_type: contentType,
+          reason: /BlobNotFound/i.test(logText) ? "github_job_log_blob_not_ready_or_missing" : "github_job_log_unavailable",
+        };
+      }
     }
     const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
     return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList, failed_log_excerpt };
