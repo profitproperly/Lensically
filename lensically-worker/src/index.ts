@@ -14791,12 +14791,18 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       };
     }
     try {
-      const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, inputs);
+      const safeInputs = profileId === "capability_definition" && typeof inputs.tool_name === "string"
+        ? { capability: inputs.tool_name }
+        : inputs;
+      const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
+      const compiledRequest = profileId === "capability_definition"
+        ? { ...compiled, inputs: { tool_name: compiled.inputs.capability } }
+        : compiled;
       return {
         ok: true,
         profile_id: profileId,
         request: {
-          ...compiled,
+          ...compiledRequest,
           ...(typeof gatewayArgs.continuation_id === "string" ? { continuation_id: gatewayArgs.continuation_id } : {}),
           ...(typeof gatewayArgs.incident_id === "string" ? { incident_id: gatewayArgs.incident_id } : {}),
           ...(typeof gatewayArgs.permit === "string" ? { permit: gatewayArgs.permit } : {}),
