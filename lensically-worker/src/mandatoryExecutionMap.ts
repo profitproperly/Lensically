@@ -361,7 +361,11 @@ const ROUTER_EXCLUDED_TOOLS = new Set([
 
 const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "engineeringPrecheck",
-  "getEngineeringAccessState",
+    "getEngineeringAccessState",
+  "recordHardeningIncident",
+  "getHardeningStatus",
+  "advanceHardeningIncident",
+  "recordOperationalObservation",
   "getRepoStatus",
   "listRepoFiles",
   "searchRepoFiles",
