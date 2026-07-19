@@ -14774,6 +14774,23 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
     inputs = lifecycleProfile.inputs;
   }
   if (!profileId) {
+    const cachedObjective = normalizeOperatorText(gatewayArgs.objective, 600, true);
+    const cachedIntent = normalizeOperatorText(gatewayArgs.intent, 300);
+    const cachedInputsSize = JSON.stringify(inputs).length;
+    if (cachedIntent && cachedInputsSize <= 12_000) {
+      return {
+        ok: true,
+        profile_id: "cached_schema_compat",
+        request: {
+          objective: cachedObjective || "Execute a cached-schema Lensically request.",
+          intent: cachedIntent,
+          inputs,
+          ...(typeof gatewayArgs.continuation_id === "string" ? { continuation_id: gatewayArgs.continuation_id } : {}),
+          ...(typeof gatewayArgs.incident_id === "string" ? { incident_id: gatewayArgs.incident_id } : {}),
+          ...(typeof gatewayArgs.permit === "string" ? { permit: gatewayArgs.permit } : {}),
+        },
+      };
+    }
     return {
       ok: false,
       error: "registered_profile_id_required",
