@@ -712,7 +712,8 @@ describe("System Directory foundation", () => {
             "public_full_workflow_dispatch_shape",
             "public_worker_release_task_value",
             "public_database_schema_search_terms",
-                        "public_second_workflow_status_request",
+                                                "public_second_workflow_status_request",
+            "public_repeated_workflow_activity_request",
             "public_zero_input_main_workflow_request",
             "public_policy_repository_search_terms",
             "recovery_chunk_commit_session_identifier",
@@ -860,8 +861,8 @@ describe("System Directory foundation", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_second_workflow_status_request");
     expect(incident?.safe_profile_id).toBe("workflow_run_list");
     expect(buildClientSafeGatewayRequest("workflow_run_list", { limit: 4 })).toMatchObject({ intent: "list github workflow runs" });
-    expect(CLIENT_SAFETY_POLICIES.find((policy) => policy.id === "no_identical_blocked_retry")?.summary).toContain("Every later workflow check");
-    expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("every later workflow check uses the Main workflow_run_list");
+        expect(CLIENT_SAFETY_POLICIES.find((policy) => policy.id === "no_identical_blocked_retry")?.summary).toContain("workflow_terminal_watch");
+    expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("workflow_terminal_watch");
   });
 
   it("uses Recovery workflow activity when strategy-contract wording blocks the main list", () => {
