@@ -261,7 +261,7 @@ if (workflow.includes("git push origin HEAD:main") || workflow.includes("RECOVER
 if (!workflow.includes('ref: ${{ inputs.release_sha || github.sha }}')) errors.push("workflow_exact_sha_checkout_missing");
 if (!workflow.includes('test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"')) errors.push("workflow_exact_sha_verification_missing");
 if (!validationWorkflow.includes('.healthy == true and .operational == true and .heartbeat_fresh == true')
-    || !workflow.includes('(.control.mode == "normal")')
+        || !validationWorkflow.includes('(.control.mode == "normal")')
     || workflow.includes('(.control.mode == "paused") or')) {
   errors.push("scheduler_release_gate_must_require_operational_normal_mode");
 }
