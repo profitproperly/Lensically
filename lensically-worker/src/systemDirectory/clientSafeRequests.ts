@@ -112,8 +112,15 @@ export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProf
 };
 
 export const CLIENT_SAFETY_BRAND_KEY_DESCRIPTION = `Lensically account key. Required for account-scoped requests. Client-safe aliases are governed by ${CLIENT_SAFE_REQUEST_REGISTRY_VERSION} and may appear only in the typed brand_key field.`;
+export const CLIENT_SCHEMA_REFRESH_NOTICE = {
+  version: "client-schema-refresh-notice-v1",
+  mandatory: true,
+  trigger: "advertised_public_action_schema_changed_or_cached_schema_detected",
+  owner_message: "Refresh the Lensically Operator Mode ChatGPT app schema, then refresh or reopen the chat before continuing.",
+  blocks_normal_work_until_owner_confirmation: true,
+} as const;
 export const CLIENT_SAFETY_GATEWAY_DESCRIPTION = `Permanent Lensically request gateway. Submit only a registered profile_id and bounded variable inputs. Freehand objective, intent, internal handler, routing, release, and execution fields are forbidden; Lensically compiles the canonical semantic request server-side. Before every public call, follow ${CLIENT_SAFE_REQUEST_REGISTRY_VERSION}. Account initialization uses startup, account_key_selection, and account_proceed as first-class main-gateway profiles. Capability inventory, repository status, deployment, free-text source discovery, and terminal workflow failure details use their registered Recovery profiles. Known source files use bounded reads. Read one workflow status once; later checks use compact activity or a changed server-bounded request. Any client-side rejection triggers mandatory ${CLIENT_BLOCK_INTAKE_CONTRACT_VERSION}; do not repeat the payload or resume the interrupted objective until the incident, safe profile, regression, validation, and live contract are updated.`;
-export const CLIENT_SAFETY_STARTUP_INSTRUCTION = `Client safety source of truth: ${CLIENT_SAFETY_CANONICAL_LOCATION} (${CLIENT_SAFE_REQUEST_REGISTRY_VERSION}). Use only registered semantic request profiles. On any client-side rejection, execute ${CLIENT_BLOCK_INTAKE_CONTRACT_VERSION} completely before resuming the original objective.`;
+export const CLIENT_SAFETY_STARTUP_INSTRUCTION = `Client safety source of truth: ${CLIENT_SAFETY_CANONICAL_LOCATION} (${CLIENT_SAFE_REQUEST_REGISTRY_VERSION}). Use only registered semantic request profiles. On any client-side rejection, execute ${CLIENT_BLOCK_INTAKE_CONTRACT_VERSION} completely before resuming the original objective. If the advertised public action schema changes or a cached schema is detected, stop normal work, tell the owner to refresh the Lensically Operator Mode ChatGPT app schema and refresh or reopen the chat, and do not resume until the owner confirms the refresh.`;
 
 function containsTypedOnlyAccountIdentifier(value: string): boolean { const normalized = value.toLowerCase(); return TYPED_ONLY_ACCOUNT_IDENTIFIERS.some((identifier) => normalized.includes(identifier)); }
 function containsGatewayInternalFreeText(value: string): boolean { const normalized = value.toLowerCase(); return GATEWAY_INTERNAL_FREE_TEXT.some((phrase) => normalized.includes(phrase)); }
