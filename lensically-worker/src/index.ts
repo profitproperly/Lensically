@@ -18867,8 +18867,21 @@ async function handleOperatorMcpEngineeringTool(
         };
       }
     }
-    const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
-    return { ok: run.ok, status: run.status, run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url }, jobs: jobList, failed_log_excerpt };
+        const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
+    const failed_steps = jobList.flatMap((job) => Array.isArray(job.steps)
+      ? job.steps.filter((step) => step.conclusion === "failure").map((step) => ({ job_id: job.id, job_name: job.name, ...step }))
+      : []);
+    return {
+      ok: run.ok,
+      status: run.status,
+      jobs_ok: jobs.ok,
+      jobs_status: jobs.status,
+      run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url },
+      jobs: jobList,
+      failed_steps,
+      failed_log_excerpt,
+      failed_log_unavailable,
+    };
   }
 
     if (toolName === "verifyDeployedMcpVersion") {
