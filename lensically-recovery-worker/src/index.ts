@@ -449,6 +449,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && !Object.prototype.hasOwnProperty.call(gatewayProperties, "intent")
       && gatewaySchema?.additionalProperties === false;
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    const accountKeyContent = ((accountKey.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const mappedContent = ((mapped.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const schedulerContent = ((scheduler.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
