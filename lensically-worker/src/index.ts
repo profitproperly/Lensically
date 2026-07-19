@@ -12767,7 +12767,29 @@ const REPO_PATH_SCHEMA = {
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
-    { name: "executeLensicallyIntent", title: "Execute Lensically intent", description: CLIENT_SAFETY_GATEWAY_DESCRIPTION, inputSchema: { type: "object", properties: { objective: { type: "string" }, intent: { type: "string", description: "What must be accomplished next. Use startup for fresh-session bootstrap. Do not name an internal tool or route." }, inputs: { type: "object", description: "Variable inputs for the mapped procedure.", additionalProperties: true }, continuation_id: { type: "string" }, incident_id: { type: "string" }, permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." } }, required: ["objective", "intent", "inputs"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    {
+    name: "executeLensicallyIntent",
+    title: "Execute registered Lensically profile",
+    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Freehand objective and intent text are forbidden. Submit only a registered profile_id and bounded variable inputs; Lensically compiles the canonical request before routing.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile_id: {
+          type: "string",
+          pattern: "^[a-z0-9_]+$",
+          maxLength: 120,
+          description: "Registered Lensically request profile. Use startup for bootstrap. For other capabilities, use the registered snake_case profile; protected known operations require their canonical client-safe profile.",
+        },
+        inputs: { type: "object", description: "Bounded variable fields accepted by the registered profile.", additionalProperties: true },
+        continuation_id: { type: "string" },
+        incident_id: { type: "string" },
+        permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." },
+      },
+      required: ["profile_id", "inputs"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
   { name: "engineeringPrecheck", title: "Engineering precheck", description: "Load compact source-control, MCP, ops-memory, failure-pattern, gate, requirement, and runtime state before engineering work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "getEngineeringAccessState", title: "Get engineering access state", description: "Report GitHub/Cloudflare engineering access status without exposing secret values.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "listRepoFiles", title: "List repo files", description: "List GitHub repository files from the default branch with optional prefix filtering.", inputSchema: { type: "object", properties: { prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
