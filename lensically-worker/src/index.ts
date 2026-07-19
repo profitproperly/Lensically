@@ -18412,9 +18412,13 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-    if (toolName === "getOperatorStartupContext") {
+        if (toolName === "getOperatorStartupContext") {
         return buildOperatorStartupContext(request, env);
   }
+  if (toolName === "recordHardeningIncident") return recordHardeningIncident(env, args);
+  if (toolName === "getHardeningStatus") return getHardeningStatus(env, args);
+  if (toolName === "advanceHardeningIncident") return advanceHardeningIncident(env, args);
+  if (toolName === "recordOperationalObservation") return recordOperationalObservation(env, args);
 
   if (toolName === "engineeringPrecheck") {
     const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
