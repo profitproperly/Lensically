@@ -2,7 +2,7 @@ name: Lensically Validation
 # Fast routine validation. This workflow never deploys either Worker.
 # Push markers: [typecheck], [acceptance-regressions], [operator-smoke], [operator-analytics], [operator-scheduler],
 # [operator-content], [operator-accounts], [operator-engineering], [system-directory-tests], [operator-full], [gpt-memory-tests], [verified-worker-release].
-run-name: Lensically validation · ${{ inputs.task || github.sha }}
+
 
 on:
   workflow_dispatch:
@@ -31,30 +31,14 @@ on:
       - ".github/workflows/lensically-validation.yml"
 
 concurrency:
-  group: lensically-validation-${{ inputs.task || github.sha }}
+  group: lensically-validation-main
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  validate:
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-                        contains(github.event.head_commit.message, '[typecheck]') ||
-        contains(github.event.head_commit.message, '[acceptance-regressions]') ||
-        contains(github.event.head_commit.message, '[operator-smoke]') ||
-        contains(github.event.head_commit.message, '[operator-analytics]') ||
-        contains(github.event.head_commit.message, '[operator-scheduler]') ||
-        contains(github.event.head_commit.message, '[operator-content]') ||
-        contains(github.event.head_commit.message, '[operator-accounts]') ||
-                contains(github.event.head_commit.message, '[operator-engineering]') ||
-        contains(github.event.head_commit.message, '[system-directory-tests]') ||
-        contains(github.event.head_commit.message, '[operator-full]') ||
-                contains(github.event.head_commit.message, '[gpt-memory-tests]') ||
-        contains(github.event.head_commit.message, '[verified-worker-release]')
-      }}
+    validate:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -128,9 +112,8 @@ jobs:
             scope="gpt-memory"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-smoke]"* ]]; then
             scope="smoke"
-          else
-            echo "No validation marker found."
-            exit 2
+                    else
+            scope="typecheck"
           fi
           echo "scope=${scope}" >> "${GITHUB_OUTPUT}"
           echo "Resolved validation scope: ${scope}"
