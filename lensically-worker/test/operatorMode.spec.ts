@@ -2862,6 +2862,27 @@ describe("operator mode MCP endpoint", () => {
       },
     });
 
+    const cachedEngineeringMutation = await mcpToolCallRaw<{
+      error: string;
+      tool_name: string;
+      routed_execution?: { profile_id?: string; executed_tool?: string };
+    }>("executeLensicallyIntent", {
+      objective: "Repair routing and preserve account context after Proceed without mutating account data.",
+      intent: "Implement repository changes and verify context persistence after Proceed.",
+      inputs: {
+        brand_key: "manifest_mental",
+        dry_run: true,
+        message: "Cached engineering mutation routing regression",
+        patches: [],
+      },
+    });
+    expect(cachedEngineeringMutation.isError).toBe(true);
+    expect(cachedEngineeringMutation.structuredContent).toMatchObject({
+      error: "routed_gateway_payload_invalid",
+      tool_name: "applyRepoPatchSet",
+    });
+    expect(JSON.stringify(cachedEngineeringMutation.structuredContent)).not.toContain("confirmOperatorProceed");
+
     const cachedAccountRead = await mcpToolCallRaw<{
       ok: boolean;
       routed_execution: { profile_id: string; executed_tool: string };
