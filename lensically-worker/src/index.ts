@@ -32931,23 +32931,24 @@ export class ScheduledPostScheduler {
       const pausedWithOverdue = control.mode === "paused"
         && typeof currentOverdueCount === "number"
         && currentOverdueCount > 0;
-      const blockedByUnresolvedDelivery = hasQuarantinedPublish || pausedWithOverdue;
-      const healthy = heartbeatFresh && health.last_success !== false && !blockedByUnresolvedDelivery;
+      const healthy = heartbeatFresh && health.last_success !== false;
       const operational = healthy && control.mode === "normal";
       return new Response(JSON.stringify({
         enabled: true,
         healthy,
         operational,
-        publishing_enabled: control.mode !== "paused" && !hasQuarantinedPublish,
-        blocked_reason: hasQuarantinedPublish
-          ? "scheduler_quarantined_publish"
-          : pausedWithOverdue
-            ? "scheduler_paused_with_overdue_posts"
-            : control.mode === "paused"
-              ? "scheduler_paused"
-              : control.mode === "canary"
-                ? "scheduler_canary_mode"
-                : null,
+        publishing_enabled: control.mode === "normal",
+        blocked_reason: pausedWithOverdue
+          ? "scheduler_paused_with_overdue_posts"
+          : control.mode === "paused"
+            ? "scheduler_paused"
+            : control.mode === "canary"
+              ? "scheduler_canary_mode"
+              : null,
+        attention_required: hasQuarantinedPublish || pausedWithOverdue,
+        quarantined_post_ids: unresolvedPosts
+          ? unresolvedPosts.filter((row) => row.status === SCHEDULED_POST_STATUS_POSTING).map((row) => row.id)
+          : [],
         heartbeat_fresh: heartbeatFresh,
         current_overdue_count: currentOverdueCount,
         control,
