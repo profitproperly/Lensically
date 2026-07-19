@@ -13546,6 +13546,23 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
+    name: "audit_published_post_lineage",
+    title: "Audit published winner lineage",
+    description: "Read a bounded set of high-performing published posts and verify every lineage stage from source selection through metric snapshots. Returns complete and incomplete posts without mutating account data.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        minimum_likes: { type: "integer", minimum: 1, default: 1000 },
+        days: { type: "integer", minimum: 1, maximum: 90, default: 30 },
+        limit: { type: "integer", minimum: 1, maximum: 50, default: 25 },
+      },
+      required: ["brand_key"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
     name: "recover_published_post_lineage",
     title: "Recover published post lineage",
     description: "Recover one proven Manifest Saved Pattern family by creating or reusing its canonical source selection and source card, then attaching known published posts, dedicated generation runs, drafts, schedules, and metric snapshots. Use only when the historical Saved Pattern source is known and verified.",
