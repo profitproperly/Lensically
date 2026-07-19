@@ -1057,15 +1057,15 @@ describe("System Directory foundation", () => {
       tools,
       { signPermit: async () => "unused", verifyPermit: async () => null },
     );
-    expect(prepared).toMatchObject({
-      ok: false,
-      error: "promoted_winning_path_external_surface_required",
-      map_state: "known",
-      map_entry: { id: "large_repository_mutation_recovery" },
+        expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "applyRepoPatchSet",
       map_execution: {
-        winning_path_id: "large_repository_mutation_recovery",
-        winning_path_surface: "recovery_plane",
-        losing_path_prohibited: true,
+        winning_path_promotion: {
+          id: "large_repository_mutation_main_atomic",
+          losing_path_prohibited: true,
+          surface: "main_gateway",
+        },
       },
     });
   });
