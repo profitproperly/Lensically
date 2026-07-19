@@ -1,6 +1,6 @@
 
 import { describe, expect, it } from "vitest";
-import { classifyDefectForGeneralization, evaluatePreventableIncidentClosure, finalizeMandatoryExecutionMapCall, prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, resolvePromotedWinningPath, validateWinningPathPromotions, WINNING_PATH_PROMOTIONS, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
+import { classifyDefectForGeneralization, CONTINUOUS_HARDENING_VERSION, evaluatePreventableIncidentClosure, finalizeMandatoryExecutionMapCall, HARDENING_ALLOWED_TRANSITIONS, prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, resolvePromotedWinningPath, validateHardeningTransition, validateWinningPathPromotions, WINNING_PATH_PROMOTIONS, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
       assertClientSafetyRegistry,
   buildClientSafeGatewayRequest,
