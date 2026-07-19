@@ -14661,6 +14661,110 @@ type OperatorRoutedGatewayResult = {
   execution_library?: Record<string, unknown>;
 };
 
+type OperatorPublicProfileCompilation =
+  | { ok: true; profile_id: string; request: Record<string, unknown> }
+  | { ok: false; error: string; profile_id: string | null; required_profile_id?: string; available_profile_hint?: string };
+
+const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequestProfileId>([
+  ["listGitHubWorkflowRuns", "workflow_run_list"],
+  ["getGitHubWorkflowRun", "workflow_run_status"],
+  ["readRepoFile", "repository_file_read"],
+  ["readMcpToolDefinition", "capability_definition"],
+  ["auditScheduledPost", "scheduled_post_audit"],
+  ["recoverOverdueScheduledPosts", "protected_scheduler_recovery"],
+  ["selectOperatorKey", "account_key_selection"],
+]);
+
+function operatorPublicProfileIdForToolName(toolName: string): string {
+  return toolName
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+}
+
+function operatorPublicIntentForToolName(toolName: string): string {
+  if (toolName === "getOperatorStartupContext") return "startup";
+  return operatorPublicProfileIdForToolName(toolName).replace(/_/g, " ");
+}
+
+function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown>): OperatorPublicProfileCompilation {
+  const profileId = normalizeOperatorMachineKey(gatewayArgs.profile_id, "");
+  if (!profileId) {
+    return {
+      ok: false,
+      error: "registered_profile_id_required",
+      profile_id: null,
+      available_profile_hint: "Use startup for bootstrap or the snake_case registered capability profile returned by Lensically.",
+    };
+  }
+  const inputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
+    ? gatewayArgs.inputs as Record<string, unknown>
+    : {};
+  const safeProfile = CLIENT_SAFE_REQUEST_PROFILES[profileId as ClientSafeRequestProfileId];
+  if (safeProfile) {
+    if (safeProfile.surface === "recovery_plane") {
+      return {
+        ok: false,
+        error: "profile_requires_recovery_plane",
+        profile_id: profileId,
+      };
+    }
+    try {
+      const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, inputs);
+      return {
+        ok: true,
+        profile_id: profileId,
+        request: {
+          ...compiled,
+          ...(typeof gatewayArgs.continuation_id === "string" ? { continuation_id: gatewayArgs.continuation_id } : {}),
+          ...(typeof gatewayArgs.incident_id === "string" ? { incident_id: gatewayArgs.incident_id } : {}),
+          ...(typeof gatewayArgs.permit === "string" ? { permit: gatewayArgs.permit } : {}),
+        },
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "client_safe_profile_compilation_failed",
+        profile_id: profileId,
+      };
+    }
+  }
+  const baseTools = buildOperatorMcpBaseTools(false);
+  const matchedTool = baseTools.find((tool) =>
+    operatorPublicProfileIdForToolName(tool.name) === profileId
+    || (profileId === "startup" && tool.name === "getOperatorStartupContext")
+  );
+  if (!matchedTool) {
+    return {
+      ok: false,
+      error: "unknown_registered_profile_id",
+      profile_id: profileId,
+    };
+  }
+  const requiredSafeProfile = OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(matchedTool.name);
+  if (requiredSafeProfile) {
+    return {
+      ok: false,
+      error: "canonical_safe_profile_required",
+      profile_id: profileId,
+      required_profile_id: requiredSafeProfile,
+    };
+  }
+  return {
+    ok: true,
+    profile_id: profileId,
+    request: {
+      objective: `Execute registered Lensically profile ${profileId}.`,
+      intent: operatorPublicIntentForToolName(matchedTool.name),
+      inputs,
+      ...(typeof gatewayArgs.continuation_id === "string" ? { continuation_id: gatewayArgs.continuation_id } : {}),
+      ...(typeof gatewayArgs.incident_id === "string" ? { incident_id: gatewayArgs.incident_id } : {}),
+      ...(typeof gatewayArgs.permit === "string" ? { permit: gatewayArgs.permit } : {}),
+    },
+  };
+}
+
 async function prepareOperatorRoutedGatewayCall(
   env: Env,
   gatewayArgs: Record<string, unknown>,
