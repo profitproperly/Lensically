@@ -1205,10 +1205,41 @@ describe("System Directory foundation", () => {
       { capability: "workflow activity listing" },
       tools,
     );
-    expect(prepared).toMatchObject({
+        expect(prepared).toMatchObject({
       ok: true,
       tool_name: "readMcpToolDefinition",
       arguments: { tool_name: "listGitHubWorkflowRuns" },
+    });
+  });
+
+  it("enforces the continuous-hardening lifecycle and closure proof", () => {
+    expect(CONTINUOUS_HARDENING_VERSION).toBe("continuous-hardening-loop-v1");
+    expect(HARDENING_ALLOWED_TRANSITIONS.detected).toEqual(["contained"]);
+    expect(validateHardeningTransition("detected", "generalized")).toMatchObject({ allowed: false });
+    const proof = {
+      root_cause: "Typed public and internal contracts diverged.",
+      generalized_cause: "Semantic profiles must compile to exact typed handler arguments.",
+      prevention_rule_id: "typed_profile_exact_contract",
+      regression_test_ids: ["systemDirectory:continuous-hardening"],
+      tested_sha: "abc123",
+      deployment_id: "deployment-1",
+      live_verification: { ok: true },
+      resume_result: { ok: true },
+      autonomy_dividend: { owner_intervention_removed: true },
+    };
+    expect(validateHardeningTransition("released", "live_verified", proof)).toEqual({ allowed: true, errors: [] });
+    expect(validateHardeningTransition("resumed", "closed", proof)).toEqual({ allowed: true, errors: [] });
+    expect(validateHardeningTransition("resumed", "closed", { ...proof, autonomy_dividend: null })).toMatchObject({ allowed: false });
+  });
+
+  it("registers typed hardening and repository inspection profiles", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.client_block_intake.allowed_input_keys).toContain("resume_capsule");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.hardening_transition.allowed_input_keys).toContain("prevention_rule_id");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_symbol_search.allowed_input_keys).toEqual(["path", "symbol", "limit"]);
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_file_read.allowed_input_keys).toContain("max_lines");
+    expect(buildClientSafeGatewayRequest("repository_symbol_search", { path: "lensically-worker/src/index.ts", symbol: "validateHardeningTransition", limit: 5 })).toMatchObject({
+      intent: "search repository symbol",
+      inputs: { path: "lensically-worker/src/index.ts", symbol: "validateHardeningTransition", limit: 5 },
     });
   });
 });
