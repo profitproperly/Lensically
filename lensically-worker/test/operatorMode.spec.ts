@@ -3050,8 +3050,8 @@ describe("operator mode MCP endpoint", () => {
         risk_groups: { read_only: number; mutation: number };
       };
     }>("executeLensicallyIntent", {
-      objective: "Run compact system checks.",
-      intent: "run system checks",
+      objective: "Review one.",
+      intent: "checkup",
       inputs: {},
     });
     expect(campaign.structuredContent.campaign).toMatchObject({
