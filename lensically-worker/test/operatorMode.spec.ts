@@ -3272,6 +3272,13 @@ describe("operator mode MCP endpoint", () => {
       expect(startup.structuredContent).not.toHaveProperty(retiredField);
     }
 
+            const capabilityDefinition = await mcpToolCallRaw<{ ok: boolean; tool: { name: string } }>("executeLensicallyIntent", {
+      profile_id: "capability_definition",
+      inputs: { capability: "repository patch set" },
+    });
+    expect(capabilityDefinition.isError).not.toBe(true);
+    expect(capabilityDefinition.structuredContent).toMatchObject({ ok: true, tool: { name: "applyRepoPatchSet" } });
+
         const mapped = await mcpToolCallRaw<{
       ok: boolean;
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };

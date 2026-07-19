@@ -14657,7 +14657,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.34.1";
+export const OPERATOR_MCP_VERSION = "1.34.2";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -15213,9 +15213,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           : inputs;
       delete safeInputs.account_key;
       const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
-      const compiledRequest = profileId === "capability_definition"
-        ? { ...compiled, inputs: { tool_name: compiled.inputs.capability } }
-        : compiled;
+            const compiledRequest = compiled;
       return {
         ok: true,
         profile_id: profileId,
