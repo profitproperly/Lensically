@@ -16547,9 +16547,9 @@ function operatorMcpInstructions(toolCount: number): string {
   return [
     "Use Lensically Operator Mode as the source of truth.",
     CLIENT_SAFETY_STARTUP_INSTRUCTION,
-    "The source-defined static router selects one live typed handler. Do not choose internal tools, wrappers, retries, or fallbacks.",
-    "Route selection is database-independent. Dynamic execution libraries, maps, incidents, promotions, phonebook routes, and OpsMemory routing are retired.",
-    "Use profile_id='startup' once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
+    "The server-side Execution Kernel resolves the live capability, payload contract, deterministic route, policy, continuity, and execution receipt. Do not choose internal tools, wrappers, retries, or fallbacks.",
+    "Execution Kernel routing is source-defined and database-independent. Retired dynamic execution libraries, maps, incidents, phonebook routes, and OpsMemory routing are compatibility history only.",
+    "Use objective='Load the compact Lensically startup bootstrap' and intent='startup' once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
     "After Proceed, restore account continuity and present the guided Growth Mission Brief. Brainstorm, revise, and obtain explicit plan approval before account mutation; routine engineering remains autonomous.",
     "Routine engineering uses bounded inspection, one coherent change set, focused validation, one exact-SHA release, and compact receipts.",
     "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
