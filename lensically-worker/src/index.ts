@@ -17376,11 +17376,13 @@ async function handleOperatorMcpAdminTool(
     const campaignFailures = campaignRows.filter((row) => row.route_passed !== true
       || row.client_request_safe !== true
       || row.schema_passed !== true
+      || row.policy_classification_passed !== true
       || row.mutation_without_required_inputs === true);
     const failureClasses = {
       routing: campaignRows.filter((row) => row.route_passed !== true).length,
       client_safety: campaignRows.filter((row) => row.client_request_safe !== true).length,
       schema_contract: campaignRows.filter((row) => row.schema_passed !== true).length,
+      policy_classification: campaignRows.filter((row) => row.policy_classification_passed !== true).length,
       zero_input_mutation: campaignRows.filter((row) => row.mutation_without_required_inputs === true).length,
     };
 
