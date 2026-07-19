@@ -14,11 +14,12 @@
 
 ## Execution Contract
 
-- `executeLensicallyIntent` is the sole public main-MCP tool. Its public schema is `profile_id` and bounded `inputs`, with optional continuation fields. Freehand `objective` and `intent` are forbidden; registered profiles compile canonical semantic requests server-side.
-- The source-controlled System Directory resolves the relevant Lensically system, source of truth, payload bounds, and adjacent systems before `static-execution-router-v1` selects one live typed handler.
-- Exact deterministic and exact source-defined intents always keep precedence over broader Directory hints. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
+- `executeLensicallyIntent` is the sole public main-MCP tool. Its permanent public schema is concise `objective`, `intent`, and bounded `inputs`, with optional continuation fields. The server compiles and validates the request before internal routing.
+- The canonical server-side architecture is the **Execution Kernel** (`lensically-execution-kernel-v1`). It owns capability resolution, payload safety, source-defined routing, pre-call policy, continuity and authorization, execution receipts, and reusable-blocker prevention.
+- The source-controlled capability directory and `static-execution-router-v1` remain active components inside the Execution Kernel. Exact deterministic and exact source-defined intents keep precedence over broader directory hints. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
+- Legacy receipt names such as `mandatory_execution_map`, `system_directory`, `client_safety`, and `execution_policy` remain compatibility fields only until the approved cleanup phase. Do not create new architecture under those names.
 - Direct internal tool calls are rejected.
-- Known-file reads and normal account operations stay on the main gateway. Free-text repository discovery, terminal failure diagnostics, and deployment use Recovery because those public main-gateway payload classes are client-blocked. Recovery is also the break-glass plane when the main Worker is unreachable.
+- Recovery remains an independent break-glass repair plane. Any current normal-path dependency on Recovery must be identified during the extensive post-consolidation call campaign and removed before dead-weight cleanup begins.
 - Account workflows retain explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety after routing.
 - For Manifest, Proceed restores state and opens `guided-growth-mission-v1`: the model presents a preemptive diagnostic and proposed plan, then discusses and revises it with the owner. Proceed alone never authorizes account mutation.
 - Account execution requires the current persistent Growth Mission to be approved or active. Routine engineering remains autonomous. Full autonomous account mode requires an explicit owner-authorized mode change and must never be inferred from ordinary approval language.
