@@ -175,6 +175,17 @@
       "compatibility_bridge": false
     },
     {
+      "capability_id": "engineering.search_known_repository_file",
+      "directory_entry_id": "engineering.repository",
+      "canonical_handler": "searchRepoFiles",
+      "route_intent": "search repository files",
+      "implementation_mode": "new_handler",
+      "focused_regression": "routes bounded known-file repository search through the main Execution Kernel without Recovery",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed main gateway finds executeLensicallyIntent in lensically-worker/src/index.ts using bounded_known_file_content with one external request and no Recovery fallback.",
+      "compatibility_bridge": false
+    },
+    {
       "capability_id": "strategy.read_growth_mission",
       "directory_entry_id": "strategy.growth_mission_read",
       "canonical_handler": "getGrowthMission",
