@@ -663,9 +663,9 @@ describe("operator mode backend spine", () => {
       threads_user_id?: string;
       follower_growth?: { starting_followers?: number; current_followers?: number; net_growth?: number };
       post_performance?: { by_views?: Array<{ id: string }> };
-      mandatory_execution_map?: { mapped_tool?: string };
+            execution_kernel?: { route?: { tool_name?: string } };
     };
-    expect(payload.mandatory_execution_map?.mapped_tool).toBe("get_monthly_growth_review");
+        expect(payload.execution_kernel?.route?.tool_name).toBe("get_monthly_growth_review");
     expect(payload.threads_user_id).toBe("35758578720393972");
     expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
     expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
@@ -3274,20 +3274,21 @@ describe("operator mode MCP endpoint", () => {
       account_data_loaded: true,
     });
 
-    const startup = await mcpToolCallRaw<{
-      gateway: { intent: string; public_schema_frozen: boolean };
-      mandatory_execution_map: { route_mode: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
+        const startup = await mcpToolCallRaw<{
+      execution_kernel: { public_contract: string; route: { tool_name: string }; lifecycle: { route_mode: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean } };
     }>("executeLensicallyIntent", {
       profile_id: "startup",
       inputs: {},
     });
     expect(startup.isError).not.toBe(true);
-    expect(startup.structuredContent.gateway).toMatchObject({ intent: "startup", public_schema_frozen: true });
-    expect(startup.structuredContent.mandatory_execution_map).toMatchObject({
-      route_mode: "source_defined_static_route",
-      d1_execution_library_bypassed: true,
-      discovery_allowed: false,
+    expect(startup.structuredContent.execution_kernel).toMatchObject({
+      public_contract: "profile_id_inputs_v1",
+      route: { tool_name: "getOperatorStartupContext" },
+      lifecycle: { route_mode: "source_defined_static_route", d1_execution_library_bypassed: true, discovery_allowed: false },
     });
+    for (const retiredField of ["gateway", "mandatory_execution_map", "execution_library", "execution_policy"]) {
+      expect(startup.structuredContent).not.toHaveProperty(retiredField);
+    }
 
     const mapped = await mcpToolCallRaw<{
       ok: boolean;
