@@ -15178,33 +15178,15 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
     ? gatewayArgs.inputs as Record<string, unknown>
     : {};
   const explicitProfileId = normalizeOperatorMachineKey(gatewayArgs.profile_id, "");
-  const nestedProfileId = normalizeOperatorMachineKey(rawInputs.profile_id, "");
-  const lifecycleProfile = resolveOperatorAccountLifecycleProfile(gatewayArgs, rawInputs);
-  let profileId = explicitProfileId || nestedProfileId;
+    const lifecycleProfile = explicitProfileId ? resolveOperatorAccountLifecycleProfile(gatewayArgs, rawInputs) : null;
+  let profileId = explicitProfileId;
   let inputs = { ...rawInputs };
   delete inputs.profile_id;
   if (lifecycleProfile && (!profileId || profileId === "startup" || profileId === "select_operator_key" || profileId === "confirm_operator_proceed")) {
     profileId = lifecycleProfile.profile_id;
     inputs = lifecycleProfile.inputs;
   }
-  if (!profileId) {
-    const cachedObjective = normalizeOperatorText(gatewayArgs.objective, 600, true);
-    const cachedIntent = normalizeOperatorText(gatewayArgs.intent, 300);
-    const cachedInputsSize = JSON.stringify(inputs).length;
-    if (cachedIntent && cachedInputsSize <= 12_000) {
-      return {
-        ok: true,
-        profile_id: "public_intent",
-        request: {
-          objective: cachedObjective || "Execute the requested Lensically action.",
-          intent: cachedIntent,
-          inputs,
-          ...(typeof gatewayArgs.continuation_id === "string" ? { continuation_id: gatewayArgs.continuation_id } : {}),
-          ...(typeof gatewayArgs.incident_id === "string" ? { incident_id: gatewayArgs.incident_id } : {}),
-          ...(typeof gatewayArgs.permit === "string" ? { permit: gatewayArgs.permit } : {}),
-        },
-      };
-    }
+    if (!profileId) {
     return {
       ok: false,
       error: "registered_profile_id_required",
