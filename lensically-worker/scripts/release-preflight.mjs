@@ -19,6 +19,8 @@ const workflow = read("../.github/workflows/lensically-engineering.yml");
 const validationWorkflow = read("../.github/workflows/lensically-validation.yml");
 const currentState = read("../CURRENT_STATE.md");
 const recoverySource = read("../lensically-recovery-worker/src/index.ts");
+const threadsPublishService = read("src/utils/threadsPublishService.ts");
+const threadsPublishTests = read("test/threadsPublishService.spec.ts");
 
 const cronMatch = wrangler.match(/"crons"\s*:\s*(\[[\s\S]*?\])/);
 if (!cronMatch) throw new Error("wrangler_crons_missing");
