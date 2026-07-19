@@ -3047,7 +3047,7 @@ describe("operator mode MCP endpoint", () => {
         passed: number;
         failed: number;
         failure_classes: Record<string, number>;
-        live_reads: { eligible: number; executed: number; passed: number; skipped: number; failed: number };
+        live_reads: { eligible: number; executed: number; passed: number; skipped: number; failed: number; failures: Array<Record<string, unknown>> };
         risk_groups: { read_only: number; mutation: number };
       };
     }>("executeLensicallyIntent", {
