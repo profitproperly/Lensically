@@ -17933,7 +17933,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
                 ...prepared,
                 profile_id: compiledProfile.profile_id,
                 required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-                account_data_loaded: false,
+                account_data_loaded: gatewayAccountDataLoaded,
               },
               content: [{ type: "text", text: `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.` }],
               isError: true,
