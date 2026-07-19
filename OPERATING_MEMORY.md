@@ -64,10 +64,11 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Scheduling Safety
 
 - Cron and the Durable Object alarm share one persisted scheduler control.
-- Missing control defaults to `paused`.
-- `canary` authorizes exactly one scheduled entry and automatically returns to paused after one attempt.
-- `normal` activation is forbidden while overdue approved or posting records exist.
-- Overdue recovery is explicit, bounded, and transactional. Retire or reschedule exact selected rows, then verify the overdue set is empty before normal activation.
+- Automatic scheduled delivery is the default. A missing control initializes as `normal`; `paused` is an explicit emergency-maintenance state only.
+- An uncertain publish attempt quarantines only that scheduled row as `posting`. It never pauses unrelated future posts, and later runs continue selecting only due `approved` rows.
+- `canary` authorizes exactly one scheduled entry for explicit diagnostics and automatically returns to its prior safe mode after one attempt.
+- `normal` activation is blocked only by overdue `approved` rows that could backfill unexpectedly; quarantined `posting` rows remain isolated and do not block delivery.
+- Overdue or quarantined-row recovery is explicit, bounded, and transactional and may run while automatic delivery continues.
 - A scheduled item is successfully published only when its row is `posted` and contains a nonempty Threads identifier.
 - Scheduled wording corrections use the shared edit path and preserve omitted fields. Posting and posted rows are not editable.
 
