@@ -2681,15 +2681,45 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
 
-    const freehand = await mcpToolCallRaw<{ error: string; freehand_gateway_payload_allowed: boolean }>("executeLensicallyIntent", {
-      objective: "Load startup.",
-      intent: "startup",
+    const arbitraryFreehand = await mcpToolCallRaw<{ error: string; freehand_gateway_payload_allowed: boolean }>("executeLensicallyIntent", {
+      objective: "Inspect an unknown operation.",
+      intent: "unknown operation",
       inputs: {},
     });
-    expect(freehand.isError).toBe(true);
-    expect(freehand.structuredContent).toMatchObject({
+    expect(arbitraryFreehand.isError).toBe(true);
+    expect(arbitraryFreehand.structuredContent).toMatchObject({
       error: "registered_profile_id_required",
       freehand_gateway_payload_allowed: false,
+    });
+
+    const resolvedFreshKey = await mcpToolCallRaw<{
+      selected_key: CanonicalBrandKey;
+      account_data_loaded: boolean;
+      next_profile_id: string;
+      routed_execution: { profile_id: string; executed_tool: string };
+    }>("executeLensicallyIntent", {
+      objective: "key manifest",
+      intent: "initialize account handshake",
+      inputs: { brand_key: "manifest" },
+    });
+    expect(resolvedFreshKey.isError).not.toBe(true);
+    expect(resolvedFreshKey.structuredContent).toMatchObject({
+      selected_key: "manifest_mental",
+      account_data_loaded: false,
+      next_profile_id: "account_proceed",
+      routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
+    });
+
+    const nestedProfileKey = await mcpToolCallRaw<{
+      selected_key: CanonicalBrandKey;
+      routed_execution: { profile_id: string; executed_tool: string };
+    }>("executeLensicallyIntent", {
+      inputs: { profile_id: "account_key_selection", brand_key: "manifest_mental" },
+    });
+    expect(nestedProfileKey.isError).not.toBe(true);
+    expect(nestedProfileKey.structuredContent).toMatchObject({
+      selected_key: "manifest_mental",
+      routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
     });
 
     const startup = await mcpToolCallRaw<{
