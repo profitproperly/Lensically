@@ -16176,7 +16176,29 @@ async function recordOperationalObservation(env: Env, args: Record<string, unkno
     normalizeOperatorMachineKey(args.profile_id, "") || null, capability, normalizeOperatorMachineKey(args.outcome, "unknown"), durationMs,
     callCount, Math.max(0, Math.trunc(Number(args.external_requests ?? 0))), repeated, progress, normalizeOperatorJson(args.metadata ?? {}, {}),
   ).run();
-  /* HARDENING_EFFICIENCY_DETECTION */
+    const averageCalls = Number(baseline?.avg_calls ?? 0);
+  const averageDuration = Number(baseline?.avg_duration ?? 0);
+  const excessiveCalls = callCount > Math.max(8, averageCalls > 0 ? averageCalls * 2.5 : 8);
+  const excessiveDuration = durationMs > Math.max(120000, averageDuration > 0 ? averageDuration * 3 : 120000);
+  const stalled = !progress && (repeated > 0 || excessiveCalls || excessiveDuration);
+  const efficiencyIncident = stalled
+    ? await recordHardeningIncident(env, {
+        boundary: "efficiency",
+        blocked_profile_id: args.profile_id ?? "operational_observation",
+        error_category: repeated > 0 ? "repeated_operation_fingerprint" : excessiveCalls ? "excessive_call_count" : "execution_duration_degradation",
+        request_fingerprint: `${capability}:${args.operation_id ?? id}`,
+        expected_outcome: { average_calls: averageCalls, average_duration_ms: averageDuration, progress_checkpoint_required: true },
+        observed_outcome: { call_count: callCount, duration_ms: durationMs, repeated_fingerprint_count: repeated, progress_checkpoint: progress },
+        resume_capsule: { operation_id: args.operation_id ?? null, capability },
+      })
+    : null;
+  return {
+    ok: true,
+    observation_id: id,
+    baseline: { average_calls: averageCalls, average_duration_ms: averageDuration },
+    efficiency_incident: efficiencyIncident,
+    safe_checkpoint_required: stalled,
+  };
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
