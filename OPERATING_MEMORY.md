@@ -4,7 +4,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 ## Execution Architecture
 
-- Every main-MCP operation enters through the sole public tool `executeLensicallyIntent`.
+- Every main-MCP operation enters through the sole public tool `executeLensicallyIntent` using a registered `profile_id` and bounded `inputs`. Freehand `objective` and `intent` fields are prohibited and compiled server-side.
 - The source-controlled System Directory resolves the relevant system, system of record, payload bounds, and adjacent systems before the static router selects one live typed handler.
 - Exact deterministic and exact source-defined intents keep precedence over broader Directory guidance. The model does not choose tools, wrappers, retries, or fallbacks.
 - Route selection must remain D1-independent. Do not reintroduce execution-library compilation, dynamic maps, route incidents, promotions, phonebook overrides, OpsMemory routing, or execution-event recording.
