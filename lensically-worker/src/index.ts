@@ -17674,6 +17674,7 @@ async function handleOperatorMcpAdminTool(
       { name: "static_router_active", passed: OPERATOR_REGISTRY_GENERATION === "static-execution-router-v1" },
       { name: "complete_capability_campaign_passed", passed: campaignFailures.length === 0 },
       { name: "live_read_capability_campaign_passed", passed: liveReadFailures.length === 0 },
+      { name: "mutation_preflight_campaign_passed", passed: mutationPreflightFailures.length === 0 },
     ];
     return {
       ok: checks.every((check) => check.passed),
