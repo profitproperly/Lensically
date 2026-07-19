@@ -6966,6 +6966,50 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
      ON operator_hardening_incidents (state, severity, updated_at DESC)`,
   ).run();
 
+    await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_hardening_incident_events (
+      id TEXT PRIMARY KEY,
+      incident_id TEXT NOT NULL,
+      from_state TEXT,
+      to_state TEXT NOT NULL,
+      evidence_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_hardening_events_incident
+     ON operator_hardening_incident_events (incident_id, created_at ASC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_operational_observations (
+      id TEXT PRIMARY KEY,
+      operation_id TEXT,
+      incident_id TEXT,
+      profile_id TEXT,
+      capability TEXT,
+      outcome TEXT NOT NULL,
+      duration_ms INTEGER,
+      call_count INTEGER,
+      external_requests INTEGER,
+      repeated_fingerprint_count INTEGER,
+      progress_checkpoint TEXT,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_observations_capability_created
+     ON operator_operational_observations (capability, created_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TRIGGER IF NOT EXISTS trg_operator_hardening_touch_updated_at
+     AFTER UPDATE ON operator_hardening_incidents
+     FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+     BEGIN
+       UPDATE operator_hardening_incidents SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+     END`,
+  ).run();
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_repo_write_sessions (
       id TEXT PRIMARY KEY,
