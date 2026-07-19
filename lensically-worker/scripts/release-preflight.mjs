@@ -179,7 +179,11 @@ if (!source.includes("const RETIRED_EXECUTION_TABLES")
 }
 
 if (!source.includes('name: "executeLensicallyIntent"')
-    || !source.includes('required: ["objective", "intent", "inputs"]')
+    || !source.includes('required: ["profile_id", "inputs"]')
+    || !source.includes("Freehand objective and intent text are forbidden")
+    || !source.includes("compileOperatorPublicProfileRequest")
+    || !source.includes("registered_profile_id_required")
+    || !source.includes("canonical_safe_profile_required")
     || !source.includes("routed_execution_gateway_required")
     || !source.includes("prepareMandatoryExecutionMapCall")
     || !source.includes("finalizeMandatoryExecutionMapCall")) {
