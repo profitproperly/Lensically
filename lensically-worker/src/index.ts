@@ -18550,6 +18550,21 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             } satisfies ExecutionPolicyLibrarySource)),
           },
         );
+        resultPayload.execution_kernel = {
+          ...operatorExecutionKernelMetadata(env),
+          route: {
+            intent: routedGatewayMetadata.action_intent ?? null,
+            action_key: routedGatewayMetadata.action_key ?? null,
+            tool_name: toolName,
+            source_defined: true,
+            model_tool_choice_allowed: false,
+          },
+          compatibility: {
+            mandatory_execution_map: true,
+            routed_execution: true,
+            execution_policy: true,
+          },
+        };
         resultPayload.mandatory_execution_map = mapLifecycle;
         resultPayload.execution_library = routedGatewayMetadata.execution_library ?? null;
         resultPayload.gateway = {
