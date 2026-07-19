@@ -17514,6 +17514,33 @@ async function handleOperatorMcpAdminTool(
   return { ok: false, error: "admin_tool_not_implemented" };
 }
 
+export function searchKnownRepositoryFileContent(
+  content: string,
+  query: string,
+  limit = 20,
+): {
+  matches: Array<{ line_number: number; line: string }>;
+  match_count: number;
+  searched_line_count: number;
+  truncated: boolean;
+} {
+  const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+  const normalizedQuery = query.trim().toLowerCase();
+  const lines = content.split(/\r?\n/);
+  const allMatches = normalizedQuery
+    ? lines
+        .map((line, index) => ({ line_number: index + 1, line }))
+        .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery))
+    : [];
+  const matches = allMatches.slice(0, boundedLimit);
+  return {
+    matches,
+    match_count: allMatches.length,
+    searched_line_count: lines.length,
+    truncated: allMatches.length > matches.length,
+  };
+}
+
 async function handleOperatorMcpEngineeringTool(
   request: Request,
   env: Env,
