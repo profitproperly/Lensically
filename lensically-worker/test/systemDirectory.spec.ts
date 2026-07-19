@@ -478,8 +478,16 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).not.toContain("Submit objective, intent");
     expect(CLIENT_SAFETY_POLICIES).toContainEqual(expect.objectContaining({
       id: "stale_schema_prevention",
-      summary: expect.stringContaining("bounded server-side compatibility compiler"),
+      summary: expect.stringContaining("owner must be explicitly told to refresh"),
     }));
+    expect(CLIENT_SCHEMA_REFRESH_NOTICE).toMatchObject({
+      version: "client-schema-refresh-notice-v1",
+      mandatory: true,
+      blocks_normal_work_until_owner_confirmation: true,
+    });
+    expect(getClientSafetyRegistrySummary()).toMatchObject({
+      schema_refresh_notice: CLIENT_SCHEMA_REFRESH_NOTICE,
+    });
     expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
       id: "public_cached_freehand_gateway_schema",
       safe_profile_id: "startup_context",
