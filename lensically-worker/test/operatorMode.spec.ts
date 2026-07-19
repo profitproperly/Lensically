@@ -3056,7 +3056,7 @@ describe("operator mode MCP endpoint", () => {
     }>("executeLensicallyIntent", {
       objective: "Review one.",
       intent: "checkup",
-      inputs: { segment: "routes" },
+      inputs: { segment: "s0" },
     });
     expect(campaign.structuredContent.campaign).toMatchObject({
       segment: "routes",
