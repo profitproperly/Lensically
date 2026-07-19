@@ -425,6 +425,9 @@ export async function publishTextToThreads({
     text,
     media_type: "TEXT",
   });
+  if (autoPublishText) {
+    publishCreateBody.set("auto_publish_text", "true");
+  }
   const spoilerEntities = buildTextSpoilerEntities(text, {
     spoilerAllText,
     spoilerPhrases,
