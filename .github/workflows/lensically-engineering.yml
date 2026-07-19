@@ -178,7 +178,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          npm run test -- --run test/operatorMode.spec.ts --testNamePattern="routes operational status and engineering intents deterministically away from content procedures|arms, executes, and re-arms the independent scheduled-post alarm with shared cron health" --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-operator-release-gate.log
+          npm run test -- --run test/operatorMode.spec.ts --testNamePattern="routes operational status and engineering intents deterministically away from content procedures|arms, executes, and re-arms the independent scheduled-post alarm with shared cron health|recovers a known Saved Pattern into complete published-post lineage" --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-operator-release-gate.log
 
       - name: Surface fast Operator release-gate failure
         if: ${{ steps.operator_release_gate.outcome == 'failure' }}
