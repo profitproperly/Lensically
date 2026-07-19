@@ -137,7 +137,7 @@ if (/Operator MCP v\d+\.\d+\.\d+/.test(currentState)) {
   errors.push("current_state_manual_version_literal_forbidden");
 }
 
-// Fresh-chat acceptance requires startup documents, runtime profiles, and Main validation routes to match the advertised profile-only action schema.
+// Fresh-chat acceptance requires startup documents, runtime profiles, Main validation routes, and deployment policy to match the advertised profile-only action schema.
 for (const [documentName, documentText] of [["AGENTS.md", agentRules], ["CURRENT_STATE.md", currentState], ["OPERATING_MEMORY.md", operatingMemory]]) {
   if (!documentText.includes("`profile_id`")
       || !documentText.includes("bounded `inputs`")
