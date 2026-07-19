@@ -14791,10 +14791,15 @@ async function prepareOperatorRoutedGatewayCall(
   env: Env,
   gatewayArgs: Record<string, unknown>,
 ): Promise<OperatorRoutedGatewayResult> {
-  const actionIntent = normalizeOperatorText(gatewayArgs.intent ?? gatewayArgs.action_intent, 8000);
-  const objective = normalizeOperatorText(gatewayArgs.objective, 8000, true);
-  const directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
-    ? gatewayArgs.inputs as Record<string, unknown>
+  const compiledProfile = compileOperatorPublicProfileRequest(gatewayArgs);
+  if (!compiledProfile.ok) {
+    return { ok: false, error: compiledProfile.error };
+  }
+  const compiledGatewayArgs = compiledProfile.request;
+  const actionIntent = normalizeOperatorText(compiledGatewayArgs.intent ?? compiledGatewayArgs.action_intent, 8000);
+  const objective = normalizeOperatorText(compiledGatewayArgs.objective, 8000, true);
+  const directInputs = compiledGatewayArgs.inputs && typeof compiledGatewayArgs.inputs === "object" && !Array.isArray(compiledGatewayArgs.inputs)
+    ? compiledGatewayArgs.inputs as Record<string, unknown>
     : null;
   const baseTools = buildOperatorMcpBaseTools(false);
   const directMapped = actionIntent && directInputs
