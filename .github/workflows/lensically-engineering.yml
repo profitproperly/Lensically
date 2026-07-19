@@ -88,12 +88,24 @@ jobs:
         working-directory: .
         run: |
           if [ -f lensically-worker/scripts/run-compact-maintenance.mjs ]; then
+            set +e
             node lensically-worker/scripts/run-compact-maintenance.mjs
+            status=$?
+            set -e
             git config user.name "lensically-engineering"
             git config user.email "lensically-engineering@users.noreply.github.com"
             git add -A
-            git commit -m "Add compact published-post verification [operator-tests]"
+            if git diff --cached --quiet; then
+              exit "$status"
+            fi
+            if [ "$status" -eq 0 ]; then
+              message="Add compact published-post verification [operator-tests]"
+            else
+              message="Record compact maintenance diagnostic"
+            fi
+            git commit -m "$message"
             git push origin HEAD:main
+            exit "$status"
           fi
 
       - name: Verify exact release identity
