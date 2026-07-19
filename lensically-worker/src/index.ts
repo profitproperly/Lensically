@@ -17368,6 +17368,8 @@ async function handleOperatorMcpAdminTool(
         client_request_safe: safety.safe,
         client_safety_violations: safety.violations,
         schema_passed: schemaPassed,
+        policy_mutates_state: policyMutatesState,
+        policy_classification_passed: policyClassificationPassed,
         mutation_without_required_inputs: mutationWithoutRequiredInputs,
       });
     }
