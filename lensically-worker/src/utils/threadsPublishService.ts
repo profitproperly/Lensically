@@ -483,70 +483,45 @@ export async function publishTextToThreads({
     };
   }
 
-    void publishMaxAttempts;
-  const boundedPublishAttempts = 1;
+  void publishMaxAttempts;
 
-  let commitFailure: {
-    errorCode: ThreadsPublishErrorCode;
-    status?: number;
-    errorMessage?: string;
-    responseBody?: string;
-  } | null = null;
+  const readinessResult = await waitForContainerReadiness(
+    accessToken,
+    publishRequestId,
+    readinessMaxChecks,
+    readinessDelayMs,
+  );
+  if (!readinessResult.success) {
+    return readinessResult;
+  }
 
-  for (let attempt = 0; attempt < boundedPublishAttempts; attempt += 1) {
-    const commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId);
-    if (commitResult.success) {
-      const commitPayload = commitResult.payload;
-      const publishedPostId = getIdFromPayload(commitPayload);
-      if (!publishedPostId) {
-        return {
-          success: false,
-          errorCode: "threads_publish_commit_invalid_response",
-        };
-      }
-
-      return {
-        success: true,
-        publishRequestId,
-        publishedPostId,
-        publishResponse: commitPayload,
-      };
-    }
-
-    commitFailure = {
+  // At-most-once external commit: readiness may be polled, but the publish
+  // endpoint is called exactly once. An ambiguous commit remains quarantined
+  // for explicit reconciliation instead of being retried automatically.
+  const commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId);
+  if (!commitResult.success) {
+    return {
+      success: false,
       errorCode: commitResult.errorCode,
       status: commitResult.status,
       errorMessage: commitResult.errorMessage,
       responseBody: commitResult.responseBody,
     };
-
-    if (attempt >= boundedPublishAttempts - 1) {
-      break;
-    }
-
-    const readinessResult = await waitForContainerReadiness(
-      accessToken,
-      publishRequestId,
-      readinessMaxChecks,
-      readinessDelayMs,
-    );
-    if (!readinessResult.success) {
-      return readinessResult;
-    }
   }
 
-  if (!commitFailure) {
+  const commitPayload = commitResult.payload;
+  const publishedPostId = getIdFromPayload(commitPayload);
+  if (!publishedPostId) {
     return {
       success: false,
-      errorCode: "threads_publish_commit_failed",
+      errorCode: "threads_publish_commit_invalid_response",
     };
   }
 
   return {
-    success: false,
-    errorCode: commitFailure.errorCode,
-    status: commitFailure.status,
-    errorMessage: commitFailure.errorMessage,
-    responseBody: commitFailure.responseBody,
+    success: true,
+    publishRequestId,
+    publishedPostId,
+    publishResponse: commitPayload,
   };
 }
