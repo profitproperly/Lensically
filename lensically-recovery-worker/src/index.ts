@@ -472,6 +472,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       },
       direct_operational_call: { status: direct.status, rejected: directRejected, error: directContent?.error ?? null },
       mapped_execution_call: { status: mapped.status, ok: mappedSucceeded, executed_tool: (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool ?? null, model_tool_choice_allowed: (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed ?? null },
+      scheduler_state: { status: scheduler.status, content: schedulerContent },
+      scheduled_inventory: { today: { status: scheduledToday.status, content: scheduledTodayContent }, tomorrow: { status: scheduledTomorrow.status, content: scheduledTomorrowContent } },
     };
   }
   return { ok: false, error: "unknown_recovery_tool" };
