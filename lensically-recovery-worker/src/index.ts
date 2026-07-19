@@ -476,7 +476,6 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const mappedContent = ((mapped.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const schedulerContent = ((scheduler.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const schedulerRestoreContent = schedulerRestore ? (((schedulerRestore.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null) : null;
     const scheduledTodayContent = ((scheduledToday.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const scheduledTomorrowContent = ((scheduledTomorrow.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const mappedSurface = toolNames.length === 1 && toolNames.includes("executeLensicallyIntent") && profileSchemaSucceeded;
