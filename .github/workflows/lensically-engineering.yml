@@ -87,6 +87,7 @@ jobs:
         if: ${{ inputs.task == 'typecheck' }}
         working-directory: .
         run: |
+          set -o pipefail
           if [ -f lensically-worker/scripts/apply-compact-post-results-patch.mjs ]; then
             if ! node lensically-worker/scripts/apply-compact-post-results-patch.mjs 2>&1 | tee /tmp/compact-post-results-maintenance.log; then
               diagnostic=$(tail -n 80 /tmp/compact-post-results-maintenance.log | tr '\n' ' ' | sed 's/%/%25/g')
