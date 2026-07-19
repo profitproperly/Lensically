@@ -19537,7 +19537,31 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         };
         await completeOperatorOperationReceipt(env, idempotencyKey, resultPayload);
       }
-      const isError = resultPayload.ok === false;
+            const isError = resultPayload.ok === false;
+      const resultError = normalizeOperatorMachineKey(resultPayload.error ?? resultPayload.error_code, "unexpected_result");
+      const unexplainedZero = toolName === "searchRepoFiles"
+        && Number(resultPayload.returned_count ?? 0) === 0
+        && resultPayload.verified_complete_for_known_file !== true;
+      if (!HARDENING_CONTROLLER_TOOLS.has(toolName)
+          && ((isError && !HARDENING_EXPECTED_CONTROL_ERRORS.has(resultError)) || unexplainedZero)) {
+        const automaticIncident = await recordHardeningIncident(env, {
+          boundary: isOperatorMcpEngineeringToolName(toolName) ? "server" : "quality",
+          blocked_profile_id: routedGatewayMetadata?.profile_id ?? operatorPublicProfileIdForToolName(toolName),
+          error_category: unexplainedZero ? "unexplained_zero_result" : resultError,
+          request_fingerprint: await operatorExecutionFingerprint(toolName, args),
+          operation_class: operatorToolMutatesState(toolName) ? "mutation" : "read",
+          expected_outcome: unexplainedZero ? "complete and non-ambiguous search evidence" : "successful typed handler result",
+          observed_outcome: resultPayload,
+          resume_capsule: {
+            profile_id: routedGatewayMetadata?.profile_id ?? operatorPublicProfileIdForToolName(toolName),
+            tool_name: toolName,
+            argument_keys: Object.keys(args).sort(),
+            workflow_session_id: normalizeOperatorText(args.workflow_session_id, 120, true),
+          },
+        });
+        resultPayload.hardening_incident = automaticIncident.incident;
+        resultPayload.normal_work_blocked = automaticIncident.normal_work_blocked;
+      }
       if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
       }
