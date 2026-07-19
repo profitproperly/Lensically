@@ -17099,7 +17099,7 @@ async function handleOperatorMcpEngineeringTool(
         admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
       tool_block_prevention: [
-        "Call executeLensicallyIntent with intent='startup' once at fresh-session startup before engineering/admin/workflow/account work.",
+        "Call executeLensicallyIntent with profile_id='startup' and empty inputs once at fresh-session startup before engineering/admin/workflow/account work.",
         "Use the production System Directory directive before the static router.",
         "Use readRepoFile with line bounds for known files.",
         "Use applyRepoTextPatch only for one isolated replacement.",
