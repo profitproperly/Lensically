@@ -12521,6 +12521,86 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       anomaly_reason: evaluatedMetrics?.anomalyReason ?? null,
     } : null;
 
+    if (payload.compact === true) {
+      const generationRun = lineageRow?.run_id
+        ? await env.DB.prepare(
+          `SELECT id, source_card_id, source_card_family_id, source_card_version_number,
+                  objective, prompt_summary, status, metadata_json, adaptation_plan_json, created_at, updated_at
+           FROM gpt_generation_runs
+           WHERE id = ? AND account_id = ? AND threads_user_id = ?
+           LIMIT 1`,
+        ).bind(String(lineageRow.run_id), brand.account_id, brand.profile.threads_user_id).first<Record<string, unknown>>()
+        : null;
+      const draftDetail = lineageRow?.draft_id
+        ? await env.DB.prepare(
+          `SELECT id, run_id, source_card_id, text, status, scheduled_post_id, published_post_id,
+                  strategy_json, metadata_json, created_at, updated_at
+           FROM gpt_generation_drafts
+           WHERE id = ? AND account_id = ? AND threads_user_id = ?
+           LIMIT 1`,
+        ).bind(String(lineageRow.draft_id), brand.account_id, brand.profile.threads_user_id).first<Record<string, unknown>>()
+        : null;
+      const primarySource = sourceCard?.primary_source && typeof sourceCard.primary_source === "object"
+        ? sourceCard.primary_source as Record<string, unknown>
+        : null;
+      return operatorJsonResponse({
+        post: {
+          published_post_id: publishedPostId,
+          text: archivePost?.post_text ?? lineageRow?.post_text ?? null,
+          posted_at: archivePost?.post_timestamp ?? lineageRow?.published_at ?? null,
+        },
+        metrics,
+        lineage: {
+          source_selection_id: sourceSelection?.id ?? null,
+          source_batch_id: sourceSelection?.batch_id ?? null,
+          source_identity_key: sourceSelection?.source_identity_key ?? null,
+          source_card_id: sourceCardId,
+          generation_run_id: lineageRow?.run_id ?? null,
+          draft_id: lineageRow?.draft_id ?? null,
+          scheduled_post_id: lineageRow?.scheduled_post_id ?? null,
+          published_post_id: publishedPostId,
+        },
+        source: sourceSelection ? {
+          saved_pattern_id: sourceSelection.source_type === "saved_pattern" ? Number(sourceSelection.internal_source_id) : null,
+          source_type: sourceSelection.source_type ?? null,
+          source_identity_key: sourceSelection.source_identity_key ?? null,
+          source_text: sourceSelection.post_text ?? primarySource?.text ?? null,
+          source_likes: Number((safeParseJsonString(String(sourceSelection.metrics_snapshot_json ?? "{}")) as Record<string, unknown> | null)?.likes ?? 0),
+        } : null,
+        source_card: sourceCard ? {
+          id: sourceCard.id,
+          family_id: sourceCard.family_id ?? null,
+          version_number: sourceCard.version_number ?? null,
+          is_current: sourceCard.is_current ?? null,
+          title: sourceCard.title ?? null,
+          transformation_contract: sourceCard.transformation_contract ?? null,
+        } : null,
+        generation_run: generationRun ? {
+          id: generationRun.id,
+          source_card_id: generationRun.source_card_id ?? null,
+          source_card_family_id: generationRun.source_card_family_id ?? null,
+          source_card_version_number: generationRun.source_card_version_number ?? null,
+          objective: generationRun.objective ?? null,
+          prompt_summary: generationRun.prompt_summary ?? null,
+          status: generationRun.status ?? null,
+          metadata: safeParseJsonString(String(generationRun.metadata_json ?? "{}")) ?? {},
+          adaptation_plan: safeParseJsonString(String(generationRun.adaptation_plan_json ?? "{}")) ?? {},
+        } : null,
+        draft: draftDetail ? {
+          id: draftDetail.id,
+          run_id: draftDetail.run_id ?? null,
+          source_card_id: draftDetail.source_card_id ?? null,
+          status: draftDetail.status ?? null,
+          scheduled_post_id: draftDetail.scheduled_post_id ?? null,
+          published_post_id: draftDetail.published_post_id ?? null,
+          strategy: safeParseJsonString(String(draftDetail.strategy_json ?? "{}")) ?? {},
+          metadata: safeParseJsonString(String(draftDetail.metadata_json ?? "{}")) ?? {},
+        } : null,
+        warning: archivePost ? null : "Published post lineage was found, but synced Threads metrics are not available yet.",
+        response_mode: "compact",
+      });
+    }
+
     if (metrics && evaluatedMetrics) {
       const serializedMetrics = normalizeOperatorJson(evaluatedMetrics.metrics, {});
       const latestSnapshot = await env.DB.prepare(
@@ -13591,7 +13671,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     name: "get_post_results",
     title: "Get post results",
     description: "Use this to retrieve published post results linked to a Lensically draft and source card when available.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, published_post_id: { type: "string" }, include_history: { type: "boolean" } }, required: ["brand_key", "published_post_id"], additionalProperties: false },
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, published_post_id: { type: "string" }, include_history: { type: "boolean" }, compact: { type: "boolean", description: "Return only bounded verification fields and compact generation evidence." } }, required: ["brand_key", "published_post_id"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
@@ -14370,7 +14450,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.31.8";
+export const OPERATOR_MCP_VERSION = "1.31.9";
 
 const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";
 

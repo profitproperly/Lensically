@@ -82,6 +82,7 @@
 - Insights collection runs at 12:00 AM, 6:00 AM, 12:00 PM, and 6:00 PM America/New_York through an hourly cron admitted only at those local windows.
 - Each run fetches the newest 40 posts, updates cache and archive state, appends only changed metric snapshots, and preserves available lineage.
 - Performance learning uses age-matched 6, 12, 18, and 24-hour checkpoints; 24 hours is final.
+- Published-post result reads support a compact verification mode that returns bounded lineage, source, source-card, generation-run, draft, and current-metric evidence without the full performance payload.
 - Learning uses each post's own views, likes, replies, reposts, quotes, and shares. Follower totals remain account-level trajectory data and are never attributed to a post, day, batch, or posting period.
 
 ## Engineering and Release

@@ -1262,6 +1262,35 @@ describe("operator mode backend spine", () => {
     });
     expect(results.source_card.transformation_contract.must_preserve_exact)
       .toContain("Universe, make the person reading this");
+
+    const compact = await operatorTool<{
+      response_mode: string;
+      lineage: { source_card_id: string; generation_run_id: string; draft_id: string };
+      source: { saved_pattern_id: number; source_text: string };
+      source_card: { id: string; version_number: number };
+      generation_run: { id: string; metadata: Record<string, unknown> };
+      draft: { id: string };
+      performance_evaluation?: unknown;
+      metric_history?: unknown;
+    }>("get_post_results", {
+      brand_key: "manifest_mental",
+      published_post_id: publishedPostId,
+      compact: true,
+    });
+    expect(compact.response_mode).toBe("compact");
+    expect(compact.lineage).toMatchObject({
+      source_card_id: recovered.source_card_id,
+      generation_run_id: recovered.recovered_posts[0].generation_run_id,
+      draft_id: recovered.recovered_posts[0].draft_id,
+    });
+    expect(compact.source.saved_pattern_id).toBe(savedPatternId);
+    expect(compact.source.source_text).toContain("Universe");
+    expect(compact.source_card.id).toBe(recovered.source_card_id);
+    expect(compact.generation_run.id).toBe(recovered.recovered_posts[0].generation_run_id);
+    expect(compact.draft.id).toBe(recovered.recovered_posts[0].draft_id);
+    expect(compact.performance_evaluation).toBeUndefined();
+    expect(compact.metric_history).toBeUndefined();
+    expect(new TextEncoder().encode(JSON.stringify(compact)).byteLength).toBeLessThan(8000);
   }, 30000);
 
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
