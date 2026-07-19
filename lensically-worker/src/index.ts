@@ -15455,8 +15455,15 @@ async function prepareOperatorRoutedGatewayCall(
     if (requiredTool === toolName) {
       return { ...mapped, ok: false, error: "known_blocker_prevented", corrections, route_trail: routeTrail };
     }
-    if (!requiredTool || requiredTool === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
+        if (!requiredTool || requiredTool === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
       return { ...mapped, ok: false, error: "routed_gateway_redirect_invalid", corrections, route_trail: routeTrail };
+    }
+    if (toolName === "applyRepoTextPatch" && requiredTool === "applyRepoPatchSet") {
+      args = {
+        patches: [{ path: args.path, find: args.find, replace: args.replace }],
+        message: args.message,
+        ...(args.summary !== undefined ? { summary: args.summary } : {}),
+      };
     }
     toolName = requiredTool;
   }
