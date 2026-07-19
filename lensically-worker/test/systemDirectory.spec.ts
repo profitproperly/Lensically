@@ -904,7 +904,7 @@ describe("System Directory foundation", () => {
 
   it("returns the mandatory client-safety receipt for every startup response", () => {
     expect(getClientSafetyRegistrySummary()).toMatchObject({
-      registry_version: "client-safe-requests-v6",
+            registry_version: "client-safe-requests-v7",
       canonical_location: "lensically-worker/src/systemDirectory/clientSafeRequests.ts",
       registry_valid: true,
       intake_contract_version: "client-block-intake-v1",
