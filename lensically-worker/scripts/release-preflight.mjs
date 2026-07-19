@@ -249,7 +249,9 @@ if (!threadsPublishService.includes("const readinessResult = await waitForContai
     || !threadsPublishService.includes("// At-most-once external commit")
     || !threadsPublishService.includes("const commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId)")
     || !threadsPublishTests.includes("waits for FINISHED before making exactly one publish commit")
-    || !threadsPublishTests.includes("does not call the publish endpoint when readiness never completes")) {
+    || !threadsPublishTests.includes("does not call the publish endpoint when readiness never completes")
+    || !workflow.includes("Threads publish readiness tests")
+    || !workflow.includes("test/threadsPublishService.spec.ts")) {
   errors.push("threads_publish_readiness_single_commit_missing");
 }
 if (!source.includes("Worker deployment is Recovery-only")
