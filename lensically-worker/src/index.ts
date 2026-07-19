@@ -18042,7 +18042,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
               required_tool: toolName,
               required_route: route.mandatory_route,
               route_trail: [route],
-              account_data_loaded: false,
+              account_data_loaded: gatewayAccountDataLoaded,
             },
             content: [{ type: "text", text: `Lensically blocked protected operation ${toolName} until explicit owner ratification is supplied.` }],
             isError: true,
