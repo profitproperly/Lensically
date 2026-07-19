@@ -4,6 +4,11 @@ export const MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v1";
 export const EXECUTION_POLICY_LIBRARY_VERSION = "retired";
 export const DEFECT_GENERALIZATION_GATE_VERSION = "defect-generalization-gate-v1";
 export const WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v1";
+export const CONTINUOUS_HARDENING_VERSION = "continuous-hardening-loop-v1";
+export type HardeningBoundary = "client" | "gateway" | "routing" | "server" | "database" | "deployment" | "quality" | "efficiency" | "external";
+export type HardeningSeverity = "P0" | "P1" | "P2" | "P3";
+export type HardeningClassification = "novel_failure" | "known_prevention" | "prevention_breach";
+export type HardeningState = "detected" | "contained" | "classified" | "reproduced" | "generalized" | "repaired" | "prevention_locked" | "validated" | "released" | "live_verified" | "resumed" | "closed";
 
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
 export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
