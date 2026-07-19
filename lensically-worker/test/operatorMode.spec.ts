@@ -2946,6 +2946,27 @@ describe("operator mode MCP endpoint", () => {
       routed_execution: { profile_id: "account_proceed", executed_tool: "confirmOperatorProceed" },
     });
 
+    const routedErrorAfterProceed = await mcpToolCallRaw<{
+      error: string;
+      tool_name: string;
+      account_data_loaded: boolean;
+    }>("executeLensicallyIntent", {
+      objective: "Verify engineering routing without changing account data.",
+      intent: "Implement repository changes and verify context persistence after Proceed.",
+      inputs: {
+        brand_key: "manifest_mental",
+        dry_run: true,
+        message: "Post-Proceed continuity receipt regression",
+        patches: [],
+      },
+    });
+    expect(routedErrorAfterProceed.isError).toBe(true);
+    expect(routedErrorAfterProceed.structuredContent).toMatchObject({
+      error: "routed_gateway_payload_invalid",
+      tool_name: "applyRepoPatchSet",
+      account_data_loaded: true,
+    });
+
     const startup = await mcpToolCallRaw<{
       gateway: { intent: string; public_schema_frozen: boolean };
       mandatory_execution_map: { route_mode: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
