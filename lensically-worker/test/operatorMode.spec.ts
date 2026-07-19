@@ -3018,8 +3018,9 @@ describe("operator mode MCP endpoint", () => {
 
     const routed = await mcpToolCallRaw<{
       error: string;
-      tool_name: string;
-      missing_required?: string[];
+      map_state: string;
+      map_entry: { tool_name: string; source_type: string };
+      missing_inputs: string[];
     }>("executeLensicallyIntent", {
       objective: "Find executeLensicallyIntent in a known repository file.",
       intent: "search repository files",
@@ -3027,8 +3028,13 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(routed.isError).toBe(true);
     expect(routed.structuredContent).toMatchObject({
-      error: "routed_gateway_payload_invalid",
-      tool_name: "searchRepoFiles",
+      error: "static_router_inputs_missing",
+      map_state: "known",
+      map_entry: {
+        tool_name: "searchRepoFiles",
+        source_type: "source_defined_direct_engineering",
+      },
+      missing_inputs: ["prefix"],
     });
   }, 30000);
 
