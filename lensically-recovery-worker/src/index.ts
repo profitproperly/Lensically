@@ -452,12 +452,6 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const direct = await mainMcpRequest(origin, token, 4, "tools/call", { name: "getEngineeringAccessState", arguments: {} });
     const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "get_engineering_access_state", inputs: {} } });
     const scheduler = await mainMcpRequest(origin, token, 6, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "get_scheduled_post_scheduler_state", inputs: {} } });
-    const schedulerBeforeContent = ((scheduler.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const schedulerBeforeState = schedulerBeforeContent?.scheduler && typeof schedulerBeforeContent.scheduler === "object" && !Array.isArray(schedulerBeforeContent.scheduler) ? schedulerBeforeContent.scheduler as Record<string, unknown> : null;
-    const schedulerBeforeControl = schedulerBeforeState?.control && typeof schedulerBeforeState.control === "object" && !Array.isArray(schedulerBeforeState.control) ? schedulerBeforeState.control as Record<string, unknown> : null;
-    const schedulerRestore = schedulerBeforeControl?.mode === "paused" && Number(schedulerBeforeState?.current_overdue_count ?? -1) === 0
-      ? await mainMcpRequest(origin, token, 9, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "set_scheduled_post_scheduler_mode", inputs: { brand_key: "manifest_mental", mode: "normal", reason: "Restore automatic delivery for 26 future approved posts after global quarantine pause; overdue count verified zero.", owner_response: "if its scheduled its scheduled and it either posts or it dont" } } })
-      : null;
     const scheduledToday = await mainMcpRequest(origin, token, 7, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "list_scheduled_posts", inputs: { brand_key: "manifest_mental", date: "2026-07-18", timezone: "America/New_York", proceed_confirmed: true } } });
     const scheduledTomorrow = await mainMcpRequest(origin, token, 8, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "list_scheduled_posts", inputs: { brand_key: "manifest_mental", date: "2026-07-19", timezone: "America/New_York", proceed_confirmed: true } } });
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
