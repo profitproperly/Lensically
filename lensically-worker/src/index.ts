@@ -15090,9 +15090,9 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
     if (cachedIntent && cachedInputsSize <= 12_000) {
       return {
         ok: true,
-        profile_id: "cached_schema_compat",
+        profile_id: "public_intent",
         request: {
-          objective: cachedObjective || "Execute a cached-schema Lensically request.",
+          objective: cachedObjective || "Execute the requested Lensically action.",
           intent: cachedIntent,
           inputs,
           ...(typeof gatewayArgs.continuation_id === "string" ? { continuation_id: gatewayArgs.continuation_id } : {}),
