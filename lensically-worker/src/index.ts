@@ -12992,6 +12992,7 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
+  "searchRepoFiles",
   "readRepoFile",
   "getRepoStatus",
   "applyRepoTextPatch",
