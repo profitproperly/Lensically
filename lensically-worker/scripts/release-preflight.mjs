@@ -251,14 +251,17 @@ if (!source.includes("quarantineScheduledPostPublishAttempt")
     || !tests.includes('expect(autoResumed.blocked_reason).toBe("scheduler_quarantined_publish")')) {
   errors.push("scheduled_publish_unknown_state_quarantine_missing");
 }
-if (!threadsPublishService.includes("const readinessResult = await waitForContainerReadiness(")
+if (!threadsPublishService.includes('publishCreateBody.set("auto_publish_text", "true")')
+    || !threadsPublishService.includes("if (autoPublishText) {")
+    || !threadsPublishTests.includes("uses native auto-publish for text posts and never calls threads_publish")
+    || !threadsPublishService.includes("const readinessResult = await waitForContainerReadiness(")
     || !threadsPublishService.includes("// At-most-once external commit")
     || !threadsPublishService.includes("const commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId)")
     || !threadsPublishTests.includes("waits for FINISHED before making exactly one publish commit")
     || !threadsPublishTests.includes("does not call the publish endpoint when readiness never completes")
     || !workflow.includes("Threads publish readiness tests")
     || !workflow.includes("test/threadsPublishService.spec.ts")) {
-  errors.push("threads_publish_readiness_single_commit_missing");
+  errors.push("threads_text_auto_publish_contract_missing");
 }
 if (!source.includes("Worker deployment is Recovery-only")
     || !clientSafety.includes('verified_release_marker')
