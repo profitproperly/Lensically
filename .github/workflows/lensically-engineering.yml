@@ -4,7 +4,7 @@ name: Lensically Engineering
 # verified-release-marker: release-44
 # verified-release-trigger: r44
 # verified-operator-shards-marker: shards-16
-run-name: Lensically ${{ inputs.task }} · ${{ inputs.release_id || github.sha }}
+run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}
 
 on:
   push:
@@ -39,7 +39,7 @@ on:
         type: string
 
 concurrency:
-  group: lensically-engineering-${{ inputs.task || 'recovery-push' }}
+    group: lensically-engineering-${{ github.event.inputs.task || 'marker-push' }}
   cancel-in-progress: true
 
 permissions:
@@ -57,11 +57,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_SHA: ${{ github.sha }}
         run: |
-          gh workflow run lensically-engineering.yml \
-            --ref main \
-            --field task=worker-deploy \
-            --field release_id="${RELEASE_SHA:0:12}" \
-            --field release_sha="${RELEASE_SHA}"
+                    gh api --method POST "repos/${GH_REPO}/actions/workflows/lensically-engineering.yml/dispatches" \
+            -f ref=main \
+            -f 'inputs[task]=worker-deploy' \
+            -f "inputs[release_id]=${RELEASE_SHA:0:12}" \
+            -f "inputs[release_sha]=${RELEASE_SHA}"
 
   verified-operator-shards-marker:
     if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-operator-shards]') }}
