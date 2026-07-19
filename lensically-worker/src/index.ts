@@ -16135,7 +16135,22 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
     normalizeOperatorJson(evidence.autonomy_dividend ?? null, null), normalizeOperatorJson(args.efficiency_result ?? safeParseJsonString(String(row.efficiency_result_json ?? "")), null),
     target, incidentId, current,
   ).run();
-  /* HARDENING_TRANSITION_EVENT */
+    await env.DB.prepare(
+    `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), incidentId, current, target,
+    normalizeOperatorJson({ ...evidence, efficiency_result: args.efficiency_result ?? null }, {}),
+  ).run();
+  const updated = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ?`).bind(incidentId).first<Record<string, unknown>>();
+  return {
+    ok: true,
+    version: CONTINUOUS_HARDENING_VERSION,
+    incident: updated ? serializeHardeningIncident(updated) : { id: incidentId, state: target },
+    previous_state: current,
+    current_state: target,
+    normal_work_blocked: target !== "closed" && (row.severity === "P0" || row.severity === "P1"),
+  };
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
