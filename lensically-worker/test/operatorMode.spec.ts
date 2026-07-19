@@ -2682,15 +2682,22 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
 
-    const arbitraryFreehand = await mcpToolCallRaw<{ error: string; freehand_gateway_payload_allowed: boolean }>("executeLensicallyIntent", {
-      objective: "Inspect an unknown operation.",
-      intent: "unknown operation",
+    const cachedSchemaCall = await mcpToolCallRaw<{
+      ok: boolean;
+      routed_execution: { profile_id: string; executed_tool: string; model_tool_choice_allowed: boolean };
+    }>("executeLensicallyIntent", {
+      objective: "Read current engineering access.",
+      intent: "get engineering access state",
       inputs: {},
     });
-    expect(arbitraryFreehand.isError).toBe(true);
-    expect(arbitraryFreehand.structuredContent).toMatchObject({
-      error: "registered_profile_id_required",
-      freehand_gateway_payload_allowed: false,
+    expect(cachedSchemaCall.isError).not.toBe(true);
+    expect(cachedSchemaCall.structuredContent).toMatchObject({
+      ok: true,
+      routed_execution: {
+        profile_id: "cached_schema_compat",
+        executed_tool: "getEngineeringAccessState",
+        model_tool_choice_allowed: false,
+      },
     });
 
     const resolvedFreshKey = await mcpToolCallRaw<{
