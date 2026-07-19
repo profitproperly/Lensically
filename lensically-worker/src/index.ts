@@ -17717,8 +17717,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         };
         routedGatewayMetadata = {
           version: MANDATORY_EXECUTION_MAP_VERSION,
-          action_intent: requestedArgs.intent ?? requestedArgs.action_intent ?? null,
-          action_key: prepared.map_execution?.action_key ?? requestedArgs.action_key ?? null,
+          profile_id: compiledProfile.profile_id,
+          action_intent: compiledProfile.request.intent ?? null,
+          action_key: prepared.map_execution?.action_key ?? null,
           map_state: prepared.map_state ?? null,
           map_entry: prepared.map_entry ?? null,
           incident: prepared.incident ?? null,
