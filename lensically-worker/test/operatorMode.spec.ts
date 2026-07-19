@@ -3057,8 +3057,12 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(campaign.structuredContent.campaign).toMatchObject({
       total_internal_capabilities: 84,
-      route_only: true,
+      route_only: false,
       mutations_executed: 0,
+      live_reads: {
+        eligible: 37,
+        failed: 0,
+      },
     });
     expect(campaign.structuredContent.campaign.passed).toBe(84);
     expect(campaign.structuredContent.campaign.failed).toBe(0);
