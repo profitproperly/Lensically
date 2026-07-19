@@ -493,12 +493,34 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const schedulerContent = ((scheduler.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const scheduledTodayContent = ((scheduledToday.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const scheduledTomorrowContent = ((scheduledTomorrow.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const mappedSurface = toolNames.length === 1 && toolNames.includes("executeLensicallyIntent") && profileSchemaSucceeded;
+    const mappedSurface = toolNames.length === 1 && toolNames.includes("executeLensicallyIntent") && publicContractSucceeded;
+    const staleSessionError = staleSession.body?.error && typeof staleSession.body.error === "object" && !Array.isArray(staleSession.body.error)
+      ? staleSession.body.error as Record<string, unknown>
+      : null;
+    const staleSessionData = staleSessionError?.data && typeof staleSessionError.data === "object" && !Array.isArray(staleSessionError.data)
+      ? staleSessionError.data as Record<string, unknown>
+      : null;
+    const sessionIssued = initialize.status === 200
+      && Boolean(sessionId)
+      && initialize.headers.execution_kernel === "lensically-execution-kernel-v1"
+      && Boolean(initialize.headers.deployment_id)
+      && Boolean(initialize.headers.commit_sha);
+    const staleSessionRejected = staleSession.status === 404
+      && ["invalid_mcp_session", "stale_mcp_deployment_session"].includes(String(staleSessionData?.reason ?? ""))
+      && Boolean(staleSession.headers.mcp_session_id)
+      && staleSession.headers.mcp_session_id !== invalidSession;
     const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "executeLensicallyIntent";
     const mappedSucceeded = mapped.status === 200
       && mappedContent?.ok === true
       && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState"
       && (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed === false;
+    const executionKernel = startupContent?.execution_kernel && typeof startupContent.execution_kernel === "object" && !Array.isArray(startupContent.execution_kernel)
+      ? startupContent.execution_kernel as Record<string, unknown>
+      : null;
+    const executionKernelSucceeded = executionKernel?.name === "Execution Kernel"
+      && executionKernel?.version === "lensically-execution-kernel-v1"
+      && executionKernel?.public_contract === "objective_intent_inputs_v1"
+      && executionKernel?.deployment_fresh_sessions === true;
     const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
     const startupPolicySucceeded = mapSummary?.version === "static-execution-router-v1"
       && mapSummary?.map_state === "source_defined_route_completed"
