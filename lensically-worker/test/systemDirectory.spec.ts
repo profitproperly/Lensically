@@ -697,6 +697,7 @@ describe("System Directory foundation", () => {
       "public_startup_receipt_wording",
       "public_startup_bootstrap_shape",
       "public_operator_context_shape",
+      "public_cached_freehand_gateway_schema",
       "public_repository_status_request",
       "recovery_full_gateway_description_patch",
       "recovery_exact_sha_deploy_dispatch",
