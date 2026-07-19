@@ -11396,9 +11396,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            FROM gpt_generation_drafts d2
            WHERE d2.account_id = ?
              AND d2.threads_user_id = ?
-             AND (d2.published_post_id = w.post_id OR (s.id IS NOT NULL AND d2.scheduled_post_id = s.id))
-           ORDER BY CASE WHEN d2.published_post_id = w.post_id THEN 0 ELSE 1 END,
-                    datetime(d2.updated_at) DESC
+             AND (
+               d2.published_post_id = w.post_id
+               OR d2.scheduled_post_id = (
+                 SELECT s3.id
+                 FROM scheduled_posts s3
+                 WHERE s3.threads_user_id = ? AND s3.published_post_id = w.post_id
+                 ORDER BY s3.id DESC
+                 LIMIT 1
+               )
+             )
+           ORDER BY datetime(d2.updated_at) DESC
            LIMIT 1
          )
        LEFT JOIN gpt_generation_runs r
