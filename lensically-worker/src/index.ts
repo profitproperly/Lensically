@@ -21,11 +21,14 @@ import {
 } from "./mandatoryExecutionMap";
 import {
   assertClientSafetyRegistry,
+  buildClientSafeGatewayRequest,
+  CLIENT_SAFE_REQUEST_PROFILES,
   CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
-    CLIENT_SAFETY_GATEWAY_DESCRIPTION,
-    CLIENT_SAFETY_STARTUP_INSTRUCTION,
+  CLIENT_SAFETY_GATEWAY_DESCRIPTION,
+  CLIENT_SAFETY_STARTUP_INSTRUCTION,
   getClientSafetyRegistrySummary,
   getLensicallySystemDirectorySummary,
+  type ClientSafeRequestProfileId,
 } from "./systemDirectory";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
