@@ -3059,7 +3059,8 @@ describe("operator mode MCP endpoint", () => {
       route_only: true,
       mutations_executed: 0,
     });
-    expect(campaign.structuredContent.campaign.passed + campaign.structuredContent.campaign.failed).toBe(84);
+    expect(campaign.structuredContent.campaign.passed).toBe(84);
+    expect(campaign.structuredContent.campaign.failed).toBe(0);
     expect(campaign.structuredContent.campaign.risk_groups.read_only + campaign.structuredContent.campaign.risk_groups.mutation).toBe(84);
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
       "client_safety",
