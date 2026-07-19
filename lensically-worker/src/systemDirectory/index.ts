@@ -272,6 +272,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     keywords: ["GitHub", "repo", "patch", "source", "implementation"],
     capabilities: ["read known source file", "search one known source file", "apply coherent change set", "verify repository head"],
     payload: { action_size: "coherent_change_set", max_results: 20, max_response_bytes: 16000 },
+    route_intent: "search repository files",
     related_entry_ids: ["engineering.operator_validation", "deployment.main_worker"],
     recommended_next_planes: ["deployment"],
     hard_gates: ["Deployment requires a verified repository head and passing focused validation."],
