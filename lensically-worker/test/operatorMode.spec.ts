@@ -878,10 +878,16 @@ describe("operator mode backend spine", () => {
     expect(sharedHealth.last_success).toBe(true);
     expect(sharedHealth.run_count).toBe(1);
 
-        const pausedHealth = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
+        const automaticHealth = await (await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/health"))).json() as {
       control: { mode: string; allowed_post_ids: number[]; max_posts: number };
     };
-    expect(pausedHealth.control).toMatchObject({ mode: "paused", allowed_post_ids: [], max_posts: 0 });
+    expect(automaticHealth.control).toMatchObject({ mode: "normal", allowed_post_ids: [], max_posts: 25 });
+    const explicitPause = await scheduler.fetch(new Request("https://scheduled-post-scheduler.internal/control", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "paused", reason: "explicit maintenance fixture" }),
+    }));
+    expect(explicitPause.ok).toBe(true);
 
     const firstInsert = await env.DB.prepare(
       `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
