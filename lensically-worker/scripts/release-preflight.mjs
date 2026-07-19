@@ -245,14 +245,17 @@ if (!source.includes("quarantineScheduledPostPublishAttempt")
     || !source.includes("finalizeScheduledPostPublished")
     || !source.includes("datetime(processing_started_at) <= datetime(?)")
     || !source.includes("WHERE status IN (?, ?)")
-    || !source.includes("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE")
-    || !source.includes("unresolved_publish_quarantine")
-    || !source.includes("scheduler_quarantined_publish")
+    || !source.includes("SCHEDULED_POST_QUARANTINE_ISOLATED")
+    || source.includes("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE")
+    || !source.includes('reason: "automatic_delivery_default"')
+    || !source.includes("quarantined_post_ids")
+    || source.includes("scheduler_must_be_paused_for_recovery")
     || source.includes("publish_interrupted_retry")
     || !tests.includes("never reopens stale posting rows after an external publish attempt")
     || !tests.includes("quarantines uncertain attempts and treats returned Threads ids as authoritative")
-    || !tests.includes('expect(autoResumed.control.mode).toBe("paused")')
-    || !tests.includes('expect(autoResumed.blocked_reason).toBe("scheduler_quarantined_publish")')) {
+    || !tests.includes('expect(autoResumed.control.mode).toBe("normal")')
+    || !tests.includes('expect(autoResumed.publishing_enabled).toBe(true)')
+    || !tests.includes("expect(autoResumed.quarantined_post_ids).toContain(stalePostId)")) {
   errors.push("scheduled_publish_unknown_state_quarantine_missing");
 }
 if (!threadsPublishService.includes('publishCreateBody.set("auto_publish_text", "true")')
