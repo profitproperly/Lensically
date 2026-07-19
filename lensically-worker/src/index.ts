@@ -14876,7 +14876,11 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
   if (typeof token !== "string" || !token.trim()) {
     return null;
   }
-  const [encodedPayload, providedSignature] = token.trim().split(".");
+  const tokenParts = token.trim().split(".");
+  if (tokenParts.length !== 2) {
+    return null;
+  }
+  const [encodedPayload, providedSignature] = tokenParts;
   if (!encodedPayload || !providedSignature) {
     return null;
   }
