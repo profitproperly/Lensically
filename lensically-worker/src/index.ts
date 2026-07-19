@@ -32727,17 +32727,11 @@ export class ScheduledPostScheduler {
       overdueAfter = unresolvedAfter.length;
       const quarantinedAfter = unresolvedAfter.filter((row) => row.status === SCHEDULED_POST_STATUS_POSTING);
       if (quarantinedAfter.length > 0) {
-        const activeControl = await this.getControl();
-        if (activeControl.mode !== "paused") {
-          control = await this.setControl({
-            mode: "paused",
-            reason: `unresolved_publish_quarantine:${quarantinedAfter.map((row) => row.id).join(",")}`.slice(0, 500),
-          });
-          logWorkerEvent("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE", {
-            trigger,
-            quarantined_post_ids: quarantinedAfter.map((row) => row.id),
-          }, "error");
-        }
+        logWorkerEvent("SCHEDULED_POST_QUARANTINE_ISOLATED", {
+          trigger,
+          quarantined_post_ids: quarantinedAfter.map((row) => row.id),
+          scheduler_mode: (await this.getControl()).mode,
+        }, "error");
       }
     } catch (error) {
       failure = error;
