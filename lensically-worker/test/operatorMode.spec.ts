@@ -3232,6 +3232,19 @@ describe("operator mode MCP endpoint", () => {
       routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
     });
 
+    const accountKeyAlias = await mcpToolCallRaw<{
+      selected_key: CanonicalBrandKey;
+      routed_execution: { profile_id: string; executed_tool: string };
+    }>("executeLensicallyIntent", {
+      profile_id: "account_key_selection",
+      inputs: { account_key: "manifest_mental" },
+    });
+    expect(accountKeyAlias.isError).not.toBe(true);
+    expect(accountKeyAlias.structuredContent).toMatchObject({
+      selected_key: "manifest_mental",
+      routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
+    });
+
     const accountProceed = await mcpToolCallRaw<{
       selected_key: CanonicalBrandKey;
       proceeded: boolean;
