@@ -2385,7 +2385,7 @@ describe("operator mode MCP endpoint", () => {
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     const names = registry.tools.map((tool) => tool.name);
     const startup = await mcpTool<{
-      execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean };
+      execution_kernel?: { name?: string; version?: string; public_contract?: string; legacy_freehand_compatibility?: boolean; deployment_fresh_sessions?: boolean };
     }>("getOperatorStartupContext");
     expect(startup.execution_kernel).toMatchObject({
       name: "Execution Kernel",
