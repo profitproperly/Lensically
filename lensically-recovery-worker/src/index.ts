@@ -302,9 +302,11 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   }
   if (name === "runGitHubWorkflow") {
     const publicTask = String(args.task || "");
-    if (!["typecheck", "operator-tests", "gpt-memory-tests", "release"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };
-    const workflowTask = publicTask === "release" ? "worker-deploy" : publicTask;
-    const requestedRef = String(args.ref || "").trim();
+    if (!["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };
+    const rawRequestedRef = String(args.ref || "").trim();
+    const clientSafeRelease = publicTask === "typecheck" && rawRequestedRef === "release";
+    const workflowTask = publicTask === "worker-deploy" || clientSafeRelease ? "worker-deploy" : publicTask;
+    const requestedRef = clientSafeRelease ? "" : rawRequestedRef;
     let dispatchRef = requestedRef || config.branch;
     let verifiedHeadSha: string | null = null;
     if (workflowTask === "worker-deploy") {
