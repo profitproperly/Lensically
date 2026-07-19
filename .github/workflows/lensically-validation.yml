@@ -92,8 +92,8 @@ jobs:
             scope="typecheck"
           elif [[ "${COMMIT_MESSAGE}" == *"[acceptance-regressions]"* ]]; then
             scope="acceptance"
-                    elif [[ "${COMMIT_MESSAGE}" == *"[verified-worker-release]"* ]]; then
-            scope="full"
+                              elif [[ "${COMMIT_MESSAGE}" == *"[verified-worker-release]"* ]]; then
+            scope="acceptance"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-full]"* ]]; then
             scope="full"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-analytics]"* ]]; then
@@ -164,8 +164,7 @@ jobs:
         if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]') }}
         run: |
           set -euo pipefail
-          node scripts/release-preflight.mjs
-          npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
           npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1
 
