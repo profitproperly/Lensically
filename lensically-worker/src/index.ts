@@ -14730,7 +14730,10 @@ function resolveOperatorAccountLifecycleProfile(
   if (!brandKey && /\bmanifest(?:_mental|mental)?\b/.test(lifecycleText)) brandKey = "manifest_mental";
   if (!brandKey && /\b(?:opmg[_ -]?deadman|deadman)\b/.test(lifecycleText)) brandKey = "opmg_deadman";
   if (!brandKey && /\bvectrix\b/.test(lifecycleText)) brandKey = "vectrix";
-  const proceedRequested = inputs.proceed_confirmed === true
+  const suppliedProfileId = normalizeOperatorMachineKey(gatewayArgs.profile_id ?? rawInputs.profile_id, "");
+  const proceedRequested = suppliedProfileId === "account_proceed"
+    || suppliedProfileId === "confirm_operator_proceed"
+    || inputs.proceed_confirmed === true
     || gatewayArgs.proceed_confirmed === true
     || /\b(confirm|proceed)\b/.test(lifecycleText);
   if (brandKey && proceedRequested) {
