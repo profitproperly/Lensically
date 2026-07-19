@@ -13117,6 +13117,22 @@ const REPO_PATH_SCHEMA = {
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
+      {
+    name: "recordHardeningIncident",
+    title: "Record hardening incident",
+    description: "Open or reuse one continuous-hardening incident for a blocked or contradictory operation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        boundary: { type: "string", enum: ["client", "gateway", "routing", "server", "database", "deployment", "quality", "efficiency", "external"] },
+        blocked_profile_id: { type: "string" }, field_names: { type: "array", items: { type: "string" } }, request_fingerprint: { type: "string" },
+        error_category: { type: "string" }, payload_size: { type: "integer", minimum: 0 }, operation_class: { type: "string" },
+        expected_outcome: {}, observed_outcome: {}, resume_capsule: { type: "object", additionalProperties: true },
+      },
+      required: ["boundary", "blocked_profile_id", "error_category"], additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
     {
     name: "executeLensicallyIntent",
     title: "Execute Lensically intent",
