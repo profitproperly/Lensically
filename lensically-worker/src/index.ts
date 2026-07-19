@@ -17711,6 +17711,7 @@ async function handleOperatorMcpAdminTool(
       checks,
       campaign: {
         version: "execution-kernel-capability-campaign-v1",
+        transport_segment: rawCampaignSegment,
         segment: campaignSegment,
         total_internal_capabilities: campaignRows.length,
         total_read_only_capabilities: campaignRows.filter((row) => row.read_only === true).length,
