@@ -2700,6 +2700,23 @@ describe("operator mode MCP endpoint", () => {
       },
     });
 
+    const cachedAccountRead = await mcpToolCallRaw<{
+      ok: boolean;
+      routed_execution: { profile_id: string; executed_tool: string };
+    }>("executeLensicallyIntent", {
+      objective: "Read the selected account state.",
+      intent: "get account state",
+      inputs: { brand_key: BRAND_KEY, proceed_confirmed: true },
+    });
+    expect(cachedAccountRead.isError).not.toBe(true);
+    expect(cachedAccountRead.structuredContent).toMatchObject({
+      ok: true,
+      routed_execution: {
+        profile_id: "cached_schema_compat",
+        executed_tool: "get_account_state",
+      },
+    });
+
     const resolvedFreshKey = await mcpToolCallRaw<{
       selected_key: CanonicalBrandKey;
       account_data_loaded: boolean;
