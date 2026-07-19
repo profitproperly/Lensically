@@ -17460,8 +17460,10 @@ async function handleOperatorMcpAdminTool(
       checks,
       campaign: {
         version: "execution-kernel-capability-campaign-v1",
+        segment: campaignSegment,
         total_internal_capabilities: campaignRows.length,
-        route_only: false,
+        total_read_only_capabilities: campaignRows.filter((row) => row.read_only === true).length,
+        route_only: campaignSegment === "routes",
         mutations_executed: 0,
         passed: campaignRows.length - campaignFailures.length,
         failed: campaignFailures.length,
