@@ -11355,8 +11355,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          FROM threads_posts_archive
          WHERE threads_user_id = ?
            AND likes >= ?
-           AND datetime(post_timestamp) >= datetime('now', '-' || ? || ' days')
-         ORDER BY likes DESC, datetime(post_timestamp) DESC
+           AND datetime(substr(post_timestamp, 1, 19)) >= datetime('now', '-' || ? || ' days')
+         ORDER BY likes DESC, datetime(substr(post_timestamp, 1, 19)) DESC
          LIMIT ?
        )
        SELECT
