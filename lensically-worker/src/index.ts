@@ -14629,9 +14629,47 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.31.9";
+export const OPERATOR_MCP_VERSION = "1.32.0";
+export const EXECUTION_KERNEL_NAME = "Execution Kernel";
+export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
 const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";
+const OPERATOR_MCP_SESSION_VERSION = "deployment-scoped-mcp-session-v1";
+const OPERATOR_MCP_SESSION_TTL_SECONDS = 60 * 60 * 12;
+
+function currentOperatorDeploymentIdentity(env: Env): string {
+  return env.CF_VERSION_METADATA?.id
+    ?? env.LENSICALLY_COMMIT_SHA?.trim()
+    ?? `${OPERATOR_MCP_VERSION}:${OPERATOR_REGISTRY_GENERATION}`;
+}
+
+function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
+  return {
+    name: EXECUTION_KERNEL_NAME,
+    version: EXECUTION_KERNEL_VERSION,
+    deployment_id: env.CF_VERSION_METADATA?.id ?? null,
+    commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+    public_gateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+    public_contract: "objective_intent_inputs_v1",
+    deployment_fresh_sessions: true,
+    router_version: OPERATOR_REGISTRY_GENERATION,
+    components: [
+      "capability_directory",
+      "payload_safety",
+      "source_defined_routing",
+      "pre_call_policy",
+      "continuity_and_authorization",
+      "execution_receipts",
+      "blocker_prevention",
+    ],
+    compatibility_fields_retained_until_cleanup: [
+      "mandatory_execution_map",
+      "system_directory",
+      "client_safety",
+      "execution_policy",
+    ],
+  };
+}
 
 function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
   return {
@@ -14639,6 +14677,44 @@ function operatorRuntimeMetadata(env: Env): Record<string, unknown> {
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
     mcp_version: OPERATOR_MCP_VERSION,
     registry_generation: OPERATOR_REGISTRY_GENERATION,
+    execution_kernel: operatorExecutionKernelMetadata(env),
+  };
+}
+
+async function createOperatorMcpSessionId(env: Env): Promise<string> {
+  return createSignedOperatorEnvelope(env, {
+    kind: "operator_mcp_session",
+    version: OPERATOR_MCP_SESSION_VERSION,
+    deployment_id: currentOperatorDeploymentIdentity(env),
+    commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+    execution_kernel_version: EXECUTION_KERNEL_VERSION,
+    exp: Math.floor(Date.now() / 1000) + OPERATOR_MCP_SESSION_TTL_SECONDS,
+  });
+}
+
+async function verifyOperatorMcpSession(
+  request: Request,
+  env: Env,
+): Promise<{ ok: boolean; provided: boolean; stale: boolean; reason?: string }> {
+  const sessionId = request.headers.get("mcp-session-id")?.trim();
+  if (!sessionId) return { ok: true, provided: false, stale: false };
+  const payload = await verifySignedOperatorEnvelope(env, sessionId);
+  if (!payload || payload.kind !== "operator_mcp_session" || payload.version !== OPERATOR_MCP_SESSION_VERSION) {
+    return { ok: false, provided: true, stale: true, reason: "invalid_mcp_session" };
+  }
+  if (payload.deployment_id !== currentOperatorDeploymentIdentity(env)
+      || payload.execution_kernel_version !== EXECUTION_KERNEL_VERSION) {
+    return { ok: false, provided: true, stale: true, reason: "stale_mcp_deployment_session" };
+  }
+  return { ok: true, provided: true, stale: false };
+}
+
+function operatorMcpRuntimeHeaders(env: Env, sessionId?: string): Record<string, string> {
+  return {
+    ...(sessionId ? { "Mcp-Session-Id": sessionId } : {}),
+    "X-Lensically-Deployment-Id": currentOperatorDeploymentIdentity(env),
+    "X-Lensically-Commit-Sha": env.LENSICALLY_COMMIT_SHA?.trim() || "unknown",
+    "X-Lensically-Execution-Kernel": EXECUTION_KERNEL_VERSION,
   };
 }
 
