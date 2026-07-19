@@ -1033,15 +1033,28 @@ describe("System Directory foundation", () => {
     });
   });
 
-  it("routes large repository mutations to the promoted Recovery path", async () => {
+    it("keeps bounded large repository patch sets on the Main gateway", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "applyRepoPatchSet",
+      title: "Apply atomic repo patch set",
+      description: "Apply bounded exact replacements atomically.",
+      inputSchema: {
+        type: "object",
+        properties: { patches: { type: "array" }, message: { type: "string" } },
+        required: ["patches", "message"],
+      },
+    }];
     const prepared = await prepareMandatoryExecutionMapCall(
       null as unknown as D1Database,
       {
         objective: "Implement the repository architecture correction.",
         intent: "Apply the approved repository implementation.",
-        inputs: { specification: "x".repeat(3200) },
+                inputs: {
+          patches: [{ path: "AGENTS.md", find: "old", replace: "x".repeat(3200) }],
+          message: "Apply bounded Main patch set",
+        },
       },
-      [],
+      tools,
       { signPermit: async () => "unused", verifyPermit: async () => null },
     );
     expect(prepared).toMatchObject({
