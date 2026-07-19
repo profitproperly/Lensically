@@ -17676,14 +17676,36 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       let rawArgs = requestedArgs;
       let routedGatewayMetadata: Record<string, unknown> | null = null;
       if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
-        const prepared = await prepareOperatorRoutedGatewayCall(env, requestedArgs);
+        const compiledProfile = compileOperatorPublicProfileRequest(requestedArgs);
+        if (!compiledProfile.ok) {
+          return mcpJsonResponse({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            result: {
+              structuredContent: {
+                ...compiledProfile,
+                required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+                account_data_loaded: false,
+                freehand_gateway_payload_allowed: false,
+              },
+              content: [{ type: "text", text: `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.` }],
+              isError: true,
+            },
+          });
+        }
+        const prepared = await prepareOperatorRoutedGatewayCall(env, compiledProfile.request);
         if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
           return mcpJsonResponse({
             jsonrpc: "2.0",
             id: id ?? null,
             result: {
-              structuredContent: { ...prepared, required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY, account_data_loaded: false },
-              content: [{ type: "text", text: `Lensically could not resolve the routed operation: ${String(prepared.error ?? "unknown_error")}.` }],
+              structuredContent: {
+                ...prepared,
+                profile_id: compiledProfile.profile_id,
+                required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+                account_data_loaded: false,
+              },
+              content: [{ type: "text", text: `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.` }],
               isError: true,
             },
           });
