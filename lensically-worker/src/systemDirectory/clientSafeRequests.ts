@@ -96,6 +96,8 @@ export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProf
     repository_file_read: { id: "repository_file_read", objective: "Read one known source file using a bounded line range.", intent: "read repository file", allowed_input_keys: ["path", "start_line", "max_characters"], max_input_characters: 600 },
   recovery_exact_patch: { id: "recovery_exact_patch", objective: "Apply one exact source-controlled replacement through the independent control surface.", intent: "recovery exact text patch", allowed_input_keys: ["path", "find", "replace", "message"], max_input_characters: 12000, surface: "recovery_plane" },
   recovery_repository_mutation: { id: "recovery_repository_mutation", objective: "Implement one bounded repository change through the independent control surface.", intent: "recovery repository mutation", allowed_input_keys: ["path", "find", "replace", "message"], max_input_characters: 12000, surface: "recovery_plane" },
+  scheduled_post_audit: { id: "scheduled_post_audit", objective: "Audit one scheduled post.", intent: "audit scheduled post", allowed_input_keys: ["brand_key", "scheduled_post_id", "operation_id", "proceed_confirmed"], max_input_characters: 300 },
+  protected_scheduler_recovery: { id: "protected_scheduler_recovery", objective: "Recover scheduled posts.", intent: "recover overdue scheduled posts", allowed_input_keys: ["brand_key", "actions", "reason", "owner_response"], max_input_characters: 1200 },
   account_key_selection: { id: "account_key_selection", objective: "Select one account using the typed brand key field.", intent: "select operator key", allowed_input_keys: ["brand_key"], max_input_characters: 100 },
 };
 
