@@ -2432,7 +2432,7 @@ function normalizeGptBrandKey(value: unknown): GptBrandKey | null {
   if (normalized === "deadman" || normalized === "opmgdeadman" || normalized === "opmg") {
     return "opmg_deadman";
   }
-  if (normalized === "manifestmental") {
+  if (normalized === "manifestmental" || normalized === "manifest") {
     return "manifest_mental";
   }
   if (normalized === "vectrixvoltmore") {
