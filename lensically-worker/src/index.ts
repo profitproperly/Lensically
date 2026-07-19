@@ -14739,7 +14739,18 @@ function resolveOperatorAccountLifecycleProfile(
   if (brandKey && proceedRequested) {
     return { profile_id: "account_proceed", inputs: { brand_key: brandKey } };
   }
-  if (brandKey) {
+  const inputKeys = Object.keys(inputs);
+  const onlyBrandInput = !suppliedProfileId
+    && inputKeys.length > 0
+    && inputKeys.every((key) => key === "brand_key" || key === "key");
+  const keySelectionRequested = suppliedProfileId === "startup"
+    || suppliedProfileId === "account_key_selection"
+    || suppliedProfileId === "select_operator_key"
+    || inputs.key !== undefined
+    || gatewayArgs.key !== undefined
+    || onlyBrandInput
+    || /\b(key|select|handshake|account initialization|initialize account|initialise account)\b/.test(lifecycleText);
+  if (brandKey && keySelectionRequested) {
     return { profile_id: "account_key_selection", inputs: { brand_key: brandKey } };
   }
   if (/\b(startup|bootstrap|initialize|initialise)\b/.test(lifecycleText) && Object.keys(inputs).length === 0) {
