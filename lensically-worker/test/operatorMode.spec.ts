@@ -2398,6 +2398,7 @@ describe("operator mode MCP endpoint", () => {
       "engineeringPrecheck",
       "getRepoStatus",
       "readRepoFile",
+      "searchRepoFiles",
       "applyRepoPatchSet",
       "verifyDeployedMcpVersion",
       "selectOperatorKey",
