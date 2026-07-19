@@ -16082,12 +16082,13 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const id = crypto.randomUUID();
   await env.DB.prepare(
     `INSERT INTO operator_hardening_incidents (
-      id, signature, boundary, severity, classification, state, affected_scope,
-      blocked_profile_id, request_fingerprint, expected_json, observed_json, resume_capsule_json
-    ) VALUES (?, ?, ?, ?, ?, 'detected', ?, ?, ?, ?, ?, ?)`,
+            id, signature, boundary, severity, classification, state, affected_scope,
+      blocked_profile_id, blocked_tool_name, request_fingerprint, side_effect_state,
+      expected_json, observed_json, resume_capsule_json
+    ) VALUES (?, ?, ?, ?, ?, 'detected', ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, signature, boundary, severity, classification, severity === "P2" ? "safe_checkpoint" : "objective",
-    profile, fingerprint, normalizeOperatorJson(args.expected_outcome ?? null, null),
+    profile, blockedTool, fingerprint, sideEffectState, normalizeOperatorJson(args.expected_outcome ?? null, null),
     normalizeOperatorJson(args.observed_outcome ?? null, null), normalizeOperatorJson(args.resume_capsule ?? null, null),
   ).run();
     await env.DB.prepare(
