@@ -208,11 +208,11 @@
     },
     {
       "capability_id": "content.audit_published_post_lineage",
-      "directory_entry_id": "content.lineage_recovery",
+      "directory_entry_id": "content.lineage_audit",
       "canonical_handler": "audit_published_post_lineage",
       "route_intent": "audit published post lineage",
       "implementation_mode": "new_handler",
-      "focused_regression": "audits proven published posts before and after lineage recovery",
+      "focused_regression": "recovers a known Saved Pattern into complete published-post lineage",
       "release_scope": "operator-content",
       "live_verification": "The deployed Worker returns bounded complete and incomplete winner lineage from source through linked metric snapshots without account mutation.",
       "compatibility_bridge": false
