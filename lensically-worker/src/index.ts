@@ -19245,6 +19245,28 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           },
         });
       }
+            const activeHardeningIncident = HARDENING_REPAIR_TOOLS.has(toolName)
+        ? null
+        : await getActiveBlockingHardeningIncident(env);
+      if (activeHardeningIncident) {
+        return mcpJsonResponse({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            structuredContent: {
+              ok: false,
+              error: "hardening_incident_active",
+              intended_tool: toolName,
+              blocking_incident: activeHardeningIncident,
+              required_profile_id: "hardening_status",
+              required_action: "Repair, prevention-lock, validate, release, verify live, resume, and close the incident before normal work continues.",
+              account_data_loaded: false,
+            },
+            content: [{ type: "text", text: `Lensically paused normal work because a blocking continuous-hardening incident is active.` }],
+            isError: true,
+          },
+        });
+      }
       const boundaryBlock = sourceDefinedDirectEngineering
         ? null
         : await getOperatorMcpBoundaryBlock(request, env, toolName, args);
