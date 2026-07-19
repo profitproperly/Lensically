@@ -509,9 +509,9 @@ describe("System Directory foundation", () => {
     }));
   });
 
-  it("routes deployment exclusively through the Recovery surface", () => {
-    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
-    expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
+    it("routes deployment through the Main verified source marker", () => {
+    expect(CLIENT_SAFETY_POLICIES.find((policy) => policy.id === "safe_release_dispatch")?.summary).toContain("Main repository patch path");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_patch_set).toMatchObject({ intent: "apply repo patch set" });
   });
 
   // Canonical regression required by capabilityLifecycle.json.
