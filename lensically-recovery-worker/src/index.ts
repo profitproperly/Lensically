@@ -400,6 +400,30 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     if (result.ok) await env.RECOVERY_SESSIONS.delete(`write:${id}`);
     return { ok: result.ok, status: result.status, path: session.path, commit_sha: result.commit_sha, phase: result.phase ?? null, write_mode: "git_data_api" };
   }
+  if (name === "restoreSchedulerNormal") {
+    const reason = String(args.reason || "").trim();
+    const ownerResponse = String(args.owner_response || "").trim();
+    if (!reason || !ownerResponse) return { ok: false, error: "reason_and_owner_response_required" };
+    const origin = env.MAIN_MCP_ORIGIN || "https://api.lensically.com";
+    const redirect = "https://chatgpt.com/connector/oauth/lensically-recovery-scheduler";
+    const clientId = "lensically-operator-mode";
+    const authorize = await fetch(`${origin}/api/operator/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirect)}&scope=operator_mode`, { redirect: "manual" });
+    const location = authorize.headers.get("location"); const code = location ? new URL(location).searchParams.get("code") : null;
+    if (authorize.status !== 302 || !code) return { ok: false, phase: "oauth_authorize", status: authorize.status };
+    const tokenResponse = await fetch(`${origin}/api/operator/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, redirect_uri: redirect, code }) });
+    const tokenBody = await tokenResponse.json().catch(() => null) as Record<string, unknown> | null; const token = typeof tokenBody?.access_token === "string" ? tokenBody.access_token : "";
+    if (!tokenResponse.ok || !token) return { ok: false, phase: "oauth_token", status: tokenResponse.status };
+    const state = await mainMcpRequest(origin, token, 1, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "get_scheduled_post_scheduler_state", inputs: {} } });
+    const stateContent = ((state.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    const scheduler = stateContent?.scheduler && typeof stateContent.scheduler === "object" && !Array.isArray(stateContent.scheduler) ? stateContent.scheduler as Record<string, unknown> : null;
+    if (!scheduler) return { ok: false, error: "scheduler_state_unavailable", status: state.status };
+    if (Number(scheduler.current_overdue_count ?? -1) !== 0) return { ok: false, error: "overdue_rows_must_be_zero", scheduler };
+    const control = scheduler.control && typeof scheduler.control === "object" && !Array.isArray(scheduler.control) ? scheduler.control as Record<string, unknown> : null;
+    if (control?.mode === "normal" && scheduler.operational === true) return { ok: true, already_normal: true, scheduler };
+    const restored = await mainMcpRequest(origin, token, 2, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "set_scheduled_post_scheduler_mode", inputs: { brand_key: "manifest_mental", mode: "normal", reason, owner_response: ownerResponse } } });
+    const restoredContent = ((restored.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    return { ok: restored.status === 200 && restoredContent?.ok === true, status: restored.status, result: restoredContent };
+  }
   if (name === "runMainMcpSmoke") {
     const origin = env.MAIN_MCP_ORIGIN || "https://api.lensically.com";
     const redirect = "https://chatgpt.com/connector/oauth/lensically-recovery-smoke";
