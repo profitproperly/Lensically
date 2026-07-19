@@ -10,7 +10,8 @@ on:
   push:
     branches:
       - main
-    paths:
+        paths:
+      - "lensically-worker/**"
       - "lensically-recovery-worker/**"
       - ".github/workflows/lensically-engineering.yml"
   workflow_dispatch:
