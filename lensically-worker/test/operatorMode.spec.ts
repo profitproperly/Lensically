@@ -9,6 +9,7 @@ import worker, {
   finalizeScheduledPostPublished,
   isSixHourInsightsRefreshWindow,
   OPERATOR_MCP_VERSION,
+  searchKnownRepositoryFileContent,
   quarantineScheduledPostPublishAttempt,
   recoverStalePostingScheduledPosts,
   OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
