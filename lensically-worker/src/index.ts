@@ -17498,11 +17498,18 @@ async function handleOperatorMcpAdminTool(
         continue;
       }
       const canonicalTool = prepared.tool_name ?? null;
-      const passed = prepared.ok === true
+      const autonomyTool = canonicalAutonomyToolName(tool.name);
+      const protectedOperation = MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(autonomyTool);
+      const protectedGateEnforced = protectedOperation
+        && prepared.error === "known_blocker_prevented"
+        && canonicalTool === tool.name
+        && safety.safe;
+      const passed = protectedGateEnforced || (
+        prepared.ok === true
         && Boolean(canonicalTool)
         && Boolean(prepared.arguments)
-        && safety.safe;
-      const autonomyTool = canonicalAutonomyToolName(tool.name);
+        && safety.safe
+      );
       mutationPreflightRows.push({
         tool_name: tool.name,
         canonical_tool: canonicalTool,
