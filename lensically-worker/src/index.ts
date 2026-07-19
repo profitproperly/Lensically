@@ -11426,6 +11426,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       brand.profile.threads_user_id,
       brand.account_id,
       brand.profile.threads_user_id,
+      brand.profile.threads_user_id,
       brand.account_id,
       brand.profile.threads_user_id,
       brand.brand_key,
