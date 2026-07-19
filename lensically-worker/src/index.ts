@@ -13797,7 +13797,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "schedule_owner_approved_batch",
     title: "Schedule owner-approved post batch",
-    description: "Schedule up to 12 posts exactly as explicitly approved by the owner. This is a bounded manual scheduling path for already-reviewed text and does not generate, revise, or infer content.",
+    description: "Schedule up to 12 posts exactly as explicitly approved by the owner for accounts that permit direct text scheduling. Manifest Mental rejects this path because it bypasses source-card, generation-run, draft, and metric lineage; use schedule_manifest_review_batch or schedule_approved_draft instead.",
     inputSchema: {
       type: "object",
       properties: {
