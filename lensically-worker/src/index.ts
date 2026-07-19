@@ -16063,7 +16063,10 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   await ensureOperatorMcpAdminTables(env);
   const boundary = normalizeHardeningBoundary(args.boundary);
   const profile = normalizeOperatorMachineKey(args.blocked_profile_id, "unknown");
-  const category = normalizeOperatorMachineKey(args.error_category, "unexpected_result");
+    const category = normalizeOperatorMachineKey(args.error_category, "unexpected_result");
+  const operationClass = normalizeOperatorMachineKey(args.operation_class, "unknown");
+  const blockedTool = normalizeOperatorText(args.blocked_tool_name ?? args.tool_name, 160, true);
+  const sideEffectState = operationClass === "mutation" ? "may_have_happened" : "not_applicable";
   const fingerprint = normalizeOperatorText(args.request_fingerprint, 200, true);
   const observed = normalizeOperatorText(args.observed_outcome, 1000, true) ?? category;
   const rule = resolvePromotedWinningPath(category.replace(/_/g, " "), observed, { blocked_profile_id: profile });
