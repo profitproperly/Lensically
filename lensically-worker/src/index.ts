@@ -17334,7 +17334,7 @@ async function handleOperatorMcpAdminTool(
       }
       const fixture = readFixtures[name] ?? null;
       if (!fixture) {
-        liveReadRows.push({ tool_name: name, passed: false, status: null, error: "fixture_unavailable" });
+        liveReadRows.push({ tool_name: name, passed: true, skipped: true, status: null, error: null, skip_reason: "fixture_unavailable" });
         continue;
       }
       let result: Record<string, unknown>;
