@@ -780,7 +780,9 @@ function prepareStaticCall(
       candidates: winningPathValidation.errors.map((error) => ({ error })),
     };
   }
-  const promotedWinningPath = resolvePromotedWinningPath(actionIntent, objective, inputs);
+    const directFileCreation = machineKey(actionIntent, "") === machineKey("create repo file", "")
+    || machineKey(actionIntent, "") === machineKey("createRepoFile", "");
+  const promotedWinningPath = directFileCreation ? null : resolvePromotedWinningPath(actionIntent, objective, inputs);
   if (promotedWinningPath?.winning_path.surface === "recovery_plane") {
     return {
       ok: false,
