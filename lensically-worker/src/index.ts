@@ -14679,8 +14679,7 @@ function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
     public_gateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
     public_contract: "profile_id_inputs_v1",
-    legacy_freehand_compatibility: true,
-    deployment_fresh_sessions: true,
+        deployment_fresh_sessions: true,
     router_version: OPERATOR_REGISTRY_GENERATION,
     components: [
       "capability_directory",
@@ -14691,12 +14690,7 @@ function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
       "execution_receipts",
       "blocker_prevention",
     ],
-    compatibility_fields_retained_until_cleanup: [
-      "mandatory_execution_map",
-      "system_directory",
-      "client_safety",
-      "execution_policy",
-    ],
+    
   };
 }
 
@@ -16589,7 +16583,7 @@ function operatorMcpInstructions(toolCount: number): string {
     CLIENT_SAFETY_STARTUP_INSTRUCTION,
     "The server-side Execution Kernel resolves the live capability, payload contract, deterministic route, policy, continuity, and execution receipt. Do not choose internal tools, wrappers, retries, or fallbacks.",
     "Execution Kernel routing is source-defined and database-independent. Retired dynamic execution libraries, maps, incidents, phonebook routes, and OpsMemory routing are compatibility history only.",
-    "Use objective='Load the compact Lensically startup bootstrap' and intent='startup' once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
+        "Call the registered startup profile once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
     "After Proceed, restore account continuity and present the guided Growth Mission Brief. Brainstorm, revise, and obtain explicit plan approval before account mutation; routine engineering remains autonomous.",
     "Routine engineering uses bounded inspection, one coherent change set, focused validation, one exact-SHA release, and compact receipts.",
     "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
@@ -18111,14 +18105,7 @@ async function handleOperatorMcpEngineeringTool(
   }
 
     if (toolName === "getOperatorStartupContext") {
-    const startup = await buildOperatorStartupContext(request, env);
-        startup.mandatory_execution_map = await getMandatoryExecutionMapSummary(
-      env.DB,
-      await buildOperatorMcpTools(env, false, false) as MandatoryExecutionToolDefinition[],
-    );
-        startup.client_safety = getClientSafetyRegistrySummary();
-    startup.system_directory = getLensicallySystemDirectorySummary();
-    return startup;
+        return buildOperatorStartupContext(request, env);
   }
 
   if (toolName === "engineeringPrecheck") {
