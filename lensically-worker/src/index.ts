@@ -17372,12 +17372,18 @@ async function handleOperatorMcpAdminTool(
       campaign: {
         version: "execution-kernel-capability-campaign-v1",
         total_internal_capabilities: campaignRows.length,
-        route_only: true,
+        route_only: false,
         mutations_executed: 0,
         passed: campaignRows.length - campaignFailures.length,
         failed: campaignFailures.length,
         failure_classes: failureClasses,
         failures: campaignFailures,
+        live_reads: {
+          attempted: liveReadRows.length,
+          passed: liveReadRows.length - liveReadFailures.length,
+          failed: liveReadFailures.length,
+          failures: liveReadFailures,
+        },
         risk_groups: {
           read_only: campaignRows.filter((row) => row.read_only === true).length,
           mutation: campaignRows.filter((row) => row.read_only !== true).length,
