@@ -15752,26 +15752,13 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
       reason: "Optimistic concurrency preserves unrelated commits without abandoning atomic validation.",
     };
   }
-  if (toolName === "runEngineeringRelease") {
-    return {
-      rule_key: "single_exact_sha_release",
-      mandatory_route: "apply one atomic patch set, run one exact-SHA validate-and-deploy workflow, reuse successful receipts, and wait through getEngineeringRelease",
-      reason: "Separate typecheck, test, deploy, and polling loops repeat cold runner setup and validation without improving release confidence.",
-    };
-  }
-  if (toolName === "getEngineeringRelease") {
-    return {
-      rule_key: "bounded_server_side_release_wait",
-      mandatory_route: "wait on the exact release run server-side for up to 55 seconds per call and fetch detailed jobs only at completion",
-      reason: "Chat-side sleep and repeated two-request job polling waste elapsed time and tool calls.",
-    };
-  }
+  
   if ((toolName === "runGitHubWorkflow" && normalizeOperatorText(args.task, 80, true) === "worker-deploy") || toolName === "deployBackend") {
     return {
       rule_key: "workflow_source_validation_before_dispatch",
-      mandatory_route: "use runEngineeringRelease for normal releases; reserve direct workflow dispatch for isolated diagnostics",
-      reason: "Normal releases must not repeat full validation through separate workflow calls.",
-      required_tool: "runEngineeringRelease",
+            mandatory_route: "commit the final Worker change with [verified-worker-release]; reserve direct workflow dispatch for isolated diagnostics",
+      reason: "Normal releases must validate, deploy, and verify one exact source-controlled head.",
+      required_tool: "applyRepoPatchSet",
       allowed_argument_keys: ["workflow_id", "ref"],
       block_call: true,
     };
