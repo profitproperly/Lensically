@@ -2313,6 +2313,15 @@ describe("operator mode MCP endpoint", () => {
       expect(initialized.headers.get("x-lensically-deployment-id")).toBe("deployment-before");
       expect(initialized.headers.get("x-lensically-execution-kernel")).toBe("lensically-execution-kernel-v1");
 
+      const malformedRequest = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: { ...MCP_AUTH_HEADERS, "Mcp-Session-Id": `${staleSessionId}.invalid` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+      });
+      const malformedBody = await malformedRequest.json() as { error?: { data?: { reason?: string } } };
+      expect(malformedRequest.status).toBe(404);
+      expect(malformedBody.error?.data?.reason).toBe("invalid_mcp_session");
+
       mutableEnv.CF_VERSION_METADATA = { id: "deployment-after" };
       mutableEnv.LENSICALLY_COMMIT_SHA = "commit-after";
       const staleRequest = await fetchFromWorker("/api/operator/mcp", {
