@@ -575,6 +575,10 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\bapprove\b/) && has(/\b(draft|post)\b/)) return "approve_draft";
   if (has(/\breject\b/) && has(/\b(draft|post)\b/)) return "reject_draft";
   if (has(/\bschedule\b/) && has(/\bapproved\b/) && has(/\b(draft|post)\b/)) return "schedule_approved_draft";
+  if (has(/\b(reschedule|recover|retire)\b/) && has(/\b(quarantined|overdue|failed|posting|scheduled)\b/) && has(/\bpost\b/)) return "recoverOverdueScheduledPosts";
+  if (has(/\b(resume|pause|restore|set)\b/) && has(/\bscheduler\b/)) return "setScheduledPostSchedulerMode";
+  if (has(/\b(audit|inspect)\b/) && has(/\bscheduled\s+post\b/)) return "auditScheduledPost";
+  if (has(/\b(scheduler\s+(state|health|status)|scheduled\s+post\s+scheduler\s+(state|health|status))\b/)) return "getScheduledPostSchedulerState";
   if (has(/\b(list|show|get)\b/) && has(/\bscheduled\s+posts?\b/)) return "list_scheduled_posts";
   if (has(/\b(edit|update|retry)\b/) && has(/\bscheduled\s+post\b/)) return "edit_scheduled_post";
   if (
