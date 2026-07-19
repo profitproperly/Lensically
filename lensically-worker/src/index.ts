@@ -32841,7 +32841,8 @@ export class ScheduledPostScheduler {
                 required_recovery_actions: ["retire", "reschedule"],
               };
             }
-            const rechecked = await listOverdueScheduledPosts(this.env, 100);
+            const rechecked = (await listOverdueScheduledPosts(this.env, 100))
+              .filter((row) => row.status === SCHEDULED_POST_STATUS_APPROVED);
             if (rechecked.length) {
               return {
                 ok: false,
