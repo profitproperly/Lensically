@@ -18733,10 +18733,15 @@ async function handleOperatorMcpEngineeringTool(
     if (mode === "create" && existing.ok) {
       return { ok: false, error: "file_already_exists" };
     }
-    if (mode === "replace" && !existing.ok) {
+        if (mode === "replace" && !existing.ok) {
       return { ok: false, error: "file_missing_for_replace" };
     }
-    const put = await putGithubFile(env, { path, content: String(session.content ?? ""), message: String(session.message), sha: existing.sha });
+    const sessionContent = String(session.content ?? "");
+    if (mode === "replace" && existing.ok && sessionContent === String(existing.content ?? "")) {
+      await env.DB.prepare(`UPDATE operator_repo_write_sessions SET status = 'committed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(sessionId).run();
+      return { ok: true, no_change: true, no_commit_created: true, path, reason: "write_session_content_identical" };
+    }
+    const put = await putGithubFile(env, { path, content: sessionContent, message: String(session.message), sha: existing.sha });
     await env.DB.prepare(`UPDATE operator_repo_write_sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(put.ok ? "committed" : "failed", sessionId).run();
     await recordEngineeringAudit(env, { action: "commitRepoFileWrite", filesChanged: [path], diffSummary: normalizeOperatorText(session.summary, 1000, true), result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
     return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: session.summary ?? null };
