@@ -51,14 +51,14 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     matching_conditions: {
       any_terms: ["duplicate post", "double post", "publish retry", "scheduler retry", "status transition", "posting state"],
     },
-    losing_path: "Return a scheduled post to approved after an external publish attempt, infer staleness through raw timestamp-string comparison, or retry while the provider result is uncertain.",
+    losing_path: "Return a scheduled post to approved after an external publish attempt, infer staleness through raw timestamp-string comparison, retry while the provider result is uncertain, or leave the scheduler operational while a publish is quarantined.",
     winning_path: {
       surface: "runtime_guard",
-      procedure: ["Acquire the approved-to-posting claim atomically.", "Compare processing timestamps through SQLite datetime normalization.", "Keep failed or stale external attempts quarantined in posting.", "Treat a returned Threads post ID as authoritative.", "Require explicit reconciliation before any new publish attempt."],
+      procedure: ["Acquire the approved-to-posting claim atomically.", "Compare processing timestamps through SQLite datetime normalization.", "Keep failed or stale external attempts quarantined in posting.", "Pause the scheduler immediately when any quarantined publish exists.", "Treat a returned Threads post ID as authoritative.", "Require explicit reconciliation before any new publish attempt."],
     },
-    evidence: ["Cloudflare telemetry showed scheduled posts 579 and 580 claimed by fetch and alarm invocations seconds apart.", "One concurrent attempt published successfully while the sibling failed its local posting-to-posted transition.", "The stale cutoff used ISO text against SQLite CURRENT_TIMESTAMP text, immediately reopening active posting rows."],
+    evidence: ["Cloudflare telemetry showed scheduled posts 579 and 580 claimed by fetch and alarm invocations seconds apart.", "One concurrent attempt published successfully while the sibling failed its local posting-to-posted transition.", "The stale cutoff used ISO text against SQLite CURRENT_TIMESTAMP text, immediately reopening active posting rows.", "The July 18 8:00 PM failure remained quarantined while scheduler health still reported normal and operational, leaving later slots exposed."],
     scope: "universal",
-    enforcement_point: "Scheduled-post state machine, normalized stale-state guard, and focused Operator regressions.",
+    enforcement_point: "Scheduled-post state machine, automatic quarantine pause, health fail-closed behavior, normalized stale-state guard, and focused Operator regressions.",
     regression_test_id: "never reopens stale posting rows after an external publish attempt",
     supersession_rule: "A replacement must preserve at-most-once external publication and require positive reconciliation evidence before retrying an uncertain attempt.",
   },
