@@ -65,5 +65,7 @@ workflow = replaceOnce(workflow, "  contents: write\n  actions: write", "  conte
 workflow = replaceOnce(workflow, temporaryStep, "", "remove compact maintenance step");
 fs.writeFileSync(workflowPath, workflow);
 
+const diagnosticPath = path.resolve(workerRoot, "compact-maintenance-error.json");
+if (fs.existsSync(diagnosticPath)) fs.unlinkSync(diagnosticPath);
 fs.unlinkSync(path.resolve(workerRoot, "scripts/apply-compact-post-results-patch.mjs"));
 console.log("Compact post-results patch applied and temporary maintenance removed.");
