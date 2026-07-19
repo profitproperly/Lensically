@@ -568,6 +568,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\battach\b/) && has(/\bdraft\b/) && has(/\breview\s+batch\b/)) return "attach_manifest_review_draft";
   if (has(/\bschedule\b/) && has(/\breview\s+batch\b/)) return "schedule_manifest_review_batch";
   if (has(/\bskip\b/) && has(/\b(source|candidate)\b/)) return "skip_manifest_review_source";
+  if (has(/\b(audit|inspect|verify|check)\b/) && has(/\b(published\s+post|winner|source\s+to\s+metrics|lineage)\b/) && has(/\blineage\b/)) return "audit_published_post_lineage";
+  if (has(/\b(recover|restore|backfill)\b/) && has(/\b(published\s+post|winner|lineage)\b/)) return "recover_published_post_lineage";
   if (has(/\b(draw|select)\b/) && has(/\bsource\s+candidates?\b/)) return "draw_source_candidate_batch";
   if (has(/\b(get|read|show)\b/) && has(/\bsource\s+candidate\s+batch\b/)) return "get_source_candidate_batch";
   if (has(/\bcreate\b/) && has(/\bsource\s+card\b/)) return "create_source_card";
