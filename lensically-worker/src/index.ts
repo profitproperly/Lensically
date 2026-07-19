@@ -13341,7 +13341,16 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
             "engineering_mutations",
             "admin_mutations",
             "account_mutations_a",
-            "account_mutations_b"
+            "account_mutations_b",
+            "s0",
+            "s1",
+            "s2",
+            "s3",
+            "s4",
+            "s5",
+            "s6",
+            "s7",
+            "s8"
           ],
           default: "routes"
         },
