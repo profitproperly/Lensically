@@ -14712,19 +14712,60 @@ function operatorPublicIntentForToolName(toolName: string): string {
   return operatorPublicProfileIdForToolName(toolName).replace(/_/g, " ");
 }
 
+function resolveOperatorAccountLifecycleProfile(
+  gatewayArgs: Record<string, unknown>,
+  rawInputs: Record<string, unknown>,
+): { profile_id: ClientSafeRequestProfileId; inputs: Record<string, unknown> } | null {
+  const inputs = { ...rawInputs };
+  delete inputs.profile_id;
+  const lifecycleText = [
+    gatewayArgs.objective,
+    gatewayArgs.intent,
+    inputs.objective,
+    inputs.intent,
+  ].filter((value): value is string => typeof value === "string").join(" ").trim().toLowerCase();
+  const rawBrandKey = inputs.brand_key ?? inputs.key ?? gatewayArgs.brand_key ?? gatewayArgs.key;
+  let brandKey = normalizeGptBrandKey(rawBrandKey);
+  if (!brandKey && /\bmanifest(?:_mental|mental)?\b/.test(lifecycleText)) brandKey = "manifest_mental";
+  if (!brandKey && /\b(?:opmg[_ -]?deadman|deadman)\b/.test(lifecycleText)) brandKey = "opmg_deadman";
+  if (!brandKey && /\bvectrix\b/.test(lifecycleText)) brandKey = "vectrix";
+  const proceedRequested = inputs.proceed_confirmed === true
+    || gatewayArgs.proceed_confirmed === true
+    || /\b(confirm|proceed)\b/.test(lifecycleText);
+  if (brandKey && proceedRequested) {
+    return { profile_id: "account_proceed", inputs: { brand_key: brandKey } };
+  }
+  if (brandKey) {
+    return { profile_id: "account_key_selection", inputs: { brand_key: brandKey } };
+  }
+  if (/\b(startup|bootstrap|initialize|initialise)\b/.test(lifecycleText) && Object.keys(inputs).length === 0) {
+    return { profile_id: "startup", inputs: {} };
+  }
+  return null;
+}
+
 function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown>): OperatorPublicProfileCompilation {
-  const profileId = normalizeOperatorMachineKey(gatewayArgs.profile_id, "");
+  const rawInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
+    ? gatewayArgs.inputs as Record<string, unknown>
+    : {};
+  const explicitProfileId = normalizeOperatorMachineKey(gatewayArgs.profile_id, "");
+  const nestedProfileId = normalizeOperatorMachineKey(rawInputs.profile_id, "");
+  const lifecycleProfile = resolveOperatorAccountLifecycleProfile(gatewayArgs, rawInputs);
+  let profileId = explicitProfileId || nestedProfileId;
+  let inputs = { ...rawInputs };
+  delete inputs.profile_id;
+  if (lifecycleProfile && (!profileId || profileId === "startup" || profileId === "select_operator_key" || profileId === "confirm_operator_proceed")) {
+    profileId = lifecycleProfile.profile_id;
+    inputs = lifecycleProfile.inputs;
+  }
   if (!profileId) {
     return {
       ok: false,
       error: "registered_profile_id_required",
       profile_id: null,
-      available_profile_hint: "Use startup for bootstrap or the snake_case registered capability profile returned by Lensically.",
+      available_profile_hint: "Use startup, account_key_selection, or account_proceed for account initialization; use a registered snake_case capability profile for later work.",
     };
   }
-  const inputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
-    ? gatewayArgs.inputs as Record<string, unknown>
-    : {};
   const safeProfile = CLIENT_SAFE_REQUEST_PROFILES[profileId as ClientSafeRequestProfileId];
   if (safeProfile) {
     if (safeProfile.surface === "recovery_plane") {
@@ -14755,10 +14796,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
     }
   }
   const baseTools = buildOperatorMcpBaseTools(false);
-  const matchedTool = baseTools.find((tool) =>
-    operatorPublicProfileIdForToolName(tool.name) === profileId
-    || (profileId === "startup" && tool.name === "getOperatorStartupContext")
-  );
+  const matchedTool = baseTools.find((tool) => operatorPublicProfileIdForToolName(tool.name) === profileId);
   if (!matchedTool) {
     return {
       ok: false,
