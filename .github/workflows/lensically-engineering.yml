@@ -93,6 +93,9 @@ jobs:
       - name: Commit compact maintenance outcome
         if: ${{ inputs.task == 'typecheck' && always() }}
         working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
           git config user.name "lensically-engineering"
           git config user.email "lensically-engineering@users.noreply.github.com"
