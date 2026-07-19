@@ -696,6 +696,7 @@ describe("System Directory foundation", () => {
       "public_terminal_workflow_failure_detail_request",
       "public_mcp_tool_inventory_request",
       "public_capability_campaign_wording",
+      "public_capability_campaign_descriptive_segment",
       "public_startup_receipt_wording",
       "public_startup_bootstrap_shape",
       "public_operator_context_shape",
