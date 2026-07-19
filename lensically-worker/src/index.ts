@@ -32574,7 +32574,22 @@ export class ScheduledPostScheduler {
           maxPosts: control.max_posts || getScheduledPostBatchSize(this.env),
         });
       }
-      overdueAfter = await countOverdueScheduledPosts(this.env);
+      const unresolvedAfter = await listOverdueScheduledPosts(this.env, 100);
+      overdueAfter = unresolvedAfter.length;
+      const quarantinedAfter = unresolvedAfter.filter((row) => row.status === SCHEDULED_POST_STATUS_POSTING);
+      if (quarantinedAfter.length > 0) {
+        const activeControl = await this.getControl();
+        if (activeControl.mode !== "paused") {
+          control = await this.setControl({
+            mode: "paused",
+            reason: `unresolved_publish_quarantine:${quarantinedAfter.map((row) => row.id).join(",")}`.slice(0, 500),
+          });
+          logWorkerEvent("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE", {
+            trigger,
+            quarantined_post_ids: quarantinedAfter.map((row) => row.id),
+          }, "error");
+        }
+      }
     } catch (error) {
       failure = error;
       overdueAfter = await countOverdueScheduledPosts(this.env).catch(() => overdueBefore);
