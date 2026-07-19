@@ -111,6 +111,11 @@ for (const entryId of directoryEntryIds) {
   if (!lifecycleBaselineDirectoryIds.has(entryId) && !declaredDirectoryIds.has(entryId)) lifecycleErrors.push(`undeclared_new_directory_entry:${entryId}`);
 }
 if (!validationWorkflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) lifecycleErrors.push("capability_lifecycle_fast_validation_gate_missing");
+if (!validationWorkflow.includes("[typecheck]")
+    || !validationWorkflow.includes("[acceptance-regressions]")
+    || !validationWorkflow.includes('scope="acceptance"')) {
+  lifecycleErrors.push("main_validation_push_markers_missing");
+}
 if (!workflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) lifecycleErrors.push("capability_lifecycle_engineering_gate_missing");
 
 if (lifecycleErrors.length > 0) {
