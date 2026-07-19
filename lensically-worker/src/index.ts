@@ -16023,8 +16023,8 @@ function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
     "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "listRepoFiles", "readRepoFile",
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
-    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "confirmOperatorProceed", "getGrowthMission",
-                        "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "listMcpTools", "readMcpToolDefinition", "listImplementationBacklogItems", "getWorkflowStatus",
+    "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
+                        "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
     "list_accounts", "get_account_state", "read_lensically_ui_surface", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
     "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results", "get_monthly_growth_review", "get_performance_learning", "audit_published_post_lineage",
   ]);
