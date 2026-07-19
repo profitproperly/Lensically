@@ -40,32 +40,6 @@ permissions:
   actions: write
 
 jobs:
-  verified-release-marker:
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dispatch exact-head Worker release
-                env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_SHA: ${{ github.sha }}
-        run: |
-          gh api --method POST "repos/${GH_REPO}/actions/workflows/lensically-engineering.yml/dispatches" \
-            -f ref=main \
-            -f 'inputs[task]=worker-deploy' \
-            -f "inputs[release_id]=${RELEASE_SHA:0:12}" \
-            -f "inputs[release_sha]=${RELEASE_SHA}"
-
-  verified-operator-shards-marker:
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-operator-shards]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dispatch deterministic Operator shards
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: gh workflow run lensically-engineering.yml --ref main --field task=operator-tests
-
   worker:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' }}
     runs-on: ubuntu-latest
