@@ -17189,19 +17189,97 @@ async function handleOperatorMcpAdminTool(
   }
 
   if (toolName === "runMcpTests") {
-    const tools = await buildOperatorMcpTools(env, true);
+    const tools = await buildOperatorMcpTools(env, true, false);
     const names = new Set(tools.map((tool) => tool.name));
     const requirements = await listOperatorWorkflowRequirements(env, null);
+    const campaignTools = tools.filter((tool) => tool.name !== OPERATOR_ROUTED_EXECUTION_GATEWAY);
+    const campaignRows: Array<Record<string, unknown>> = [];
+    const campaignCallbacks = {
+      signPermit: async () => "capability-campaign-permit",
+      verifyPermit: async () => null,
+    };
+    for (const tool of campaignTools) {
+      const schema = tool.inputSchema as Record<string, unknown>;
+      const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+        ? schema.properties as Record<string, unknown>
+        : {};
+      const required = Array.isArray(schema.required) ? schema.required.map(String) : [];
+      const annotations = (tool as OperatorMcpToolDefinition & { annotations?: Record<string, unknown> }).annotations ?? {};
+      const intent = tool.title.trim().toLowerCase();
+      const request = {
+        objective: "Run one compact Lensically capability check.",
+        intent,
+        inputs: {},
+      };
+      const safety = inspectClientSafeGatewayRequest(request);
+      const prepared = await prepareMandatoryExecutionMapCall(
+        env.DB,
+        request,
+        tools as MandatoryExecutionToolDefinition[],
+        campaignCallbacks,
+      );
+      const mappedTool = prepared.tool_name
+        ?? (prepared.map_entry && typeof prepared.map_entry === "object" ? String(prepared.map_entry.tool_name ?? "") : "")
+        ?? null;
+      const routePassed = mappedTool === tool.name
+        && (prepared.ok || prepared.error === "static_router_inputs_missing");
+      const schemaPassed = required.every((field) => Object.prototype.hasOwnProperty.call(properties, field))
+        && schema.additionalProperties === false;
+      const readOnly = annotations.readOnlyHint === true;
+      const mutationWithoutRequiredInputs = !readOnly && required.length === 0;
+      campaignRows.push({
+        tool_name: tool.name,
+        title: tool.title,
+        read_only: readOnly,
+        required_fields: required,
+        mapped_tool: mappedTool || null,
+        route_result: prepared.ok ? "ready" : prepared.error ?? "unknown",
+        route_passed: routePassed,
+        client_request_safe: safety.safe,
+        client_safety_violations: safety.violations,
+        schema_passed: schemaPassed,
+        mutation_without_required_inputs: mutationWithoutRequiredInputs,
+      });
+    }
+    const campaignFailures = campaignRows.filter((row) => row.route_passed !== true
+      || row.client_request_safe !== true
+      || row.schema_passed !== true
+      || row.mutation_without_required_inputs === true);
+    const failureClasses = {
+      routing: campaignRows.filter((row) => row.route_passed !== true).length,
+      client_safety: campaignRows.filter((row) => row.client_request_safe !== true).length,
+      schema_contract: campaignRows.filter((row) => row.schema_passed !== true).length,
+      zero_input_mutation: campaignRows.filter((row) => row.mutation_without_required_inputs === true).length,
+    };
     const checks = [
       { name: "single_gateway_registered", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
-            { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
+      { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
       { name: "session_handshake_tools_registered", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
       { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
       { name: "schedule_requires_approved", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
       { name: "static_router_active", passed: OPERATOR_REGISTRY_GENERATION === "static-execution-router-v1" },
+      { name: "complete_capability_campaign_passed", passed: campaignFailures.length === 0 },
     ];
-    return { ok: checks.every((check) => check.passed), checks };
+    return {
+      ok: checks.every((check) => check.passed),
+      checks,
+      campaign: {
+        version: "execution-kernel-capability-campaign-v1",
+        total_internal_capabilities: campaignRows.length,
+        route_only: true,
+        mutations_executed: 0,
+        passed: campaignRows.length - campaignFailures.length,
+        failed: campaignFailures.length,
+        failure_classes: failureClasses,
+        failures: campaignFailures,
+        risk_groups: {
+          read_only: campaignRows.filter((row) => row.read_only === true).length,
+          mutation: campaignRows.filter((row) => row.read_only !== true).length,
+          mutation_without_required_inputs: failureClasses.zero_input_mutation,
+        },
+      },
+    };
   }
 
   const brand = await resolveOperatorBrandFromPayload(env, args);
