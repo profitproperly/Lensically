@@ -863,7 +863,7 @@ describe("System Directory foundation", () => {
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-      prevented_client_block_count: 32,
+      prevented_client_block_count: 33,
       safe_request_profile_count: 19,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
