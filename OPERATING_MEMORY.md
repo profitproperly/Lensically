@@ -4,11 +4,12 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 ## Execution Architecture
 
-- Every main-MCP operation enters through the sole public tool `executeLensicallyIntent` using a registered `profile_id` and bounded `inputs`. Freehand `objective` and `intent` fields are prohibited and compiled server-side.
-- The source-controlled System Directory resolves the relevant system, system of record, payload bounds, and adjacent systems before the static router selects one live typed handler.
-- Exact deterministic and exact source-defined intents keep precedence over broader Directory guidance. The model does not choose tools, wrappers, retries, or fallbacks.
-- Route selection must remain D1-independent. Do not reintroduce execution-library compilation, dynamic maps, route incidents, promotions, phonebook overrides, OpsMemory routing, or execution-event recording.
-- Direct internal tool calls are rejected. Known-file reads and normal account work stay on the main gateway; free-text source discovery, terminal workflow diagnostics, deployment, and break-glass repair use Recovery.
+- Every main-MCP operation enters through the sole public tool `executeLensicallyIntent` using concise `objective`, `intent`, and bounded `inputs`. This public contract is permanent; internal capabilities may change without changing the client schema.
+- The canonical architecture is the **Execution Kernel** (`lensically-execution-kernel-v1`). It resolves the capability directory, payload contract, source-defined route, pre-call policy, continuity and authorization, execution receipt, and blocker-prevention behavior before one typed handler executes.
+- Exact deterministic and exact source-defined intents keep precedence over broader directory guidance. The model does not choose tools, wrappers, retries, or fallbacks.
+- Route selection must remain D1-independent. Do not reintroduce execution-library compilation, dynamic maps, route incidents, promotions, phonebook overrides, OpsMemory routing, or execution-event recording. Old receipt names remain compatibility-only until cleanup.
+- Initialize issues a signed deployment-scoped MCP session. Reject a session from an older Worker deployment or Execution Kernel version before routing and require reinitialization.
+- Direct internal tool calls are rejected. Recovery remains independent break-glass infrastructure; the extensive post-consolidation call campaign must identify and remove any remaining normal-path dependency before cleanup.
 - Preserve account protections after routing: selected brand, explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety.
 - Manifest uses `guided-growth-mission-v1`. After Proceed, restore account state and produce the persistent Growth Mission Brief: mission, follower target, diagnostic, current bottleneck, primary objective, supporting objectives, experiments, evidence, risks, and recommended next action.
 - Proceed authorizes diagnosis and discussion only. Keep account mutations locked while the mission is `discussion` or `paused`; unlock guided execution only when the owner explicitly approves or activates the plan.
