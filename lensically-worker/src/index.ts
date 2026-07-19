@@ -17251,6 +17251,110 @@ async function handleOperatorMcpAdminTool(
       schema_contract: campaignRows.filter((row) => row.schema_passed !== true).length,
       zero_input_mutation: campaignRows.filter((row) => row.mutation_without_required_inputs === true).length,
     };
+
+    const campaignBrandKey: GptBrandKey = "manifest_mental";
+    const campaignBrand = await resolveGptBrand(env, campaignBrandKey);
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const latestWorkflowRuns = await handleOperatorMcpEngineeringTool(request, env, "listGitHubWorkflowRuns", { limit: 1 }, true);
+    const workflowRunRows = Array.isArray(latestWorkflowRuns.runs) ? latestWorkflowRuns.runs as Array<Record<string, unknown>> : [];
+    const latestWorkflowRunId = Math.trunc(Number(workflowRunRows[0]?.id ?? 0));
+    const latestScheduled = campaignBrand
+      ? await env.DB.prepare(
+        `SELECT id, published_post_id
+         FROM scheduled_posts
+         WHERE user_id = ? AND threads_user_id = ?
+         ORDER BY id DESC
+         LIMIT 1`,
+      ).bind(WORKSPACE_APP_USER_ID, campaignBrand.profile.threads_user_id).first<{ id: number; published_post_id: string | null }>()
+      : null;
+    const latestPublished = campaignBrand
+      ? await env.DB.prepare(
+        `SELECT published_post_id
+         FROM scheduled_posts
+         WHERE user_id = ? AND threads_user_id = ? AND published_post_id IS NOT NULL
+         ORDER BY id DESC
+         LIMIT 1`,
+      ).bind(WORKSPACE_APP_USER_ID, campaignBrand.profile.threads_user_id).first<{ published_post_id: string }>()
+      : null;
+    const latestSourceBatch = await env.DB.prepare(
+      `SELECT id FROM operator_source_selection_batches WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(campaignBrandKey).first<{ id: string }>();
+    const latestSourceCard = await env.DB.prepare(
+      `SELECT id FROM operator_source_cards WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(campaignBrandKey).first<{ id: string }>();
+    const accountBase = { brand_key: campaignBrandKey, proceed_confirmed: true };
+    const readFixtures: Record<string, Record<string, unknown> | null> = {
+      getOperatorStartupContext: {},
+      engineeringPrecheck: {},
+      getEngineeringAccessState: {},
+      listRepoFiles: { prefix: "lensically-worker/src", limit: 1 },
+      searchRepoFiles: { query: "executeLensicallyIntent", prefix: "lensically-worker/src/index.ts", limit: 1 },
+      readRepoFile: { path: "AGENTS.md", start_line: 1, max_lines: 1 },
+      getRepoStatus: {},
+      listGitHubWorkflowRuns: { limit: 1 },
+      getGitHubWorkflowRun: latestWorkflowRunId > 0 ? { run_id: latestWorkflowRunId } : null,
+      verifyDeployedMcpVersion: {},
+      listEngineeringAudit: { limit: 1 },
+      selectOperatorKey: { brand_key: campaignBrandKey },
+      getGrowthMission: { ...accountBase },
+      getOperatorDecisionState: { ...accountBase, limit: 1 },
+      getScheduledPostSchedulerState: {},
+      auditScheduledPost: latestScheduled?.id ? { ...accountBase, scheduled_post_id: Number(latestScheduled.id) } : null,
+      inspectMcpFailure: { tool_name: "searchRepoFiles", error_text: "campaign_fixture" },
+      listMcpTools: {},
+      readMcpToolDefinition: { tool_name: "getEngineeringAccessState" },
+      runMcpTests: {},
+      getWorkflowStatus: { ...accountBase },
+      list_accounts: {},
+      get_account_state: { ...accountBase },
+      read_lensically_ui_surface: { ...accountBase, surface: "dashboard", limit: 1 },
+      get_hourly_coverage: { ...accountBase, horizon_days: 1 },
+      get_manifest_review_batch: { ...accountBase, production_date: today },
+      get_production_board: { ...accountBase },
+      list_source_candidates: { ...accountBase, limit: 1, offset: 0 },
+      audit_published_post_lineage: { ...accountBase, minimum_likes: 1, days: 7, limit: 1 },
+      get_source_candidate_batch: latestSourceBatch?.id ? { ...accountBase, source_batch_id: latestSourceBatch.id } : null,
+      get_source_card: latestSourceCard?.id ? { ...accountBase, source_card_id: latestSourceCard.id, include_history: false } : null,
+      list_active_gates: { ...accountBase },
+      list_strategy_memory: { ...accountBase, limit: 1, offset: 0 },
+      list_scheduled_posts: { ...accountBase, date: today, timezone: WORKSPACE_DEFAULT_TIMEZONE, limit: 1, offset: 0 },
+      get_post_results: latestPublished?.published_post_id
+        ? { ...accountBase, published_post_id: latestPublished.published_post_id, compact: true }
+        : null,
+      get_monthly_growth_review: { ...accountBase, date_from: weekAgo, date_to: today, timezone: WORKSPACE_DEFAULT_TIMEZONE, top_limit: 1 },
+      get_performance_learning: { ...accountBase, include_posts: false },
+    };
+    const liveReadRows: Array<Record<string, unknown>> = [];
+    for (const row of campaignRows.filter((item) => item.read_only === true)) {
+      const name = String(row.tool_name ?? "");
+      if (name === "runMcpTests") {
+        liveReadRows.push({ tool_name: name, passed: true, status: 200, mode: "campaign_self" });
+        continue;
+      }
+      const fixture = readFixtures[name] ?? null;
+      if (!fixture) {
+        liveReadRows.push({ tool_name: name, passed: false, status: null, error: "fixture_unavailable" });
+        continue;
+      }
+      let result: Record<string, unknown>;
+      if ((OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]).includes(name)) {
+        result = await handleOperatorMcpEngineeringTool(request, env, name as OperatorMcpEngineeringToolName, fixture, true);
+      } else if ((OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(name)) {
+        result = await handleOperatorMcpAdminTool(request, env, name as OperatorMcpAdminToolName, fixture, true);
+      } else {
+        result = await callOperatorToolForMcp(request, env, name, fixture);
+      }
+      const status = Math.trunc(Number(result.status ?? 200));
+      const passed = status < 400 && result.ok !== false && result.success !== false && !result.error;
+      liveReadRows.push({
+        tool_name: name,
+        passed,
+        status,
+        error: passed ? null : result.error ?? "read_execution_failed",
+      });
+    }
+    const liveReadFailures = liveReadRows.filter((row) => row.passed !== true);
     const checks = [
       { name: "single_gateway_registered", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
       { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
