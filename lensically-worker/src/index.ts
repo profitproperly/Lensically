@@ -14688,6 +14688,7 @@ type OperatorPublicProfileCompilation =
   | { ok: false; error: string; profile_id: string | null; required_profile_id?: string; available_profile_hint?: string };
 
 const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequestProfileId>([
+  ["getOperatorStartupContext", "startup"],
   ["listGitHubWorkflowRuns", "workflow_run_list"],
   ["getGitHubWorkflowRun", "workflow_run_status"],
   ["readRepoFile", "repository_file_read"],
@@ -14695,6 +14696,7 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["auditScheduledPost", "scheduled_post_audit"],
   ["recoverOverdueScheduledPosts", "protected_scheduler_recovery"],
   ["selectOperatorKey", "account_key_selection"],
+  ["confirmOperatorProceed", "account_proceed"],
 ]);
 
 function operatorPublicProfileIdForToolName(toolName: string): string {
