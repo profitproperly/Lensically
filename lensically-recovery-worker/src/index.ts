@@ -469,8 +469,16 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && mapSummary?.d1_execution_library_bypassed === true
       && mapSummary?.discovery_allowed === false
       && mapSummary?.model_tool_choice_allowed === false;
+    const accountKeyRoute = accountKeyContent?.routed_execution as Record<string, unknown> | undefined;
+    const accountKeySucceeded = accountKey.status === 200
+      && accountKeyContent?.ok === true
+      && accountKeyContent?.selected_key === "manifest_mental"
+      && accountKeyContent?.account_data_loaded === false
+      && accountKeyContent?.next_profile_id === "account_proceed"
+      && accountKeyRoute?.profile_id === "account_key_selection"
+      && accountKeyRoute?.executed_tool === "selectOperatorKey";
     return {
-      ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && mappedSurface && directRejected && mappedSucceeded && startupPolicySucceeded,
+      ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && accountKeySucceeded && mappedSurface && directRejected && mappedSucceeded && startupPolicySucceeded,
       oauth: { authorize: authorize.status, token: tokenResponse.status },
       initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null },
       tools_list: { status: listed.status, count: tools.length, unique_count: new Set(toolNames).size, names: toolNames, profile_schema_enforced: profileSchemaSucceeded, required: gatewayRequired, properties: Object.keys(gatewayProperties) },
