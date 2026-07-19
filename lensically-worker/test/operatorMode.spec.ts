@@ -3054,8 +3054,7 @@ describe("operator mode MCP endpoint", () => {
     expect(gatewayHealth.structuredContent.status_kind).toBe("compact_engineering_precheck");
 
     const alignment = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
-      objective: "Check repository runtime alignment.",
-      intent: "repository runtime alignment",
+      profile_id: "get_repo_status",
       inputs: {},
     });
         expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
