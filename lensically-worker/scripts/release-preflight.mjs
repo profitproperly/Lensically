@@ -148,8 +148,14 @@ if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v
     || !systemDirectoryTests.includes("routes large repository mutations to the promoted Recovery path")
     || !systemDirectoryTests.includes("blocks incident closure until the winning path is promoted and enforced")
     || !systemDirectoryTests.includes("keeps Operator MCP version metadata single-source")
+    || !systemDirectoryTests.includes("routes compact quarantined-post reschedules to the protected recovery path")
+    || !systemDirectoryTests.includes("builds compact scheduled-post audit requests")
+    || !systemDirectoryTests.includes("uses compact release-marker messages for verified patches")
     || !clientSafety.includes('public_large_repository_mutation_payload')
-    || !clientSafety.includes('recovery_repository_mutation')) {
+    || !clientSafety.includes('recovery_repository_mutation')
+    || !clientSafety.includes('public_protected_scheduler_recovery_narrative')
+    || !clientSafety.includes('public_scheduled_post_audit_narrative')
+    || !clientSafety.includes('recovery_release_marker_verbose_message')) {
   errors.push("winning_path_promotion_contract_missing");
 }
 
