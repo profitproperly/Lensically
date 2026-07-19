@@ -915,7 +915,10 @@ describe("System Directory foundation", () => {
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
-    expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("resume_original_objective");
+        expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("close_incident");
+    expect(getClientSafetyRegistrySummary().required_sequence).toEqual(expect.arrayContaining([
+      "generalize_shared_cause", "lock_prevention_rule", "verify_live", "resume_original_objective", "record_autonomy_dividend",
+    ]));
   });
 
         it("keeps Worker deployment on the Main verified marker path", () => {
