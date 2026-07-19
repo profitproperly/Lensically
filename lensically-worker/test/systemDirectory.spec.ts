@@ -923,7 +923,7 @@ describe("System Directory foundation", () => {
       description: "Read one compact internal capability definition.",
       inputSchema: { type: "object", properties: { tool_name: { type: "string" } }, required: ["tool_name"] },
     }];
-    expect(prepareSourceDefinedDirectEngineeringCall(
+        expect(prepareSourceDefinedDirectEngineeringCall(
       "read capability definition",
       "Read the compact workflow activity capability definition.",
       { capability: "workflow activity listing" },
@@ -933,6 +933,16 @@ describe("System Directory foundation", () => {
       tool_name: "readMcpToolDefinition",
       arguments: { tool_name: "listGitHubWorkflowRuns" },
       map_execution: { system_directory: { route_applied: false } },
+    });
+    expect(prepareSourceDefinedDirectEngineeringCall(
+      "read capability definition",
+      "Read the compact repository patch-set capability definition.",
+      { capability: "repository patch set" },
+      tools,
+    )).toMatchObject({
+      ok: true,
+      tool_name: "readMcpToolDefinition",
+      arguments: { tool_name: "applyRepoPatchSet" },
     });
   });
 

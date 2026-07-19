@@ -625,6 +625,7 @@ function inferredArgumentsForOperationalIntent(
     if (/\b(workflow|github)\b/.test(normalized) && /\b(run status|single run|completion|result)\b/.test(normalized)) return { tool_name: "getGitHubWorkflowRun" };
     if (/\b(account|brand)\b/.test(normalized) && /\b(key|alias|selection)\b/.test(normalized)) return { tool_name: "selectOperatorKey" };
     
+        if (/\b(repository|source)\b/.test(normalized) && /\b(patch set|atomic patch|implementation)\b/.test(normalized)) return { tool_name: "applyRepoPatchSet" };
     if (/\b(repository|source)\b/.test(normalized) && /\b(file|read|open)\b/.test(normalized)) return { tool_name: "readRepoFile" };
     
     if (/\b(public|request)\b/.test(normalized) && /\b(gateway|action)\b/.test(normalized)) return { tool_name: "executeLensicallyIntent" };
