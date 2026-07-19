@@ -909,7 +909,7 @@ describe("System Directory foundation", () => {
       registry_valid: true,
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
-      resume_allowed_only_after: "registry_validation_and_live_deployment",
+            resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification",
                         prevented_client_block_count: 37,
                                     safe_request_profile_count: 27,
       universal_policy_count: 8,
