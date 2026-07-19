@@ -178,24 +178,27 @@ if (!source.includes("const RETIRED_EXECUTION_TABLES")
   errors.push("legacy_execution_storage_retirement_missing");
 }
 
-if (!source.includes('name: "executeLensicallyIntent"')
-    || !source.includes('required: ["profile_id", "inputs"]')
-    || source.includes('required: ["objective", "intent", "inputs"]')
-    || !source.includes("Lensically compiles the canonical objective and intent server-side")
-    || !source.includes('public_contract: "profile_id_inputs_v1"')
-    || !source.includes("legacy_freehand_compatibility: true")
-    || !source.includes('export const EXECUTION_KERNEL_NAME = "Execution Kernel"')
-    || !source.includes('export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1"')
-    || !source.includes("createOperatorMcpSessionId")
-    || !source.includes("verifyOperatorMcpSession")
-    || !source.includes("stale_mcp_deployment_session")
-    || !source.includes("compileOperatorPublicProfileRequest")
-    || !source.includes("canonical_safe_profile_required")
-    || !source.includes("routed_execution_gateway_required")
-    || !source.includes("prepareMandatoryExecutionMapCall")
-    || !source.includes("finalizeMandatoryExecutionMapCall")
-    || !source.includes("resultPayload.execution_kernel")) {
-  errors.push("single_gateway_contract_missing");
+const singleGatewayContractChecks = [
+  ["public_tool", source.includes('name: "executeLensicallyIntent"')],
+  ["profile_inputs_required", source.includes('required: ["profile_id", "inputs"]')],
+  ["retired_freehand_required_absent", !source.includes('required: ["objective", "intent", "inputs"]')],
+  ["server_compilation_description", source.includes("Lensically compiles the canonical objective and intent server-side")],
+  ["profile_contract_metadata", source.includes('public_contract: "profile_id_inputs_v1"')],
+  ["legacy_compatibility_metadata", source.includes("legacy_freehand_compatibility: true")],
+  ["execution_kernel_name", source.includes('export const EXECUTION_KERNEL_NAME = "Execution Kernel"')],
+  ["execution_kernel_version", source.includes('export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1"')],
+  ["session_creation", source.includes("createOperatorMcpSessionId")],
+  ["session_verification", source.includes("verifyOperatorMcpSession")],
+  ["stale_session_rejection", source.includes("stale_mcp_deployment_session")],
+  ["profile_compiler", source.includes("compileOperatorPublicProfileRequest")],
+  ["canonical_profile_gate", source.includes("canonical_safe_profile_required")],
+  ["routed_gateway_gate", source.includes("routed_execution_gateway_required")],
+  ["map_prepare", source.includes("prepareMandatoryExecutionMapCall")],
+  ["map_finalize", source.includes("finalizeMandatoryExecutionMapCall")],
+  ["execution_kernel_receipt", source.includes("resultPayload.execution_kernel")],
+];
+for (const [checkId, present] of singleGatewayContractChecks) {
+  if (!present) errors.push(`single_gateway_contract_missing:${checkId}`);
 }
 
 if (!source.includes("const sourceDefinedStaticRoute = routedMapExecution?.d1_execution_library_bypassed === true;")
