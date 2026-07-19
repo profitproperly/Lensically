@@ -716,6 +716,7 @@ describe("System Directory foundation", () => {
       "public_account_lifecycle_profile_omitted",
       "recovery_task_only_operator_validation_dispatch",
       "capability_definition_profile_input_mismatch",
+      "account_lifecycle_account_key_alias_mismatch",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
