@@ -1233,17 +1233,26 @@ describe("operator mode backend spine", () => {
       brand_key: "manifest_mental",
     });
 
-    const auditBefore = await operatorTool<{
+    await ensureMcpAccountOpen("manifest_mental");
+    const auditBeforeCall = await mcpToolCallRaw<{
       audited_count: number;
       complete_count: number;
       incomplete_count: number;
       posts: Array<{ published_post_id: string; complete: boolean; missing_stages: string[] }>;
-    }>("audit_published_post_lineage", {
-      brand_key: "manifest_mental",
-      minimum_likes: 1000,
-      days: 90,
-      limit: 10,
+      error?: string;
+    }>("executeLensicallyIntent", {
+      objective: "Audit proven Manifest winners without mutating account data.",
+      intent: "audit published post lineage",
+      inputs: {
+        brand_key: "manifest_mental",
+        proceed_confirmed: true,
+        minimum_likes: 1000,
+        days: 90,
+        limit: 10,
+      },
     });
+    expect(auditBeforeCall.isError, JSON.stringify(auditBeforeCall.structuredContent)).not.toBe(true);
+    const auditBefore = auditBeforeCall.structuredContent;
     const incompleteWinner = auditBefore.posts.find((post) => post.published_post_id === publishedPostId);
     expect(incompleteWinner).toMatchObject({ complete: false });
     expect(incompleteWinner?.missing_stages).toEqual(expect.arrayContaining([
