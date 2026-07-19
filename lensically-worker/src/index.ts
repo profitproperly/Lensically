@@ -17376,12 +17376,15 @@ async function handleOperatorMcpAdminTool(
         result = await callOperatorToolForMcp(request, env, name, fixture);
       }
       const status = Math.trunc(Number(result.status ?? 200));
-      const passed = status < 400 && result.ok !== false && result.success !== false && !result.error;
+      const errorCode = typeof result.error === "string" ? result.error : null;
+      const legitimateEmpty = Boolean(errorCode && legitimateEmptyReadErrors.has(errorCode));
+      const passed = legitimateEmpty || (status < 400 && result.ok !== false && result.success !== false && !result.error);
       liveReadRows.push({
         tool_name: name,
         passed,
         status,
-        error: passed ? null : result.error ?? "read_execution_failed",
+        legitimate_empty: legitimateEmpty,
+        error: passed ? null : errorCode ?? "read_execution_failed",
       });
     }
     const liveReadFailures = liveReadRows.filter((row) => row.passed !== true);
