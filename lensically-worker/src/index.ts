@@ -12430,6 +12430,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!ownerApproval || !rawPosts.length) {
       return operatorJsonResponse({ success: false, error: "owner_approval_and_posts_required" }, 400);
     }
+    if (brand.brand_key === "manifest_mental") {
+      return operatorJsonResponse({
+        success: false,
+        error: "manifest_lineage_preserving_schedule_required",
+        reason: "Direct text-only batch scheduling bypasses source cards, generation runs, drafts, and future metric lineage.",
+        required_tools: ["schedule_manifest_review_batch", "schedule_approved_draft"],
+        account_mutated: false,
+      }, 409);
+    }
     const scheduledItems: Array<Record<string, unknown>> = [];
     for (let index = 0; index < rawPosts.length; index += 1) {
       const rawPost = rawPosts[index];
