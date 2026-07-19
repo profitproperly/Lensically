@@ -3107,16 +3107,21 @@ describe("operator mode MCP endpoint", () => {
     expect(eligibleReads).toBe(37);
     expect(failedReads).toBe(0);
 
-    const mutationSegments = ["engineering_mutations", "admin_mutations", "account_mutations_a", "account_mutations_b"] as const;
+    const mutationSegments = [
+      ["s5", "engineering_mutations"],
+      ["s6", "admin_mutations"],
+      ["s7", "account_mutations_a"],
+      ["s8", "account_mutations_b"],
+    ] as const;
     let eligibleMutations = 0;
     let failedMutationPreflights = 0;
-    for (const segment of mutationSegments) {
+    for (const [transportSegment, canonicalSegment] of mutationSegments) {
       const result = await mcpToolCallRaw<typeof campaign.structuredContent>("executeLensicallyIntent", {
-        objective: `Validate ${segment}.`,
+        objective: `Validate ${transportSegment}.`,
         intent: "checkup",
-        inputs: { segment },
+        inputs: { segment: transportSegment },
       });
-      expect(result.structuredContent.campaign.segment).toBe(segment);
+      expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
       expect(result.structuredContent.campaign.mutations_executed).toBe(0);
       eligibleMutations += result.structuredContent.campaign.mutation_preflights.eligible;
       failedMutationPreflights += result.structuredContent.campaign.mutation_preflights.failed;
