@@ -16121,7 +16121,21 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
   if (!validation.allowed) {
     return { ok: false, error: "hardening_transition_blocked", incident_id: incidentId, current_state: current, target_state: target, missing_or_invalid_evidence: validation.errors };
   }
-  /* HARDENING_TRANSITION_UPDATE */
+    await env.DB.prepare(
+    `UPDATE operator_hardening_incidents SET
+      state = ?, root_cause = ?, generalized_cause = ?, prevention_rule_id = ?,
+      regression_test_ids_json = ?, tested_sha = ?, deployment_id = ?,
+      live_verification_json = ?, resume_result_json = ?, autonomy_dividend_json = ?,
+      efficiency_result_json = ?, closed_at = CASE WHEN ? = 'closed' THEN CURRENT_TIMESTAMP ELSE closed_at END
+     WHERE id = ? AND state = ?`,
+  ).bind(
+    target, evidence.root_cause ?? null, evidence.generalized_cause ?? null, evidence.prevention_rule_id ?? null,
+    normalizeOperatorJson(evidence.regression_test_ids ?? [], []), evidence.tested_sha ?? null, evidence.deployment_id ?? null,
+    normalizeOperatorJson(evidence.live_verification ?? null, null), normalizeOperatorJson(evidence.resume_result ?? null, null),
+    normalizeOperatorJson(evidence.autonomy_dividend ?? null, null), normalizeOperatorJson(args.efficiency_result ?? safeParseJsonString(String(row.efficiency_result_json ?? "")), null),
+    target, incidentId, current,
+  ).run();
+  /* HARDENING_TRANSITION_EVENT */
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
