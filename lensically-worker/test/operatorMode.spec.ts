@@ -3041,7 +3041,9 @@ describe("operator mode MCP endpoint", () => {
   it("builds one complete non-mutating Execution Kernel capability campaign", async () => {
     const campaign = await mcpToolCallRaw<{
       campaign: {
+        segment: string;
         total_internal_capabilities: number;
+        total_read_only_capabilities: number;
         route_only: boolean;
         mutations_executed: number;
         passed: number;
