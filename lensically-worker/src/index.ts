@@ -13327,7 +13327,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     title: "Run MCP tests",
     description: "Run built-in MCP configuration and workflow enforcement tests without needing Codex.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "getWorkflowStatus",
