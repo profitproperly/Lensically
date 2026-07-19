@@ -1049,13 +1049,17 @@ describe("operator mode backend spine", () => {
       operational: boolean;
       publishing_enabled: boolean;
       blocked_reason: string | null;
+      attention_required: boolean;
+      quarantined_post_ids: number[];
       current_overdue_count: number;
     };
-    expect(autoResumed.control.mode).toBe("paused");
-    expect(autoResumed.control.reason).toContain("unresolved_publish_quarantine");
-    expect(autoResumed.operational).toBe(false);
-    expect(autoResumed.publishing_enabled).toBe(false);
-    expect(autoResumed.blocked_reason).toBe("scheduler_quarantined_publish");
+    expect(autoResumed.control.mode).toBe("normal");
+    expect(autoResumed.control.reason).toContain("auto_resumed_temporary_pause");
+    expect(autoResumed.operational).toBe(true);
+    expect(autoResumed.publishing_enabled).toBe(true);
+    expect(autoResumed.blocked_reason).toBeNull();
+    expect(autoResumed.attention_required).toBe(true);
+    expect(autoResumed.quarantined_post_ids).toContain(stalePostId);
     expect(autoResumed.current_overdue_count).toBeGreaterThanOrEqual(1);
     const staleRow = await env.DB.prepare(
       `SELECT last_attempted_at, publish_error_message FROM scheduled_posts WHERE id = ?`,
