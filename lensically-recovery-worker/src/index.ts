@@ -538,13 +538,49 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && accountKeyRoute?.profile_id === "account_key_selection"
       && accountKeyRoute?.executed_tool === "selectOperatorKey";
     return {
-      ok: initialize.status === 200 && listed.status === 200 && startup.status === 200 && startupContent?.ok === true && accountKeySucceeded && mappedSurface && directRejected && mappedSucceeded && startupPolicySucceeded,
+      ok: initialize.status === 200
+        && listed.status === 200
+        && startup.status === 200
+        && startupContent?.ok === true
+        && accountKeySucceeded
+        && mappedSurface
+        && sessionIssued
+        && staleSessionRejected
+        && executionKernelSucceeded
+        && directRejected
+        && mappedSucceeded
+        && startupPolicySucceeded,
       oauth: { authorize: authorize.status, token: tokenResponse.status },
-      initialize: { status: initialize.status, server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null },
-      tools_list: { status: listed.status, count: tools.length, unique_count: new Set(toolNames).size, names: toolNames, profile_schema_enforced: profileSchemaSucceeded, required: gatewayRequired, properties: Object.keys(gatewayProperties) },
+      initialize: {
+        status: initialize.status,
+        server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null,
+        deployment_id: initialize.headers.deployment_id,
+        commit_sha: initialize.headers.commit_sha,
+        execution_kernel: initialize.headers.execution_kernel,
+        session_issued: sessionIssued,
+      },
+      tools_list: {
+        status: listed.status,
+        count: tools.length,
+        unique_count: new Set(toolNames).size,
+        names: toolNames,
+        public_contract_enforced: publicContractSucceeded,
+        legacy_profile_schema_retired: !Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id"),
+        required: gatewayRequired,
+        properties: Object.keys(gatewayProperties),
+      },
+      session_freshness: {
+        version: "deployment-scoped-mcp-session-v1",
+        issued: sessionIssued,
+        stale_or_invalid_session_rejected_before_routing: staleSessionRejected,
+        rejection_status: staleSession.status,
+        rejection_reason: staleSessionData?.reason ?? null,
+        replacement_session_issued: Boolean(staleSession.headers.mcp_session_id),
+      },
       startup: {
         status: startup.status,
         ok: startupContent?.ok === true,
+        execution_kernel: executionKernel,
         mandatory_execution_map: mapSummary ?? null,
         client_safety: startupContent?.client_safety ?? null,
         system_directory: startupContent?.system_directory ?? null,
