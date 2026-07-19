@@ -3075,6 +3075,7 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
       "client_safety",
+      "policy_classification",
       "routing",
       "schema_contract",
       "zero_input_mutation",
