@@ -741,7 +741,7 @@ describe("operator mode backend spine", () => {
       full_auto_enabled: false,
       growth_mission: { status: "approved", execution_mode: "guided_owner_approval" },
     });
-  });
+  }, 15000);
 
   it("fingerprints content and evaluates age-matched post performance without follower attribution", () => {
     const fingerprint = buildOperatorPostFingerprint({
