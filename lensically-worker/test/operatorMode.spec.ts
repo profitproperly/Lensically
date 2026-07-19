@@ -3892,8 +3892,7 @@ describe("operator mode MCP endpoint", () => {
     expect(decision).toEqual({ status: "executed", owner_response: "Proceed" });
 
     const paused = await mcpToolRaw<{ ok: boolean; scheduler?: { control: { mode: string } }; result?: { scheduler: { control: { mode: string } } } }>("executeLensicallyIntent", {
-      objective: "Pause scheduler after protected canary test.",
-      intent: "set scheduled post scheduler mode",
+      profile_id: "set_scheduled_post_scheduler_mode",
       inputs: {
         brand_key: "manifest_mental",
         mode: "paused",
