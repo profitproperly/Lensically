@@ -17224,7 +17224,19 @@ async function handleOperatorMcpAdminTool(
     const names = new Set(tools.map((tool) => tool.name));
     const requirements = await listOperatorWorkflowRequirements(env, null);
     const campaignTools = tools.filter((tool) => tool.name !== OPERATOR_ROUTED_EXECUTION_GATEWAY);
-    const campaignSegment = normalizeOperatorText(args.segment, 80, true) ?? "routes";
+    const rawCampaignSegment = normalizeOperatorText(args.segment, 80, true) ?? "routes";
+    const campaignSegmentAliases: Record<string, string> = {
+      s0: "routes",
+      s1: "engineering_reads",
+      s2: "admin_reads",
+      s3: "account_reads_a",
+      s4: "account_reads_b",
+      s5: "engineering_mutations",
+      s6: "admin_mutations",
+      s7: "account_mutations_a",
+      s8: "account_mutations_b",
+    };
+    const campaignSegment = campaignSegmentAliases[rawCampaignSegment] ?? rawCampaignSegment;
     const liveReadSegments: Record<string, Set<string>> = {
       engineering_reads: new Set([
         "getOperatorStartupContext",
