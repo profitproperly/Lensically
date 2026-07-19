@@ -18102,18 +18102,37 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
   }
 
   try {
-    if (method === "notifications/initialized") {
-      return new Response(null, { status: 202 });
-    }
-
-            if (method === "initialize") {
+    if (method === "initialize") {
+      const sessionId = await createOperatorMcpSessionId(env);
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
         result: await operatorMcpInitializeResult(env, message.params?.protocolVersion),
       }, 200, {
         "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18"),
+        ...operatorMcpRuntimeHeaders(env, sessionId),
       });
+    }
+
+    const sessionValidation = await verifyOperatorMcpSession(request, env);
+    if (!sessionValidation.ok) {
+      const replacementSessionId = await createOperatorMcpSessionId(env);
+      return mcpJsonResponse({
+        jsonrpc: "2.0",
+        id: id ?? null,
+        error: {
+          code: -32001,
+          message: "MCP deployment changed. Reinitialize before retrying the request.",
+          data: {
+            reason: sessionValidation.reason ?? "stale_mcp_deployment_session",
+            execution_kernel: operatorExecutionKernelMetadata(env),
+          },
+        },
+      }, 404, operatorMcpRuntimeHeaders(env, replacementSessionId));
+    }
+
+    if (method === "notifications/initialized") {
+      return new Response(null, { status: 202, headers: operatorMcpRuntimeHeaders(env) });
     }
 
     if (method === "ping") {
