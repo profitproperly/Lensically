@@ -17607,6 +17607,39 @@ async function handleOperatorMcpEngineeringTool(
     return { ok: true, files, returned_count: files.length, truncated: files.length === limit };
   }
 
+  if (toolName === "searchRepoFiles") {
+    const query = normalizeOperatorText(args.query, 500);
+    const path = sanitizeRepoPath(args.prefix);
+    const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+    if (!query || !path) {
+      return { ok: false, error: "query_and_known_file_prefix_required" };
+    }
+    const file = await getGithubFile(env, path);
+    if (!file.ok || file.content === null) {
+      return { ok: false, error: "repo_file_read_failed", status: file.status, path };
+    }
+    const normalizedQuery = query.toLowerCase();
+    const lines = file.content.split(/\r?\n/);
+    const allMatches = lines
+      .map((line, index) => ({ line_number: index + 1, line }))
+      .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery));
+    const matches = allMatches.slice(0, limit);
+    return {
+      ok: true,
+      query,
+      path,
+      matches,
+      match_count: allMatches.length,
+      returned_count: matches.length,
+      truncated: allMatches.length > matches.length,
+      searched_line_count: lines.length,
+      verified_complete_for_known_file: true,
+      search_mode: "bounded_known_file_content",
+      external_requests: 1,
+      file_content_fanout: 1,
+    };
+  }
+
   if (toolName === "readRepoFile") {
     const path = sanitizeRepoPath(args.path);
     const file = path ? await getGithubFile(env, path) : null;
