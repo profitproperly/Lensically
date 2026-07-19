@@ -212,6 +212,18 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const prefix = safePath(args.prefix || "") || "";
     const limit = Math.min(20, Math.max(1, Number(args.limit || 20)));
     if (!query) return { ok: false, error: "query_required" };
+    if (prefix && /\.[a-z0-9]+$/i.test(prefix)) {
+      const file = await repoFile(env, prefix);
+      if (file.ok && file.content) {
+        const normalizedQuery = query.toLowerCase();
+        const lines = file.content.split(/\r?\n/);
+        const matches = lines
+          .map((line, index) => ({ line_number: index + 1, line }))
+          .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery))
+          .slice(0, limit);
+        return { ok: true, matches, path: prefix, search_mode: "bounded_known_file_content", external_requests: 1, file_content_fanout: 1 };
+      }
+    }
     const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
     if (prefix) searchTerms.push(`path:${prefix}`);
     const codeSearch = await github(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
