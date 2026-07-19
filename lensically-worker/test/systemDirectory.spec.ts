@@ -816,10 +816,14 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_exact_patch).toMatchObject({ surface: "recovery_plane" });
   });
 
-  it("uses task-only validation dispatches and reserves exact SHA for deployment", () => {
-    expect(CLIENT_SAFE_REQUEST_PROFILES.validation_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: ["task"] });
-    expect(() => buildClientSafeGatewayRequest("validation_dispatch", { task: "operator-tests" })).toThrow("client_safe_request_external_surface:validation_dispatch");
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "recovery_exact_sha_validation_dispatch")?.safe_profile_id).toBe("validation_dispatch");
+  it("uses verified source markers when client-side validation dispatch is blocked", () => {
+    expect(Object.prototype.hasOwnProperty.call(CLIENT_SAFE_REQUEST_PROFILES, "validation_dispatch")).toBe(false);
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "recovery_exact_sha_validation_dispatch")?.safe_profile_id).toBe("verified_release_marker");
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "recovery_task_only_operator_validation_dispatch")?.safe_profile_id).toBe("verified_release_marker");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.verified_release_marker).toMatchObject({
+      surface: "recovery_plane",
+      allowed_input_keys: ["path", "find", "replace", "message"],
+    });
   });
 
   it("uses Recovery activity after a repeated workflow request is blocked", () => {
