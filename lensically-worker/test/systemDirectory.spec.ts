@@ -203,6 +203,53 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("routes compact quarantined-post reschedules to the protected recovery path", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "recoverOverdueScheduledPosts",
+        title: "Recover overdue scheduled posts",
+        description: "Retire or reschedule quarantined scheduled posts.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            brand_key: { type: "string" },
+            actions: { type: "array" },
+            reason: { type: "string" },
+            owner_response: { type: "string" },
+          },
+          required: ["brand_key", "actions", "reason", "owner_response"],
+        },
+      },
+      {
+        name: "edit_scheduled_post",
+        title: "Edit scheduled post",
+        description: "Edit an ordinary scheduled post.",
+        inputSchema: {
+          type: "object",
+          properties: { brand_key: { type: "string" }, scheduled_post_id: { type: "number" } },
+          required: ["brand_key", "scheduled_post_id"],
+        },
+      },
+    ];
+    const inputs = {
+      brand_key: "manifest_mental",
+      actions: [{ scheduled_post_id: 581, action: "reschedule", scheduled_time: "2026-07-19T00:25:00.000Z" }],
+      reason: "Owner requested a future retry after quarantine.",
+      owner_response: "reschedule for 8:25",
+    };
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      { intent: "reschedule for 8:25", objective: "Reschedule quarantined post 581.", inputs },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "recoverOverdueScheduledPosts",
+      arguments: inputs,
+    });
+  });
+
   it("preserves exact source-candidate reads instead of rewriting them into draws", async () => {
     const tools: MandatoryExecutionToolDefinition[] = [
       {
