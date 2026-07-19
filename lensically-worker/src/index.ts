@@ -17259,30 +17259,42 @@ async function handleOperatorMcpAdminTool(
     const latestWorkflowRuns = await handleOperatorMcpEngineeringTool(request, env, "listGitHubWorkflowRuns", { limit: 1 }, true);
     const workflowRunRows = Array.isArray(latestWorkflowRuns.runs) ? latestWorkflowRuns.runs as Array<Record<string, unknown>> : [];
     const latestWorkflowRunId = Math.trunc(Number(workflowRunRows[0]?.id ?? 0));
+    const safeCampaignFirst = async <T>(sql: string, bindings: unknown[] = []): Promise<T | null> => {
+      try {
+        const statement = bindings.length ? env.DB.prepare(sql).bind(...bindings) : env.DB.prepare(sql);
+        return await statement.first<T>();
+      } catch {
+        return null;
+      }
+    };
     const latestScheduled = campaignBrand
-      ? await env.DB.prepare(
+      ? await safeCampaignFirst<{ id: number; published_post_id: string | null }>(
         `SELECT id, published_post_id
          FROM scheduled_posts
          WHERE user_id = ? AND threads_user_id = ?
          ORDER BY id DESC
          LIMIT 1`,
-      ).bind(WORKSPACE_APP_USER_ID, campaignBrand.profile.threads_user_id).first<{ id: number; published_post_id: string | null }>()
+        [WORKSPACE_APP_USER_ID, campaignBrand.profile.threads_user_id],
+      )
       : null;
     const latestPublished = campaignBrand
-      ? await env.DB.prepare(
+      ? await safeCampaignFirst<{ published_post_id: string }>(
         `SELECT published_post_id
          FROM scheduled_posts
          WHERE user_id = ? AND threads_user_id = ? AND published_post_id IS NOT NULL
          ORDER BY id DESC
          LIMIT 1`,
-      ).bind(WORKSPACE_APP_USER_ID, campaignBrand.profile.threads_user_id).first<{ published_post_id: string }>()
+        [WORKSPACE_APP_USER_ID, campaignBrand.profile.threads_user_id],
+      )
       : null;
-    const latestSourceBatch = await env.DB.prepare(
+    const latestSourceBatch = await safeCampaignFirst<{ id: string }>(
       `SELECT id FROM operator_source_selection_batches WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
-    ).bind(campaignBrandKey).first<{ id: string }>();
-    const latestSourceCard = await env.DB.prepare(
+      [campaignBrandKey],
+    );
+    const latestSourceCard = await safeCampaignFirst<{ id: string }>(
       `SELECT id FROM operator_source_cards WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
-    ).bind(campaignBrandKey).first<{ id: string }>();
+      [campaignBrandKey],
+    );
     const accountBase = { brand_key: campaignBrandKey, proceed_confirmed: true };
     const readFixtures: Record<string, Record<string, unknown> | null> = {
       getOperatorStartupContext: {},
