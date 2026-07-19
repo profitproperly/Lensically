@@ -3060,8 +3060,7 @@ describe("operator mode MCP endpoint", () => {
         expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
 
     const audit = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
-      objective: "Read the execution audit and policy records.",
-      intent: "inspect the execution audit and policy records",
+      profile_id: "list_engineering_audit",
       inputs: { limit: 1 },
     });
     expect(audit.isError).not.toBe(true);
