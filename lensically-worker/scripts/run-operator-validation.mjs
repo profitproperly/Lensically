@@ -48,6 +48,13 @@ const scopes = {
     "router",
     "tool surface",
   ],
+    acceptance: [
+    "builds compact Main atomic patch sets and rejects oversized combinations",
+    "uses Main compact activity after the first workflow status read",
+    "keeps bounded large repository patch sets on the Main gateway",
+    "returns the mandatory client-safety receipt for every startup response",
+    "keeps new clients profile-only while routing cached gateway schemas",
+  ],
   "system-directory": null,
   full: null,
 };
@@ -64,7 +71,7 @@ const args = [
   "test",
   "--",
     "--run",
-  scope === "system-directory" ? "test/systemDirectory.spec.ts" : "test/operatorMode.spec.ts",
+    ["system-directory", "acceptance"].includes(scope) ? "test/systemDirectory.spec.ts" : "test/operatorMode.spec.ts",
   "--reporter=dot",
   "--bail=1",
 ];
