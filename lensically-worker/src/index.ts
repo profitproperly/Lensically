@@ -17379,10 +17379,13 @@ async function handleOperatorMcpAdminTool(
         failure_classes: failureClasses,
         failures: campaignFailures,
         live_reads: {
-          attempted: liveReadRows.length,
-          passed: liveReadRows.length - liveReadFailures.length,
+          eligible: liveReadRows.length,
+          executed: liveReadRows.filter((row) => row.skipped !== true).length,
+          passed: liveReadRows.filter((row) => row.passed === true && row.skipped !== true).length,
+          skipped: liveReadRows.filter((row) => row.skipped === true).length,
           failed: liveReadFailures.length,
           failures: liveReadFailures,
+          skipped_tools: liveReadRows.filter((row) => row.skipped === true).map((row) => row.tool_name),
         },
         risk_groups: {
           read_only: campaignRows.filter((row) => row.read_only === true).length,
