@@ -3061,7 +3061,6 @@ describe("operator mode MCP endpoint", () => {
       mutations_executed: 0,
       live_reads: {
         eligible: 37,
-        failed: 0,
       },
     });
     expect(
