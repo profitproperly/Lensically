@@ -15229,7 +15229,12 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
     try {
       const safeInputs = profileId === "capability_definition" && typeof inputs.tool_name === "string"
         ? { capability: inputs.tool_name }
-        : inputs;
+        : (profileId === "account_key_selection" || profileId === "account_proceed")
+          && typeof inputs.account_key === "string"
+          && typeof inputs.brand_key !== "string"
+          ? { ...inputs, brand_key: inputs.account_key, account_key: undefined }
+          : inputs;
+      delete safeInputs.account_key;
       const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
       const compiledRequest = profileId === "capability_definition"
         ? { ...compiled, inputs: { tool_name: compiled.inputs.capability } }
