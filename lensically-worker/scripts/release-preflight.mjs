@@ -297,10 +297,10 @@ if (!threadsPublishService.includes('publishCreateBody.set("auto_publish_text", 
     || !workflow.includes("test/threadsPublishService.spec.ts")) {
   errors.push("threads_text_auto_publish_contract_missing");
 }
-if (!source.includes("Worker deployment is Recovery-only")
-    || !clientSafety.includes('verified_release_marker')
-    || !clientSafety.includes('recovery_task_only_deploy_dispatch')
-    || !clientSafety.includes('surface: "recovery_plane"')
+if (!source.includes("Worker deployment is triggered by a verified source-control release marker through the Main engineering path")
+    || !clientSafety.includes('Main repository patch path')
+    || !systemDirectoryTests.includes("routes deployment through the Main verified source marker")
+    || !workflow.includes("[verified-worker-release]")
     || !workflow.includes("gh workflow run lensically-engineering.yml")
     || !workflow.includes("--field release_id=\"${RELEASE_SHA:0:12}\"")
     || !workflow.includes("--field release_sha=\"${RELEASE_SHA}\"")) {
