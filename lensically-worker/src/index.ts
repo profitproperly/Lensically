@@ -17338,6 +17338,20 @@ async function handleOperatorMcpAdminTool(
       get_performance_learning: { ...accountBase, include_posts: false },
     };
     const liveReadRows: Array<Record<string, unknown>> = [];
+    const canonicalLiveHost = new URL(request.url).hostname === new URL(DEFAULT_WORKER_ORIGIN).hostname;
+    const externalLiveReadTools = new Set([
+      "listRepoFiles",
+      "searchRepoFiles",
+      "readRepoFile",
+      "getRepoStatus",
+      "listGitHubWorkflowRuns",
+      "getGitHubWorkflowRun",
+      "verifyDeployedMcpVersion",
+    ]);
+    const legitimateEmptyReadErrors = new Set([
+      "active_review_batch_not_found",
+      "growth_mission_unavailable",
+    ]);
     for (const row of campaignRows.filter((item) => item.read_only === true)) {
       const name = String(row.tool_name ?? "");
       if (name === "runMcpTests") {
