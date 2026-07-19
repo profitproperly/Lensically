@@ -32517,7 +32517,19 @@ export class ScheduledPostScheduler {
     });
 
     try {
-      overdueBefore = await countOverdueScheduledPosts(this.env);
+      const unresolvedBefore = await listOverdueScheduledPosts(this.env, 100);
+      overdueBefore = unresolvedBefore.length;
+      const quarantinedBefore = unresolvedBefore.filter((row) => row.status === SCHEDULED_POST_STATUS_POSTING);
+      if (control.mode !== "paused" && quarantinedBefore.length > 0) {
+        control = await this.setControl({
+          mode: "paused",
+          reason: `unresolved_publish_quarantine:${quarantinedBefore.map((row) => row.id).join(",")}`.slice(0, 500),
+        });
+        logWorkerEvent("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE", {
+          trigger,
+          quarantined_post_ids: quarantinedBefore.map((row) => row.id),
+        }, "error");
+      }
       if (control.mode === "paused" && overdueBefore > 0 && shouldAutoResumeTemporarySchedulerPause(control)) {
         const previousReason = control.reason;
         control = await this.setControl({
