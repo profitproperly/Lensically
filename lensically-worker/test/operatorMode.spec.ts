@@ -3046,8 +3046,7 @@ describe("operator mode MCP endpoint", () => {
     expect(status.structuredContent.missing_inputs ?? []).not.toEqual(expect.arrayContaining(["brand_key", "run_id", "source_card_id"]));
 
     const gatewayHealth = await mcpToolCallRaw<{ routed_execution: { executed_tool: string }; status_kind?: string }>("executeLensicallyIntent", {
-      objective: "Check gateway execution health.",
-      intent: "check gateway execution health",
+      profile_id: "engineering_precheck",
       inputs: {},
     });
     expect(gatewayHealth.isError).not.toBe(true);
