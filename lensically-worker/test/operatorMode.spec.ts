@@ -2374,6 +2374,15 @@ describe("operator mode MCP endpoint", () => {
     expect(listed.tools[0]?.inputSchema?.properties).not.toHaveProperty("profile_id");
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     const names = registry.tools.map((tool) => tool.name);
+    const startup = await mcpTool<{
+      execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean };
+    }>("getOperatorStartupContext");
+    expect(startup.execution_kernel).toMatchObject({
+      name: "Execution Kernel",
+      version: "lensically-execution-kernel-v1",
+      public_contract: "objective_intent_inputs_v1",
+      deployment_fresh_sessions: true,
+    });
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(expect.arrayContaining([
       "engineeringPrecheck",
