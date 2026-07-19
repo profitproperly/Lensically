@@ -1209,6 +1209,27 @@ describe("operator mode backend spine", () => {
       brand_key: "manifest_mental",
     });
 
+    const auditBefore = await operatorTool<{
+      audited_count: number;
+      complete_count: number;
+      incomplete_count: number;
+      posts: Array<{ published_post_id: string; complete: boolean; missing_stages: string[] }>;
+    }>("audit_published_post_lineage", {
+      brand_key: "manifest_mental",
+      minimum_likes: 1000,
+      days: 90,
+      limit: 10,
+    });
+    const incompleteWinner = auditBefore.posts.find((post) => post.published_post_id === publishedPostId);
+    expect(incompleteWinner).toMatchObject({ complete: false });
+    expect(incompleteWinner?.missing_stages).toEqual(expect.arrayContaining([
+      "source",
+      "source_card",
+      "generation_run",
+      "draft",
+      "metrics",
+    ]));
+
     const recovered = await operatorTool<{
       source_selection_id: string;
       source_card_id: string;
