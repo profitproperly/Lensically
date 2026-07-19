@@ -88,7 +88,11 @@ jobs:
         working-directory: .
         run: |
           if [ -f lensically-worker/scripts/apply-lineage-recovery-patch.mjs ]; then
-            node lensically-worker/scripts/apply-lineage-recovery-patch.mjs
+            if ! node lensically-worker/scripts/apply-lineage-recovery-patch.mjs 2>&1 | tee /tmp/lineage-recovery-maintenance.log; then
+              diagnostic=$(tail -n 80 /tmp/lineage-recovery-maintenance.log | tr '\n' ' ' | sed 's/%/%25/g')
+              echo "::error title=Lineage recovery maintenance failure::$diagnostic"
+              exit 1
+            fi
             git config user.name "lensically-engineering"
             git config user.email "lensically-engineering@users.noreply.github.com"
             git add -A
