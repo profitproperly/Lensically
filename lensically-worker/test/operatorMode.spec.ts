@@ -3290,10 +3290,10 @@ describe("operator mode MCP endpoint", () => {
       expect(startup.structuredContent).not.toHaveProperty(retiredField);
     }
 
-    const mapped = await mcpToolCallRaw<{
+        const mapped = await mcpToolCallRaw<{
       ok: boolean;
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
-      mandatory_execution_map: { map_state: string; mandatory_path_followed: boolean; d1_execution_library_bypassed: boolean };
+      execution_kernel: { lifecycle: { map_state: string; mandatory_path_followed: boolean; d1_execution_library_bypassed: boolean } };
     }>("executeLensicallyIntent", {
       profile_id: "get_engineering_access_state",
       inputs: {},
@@ -3304,11 +3304,14 @@ describe("operator mode MCP endpoint", () => {
       executed_tool: "getEngineeringAccessState",
       model_tool_choice_allowed: false,
     });
-    expect(mapped.structuredContent.mandatory_execution_map).toMatchObject({
+        expect(mapped.structuredContent.execution_kernel.lifecycle).toMatchObject({
       map_state: "source_defined_direct_completed",
       mandatory_path_followed: true,
       d1_execution_library_bypassed: true,
     });
+    for (const retiredField of ["gateway", "mandatory_execution_map", "execution_library", "execution_policy"]) {
+      expect(mapped.structuredContent).not.toHaveProperty(retiredField);
+    }
   }, 30000);
 
   it.skip("retired: dynamic execution-library policy refresh", async () => {
