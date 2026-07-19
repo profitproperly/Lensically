@@ -87,19 +87,8 @@ jobs:
         if: ${{ inputs.task == 'typecheck' }}
         working-directory: .
         run: |
-          set -o pipefail
-          if [ -f lensically-worker/scripts/apply-compact-post-results-patch.mjs ]; then
-            if ! node lensically-worker/scripts/apply-compact-post-results-patch.mjs 2>&1 | tee /tmp/compact-post-results-maintenance.log; then
-              diagnostic=$(tail -n 80 /tmp/compact-post-results-maintenance.log | tr '\n' ' ' | sed 's/%/%25/g')
-              echo "::error title=Compact post-results maintenance failure::$diagnostic"
-              printf '%s\n' "$diagnostic" > lensically-worker/compact-maintenance-error.txt
-              git config user.name "lensically-engineering"
-              git config user.email "lensically-engineering@users.noreply.github.com"
-              git add lensically-worker/compact-maintenance-error.txt
-              git commit -m "Record compact maintenance diagnostic"
-              git push origin HEAD:main
-              exit 1
-            fi
+          if [ -f lensically-worker/scripts/run-compact-maintenance.mjs ]; then
+            node lensically-worker/scripts/run-compact-maintenance.mjs
             git config user.name "lensically-engineering"
             git config user.email "lensically-engineering@users.noreply.github.com"
             git add -A
