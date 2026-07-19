@@ -16153,6 +16153,32 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
   };
 }
 
+async function recordOperationalObservation(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const capability = normalizeOperatorText(args.capability, 160, true) ?? "unknown";
+  const callCount = Math.max(0, Math.trunc(Number(args.call_count ?? 0)));
+  const durationMs = Math.max(0, Math.trunc(Number(args.duration_ms ?? 0)));
+  const repeated = Math.max(0, Math.trunc(Number(args.repeated_fingerprint_count ?? 0)));
+  const progress = normalizeOperatorText(args.progress_checkpoint, 500, true);
+  const baseline = await env.DB.prepare(
+    `SELECT AVG(call_count) AS avg_calls, AVG(duration_ms) AS avg_duration
+     FROM (SELECT call_count, duration_ms FROM operator_operational_observations
+           WHERE capability = ? AND outcome = 'success' ORDER BY datetime(created_at) DESC LIMIT 20)`,
+  ).bind(capability).first<Record<string, unknown>>();
+  const id = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_operational_observations (
+      id, operation_id, incident_id, profile_id, capability, outcome, duration_ms,
+      call_count, external_requests, repeated_fingerprint_count, progress_checkpoint, metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id, normalizeOperatorText(args.operation_id, 160, true), normalizeOperatorText(args.incident_id, 160, true),
+    normalizeOperatorMachineKey(args.profile_id, "") || null, capability, normalizeOperatorMachineKey(args.outcome, "unknown"), durationMs,
+    callCount, Math.max(0, Math.trunc(Number(args.external_requests ?? 0))), repeated, progress, normalizeOperatorJson(args.metadata ?? {}, {}),
+  ).run();
+  /* HARDENING_EFFICIENCY_DETECTION */
+}
+
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_execution_events (
