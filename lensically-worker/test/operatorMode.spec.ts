@@ -3038,6 +3038,37 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
+  it("builds one complete non-mutating Execution Kernel capability campaign", async () => {
+    const campaign = await mcpToolCallRaw<{
+      campaign: {
+        total_internal_capabilities: number;
+        route_only: boolean;
+        mutations_executed: number;
+        passed: number;
+        failed: number;
+        failure_classes: Record<string, number>;
+        risk_groups: { read_only: number; mutation: number };
+      };
+    }>("executeLensicallyIntent", {
+      objective: "Run compact gateway checks.",
+      intent: "gateway configuration",
+      inputs: {},
+    });
+    expect(campaign.structuredContent.campaign).toMatchObject({
+      total_internal_capabilities: 84,
+      route_only: true,
+      mutations_executed: 0,
+    });
+    expect(campaign.structuredContent.campaign.passed + campaign.structuredContent.campaign.failed).toBe(84);
+    expect(campaign.structuredContent.campaign.risk_groups.read_only + campaign.structuredContent.campaign.risk_groups.mutation).toBe(84);
+    expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
+      "client_safety",
+      "routing",
+      "schema_contract",
+      "zero_input_mutation",
+    ]);
+  }, 30000);
+
   it("makes the static router the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
     expect(direct.isError).toBe(true);
