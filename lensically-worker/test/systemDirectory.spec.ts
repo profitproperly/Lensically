@@ -785,12 +785,15 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("repository_search", { query: "follower attribution behavior", max_results: 5 })).toThrow("client_safe_request_external_surface:repository_search");
   });
 
-  it("keeps startup-context retrieval on Recovery", () => {
+    it("uses runtime verification after the first startup call", () => {
+    expect(buildClientSafeGatewayRequest("runtime_verification")).toMatchObject({
+      intent: "get operator startup context",
+      inputs: {},
+    });
+    for (const incidentId of ["public_startup_receipt_wording", "public_startup_bootstrap_shape", "public_operator_context_shape", "public_second_startup_request"]) {
+      expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === incidentId)?.safe_profile_id).toBe("runtime_verification");
+    }
     expect(CLIENT_SAFE_REQUEST_PROFILES.startup_context).toMatchObject({ surface: "recovery_plane" });
-    expect(() => buildClientSafeGatewayRequest("startup_context")).toThrow("client_safe_request_external_surface:startup_context");
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_startup_receipt_wording")?.safe_profile_id).toBe("startup_context");
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_startup_bootstrap_shape")?.safe_profile_id).toBe("startup_context");
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_operator_context_shape")?.safe_profile_id).toBe("startup_context");
     expect(getLensicallySystemDirectorySummary()).toMatchObject({ pre_router_resolution: true });
   });
 
