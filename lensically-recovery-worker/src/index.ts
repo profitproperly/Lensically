@@ -414,6 +414,9 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "startup", inputs: {} } });
     const direct = await mainMcpRequest(origin, token, 4, "tools/call", { name: "getEngineeringAccessState", arguments: {} });
     const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "get_engineering_access_state", inputs: {} } });
+    const scheduler = await mainMcpRequest(origin, token, 6, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "get_scheduled_post_scheduler_state", inputs: {} } });
+    const scheduledToday = await mainMcpRequest(origin, token, 7, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "list_scheduled_posts", inputs: { brand_key: "manifest_mental", date: "2026-07-18", timezone: "America/New_York", proceed_confirmed: true } } });
+    const scheduledTomorrow = await mainMcpRequest(origin, token, 8, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "list_scheduled_posts", inputs: { brand_key: "manifest_mental", date: "2026-07-19", timezone: "America/New_York", proceed_confirmed: true } } });
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
     const gatewayTool = tools.find((tool) => tool.name === "executeLensicallyIntent") ?? null;
