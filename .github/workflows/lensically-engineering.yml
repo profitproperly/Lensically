@@ -49,8 +49,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_SHA: ${{ github.sha }}
-        run: |
-                    gh api --method POST "repos/${GH_REPO}/actions/workflows/lensically-engineering.yml/dispatches" \
+                run: |
+          gh api --method POST "repos/${GH_REPO}/actions/workflows/lensically-engineering.yml/dispatches" \
             -f ref=main \
             -f 'inputs[task]=worker-deploy' \
             -f "inputs[release_id]=${RELEASE_SHA:0:12}" \
