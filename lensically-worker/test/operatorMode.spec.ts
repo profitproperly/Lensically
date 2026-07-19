@@ -646,8 +646,7 @@ describe("operator mode backend spine", () => {
     expect(Number(afterProceedSnapshots?.total ?? 0)).toBe(2);
 
     const result = await mcpToolRaw<Record<string, unknown>>("executeLensicallyIntent", {
-      objective: "Review this month's follower growth and strongest posts.",
-      intent: "How many followers have we grown this month and which posts have done well this month?",
+      profile_id: "get_monthly_growth_review",
       inputs: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
