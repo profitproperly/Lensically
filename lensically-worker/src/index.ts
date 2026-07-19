@@ -15227,7 +15227,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       };
     }
     try {
-      const safeInputs = profileId === "capability_definition" && typeof inputs.tool_name === "string"
+      const safeInputs: Record<string, unknown> = profileId === "capability_definition" && typeof inputs.tool_name === "string"
         ? { capability: inputs.tool_name }
         : (profileId === "account_key_selection" || profileId === "account_proceed")
           && typeof inputs.account_key === "string"
