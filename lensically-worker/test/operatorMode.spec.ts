@@ -3002,6 +3002,35 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
+  it("routes bounded known-file repository search through the main Execution Kernel without Recovery", async () => {
+    const bounded = searchKnownRepositoryFileContent(
+      "alpha\nexecuteLensicallyIntent first\nbeta\nEXECUTELENSICALLYINTENT second",
+      "executeLensicallyIntent",
+      1,
+    );
+    expect(bounded).toEqual({
+      matches: [{ line_number: 2, line: "executeLensicallyIntent first" }],
+      match_count: 2,
+      searched_line_count: 4,
+      truncated: true,
+    });
+
+    const routed = await mcpToolCallRaw<{
+      error: string;
+      tool_name: string;
+      missing_required?: string[];
+    }>("executeLensicallyIntent", {
+      objective: "Find executeLensicallyIntent in a known repository file.",
+      intent: "search repository files",
+      inputs: { query: "executeLensicallyIntent" },
+    });
+    expect(routed.isError).toBe(true);
+    expect(routed.structuredContent).toMatchObject({
+      error: "routed_gateway_payload_invalid",
+      tool_name: "searchRepoFiles",
+    });
+  }, 30000);
+
   it("makes the static router the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
     expect(direct.isError).toBe(true);
