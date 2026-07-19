@@ -17645,21 +17645,16 @@ async function handleOperatorMcpEngineeringTool(
     if (!file.ok || file.content === null) {
       return { ok: false, error: "repo_file_read_failed", status: file.status, path };
     }
-    const normalizedQuery = query.toLowerCase();
-    const lines = file.content.split(/\r?\n/);
-    const allMatches = lines
-      .map((line, index) => ({ line_number: index + 1, line }))
-      .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery));
-    const matches = allMatches.slice(0, limit);
+    const search = searchKnownRepositoryFileContent(file.content, query, limit);
     return {
       ok: true,
       query,
       path,
-      matches,
-      match_count: allMatches.length,
-      returned_count: matches.length,
-      truncated: allMatches.length > matches.length,
-      searched_line_count: lines.length,
+      matches: search.matches,
+      match_count: search.match_count,
+      returned_count: search.matches.length,
+      truncated: search.truncated,
+      searched_line_count: search.searched_line_count,
       verified_complete_for_known_file: true,
       search_mode: "bounded_known_file_content",
       external_requests: 1,
