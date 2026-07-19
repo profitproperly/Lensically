@@ -32889,9 +32889,6 @@ export class ScheduledPostScheduler {
         : [];
       const result = await this.withExclusiveSchedulerControl(async () => {
         const control = await this.getControl();
-        if (control.mode !== "paused") {
-          return { ok: false, error: "scheduler_must_be_paused_for_recovery", control };
-        }
         if (!reason) {
           return { ok: false, error: "recovery_reason_required", control };
         }
