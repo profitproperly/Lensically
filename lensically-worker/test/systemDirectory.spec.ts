@@ -712,7 +712,7 @@ describe("System Directory foundation", () => {
             "public_full_workflow_dispatch_shape",
             "public_worker_release_task_value",
             "public_database_schema_search_terms",
-            "public_repeated_identical_status_poll",
+                        "public_second_workflow_status_request",
             "public_zero_input_main_workflow_request",
             "public_policy_repository_search_terms",
             "recovery_chunk_commit_session_identifier",
@@ -737,7 +737,7 @@ describe("System Directory foundation", () => {
       "public_scheduled_post_audit_narrative",
       "recovery_release_marker_verbose_message",
       "public_account_lifecycle_profile_omitted",
-      "recovery_task_only_operator_validation_dispatch",
+            "public_repeated_validation_dispatch",
       "capability_definition_profile_input_mismatch",
       "account_lifecycle_account_key_alias_mismatch",
     ]);
