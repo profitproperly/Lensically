@@ -533,6 +533,7 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
     || has(/\bstatus\s+(request|check|verification)\b/)
     || has(/\bcheck\s+(mcp|operator|runtime|gateway)\b/)
   ) return "engineeringPrecheck";
+  if (has(/\b(search|find)\b/) && has(/\b(repo|repository|source|code|file|files)\b/)) return "searchRepoFiles";
   if (has(/\b(list|show)\b/) && has(/\b(repo|repository)\b/) && has(/\b(files|tree)\b/)) return "listRepoFiles";
   if (has(/\b(start|begin|open)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "startRepoFileWrite";
   if (has(/\b(append|add)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+chunk|write\s+chunk|chunk)\b/)) return "appendRepoFileChunk";
