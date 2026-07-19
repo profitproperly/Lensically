@@ -1,7 +1,7 @@
 name: Lensically Validation
 # Fast routine validation. This workflow never deploys either Worker.
 # Push markers: [typecheck], [acceptance-regressions], [operator-smoke], [operator-analytics], [operator-scheduler],
-# [operator-content], [operator-accounts], [operator-engineering], [system-directory-tests], [operator-full], [gpt-memory-tests].
+# [operator-content], [operator-accounts], [operator-engineering], [system-directory-tests], [operator-full], [gpt-memory-tests], [verified-worker-release].
 run-name: Lensically validation · ${{ inputs.task || github.sha }}
 
 on:
@@ -52,7 +52,8 @@ jobs:
                 contains(github.event.head_commit.message, '[operator-engineering]') ||
         contains(github.event.head_commit.message, '[system-directory-tests]') ||
         contains(github.event.head_commit.message, '[operator-full]') ||
-        contains(github.event.head_commit.message, '[gpt-memory-tests]')
+                contains(github.event.head_commit.message, '[gpt-memory-tests]') ||
+        contains(github.event.head_commit.message, '[verified-worker-release]')
       }}
     runs-on: ubuntu-latest
     defaults:
@@ -107,6 +108,8 @@ jobs:
             scope="typecheck"
           elif [[ "${COMMIT_MESSAGE}" == *"[acceptance-regressions]"* ]]; then
             scope="acceptance"
+                    elif [[ "${COMMIT_MESSAGE}" == *"[verified-worker-release]"* ]]; then
+            scope="full"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-full]"* ]]; then
             scope="full"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-analytics]"* ]]; then
