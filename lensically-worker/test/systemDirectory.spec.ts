@@ -408,7 +408,7 @@ describe("System Directory foundation", () => {
 
   it("directs monthly analytics and deployment to their authoritative systems", () => {
     expect(resolveLensicallySystemDirectory("How many followers have we grown this month and which posts performed best?")).toMatchObject({ entry_id: "analytics.monthly_growth", route_intent: "get monthly growth review" });
-    expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({ entry_id: "deployment.main_worker", recommended_next_planes: ["recovery"] });
+        expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({ entry_id: "deployment.main_worker", recommended_next_planes: ["engineering"] });
   });
 
   it("builds workflow lookups without exposing internal handler identifiers", () => {
@@ -896,13 +896,13 @@ describe("System Directory foundation", () => {
     expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("resume_original_objective");
   });
 
-      it("keeps Worker deployment outside the main router", () => {
-    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane" });
+        it("keeps Worker deployment on the Main verified marker path", () => {
     expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({
       entry_id: "deployment.main_worker",
-      recommended_next_planes: ["recovery"],
-      hard_gates: expect.arrayContaining(["Deployment requests never use the main public gateway."]),
+      recommended_next_planes: ["engineering"],
+      hard_gates: expect.arrayContaining(["Main release markers require a verified repository head and passing validation."]),
     });
+    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane" });
   });
 
     it("falls back to the original semantic route when a directory hint target is unavailable", () => {
