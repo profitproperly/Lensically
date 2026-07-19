@@ -24,12 +24,9 @@ if (result.status !== 0) {
     stderr: String(result.stderr ?? "").slice(-20000),
     captured_at: new Date().toISOString(),
   };
+  execFileSync("git", ["reset", "--hard", "HEAD"], { cwd: repoRoot, stdio: "inherit" });
+  execFileSync("git", ["clean", "-fd"], { cwd: repoRoot, stdio: "inherit" });
   fs.writeFileSync(diagnosticPath, `${JSON.stringify(diagnostic, null, 2)}\n`);
-  execFileSync("git", ["config", "user.name", "lensically-engineering"], { cwd: repoRoot, stdio: "inherit" });
-  execFileSync("git", ["config", "user.email", "lensically-engineering@users.noreply.github.com"], { cwd: repoRoot, stdio: "inherit" });
-  execFileSync("git", ["add", "lensically-worker/compact-maintenance-error.json"], { cwd: repoRoot, stdio: "inherit" });
-  execFileSync("git", ["commit", "-m", "Record compact maintenance diagnostic"], { cwd: repoRoot, stdio: "inherit" });
-  execFileSync("git", ["push", "origin", "HEAD:main"], { cwd: repoRoot, stdio: "inherit" });
   process.exit(result.status ?? 1);
 }
 
