@@ -16015,6 +16015,11 @@ async function operatorExecutionFingerprint(toolName: string, args: Record<strin
 
 const HARDENING_BOUNDARY_VALUES = new Set<HardeningBoundary>(["client", "gateway", "routing", "server", "database", "deployment", "quality", "efficiency", "external"]);
 const HARDENING_STATE_VALUES = new Set<HardeningState>(["detected", "contained", "classified", "reproduced", "generalized", "repaired", "prevention_locked", "validated", "released", "live_verified", "resumed", "closed"]);
+const HARDENING_CONTROLLER_TOOLS = new Set<string>(["recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation"]);
+const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
+  "explicit_proceed_required", "continuity_context_required", "continuity_session_mismatch", "growth_plan_approval_required",
+  "owner_ratification_required", "hardening_incident_active", "operation_already_in_progress", "idempotency_key_payload_mismatch",
+]);
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile",
