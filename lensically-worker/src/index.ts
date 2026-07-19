@@ -19144,26 +19144,13 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             source_defined: true,
             model_tool_choice_allowed: false,
           },
-          compatibility: {
-            mandatory_execution_map: true,
-            routed_execution: true,
-            execution_policy: true,
-          },
+                    lifecycle: mapLifecycle,
+          policy: executionPolicy,
         };
-        resultPayload.mandatory_execution_map = mapLifecycle;
-        resultPayload.execution_library = routedGatewayMetadata.execution_library ?? null;
-        resultPayload.gateway = {
-          name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-          intent: routedGatewayMetadata.action_intent ?? null,
-          public_schema_frozen: true,
-          public_contract: "profile_id_inputs_v1",
-          legacy_freehand_compatibility: true,
-          execution_kernel: EXECUTION_KERNEL_VERSION,
-        };
-        resultPayload.routed_execution = routedGatewayMetadata;
+                resultPayload.routed_execution = routedGatewayMetadata;
         resultPayload.execution_guard_enforcement = {
           version: OPERATOR_EXECUTION_GUARD_VERSION,
-          mode: sourceDefinedDirectEngineering ? "source_defined_direct_engineering" : "mandatory_execution_map",
+                    mode: sourceDefinedDirectEngineering ? "source_defined_direct_engineering" : "source_defined_static_route",
           normalized_before_execution: true,
           known_path_checked: true,
           direct_operational_calls_allowed: false,
@@ -19175,8 +19162,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             d1_autonomy_bypassed: !sourceDefinedProtectedOperation,
           } : {}),
         };
-      }
-      resultPayload.execution_policy = executionPolicy;
+            }
       resultPayload = enforceOperatorPayloadBudget(resultPayload);
       if (idempotencyKey) {
         resultPayload.idempotency = {
