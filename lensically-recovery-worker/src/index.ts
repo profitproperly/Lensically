@@ -578,7 +578,10 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         unique_count: new Set(toolNames).size,
         names: toolNames,
         public_contract_enforced: publicContractSucceeded,
-        legacy_profile_schema_retired: !Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id"),
+        legacy_profile_schema_retired: Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id")
+          && !Object.prototype.hasOwnProperty.call(gatewayProperties, "objective")
+          && !Object.prototype.hasOwnProperty.call(gatewayProperties, "intent"),
+        legacy_freehand_compatibility_verified: legacyCompatibilitySucceeded,
         required: gatewayRequired,
         properties: Object.keys(gatewayProperties),
       },
