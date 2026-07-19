@@ -47,8 +47,8 @@ jobs:
       - name: Dispatch exact-head Worker release
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-                    RELEASE_SHA: ${{ github.sha }}
+                    GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           gh api --method POST "repos/${GH_REPO}/actions/workflows/lensically-engineering.yml/dispatches" \
             -f ref=main \
