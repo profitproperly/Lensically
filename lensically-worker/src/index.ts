@@ -17699,6 +17699,14 @@ async function handleOperatorMcpAdminTool(
           failures: liveReadFailures,
           skipped_tools: liveReadRows.filter((row) => row.skipped === true).map((row) => row.tool_name),
         },
+        mutation_preflights: {
+          eligible: mutationPreflightRows.length,
+          executed: mutationPreflightRows.length,
+          passed: mutationPreflightRows.length - mutationPreflightFailures.length,
+          failed: mutationPreflightFailures.length,
+          failures: mutationPreflightFailures,
+          side_effects_executed: 0,
+        },
         risk_groups: {
           read_only: campaignRows.filter((row) => row.read_only === true).length,
           mutation: campaignRows.filter((row) => row.read_only !== true).length,
