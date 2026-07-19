@@ -16103,7 +16103,16 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
   const current = normalizeHardeningState(row.state);
   if (!current) return { ok: false, error: "hardening_incident_state_invalid" };
   const supplied = args.evidence && typeof args.evidence === "object" && !Array.isArray(args.evidence) ? args.evidence as Record<string, unknown> : {};
-  /* HARDENING_TRANSITION_EVIDENCE */
+    const priorRegressions = safeParseJsonString(String(row.regression_test_ids_json ?? "[]"));
+  const evidence: HardeningTransitionEvidence = {
+    root_cause: normalizeOperatorText(args.root_cause ?? row.root_cause, 4000, true),
+    generalized_cause: normalizeOperatorText(args.generalized_cause ?? row.generalized_cause, 4000, true),
+    prevention_rule_id: normalizeOperatorMachineKey(args.prevention_rule_id ?? row.prevention_rule_id, "") || null,
+    regression_test_ids: Array.isArray(args.regression_test_ids)
+      ? args.regression_test_ids.map(String).filter(Boolean)
+      : Array.isArray(priorRegressions) ? priorRegressions.map(String) : [],
+    /* HARDENING_TRANSITION_RELEASE_EVIDENCE */
+  };
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
