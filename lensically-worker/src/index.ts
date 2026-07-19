@@ -15348,7 +15348,12 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           : inputs;
       delete safeInputs.account_key;
             const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
-      let compiledRequest = compiled;
+            let compiledRequest = compiled;
+      if (profileId === "capability_definition") {
+        const exactTool = resolveExactCapabilityToolName(safeInputs.capability);
+        if (!exactTool) throw new Error("unknown_capability_definition");
+        compiledRequest = { ...compiled, inputs: { tool_name: exactTool } };
+      }
       if (profileId === "repository_symbol_search") {
         compiledRequest = { ...compiled, inputs: { prefix: safeInputs.path, query: safeInputs.symbol, limit: safeInputs.limit ?? 20 } };
       }
