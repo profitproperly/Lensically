@@ -14733,8 +14733,6 @@ function resolveOperatorAccountLifecycleProfile(
   const suppliedProfileId = normalizeOperatorMachineKey(gatewayArgs.profile_id ?? rawInputs.profile_id, "");
   const proceedRequested = suppliedProfileId === "account_proceed"
     || suppliedProfileId === "confirm_operator_proceed"
-    || inputs.proceed_confirmed === true
-    || gatewayArgs.proceed_confirmed === true
     || /\b(confirm|proceed)\b/.test(lifecycleText);
   if (brandKey && proceedRequested) {
     return { profile_id: "account_proceed", inputs: { brand_key: brandKey } };
