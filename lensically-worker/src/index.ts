@@ -13060,7 +13060,7 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner. Include owner_response with the owner's exact approval so authorization is persisted before execution.", inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
   { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
     { name: "runGitHubWorkflow", title: "Run GitHub validation workflow", description: "Dispatch one configured validation task. Worker deployment is triggered by a verified source-control release marker through the Main engineering path; direct client deployment dispatch is forbidden.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-tests", "gpt-memory-tests"] } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-    { name: "getGitHubWorkflowRun", title: "Get GitHub workflow run", description: "Read one GitHub Actions workflow run and its compact job status.", inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    { name: "getGitHubWorkflowRun", title: "Get GitHub workflow run", description: "Read one GitHub Actions workflow run, optionally waiting once for a terminal result.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, wait_seconds: { type: "integer", minimum: 0, maximum: 60 } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
   { name: "verifyDeployedMcpVersion", title: "Verify deployed MCP version", description: "Verify the live deployed Lensically MCP endpoint version and tool count.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: "listEngineeringAudit", title: "List engineering audit", description: "List compact audit entries for source edits, workflow dispatches, deploys, and memory updates.", inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 }, action: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
@@ -18467,8 +18467,16 @@ async function handleOperatorMcpEngineeringTool(
     if (!Number.isFinite(runId)) {
       return { ok: false, error: "run_id_required" };
     }
-    const run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
-        const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
+        const waitSeconds = Math.min(Math.max(Number(args.wait_seconds ?? 0), 0), 60);
+    const deadline = Date.now() + waitSeconds * 1000;
+    let run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
+    while (waitSeconds > 0 && Date.now() < deadline) {
+      const runData = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
+      if (["completed", "cancelled"].includes(String(runData.status ?? ""))) break;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(5000, Math.max(250, deadline - Date.now()))));
+      run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
+    }
+    const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
     const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
       ? ((jobs.data as Record<string, unknown>).jobs as Array<Record<string, unknown>>).map((job) => ({
         id: job.id,
