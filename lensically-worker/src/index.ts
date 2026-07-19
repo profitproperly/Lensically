@@ -18642,7 +18642,7 @@ async function handleOperatorMcpEngineeringTool(
     }
 
     const put = await putGithubFiles(env, {
-      files: nextFiles,
+            files: changedFiles,
       message,
       expectedHeadSha,
     });
