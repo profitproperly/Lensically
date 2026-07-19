@@ -2708,13 +2708,13 @@ describe("operator mode MCP endpoint", () => {
       intent: "list scheduled posts",
       inputs: { brand_key: BRAND_KEY, proceed_confirmed: true },
     });
+    expect(cachedAccountRead.isError).toBe(true);
     expect(cachedAccountRead.structuredContent).toMatchObject({
-      profile_id: "cached_schema_compat",
+      ok: false,
+      error: "continuity_context_required",
+      required_next_tool: "confirmOperatorProceed",
     });
     expect(cachedAccountRead.structuredContent.error).not.toBe("registered_profile_id_required");
-    expect(cachedAccountRead.structuredContent).not.toMatchObject({
-      routed_execution: { executed_tool: "confirmOperatorProceed" },
-    });
 
     const resolvedFreshKey = await mcpToolCallRaw<{
       selected_key: CanonicalBrandKey;
