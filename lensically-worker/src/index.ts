@@ -13325,8 +13325,15 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "runMcpTests",
     title: "Run MCP tests",
-    description: "Run built-in MCP configuration and workflow enforcement tests without needing Codex.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, additionalProperties: false },
+    description: "Run the bounded Execution Kernel campaign. Routes validates the complete surface; each read segment executes only its bounded read-only group so one Worker invocation never exceeds external-request limits.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        segment: { type: "string", enum: ["routes", "engineering_reads", "admin_reads", "account_reads_a", "account_reads_b"], default: "routes" },
+      },
+      additionalProperties: false,
+    },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
