@@ -13133,6 +13133,7 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
+      { name: "getHardeningStatus", title: "Get hardening status", description: "Read continuous-hardening incidents and transition evidence.", inputSchema: { type: "object", properties: { incident_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 50 } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
     {
     name: "executeLensicallyIntent",
     title: "Execute Lensically intent",
