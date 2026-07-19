@@ -32822,7 +32822,8 @@ export class ScheduledPostScheduler {
       try {
         if (mode === "normal") {
           const activation = await this.withExclusiveSchedulerControl(async () => {
-            const overdue = await listOverdueScheduledPosts(this.env, 100);
+            const overdue = (await listOverdueScheduledPosts(this.env, 100))
+              .filter((row) => row.status === SCHEDULED_POST_STATUS_APPROVED);
             if (overdue.length) {
               return {
                 ok: false,
