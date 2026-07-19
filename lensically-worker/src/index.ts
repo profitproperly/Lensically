@@ -13330,7 +13330,21 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
-        segment: { type: "string", enum: ["routes", "engineering_reads", "admin_reads", "account_reads_a", "account_reads_b"], default: "routes" },
+        segment: {
+          type: "string",
+          enum: [
+            "routes",
+            "engineering_reads",
+            "admin_reads",
+            "account_reads_a",
+            "account_reads_b",
+            "engineering_mutations",
+            "admin_mutations",
+            "account_mutations_a",
+            "account_mutations_b"
+          ],
+          default: "routes"
+        },
       },
       additionalProperties: false,
     },
