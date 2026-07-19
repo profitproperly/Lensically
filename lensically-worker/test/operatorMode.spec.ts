@@ -3058,27 +3058,48 @@ describe("operator mode MCP endpoint", () => {
       inputs: { segment: "routes" },
     });
     expect(campaign.structuredContent.campaign).toMatchObject({
+      segment: "routes",
       total_internal_capabilities: 84,
-      route_only: false,
+      total_read_only_capabilities: 37,
+      route_only: true,
       mutations_executed: 0,
-      live_reads: {
-        eligible: 37,
-      },
+      live_reads: { eligible: 0, failed: 0 },
     });
-    expect(
-      campaign.structuredContent.campaign.live_reads.failed,
-      JSON.stringify(campaign.structuredContent.campaign.live_reads.failures),
-    ).toBe(0);
     expect(campaign.structuredContent.campaign.passed).toBe(84);
     expect(campaign.structuredContent.campaign.failed).toBe(0);
-    expect(campaign.structuredContent.campaign.risk_groups.read_only + campaign.structuredContent.campaign.risk_groups.mutation).toBe(84);
+    expect(campaign.structuredContent.campaign.risk_groups).toEqual({
+      read_only: 37,
+      mutation: 47,
+      mutation_without_required_inputs: 0,
+    });
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
       "client_safety",
       "routing",
       "schema_contract",
       "zero_input_mutation",
     ]);
-  }, 30000);
+
+    const readSegments = ["engineering_reads", "admin_reads", "account_reads_a", "account_reads_b"] as const;
+    let eligibleReads = 0;
+    let failedReads = 0;
+    for (const segment of readSegments) {
+      const result = await mcpToolCallRaw<typeof campaign.structuredContent>("executeLensicallyIntent", {
+        objective: `Review ${segment}.`,
+        intent: "checkup",
+        inputs: { segment },
+      });
+      expect(result.structuredContent.campaign.segment).toBe(segment);
+      expect(result.structuredContent.campaign.route_only).toBe(false);
+      eligibleReads += result.structuredContent.campaign.live_reads.eligible;
+      failedReads += result.structuredContent.campaign.live_reads.failed;
+      expect(
+        result.structuredContent.campaign.live_reads.failed,
+        JSON.stringify(result.structuredContent.campaign.live_reads.failures),
+      ).toBe(0);
+    }
+    expect(eligibleReads).toBe(37);
+    expect(failedReads).toBe(0);
+  }, 60000);
 
   it("makes the static router the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
