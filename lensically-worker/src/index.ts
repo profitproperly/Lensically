@@ -15993,6 +15993,29 @@ function normalizeHardeningState(value: unknown): HardeningState | null {
   return HARDENING_STATE_VALUES.has(normalized) ? normalized : null;
 }
 
+function serializeHardeningIncident(row: Record<string, unknown>): Record<string, unknown> {
+  const parse = (key: string, fallback: unknown) => safeParseJsonString(String(row[key] ?? "")) ?? fallback;
+  return {
+    id: row.id, signature: row.signature, boundary: row.boundary, severity: row.severity, classification: row.classification, state: row.state,
+    affected_scope: row.affected_scope, blocked_profile_id: row.blocked_profile_id ?? null, blocked_tool_name: row.blocked_tool_name ?? null,
+    request_fingerprint: row.request_fingerprint ?? null, expected: parse("expected_json", null), observed: parse("observed_json", null), side_effect_state: row.side_effect_state,
+    root_cause: row.root_cause ?? null, generalized_cause: row.generalized_cause ?? null, prevention_rule_id: row.prevention_rule_id ?? null,
+    regression_test_ids: parse("regression_test_ids_json", []), tested_sha: row.tested_sha ?? null, deployment_id: row.deployment_id ?? null,
+    live_verification: parse("live_verification_json", null), resume_capsule: parse("resume_capsule_json", null), resume_result: parse("resume_result_json", null),
+    autonomy_dividend: parse("autonomy_dividend_json", null), efficiency_result: parse("efficiency_result_json", null), created_at: row.created_at, updated_at: row.updated_at, closed_at: row.closed_at ?? null,
+  };
+}
+
+async function getActiveBlockingHardeningIncident(env: Env): Promise<Record<string, unknown> | null> {
+  await ensureOperatorMcpAdminTables(env);
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_hardening_incidents
+     WHERE state <> 'closed' AND severity IN ('P0', 'P1')
+     ORDER BY CASE severity WHEN 'P0' THEN 0 ELSE 1 END, datetime(created_at) ASC LIMIT 1`,
+  ).first<Record<string, unknown>>();
+  return row ? serializeHardeningIncident(row) : null;
+}
+
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_execution_events (
