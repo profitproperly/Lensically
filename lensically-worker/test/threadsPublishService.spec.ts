@@ -70,6 +70,7 @@ describe("Threads publish readiness", () => {
       accessToken: "token",
       threadsUserId: "user-2",
       text: "Do not commit early.",
+      autoPublishText: false,
       readinessMaxChecks: 2,
       readinessDelayMs: 0,
     });
