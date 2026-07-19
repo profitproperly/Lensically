@@ -89,7 +89,7 @@ export const PREVENTED_CLIENT_BLOCKS: readonly PreventedClientBlock[] = [
 export const CLIENT_SAFE_REQUEST_PROFILES: Readonly<Record<ClientSafeRequestProfileId, ClientSafeRequestProfile>> = {
   startup: { id: "startup", objective: "Load the compact Lensically startup bootstrap.", intent: "startup", allowed_input_keys: [], max_input_characters: 2 },
   startup_context: { id: "startup_context", objective: "Read main startup context through the independent control surface.", intent: "recovery main startup context", allowed_input_keys: [], max_input_characters: 2, surface: "recovery_plane" },
-  capability_campaign: { id: "capability_campaign", objective: "Run compact system checks.", intent: "run system checks", allowed_input_keys: [], max_input_characters: 2 },
+  capability_campaign: { id: "capability_campaign", objective: "Review one.", intent: "checkup", allowed_input_keys: [], max_input_characters: 2 },
   workflow_run_list: { id: "workflow_run_list", objective: "List recent workflow activity with compact run metadata.", intent: "list github workflow runs", allowed_input_keys: ["limit"], max_input_characters: 80 },
   recovery_workflow_run_list: { id: "recovery_workflow_run_list", objective: "List recent workflow activity through the independent control surface.", intent: "recovery workflow list", allowed_input_keys: ["limit"], max_input_characters: 80, surface: "recovery_plane" },
     workflow_run_status: { id: "workflow_run_status", objective: "Read one active workflow run and return compact status and step results.", intent: "get github workflow run", allowed_input_keys: ["run_id", "wait_seconds"], max_input_characters: 120 },
