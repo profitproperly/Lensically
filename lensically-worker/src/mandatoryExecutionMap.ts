@@ -26,6 +26,22 @@ export type HardeningTransitionEvidence = {
   autonomy_dividend?: Record<string, unknown> | null;
 };
 
+export function validateHardeningTransition(current: HardeningState, target: HardeningState, evidence: HardeningTransitionEvidence = {}): { allowed: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (!HARDENING_ALLOWED_TRANSITIONS[current].includes(target)) errors.push(`invalid_transition:${current}:${target}`);
+  const atOrAfter = (state: HardeningState) => HARDENING_STATE_ORDER.indexOf(target) >= HARDENING_STATE_ORDER.indexOf(state);
+  if (atOrAfter("generalized") && !evidence.root_cause?.trim()) errors.push("root_cause_required");
+  if (atOrAfter("generalized") && !evidence.generalized_cause?.trim()) errors.push("generalized_cause_required");
+  if (atOrAfter("prevention_locked") && !evidence.prevention_rule_id?.trim()) errors.push("prevention_rule_required");
+  if (atOrAfter("validated") && !evidence.regression_test_ids?.length) errors.push("regression_evidence_required");
+  if (atOrAfter("released") && !evidence.tested_sha?.trim()) errors.push("tested_sha_required");
+  if (atOrAfter("live_verified") && !evidence.deployment_id?.trim()) errors.push("deployment_id_required");
+  if (atOrAfter("resumed") && !evidence.live_verification) errors.push("live_verification_required");
+  if (target === "closed" && !evidence.resume_result) errors.push("resume_result_required");
+  if (target === "closed" && !evidence.autonomy_dividend) errors.push("autonomy_dividend_required");
+  return { allowed: errors.length === 0, errors };
+}
+
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
 export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
 export type WinningPathPromotion = {
