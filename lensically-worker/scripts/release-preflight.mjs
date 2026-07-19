@@ -179,8 +179,11 @@ if (!source.includes("const RETIRED_EXECUTION_TABLES")
 }
 
 if (!source.includes('name: "executeLensicallyIntent"')
-    || !source.includes('required: ["objective", "intent", "inputs"]')
-    || !source.includes("The server-side Execution Kernel resolves the live capability")
+    || !source.includes('required: ["profile_id", "inputs"]')
+    || source.includes('required: ["objective", "intent", "inputs"]')
+    || !source.includes("Lensically compiles the canonical objective and intent server-side")
+    || !source.includes('public_contract: "profile_id_inputs_v1"')
+    || !source.includes("legacy_freehand_compatibility: true")
     || !source.includes('export const EXECUTION_KERNEL_NAME = "Execution Kernel"')
     || !source.includes('export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1"')
     || !source.includes("createOperatorMcpSessionId")
