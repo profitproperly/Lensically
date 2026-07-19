@@ -119,7 +119,7 @@ write("test/operatorMode.spec.ts", operatorTests);
 
 const workflowPath = path.resolve(repoRoot, ".github/workflows/lensically-engineering.yml");
 let workflow = fs.readFileSync(workflowPath, "utf8");
-const temporaryStep = `\n      - name: Apply one-run lineage recovery maintenance\n        if: \${{ inputs.task == 'typecheck' }}\n        working-directory: .\n        run: |\n          if [ -f scripts/apply-lineage-recovery-patch.mjs ]; then\n            node scripts/apply-lineage-recovery-patch.mjs\n            git config user.name "lensically-engineering"\n            git config user.email "lensically-engineering@users.noreply.github.com"\n            git add -A\n            git commit -m "Implement published winner lineage recovery [operator-tests]"\n            git push origin HEAD:main\n          fi\n`;
+const temporaryStep = `\n      - name: Apply one-run lineage recovery maintenance\n        if: \${{ inputs.task == 'typecheck' }}\n        working-directory: .\n        run: |\n          if [ -f lensically-worker/scripts/apply-lineage-recovery-patch.mjs ]; then\n            node lensically-worker/scripts/apply-lineage-recovery-patch.mjs\n            git config user.name "lensically-engineering"\n            git config user.email "lensically-engineering@users.noreply.github.com"\n            git add -A\n            git commit -m "Implement published winner lineage recovery [operator-tests]"\n            git push origin HEAD:main\n          fi\n`;
 workflow = replaceOnce(workflow, "  contents: write\n  actions: write", "  contents: read\n  actions: write", "restore workflow contents permission");
 workflow = replaceOnce(workflow, temporaryStep, "", "remove one-run maintenance step");
 fs.writeFileSync(workflowPath, workflow);
