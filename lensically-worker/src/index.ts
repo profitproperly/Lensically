@@ -18958,7 +18958,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           jsonrpc: "2.0",
           id: id ?? null,
           result: {
-            structuredContent: { ...aliasRetryBlock, execution_policy: executionPolicy },
+                        structuredContent: { ...aliasRetryBlock, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } },
             content: [{ type: "text", text: `Lensically Operator Mode blocked same-backend wrapper retry for ${String(executionPolicy.canonical_tool ?? toolName)}.` }],
             isError: true,
           },
@@ -18979,7 +18979,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           const resultPayload = replayed && typeof replayed === "object" && !Array.isArray(replayed)
             ? replayed as Record<string, unknown>
             : { ok: false, error: "idempotency_receipt_parse_failed" };
-          resultPayload.execution_policy = executionPolicy;
+                    resultPayload.execution_kernel = { ...operatorExecutionKernelMetadata(env), policy: executionPolicy };
           resultPayload.idempotency = {
             version: OPERATOR_IDEMPOTENCY_VERSION,
             key: idempotencyKey,
@@ -19002,7 +19002,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             ok: false,
             error: "idempotency_key_payload_mismatch",
             idempotency: { version: OPERATOR_IDEMPOTENCY_VERSION, key: idempotencyKey, request_fingerprint: receiptFingerprint },
-            execution_policy: executionPolicy,
+                        execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy },
           };
           return mcpJsonResponse({
             jsonrpc: "2.0",
@@ -19027,7 +19027,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
                 replayed: false,
                 request_fingerprint: receiptFingerprint,
               },
-              execution_policy: executionPolicy,
+                            execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy },
             };
             return mcpJsonResponse({
               jsonrpc: "2.0",
@@ -19051,7 +19051,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         : await beginOperatorAutonomyAuthorization(env, toolName, args);
       if (!autonomyAuthorization.allowed) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_autonomy_decision_required");
-        const resultPayload = { ok: false, ...autonomyAuthorization, execution_policy: executionPolicy };
+                const resultPayload = { ok: false, ...autonomyAuthorization, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } };
         return mcpJsonResponse({
           jsonrpc: "2.0",
           id: id ?? null,
