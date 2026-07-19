@@ -18011,7 +18011,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           required_tool: requiredTool,
           required_route: preCallRouting.route?.mandatory_route ?? null,
           suggested_tools: [requiredTool],
-          account_data_loaded: false,
+          account_data_loaded: gatewayAccountDataLoaded,
         };
         return mcpJsonResponse({
           jsonrpc: "2.0",
