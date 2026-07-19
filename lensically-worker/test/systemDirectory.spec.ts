@@ -854,14 +854,14 @@ describe("System Directory foundation", () => {
 
   it("returns the mandatory client-safety receipt for every startup response", () => {
     expect(getClientSafetyRegistrySummary()).toMatchObject({
-      registry_version: "client-safe-requests-v3",
+      registry_version: "client-safe-requests-v4",
       canonical_location: "lensically-worker/src/systemDirectory/clientSafeRequests.ts",
       registry_valid: true,
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
-                                                prevented_client_block_count: 28,
-      safe_request_profile_count: 17,
+      prevented_client_block_count: 31,
+      safe_request_profile_count: 18,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
