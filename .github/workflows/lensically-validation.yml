@@ -170,7 +170,7 @@ jobs:
           set -o pipefail
           npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-gpt-memory-tests.log
 
-            - name: Surface GPT memory failure
+                  - name: Surface GPT memory failure
         if: ${{ steps.gpt_memory_tests.outcome == 'failure' }}
         run: |
           diagnostic=$(tail -n 100 /tmp/lensically-gpt-memory-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
