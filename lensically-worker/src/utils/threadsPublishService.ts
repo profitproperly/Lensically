@@ -488,6 +488,15 @@ export async function publishTextToThreads({
     };
   }
 
+  if (autoPublishText) {
+    return {
+      success: true,
+      publishRequestId,
+      publishedPostId: publishRequestId,
+      publishResponse: createPayload,
+    };
+  }
+
   void publishMaxAttempts;
 
   const readinessResult = await waitForContainerReadiness(
