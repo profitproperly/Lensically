@@ -19,7 +19,7 @@ on:
           - operator-scheduler
           - operator-content
           - operator-accounts
-                    - operator-engineering
+                              - operator-engineering
           - system-directory-tests
           - operator-full-tests
           - gpt-memory-tests
@@ -170,14 +170,14 @@ jobs:
           set -o pipefail
           npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-gpt-memory-tests.log
 
-                  - name: Surface GPT memory failure
+                        - name: Surface GPT memory failure
         if: ${{ steps.gpt_memory_tests.outcome == 'failure' }}
         run: |
           diagnostic=$(tail -n 100 /tmp/lensically-gpt-memory-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
           echo "::error title=GPT memory validation failure::${diagnostic}"
           exit 1
 
-            - name: Run verified release supporting gates
+                  - name: Run verified release supporting gates
         if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]') }}
         run: |
           set -euo pipefail
