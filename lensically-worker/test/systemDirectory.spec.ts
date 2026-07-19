@@ -1238,7 +1238,8 @@ describe("System Directory foundation", () => {
   it("registers typed hardening and repository inspection profiles", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.client_block_intake.allowed_input_keys).toContain("resume_capsule");
     expect(CLIENT_SAFE_REQUEST_PROFILES.hardening_transition.allowed_input_keys).toContain("prevention_rule_id");
-    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_symbol_search.allowed_input_keys).toEqual(["path", "symbol", "limit"]);
+        expect(CLIENT_SAFE_REQUEST_PROFILES.repository_symbol_search.allowed_input_keys).toEqual(["path", "symbol", "limit"]);
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_write_commit.allowed_input_keys).toEqual(["session_id"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_file_read.allowed_input_keys).toContain("max_lines");
     expect(buildClientSafeGatewayRequest("repository_symbol_search", { path: "lensically-worker/src/index.ts", symbol: "validateHardeningTransition", limit: 5 })).toMatchObject({
       intent: "search repository symbol",
