@@ -29,6 +29,7 @@ import {
   CLIENT_SAFETY_STARTUP_INSTRUCTION,
   getClientSafetyRegistrySummary,
   getLensicallySystemDirectorySummary,
+  inspectClientSafeGatewayRequest,
   type ClientSafeRequestProfileId,
 } from "./systemDirectory";
 
