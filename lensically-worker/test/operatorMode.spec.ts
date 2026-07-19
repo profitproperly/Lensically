@@ -1205,6 +1205,30 @@ describe("operator mode backend spine", () => {
                 '2026-07-18T05:00:00Z', ?, '2026-07-18T05:00:08Z')`,
     ).bind(publishedText, publishedPostId).run();
     const scheduledPostId = Number(scheduledInsert.meta?.last_row_id ?? 0);
+    const scheduledCountBeforeBypass = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = '35758578720393972'`,
+    ).first<{ total: number | string }>();
+    const blockedDirectBatch = await fetchFromWorker("/api/operator/tools/schedule_owner_approved_batch", {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        brand_key: "manifest_mental",
+        owner_approval: "Approved fixture text only.",
+        timezone: "America/New_York",
+        posts: [{ text: "This must not bypass lineage.", date: "2026-07-20", time: "12:00" }],
+      }),
+    });
+    expect(blockedDirectBatch.status).toBe(409);
+    expect(await blockedDirectBatch.json()).toMatchObject({
+      success: false,
+      error: "manifest_lineage_preserving_schedule_required",
+      account_mutated: false,
+    });
+    const scheduledCountAfterBypass = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = '35758578720393972'`,
+    ).first<{ total: number | string }>();
+    expect(Number(scheduledCountAfterBypass?.total ?? 0)).toBe(Number(scheduledCountBeforeBypass?.total ?? 0));
+
     const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
       brand_key: "manifest_mental",
     });
