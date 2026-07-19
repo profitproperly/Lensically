@@ -12,12 +12,19 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 import { logAuthEvent, logWorkerOperationalEvent } from "../auth/operationalLog.js";
 import {
+  CONTINUOUS_HARDENING_VERSION,
   finalizeMandatoryExecutionMapCall,
   getMandatoryExecutionMapSummary,
   MANDATORY_EXECUTION_MAP_VERSION,
   prepareMandatoryExecutionMapCall,
   prepareSourceDefinedDirectEngineeringCall,
+  validateHardeningTransition,
   type ExecutionPolicyLibrarySource,
+  type HardeningBoundary,
+  type HardeningClassification,
+  type HardeningSeverity,
+  type HardeningState,
+  type HardeningTransitionEvidence,
   type MandatoryExecutionToolDefinition,
 } from "./mandatoryExecutionMap";
 import {
