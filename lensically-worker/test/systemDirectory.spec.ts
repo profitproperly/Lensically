@@ -844,13 +844,11 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_exact_patch).toMatchObject({ surface: "recovery_plane" });
   });
 
-  it("uses verified source markers when client-side validation dispatch is blocked", () => {
-    expect(Object.prototype.hasOwnProperty.call(CLIENT_SAFE_REQUEST_PROFILES, "validation_dispatch")).toBe(false);
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "recovery_exact_sha_validation_dispatch")?.safe_profile_id).toBe("verified_release_marker");
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "recovery_task_only_operator_validation_dispatch")?.safe_profile_id).toBe("verified_release_marker");
-    expect(CLIENT_SAFE_REQUEST_PROFILES.verified_release_marker).toMatchObject({
-      surface: "recovery_plane",
-      allowed_input_keys: ["path", "find", "replace", "message"],
+    it("uses Main push markers after validation dispatch is client-blocked", () => {
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_repeated_validation_dispatch")?.safe_profile_id).toBe("repository_patch_set");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_patch_set).toMatchObject({
+      intent: "apply repo patch set",
+      allowed_input_keys: ["patches", "message", "summary", "expected_head_sha", "dry_run"],
     });
   });
 
