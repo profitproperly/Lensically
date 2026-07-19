@@ -86,6 +86,7 @@ const result = spawnSync(
     "--run",
     testPath,
     "--reporter=dot",
+    "--silent",
     "--no-color",
     "--bail=1",
     `--testNamePattern=${titlePattern}`,
