@@ -215,6 +215,7 @@ export function getClientSafetyRegistrySummary(): Record<string, unknown> {
     safe_request_profile_count: Object.keys(CLIENT_SAFE_REQUEST_PROFILES).length,
     universal_policy_count: CLIENT_SAFETY_POLICIES.length,
     migrated_legacy_rule_count: CLIENT_SAFETY_LEGACY_MIGRATIONS.length,
+    schema_refresh_notice: CLIENT_SCHEMA_REFRESH_NOTICE,
   };
 }
 
