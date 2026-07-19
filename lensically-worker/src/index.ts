@@ -17354,6 +17354,8 @@ async function handleOperatorMcpAdminTool(
       const schemaPassed = required.every((field) => Object.prototype.hasOwnProperty.call(properties, field))
         && schema.additionalProperties === false;
       const readOnly = annotations.readOnlyHint === true;
+      const policyMutatesState = operatorToolMutatesState(tool.name);
+      const policyClassificationPassed = readOnly === !policyMutatesState;
       const mutationWithoutRequiredInputs = !readOnly && required.length === 0;
       campaignRows.push({
         tool_name: tool.name,
