@@ -13083,9 +13083,9 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "confirmOperatorProceed",
     title: "Confirm operator proceed",
-    description: "Use the owner's explicit Proceed to restore the selected account, generate the current Growth Mission Brief, and open a discussion-only planning cycle. This does not authorize account mutations.",
+    description: "Use the owner's explicit Proceed to restore the selected account, generate the current Growth Mission Brief, and open a discussion-only planning cycle. This writes continuity state but does not authorize account-content mutations.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "getGrowthMission",
