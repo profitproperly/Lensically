@@ -137,7 +137,7 @@ describe("System Directory foundation", () => {
     const deployment = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker");
     expect(deployment?.related_entry_ids).toContain("engineering.operator_validation");
     expect(deployment?.hard_gates).toEqual(expect.arrayContaining([
-      "Recovery dispatch requires a verified repository head and passing validation.",
+            "Main release markers require a verified repository head and passing validation.",
     ]));
   });
 
