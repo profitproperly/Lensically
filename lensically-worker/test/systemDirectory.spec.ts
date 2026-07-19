@@ -690,6 +690,9 @@ describe("System Directory foundation", () => {
       "recovery_new_file_write_session",
       "public_growth_mission_workflow_list_wording",
       "public_large_repository_mutation_payload",
+      "public_protected_scheduler_recovery_narrative",
+      "public_scheduled_post_audit_narrative",
+      "recovery_release_marker_verbose_message",
     ]);
     expect(new Set(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).size).toBe(PREVENTED_CLIENT_BLOCKS.length);
     for (const incident of PREVENTED_CLIENT_BLOCKS) {
