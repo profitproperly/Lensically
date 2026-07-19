@@ -78,6 +78,7 @@ function testProfileId(toolName: string): string {
   const requiredSafeProfiles: Record<string, string> = {
     getOperatorStartupContext: "startup",
     selectOperatorKey: "account_key_selection",
+    confirmOperatorProceed: "account_proceed",
     listGitHubWorkflowRuns: "workflow_run_list",
     getGitHubWorkflowRun: "workflow_run_status",
     readRepoFile: "repository_file_read",
