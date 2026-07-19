@@ -50,7 +50,8 @@ const scopes = {
   ],
     acceptance: [
     "builds compact Main atomic patch sets and rejects oversized combinations",
-    "uses Main compact activity after the first workflow status read",
+        "uses Main compact activity after the first workflow status read",
+    "uses one terminal watch after the compact activity read",
     "keeps bounded large repository patch sets on the Main gateway",
         "returns the mandatory client-safety receipt for every startup response",
     "uses runtime verification after the first startup call",

@@ -865,6 +865,15 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("workflow_terminal_watch");
   });
 
+    it("uses one terminal watch after the compact activity read", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_repeated_workflow_activity_request");
+    expect(incident?.safe_profile_id).toBe("workflow_terminal_watch");
+    expect(buildClientSafeGatewayRequest("workflow_terminal_watch", { run_id: 1, wait_seconds: 60 })).toMatchObject({
+      intent: "get github workflow run",
+      inputs: { run_id: 1, wait_seconds: 60 },
+    });
+  });
+
   it("uses Recovery workflow activity when strategy-contract wording blocks the main list", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_growth_mission_workflow_list_wording");
     expect(incident?.safe_profile_id).toBe("recovery_workflow_run_list");
