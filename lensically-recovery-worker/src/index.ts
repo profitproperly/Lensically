@@ -482,14 +482,13 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       ? gatewaySchema.properties as Record<string, unknown>
       : {};
     const gatewayRequired = Array.isArray(gatewaySchema?.required) ? gatewaySchema.required.map(String) : [];
-    const publicContractSucceeded = gatewayRequired.length === 3
-      && gatewayRequired.includes("objective")
-      && gatewayRequired.includes("intent")
+    const publicContractSucceeded = gatewayRequired.length === 2
+      && gatewayRequired.includes("profile_id")
       && gatewayRequired.includes("inputs")
-      && Object.prototype.hasOwnProperty.call(gatewayProperties, "objective")
-      && Object.prototype.hasOwnProperty.call(gatewayProperties, "intent")
+      && Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id")
       && Object.prototype.hasOwnProperty.call(gatewayProperties, "inputs")
-      && !Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id")
+      && !Object.prototype.hasOwnProperty.call(gatewayProperties, "objective")
+      && !Object.prototype.hasOwnProperty.call(gatewayProperties, "intent")
       && gatewaySchema?.additionalProperties === false;
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const accountKeyContent = ((accountKey.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
