@@ -17386,6 +17386,138 @@ async function handleOperatorMcpAdminTool(
       zero_input_mutation: campaignRows.filter((row) => row.mutation_without_required_inputs === true).length,
     };
 
+    const mutationFixtureString = (key: string, schema: Record<string, unknown>): string => {
+      const normalizedKey = key.toLowerCase();
+      const fixed: Record<string, string> = {
+        brand_key: "manifest_mental",
+        path: "AGENTS.md",
+        find: "capability-campaign-fixture",
+        replace: "capability-campaign-fixture-replacement",
+        message: "Capability campaign preflight",
+        summary: "Capability campaign preflight",
+        title: "Capability campaign fixture",
+        body: "Capability campaign fixture",
+        reason: "Capability campaign preflight only",
+        description: "Capability campaign fixture",
+        text: "Capability campaign fixture text.",
+        draft_text: "Capability campaign fixture draft.",
+        post_text: "Capability campaign fixture post.",
+        objective: "Validate one capability without execution.",
+        intent: "capability preflight",
+        timezone: WORKSPACE_DEFAULT_TIMEZONE,
+        date: new Date().toISOString().slice(0, 10),
+        production_date: new Date().toISOString().slice(0, 10),
+        date_from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        date_to: new Date().toISOString().slice(0, 10),
+        time: "23:59",
+        scheduled_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        scheduled_time_utc: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        owner_approval: "Approved only for non-executing capability preflight.",
+        owner_response: "Approved only for non-executing capability preflight.",
+        source_url: "https://example.com/campaign-fixture",
+        canonical_source_url: "https://example.com/campaign-fixture",
+        url: "https://example.com/campaign-fixture",
+        stage: "generation",
+        status: "active",
+        mode: "normal",
+        task: "typecheck",
+        tool_name: "getEngineeringAccessState",
+        workflow_id: "lensically-engineering.yml",
+        kind: "winner",
+        content: "Capability campaign fixture content.",
+        commit_sha: "0000000000000000000000000000000000000000",
+        expected_head_sha: "0000000000000000000000000000000000000000",
+      };
+      let value = fixed[normalizedKey]
+        ?? (/(?:^|_)(?:id|key)$/.test(normalizedKey) ? `campaign-${normalizedKey.replace(/_/g, "-")}` : "campaign_fixture");
+      const minLength = Math.max(Number(schema.minLength ?? 0), 0);
+      if (value.length < minLength) value = value.padEnd(minLength, "x");
+      const maxLength = Number(schema.maxLength ?? 0);
+      return Number.isFinite(maxLength) && maxLength > 0 ? value.slice(0, maxLength) : value;
+    };
+    const mutationFixtureValue = (
+      schemaValue: unknown,
+      key: string,
+      requiredValue = true,
+    ): unknown => {
+      const schema = schemaValue && typeof schemaValue === "object" && !Array.isArray(schemaValue)
+        ? schemaValue as Record<string, unknown>
+        : {};
+      const variants = Array.isArray(schema.oneOf) ? schema.oneOf : Array.isArray(schema.anyOf) ? schema.anyOf : null;
+      if (variants?.length) return mutationFixtureValue(variants[0], key, requiredValue);
+      if (Object.prototype.hasOwnProperty.call(schema, "const")) return schema.const;
+      if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+      const type = typeof schema.type === "string" ? schema.type : null;
+      if (type === "object" || (schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties))) {
+        const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+          ? schema.properties as Record<string, unknown>
+          : {};
+        const requiredKeys = Array.isArray(schema.required) ? schema.required.map(String) : [];
+        const objectValue: Record<string, unknown> = {};
+        for (const requiredKey of requiredKeys) {
+          objectValue[requiredKey] = mutationFixtureValue(properties[requiredKey], requiredKey, true);
+        }
+        return objectValue;
+      }
+      if (type === "array" || schema.items) {
+        const minimumItems = Math.max(Math.trunc(Number(schema.minItems ?? 0)), requiredValue ? 1 : 0);
+        return Array.from({ length: minimumItems }, (_, index) => mutationFixtureValue(schema.items, `${key}_${index}`, true));
+      }
+      if (type === "integer") return Math.max(Math.trunc(Number(schema.minimum ?? 1)), 1);
+      if (type === "number") return Math.max(Number(schema.minimum ?? 1), 1);
+      if (type === "boolean") return false;
+      return mutationFixtureString(key, schema);
+    };
+    const mutationPreflightRows: Array<Record<string, unknown>> = [];
+    for (const tool of campaignTools.filter((item) => selectedMutationTools.has(item.name))) {
+      const schema = tool.inputSchema as Record<string, unknown>;
+      const fixture = mutationFixtureValue(schema, tool.name, true) as Record<string, unknown>;
+      const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
+        ? schema.properties as Record<string, unknown>
+        : {};
+      if (Object.prototype.hasOwnProperty.call(properties, "brand_key")) fixture.brand_key = "manifest_mental";
+      if (Object.prototype.hasOwnProperty.call(properties, "proceed_confirmed")) fixture.proceed_confirmed = true;
+      if (Object.prototype.hasOwnProperty.call(properties, "dry_run")) fixture.dry_run = true;
+      const preflightRequest = {
+        objective: "Validate one state-changing Lensically capability without executing it.",
+        intent: tool.title.trim().toLowerCase(),
+        inputs: fixture,
+      };
+      const safety = inspectClientSafeGatewayRequest(preflightRequest);
+      let prepared: OperatorRoutedGatewayResult;
+      try {
+        prepared = await prepareOperatorRoutedGatewayCall(env, preflightRequest);
+      } catch (error) {
+        mutationPreflightRows.push({
+          tool_name: tool.name,
+          passed: false,
+          error: getErrorMessage(error).slice(0, 500) || "mutation_preflight_failed",
+          client_request_safe: safety.safe,
+        });
+        continue;
+      }
+      const canonicalTool = prepared.tool_name ?? null;
+      const passed = prepared.ok === true
+        && Boolean(canonicalTool)
+        && Boolean(prepared.arguments)
+        && safety.safe;
+      const autonomyTool = canonicalAutonomyToolName(tool.name);
+      mutationPreflightRows.push({
+        tool_name: tool.name,
+        canonical_tool: canonicalTool,
+        passed,
+        error: passed ? null : prepared.error ?? (safety.safe ? "mutation_preflight_failed" : "client_request_unsafe"),
+        client_request_safe: safety.safe,
+        client_safety_violations: safety.violations,
+        payload_bytes: JSON.stringify(preflightRequest).length,
+        protected_operation: MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(autonomyTool),
+        governance_exempt: OPERATOR_AUTONOMY_GOVERNANCE_EXEMPT_TOOLS.has(autonomyTool),
+        idempotency_required: true,
+        side_effects_executed: false,
+      });
+    }
+    const mutationPreflightFailures = mutationPreflightRows.filter((row) => row.passed !== true);
+
     const campaignBrandKey: GptBrandKey = "manifest_mental";
     const campaignBrand = await resolveGptBrand(env, campaignBrandKey);
     const today = new Date().toISOString().slice(0, 10);
