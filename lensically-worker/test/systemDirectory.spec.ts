@@ -467,8 +467,8 @@ describe("System Directory foundation", () => {
       summary: expect.stringContaining("compact marker-only message"),
     }));
     expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
-      id: "public_main_release_marker_verbose_message",
-      safe_profile_id: "verified_release_marker",
+            id: "public_main_release_marker_verbose_message",
+      safe_profile_id: "repository_patch_set",
     }));
   });
 
