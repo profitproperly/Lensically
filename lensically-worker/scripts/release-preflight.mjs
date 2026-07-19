@@ -233,9 +233,14 @@ if (!source.includes("quarantineScheduledPostPublishAttempt")
     || !source.includes("finalizeScheduledPostPublished")
     || !source.includes("datetime(processing_started_at) <= datetime(?)")
     || !source.includes("WHERE status IN (?, ?)")
+    || !source.includes("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE")
+    || !source.includes("unresolved_publish_quarantine")
+    || !source.includes("scheduler_quarantined_publish")
     || source.includes("publish_interrupted_retry")
     || !tests.includes("never reopens stale posting rows after an external publish attempt")
-    || !tests.includes("quarantines uncertain attempts and treats returned Threads ids as authoritative")) {
+    || !tests.includes("quarantines uncertain attempts and treats returned Threads ids as authoritative")
+    || !tests.includes('expect(autoResumed.control.mode).toBe("paused")')
+    || !tests.includes('expect(autoResumed.blocked_reason).toBe("scheduler_quarantined_publish")')) {
   errors.push("scheduled_publish_unknown_state_quarantine_missing");
 }
 if (!source.includes("Worker deployment is Recovery-only")
