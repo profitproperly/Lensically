@@ -207,7 +207,7 @@
     },
     {
       "capability_id": "content.recover_published_post_lineage",
-      "directory_entry_id": "content.sources",
+      "directory_entry_id": "content.lineage_recovery",
       "canonical_handler": "recover_published_post_lineage",
       "route_intent": "recover published post lineage",
       "implementation_mode": "new_handler",
