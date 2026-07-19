@@ -3024,8 +3024,7 @@ describe("operator mode MCP endpoint", () => {
       status_kind?: string;
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
-      objective: "Report MCP status and verification state.",
-      intent: "MCP status verification",
+      profile_id: "engineering_precheck",
       inputs: {},
     });
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
