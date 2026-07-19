@@ -3195,32 +3195,14 @@ describe("operator mode MCP endpoint", () => {
       intent: "initialize account handshake",
       inputs: { brand_key: "manifest" },
     });
-        if (false) {
-    expect(resolvedFreshKey.isError).not.toBe(true);
-    expect(resolvedFreshKey.structuredContent).toMatchObject({
-      selected_key: "manifest_mental",
-      account_data_loaded: false,
-      next_profile_id: "account_proceed",
-      routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
-    });
-
-    
-    }
+        
     expect(resolvedFreshKey.isError).toBe(true);
     expect(resolvedFreshKey.structuredContent.error).toBe("registered_profile_id_required");
 
         const nestedProfileKey = await mcpToolCallRaw<{ error: string }>("executeLensicallyIntent", {
       inputs: { profile_id: "account_key_selection", brand_key: "manifest_mental" },
     });
-        if (false) {
-    expect(nestedProfileKey.isError).not.toBe(true);
-    expect(nestedProfileKey.structuredContent).toMatchObject({
-      selected_key: "manifest_mental",
-      routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
-    });
-
-    
-    }
+        
     expect(nestedProfileKey.isError).toBe(true);
     expect(nestedProfileKey.structuredContent.error).toBe("registered_profile_id_required");
 
