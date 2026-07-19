@@ -17,7 +17,9 @@ const tests = read("test/operatorMode.spec.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml");
 const validationWorkflow = read("../.github/workflows/lensically-validation.yml");
+const agentRules = read("../AGENTS.md");
 const currentState = read("../CURRENT_STATE.md");
+const operatingMemory = read("../OPERATING_MEMORY.md");
 const recoverySource = read("../lensically-recovery-worker/src/index.ts");
 const threadsPublishService = read("src/utils/threadsPublishService.ts");
 const threadsPublishTests = read("test/threadsPublishService.spec.ts");
@@ -130,6 +132,14 @@ if (/Operator MCP v\d+\.\d+\.\d+/.test(currentState)) {
   errors.push("current_state_manual_version_literal_forbidden");
 }
 
+for (const [documentName, documentText] of [["AGENTS.md", agentRules], ["CURRENT_STATE.md", currentState], ["OPERATING_MEMORY.md", operatingMemory]]) {
+  if (!documentText.includes("`profile_id`")
+      || !documentText.includes("bounded `inputs`")
+      || documentText.includes("concise `objective`, `intent`")) {
+    errors.push(`startup_public_contract_drift:${documentName}`);
+  }
+}
+
 if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";')
     || !router.includes('MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v1"')
     || !router.includes("source_defined_static_route")
@@ -145,7 +155,7 @@ if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v
     || !router.includes("evaluatePreventableIncidentClosure")
     || !router.includes("promoted_winning_path_external_surface_required")
     || !systemDirectoryTests.includes("promotes multi-stage architecture work to implementation before release")
-    || !systemDirectoryTests.includes("routes large repository mutations to the promoted Recovery path")
+        || !systemDirectoryTests.includes("keeps bounded large repository patch sets on the Main gateway")
     || !systemDirectoryTests.includes("blocks incident closure until the winning path is promoted and enforced")
     || !systemDirectoryTests.includes("keeps Operator MCP version metadata single-source")
     || !systemDirectoryTests.includes("routes compact quarantined-post reschedules to the protected recovery path")
