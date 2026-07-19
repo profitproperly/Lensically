@@ -3722,8 +3722,7 @@ describe("operator mode MCP endpoint", () => {
       route_trail: Array<{ route_key: string }>;
       map_state: string;
     }>("executeLensicallyIntent", {
-      objective: "Attempt one protected repository deletion without owner ratification.",
-      intent: "delete repository file",
+      profile_id: "delete_repo_file",
       inputs: {
         path: "AUTONOMY_PROTECTED_FIXTURE.md",
         message: "Protected-operation regression fixture.",
