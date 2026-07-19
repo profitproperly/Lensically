@@ -1,4 +1,4 @@
-export const CLIENT_SAFE_REQUEST_REGISTRY_VERSION = "client-safe-requests-v3";
+export const CLIENT_SAFE_REQUEST_REGISTRY_VERSION = "client-safe-requests-v4";
 export const CLIENT_BLOCK_INTAKE_CONTRACT_VERSION = "client-block-intake-v1";
 export const CLIENT_SAFETY_CANONICAL_LOCATION = "lensically-worker/src/systemDirectory/clientSafeRequests.ts";
 
