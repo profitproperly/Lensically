@@ -6,6 +6,29 @@ describe("Threads publish readiness", () => {
     vi.unstubAllGlobals();
   });
 
+  it("uses native auto-publish for text posts and never calls threads_publish", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "post-auto-1" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await publishTextToThreads({
+      accessToken: "token",
+      threadsUserId: "user-auto-1",
+      text: "Publish in one request.",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      publishRequestId: "post-auto-1",
+      publishedPostId: "post-auto-1",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toContain("/user-auto-1/threads");
+    expect(String(init?.body)).toContain("auto_publish_text=true");
+    expect(String(input)).not.toContain("/threads_publish");
+  });
+
   it("waits for FINISHED before making exactly one publish commit", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: "container-1" }), { status: 200 }))
