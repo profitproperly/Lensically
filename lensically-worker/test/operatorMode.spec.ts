@@ -74,24 +74,27 @@ async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, arg
 
 const MCP_DIRECT_ENTRY_TOOLS = new Set(["executeLensicallyIntent"]);
 
-function testActionIntent(toolName: string): string {
-  return toolName.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase();
+function testProfileId(toolName: string): string {
+  const requiredSafeProfiles: Record<string, string> = {
+    getOperatorStartupContext: "startup",
+    selectOperatorKey: "account_key_selection",
+    listGitHubWorkflowRuns: "workflow_run_list",
+    getGitHubWorkflowRun: "workflow_run_status",
+    readRepoFile: "repository_file_read",
+    readMcpToolDefinition: "capability_definition",
+    auditScheduledPost: "scheduled_post_audit",
+    recoverOverdueScheduledPosts: "protected_scheduler_recovery",
+  };
+  return requiredSafeProfiles[toolName]
+    ?? toolName.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
 }
 
 async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
   if (MCP_DIRECT_ENTRY_TOOLS.has(toolName)) {
     return mcpToolCallRaw<T>(toolName, args);
   }
-  if (toolName === "getOperatorStartupContext") {
-    return mcpToolCallRaw<T>("executeLensicallyIntent", {
-      objective: "Load Lensically startup context.",
-      intent: "startup",
-      inputs: {},
-    });
-  }
   return mcpToolCallRaw<T>("executeLensicallyIntent", {
-    objective: `Execute ${testActionIntent(toolName)}.`,
-    intent: testActionIntent(toolName),
+    profile_id: testProfileId(toolName),
     inputs: args,
   });
 }
