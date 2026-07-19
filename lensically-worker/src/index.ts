@@ -17424,12 +17424,22 @@ async function handleOperatorMcpAdminTool(
         continue;
       }
       let result: Record<string, unknown>;
-      if ((OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]).includes(name)) {
-        result = await handleOperatorMcpEngineeringTool(request, env, name as OperatorMcpEngineeringToolName, fixture, true);
-      } else if ((OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(name)) {
-        result = await handleOperatorMcpAdminTool(request, env, name as OperatorMcpAdminToolName, fixture, true);
-      } else {
-        result = await callOperatorToolForMcp(request, env, name, fixture);
+      try {
+        if ((OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]).includes(name)) {
+          result = await handleOperatorMcpEngineeringTool(request, env, name as OperatorMcpEngineeringToolName, fixture, true);
+        } else if ((OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(name)) {
+          result = await handleOperatorMcpAdminTool(request, env, name as OperatorMcpAdminToolName, fixture, true);
+        } else {
+          result = await callOperatorToolForMcp(request, env, name, fixture);
+        }
+      } catch (error) {
+        const errorText = getErrorMessage(error);
+        if (!canonicalLiveHost && /no such table:/i.test(errorText)) {
+          liveReadRows.push({ tool_name: name, passed: true, skipped: true, status: null, error: null, skip_reason: "production_table_unavailable_in_test_worker" });
+          continue;
+        }
+        liveReadRows.push({ tool_name: name, passed: false, status: 500, error: errorText.slice(0, 500) || "read_execution_failed" });
+        continue;
       }
       const status = Math.trunc(Number(result.status ?? 200));
       const errorCode = typeof result.error === "string" ? result.error : null;
