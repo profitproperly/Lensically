@@ -46,9 +46,14 @@ export const CLIENT_BLOCK_INTAKE_CONTRACT = {
   mandatory: true,
   trigger: "any_client_side_rejection_before_gateway_response",
   canonical_location: CLIENT_SAFETY_CANONICAL_LOCATION,
-  required_fields: ["id", "observed_on", "blocked_shape", "cause", "safe_profile_id", "regression_test_id", "source_locations"],
-  sequence: ["stop_current_objective", "do_not_retry_identical_payload", "add_or_update_registry_incident", "add_or_update_safe_request_profile", "add_regression_test", "run_focused_validation", "deploy_updated_public_contract", "resume_original_objective"],
-  resume_allowed_only_after: "registry_validation_and_live_deployment",
+    required_fields: ["boundary", "blocked_profile_id", "request_fingerprint", "error_category", "expected_outcome", "observed_outcome", "resume_capsule"],
+  sequence: [
+    "stop_current_objective", "do_not_retry_identical_payload", "record_incident", "contain_affected_scope",
+    "classify_failure", "reproduce_safely", "generalize_shared_cause", "repair_shared_cause",
+    "lock_prevention_rule", "add_regression_test", "run_focused_validation", "release_exact_tested_head",
+    "verify_live", "resume_original_objective", "record_autonomy_dividend", "close_incident",
+  ],
+  resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification",
 } as const;
 
 export const PREVENTED_CLIENT_BLOCKS: readonly PreventedClientBlock[] = [
