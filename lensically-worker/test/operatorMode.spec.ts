@@ -3101,7 +3101,29 @@ describe("operator mode MCP endpoint", () => {
     }
     expect(eligibleReads).toBe(37);
     expect(failedReads).toBe(0);
-  }, 60000);
+
+    const mutationSegments = ["engineering_mutations", "admin_mutations", "account_mutations_a", "account_mutations_b"] as const;
+    let eligibleMutations = 0;
+    let failedMutationPreflights = 0;
+    for (const segment of mutationSegments) {
+      const result = await mcpToolCallRaw<typeof campaign.structuredContent>("executeLensicallyIntent", {
+        objective: `Validate ${segment}.`,
+        intent: "checkup",
+        inputs: { segment },
+      });
+      expect(result.structuredContent.campaign.segment).toBe(segment);
+      expect(result.structuredContent.campaign.mutations_executed).toBe(0);
+      eligibleMutations += result.structuredContent.campaign.mutation_preflights.eligible;
+      failedMutationPreflights += result.structuredContent.campaign.mutation_preflights.failed;
+      expect(
+        result.structuredContent.campaign.mutation_preflights.failed,
+        JSON.stringify(result.structuredContent.campaign.mutation_preflights.failures),
+      ).toBe(0);
+      expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
+    }
+    expect(eligibleMutations).toBe(47);
+    expect(failedMutationPreflights).toBe(0);
+  }, 120000);
 
   it("makes the static router the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
