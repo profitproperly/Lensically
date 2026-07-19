@@ -223,7 +223,7 @@ if (!source.includes("const sourceDefinedStaticRoute = routedMapExecution?.d1_ex
   errors.push("static_route_runtime_bypass_missing");
 }
 
-if (!workflow.includes("run-name: Lensically ${{ inputs.task }} · ${{ inputs.release_id || github.sha }}")) errors.push("workflow_run_name_missing");
+if (!workflow.includes("run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}")) errors.push("workflow_run_name_missing");
 if (!workflow.includes("cancel-in-progress: true")) errors.push("workflow_concurrency_cancellation_missing");
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
 if (!workflow.includes("release_id:")) errors.push("workflow_release_id_missing");
@@ -249,13 +249,10 @@ if (!workflow.includes("operator-test-shards:")
 if (workflow.includes("Full Operator MCP tests") || workflow.includes("/tmp/lensically-operator-tests.log")) {
   errors.push("serial_operator_test_monolith_forbidden");
 }
-if (!workflow.includes("# verified-release-marker:")
-    || !workflow.includes("verified-release-marker:")
-    || !workflow.includes("[verified-worker-release]")
-    || !workflow.includes("gh workflow run lensically-engineering.yml")
-    || !workflow.includes("--field task=worker-deploy")
-    || !workflow.includes('--field release_sha="${RELEASE_SHA}"')
-    || !workflow.includes("actions: write")) {
+if (!validationWorkflow.includes("[verified-worker-release]")
+    || !validationWorkflow.includes("Run verified release supporting gates")
+    || !validationWorkflow.includes("Deploy verified Worker head")
+    || !validationWorkflow.includes("npx wrangler deploy")) {
   errors.push("verified_release_marker_dispatch_missing");
 }
 if (workflow.includes("git push origin HEAD:main") || workflow.includes("RECOVERY_TYPECHECK_LOG.txt")) {
