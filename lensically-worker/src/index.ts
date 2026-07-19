@@ -18629,7 +18629,7 @@ async function handleOperatorMcpEngineeringTool(
     }
 
     const diffSummary = normalizeOperatorText(args.summary, 1000, true)
-      ?? `Applied ${normalizedPatches.length} exact replacements across ${nextFiles.length} files in one commit.`;
+            ?? `Applied ${normalizedPatches.length} exact replacements across ${changedFiles.length} changed files in one commit.`;
     if (dryRun) {
       return {
         ok: true,
