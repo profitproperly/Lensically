@@ -16115,8 +16115,13 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
     deployment_id: normalizeOperatorText(args.deployment_id ?? row.deployment_id, 160, true),
     live_verification: (args.live_verification ?? safeParseJsonString(String(row.live_verification_json ?? ""))) as Record<string, unknown> | null,
     resume_result: (supplied.resume_result ?? safeParseJsonString(String(row.resume_result_json ?? ""))) as Record<string, unknown> | null,
-    autonomy_dividend: (args.autonomy_dividend ?? safeParseJsonString(String(row.autonomy_dividend_json ?? ""))) as Record<string, unknown> | null,
+        autonomy_dividend: (args.autonomy_dividend ?? safeParseJsonString(String(row.autonomy_dividend_json ?? ""))) as Record<string, unknown> | null,
   };
+  const validation = validateHardeningTransition(current, target, evidence);
+  if (!validation.allowed) {
+    return { ok: false, error: "hardening_transition_blocked", incident_id: incidentId, current_state: current, target_state: target, missing_or_invalid_evidence: validation.errors };
+  }
+  /* HARDENING_TRANSITION_UPDATE */
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
