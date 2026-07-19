@@ -562,7 +562,7 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(engineering|gateway|mcp|operator|execution)\b/) && has(/\b(diagnose|diagnosis|failure|debug|inspect|broken|timeout|timed out)\b/)) return "inspectMcpFailure";
     
   if (has(/\btypecheck\b/) || has(/\boperator\s+tests?\b/) || has(/\bgpt\s+memory\s+tests?\b/) || has(/\bregression\s+tests?\b/)) return "runGitHubWorkflow";
-  if (has(/\b(run mcp tests?|mcp self checks?|built-in mcp checks?|gateway configuration|mcp configuration)\b/)) return "runMcpTests";
+  if (has(/\b(run system checks?|system checks?|run mcp tests?|mcp self checks?|built-in mcp checks?|gateway configuration|mcp configuration)\b/)) return "runMcpTests";
   if (has(/\b(read|list|show|get|pull)\b/) && has(/\b(saved\s+patterns?|post\s+archive|live\s+insights|insights\s+posts?|follower\s+history|dashboard|lensically\s+ui\s+surface)\b/)) return "read_lensically_ui_surface";
   if (has(/\b(discard|retire|scrap|clear|remove)\b/) && has(/\b(stale\s+)?(manifest\s+)?review\s+batch\b/)) return "discard_manifest_review_batch";
   
