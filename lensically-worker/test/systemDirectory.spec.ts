@@ -874,7 +874,7 @@ describe("System Directory foundation", () => {
       intake_mandatory: true,
       resume_allowed_only_after: "registry_validation_and_live_deployment",
       prevented_client_block_count: 35,
-      safe_request_profile_count: 19,
+            safe_request_profile_count: 20,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
