@@ -16052,7 +16052,21 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
     profile, fingerprint, normalizeOperatorJson(args.expected_outcome ?? null, null),
     normalizeOperatorJson(args.observed_outcome ?? null, null), normalizeOperatorJson(args.resume_capsule ?? null, null),
   ).run();
-  /* HARDENING_INTAKE_EVENT */
+    await env.DB.prepare(
+    `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+     VALUES (?, ?, NULL, 'detected', ?)`,
+  ).bind(
+    crypto.randomUUID(), id,
+    normalizeOperatorJson({ error_category: category, promoted_rule_id: rule?.id ?? null }, {}),
+  ).run();
+  const row = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+  return {
+    ok: true,
+    created: true,
+    incident: row ? serializeHardeningIncident(row) : { id },
+    normal_work_blocked: severity === "P0" || severity === "P1",
+    required_next_state: "contained",
+  };
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
