@@ -32204,11 +32204,11 @@ type ScheduledPostSchedulerControl = {
 };
 
 const EMPTY_SCHEDULED_POST_SCHEDULER_CONTROL: ScheduledPostSchedulerControl = {
-  mode: "paused",
+  mode: "normal",
   allowed_post_ids: [],
-  max_posts: 0,
+  max_posts: DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE,
   updated_at: null,
-  reason: "safe_default",
+  reason: "automatic_delivery_default",
   resume_mode: null,
 };
 
