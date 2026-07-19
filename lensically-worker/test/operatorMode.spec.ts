@@ -3015,7 +3015,7 @@ describe("operator mode MCP endpoint", () => {
     expect(cachedSchemaCall.structuredContent).toMatchObject({
       ok: true,
       routed_execution: {
-        profile_id: "cached_schema_compat",
+        profile_id: "public_intent",
         executed_tool: "getEngineeringAccessState",
         model_tool_choice_allowed: false,
       },
