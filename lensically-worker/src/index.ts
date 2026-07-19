@@ -17200,6 +17200,55 @@ async function handleOperatorMcpAdminTool(
     const names = new Set(tools.map((tool) => tool.name));
     const requirements = await listOperatorWorkflowRequirements(env, null);
     const campaignTools = tools.filter((tool) => tool.name !== OPERATOR_ROUTED_EXECUTION_GATEWAY);
+    const campaignSegment = normalizeOperatorText(args.segment, 80, true) ?? "routes";
+    const liveReadSegments: Record<string, Set<string>> = {
+      engineering_reads: new Set([
+        "getOperatorStartupContext",
+        "engineeringPrecheck",
+        "getEngineeringAccessState",
+        "listRepoFiles",
+        "searchRepoFiles",
+        "readRepoFile",
+        "getRepoStatus",
+        "listGitHubWorkflowRuns",
+        "getGitHubWorkflowRun",
+        "verifyDeployedMcpVersion",
+        "listEngineeringAudit",
+      ]),
+      admin_reads: new Set([
+        "selectOperatorKey",
+        "getGrowthMission",
+        "getOperatorDecisionState",
+        "getScheduledPostSchedulerState",
+        "auditScheduledPost",
+        "inspectMcpFailure",
+        "listMcpTools",
+        "readMcpToolDefinition",
+        "runMcpTests",
+        "getWorkflowStatus",
+      ]),
+      account_reads_a: new Set([
+        "list_accounts",
+        "get_account_state",
+        "read_lensically_ui_surface",
+        "get_hourly_coverage",
+        "get_manifest_review_batch",
+        "get_production_board",
+        "list_source_candidates",
+        "audit_published_post_lineage",
+      ]),
+      account_reads_b: new Set([
+        "get_source_candidate_batch",
+        "get_source_card",
+        "list_active_gates",
+        "list_strategy_memory",
+        "list_scheduled_posts",
+        "get_post_results",
+        "get_monthly_growth_review",
+        "get_performance_learning",
+      ]),
+    };
+    const selectedLiveReadTools = liveReadSegments[campaignSegment] ?? new Set<string>();
     const campaignRows: Array<Record<string, unknown>> = [];
     const campaignCallbacks = {
       signPermit: async () => "capability-campaign-permit",
