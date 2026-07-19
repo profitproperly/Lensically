@@ -9,6 +9,10 @@ export type HardeningBoundary = "client" | "gateway" | "routing" | "server" | "d
 export type HardeningSeverity = "P0" | "P1" | "P2" | "P3";
 export type HardeningClassification = "novel_failure" | "known_prevention" | "prevention_breach";
 export type HardeningState = "detected" | "contained" | "classified" | "reproduced" | "generalized" | "repaired" | "prevention_locked" | "validated" | "released" | "live_verified" | "resumed" | "closed";
+export const HARDENING_STATE_ORDER: readonly HardeningState[] = ["detected", "contained", "classified", "reproduced", "generalized", "repaired", "prevention_locked", "validated", "released", "live_verified", "resumed", "closed"];
+export const HARDENING_ALLOWED_TRANSITIONS: Readonly<Record<HardeningState, readonly HardeningState[]>> = {
+  detected: ["contained"], contained: ["classified"], classified: ["reproduced"], reproduced: ["generalized"], generalized: ["repaired"], repaired: ["prevention_locked"], prevention_locked: ["validated"], validated: ["released"], released: ["live_verified"], live_verified: ["resumed"], resumed: ["closed"], closed: [],
+};
 
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
 export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
