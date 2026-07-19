@@ -14816,7 +14816,7 @@ async function prepareOperatorRoutedGatewayCall(
     availableTools = await buildOperatorMcpTools(env, false, false);
     mapped = await prepareMandatoryExecutionMapCall(
       env.DB,
-      compiledGatewayArgs,
+      gatewayArgs,
       availableTools as MandatoryExecutionToolDefinition[],
       {
         signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
