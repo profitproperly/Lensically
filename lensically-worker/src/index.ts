@@ -7,6 +7,7 @@ import {
 import {
   executeThreadsProfileLookup,
 } from "./utils/threadsProfileLookupService";
+import { recoverPublishedPostLineage } from "./utils/recoverPublishedPostLineage";
 import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 import { logAuthEvent, logWorkerOperationalEvent } from "../auth/operationalLog.js";
@@ -11340,6 +11341,16 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
+  if (toolName === "recover_published_post_lineage") {
+    const recovered = await recoverPublishedPostLineage(
+      env,
+      brand,
+      payload,
+      MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+    );
+    return operatorJsonResponse(recovered.payload, recovered.status);
+  }
+
   if (toolName === "get_source_candidate_batch") {
     const batchId = normalizeOperatorText(payload.source_batch_id, 120);
     if (!batchId) {
@@ -12474,10 +12485,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const sourceCard = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
     const sourceSelection = sourceCardId
       ? await env.DB.prepare(
-        `SELECT *
-         FROM operator_source_selections
-         WHERE brand_key = ?
-           AND source_card_id = ?
+        `SELECT s.*
+         FROM operator_source_cards c
+         JOIN operator_source_selections s
+           ON s.id = c.source_selection_id
+          AND s.brand_key = c.brand_key
+         WHERE c.brand_key = ?
+           AND c.id = ?
          LIMIT 1`,
       ).bind(brand.brand_key, sourceCardId).first<Record<string, unknown>>()
       : null;
@@ -13308,6 +13322,40 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         source_types: { type: "array", items: { type: "string" } },
       },
       required: ["brand_key", "workflow_session_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "recover_published_post_lineage",
+    title: "Recover published post lineage",
+    description: "Recover one proven Manifest Saved Pattern family by creating or reusing its canonical source selection and source card, then attaching known published posts, dedicated generation runs, drafts, schedules, and metric snapshots. Use only when the historical Saved Pattern source is known and verified.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        workflow_session_id: { type: "string" },
+        saved_pattern_id: { type: "integer", minimum: 1 },
+        published_post_ids: { type: "array", minItems: 1, maxItems: 10, items: { type: "string" } },
+        source_card: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            lane_key: { type: "string" },
+            source_mechanism: { type: "string" },
+            required_product: { type: "string" },
+            transformation_contract: SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
+            forbidden_surfaces: { type: "array", items: {} },
+            danger_surfaces: { type: "array", items: {} },
+            pass_conditions: { type: "array", items: {} },
+            fail_conditions: { type: "array", items: {} },
+            recommended_direction: { type: "string" },
+          },
+          required: ["title", "source_mechanism", "required_product", "forbidden_surfaces", "pass_conditions", "fail_conditions"],
+          additionalProperties: false,
+        },
+      },
+      required: ["brand_key", "workflow_session_id", "saved_pattern_id", "published_post_ids", "source_card"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -14322,7 +14370,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.31.7";
+export const OPERATOR_MCP_VERSION = "1.31.8";
 
 const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";
 
