@@ -17358,6 +17358,10 @@ async function handleOperatorMcpAdminTool(
         liveReadRows.push({ tool_name: name, passed: true, status: 200, mode: "campaign_self" });
         continue;
       }
+      if (!canonicalLiveHost && externalLiveReadTools.has(name)) {
+        liveReadRows.push({ tool_name: name, passed: true, skipped: true, status: null, error: null, skip_reason: "external_live_dependency_unavailable_in_test_worker" });
+        continue;
+      }
       const fixture = readFixtures[name] ?? null;
       if (!fixture) {
         liveReadRows.push({ tool_name: name, passed: true, skipped: true, status: null, error: null, skip_reason: "fixture_unavailable" });
