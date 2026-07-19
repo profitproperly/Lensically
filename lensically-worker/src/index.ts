@@ -18751,8 +18751,17 @@ async function handleOperatorMcpEngineeringTool(
     const path = sanitizeRepoPath(args.path);
     const content = typeof args.content === "string" ? args.content : "";
     const message = normalizeOperatorText(args.message, 200);
-    if (!path || !message) {
+        if (!path || !message) {
       return { ok: false, error: "path_message_required" };
+    }
+    if (new TextEncoder().encode(content).length > 2400) {
+      return {
+        ok: false,
+        error: "large_file_requires_chunked_write",
+        required_sequence: ["start_repo_file_write", "append_repo_file_chunk", "repository_write_commit"],
+        path,
+        content_bytes: new TextEncoder().encode(content).length,
+      };
     }
     const existing = await getGithubFile(env, path);
     if (existing.ok) {
