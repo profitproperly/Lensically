@@ -2722,6 +2722,23 @@ describe("operator mode MCP endpoint", () => {
       routed_execution: { profile_id: "account_key_selection", executed_tool: "selectOperatorKey" },
     });
 
+    const accountProceed = await mcpToolCallRaw<{
+      selected_key: CanonicalBrandKey;
+      proceeded: boolean;
+      account_data_loaded: boolean;
+      routed_execution: { profile_id: string; executed_tool: string };
+    }>("executeLensicallyIntent", {
+      profile_id: "account_proceed",
+      inputs: { brand_key: "manifest_mental" },
+    });
+    expect(accountProceed.isError).not.toBe(true);
+    expect(accountProceed.structuredContent).toMatchObject({
+      selected_key: "manifest_mental",
+      proceeded: true,
+      account_data_loaded: true,
+      routed_execution: { profile_id: "account_proceed", executed_tool: "confirmOperatorProceed" },
+    });
+
     const startup = await mcpToolCallRaw<{
       gateway: { intent: string; public_schema_frozen: boolean };
       mandatory_execution_map: { route_mode: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
