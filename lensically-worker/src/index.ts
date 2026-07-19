@@ -17915,7 +17915,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
               structuredContent: {
                 ...compiledProfile,
                 required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-                account_data_loaded: false,
+                account_data_loaded: gatewayAccountDataLoaded,
                 freehand_gateway_payload_allowed: false,
               },
               content: [{ type: "text", text: `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.` }],
