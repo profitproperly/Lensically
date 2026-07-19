@@ -476,6 +476,7 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   schedule_manifest_review_batch: ["schedule manifest review batch", "schedule review batch"],
   skip_manifest_review_source: ["skip manifest review source", "skip source"],
   draw_source_candidate_batch: ["draw source candidate batch", "select source candidates", "draw sources"],
+  audit_published_post_lineage: ["audit published post lineage", "audit winner lineage", "verify winner lineage", "inspect source to metrics lineage"],
   recover_published_post_lineage: ["recover published post lineage", "restore published post lineage", "backfill winner lineage"],
   get_source_candidate_batch: ["get source candidate batch", "read source candidate batch"],
   create_source_card: ["create source card", "build source card"],
