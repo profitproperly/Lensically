@@ -6925,6 +6925,47 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     )`,
   ).run();
 
+    await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_hardening_incidents (
+      id TEXT PRIMARY KEY,
+      signature TEXT NOT NULL,
+      boundary TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      classification TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'detected',
+      affected_scope TEXT NOT NULL DEFAULT 'objective',
+      blocked_profile_id TEXT,
+      blocked_tool_name TEXT,
+      request_fingerprint TEXT,
+      expected_json TEXT,
+      observed_json TEXT,
+      side_effect_state TEXT NOT NULL DEFAULT 'not_applicable',
+      root_cause TEXT,
+      generalized_cause TEXT,
+      prevention_rule_id TEXT,
+      regression_test_ids_json TEXT,
+      tested_sha TEXT,
+      deployment_id TEXT,
+      live_verification_json TEXT,
+      resume_capsule_json TEXT,
+      resume_result_json TEXT,
+      autonomy_dividend_json TEXT,
+      efficiency_result_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      closed_at TEXT
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_hardening_open_signature
+     ON operator_hardening_incidents (signature)
+     WHERE state <> 'closed'`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_hardening_state_severity
+     ON operator_hardening_incidents (state, severity, updated_at DESC)`,
+  ).run();
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_repo_write_sessions (
       id TEXT PRIMARY KEY,
