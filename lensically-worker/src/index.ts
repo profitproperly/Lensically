@@ -11341,6 +11341,145 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
+  if (toolName === "audit_published_post_lineage") {
+    await ensureThreadsPostsArchiveTable(env);
+    await ensureOperatorWorkflowTables(env);
+    await ensureOperatorPostMetricSnapshotsTable(env);
+    const minimumLikes = Math.max(1, Math.trunc(Number(payload.minimum_likes ?? 1000)));
+    const days = Math.min(Math.max(Math.trunc(Number(payload.days ?? 30)), 1), 90);
+    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 25)), 1), 50);
+    const rows = await env.DB.prepare(
+      `WITH winners AS (
+         SELECT post_id, post_text, post_timestamp, post_permalink,
+                views, likes, replies, reposts, quotes, shares, engagement_total, last_synced_at
+         FROM threads_posts_archive
+         WHERE threads_user_id = ?
+           AND likes >= ?
+           AND datetime(post_timestamp) >= datetime('now', '-' || ? || ' days')
+         ORDER BY likes DESC, datetime(post_timestamp) DESC
+         LIMIT ?
+       )
+       SELECT
+         w.*,
+         s.id AS scheduled_post_id,
+         d.id AS draft_id,
+         r.id AS generation_run_id,
+         c.id AS source_card_id,
+         sel.id AS source_selection_id,
+         sel.batch_id AS source_batch_id,
+         sel.source_identity_key,
+         sel.source_type,
+         sel.internal_source_id,
+         (SELECT COUNT(*)
+            FROM operator_post_metric_snapshots m
+           WHERE m.brand_key = ? AND m.published_post_id = w.post_id) AS metric_snapshot_count,
+         (SELECT COUNT(*)
+            FROM operator_post_metric_snapshots m
+           WHERE m.brand_key = ?
+             AND m.published_post_id = w.post_id
+             AND m.scheduled_post_id = s.id
+             AND m.draft_id = d.id
+             AND m.source_card_id = c.id
+             AND m.source_selection_id = sel.id) AS linked_metric_snapshot_count
+       FROM winners w
+       LEFT JOIN scheduled_posts s
+         ON s.id = (
+           SELECT s2.id
+           FROM scheduled_posts s2
+           WHERE s2.threads_user_id = ? AND s2.published_post_id = w.post_id
+           ORDER BY s2.id DESC
+           LIMIT 1
+         )
+       LEFT JOIN gpt_generation_drafts d
+         ON d.id = (
+           SELECT d2.id
+           FROM gpt_generation_drafts d2
+           WHERE d2.account_id = ?
+             AND d2.threads_user_id = ?
+             AND (d2.published_post_id = w.post_id OR (s.id IS NOT NULL AND d2.scheduled_post_id = s.id))
+           ORDER BY CASE WHEN d2.published_post_id = w.post_id THEN 0 ELSE 1 END,
+                    datetime(d2.updated_at) DESC
+           LIMIT 1
+         )
+       LEFT JOIN gpt_generation_runs r
+         ON r.id = d.run_id AND r.account_id = ? AND r.threads_user_id = ?
+       LEFT JOIN operator_source_cards c
+         ON c.id = d.source_card_id AND c.brand_key = ?
+       LEFT JOIN operator_source_selections sel
+         ON sel.id = c.source_selection_id AND sel.brand_key = ?
+       ORDER BY w.likes DESC, datetime(w.post_timestamp) DESC`,
+    ).bind(
+      brand.profile.threads_user_id,
+      minimumLikes,
+      days,
+      limit,
+      brand.brand_key,
+      brand.brand_key,
+      brand.profile.threads_user_id,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      brand.brand_key,
+      brand.brand_key,
+    ).all<Record<string, unknown>>();
+
+    const posts = (rows.results ?? []).map((row) => {
+      const missingStages: string[] = [];
+      if (!row.source_selection_id || !row.source_batch_id) missingStages.push("source");
+      if (!row.source_card_id) missingStages.push("source_card");
+      if (!row.generation_run_id) missingStages.push("generation_run");
+      if (!row.draft_id) missingStages.push("draft");
+      if (!row.scheduled_post_id) missingStages.push("scheduled_post");
+      if (Number(row.linked_metric_snapshot_count ?? 0) < 1) missingStages.push("metrics");
+      return {
+        published_post_id: row.post_id,
+        post_text: row.post_text,
+        posted_at: row.post_timestamp,
+        post_permalink: row.post_permalink,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes: Number(row.likes ?? 0),
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          quotes: Number(row.quotes ?? 0),
+          shares: Number(row.shares ?? 0),
+          engagement_total: Number(row.engagement_total ?? 0),
+          last_synced_at: row.last_synced_at ?? null,
+        },
+        lineage: {
+          source_batch_id: row.source_batch_id ?? null,
+          source_selection_id: row.source_selection_id ?? null,
+          source_identity_key: row.source_identity_key ?? null,
+          source_type: row.source_type ?? null,
+          saved_pattern_id: row.source_type === "saved_pattern" && row.internal_source_id !== null && row.internal_source_id !== undefined
+            ? Number(row.internal_source_id)
+            : null,
+          source_card_id: row.source_card_id ?? null,
+          generation_run_id: row.generation_run_id ?? null,
+          draft_id: row.draft_id ?? null,
+          scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined
+            ? null
+            : Number(row.scheduled_post_id),
+          published_post_id: row.post_id,
+          metric_snapshot_count: Number(row.metric_snapshot_count ?? 0),
+          linked_metric_snapshot_count: Number(row.linked_metric_snapshot_count ?? 0),
+        },
+        complete: missingStages.length === 0,
+        missing_stages: missingStages,
+      };
+    });
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      criteria: { minimum_likes: minimumLikes, days, limit },
+      audited_count: posts.length,
+      complete_count: posts.filter((post) => post.complete).length,
+      incomplete_count: posts.filter((post) => !post.complete).length,
+      posts,
+    });
+  }
+
   if (toolName === "recover_published_post_lineage") {
     const recovered = await recoverPublishedPostLineage(
       env,
