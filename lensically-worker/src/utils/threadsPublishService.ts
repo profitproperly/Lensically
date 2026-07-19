@@ -416,6 +416,7 @@ export async function publishTextToThreads({
   text,
   spoilerAllText = false,
   spoilerPhrases = [],
+  autoPublishText = true,
   readinessMaxChecks = DEFAULT_READINESS_MAX_CHECKS,
   readinessDelayMs = DEFAULT_READINESS_DELAY_MS,
   publishMaxAttempts = DEFAULT_PUBLISH_MAX_ATTEMPTS,
