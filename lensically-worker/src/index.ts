@@ -15975,6 +15975,24 @@ async function operatorExecutionFingerprint(toolName: string, args: Record<strin
   return sha256OperatorText(JSON.stringify({ tool_name: canonical.tool_name, args: canonical.args }));
 }
 
+const HARDENING_BOUNDARY_VALUES = new Set<HardeningBoundary>(["client", "gateway", "routing", "server", "database", "deployment", "quality", "efficiency", "external"]);
+const HARDENING_STATE_VALUES = new Set<HardeningState>(["detected", "contained", "classified", "reproduced", "generalized", "repaired", "prevention_locked", "validated", "released", "live_verified", "resumed", "closed"]);
+const HARDENING_REPAIR_TOOLS = new Set<string>([
+  "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
+  "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile",
+  "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
+]);
+
+function normalizeHardeningBoundary(value: unknown): HardeningBoundary {
+  const normalized = normalizeOperatorMachineKey(value, "server") as HardeningBoundary;
+  return HARDENING_BOUNDARY_VALUES.has(normalized) ? normalized : "server";
+}
+
+function normalizeHardeningState(value: unknown): HardeningState | null {
+  const normalized = normalizeOperatorMachineKey(value, "") as HardeningState;
+  return HARDENING_STATE_VALUES.has(normalized) ? normalized : null;
+}
+
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_execution_events (
