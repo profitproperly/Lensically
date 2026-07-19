@@ -17408,7 +17408,7 @@ async function handleOperatorMcpAdminTool(
       "active_review_batch_not_found",
       "growth_mission_unavailable",
     ]);
-    for (const row of campaignRows.filter((item) => item.read_only === true)) {
+    for (const row of campaignRows.filter((item) => item.read_only === true && selectedLiveReadTools.has(String(item.tool_name ?? "")))) {
       const name = String(row.tool_name ?? "");
       if (name === "runMcpTests") {
         liveReadRows.push({ tool_name: name, passed: true, status: 200, mode: "campaign_self" });
