@@ -561,6 +561,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         && executionKernelSucceeded
         && directRejected
         && mappedSucceeded
+        && legacyCompatibilitySucceeded
         && startupPolicySucceeded,
       oauth: { authorize: authorize.status, token: tokenResponse.status },
       initialize: {
