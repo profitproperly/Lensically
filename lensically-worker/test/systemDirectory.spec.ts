@@ -420,6 +420,56 @@ describe("System Directory foundation", () => {
     expect(JSON.stringify(request)).not.toContain("listGitHubWorkflowRuns");
   });
 
+  it("builds compact scheduled-post audit requests", () => {
+    const request = buildClientSafeGatewayRequest("scheduled_post_audit", {
+      brand_key: "manifest_mental",
+      scheduled_post_id: 581,
+      operation_id: "a581",
+      proceed_confirmed: true,
+    });
+    expect(request).toEqual({
+      objective: "Audit one scheduled post.",
+      intent: "audit scheduled post",
+      inputs: {
+        brand_key: "manifest_mental",
+        scheduled_post_id: 581,
+        operation_id: "a581",
+        proceed_confirmed: true,
+      },
+    });
+    expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
+    expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
+      id: "public_scheduled_post_audit_narrative",
+      safe_profile_id: "scheduled_post_audit",
+    }));
+  });
+
+  it("builds compact protected scheduler recovery requests", () => {
+    const request = buildClientSafeGatewayRequest("protected_scheduler_recovery", {
+      brand_key: "manifest_mental",
+      actions: [{ scheduled_post_id: 581, action: "reschedule", scheduled_time: "2026-07-19T00:25:00.000Z" }],
+      reason: "Owner requested a future retry after quarantine.",
+      owner_response: "reschedule for 8:25",
+    });
+    expect(request.intent).toBe("recover overdue scheduled posts");
+    expect(inspectClientSafeGatewayRequest(request)).toEqual({ safe: true, violations: [] });
+    expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
+      id: "public_protected_scheduler_recovery_narrative",
+      safe_profile_id: "protected_scheduler_recovery",
+    }));
+  });
+
+  it("uses compact release-marker messages for verified patches", () => {
+    expect(CLIENT_SAFETY_POLICIES).toContainEqual(expect.objectContaining({
+      id: "safe_release_dispatch",
+      summary: expect.stringContaining("compact marker-only message"),
+    }));
+    expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
+      id: "recovery_release_marker_verbose_message",
+      safe_profile_id: "verified_release_marker",
+    }));
+  });
+
   it("routes deployment exclusively through the Recovery surface", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
     expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
