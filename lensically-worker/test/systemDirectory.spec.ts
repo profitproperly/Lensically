@@ -471,6 +471,20 @@ describe("System Directory foundation", () => {
     }));
   });
 
+  it("records and forbids cached freehand gateway schemas", () => {
+    expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("registered profile_id");
+    expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("Freehand objective, intent");
+    expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).not.toContain("Submit objective, intent");
+    expect(CLIENT_SAFETY_POLICIES).toContainEqual(expect.objectContaining({
+      id: "stale_schema_prevention",
+      summary: expect.stringContaining("prohibited from calling the main gateway"),
+    }));
+    expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
+      id: "public_cached_freehand_gateway_schema",
+      safe_profile_id: "startup_context",
+    }));
+  });
+
   it("routes deployment exclusively through the Recovery surface", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
     expect(() => buildClientSafeGatewayRequest("worker_release_dispatch")).toThrow("client_safe_request_external_surface:worker_release_dispatch");
