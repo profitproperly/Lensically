@@ -40,6 +40,7 @@ type ThreadsPublishOptions = {
   spoilerAllText?: boolean;
   spoilerPhrases?: string[];
   readinessMaxChecks?: number;
+  autoPublishText?: boolean;
   readinessDelayMs?: number;
   publishMaxAttempts?: number;
 };
