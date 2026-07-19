@@ -840,13 +840,12 @@ describe("System Directory foundation", () => {
     });
   });
 
-  it("uses Recovery activity after a repeated workflow request is blocked", () => {
-    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_repeated_identical_status_poll");
-    expect(incident?.safe_profile_id).toBe("recovery_workflow_run_list");
+    it("uses Main compact activity after the first workflow status read", () => {
+    const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_second_workflow_status_request");
+    expect(incident?.safe_profile_id).toBe("workflow_run_list");
     expect(buildClientSafeGatewayRequest("workflow_run_list", { limit: 4 })).toMatchObject({ intent: "list github workflow runs" });
-    expect(() => buildClientSafeGatewayRequest("recovery_workflow_run_list", { limit: 4 })).toThrow(
-      "client_safe_request_external_surface:recovery_workflow_run_list",
-    );
+    expect(CLIENT_SAFETY_POLICIES.find((policy) => policy.id === "no_identical_blocked_retry")?.summary).toContain("Every later workflow check");
+    expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("every later workflow check uses the Main workflow_run_list");
   });
 
   it("uses Recovery workflow activity when strategy-contract wording blocks the main list", () => {
