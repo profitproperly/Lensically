@@ -32672,14 +32672,11 @@ export class ScheduledPostScheduler {
       const unresolvedBefore = await listOverdueScheduledPosts(this.env, 100);
       overdueBefore = unresolvedBefore.length;
       const quarantinedBefore = unresolvedBefore.filter((row) => row.status === SCHEDULED_POST_STATUS_POSTING);
-      if (control.mode !== "paused" && quarantinedBefore.length > 0) {
-        control = await this.setControl({
-          mode: "paused",
-          reason: `unresolved_publish_quarantine:${quarantinedBefore.map((row) => row.id).join(",")}`.slice(0, 500),
-        });
-        logWorkerEvent("SCHEDULED_POST_SCHEDULER_PAUSED_FOR_QUARANTINE", {
+      if (quarantinedBefore.length > 0) {
+        logWorkerEvent("SCHEDULED_POST_QUARANTINE_ISOLATED", {
           trigger,
           quarantined_post_ids: quarantinedBefore.map((row) => row.id),
+          scheduler_mode: control.mode,
         }, "error");
       }
       if (control.mode === "paused" && overdueBefore > 0 && shouldAutoResumeTemporarySchedulerPause(control)) {
