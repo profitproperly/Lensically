@@ -486,6 +486,10 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   schedule_approved_draft: ["schedule approved draft", "schedule approved post"],
   list_scheduled_posts: ["list scheduled posts", "scheduled posts", "scheduled calendar"],
   edit_scheduled_post: ["edit scheduled post", "update scheduled post", "retry scheduled post"],
+  auditScheduledPost: ["audit scheduled post", "audit post delivery", "inspect scheduled post delivery"],
+  getScheduledPostSchedulerState: ["get scheduled post scheduler state", "scheduler state", "scheduler health", "scheduler status"],
+  recoverOverdueScheduledPosts: ["recover overdue scheduled posts", "reschedule quarantined post", "reschedule overdue post", "reschedule failed scheduled post", "retire overdue scheduled post"],
+  setScheduledPostSchedulerMode: ["set scheduled post scheduler mode", "resume scheduler", "pause scheduler", "restore normal scheduler mode"],
   get_monthly_growth_review: [
     "get monthly growth review",
     "monthly growth review",
