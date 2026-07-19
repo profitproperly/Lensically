@@ -467,7 +467,7 @@ describe("System Directory foundation", () => {
       summary: expect.stringContaining("compact marker-only message"),
     }));
     expect(PREVENTED_CLIENT_BLOCKS).toContainEqual(expect.objectContaining({
-      id: "recovery_release_marker_verbose_message",
+      id: "public_main_release_marker_verbose_message",
       safe_profile_id: "verified_release_marker",
     }));
   });
@@ -735,7 +735,7 @@ describe("System Directory foundation", () => {
       "public_large_repository_mutation_payload",
       "public_protected_scheduler_recovery_narrative",
       "public_scheduled_post_audit_narrative",
-      "recovery_release_marker_verbose_message",
+      "public_main_release_marker_verbose_message",
       "public_account_lifecycle_profile_omitted",
             "public_repeated_validation_dispatch",
       "capability_definition_profile_input_mismatch",
