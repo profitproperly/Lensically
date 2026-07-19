@@ -1,6 +1,6 @@
 name: Lensically Validation
 # Fast routine validation. This workflow never deploys either Worker.
-# Push markers: [operator-smoke], [operator-analytics], [operator-scheduler],
+# Push markers: [typecheck], [operator-smoke], [operator-analytics], [operator-scheduler],
 # [operator-content], [operator-accounts], [operator-engineering], [system-directory-tests], [operator-full], [gpt-memory-tests].
 run-name: Lensically validation · ${{ inputs.task || github.sha }}
 
@@ -42,6 +42,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
+                contains(github.event.head_commit.message, '[typecheck]') ||
         contains(github.event.head_commit.message, '[operator-smoke]') ||
         contains(github.event.head_commit.message, '[operator-analytics]') ||
         contains(github.event.head_commit.message, '[operator-scheduler]') ||
@@ -101,6 +102,8 @@ jobs:
               gpt-memory-tests) scope="gpt-memory" ;;
               *) echo "Unknown validation task: ${DISPATCH_TASK}"; exit 2 ;;
             esac
+                    elif [[ "${COMMIT_MESSAGE}" == *"[typecheck]"* ]]; then
+            scope="typecheck"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-full]"* ]]; then
             scope="full"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-analytics]"* ]]; then
