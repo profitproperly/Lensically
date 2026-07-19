@@ -411,9 +411,9 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     if (!tokenResponse.ok || !token) return { ok: false, phase: "oauth_token", status: tokenResponse.status };
     const initialize = await mainMcpRequest(origin, token, 1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "lensically-recovery", version: VERSION } });
     const listed = await mainMcpRequest(origin, token, 2, "tools/list", {});
-    const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "executeLensicallyIntent", arguments: { objective: "Verify live startup.", intent: "startup", inputs: {} } });
+    const startup = await mainMcpRequest(origin, token, 3, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "startup", inputs: {} } });
     const direct = await mainMcpRequest(origin, token, 4, "tools/call", { name: "getEngineeringAccessState", arguments: {} });
-    const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeLensicallyIntent", arguments: { objective: "Verify the live mapped execution path.", intent: "inspect engineering access state", inputs: {} } });
+    const mapped = await mainMcpRequest(origin, token, 5, "tools/call", { name: "executeLensicallyIntent", arguments: { profile_id: "get_engineering_access_state", inputs: {} } });
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
