@@ -14,7 +14,7 @@
 
 ## Execution Contract
 
-- `executeLensicallyIntent` is the sole public main-MCP tool. Its public schema remains `objective`, `intent`, and `inputs`, with only existing optional continuation fields.
+- `executeLensicallyIntent` is the sole public main-MCP tool. Its public schema is `profile_id` and bounded `inputs`, with optional continuation fields. Freehand `objective` and `intent` are forbidden; registered profiles compile canonical semantic requests server-side.
 - The source-controlled System Directory resolves the relevant Lensically system, source of truth, payload bounds, and adjacent systems before `static-execution-router-v1` selects one live typed handler.
 - Exact deterministic and exact source-defined intents always keep precedence over broader Directory hints. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
 - Direct internal tool calls are rejected.
