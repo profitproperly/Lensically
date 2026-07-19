@@ -42,7 +42,8 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
-                contains(github.event.head_commit.message, '[typecheck]') ||
+                        contains(github.event.head_commit.message, '[typecheck]') ||
+        contains(github.event.head_commit.message, '[acceptance-regressions]') ||
         contains(github.event.head_commit.message, '[operator-smoke]') ||
         contains(github.event.head_commit.message, '[operator-analytics]') ||
         contains(github.event.head_commit.message, '[operator-scheduler]') ||
@@ -102,8 +103,10 @@ jobs:
               gpt-memory-tests) scope="gpt-memory" ;;
               *) echo "Unknown validation task: ${DISPATCH_TASK}"; exit 2 ;;
             esac
-                    elif [[ "${COMMIT_MESSAGE}" == *"[typecheck]"* ]]; then
+                              elif [[ "${COMMIT_MESSAGE}" == *"[typecheck]"* ]]; then
             scope="typecheck"
+          elif [[ "${COMMIT_MESSAGE}" == *"[acceptance-regressions]"* ]]; then
+            scope="acceptance"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-full]"* ]]; then
             scope="full"
           elif [[ "${COMMIT_MESSAGE}" == *"[operator-analytics]"* ]]; then
