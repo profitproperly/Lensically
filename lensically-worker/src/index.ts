@@ -16111,7 +16111,11 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
     regression_test_ids: Array.isArray(args.regression_test_ids)
       ? args.regression_test_ids.map(String).filter(Boolean)
       : Array.isArray(priorRegressions) ? priorRegressions.map(String) : [],
-    /* HARDENING_TRANSITION_RELEASE_EVIDENCE */
+        tested_sha: normalizeOperatorText(args.tested_sha ?? row.tested_sha, 120, true),
+    deployment_id: normalizeOperatorText(args.deployment_id ?? row.deployment_id, 160, true),
+    live_verification: (args.live_verification ?? safeParseJsonString(String(row.live_verification_json ?? ""))) as Record<string, unknown> | null,
+    resume_result: (supplied.resume_result ?? safeParseJsonString(String(row.resume_result_json ?? ""))) as Record<string, unknown> | null,
+    autonomy_dividend: (args.autonomy_dividend ?? safeParseJsonString(String(row.autonomy_dividend_json ?? ""))) as Record<string, unknown> | null,
   };
 }
 
