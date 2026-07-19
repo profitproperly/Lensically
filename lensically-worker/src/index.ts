@@ -18842,7 +18842,8 @@ async function handleOperatorMcpEngineeringTool(
       : [];
     const failedJob = jobList.find((job) => job.conclusion === "failure");
     const failedJobId = typeof failedJob?.id === "number" || typeof failedJob?.id === "string" ? String(failedJob.id) : null;
-    let failed_log_excerpt: string | null = null;
+        let failed_log_excerpt: string | null = null;
+    let failed_log_unavailable: Record<string, unknown> | null = null;
     if (failedJobId) {
       const config = githubRepoConfig(env);
       const logResponse = await fetch(`https://api.github.com/repos/${config.owner}/${config.repo}/actions/jobs/${failedJobId}/logs`, {
