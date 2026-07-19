@@ -22,7 +22,7 @@ import {
 } from "./mandatoryExecutionMap";
 import {
   assertClientSafetyRegistry,
-  buildClientSafeGatewayRequest,
+    buildClientSafeGatewayRequest,
   CLIENT_SAFE_REQUEST_PROFILES,
   CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
   CLIENT_SAFETY_GATEWAY_DESCRIPTION,
