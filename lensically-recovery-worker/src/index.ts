@@ -525,7 +525,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       : null;
     const executionKernelSucceeded = executionKernel?.name === "Execution Kernel"
       && executionKernel?.version === "lensically-execution-kernel-v1"
-      && executionKernel?.public_contract === "objective_intent_inputs_v1"
+      && executionKernel?.public_contract === "profile_id_inputs_v1"
+      && executionKernel?.legacy_freehand_compatibility === true
       && executionKernel?.deployment_fresh_sessions === true;
     const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
     const startupPolicySucceeded = mapSummary?.version === "static-execution-router-v1"
