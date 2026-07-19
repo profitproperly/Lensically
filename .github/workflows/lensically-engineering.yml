@@ -109,7 +109,7 @@ jobs:
             message="Record compact maintenance diagnostic"
           fi
           git commit -m "$message"
-          git push origin HEAD:main
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPOSITORY}.git" HEAD:main
 
       - name: Surface compact maintenance failure
         if: ${{ inputs.task == 'typecheck' && steps.compact_post_results_maintenance.outcome == 'failure' }}
