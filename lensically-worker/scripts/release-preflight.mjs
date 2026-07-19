@@ -162,7 +162,7 @@ if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v
     || !systemDirectoryTests.includes("builds compact scheduled-post audit requests")
     || !systemDirectoryTests.includes("uses compact release-marker messages for verified patches")
     || !clientSafety.includes('public_large_repository_mutation_payload')
-    || !clientSafety.includes('recovery_repository_mutation')
+        || !clientSafety.includes('repository_patch_set')
     || !clientSafety.includes('public_protected_scheduler_recovery_narrative')
     || !clientSafety.includes('public_scheduled_post_audit_narrative')
     || !clientSafety.includes('recovery_release_marker_verbose_message')) {

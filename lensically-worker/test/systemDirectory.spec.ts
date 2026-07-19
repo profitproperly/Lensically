@@ -472,6 +472,20 @@ describe("System Directory foundation", () => {
     }));
   });
 
+    it("builds compact Main atomic patch sets and rejects oversized combinations", () => {
+    const request = buildClientSafeGatewayRequest("repository_patch_set", {
+      patches: [{ path: "AGENTS.md", find: "old", replace: "new" }],
+      message: "Apply compact patch",
+      dry_run: true,
+    });
+    expect(request).toMatchObject({ intent: "apply repo patch set" });
+    expect(() => buildClientSafeGatewayRequest("repository_patch_set", {
+      patches: [{ path: "AGENTS.md", find: "old", replace: "x".repeat(2600) }],
+      message: "Oversized patch",
+    })).toThrow("client_safe_request_too_large:repository_patch_set");
+    expect(PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_large_repository_mutation_payload")?.safe_profile_id).toBe("repository_patch_set");
+  });
+
   it("keeps new clients profile-only while routing cached gateway schemas", () => {
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("registered profile_id");
     expect(CLIENT_SAFETY_GATEWAY_DESCRIPTION).toContain("Freehand objective, intent");
