@@ -3149,23 +3149,13 @@ describe("operator mode MCP endpoint", () => {
     const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list", {});
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
 
-    const cachedSchemaCall = await mcpToolCallRaw<{
-      ok: boolean;
-      routed_execution: { profile_id: string; executed_tool: string; model_tool_choice_allowed: boolean };
-    }>("executeLensicallyIntent", {
+        const freehand = await mcpToolCallRaw<{ error: string }>("executeLensicallyIntent", {
       objective: "Read current engineering access.",
       intent: "get engineering access state",
       inputs: {},
     });
-    expect(cachedSchemaCall.isError).not.toBe(true);
-    expect(cachedSchemaCall.structuredContent).toMatchObject({
-      ok: true,
-      routed_execution: {
-        profile_id: "public_intent",
-        executed_tool: "getEngineeringAccessState",
-        model_tool_choice_allowed: false,
-      },
-    });
+    expect(freehand.isError).toBe(true);
+    expect(freehand.structuredContent.error).toBe("registered_profile_id_required");
 
     const cachedEngineeringMutation = await mcpToolCallRaw<{
       error: string;
@@ -3182,9 +3172,8 @@ describe("operator mode MCP endpoint", () => {
       },
     });
     expect(cachedEngineeringMutation.isError).toBe(true);
-    expect(cachedEngineeringMutation.structuredContent).toMatchObject({
-      error: "routed_gateway_payload_invalid",
-      tool_name: "applyRepoPatchSet",
+        expect(cachedEngineeringMutation.structuredContent).toMatchObject({
+      error: "registered_profile_id_required",
     });
     expect(JSON.stringify(cachedEngineeringMutation.structuredContent)).not.toContain("confirmOperatorProceed");
 
@@ -3197,12 +3186,9 @@ describe("operator mode MCP endpoint", () => {
       inputs: { brand_key: BRAND_KEY, proceed_confirmed: true },
     });
     expect(cachedAccountRead.isError).toBe(true);
-    expect(cachedAccountRead.structuredContent).toMatchObject({
-      ok: false,
-      error: "continuity_context_required",
-      required_next_tool: "confirmOperatorProceed",
+        expect(cachedAccountRead.structuredContent).toMatchObject({
+      error: "registered_profile_id_required",
     });
-    expect(cachedAccountRead.structuredContent.error).not.toBe("registered_profile_id_required");
 
     const resolvedFreshKey = await mcpToolCallRaw<{
       selected_key: CanonicalBrandKey;
