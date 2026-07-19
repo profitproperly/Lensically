@@ -13020,24 +13020,29 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   
     {
     name: "executeLensicallyIntent",
-    title: "Execute registered Lensically profile",
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Freehand objective and intent text are forbidden. Submit only a registered profile_id and bounded variable inputs; Lensically compiles the canonical request before routing.`,
+    title: "Execute Lensically intent",
+    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Submit one concise objective, one action intent, and bounded variable inputs. The server-side Execution Kernel resolves the live capability and applies all routing, safety, continuity, and execution controls.`,
     inputSchema: {
       type: "object",
       properties: {
-        profile_id: {
+        objective: {
           type: "string",
-          pattern: "^[a-z0-9_]+$",
-          maxLength: 120,
-          description: "Registered Lensically request profile. Use startup with empty inputs for bootstrap; use account_key_selection with brand_key for `key manifest`; use account_proceed with brand_key after the owner says Proceed. For later capabilities, use the registered snake_case profile returned by Lensically.",
-          examples: ["startup", "account_key_selection", "account_proceed"],
+          minLength: 1,
+          maxLength: 600,
+          description: "What must be accomplished. Keep this concise and outcome-focused.",
         },
-        inputs: { type: "object", description: "Bounded variable fields accepted by the registered profile.", additionalProperties: true },
+        intent: {
+          type: "string",
+          minLength: 1,
+          maxLength: 300,
+          description: "The action to perform. The Execution Kernel selects the internal capability.",
+        },
+        inputs: { type: "object", description: "Bounded variable fields for the requested action.", additionalProperties: true },
         continuation_id: { type: "string" },
         incident_id: { type: "string" },
         permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." },
       },
-      required: ["profile_id", "inputs"],
+      required: ["objective", "intent", "inputs"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
