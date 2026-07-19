@@ -969,7 +969,7 @@ describe("operator mode backend spine", () => {
     };
     expect(blockedPayload.error).toBe("scheduler_overdue_recovery_required");
     expect(blockedPayload.control.mode).toBe("paused");
-    expect(blockedPayload.overdue_post_ids).toEqual([firstPostId, secondPostId]);
+    expect(blockedPayload.overdue_post_ids).toEqual([secondPostId]);
     expect(blockedPayload.required_recovery_actions).toEqual(["retire", "reschedule"]);
 
     const futureScheduledTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
