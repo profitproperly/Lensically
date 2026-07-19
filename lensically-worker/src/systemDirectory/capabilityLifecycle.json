@@ -206,6 +206,17 @@
       "compatibility_bridge": false
     },
     {
+      "capability_id": "content.recover_published_post_lineage",
+      "directory_entry_id": "content.sources",
+      "canonical_handler": "recover_published_post_lineage",
+      "route_intent": "recover published post lineage",
+      "implementation_mode": "new_handler",
+      "focused_regression": "recovers a known Saved Pattern into complete published-post lineage",
+      "release_scope": "operator-content",
+      "live_verification": "Verify recovered posts through get post results.",
+      "compatibility_bridge": false
+    },
+    {
       "capability_id": "content.retire_review_batch",
       "directory_entry_id": "content.review_batch_retirement",
       "canonical_handler": "discard_manifest_review_batch",
