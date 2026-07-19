@@ -1131,6 +1131,139 @@ describe("operator mode backend spine", () => {
     });
   }, 30000);
 
+  it("recovers a known Saved Pattern into complete published-post lineage", async () => {
+    await operatorTool("list_accounts");
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS external_patterns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        app_user_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'threads',
+        source_url TEXT NOT NULL,
+        post_id TEXT,
+        post_text TEXT NOT NULL,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        views INTEGER,
+        posted_at TEXT,
+        capture_confidence TEXT NOT NULL DEFAULT 'high',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    const patternInsert = await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, source_url, post_id, post_text,
+        likes, replies, reposts, shares, views, posted_at
+      ) VALUES ('lensically', 'manifest-mental',
+                'https://www.threads.com/@fixture/post/universe-source',
+                'universe-source',
+                'Universe! Make the woman reading this a multimillionaire!',
+                23100, 135, 1000, 47, 191165, '2026-06-25T01:59:47Z')`,
+    ).run();
+    const savedPatternId = Number(patternInsert.meta?.last_row_id ?? 0);
+
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS threads_posts_archive (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT NOT NULL,
+        post_text TEXT,
+        post_timestamp TEXT,
+        post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        engagement_total INTEGER NOT NULL DEFAULT 0,
+        source_rank INTEGER NOT NULL DEFAULT 0,
+        first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (threads_user_id, post_id)
+      )`,
+    ).run();
+    const publishedPostId = "recovered-universe-winner";
+    const publishedText = "Universe, make the person reading this rich enough to pay it off, take the trip, move where they want, and still have money left.";
+    await env.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink,
+        views, likes, replies, reposts, quotes, shares, engagement_total
+      ) VALUES ('35758578720393972', ?, ?, '2026-07-18T05:00:08Z',
+                'https://www.threads.com/@manifestmental/post/recovered-universe-winner',
+                8680, 1800, 32, 43, 4, 7, 1886)`,
+    ).bind(publishedPostId, publishedText).run();
+    const scheduledInsert = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (
+        user_id, threads_user_id, post_text, status, scheduled_time,
+        published_post_id, published_at
+      ) VALUES ('workspace-owner', '35758578720393972', ?, 'posted',
+                '2026-07-18T05:00:00Z', ?, '2026-07-18T05:00:08Z')`,
+    ).bind(publishedText, publishedPostId).run();
+    const scheduledPostId = Number(scheduledInsert.meta?.last_row_id ?? 0);
+    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
+      brand_key: "manifest_mental",
+    });
+
+    const recovered = await operatorTool<{
+      source_selection_id: string;
+      source_card_id: string;
+      recovered_posts: Array<{ generation_run_id: string; draft_id: string }>;
+    }>("recover_published_post_lineage", {
+      brand_key: "manifest_mental",
+      workflow_session_id: session.workflow_session_id,
+      saved_pattern_id: savedPatternId,
+      published_post_ids: [publishedPostId],
+      source_card: {
+        title: "Universe direct-reader financial freedom",
+        lane_key: "financial_manifestation",
+        source_mechanism: "The exact Universe reader opener makes the financial blessing feel personally assigned.",
+        required_product: "Keep the exact Universe reader opener and rotate concrete financial-freedom payoffs.",
+        transformation_contract: {
+          must_preserve_exact: ["Universe, make the person reading this"],
+          may_reuse: ["Universe, make the person reading this"],
+          must_transform: ["The payoff after the opener."],
+          audience_reward: "Concrete financial relief and freedom.",
+        },
+        forbidden_surfaces: [],
+        danger_surfaces: ["Changing the fixed opener."],
+        pass_conditions: ["Keep the opener exact."],
+        fail_conditions: ["Paraphrase the opener."],
+        recommended_direction: "Keep the opener and change the concrete payoff.",
+      },
+    });
+
+    const results = await operatorTool<{
+      metrics: { likes: number };
+      lineage: {
+        source_selection_id: string;
+        source_card_id: string;
+        generation_run_id: string;
+        draft_id: string;
+        scheduled_post_id: number;
+      };
+      source_card: { transformation_contract: { must_preserve_exact: string[] } };
+    }>("get_post_results", {
+      brand_key: "manifest_mental",
+      published_post_id: publishedPostId,
+      include_history: true,
+    });
+    expect(results.metrics.likes).toBe(1800);
+    expect(results.lineage).toMatchObject({
+      source_selection_id: recovered.source_selection_id,
+      source_card_id: recovered.source_card_id,
+      generation_run_id: recovered.recovered_posts[0].generation_run_id,
+      draft_id: recovered.recovered_posts[0].draft_id,
+      scheduled_post_id: scheduledPostId,
+    });
+    expect(results.source_card.transformation_contract.must_preserve_exact)
+      .toContain("Universe, make the person reading this");
+  }, 30000);
+
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
     await operatorTool("list_accounts");
     await env.DB.prepare(
