@@ -3081,16 +3081,21 @@ describe("operator mode MCP endpoint", () => {
       "zero_input_mutation",
     ]);
 
-    const readSegments = ["engineering_reads", "admin_reads", "account_reads_a", "account_reads_b"] as const;
+    const readSegments = [
+      ["s1", "engineering_reads"],
+      ["s2", "admin_reads"],
+      ["s3", "account_reads_a"],
+      ["s4", "account_reads_b"],
+    ] as const;
     let eligibleReads = 0;
     let failedReads = 0;
-    for (const segment of readSegments) {
+    for (const [transportSegment, canonicalSegment] of readSegments) {
       const result = await mcpToolCallRaw<typeof campaign.structuredContent>("executeLensicallyIntent", {
-        objective: `Review ${segment}.`,
+        objective: `Review ${transportSegment}.`,
         intent: "checkup",
-        inputs: { segment },
+        inputs: { segment: transportSegment },
       });
-      expect(result.structuredContent.campaign.segment).toBe(segment);
+      expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
       expect(result.structuredContent.campaign.route_only).toBe(false);
       eligibleReads += result.structuredContent.campaign.live_reads.eligible;
       failedReads += result.structuredContent.campaign.live_reads.failed;
