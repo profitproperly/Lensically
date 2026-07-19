@@ -3055,7 +3055,7 @@ describe("operator mode MCP endpoint", () => {
     }>("executeLensicallyIntent", {
       objective: "Review one.",
       intent: "checkup",
-      inputs: {},
+      inputs: { segment: "routes" },
     });
     expect(campaign.structuredContent.campaign).toMatchObject({
       total_internal_capabilities: 84,
