@@ -17714,6 +17714,7 @@ async function handleOperatorMcpAdminTool(
           passed: mutationPreflightRows.length - mutationPreflightFailures.length,
           failed: mutationPreflightFailures.length,
           failures: mutationPreflightFailures,
+          protected_gates_enforced: mutationPreflightRows.filter((row) => row.protected_gate_enforced === true).length,
           side_effects_executed: 0,
         },
         risk_groups: {
