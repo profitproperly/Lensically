@@ -2372,16 +2372,16 @@ describe("operator mode MCP endpoint", () => {
     });
     const listed = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { required?: string[]; properties?: Record<string, unknown> } }> }>("tools/list");
     expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
-    expect(listed.tools[0]?.inputSchema?.required).toEqual(["objective", "intent", "inputs"]);
+    expect(listed.tools[0]?.inputSchema?.required).toEqual(["profile_id", "inputs"]);
     expect(Object.keys(listed.tools[0]?.inputSchema?.properties ?? {})).toEqual(expect.arrayContaining([
-      "objective",
-      "intent",
+      "profile_id",
       "inputs",
       "continuation_id",
       "incident_id",
       "permit",
     ]));
-    expect(listed.tools[0]?.inputSchema?.properties).not.toHaveProperty("profile_id");
+    expect(listed.tools[0]?.inputSchema?.properties).not.toHaveProperty("objective");
+    expect(listed.tools[0]?.inputSchema?.properties).not.toHaveProperty("intent");
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     const names = registry.tools.map((tool) => tool.name);
     const startup = await mcpTool<{
