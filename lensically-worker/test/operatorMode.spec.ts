@@ -1193,7 +1193,7 @@ describe("operator mode backend spine", () => {
       `INSERT INTO threads_posts_archive (
         threads_user_id, post_id, post_text, post_timestamp, post_permalink,
         views, likes, replies, reposts, quotes, shares, engagement_total
-      ) VALUES ('35758578720393972', ?, ?, '2026-07-18T05:00:08Z',
+      ) VALUES ('35758578720393972', ?, ?, '2026-07-18T05:00:08+0000',
                 'https://www.threads.com/@manifestmental/post/recovered-universe-winner',
                 8680, 1800, 32, 43, 4, 7, 1886)`,
     ).bind(publishedPostId, publishedText).run();
