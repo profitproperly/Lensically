@@ -695,6 +695,7 @@ describe("System Directory foundation", () => {
             "recovery_chunk_commit_session_identifier",
       "public_terminal_workflow_failure_detail_request",
       "public_mcp_tool_inventory_request",
+      "public_capability_campaign_wording",
       "public_startup_receipt_wording",
       "public_startup_bootstrap_shape",
       "public_operator_context_shape",
