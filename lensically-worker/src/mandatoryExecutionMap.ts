@@ -72,9 +72,10 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       min_input_characters: 3000,
     },
     losing_path: "Submit one large repository-mutation specification through the public gateway.",
-    winning_path: {
-      surface: "recovery_plane",
-      procedure: ["Inspect bounded known source.", "Apply compact phrase-level exact patches.", "Run focused validation.", "Release the exact tested head."],
+        winning_path: {
+      surface: "main_gateway",
+      route_intent: "apply repo patch set",
+      procedure: ["Use the registered atomic patch-set profile.", "Validate every exact replacement against one repository head.", "Commit once only after all replacements validate.", "Run focused validation and release the exact tested head."],
     },
     evidence: ["The public implementation payload was rejected before the gateway received it.", "Bounded Recovery inspection and exact patches were accepted."],
     scope: "universal",
