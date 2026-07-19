@@ -16391,6 +16391,8 @@ async function handleOperatorMcpAdminTool(
       tool_count: toolCount,
       account_data_loaded: false,
             proceed_required: true,
+      next_profile_id: "account_proceed",
+      next_profile_inputs: { brand_key: brandKey },
       collaboration_contract_version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
       startup_contract_required: true,
       handshake,
