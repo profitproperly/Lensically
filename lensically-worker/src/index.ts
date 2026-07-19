@@ -16024,6 +16024,20 @@ async function getActiveBlockingHardeningIncident(env: Env): Promise<Record<stri
   return row ? serializeHardeningIncident(row) : null;
 }
 
+async function recordHardeningIncident(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const boundary = normalizeHardeningBoundary(args.boundary);
+  const profile = normalizeOperatorMachineKey(args.blocked_profile_id, "unknown");
+  const category = normalizeOperatorMachineKey(args.error_category, "unexpected_result");
+  const fingerprint = normalizeOperatorText(args.request_fingerprint, 200, true);
+  const observed = normalizeOperatorText(args.observed_outcome, 1000, true) ?? category;
+  const rule = resolvePromotedWinningPath(category.replace(/_/g, " "), observed, { blocked_profile_id: profile });
+  const classification: HardeningClassification = rule ? "prevention_breach" : "novel_failure";
+  const severity: HardeningSeverity = boundary === "efficiency" ? "P2" : rule ? "P0" : "P1";
+  const signature = await sha256OperatorText(JSON.stringify({ boundary, profile, category, fingerprint }));
+  /* HARDENING_INTAKE_BODY */
+}
+
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_execution_events (
