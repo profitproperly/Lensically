@@ -15240,6 +15240,25 @@ function operatorPublicIntentForToolName(toolName: string): string {
   return operatorPublicProfileIdForToolName(toolName).replace(/_/g, " ");
 }
 
+function resolveExactCapabilityToolName(value: unknown): string | null {
+  const key = normalizeOperatorMachineKey(value, "");
+  const aliases: Record<string, string> = {
+    repository_patch_set: "applyRepoPatchSet",
+    apply_repo_patch_set: "applyRepoPatchSet",
+    repository_file_listing: "listRepoFiles",
+    list_repository_files: "listRepoFiles",
+    list_repo_files: "listRepoFiles",
+    repository_file_read: "readRepoFile",
+    search_repository_files: "searchRepoFiles",
+    repository_symbol_search: "searchRepoFiles",
+  };
+  if (aliases[key]) return aliases[key];
+  return buildOperatorMcpBaseTools(false).find((tool) =>
+    operatorPublicProfileIdForToolName(tool.name) === key
+    || normalizeOperatorMachineKey(tool.title, "") === key,
+  )?.name ?? null;
+}
+
 function resolveOperatorAccountLifecycleProfile(
   gatewayArgs: Record<string, unknown>,
   rawInputs: Record<string, unknown>,
