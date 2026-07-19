@@ -17803,6 +17803,22 @@ async function callOperatorToolForMcp(request: Request, env: Env, toolName: stri
   };
 }
 
+async function operatorGatewayAccountDataLoaded(
+  env: Env,
+  gatewayArgs: Record<string, unknown>,
+): Promise<boolean> {
+  const rawInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
+    ? gatewayArgs.inputs as Record<string, unknown>
+    : {};
+  const brandKey = normalizeGptBrandKey(rawInputs.brand_key ?? gatewayArgs.brand_key);
+  if (!brandKey) return false;
+  try {
+    return Boolean(await readLatestOperatorContinuityState(env, "continuity_context", brandKey));
+  } catch {
+    return false;
+  }
+}
+
 async function handleOperatorMcp(request: Request, env: Env): Promise<Response> {
   const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
   if (request.method === "GET") {
