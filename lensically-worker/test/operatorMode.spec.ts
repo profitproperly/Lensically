@@ -3673,7 +3673,7 @@ describe("operator mode MCP endpoint", () => {
       error: string;
       validation_errors?: Array<{ path: string }>;
     }>("executeLensicallyIntent", {
-      profile_id: "apply_repo_patch_set",
+            profile_id: "repository_patch_set",
       inputs: {
         dry_run: true,
         message: "Dry-run gateway repair route",
