@@ -18569,7 +18569,10 @@ async function handleOperatorMcpEngineeringTool(
     if (count !== 1) {
       return { ok: false, error: "find_must_match_once", match_count: count };
     }
-    const nextContent = file.content.replace(find, replace);
+        const nextContent = file.content.replace(find, replace);
+    if (nextContent === file.content) {
+      return { ok: true, no_change: true, no_commit_created: true, path, reason: "replacement_produced_identical_content" };
+    }
     const put = await putGithubFile(env, { path, content: nextContent, message, sha: file.sha });
     const diffSummary = normalizeOperatorText(args.summary, 1000, true) ?? `Updated ${path}: ${find.length} chars replaced with ${replace.length} chars.`;
     await recordEngineeringAudit(env, { action: "applyRepoTextPatch", filesChanged: [path], diffSummary, result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
