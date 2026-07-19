@@ -15328,8 +15328,15 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           ? { ...inputs, brand_key: inputs.account_key, account_key: undefined }
           : inputs;
       delete safeInputs.account_key;
-      const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
-            const compiledRequest = compiled;
+            const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
+      let compiledRequest = compiled;
+      if (profileId === "repository_symbol_search") {
+        compiledRequest = { ...compiled, inputs: { prefix: safeInputs.path, query: safeInputs.symbol, limit: safeInputs.limit ?? 20 } };
+      }
+      if (profileId === "repository_file_read") {
+        const requestedLines = Number(safeInputs.max_lines ?? (Number(safeInputs.max_characters ?? 0) > 0 ? Math.ceil(Number(safeInputs.max_characters) / 100) : 200));
+        compiledRequest = { ...compiled, inputs: { path: safeInputs.path, start_line: safeInputs.start_line ?? 1, max_lines: Math.min(Math.max(Math.trunc(requestedLines), 1), 200) } };
+      }
       return {
         ok: true,
         profile_id: profileId,
