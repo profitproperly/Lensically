@@ -2287,6 +2287,73 @@ describe("operator mode MCP endpoint", () => {
     expect(initializedBody.result?.serverInfo?.name).toBe("lensically-operator-mode");
   }, 30000);
 
+  it("rejects an MCP session created by a previous Worker deployment before routing", async () => {
+    const mutableEnv = env as unknown as {
+      CF_VERSION_METADATA?: { id: string };
+      LENSICALLY_COMMIT_SHA?: string;
+    };
+    const originalMetadata = mutableEnv.CF_VERSION_METADATA;
+    const originalSha = mutableEnv.LENSICALLY_COMMIT_SHA;
+    try {
+      mutableEnv.CF_VERSION_METADATA = { id: "deployment-before" };
+      mutableEnv.LENSICALLY_COMMIT_SHA = "commit-before";
+      const initialized = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: MCP_AUTH_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "vitest", version: "1.0.0" } },
+        }),
+      });
+      const staleSessionId = initialized.headers.get("mcp-session-id");
+      expect(initialized.status).toBe(200);
+      expect(staleSessionId).toBeTruthy();
+      expect(initialized.headers.get("x-lensically-deployment-id")).toBe("deployment-before");
+      expect(initialized.headers.get("x-lensically-execution-kernel")).toBe("lensically-execution-kernel-v1");
+
+      mutableEnv.CF_VERSION_METADATA = { id: "deployment-after" };
+      mutableEnv.LENSICALLY_COMMIT_SHA = "commit-after";
+      const staleRequest = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: { ...MCP_AUTH_HEADERS, "Mcp-Session-Id": staleSessionId ?? "" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+      });
+      const staleBody = await staleRequest.json() as { error?: { data?: { reason?: string } } };
+      expect(staleRequest.status).toBe(404);
+      expect(staleBody.error?.data?.reason).toBe("stale_mcp_deployment_session");
+      expect(staleRequest.headers.get("x-lensically-deployment-id")).toBe("deployment-after");
+      expect(staleRequest.headers.get("mcp-session-id")).toBeTruthy();
+      expect(staleRequest.headers.get("mcp-session-id")).not.toBe(staleSessionId);
+
+      const reinitialized = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: MCP_AUTH_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 3,
+          method: "initialize",
+          params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "vitest", version: "1.0.0" } },
+        }),
+      });
+      const freshSessionId = reinitialized.headers.get("mcp-session-id");
+      const listed = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: { ...MCP_AUTH_HEADERS, "Mcp-Session-Id": freshSessionId ?? "" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/list", params: {} }),
+      });
+      expect(reinitialized.status).toBe(200);
+      expect(freshSessionId).toBeTruthy();
+      expect(listed.status).toBe(200);
+    } finally {
+      if (originalMetadata) mutableEnv.CF_VERSION_METADATA = originalMetadata;
+      else delete mutableEnv.CF_VERSION_METADATA;
+      if (originalSha !== undefined) mutableEnv.LENSICALLY_COMMIT_SHA = originalSha;
+      else delete mutableEnv.LENSICALLY_COMMIT_SHA;
+    }
+  }, 30000);
+
   it("lists only the active static MCP registry and concise instructions", async () => {
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
