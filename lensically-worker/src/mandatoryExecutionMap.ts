@@ -14,6 +14,18 @@ export const HARDENING_ALLOWED_TRANSITIONS: Readonly<Record<HardeningState, read
   detected: ["contained"], contained: ["classified"], classified: ["reproduced"], reproduced: ["generalized"], generalized: ["repaired"], repaired: ["prevention_locked"], prevention_locked: ["validated"], validated: ["released"], released: ["live_verified"], live_verified: ["resumed"], resumed: ["closed"], closed: [],
 };
 
+export type HardeningTransitionEvidence = {
+  root_cause?: string | null;
+  generalized_cause?: string | null;
+  prevention_rule_id?: string | null;
+  regression_test_ids?: string[];
+  tested_sha?: string | null;
+  deployment_id?: string | null;
+  live_verification?: Record<string, unknown> | null;
+  resume_result?: Record<string, unknown> | null;
+  autonomy_dividend?: Record<string, unknown> | null;
+};
+
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
 export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
 export type WinningPathPromotion = {
