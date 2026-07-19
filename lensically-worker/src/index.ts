@@ -13023,28 +13023,23 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "executeLensicallyIntent",
     title: "Execute Lensically intent",
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Submit one concise objective, one action intent, and bounded variable inputs. The server-side Execution Kernel resolves the live capability and applies all routing, safety, continuity, and execution controls.`,
+    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Submit one registered profile ID and bounded variable inputs. Lensically compiles the canonical objective and intent server-side, then the Execution Kernel applies routing, safety, continuity, and execution controls.`,
     inputSchema: {
       type: "object",
       properties: {
-        objective: {
+        profile_id: {
           type: "string",
           minLength: 1,
-          maxLength: 600,
-          description: "What must be accomplished. Keep this concise and outcome-focused.",
+          maxLength: 160,
+          pattern: "^[a-z0-9_]+$",
+          description: "Registered semantic request profile. Objective, intent, routing, and handler selection are compiled server-side.",
         },
-        intent: {
-          type: "string",
-          minLength: 1,
-          maxLength: 300,
-          description: "The action to perform. The Execution Kernel selects the internal capability.",
-        },
-        inputs: { type: "object", description: "Bounded variable fields for the requested action.", additionalProperties: true },
+        inputs: { type: "object", description: "Bounded variable fields allowed by the registered profile.", additionalProperties: true },
         continuation_id: { type: "string" },
         incident_id: { type: "string" },
         permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." },
       },
-      required: ["objective", "intent", "inputs"],
+      required: ["profile_id", "inputs"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
