@@ -14610,7 +14610,7 @@ async function updateGithubBranchRefWithReconciliation(
 async function getGithubFile(env: Env, repoPath: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number }> {
   const config = githubRepoConfig(env);
   const encodedPath = encodeURIComponent(repoPath).replace(/%2F/g, "/");
-  const contents = await githubRepoApi(env, `/contents/${encodedPath}?ref=${encodeURIComponent(config.branch)}`);
+  const contents = await githubRepoApiRetryable(env, `/contents/${encodedPath}?ref=${encodeURIComponent(config.branch)}`);
   if (contents.ok && contents.data && typeof contents.data === "object" && !Array.isArray(contents.data)) {
     const data = contents.data as Record<string, unknown>;
     const encoded = typeof data.content === "string" ? data.content.trim() : "";
