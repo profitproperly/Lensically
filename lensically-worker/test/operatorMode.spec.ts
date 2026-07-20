@@ -3662,11 +3662,30 @@ describe("operator mode MCP endpoint", () => {
     expect(gatewayHealth.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
     expect(gatewayHealth.structuredContent.status_kind).toBe("compact_engineering_precheck");
 
+        const repoStatusFetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (request.method !== "GET" || url.origin !== "https://api.github.com") {
+        throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
+      }
+      if (url.pathname === "/repos/profitproperly/Lensically/branches/main") {
+        return new Response(JSON.stringify({ commit: { sha: "vitest-head-sha" } }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (url.pathname === "/repos/profitproperly/Lensically/commits/vitest-head-sha/check-runs" && url.searchParams.get("per_page") === "100") {
+        return new Response(JSON.stringify({ total_count: 0, check_runs: [] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (url.pathname === "/repos/profitproperly/Lensically/commits/vitest-head-sha/status") {
+        return new Response(JSON.stringify({ state: "pending", statuses: [] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
+    });
     const alignment = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
       profile_id: "get_repo_status",
       inputs: {},
     });
-        expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
+    repoStatusFetchSpy.mockRestore();
+    expect(alignment.isError, JSON.stringify(alignment.structuredContent)).not.toBe(true);
+    expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
 
     const audit = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
       profile_id: "list_engineering_audit",
