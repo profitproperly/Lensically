@@ -98,10 +98,11 @@
 
 - GitHub `main` is the repository source of truth.
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
-- Normal implementation flow is bounded inspection, one coherent change set, focused validation, one exact-SHA release, and live health and smoke verification.
-- The deployment workflow runs preflight, TypeScript validation, mandatory System Directory tests, the focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
-- Full Operator diagnostics run as eight deterministic GitHub matrix shards. Every active Operator test title is assigned to exactly one shard, shards execute in parallel, and the former single-job monolith is forbidden by release preflight.
-- Worker releases use the source-controlled verified-release marker. GitHub converts the marker commit into an internal exact-SHA workflow dispatch; checkout must match that SHA before validation or deployment. Workflow jobs cannot self-commit diagnostics back to `main`.
+- Normal implementation flow is bounded inspection, one coherent change set, focused exact-head validation, one gated release, and live health and smoke verification.
+- Cloudflare Workers Builds is connected to `profitproperly/Lensically` on `main` with root `lensically-worker`. Ordinary commits run `npm ci && npm run validate:cloudflare`; `npm run deploy:cloudflare-gated` skips deployment unless the same validated commit carries `[verified-worker-release]` and its receipt SHA matches.
+- The validation script runs TypeScript, capability lifecycle preflight, Operator acceptance, mandatory System Directory tests, Threads publishing tests, and GPT-memory tests before writing the exact-head receipt.
+- Full Operator diagnostics remain available as eight deterministic shards when focused release evidence is insufficient. GitHub Actions billing is not part of the normal release dependency.
+- The deploy gate passes the exact validated SHA to Wrangler as `LENSICALLY_COMMIT_SHA`; production and repository heads align only after live verification of that release. Ordinary source commits never deploy production.
 - Routine engineering should complete in under ten minutes whenever the underlying platform operation permits it. Extra frameworks, duplicated registries, repeated polling, and separate validation and deployment loops are not acceptable defaults.
 
 ## Deployment Targets
