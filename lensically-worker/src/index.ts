@@ -20436,10 +20436,12 @@ async function handleOperatorMcpEngineeringTool(
         boundary_test: null,
       };
     }
+    const liveSessionId = response.headers.get("mcp-session-id") ?? "";
     const sessionHeaders = {
       "content-type": "application/json",
       "authorization": authorization,
       "MCP-Protocol-Version": "2025-06-18",
+      "Mcp-Session-Id": liveSessionId,
     };
     const callLiveMcp = async (id: number, method: string, params: Record<string, unknown>): Promise<{ status: number; payload: Record<string, unknown> | null }> => {
       const liveResponse = await fetch(endpoint, {
