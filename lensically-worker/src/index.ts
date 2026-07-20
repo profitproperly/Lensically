@@ -7108,10 +7108,6 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       contract_version = excluded.contract_version,
       policy_version = excluded.policy_version,
       role = excluded.role,
-      active_outcome_key = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.active_outcome_key ELSE excluded.active_outcome_key END,
-      active_outcome_title = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.active_outcome_title ELSE excluded.active_outcome_title END,
-      active_scope_json = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.active_scope_json ELSE excluded.active_scope_json END,
-      scope_frozen = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.scope_frozen ELSE 1 END,
       updated_at = CURRENT_TIMESTAMP`,
   ).bind(
     AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
