@@ -522,10 +522,9 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.profile_id === "get_engineering_access_state"
       && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState"
       && (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed === false;
-    const legacyCompatibilitySucceeded = legacyMapped.status === 200
-      && legacyMappedContent?.ok === true
-      && (legacyMappedContent?.routed_execution as Record<string, unknown> | undefined)?.profile_id === "public_intent"
-      && (legacyMappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState";
+    const legacyFreehandRetired = legacyMapped.status === 200
+      && legacyMappedContent?.ok === false
+      && legacyMappedContent?.error === "registered_profile_id_required";
     const executionKernel = startupContent?.execution_kernel && typeof startupContent.execution_kernel === "object" && !Array.isArray(startupContent.execution_kernel)
       ? startupContent.execution_kernel as Record<string, unknown>
       : null;
