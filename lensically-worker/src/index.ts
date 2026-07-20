@@ -14546,6 +14546,14 @@ async function buildOperatorMcpTools(_env: Env, _includeDisabled = false, includ
   return buildOperatorMcpBaseTools(includeScopedWrappers);
 }
 
+async function buildOperatorPublicMcpTools(env: Env): Promise<OperatorMcpToolDefinition[]> {
+  return (await buildOperatorMcpTools(env, false, false)).filter((tool) => isOperatorPublicDirectToolName(tool.name));
+}
+
+async function operatorPublicMcpToolCount(env: Env): Promise<number> {
+  return (await buildOperatorPublicMcpTools(env)).length;
+}
+
 async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<Record<string, unknown> | null> {
   const tools = await buildOperatorMcpTools(env, true);
   const tool = tools.find((item) => item.name === toolName);
