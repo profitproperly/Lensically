@@ -1,0 +1,10 @@
+{
+  "name": "lensically-local-bootstrap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "lensically-local-bootstrap": "./src/service.mjs"
+  }
+}
+

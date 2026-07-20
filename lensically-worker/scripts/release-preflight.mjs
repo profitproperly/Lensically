@@ -15,8 +15,8 @@ const gptMemoryTests = read("test/gptMemoryRoutes.spec.ts");
 const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifecycle.json"));
 const tests = read("test/operatorMode.spec.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
-const workflow = read("../.github/workflows/lensically-engineering.yml");
-const validationWorkflow = read("../.github/workflows/lensically-validation.yml");
+const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
+const validationWorkflow = read("../.github/workflows/lensically-validation.yml").replace(/\r\n/g, "\n");
 const agentRules = read("../AGENTS.md");
 const currentState = read("../CURRENT_STATE.md");
 const operatingMemory = read("../OPERATING_MEMORY.md");
@@ -201,7 +201,7 @@ if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v
         || !clientSafety.includes('repository_patch_set')
     || !clientSafety.includes('public_protected_scheduler_recovery_narrative')
     || !clientSafety.includes('public_scheduled_post_audit_narrative')
-    || !clientSafety.includes('recovery_release_marker_verbose_message')) {
+    || !clientSafety.includes('public_main_release_marker_verbose_message')) {
   errors.push("winning_path_promotion_contract_missing");
 }
 

@@ -15,12 +15,24 @@ let receipt;
 try {
   receipt = JSON.parse(readFileSync(".cloudflare-validation-receipt.json", "utf8"));
 } catch {
-  console.error("[deploy-gate] validation receipt missing or unreadable");
-  process.exit(2);
+  try {
+    receipt = JSON.parse(readFileSync(".local-validation-receipt.json", "utf8"));
+  } catch {
+    console.error("[deploy-gate] validation receipt missing or unreadable");
+    process.exit(2);
+  }
 }
 
-if (receipt?.ok !== true || receipt?.commit_sha !== sha) {
-  console.error(`[deploy-gate] receipt SHA mismatch: expected ${sha}, received ${receipt?.commit_sha ?? "none"}`);
+const receiptSha = receipt?.commit_sha ?? receipt?.repository_sha;
+const localReceiptShaMatches = receipt?.version === "local-validation-receipt-v1"
+  && receipt?.repository_sha === sha
+  && receipt?.checked_out_sha === sha
+  && receipt?.validated_sha === sha
+  && receipt?.release_candidate_sha === sha;
+const cloudflareReceiptShaMatches = receipt?.ok === true && receiptSha === sha;
+
+if (!cloudflareReceiptShaMatches && !localReceiptShaMatches) {
+  console.error(`[deploy-gate] receipt SHA mismatch: expected ${sha}, received ${receiptSha ?? "none"}`);
   process.exit(3);
 }
 

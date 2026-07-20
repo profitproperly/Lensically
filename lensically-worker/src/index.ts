@@ -47,6 +47,20 @@ import {
   inspectClientSafeGatewayRequest,
   type ClientSafeRequestProfileId,
 } from "./systemDirectory";
+import {
+  LOCAL_EXECUTION_BOOTSTRAP_VERSION,
+  LOCAL_EXECUTION_VERSION,
+  LOCAL_VALIDATION_RECEIPT_VERSION,
+  isExactSha,
+  selectValidationPlane,
+  validateLocalExecutionJob,
+  validateLocalValidationReceipt,
+  validateWorkerUpdatePlan,
+  type LocalExecutionJob,
+  type LocalExecutionJobType,
+  type LocalExecutionNodeStatus,
+  type LocalValidationReceipt,
+} from "./localExecution";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -13240,6 +13254,14 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "runGitHubWorkflow",
   "getGitHubWorkflowRun",
   "verifyDeployedMcpVersion",
+  "getLocalExecutionStatus",
+  "queueLocalExecutionValidation",
+  "queueLocalExecutionFullValidation",
+  "queueLocalExecutionDeployValidatedSha",
+  "queueLocalExecutionWorkerUpdate",
+  "cancelLocalExecutionJob",
+  "getValidationPlaneStatus",
+  "executeValidationPlane",
   "listEngineeringAudit",
 ] as const;
 
@@ -13278,6 +13300,7 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "executeLensicallyIntent",
     title: "Execute Lensically intent",
+    // legacy_freehand_compatibility: true remains server-side only for cached clients; the advertised public schema stays profile_id plus inputs.
     description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Submit one registered profile ID and bounded variable inputs. Lensically compiles the canonical objective and intent server-side, then the Execution Kernel applies routing, safety, continuity, and execution controls.`,
     inputSchema: {
       type: "object",
@@ -13306,6 +13329,14 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "readRepoFile", title: "Read repo file", description: "Read one GitHub repository file from the default branch, with optional line bounds.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, start_line: { type: "integer", minimum: 1 }, max_lines: { type: "integer", minimum: 1, maximum: 400 } }, required: ["path"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
   { name: "getRepoStatus", title: "Get repo status", description: "Read the configured GitHub repo, branch, latest commit SHA, bounded check runs, commit statuses, and Cloudflare validation state.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "getLocalExecutionStatus", title: "Get local execution status", description: "Read the registered Windows local execution nodes, queue counts, latest receipt state, and validation-plane availability.", inputSchema: { type: "object", properties: { node_id: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
+  { name: "queueLocalExecutionValidation", title: "Queue local execution validation", description: "Queue one signed exact-SHA validation job for the Windows local execution node.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, node_id: { type: "string" }, profile: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "queueLocalExecutionFullValidation", title: "Queue local execution full validation", description: "Queue the full local validation profile for one frozen exact repository SHA.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, node_id: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "queueLocalExecutionDeployValidatedSha", title: "Queue local deploy validated SHA", description: "Queue deployment for one exact SHA only when a matching local validation receipt exists.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, receipt_id: { type: "string" }, node_id: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha", "receipt_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "queueLocalExecutionWorkerUpdate", title: "Queue local worker update", description: "Queue a signed remotely replaceable worker update into the inactive node slot.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, worker_version: { type: "string" }, node_id: { type: "string" }, package_hash: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha", "worker_version", "package_hash"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "cancelLocalExecutionJob", title: "Cancel local execution job", description: "Cancel one pending, claimed, or running local execution job without issuing a replacement.", inputSchema: { type: "object", properties: { job_id: { type: "string" }, node_id: { type: "string" }, reason: { type: "string" } }, required: ["job_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "getValidationPlaneStatus", title: "Get validation plane status", description: "Read local-node, Cloudflare Builds, and GitHub Actions availability and routing priority without dispatching work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
+  { name: "executeValidationPlane", title: "Execute validation plane", description: "Select the highest-priority available validation plane for one exact frozen SHA and queue a bounded validation job.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, validation_profile: { type: "string", enum: ["sha", "focused", "full"] }, urgency: { type: "string", enum: ["queue", "normal", "urgent"] }, queue_when_local_offline: { type: "boolean" }, require_independent_third_plane: { type: "boolean" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "applyRepoTextPatch", title: "Apply repo text patch", description: "Apply one exact find/replace patch to a GitHub repo file and commit directly to the configured branch.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "find", "replace", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "applyRepoPatchSet", title: "Apply atomic repo patch set", description: "Apply up to 20 exact replacements across multiple GitHub repo files and create one commit only after every replacement validates.", inputSchema: { type: "object", properties: { patches: { type: "array", minItems: 1, maxItems: 20, items: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"], additionalProperties: false } }, message: { type: "string" }, summary: { type: "string" }, expected_head_sha: { type: "string" }, dry_run: { type: "boolean" } }, required: ["patches", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "startRepoFileWrite", title: "Start repo file write", description: "Start a chunked file write session for a GitHub repo path.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, mode: { type: "string", enum: ["replace", "create"] }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "mode", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -15454,6 +15485,14 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["getOperatorWorkState", "operator_work_state"],
   ["intakeOperatorWork", "operator_work_intake"],
   ["advanceOperatorWork", "operator_work_transition"],
+  ["getLocalExecutionStatus", "local_execution_status"],
+  ["queueLocalExecutionValidation", "local_execution_validate_sha"],
+  ["queueLocalExecutionFullValidation", "local_execution_full_validation"],
+  ["queueLocalExecutionDeployValidatedSha", "local_execution_deploy_validated_sha"],
+  ["queueLocalExecutionWorkerUpdate", "local_execution_update_worker"],
+  ["cancelLocalExecutionJob", "local_execution_cancel_job"],
+  ["getValidationPlaneStatus", "validation_plane_status"],
+  ["executeValidationPlane", "validation_plane_execute"],
   ["auditScheduledPost", "scheduled_post_audit"],
   ["recoverOverdueScheduledPosts", "protected_scheduler_recovery"],
   ["selectOperatorKey", "account_key_selection"],
@@ -16623,7 +16662,7 @@ async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Prom
     normalizeOperatorJson(Array.isArray(args.dependencies) ? args.dependencies : [], []),
     completionCondition,
     Math.max(1, Math.trunc(Number(args.execution_order ?? 1000))),
-    intake.decision === "merge" ? duplicateOf : null,
+    intake.decision === "merge" ? explicitDuplicateOf : null,
   ).run();
   if (!activeOutcomeExists && intake.decision === "activate") {
     await env.DB.prepare(
@@ -18947,6 +18986,404 @@ export function searchKnownRepositoryFileContent(
   };
 }
 
+async function ensureLocalExecutionTables(env: Env): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS operator_local_execution_nodes (
+        node_id TEXT PRIMARY KEY,
+        display_name TEXT,
+        status TEXT NOT NULL DEFAULT 'registered',
+        heartbeat_at TEXT,
+        healthy INTEGER NOT NULL DEFAULT 0,
+        bootstrap_version TEXT,
+        worker_version TEXT,
+        active_slot TEXT,
+        previous_worker_version TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ),
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS operator_local_execution_jobs (
+        job_id TEXT PRIMARY KEY,
+        repo TEXT NOT NULL,
+        commit_sha TEXT NOT NULL,
+        job_type TEXT NOT NULL,
+        inputs_json TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        state TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        claimed_at TEXT,
+        lease_expires_at TEXT,
+        nonce TEXT NOT NULL UNIQUE,
+        max_runtime_ms INTEGER NOT NULL,
+        expected_stages_json TEXT NOT NULL,
+        authorization_level TEXT NOT NULL,
+        signature TEXT NOT NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        result_status TEXT,
+        result_json TEXT,
+        operation_id TEXT,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ),
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS operator_local_validation_receipts (
+        receipt_id TEXT PRIMARY KEY,
+        commit_sha TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        validation_profile TEXT NOT NULL,
+        receipt_json TEXT NOT NULL,
+        ok INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ),
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS operator_validation_plane_events (
+        event_id TEXT PRIMARY KEY,
+        commit_sha TEXT,
+        selected_plane TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        validation_profile TEXT,
+        job_id TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ),
+  ]);
+}
+
+function localExecutionDefaultNodeId(env: Env): string {
+  return normalizeOperatorMachineKey((env as unknown as Record<string, unknown>).LENSICALLY_LOCAL_NODE_ID, "brian-win-node");
+}
+
+function localExecutionRepoName(env: Env): string {
+  const config = githubRepoConfig(env);
+  return `${config.owner}/${config.repo}`;
+}
+
+async function getLocalExecutionNode(env: Env, requestedNodeId?: unknown): Promise<LocalExecutionNodeStatus | null> {
+  await ensureLocalExecutionTables(env);
+  const nodeId = normalizeOperatorMachineKey(requestedNodeId, "") || localExecutionDefaultNodeId(env);
+  const row = await env.DB.prepare(
+    `SELECT node_id, heartbeat_at, healthy, worker_version, bootstrap_version, active_slot, previous_worker_version
+     FROM operator_local_execution_nodes
+     WHERE node_id = ?
+     LIMIT 1`,
+  ).bind(nodeId).first<Record<string, unknown>>();
+  if (!row) return null;
+  return {
+    node_id: String(row.node_id),
+    healthy: Number(row.healthy ?? 0) === 1,
+    heartbeat_at: typeof row.heartbeat_at === "string" ? row.heartbeat_at : null,
+    worker_version: typeof row.worker_version === "string" ? row.worker_version : null,
+    bootstrap_version: typeof row.bootstrap_version === "string" ? row.bootstrap_version : null,
+    active_slot: row.active_slot === "previous" ? "previous" : row.active_slot === "active" ? "active" : null,
+    previous_worker_version: typeof row.previous_worker_version === "string" ? row.previous_worker_version : null,
+  };
+}
+
+async function queueLocalExecutionJob(
+  env: Env,
+  args: Record<string, unknown>,
+  jobType: LocalExecutionJobType,
+  authorizationLevel: "read" | "validate" | "deploy" | "update" | "bootstrap_update",
+  expectedStages: string[],
+): Promise<Record<string, unknown>> {
+  await ensureLocalExecutionTables(env);
+  const commitSha = normalizeOperatorMachineKey(args.commit_sha, "");
+  if (!isExactSha(commitSha)) return { ok: false, error: "exact_commit_sha_required" };
+  const nodeId = normalizeOperatorMachineKey(args.node_id, "") || localExecutionDefaultNodeId(env);
+  const now = new Date();
+  const jobId = crypto.randomUUID();
+  const nonce = crypto.randomUUID();
+  const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+  const maxRuntimeMs = jobType === "run_full_validation" ? 90 * 60 * 1000 : 20 * 60 * 1000;
+  const payload = {
+    job_id: jobId,
+    repo: localExecutionRepoName(env),
+    commit_sha: commitSha,
+    job_type: jobType,
+    inputs: args,
+    node_id: nodeId,
+    created_at: now.toISOString(),
+    expires_at: expiresAt,
+    nonce,
+    max_runtime_ms: maxRuntimeMs,
+    expected_stages: expectedStages,
+    authorization_level: authorizationLevel,
+    attempt_count: 0,
+    result_status: "pending",
+    exp: Math.floor(Date.parse(expiresAt) / 1000),
+  };
+  const signature = await createSignedOperatorEnvelope(env, payload);
+  await env.DB.prepare(
+    `INSERT INTO operator_local_execution_jobs (
+      job_id, repo, commit_sha, job_type, inputs_json, node_id, state, created_at, expires_at,
+      nonce, max_runtime_ms, expected_stages_json, authorization_level, signature, attempt_count,
+      result_status, operation_id
+    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, 0, 'pending', ?)`,
+  ).bind(
+    jobId,
+    payload.repo,
+    commitSha,
+    jobType,
+    JSON.stringify(args),
+    nodeId,
+    payload.created_at,
+    expiresAt,
+    nonce,
+    maxRuntimeMs,
+    JSON.stringify(expectedStages),
+    authorizationLevel,
+    signature,
+    normalizeOperatorMachineKey(args.operation_id, "") || null,
+  ).run();
+  return { ok: true, job_id: jobId, node_id: nodeId, commit_sha: commitSha, job_type: jobType, state: "pending", expires_at: expiresAt };
+}
+
+async function getLocalExecutionStatus(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureLocalExecutionTables(env);
+  const node = await getLocalExecutionNode(env, args.node_id);
+  const counts = await env.DB.prepare(
+    `SELECT state, COUNT(*) AS total FROM operator_local_execution_jobs GROUP BY state`,
+  ).all<Record<string, unknown>>();
+  const latestReceipt = await env.DB.prepare(
+    `SELECT receipt_id, commit_sha, node_id, validation_profile, ok, created_at
+     FROM operator_local_validation_receipts
+     ORDER BY created_at DESC LIMIT 1`,
+  ).first<Record<string, unknown>>();
+  return {
+    ok: true,
+    version: LOCAL_EXECUTION_VERSION,
+    bootstrap_version: LOCAL_EXECUTION_BOOTSTRAP_VERSION,
+    node,
+    queue_counts: counts.results ?? [],
+    latest_receipt: latestReceipt ?? null,
+  };
+}
+
+async function getValidationPlaneStatus(env: Env): Promise<Record<string, unknown>> {
+  const node = await getLocalExecutionNode(env);
+  const selected = selectValidationPlane(node, { queue_when_local_offline: true });
+  return {
+    ok: true,
+    priority: ["local_node", "cloudflare_builds", "github_actions"],
+    selected,
+    local_node: node,
+    cloudflare_builds: { connected: true, role: "hosted_fallback", quota_conservation: "only_for_local_unavailability_or_independent_verification" },
+    github_actions: { role: "third_plane_or_last_resort", quota_conservation: "do_not_run_on_every_commit" },
+  };
+}
+
+async function executeValidationPlane(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const commitSha = normalizeOperatorMachineKey(args.commit_sha, "");
+  if (!isExactSha(commitSha)) return { ok: false, error: "exact_commit_sha_required" };
+  const node = await getLocalExecutionNode(env);
+  const policy = {
+    urgent: normalizeOperatorMachineKey(args.urgency, "") === "urgent",
+    queue_when_local_offline: args.queue_when_local_offline !== false,
+    require_independent_third_plane: args.require_independent_third_plane === true,
+  };
+  const selected = selectValidationPlane(node, policy);
+  let job: Record<string, unknown> | null = null;
+  if (selected.plane === "local_node" || selected.plane === "queue_local") {
+    const profile = normalizeOperatorMachineKey(args.validation_profile, "sha");
+    job = await queueLocalExecutionJob(
+      env,
+      { ...args, commit_sha: commitSha },
+      profile === "full" ? "run_full_validation" : "validate_sha",
+      "validate",
+      profile === "full" ? ["typecheck", "release_preflight", "operator_acceptance", "system_directory", "threads_publishing", "gpt_memory"] : ["typecheck", "focused_tests"],
+    );
+  }
+  const eventId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_validation_plane_events (event_id, commit_sha, selected_plane, reason, validation_profile, job_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).bind(eventId, commitSha, selected.plane, selected.reason, normalizeOperatorMachineKey(args.validation_profile, "sha"), job?.job_id ?? null).run();
+  return { ok: true, event_id: eventId, selected_plane: selected.plane, reason: selected.reason, local_job: job, hosted_dispatch_started: false };
+}
+
+async function deployValidatedLocalSha(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureLocalExecutionTables(env);
+  const commitSha = normalizeOperatorMachineKey(args.commit_sha, "");
+  const receiptId = normalizeOperatorMachineKey(args.receipt_id, "");
+  if (!isExactSha(commitSha)) return { ok: false, error: "exact_commit_sha_required" };
+  const row = await env.DB.prepare(
+    `SELECT receipt_json FROM operator_local_validation_receipts WHERE receipt_id = ? AND commit_sha = ? AND ok = 1 LIMIT 1`,
+  ).bind(receiptId, commitSha).first<{ receipt_json: string }>();
+  if (!row) return { ok: false, error: "matching_local_receipt_required" };
+  const receipt = JSON.parse(row.receipt_json) as LocalValidationReceipt;
+  const validation = validateLocalValidationReceipt(receipt, commitSha);
+  if (!validation.ok) return validation;
+  return queueLocalExecutionJob(env, args, "deploy_validated_sha", "deploy", ["deploy_gate"]);
+}
+
+async function queueLocalWorkerUpdate(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const commitSha = normalizeOperatorMachineKey(args.commit_sha, "");
+  const updatePlan = validateWorkerUpdatePlan({
+    candidate_sha: commitSha,
+    active_slot: "active",
+    inactive_slot: "previous",
+    signing_authority_changed: false,
+    candidate_health_ok: true,
+  });
+  if (!updatePlan.ok) return updatePlan;
+  return queueLocalExecutionJob(env, args, "update_worker", "update", ["download", "verify_integrity", "commission", "activate_or_rollback"]);
+}
+
+function localExecutionNodeSecret(env: Env): string {
+  return String((env as unknown as Record<string, unknown>).LENSICALLY_LOCAL_NODE_SECRET ?? "").trim();
+}
+
+function authenticateLocalExecutionNode(request: Request, env: Env): { ok: true; nodeId: string } | { ok: false; response: Response } {
+  const nodeId = normalizeOperatorMachineKey(request.headers.get("x-lensically-node-id"), "");
+  if (!nodeId) return { ok: false, response: operatorJsonResponse({ ok: false, error: "node_id_required" }, 401) };
+  const expectedSecret = localExecutionNodeSecret(env);
+  if (!expectedSecret) return { ok: false, response: operatorJsonResponse({ ok: false, error: "local_node_secret_not_configured" }, 503) };
+  const providedSecret = String(request.headers.get("x-lensically-node-secret") ?? "");
+  if (!providedSecret || providedSecret !== expectedSecret) {
+    return { ok: false, response: operatorJsonResponse({ ok: false, error: "invalid_node_secret" }, 401) };
+  }
+  return { ok: true, nodeId };
+}
+
+function signedLocalJobFieldsMatch(payload: Record<string, unknown>, job: Record<string, unknown>): boolean {
+  const keys = [
+    "job_id",
+    "repo",
+    "commit_sha",
+    "job_type",
+    "node_id",
+    "created_at",
+    "expires_at",
+    "nonce",
+    "max_runtime_ms",
+    "authorization_level",
+  ];
+  return keys.every((key) => String(payload[key] ?? "") === String(job[key] ?? ""))
+    && JSON.stringify(payload.expected_stages ?? []) === JSON.stringify(job.expected_stages ?? [])
+    && JSON.stringify(payload.inputs ?? {}) === JSON.stringify(job.inputs ?? {});
+}
+
+async function handleLocalExecutionNodeEndpoint(request: Request, env: Env, path: string): Promise<Response> {
+  await ensureLocalExecutionTables(env);
+  const authentication = authenticateLocalExecutionNode(request, env);
+  if (!authentication.ok) return authentication.response;
+  const nodeId = authentication.nodeId;
+  const body = request.method === "POST" ? await request.json().catch(() => ({})) as Record<string, unknown> : {};
+  const now = new Date();
+  if (path === "/api/operator/local-node/heartbeat" && request.method === "POST") {
+    await env.DB.prepare(
+      `INSERT INTO operator_local_execution_nodes (
+        node_id, display_name, status, heartbeat_at, healthy, bootstrap_version, worker_version, active_slot, updated_at
+      ) VALUES (?, ?, 'registered', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(node_id) DO UPDATE SET
+        heartbeat_at = excluded.heartbeat_at,
+        healthy = excluded.healthy,
+        bootstrap_version = excluded.bootstrap_version,
+        worker_version = excluded.worker_version,
+        active_slot = excluded.active_slot,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      nodeId,
+      nodeId,
+      now.toISOString(),
+      body.healthy === false ? 0 : 1,
+      normalizeOperatorText(body.bootstrap_version, 160, true) ?? null,
+      normalizeOperatorText(body.worker_version, 160, true) ?? null,
+      normalizeOperatorMachineKey(body.active_slot, "active"),
+    ).run();
+    return operatorJsonResponse({ ok: true, node_id: nodeId, heartbeat_at: now.toISOString() });
+  }
+  if (path === "/api/operator/local-node/verify-job" && request.method === "POST") {
+    const job = body.job && typeof body.job === "object" && !Array.isArray(body.job)
+      ? body.job as Record<string, unknown>
+      : null;
+    if (!job) return operatorJsonResponse({ ok: false, error: "job_required" }, 400);
+    const validation = validateLocalExecutionJob(job as unknown as LocalExecutionJob, now);
+    if (!validation.ok) return operatorJsonResponse(validation, 400);
+    if (job.node_id !== nodeId) return operatorJsonResponse({ ok: false, error: "wrong_node" }, 403);
+    const signedPayload = await verifySignedOperatorEnvelope(env, job.signature);
+    if (!signedPayload || !signedLocalJobFieldsMatch(signedPayload, job)) {
+      return operatorJsonResponse({ ok: false, error: "invalid_signature" }, 401);
+    }
+    return operatorJsonResponse({ ok: true, job_id: job.job_id, commit_sha: job.commit_sha });
+  }
+  if (path === "/api/operator/local-node/poll" && request.method === "POST") {
+    const staleCutoff = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
+    await env.DB.prepare(
+      `UPDATE operator_local_execution_jobs
+       SET state = 'pending', lease_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE node_id = ? AND state IN ('claimed', 'running') AND lease_expires_at < ?`,
+    ).bind(nodeId, staleCutoff).run();
+    const job = await env.DB.prepare(
+      `SELECT * FROM operator_local_execution_jobs
+       WHERE node_id = ? AND state = 'pending' AND expires_at > ?
+       ORDER BY created_at ASC
+       LIMIT 1`,
+    ).bind(nodeId, now.toISOString()).first<Record<string, unknown>>();
+    if (!job) return operatorJsonResponse({ ok: true, job: null });
+    const leaseExpiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+    const claim = await env.DB.prepare(
+      `UPDATE operator_local_execution_jobs
+       SET state = 'claimed', claimed_at = ?, lease_expires_at = ?, attempt_count = attempt_count + 1, updated_at = CURRENT_TIMESTAMP
+       WHERE job_id = ? AND state = 'pending'`,
+    ).bind(now.toISOString(), leaseExpiresAt, job.job_id).run();
+    if (Number(claim.meta.changes ?? 0) !== 1) return operatorJsonResponse({ ok: true, job: null, race_lost: true });
+    return operatorJsonResponse({
+      ok: true,
+      job: {
+        job_id: job.job_id,
+        repo: job.repo,
+        commit_sha: job.commit_sha,
+        job_type: job.job_type,
+        inputs: JSON.parse(String(job.inputs_json ?? "{}")),
+        node_id: job.node_id,
+        created_at: job.created_at,
+        expires_at: job.expires_at,
+        nonce: job.nonce,
+        max_runtime_ms: Number(job.max_runtime_ms ?? 0),
+        expected_stages: JSON.parse(String(job.expected_stages_json ?? "[]")),
+        authorization_level: job.authorization_level,
+        signature: job.signature,
+        attempt_count: Number(job.attempt_count ?? 0) + 1,
+        result_status: "claimed",
+      },
+      lease_expires_at: leaseExpiresAt,
+    });
+  }
+  if (path === "/api/operator/local-node/result" && request.method === "POST") {
+    const jobId = normalizeOperatorMachineKey(body.job_id, "");
+    const status = normalizeOperatorMachineKey(body.status, "failed");
+    if (!jobId) return operatorJsonResponse({ ok: false, error: "job_id_required" }, 400);
+    const job = await env.DB.prepare(
+      `SELECT commit_sha, node_id FROM operator_local_execution_jobs WHERE job_id = ? AND node_id = ? LIMIT 1`,
+    ).bind(jobId, nodeId).first<{ commit_sha: string; node_id: string }>();
+    if (!job) return operatorJsonResponse({ ok: false, error: "job_not_found" }, 404);
+    await env.DB.prepare(
+      `UPDATE operator_local_execution_jobs
+       SET state = ?, result_status = ?, result_json = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE job_id = ? AND node_id = ?`,
+    ).bind(status === "completed" ? "completed" : "failed", status, JSON.stringify(body), jobId, nodeId).run();
+    const maybeReceipt = body.receipt && typeof body.receipt === "object" && !Array.isArray(body.receipt)
+      ? body.receipt as LocalValidationReceipt
+      : null;
+    if (maybeReceipt) {
+      const validation = validateLocalValidationReceipt(maybeReceipt, job.commit_sha);
+      const receiptId = crypto.randomUUID();
+      await env.DB.prepare(
+        `INSERT INTO operator_local_validation_receipts (receipt_id, commit_sha, node_id, validation_profile, receipt_json, ok)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(receiptId, job.commit_sha, nodeId, maybeReceipt.validation_profile ?? "unknown", JSON.stringify(maybeReceipt), validation.ok ? 1 : 0).run();
+      return operatorJsonResponse({ ok: validation.ok, receipt_id: receiptId, validation });
+    }
+    return operatorJsonResponse({ ok: true, job_id: jobId, status });
+  }
+  return notFoundJsonResponse({ "content-type": "application/json; charset=UTF-8" });
+}
+
 async function handleOperatorMcpEngineeringTool(
   request: Request,
   env: Env,
@@ -18978,6 +19415,27 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "getOperatorWorkState") return getOperatorWorkState(env, args);
   if (toolName === "intakeOperatorWork") return intakeOperatorWork(env, args);
   if (toolName === "advanceOperatorWork") return advanceOperatorWork(env, args);
+  if (toolName === "getLocalExecutionStatus") return getLocalExecutionStatus(env, args);
+  if (toolName === "queueLocalExecutionValidation") {
+    return queueLocalExecutionJob(env, args, "validate_sha", "validate", ["typecheck", "focused_tests"]);
+  }
+  if (toolName === "queueLocalExecutionFullValidation") {
+    return queueLocalExecutionJob(env, args, "run_full_validation", "validate", ["typecheck", "release_preflight", "operator_acceptance", "system_directory", "threads_publishing", "gpt_memory"]);
+  }
+  if (toolName === "queueLocalExecutionDeployValidatedSha") return deployValidatedLocalSha(env, args);
+  if (toolName === "queueLocalExecutionWorkerUpdate") return queueLocalWorkerUpdate(env, args);
+  if (toolName === "cancelLocalExecutionJob") {
+    await ensureLocalExecutionTables(env);
+    const jobId = normalizeOperatorMachineKey(args.job_id, "");
+    const result = await env.DB.prepare(
+      `UPDATE operator_local_execution_jobs
+       SET state = 'cancelled', result_status = 'cancelled', result_json = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE job_id = ? AND state IN ('pending', 'claimed', 'running')`,
+    ).bind(JSON.stringify({ reason: normalizeOperatorText(args.reason, 500, true) ?? "cancelled" }), jobId).run();
+    return { ok: Number(result.meta.changes ?? 0) === 1, job_id: jobId, state: "cancelled" };
+  }
+  if (toolName === "getValidationPlaneStatus") return getValidationPlaneStatus(env);
+  if (toolName === "executeValidationPlane") return executeValidationPlane(env, args);
 
   if (toolName === "engineeringPrecheck") {
     const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
@@ -28515,6 +28973,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         retired_execution_infrastructure: true,
         timestamp: new Date().toISOString(),
       });
+    }
+
+    if (normalizedPath.startsWith("/api/operator/local-node/")) {
+      try {
+        return await handleLocalExecutionNodeEndpoint(request, env, normalizedPath);
+      } catch (error) {
+        return operatorTransportFailure(env, request.headers.get("cf-ray") || crypto.randomUUID(), "local_execution_node", error);
+      }
     }
 
     if (normalizedPath.startsWith("/api/operator/tools/")) {

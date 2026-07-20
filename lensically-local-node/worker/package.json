@@ -1,0 +1,10 @@
+{
+  "name": "lensically-local-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "lensically-local-worker": "./src/worker.mjs"
+  }
+}
+

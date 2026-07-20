@@ -1,14 +1,23 @@
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { writeFileSync } from "node:fs";
 
 const steps = [
   ["npx", ["tsc", "--noEmit"], "TypeScript"],
   ["node", ["scripts/release-preflight.mjs"], "Release preflight"],
   ["node", ["scripts/run-operator-validation.mjs", "acceptance"], "Operator acceptance"],
+  ["npm", ["run", "test", "--", "--run", "test/localExecution.spec.ts", "--reporter=dot", "--bail=1"], "Local execution node"],
   ["npm", ["run", "test", "--", "--run", "test/systemDirectory.spec.ts", "--reporter=dot", "--bail=1"], "System directory"],
   ["npm", ["run", "test", "--", "--run", "test/threadsPublishService.spec.ts", "--reporter=dot", "--bail=1"], "Threads publishing"],
   ["npm", ["run", "test", "--", "--run", "test/gptMemoryRoutes.spec.ts", "--reporter=dot", "--bail=1"], "GPT memory"],
 ];
+
+function commandForPlatform(command, args) {
+  if (process.platform !== "win32" || (command !== "npm" && command !== "npx")) return { command, args };
+  const nodeRoot = process.execPath.replace(/\\node\.exe$/i, "");
+  const cli = join(nodeRoot, "node_modules", "npm", "bin", command === "npm" ? "npm-cli.js" : "npx-cli.js");
+  return { command: process.execPath, args: [cli, ...args] };
+}
 
 const sha = process.env.WORKERS_CI_COMMIT_SHA || spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
 const startedAt = new Date().toISOString();
@@ -17,7 +26,8 @@ const completed = [];
 for (const [command, args, name] of steps) {
   const started = Date.now();
   console.log(`\n[validation] ${name}`);
-  const result = spawnSync(command, args, { stdio: "inherit", shell: process.platform === "win32" });
+  const invocation = commandForPlatform(command, args);
+  const result = spawnSync(invocation.command, invocation.args, { stdio: "inherit" });
   completed.push({ name, duration_ms: Date.now() - started, status: result.status ?? 1 });
   if (result.status !== 0) {
     console.error(`[validation] ${name} failed with status ${result.status}`);

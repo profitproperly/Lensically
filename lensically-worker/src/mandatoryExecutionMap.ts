@@ -589,6 +589,14 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   getOperatorWorkState: ["get operator work state", "read active outcome", "read deferred work ledger", "work ledger status"],
   intakeOperatorWork: ["intake operator work", "record deferred work", "classify new work", "capture implementation idea"],
   advanceOperatorWork: ["advance operator work", "complete work item", "update active outcome", "resume active outcome"],
+  getLocalExecutionStatus: ["local execution status", "local node status", "local validation node status"],
+  queueLocalExecutionValidation: ["local execution validate sha", "queue local validation", "validate sha locally"],
+  queueLocalExecutionFullValidation: ["local execution full validation", "queue full local validation", "run full validation locally"],
+  queueLocalExecutionDeployValidatedSha: ["local execution deploy validated sha", "deploy locally validated sha"],
+  queueLocalExecutionWorkerUpdate: ["local execution update worker", "update local worker", "install local worker update"],
+  cancelLocalExecutionJob: ["local execution cancel job", "cancel local job", "cancel local validation"],
+  getValidationPlaneStatus: ["validation plane status", "validation planes", "execution plane status"],
+  executeValidationPlane: ["validation plane execute", "execute validation plane", "route validation plane"],
   getRepoStatus: ["repository status", "repo status", "repository head", "current repository sha", "repository runtime alignment"],
   listRepoFiles: ["list repository files", "list repo files", "repository tree"],
   searchRepoFiles: ["search repository files", "search repo files", "find repository text", "find source text", "search known source file"],
@@ -661,6 +669,14 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(update|revise|approve|activate|pause|change)\b/) && has(/\b(growth\s+mission|growth\s+plan|mission\s+brief)\b/)) return "updateGrowthMission";
   if (has(/\b(get|read|show|current|review|discuss)\b/) && has(/\b(growth\s+mission|growth\s+plan|mission\s+brief)\b/)) return "getGrowthMission";
   if (has(/\bworkflow\s+status\b/) || has(/\bcurrent\s+workflow\s+state\b/)) return "getWorkflowStatus";
+  if (has(/\bvalidation\s+plane\s+status\b/) || has(/\bexecution\s+plane\s+status\b/)) return "getValidationPlaneStatus";
+  if (has(/\bvalidation\s+plane\s+execute\b/) || has(/\broute\s+validation\s+plane\b/)) return "executeValidationPlane";
+  if (has(/\blocal\s+execution\s+status\b/) || has(/\blocal\s+node\s+status\b/)) return "getLocalExecutionStatus";
+  if (has(/\blocal\s+execution\s+full\s+validation\b/) || has(/\bfull\s+local\s+validation\b/)) return "queueLocalExecutionFullValidation";
+  if (has(/\blocal\s+execution\s+deploy\s+validated\s+sha\b/) || has(/\bdeploy\s+locally\s+validated\s+sha\b/)) return "queueLocalExecutionDeployValidatedSha";
+  if (has(/\blocal\s+execution\s+update\s+worker\b/) || has(/\bupdate\s+local\s+worker\b/)) return "queueLocalExecutionWorkerUpdate";
+  if (has(/\blocal\s+execution\s+cancel\s+job\b/) || has(/\bcancel\s+local\s+(job|validation)\b/)) return "cancelLocalExecutionJob";
+  if (has(/\blocal\s+execution\s+validate\s+sha\b/) || has(/\bvalidate\s+sha\s+locally\b/)) return "queueLocalExecutionValidation";
   if (has(/\bhourly\s+coverage\b/) || has(/\bcalendar\s+coverage\b/) || has(/\bopen\s+(schedule\s+)?slots\b/)) return "get_hourly_coverage";
   if (has(/\bengineering\s+access\b/) || has(/\b(access|authority)\b/) && has(/\b(engineering|github|cloudflare)\b/)) return "getEngineeringAccessState";
   if (

@@ -23,6 +23,7 @@ import {
   validateClientSafetyRegistry,
   type SystemDirectoryEntry,
 } from "../src/systemDirectory";
+import { LOCAL_VALIDATION_RECEIPT_VERSION } from "../src/localExecution";
 
 const entries: SystemDirectoryEntry[] = [
   {
@@ -137,7 +138,7 @@ describe("System Directory foundation", () => {
     const deployment = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker");
     expect(deployment?.related_entry_ids).toContain("engineering.operator_validation");
     expect(deployment?.hard_gates).toEqual(expect.arrayContaining([
-            "Main release markers require a verified repository head and passing validation.",
+            "Main releases require a verified repository head and an exact-SHA validation receipt.",
     ]));
   });
 
@@ -480,7 +481,7 @@ describe("System Directory foundation", () => {
     });
     expect(request).toMatchObject({ intent: "apply repo patch set" });
     expect(() => buildClientSafeGatewayRequest("repository_patch_set", {
-      patches: [{ path: "AGENTS.md", find: "old", replace: "x".repeat(2600) }],
+      patches: [{ path: "AGENTS.md", find: "old", replace: "x".repeat(13000) }],
       message: "Oversized patch",
     })).toThrow("client_safe_request_too_large:repository_patch_set");
     expect(PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "public_large_repository_mutation_payload")?.safe_profile_id).toBe("repository_patch_set");
@@ -763,8 +764,25 @@ describe("System Directory foundation", () => {
   });
 
   it("requires future models to complete client-block intake before resuming work", () => {
-    expect(CLIENT_BLOCK_INTAKE_CONTRACT).toMatchObject({ mandatory: true, canonical_location: CLIENT_SAFETY_CANONICAL_LOCATION, trigger: "any_client_side_rejection_before_gateway_response", resume_allowed_only_after: "registry_validation_and_live_deployment" });
-    expect(CLIENT_BLOCK_INTAKE_CONTRACT.sequence).toEqual(["stop_current_objective", "do_not_retry_identical_payload", "add_or_update_registry_incident", "add_or_update_safe_request_profile", "add_regression_test", "run_focused_validation", "deploy_updated_public_contract", "resume_original_objective"]);
+    expect(CLIENT_BLOCK_INTAKE_CONTRACT).toMatchObject({ mandatory: true, canonical_location: CLIENT_SAFETY_CANONICAL_LOCATION, trigger: "any_client_side_rejection_before_gateway_response", resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification" });
+    expect(CLIENT_BLOCK_INTAKE_CONTRACT.sequence).toEqual([
+      "stop_current_objective",
+      "do_not_retry_identical_payload",
+      "record_incident",
+      "contain_affected_scope",
+      "classify_failure",
+      "reproduce_safely",
+      "generalize_shared_cause",
+      "repair_shared_cause",
+      "lock_prevention_rule",
+      "add_regression_test",
+      "run_focused_validation",
+      "release_exact_tested_head",
+      "verify_live",
+      "resume_original_objective",
+      "record_autonomy_dividend",
+      "close_incident",
+    ]);
   });
 
   it("keeps account identifiers inside typed brand key fields", () => {
@@ -927,7 +945,7 @@ describe("System Directory foundation", () => {
       intake_mandatory: true,
             resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification",
                         prevented_client_block_count: 37,
-                                                      safe_request_profile_count: 32,
+                                                      safe_request_profile_count: 40,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
@@ -941,7 +959,7 @@ describe("System Directory foundation", () => {
     expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({
       entry_id: "deployment.main_worker",
       recommended_next_planes: ["engineering"],
-      hard_gates: expect.arrayContaining(["Main release markers require a verified repository head and passing validation."]),
+      hard_gates: expect.arrayContaining(["Main releases require a verified repository head and an exact-SHA validation receipt."]),
     });
     expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane" });
   });
@@ -1257,9 +1275,9 @@ describe("System Directory foundation", () => {
         expect(CLIENT_SAFE_REQUEST_PROFILES.repository_symbol_search.allowed_input_keys).toEqual(["path", "symbol", "limit"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_write_commit.allowed_input_keys).toEqual(["session_id"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_file_read.allowed_input_keys).toContain("max_lines");
-    expect(buildClientSafeGatewayRequest("repository_symbol_search", { path: "lensically-worker/src/index.ts", symbol: "validateHardeningTransition", limit: 5 })).toMatchObject({
+    expect(buildClientSafeGatewayRequest("repository_symbol_search", { path: "lensically-worker/src/index.ts", symbol: "hardening transition", limit: 5 })).toMatchObject({
       intent: "search repository symbol",
-      inputs: { path: "lensically-worker/src/index.ts", symbol: "validateHardeningTransition", limit: 5 },
+      inputs: { path: "lensically-worker/src/index.ts", symbol: "hardening transition", limit: 5 },
     });
   });
 
@@ -1355,5 +1373,56 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_state.intent).toBe("get operator work state");
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_intake.intent).toBe("intake operator work");
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_transition.intent).toBe("advance operator work");
+  });
+
+  it("registers local execution node profiles and enforces exact-SHA receipts", async () => {
+    expect(LOCAL_VALIDATION_RECEIPT_VERSION).toBe("local-validation-receipt-v1");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_status.intent).toBe("local execution status");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_validate_sha.allowed_input_keys).toEqual(expect.arrayContaining(["commit_sha", "node_id"]));
+    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_deploy_validated_sha.allowed_input_keys).toEqual(expect.arrayContaining(["commit_sha", "receipt_id"]));
+    expect(CLIENT_SAFE_REQUEST_PROFILES.validation_plane_execute.intent).toBe("validation plane execute");
+
+    const tools: MandatoryExecutionToolDefinition[] = [{
+      name: "executeValidationPlane",
+      title: "Execute validation plane",
+      description: "Select the highest-priority available validation plane.",
+      inputSchema: {
+        type: "object",
+        properties: { commit_sha: { type: "string" }, validation_profile: { type: "string" } },
+        required: ["commit_sha"],
+      },
+    }];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        intent: "validation plane execute",
+        objective: "Validate a frozen exact SHA using the preferred execution plane.",
+        inputs: { commit_sha: "38f4e6e0ff155812005214d761fc5dd3811b59b0", validation_profile: "full" },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "executeValidationPlane",
+      arguments: { commit_sha: "38f4e6e0ff155812005214d761fc5dd3811b59b0", validation_profile: "full" },
+    });
+  });
+
+  it("makes the local execution node the primary validation plane before hosted fallbacks", () => {
+    const local = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.local_execution_node");
+    expect(local).toMatchObject({
+      route_intent: "validation plane execute",
+      recommended_next_planes: ["deployment", "engineering"],
+    });
+    expect(local?.hard_gates).toEqual(expect.arrayContaining([
+      "Local node is the primary free validation plane when heartbeat is healthy.",
+      "Code/test failures must be repaired and must not be hidden by switching planes.",
+    ]));
+    expect(resolveLensicallySystemDirectory("validate sha locally through the local execution node")).toMatchObject({
+      entry_id: "deployment.local_execution_node",
+      route_intent: "validation plane execute",
+    });
+    expect(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker")?.related_entry_ids).toContain("deployment.local_execution_node");
   });
 });

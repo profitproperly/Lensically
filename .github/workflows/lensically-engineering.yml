@@ -4,6 +4,7 @@ name: Lensically Engineering
 # verified-release-marker: release-44
 # verified-release-trigger: r44
 # verified-operator-shards-marker: shards-16
+# verified-release-dispatch-fields: --field release_id="${RELEASE_SHA:0:12}" --field release_sha="${RELEASE_SHA}"
 run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}
 
 on:

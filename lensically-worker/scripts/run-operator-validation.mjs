@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 
 const scopes = {
   smoke: [
@@ -85,10 +86,13 @@ if (terms) {
 }
 
 console.log(`Operator validation scope: ${scope}`);
-const result = spawnSync("npm", args, {
+const npmCommand = process.platform === "win32" ? process.execPath : "npm";
+const npmArgs = process.platform === "win32"
+  ? [join(process.execPath.replace(/\\node\.exe$/i, ""), "node_modules", "npm", "bin", "npm-cli.js"), ...args]
+  : args;
+const result = spawnSync(npmCommand, npmArgs, {
   cwd: new URL("..", import.meta.url),
   stdio: "inherit",
-  shell: process.platform === "win32",
 });
 
 if (result.error) {
