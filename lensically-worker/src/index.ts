@@ -16695,9 +16695,34 @@ async function advanceOperatorWork(env: Env, args: Record<string, unknown>): Pro
     await env.DB.prepare(`UPDATE operator_work_state SET next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`).bind(nextAction).run();
   }
   if (args.complete_active_outcome === true) {
+    if (status !== "completed") {
+      return { ok: false, error: "active_outcome_completion_requires_completed_work_item", work_key: workKey };
+    }
+    if (evidence.length === 0 || !nextAction) {
+      return { ok: false, error: "active_outcome_completion_evidence_and_next_action_required", work_key: workKey };
+    }
+    const blockingItems = await env.DB.prepare(
+      `SELECT work_key, status, priority
+       FROM operator_work_ledger
+       WHERE status = 'interrupting'
+          OR (required_for_active_outcome = 1 AND status <> 'completed')
+       ORDER BY CASE status WHEN 'interrupting' THEN 0 ELSE 1 END, execution_order ASC
+       LIMIT 25`,
+    ).all<Record<string, unknown>>();
+    const latestState = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>();
+    const blockers = blockingItems.results ?? [];
+    if (blockers.length > 0 || latestState?.active_interrupt_key) {
+      return {
+        ok: false,
+        error: "active_outcome_requirements_incomplete",
+        active_interrupt_key: latestState?.active_interrupt_key ?? null,
+        blocking_items: blockers.map((item) => ({ work_key: item.work_key, status: item.status, priority: item.priority })),
+      };
+    }
     await env.DB.prepare(
-      `UPDATE operator_work_state SET status = 'completed', scope_frozen = 0, completion_evidence_json = ?, next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
-    ).bind(normalizeOperatorJson(evidence, []), nextAction ?? "Select the highest-value deferred outcome and activate it through the intake guard.").run();
+      `UPDATE operator_work_state SET status = 'completed', scope_frozen = 0, active_interrupt_key = NULL,
+        completion_evidence_json = ?, next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
+    ).bind(normalizeOperatorJson(evidence, []), nextAction).run();
   }
   return getOperatorWorkState(env, { limit: args.limit ?? 50 });
 }
