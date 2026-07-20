@@ -15676,6 +15676,17 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           verify: "live_verified",
           resume: "resumed",
           close: "closed",
+          a0: "contained",
+          a1: "classified",
+          a2: "reproduced",
+          a3: "generalized",
+          a4: "repaired",
+          a5: "prevention_locked",
+          a6: "validated",
+          a7: "released",
+          a8: "live_verified",
+          a9: "resumed",
+          a10: "closed",
         };
         const targetState = stageMap[stage] ?? stage;
         const transitionInputs: Record<string, unknown> = {
