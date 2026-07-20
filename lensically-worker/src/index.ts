@@ -20797,8 +20797,9 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         && !Array.isArray(routedGatewayMetadata.map_execution)
         ? routedGatewayMetadata.map_execution as Record<string, unknown>
         : null;
-      const sourceDefinedStaticRoute = routedMapExecution?.d1_execution_library_bypassed === true;
-      const sourceDefinedDirectEngineering = routedMapExecution?.mode === "source_defined_direct_engineering";
+      const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;
+      const sourceDefinedDirectEngineering = (directPublicEntry && isOperatorMcpEngineeringToolName(toolName))
+        || routedMapExecution?.mode === "source_defined_direct_engineering";
       const sourceDefinedProtectedOperation = sourceDefinedDirectEngineering
         && MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(canonicalAutonomyToolName(toolName));
       const preCallRouting = sourceDefinedStaticRoute
