@@ -3130,7 +3130,7 @@ describe("operator mode MCP endpoint", () => {
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-    expect(eligibleMutations).toBe(47);
+    expect(eligibleMutations).toBe(60);
     expect(failedMutationPreflights).toBe(0);
   }, 120000);
 
