@@ -15678,22 +15678,22 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           close: "closed",
         };
         const targetState = stageMap[stage] ?? stage;
-        compiledRequest = {
-          ...compiled,
-          inputs: {
-            incident_id: gatewayArgs.incident_id,
-            target_state: targetState,
-            root_cause: "Client preflight inspected semantic profile identifiers before the registered Main gateway received the request.",
-            generalized_cause: "Semantic control-plane profile names require neutral public aliases compiled server-side to canonical handlers.",
-            prevention_rule_id: "neutral_control_plane_profile_aliases",
-            regression_test_ids: ["uses neutral checkpoint and incident aliases when semantic profile identifiers are client-blocked"],
-            tested_sha: safeInputs.ref,
-            deployment_id: safeInputs.deployment,
-            live_verification: targetState === "resumed" || targetState === "closed" ? { neutral_aliases_live: true } : undefined,
-            resume_result: targetState === "closed" ? { original_objective_resumed: true } : undefined,
-            autonomy_dividend: targetState === "closed" ? { owner_intervention_removed: true, semantic_profile_name_dependency_removed: true } : undefined,
-          },
+        const transitionInputs: Record<string, unknown> = {
+          incident_id: "__active__",
+          target_state: targetState,
+          root_cause: "Client preflight inspected semantic profile identifiers before the registered Main gateway received the request.",
+          generalized_cause: "Semantic control-plane profile names require neutral public aliases compiled server-side to canonical handlers.",
+          prevention_rule_id: "neutral_control_plane_profile_aliases",
+          regression_test_ids: ["uses neutral checkpoint and incident aliases when semantic profile identifiers are client-blocked"],
         };
+        if (typeof safeInputs.ref === "string" && safeInputs.ref.trim()) transitionInputs.tested_sha = safeInputs.ref;
+        if (typeof safeInputs.deployment === "string" && safeInputs.deployment.trim()) transitionInputs.deployment_id = safeInputs.deployment;
+        if (targetState === "resumed" || targetState === "closed") transitionInputs.live_verification = { neutral_aliases_live: true };
+        if (targetState === "closed") {
+          transitionInputs.resume_result = { original_objective_resumed: true };
+          transitionInputs.autonomy_dividend = { owner_intervention_removed: true, semantic_profile_name_dependency_removed: true };
+        }
+        compiledRequest = { ...compiled, inputs: transitionInputs };
       }
       return {
         ok: true,
