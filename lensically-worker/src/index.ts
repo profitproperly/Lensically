@@ -14381,6 +14381,14 @@ async function githubRepoApi(env: Env, path: string, init: RequestInit = {}): Pr
   return githubApi(env, `/repos/${config.owner}/${config.repo}${path}`, init);
 }
 
+async function githubRepoApiRetryable(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
+  let result = await githubRepoApi(env, path, init);
+  if (![502, 503, 504].includes(result.status)) return result;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  result = await githubRepoApi(env, path, init);
+  return result;
+}
+
 async function getGithubFile(env: Env, repoPath: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number }> {
   const config = githubRepoConfig(env);
   const encodedPath = encodeURIComponent(repoPath).replace(/%2F/g, "/");
