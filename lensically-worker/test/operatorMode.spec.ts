@@ -96,13 +96,7 @@ function testProfileId(toolName: string): string {
 }
 
 async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
-  if (MCP_DIRECT_ENTRY_TOOLS.has(toolName)) {
-    return mcpToolCallRaw<T>(toolName, args);
-  }
-  return mcpToolCallRaw<T>("executeLensicallyIntent", {
-    profile_id: testProfileId(toolName),
-    inputs: args,
-  });
+  return mcpToolCallRaw<T>(toolName, args);
 }
 
 
