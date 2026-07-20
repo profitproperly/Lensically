@@ -14730,7 +14730,7 @@ async function putGithubFiles(
 ): Promise<{ ok: boolean; status: number; commit_sha: string | null; data: unknown; head_sha: string | null }> {
   const config = githubRepoConfig(env);
   const branchRef = config.branch.split("/").map(encodeURIComponent).join("/");
-  const ref = await githubRepoApi(env, `/git/ref/heads/${branchRef}`);
+  const ref = await githubRepoApiRetryable(env, `/git/ref/heads/${branchRef}`);
   const refData = ref.data && typeof ref.data === "object" && !Array.isArray(ref.data) ? ref.data as Record<string, unknown> : null;
   const refObject = refData?.object && typeof refData.object === "object" && !Array.isArray(refData.object)
     ? refData.object as Record<string, unknown>
