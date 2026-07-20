@@ -3098,13 +3098,10 @@ describe("operator mode MCP endpoint", () => {
       matches: Array<{ line_number: number; line: string }>;
       verified_complete_for_known_file: boolean;
       search_mode: string;
-    }>("executeLensicallyIntent", {
-      profile_id: "repository_symbol_search",
-      inputs: {
-        path: "lensically-worker/src/index.ts",
-        symbol: "executeLensicallyIntent",
-        limit: 1,
-      },
+    }>("searchRepoFiles", {
+      prefix: "lensically-worker/src/index.ts",
+      query: "executeLensicallyIntent",
+      limit: 1,
     });
         fetchSpy.mockRestore();
     expect(routed.isError, JSON.stringify(routed.structuredContent)).not.toBe(true);
