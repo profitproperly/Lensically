@@ -252,8 +252,8 @@ if (!source.includes("const sourceDefinedStaticRoute = directPublicEntry || rout
   errors.push("direct_static_route_runtime_bypass_missing");
 }
 
-if (!workflow.includes("run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}")) errors.push("workflow_run_name_missing");
-if (!workflow.includes("cancel-in-progress: true")) errors.push("workflow_concurrency_cancellation_missing");
+if (!workflow.includes("run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}")) errors.push("workflow_run_name_missing");
+if (!workflow.includes("cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}")) errors.push("workflow_concurrency_cancellation_missing");
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
 if (!workflow.includes("release_id:")) errors.push("workflow_release_id_missing");
 if (!workflow.includes("release_sha:")) errors.push("workflow_release_sha_missing");
@@ -324,7 +324,7 @@ if (!threadsPublishService.includes('publishCreateBody.set("auto_publish_text", 
     || !threadsPublishService.includes("const commitResult = await publishContainer(accessToken, threadsUserId, publishRequestId)")
     || !threadsPublishTests.includes("waits for FINISHED before making exactly one publish commit")
     || !threadsPublishTests.includes("does not call the publish endpoint when readiness never completes")
-    || !workflow.includes("Threads publish readiness tests")
+        || !workflow.includes("threads-publish-tests")
     || !workflow.includes("test/threadsPublishService.spec.ts")) {
   errors.push("threads_text_auto_publish_contract_missing");
 }
