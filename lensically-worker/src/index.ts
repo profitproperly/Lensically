@@ -16621,7 +16621,7 @@ async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Prom
       updated_at = CURRENT_TIMESTAMP`,
   ).bind(
     crypto.randomUUID(), workKey, title, summary, priority, status, intake.decision, intake.reason,
-    args.prerequisite_for_active_outcome === true ? 1 : 0,
+    requiredForActiveOutcome,
     normalizeOperatorJson(Array.isArray(args.dependencies) ? args.dependencies : [], []),
     completionCondition,
     Math.max(1, Math.trunc(Number(args.execution_order ?? 1000))),
