@@ -78,6 +78,9 @@ export type OperatorActionClosureInput = {
   owner_action_required?: boolean;
   temporary_dependency?: string | null;
   retirement_condition?: string | null;
+  progress_recorded?: boolean;
+  deferred_work_preserved?: boolean;
+  checkpoint?: string | null;
 };
 
 export const AGENT_NATIVE_OPERATING_CONTRACT = {
