@@ -26592,6 +26592,38 @@ function operatorContentFocusHorizons(rows: OperatorContentFocusScoreRow[], nowM
   };
 }
 
+async function loadOperatorContentFocusRows(env: Env, brandKey: GptBrandKey): Promise<OperatorContentFocusScoreRow[]> {
+  const rows = await env.DB.prepare(
+    `SELECT s.published_post_id, s.checkpoint_hours, s.scores_json, a.post_timestamp,
+            f.source_card_id, c.family_id, fam.source_identity_key, c.source_mechanism,
+            c.required_product, c.recommended_direction, c.transformation_contract_json,
+            c.forbidden_surfaces_json, c.danger_surfaces_json, c.fail_conditions_json
+     FROM operator_post_performance_scores s
+     JOIN operator_post_fingerprints f ON f.brand_key = s.brand_key AND f.published_post_id = s.published_post_id
+     JOIN operator_source_cards c ON c.id = f.source_card_id AND c.brand_key = s.brand_key
+     JOIN operator_source_card_families fam ON fam.id = c.family_id AND fam.brand_key = s.brand_key
+     JOIN threads_posts_archive a ON a.post_id = s.published_post_id
+     WHERE s.brand_key = ? AND s.valid_for_learning = 1`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  return (rows.results ?? []).map((row) => ({
+    published_post_id: String(row.published_post_id ?? ""),
+    posted_at_ms: Date.parse(String(row.post_timestamp ?? "")),
+    checkpoint_hours: Number(row.checkpoint_hours),
+    overall: operatorScoreRecord(safeParseJsonString(String(row.scores_json ?? "{}"))).overall,
+    source_card_family_id: String(row.family_id ?? ""),
+    source_identity_key: String(row.source_identity_key ?? ""),
+    source_card_id: row.source_card_id ? String(row.source_card_id) : null,
+    source_mechanism: normalizeOperatorText(row.source_mechanism, 4000, true),
+    required_product: normalizeOperatorText(row.required_product, 4000, true),
+    recommended_direction: normalizeOperatorText(row.recommended_direction, 4000, true),
+    transformation_contract: operatorRecord(safeParseJsonString(String(row.transformation_contract_json ?? "{}"))),
+    forbidden_surfaces: operatorArray(row.forbidden_surfaces_json),
+    danger_surfaces: operatorArray(row.danger_surfaces_json),
+    fail_conditions: operatorArray(row.fail_conditions_json),
+  })).filter((row) => row.published_post_id && row.source_card_family_id && row.source_identity_key
+    && Number.isFinite(row.posted_at_ms) && Number.isFinite(row.overall));
+}
+
 async function refreshOperatorPerformanceEvaluator(
   env: Env,
   brandKey: GptBrandKey,
