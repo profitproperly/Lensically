@@ -20508,17 +20508,16 @@ async function handleOperatorMcpEngineeringTool(
     };
     return {
       ok: response.ok
+        && Boolean(liveSessionId)
         && listed.status < 400
         && startup.status < 400
         && select.status < 400
-        && blocked.status < 400
-                && proceed.status < 400
+        && proceed.status < 400
         && allowed.status < 400
         && coverage.status < 400
-        && boundaryTest.blocked_before_proceed
         && boundaryTest.startup_direct
-        && boundaryTest.proceed_confirmed
-        && boundaryTest.continuity_auto_resolved
+        && boundaryTest.key_selection_requires_proceed
+        && boundaryTest.proceed_accepted
         && boundaryTest.calendar_coverage_loaded
         && boundaryTest.allowed_after_proceed,
       status: response.status,
