@@ -20906,8 +20906,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             {
               type: "text",
               text: isError
-                ? `Lensically Operator Mode tool ${toolName} failed: ${String(resultPayload.error ?? resultPayload.status ?? "unknown_error")}`
-                : `Lensically Operator Mode tool ${toolName} completed.`,
+                ? `Lensically Operator Mode tool ${toolName} failed: ${String(resultPayload.error ?? resultPayload.status ?? "unknown_error")}. Required next action: ${String((resultPayload.operator_action_closure as Record<string, unknown> | undefined)?.next_action ?? "Contain, repair, verify, record, and checkpoint before ending the turn.")}`
+                : `Lensically Operator Mode tool ${toolName} completed. Required turn closure: record progress; preserve deferred work; declare next action: ${String((resultPayload.operator_action_closure as Record<string, unknown> | undefined)?.next_action ?? "Continue the active durable outcome.")}; emit checkpoint: ${String((resultPayload.operator_action_closure as Record<string, unknown> | undefined)?.checkpoint ?? "Resume from durable state, not chat memory.")}`,
             },
           ],
           isError,
