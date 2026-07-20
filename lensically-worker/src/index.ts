@@ -14958,6 +14958,9 @@ function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
       "continuity_and_authorization",
       "execution_receipts",
       "blocker_prevention",
+      "continuous_hardening",
+      "durable_work_state",
+      "action_closure_guard",
     ],
     
   };
