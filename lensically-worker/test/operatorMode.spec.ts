@@ -1300,15 +1300,12 @@ describe("operator mode backend spine", () => {
       incomplete_count: number;
       posts: Array<{ published_post_id: string; complete: boolean; missing_stages: string[] }>;
       error?: string;
-    }>("executeLensicallyIntent", {
-      profile_id: "audit_published_post_lineage",
-      inputs: {
-        brand_key: "manifest_mental",
-        proceed_confirmed: true,
-        minimum_likes: 1000,
-        days: 90,
-        limit: 10,
-      },
+    }>("audit_published_post_lineage", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+      minimum_likes: 1000,
+      days: 90,
+      limit: 10,
     });
     expect(auditBeforeCall.isError, JSON.stringify(auditBeforeCall.structuredContent)).not.toBe(true);
     const auditBefore = auditBeforeCall.structuredContent;
