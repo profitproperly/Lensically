@@ -13368,17 +13368,7 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "listGitHubWorkflowRuns",
   "runGitHubWorkflow",
   "getGitHubWorkflowRun",
-  "verifyDeployedMcpVersion",
-  "getLocalExecutionStatus",
-  "queueLocalExecutionValidation",
-  "queueLocalExecutionFullValidation",
-  "queueLocalExecutionDeployValidatedSha",
-  "queueLocalExecutionWorkerUpdate",
-  "cancelLocalExecutionJob",
-  "createLocalExecutionEnrollmentToken",
-  "revokeLocalExecutionNode",
-  "getValidationPlaneStatus",
-  "executeValidationPlane",
+    "verifyDeployedMcpVersion",
   "listEngineeringAudit",
 ] as const;
 
@@ -13446,16 +13436,7 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "readRepoFile", title: "Read repo file", description: "Read one GitHub repository file from the default branch, with optional line bounds.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, start_line: { type: "integer", minimum: 1 }, max_lines: { type: "integer", minimum: 1, maximum: 400 } }, required: ["path"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
   { name: "getRepoStatus", title: "Get repo status", description: "Read the configured GitHub repo, branch, latest commit SHA, bounded check runs, commit statuses, and Cloudflare validation state.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "getLocalExecutionStatus", title: "Get local execution status", description: "Read the registered Windows local execution nodes, queue counts, latest receipt state, and validation-plane availability.", inputSchema: { type: "object", properties: { node_id: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
-  { name: "queueLocalExecutionValidation", title: "Queue local execution validation", description: "Queue one signed exact-SHA validation job for the Windows local execution node.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, node_id: { type: "string" }, profile: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "queueLocalExecutionFullValidation", title: "Queue local execution full validation", description: "Queue the full local validation profile for one frozen exact repository SHA.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, node_id: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "queueLocalExecutionDeployValidatedSha", title: "Queue local deploy validated SHA", description: "Queue deployment for one exact SHA only when a matching local validation receipt exists.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, receipt_id: { type: "string" }, node_id: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha", "receipt_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "queueLocalExecutionWorkerUpdate", title: "Queue local worker update", description: "Queue a signed remotely replaceable worker update into the inactive node slot.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, worker_version: { type: "string" }, node_id: { type: "string" }, package_hash: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha", "worker_version", "package_hash"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "cancelLocalExecutionJob", title: "Cancel local execution job", description: "Cancel one pending, claimed, or running local execution job without issuing a replacement.", inputSchema: { type: "object", properties: { job_id: { type: "string" }, node_id: { type: "string" }, reason: { type: "string" } }, required: ["job_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "createLocalExecutionEnrollmentToken", title: "Create local node enrollment token", description: "Create one short-lived single-use enrollment token for a named local execution node.", inputSchema: { type: "object", properties: { node_id: { type: "string" }, display_name: { type: "string" }, ttl_seconds: { type: "integer", minimum: 60, maximum: 3600 }, operation_id: { type: "string" } }, required: ["node_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "revokeLocalExecutionNode", title: "Revoke local execution node", description: "Revoke one local execution node credential without affecting other nodes.", inputSchema: { type: "object", properties: { node_id: { type: "string" }, reason: { type: "string" } }, required: ["node_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "getValidationPlaneStatus", title: "Get validation plane status", description: "Read local-node, Cloudflare Builds, and GitHub Actions availability and routing priority without dispatching work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
-  { name: "executeValidationPlane", title: "Execute validation plane", description: "Select the highest-priority available validation plane for one exact frozen SHA and queue a bounded validation job.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, validation_profile: { type: "string", enum: ["sha", "focused", "full"] }, urgency: { type: "string", enum: ["queue", "normal", "urgent"] }, queue_when_local_offline: { type: "boolean" }, require_independent_third_plane: { type: "boolean" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  
     { name: "applyRepoTextPatch", title: "Apply repo text patch", description: "Apply one exact find/replace patch to a GitHub repo file and commit directly to the configured branch.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "find", "replace", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "applyRepoPatchSet", title: "Apply atomic repo patch set", description: "Apply up to 20 exact replacements across multiple GitHub repo files and create one commit only after every replacement validates.", inputSchema: { type: "object", properties: { patches: { type: "array", minItems: 1, maxItems: 20, items: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"], additionalProperties: false } }, message: { type: "string" }, summary: { type: "string" }, expected_head_sha: { type: "string" }, dry_run: { type: "boolean" } }, required: ["patches", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "startRepoFileWrite", title: "Start repo file write", description: "Start a chunked file write session for a GitHub repo path.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, mode: { type: "string", enum: ["replace", "create"] }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "mode", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -13464,7 +13445,7 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner. Include owner_response with the owner's exact approval so authorization is persisted before execution.", inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
   { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-    { name: "runGitHubWorkflow", title: "Run GitHub validation workflow", description: "Dispatch one configured validation task. Worker deployment is triggered by a verified source-control release marker through the Main engineering path; direct client deployment dispatch is forbidden.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-tests", "gpt-memory-tests"] } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+        { name: "runGitHubWorkflow", title: "Run GitHub validation or release workflow", description: "Dispatch one configured Main validation task or one explicit exact-SHA Worker release.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "gpt-memory-tests", "worker-deploy"] }, release_id: { type: "string", maxLength: 80 }, release_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "getGitHubWorkflowRun", title: "Get GitHub workflow run", description: "Read one GitHub Actions workflow run, optionally waiting once for a terminal result.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, wait_seconds: { type: "integer", minimum: 0, maximum: 60 } }, required: ["run_id"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
   { name: "verifyDeployedMcpVersion", title: "Verify deployed MCP version", description: "Verify the live deployed Lensically MCP endpoint version and tool count.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
@@ -15717,16 +15698,7 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["getOperatorWorkState", "operator_work_state"],
   ["intakeOperatorWork", "operator_work_intake"],
   ["advanceOperatorWork", "operator_work_transition"],
-  ["getLocalExecutionStatus", "local_execution_status"],
-  ["queueLocalExecutionValidation", "local_execution_validate_sha"],
-  ["queueLocalExecutionFullValidation", "local_execution_full_validation"],
-  ["queueLocalExecutionDeployValidatedSha", "local_execution_deploy_validated_sha"],
-  ["queueLocalExecutionWorkerUpdate", "local_execution_update_worker"],
-  ["cancelLocalExecutionJob", "local_execution_cancel_job"],
-  ["createLocalExecutionEnrollmentToken", "local_execution_enrollment"],
-  ["revokeLocalExecutionNode", "local_execution_revoke_node"],
-  ["getValidationPlaneStatus", "validation_plane_status"],
-  ["executeValidationPlane", "validation_plane_execute"],
+  
   ["auditScheduledPost", "scheduled_post_audit"],
   ["recoverOverdueScheduledPosts", "protected_scheduler_recovery"],
   ["selectOperatorKey", "account_key_selection"],
@@ -16494,21 +16466,20 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
     };
   }
   
-  if ((toolName === "runGitHubWorkflow" && normalizeOperatorText(args.task, 80, true) === "worker-deploy") || toolName === "deployBackend") {
+    if ((toolName === "runGitHubWorkflow" && normalizeOperatorText(args.task, 80, true) === "worker-deploy") || toolName === "deployBackend") {
     return {
-      rule_key: "workflow_source_validation_before_dispatch",
-            mandatory_route: "commit the final Worker change with [verified-worker-release]; reserve direct workflow dispatch for isolated diagnostics",
-      reason: "Normal releases must validate, deploy, and verify one exact source-controlled head.",
-      required_tool: "applyRepoPatchSet",
-      allowed_argument_keys: ["workflow_id", "ref"],
-      block_call: true,
+      rule_key: "explicit_exact_sha_release_dispatch",
+      mandatory_route: "dispatch worker-deploy only with the final exact 40-character release_sha after validation",
+      reason: "Production releases must validate, deploy, and verify one exact source-controlled head.",
+      allowed_argument_keys: ["task", "release_id", "release_sha"],
     };
   }
   if (toolName === "runGitHubWorkflow") {
     return {
-      rule_key: "isolated_diagnostic_workflow_dispatch",
-      mandatory_route: "dispatch one isolated diagnostic workflow only when a full release is not intended",
-      reason: "Typecheck and single-suite diagnostics may run directly without creating a deployment release.",
+      rule_key: "bounded_main_workflow_dispatch",
+      mandatory_route: "dispatch one configured Main validation task for the intended exact head",
+      reason: "Routine validation and the explicit release path share one source-defined workflow contract.",
+      allowed_argument_keys: ["task", "release_id", "release_sha"],
     };
   }
   if (toolName === "verifyDeployedMcpVersion") {
@@ -19945,29 +19916,7 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "getOperatorWorkState") return getOperatorWorkState(env, args);
   if (toolName === "intakeOperatorWork") return intakeOperatorWork(env, args);
   if (toolName === "advanceOperatorWork") return advanceOperatorWork(env, args);
-  if (toolName === "getLocalExecutionStatus") return getLocalExecutionStatus(env, args);
-  if (toolName === "queueLocalExecutionValidation") {
-    return queueLocalExecutionJob(env, args, "validate_sha", "validate", ["typecheck", "focused_tests"]);
-  }
-  if (toolName === "queueLocalExecutionFullValidation") {
-    return queueLocalExecutionJob(env, args, "run_full_validation", "validate", ["typecheck", "release_preflight", "operator_acceptance", "system_directory", "threads_publishing", "gpt_memory"]);
-  }
-  if (toolName === "queueLocalExecutionDeployValidatedSha") return deployValidatedLocalSha(env, args);
-  if (toolName === "queueLocalExecutionWorkerUpdate") return queueLocalWorkerUpdate(env, args);
-  if (toolName === "createLocalExecutionEnrollmentToken") return createLocalExecutionEnrollmentToken(env, args);
-  if (toolName === "revokeLocalExecutionNode") return revokeLocalExecutionNode(env, args);
-  if (toolName === "cancelLocalExecutionJob") {
-    await ensureLocalExecutionTables(env);
-    const jobId = normalizeOperatorText(args.job_id, 160, true) ?? "";
-    const result = await env.DB.prepare(
-      `UPDATE operator_local_execution_jobs
-       SET state = 'cancelled', result_status = 'cancelled', result_json = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE job_id = ? AND state IN ('pending', 'claimed', 'running')`,
-    ).bind(JSON.stringify({ reason: normalizeOperatorText(args.reason, 500, true) ?? "cancelled" }), jobId).run();
-    return { ok: Number(result.meta.changes ?? 0) === 1, job_id: jobId, state: "cancelled" };
-  }
-  if (toolName === "getValidationPlaneStatus") return getValidationPlaneStatus(env);
-  if (toolName === "executeValidationPlane") return executeValidationPlane(env, args);
+  
 
   if (toolName === "engineeringPrecheck") {
     const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
@@ -20349,22 +20298,30 @@ async function handleOperatorMcpEngineeringTool(
     return { ok: result.ok, status: result.status, path };
   }
 
-  if (toolName === "runGitHubWorkflow") {
+    if (toolName === "runGitHubWorkflow") {
     const requestedTask = normalizeOperatorText(args.task, 160, true) ?? "typecheck";
     const task = requestedTask.replace(/_/g, "-");
-    const allowedWorkflowTasks = new Set(["typecheck", "operator-tests", "gpt-memory-tests"]);
+    const allowedWorkflowTasks = new Set(["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "gpt-memory-tests", "worker-deploy"]);
     if (!allowedWorkflowTasks.has(task)) {
-      return { ok: false, error: "validation_task_required", allowed_tasks: [...allowedWorkflowTasks] };
+      return { ok: false, error: "workflow_task_required", allowed_tasks: [...allowedWorkflowTasks] };
     }
-    const workflowId = "lensically-validation.yml";
+    const releaseSha = normalizeOperatorText(args.release_sha, 40, true);
+    const releaseId = normalizeOperatorText(args.release_id, 80, true) ?? releaseSha?.slice(0, 12) ?? "";
+    if (task === "worker-deploy" && (!releaseSha || !/^[a-fA-F0-9]{40}$/.test(releaseSha))) {
+      return { ok: false, error: "exact_release_sha_required" };
+    }
+    const workflowId = "lensically-engineering.yml";
     const ref = config.branch;
+    const inputs: Record<string, string> = { task };
+    if (releaseId) inputs.release_id = releaseId;
+    if (releaseSha) inputs.release_sha = releaseSha;
     const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ref, inputs: { task } }),
+      body: JSON.stringify({ ref, inputs }),
     });
-    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched validation task ${task}.`, testsRun: [{ workflow_id: workflowId, task }], result: result.ok ? "ok" : "failed", metadata: { status: result.status } });
-    return { ok: result.ok, status: result.status, task };
+    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched Main workflow task ${task}${releaseSha ? ` for ${releaseSha}` : ""}.`, testsRun: [{ workflow_id: workflowId, task, release_sha: releaseSha ?? null }], result: result.ok ? "ok" : "failed", metadata: { status: result.status } });
+    return { ok: result.ok, status: result.status, workflow_id: workflowId, task, release_id: releaseId || null, release_sha: releaseSha ?? null };
   }
 
   if (toolName === "listGitHubWorkflowRuns") {
