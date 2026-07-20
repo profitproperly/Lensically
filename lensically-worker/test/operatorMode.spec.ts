@@ -627,16 +627,13 @@ describe("operator mode backend spine", () => {
     ).bind("35758578720393972").first<{ total: number }>();
     expect(Number(afterProceedSnapshots?.total ?? 0)).toBe(2);
 
-    const result = await mcpToolRaw<Record<string, unknown>>("executeLensicallyIntent", {
-      profile_id: "get_monthly_growth_review",
-      inputs: {
-        brand_key: "manifest_mental",
-        proceed_confirmed: true,
-        date_from: "2026-07-01",
-        date_to: "2026-07-17",
-        timezone: "America/New_York",
-        top_limit: 5,
-      },
+    const result = await mcpToolRaw<Record<string, unknown>>("get_monthly_growth_review", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+      date_from: "2026-07-01",
+      date_to: "2026-07-17",
+      timezone: "America/New_York",
+      top_limit: 5,
     });
     expect(result.isError).not.toBe(true);
         const payload = result.structuredContent as {
