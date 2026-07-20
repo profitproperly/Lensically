@@ -27,6 +27,8 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 - Routine implementation target is under ten minutes when the platform operation permits it.
 - Speed comes from removing unnecessary work, not skipping required correctness checks.
+- Protect throughput with one active implementation outcome, one interrupting P0/P1 incident when necessary, unlimited captured deferred ideas, and zero untracked side objectives.
+- Freeze scope when validation begins. A failing test permits only the smallest repair required by the frozen acceptance criteria; enhancements wait for the next outcome.
 - Use bounded source inspection, one coherent change set, focused validation, one exact-SHA release, and one live verification pass.
 - Do not run separate full validation and deployment loops for a normal change.
 - Do not poll rapidly from chat. Use bounded server-side workflow status reads and inspect detailed logs only after a terminal failure.
