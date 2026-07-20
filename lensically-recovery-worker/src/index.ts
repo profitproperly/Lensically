@@ -523,21 +523,32 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && ["invalid_mcp_session", "stale_mcp_deployment_session"].includes(String(staleSessionData?.reason ?? ""))
       && Boolean(staleSession.headers.mcp_session_id)
       && staleSession.headers.mcp_session_id !== invalidSession;
-    const directRejected = directContent?.error === "routed_execution_gateway_required" && directContent?.required_tool === "executeLensicallyIntent";
-    const mappedSucceeded = mapped.status === 200
-      && mappedContent?.ok === true
-      && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.profile_id === "get_engineering_access_state"
-      && (mappedContent?.routed_execution as Record<string, unknown> | undefined)?.executed_tool === "getEngineeringAccessState"
-      && (mappedContent?.execution_guard_enforcement as Record<string, unknown> | undefined)?.model_tool_choice_allowed === false;
-    const legacyFreehandRetired = legacyMapped.status === 200
-      && legacyMappedContent?.ok === false
-      && legacyMappedContent?.error === "registered_profile_id_required";
+    const engineeringAccessSucceeded = engineeringAccess.status === 200 && engineeringAccessContent?.ok === true;
+    const schedulerState = schedulerContent?.scheduler && typeof schedulerContent.scheduler === "object" && !Array.isArray(schedulerContent.scheduler)
+      ? schedulerContent.scheduler as Record<string, unknown>
+      : null;
+    const schedulerSucceeded = scheduler.status === 200
+      && schedulerContent?.ok === true
+      && schedulerState?.healthy === true
+      && schedulerState?.operational === true
+      && schedulerState?.heartbeat_fresh === true;
+    const campaignReport = campaignContent?.campaign && typeof campaignContent.campaign === "object" && !Array.isArray(campaignContent.campaign)
+      ? campaignContent.campaign as Record<string, unknown>
+      : null;
+    const campaignSucceeded = campaign.status === 200
+      && campaignContent?.ok === true
+      && campaignReport?.failed === 0
+      && campaignReport?.mutations_executed === 0;
+    const inventorySucceeded = scheduledToday.status === 200
+      && scheduledTodayContent?.ok === true
+      && scheduledTomorrow.status === 200
+      && scheduledTomorrowContent?.ok === true;
     const executionKernel = startupContent?.execution_kernel && typeof startupContent.execution_kernel === "object" && !Array.isArray(startupContent.execution_kernel)
       ? startupContent.execution_kernel as Record<string, unknown>
       : null;
     const executionKernelSucceeded = executionKernel?.name === "Execution Kernel"
       && executionKernel?.version === "lensically-execution-kernel-v1"
-      && executionKernel?.public_contract === "profile_id_inputs_v1"
+      && executionKernel?.public_contract === "direct_typed_tools_v1"
       && executionKernel?.deployment_fresh_sessions === true;
     const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
     const executionLifecycle = executionKernel?.lifecycle && typeof executionKernel.lifecycle === "object" && !Array.isArray(executionKernel.lifecycle)
