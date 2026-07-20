@@ -12933,6 +12933,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
+  if (toolName === "get_content_focus") {
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      content_focus: await getLatestOperatorContentFocus(env, brand.brand_key),
+    });
+  }
+
   if (toolName === "get_post_results") {
 
     await ensureThreadsPostsArchiveTable(env);
