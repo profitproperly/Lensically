@@ -959,13 +959,15 @@ describe("System Directory foundation", () => {
     ]));
   });
 
-        it("keeps Worker deployment on the Main verified marker path", () => {
+        it("keeps Worker deployment on the explicit exact-SHA Main path", () => {
     expect(resolveLensicallySystemDirectory("Deploy the main Worker release.")).toMatchObject({
       entry_id: "deployment.main_worker",
       recommended_next_planes: ["engineering"],
-      hard_gates: expect.arrayContaining(["Main releases require a verified repository head and an exact-SHA validation receipt."]),
+      hard_gates: expect.arrayContaining([
+        "Production releases require one explicit exact 40-character repository SHA.",
+        "The release workflow validates, deploys, and verifies the same SHA.",
+      ]),
     });
-    expect(CLIENT_SAFE_REQUEST_PROFILES.worker_release_dispatch).toMatchObject({ surface: "recovery_plane" });
   });
 
     it("falls back to the original semantic route when a directory hint target is unavailable", () => {
