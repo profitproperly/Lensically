@@ -3165,7 +3165,7 @@ describe("operator mode MCP endpoint", () => {
     ).toBe(0);
     expect(campaign.structuredContent.campaign.passed).toBe(102);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
-      read_only: 41,
+      read_only: 42,
       mutation: 60,
       mutation_without_required_inputs: 0,
     });
