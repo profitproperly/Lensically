@@ -160,6 +160,10 @@ jobs:
                     echo "::error title=GPT memory validation failure::${diagnostic}"
           exit 1
 
+      - name: Run verified release preflight
+        if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]') }}
+        run: node scripts/release-preflight.mjs
+
       - name: Run verified release supporting gates
         if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]') }}
         run: |
