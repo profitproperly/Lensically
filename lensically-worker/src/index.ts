@@ -14698,7 +14698,7 @@ async function putGithubFile(env: Env, input: { path: string; content: string; m
     return { ok: false, status: tree.status, commit_sha: null, data: { phase: "create_tree", response: tree.data } };
   }
 
-  const commit = await githubRepoApi(env, "/git/commits", {
+  const commit = await githubRepoApiRetryable(env, "/git/commits", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ message: input.message, tree: treeSha, parents: [headSha] }),
