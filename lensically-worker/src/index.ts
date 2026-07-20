@@ -20533,8 +20533,8 @@ async function handleOperatorMcpEngineeringTool(
         && boundaryTest.allowed_after_proceed,
       status: response.status,
       initialize: payload?.result ?? null,
-                  transport_mode: "server_side_continuity_state",
-            live_tool_count: (await buildOperatorMcpTools(env, false, false)).length,
+                  transport_mode: "direct_typed_main_tools",
+            live_tool_count: await operatorPublicMcpToolCount(env),
       advertised_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
       boundary_test: boundaryTest,
     };
