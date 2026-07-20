@@ -2,10 +2,12 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const WORKER_VERSION = "local-worker-v1";
 const BOOTSTRAP_VERSION = "lensically-local-bootstrap-v1";
+const installedWorkerRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const allowed = new Set([
   "node_status",
   "validate_sha",
@@ -57,7 +59,7 @@ function git(commandArgs, cwd) {
 
 function acquireExactSource(job) {
   if (!/^[a-f0-9]{40}$/i.test(job.commit_sha || "")) throw new Error("exact_sha_required");
-  const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || "C:\\ProgramData\\Lensically\\LocalExecutionNode";
+  const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || installedWorkerRoot;
   const sourceRoot = join(root, "source");
   const cacheDir = join(sourceRoot, "repo-cache.git");
   const jobsDir = join(sourceRoot, "jobs");
@@ -136,7 +138,7 @@ function hashFile(path) {
 }
 
 function updateWorker(job) {
-  const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || "C:\\ProgramData\\Lensically\\LocalExecutionNode";
+  const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || installedWorkerRoot;
   const packageSha = String(job.inputs?.package_sha || job.commit_sha || "");
   if (!/^[a-f0-9]{40}$/i.test(packageSha)) throw new Error("exact_package_sha_required");
   const source = acquireExactSource({ ...job, commit_sha: packageSha });

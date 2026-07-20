@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const BOOTSTRAP_VERSION = "lensically-local-bootstrap-v1";
-const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || "C:\\ProgramData\\Lensically\\LocalExecutionNode";
+const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || dirname(fileURLToPath(import.meta.url));
 const configPath = join(root, "config.json");
 const statePath = join(root, "state.json");
 const logPath = join(root, "logs", "bootstrap.log");
