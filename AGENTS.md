@@ -31,7 +31,6 @@
 - Routine engineering target is under ten minutes when the underlying platform operation permits it.
 - Use bounded inspection, one coherent change set, focused validation, one exact-SHA release, and one live verification pass.
 - Maintain one active implementation outcome. New ideas are explicitly activated, deferred, merged, or rejected through `single-active-outcome-v1`; only P0/P1 incidents, required prerequisites, or material irreversible rework may interrupt frozen scope.
-- Every operational conclusion must pass the action-closure guard with current live state, target state, active outcome, one selected next action, priority reason, completion evidence, owner-action requirement, and a retirement condition for any temporary dependency.
 - Do not create a new framework, registry, memory system, map, or control layer when a direct source-defined route can enforce the requirement.
 - Do not preserve obsolete infrastructure for sentimental reasons. Git history is the archive.
 - Use one atomic patch set for related replacements when practical. Use a chunked write for large whole-file replacements.
