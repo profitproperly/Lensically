@@ -1256,7 +1256,7 @@ describe("System Directory foundation", () => {
       single_active_outcome: true,
       owner_role: "authorize_only_when_required",
     });
-    expect(AGENT_NATIVE_OPERATING_CONTRACT.execution_loop.at(-1)).toBe("checkpoint");
+    expect(AGENT_NATIVE_OPERATING_CONTRACT.execution_loop[AGENT_NATIVE_OPERATING_CONTRACT.execution_loop.length - 1]).toBe("checkpoint");
   });
 
   it("defers noncritical scope while allowing only mandatory interruptions", () => {
