@@ -164,6 +164,17 @@
   },
   "declarations": [
     {
+      "capability_id": "analytics.read_content_focus",
+      "directory_entry_id": "analytics.content_focus",
+      "canonical_handler": "get_content_focus",
+      "route_intent": "get content focus",
+      "implementation_mode": "new_handler",
+      "focused_regression": "reads Content Focus through a direct typed Main tool after Proceed",
+      "release_scope": "operator-analytics",
+      "live_verification": "After Proceed, the deployed Main MCP returns the persisted Content Focus reviews and source-card family states through the direct typed get_content_focus tool without account mutation.",
+      "compatibility_bridge": false
+    },
+    {
       "capability_id": "engineering.autonomous_capability_lifecycle",
       "directory_entry_id": "engineering.capability_lifecycle",
       "canonical_handler": "readRepoFile",
