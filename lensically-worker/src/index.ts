@@ -26624,6 +26624,96 @@ async function loadOperatorContentFocusRows(env: Env, brandKey: GptBrandKey): Pr
     && Number.isFinite(row.posted_at_ms) && Number.isFinite(row.overall));
 }
 
+async function buildOperatorContentFocusFamilies(
+  env: Env,
+  brandKey: GptBrandKey,
+  authority: OperatorContentFocusCadence,
+  nowMs: number,
+): Promise<{ families: Array<Record<string, unknown>>; current_by_family: Map<string, Record<string, unknown>> }> {
+  const parsedRows = await loadOperatorContentFocusRows(env, brandKey);
+  const currentRows = await env.DB.prepare(
+    `SELECT * FROM operator_content_focus_family_states WHERE brand_key = ?`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const currentByFamily = new Map((currentRows.results ?? []).map((row) => [String(row.source_card_family_id), row]));
+  const rowsByFamily = new Map<string, OperatorContentFocusScoreRow[]>();
+  for (const row of parsedRows) {
+    const rows = rowsByFamily.get(row.source_card_family_id) ?? [];
+    rows.push(row);
+    rowsByFamily.set(row.source_card_family_id, rows);
+  }
+  const totalRecentPosts = new Set(
+    operatorContentFocusWindowRows(parsedRows, nowMs, 7).map((row) => row.published_post_id),
+  ).size;
+  const families: Array<Record<string, unknown>> = [];
+  for (const [familyId, rows] of rowsByFamily) {
+    const current = currentByFamily.get(familyId);
+    const horizons = operatorContentFocusHorizons(rows, nowMs);
+    const recentCount = Number(horizons.operating_7d?.post_count ?? 0);
+    const fatigueRatio = totalRecentPosts ? recentCount / totalRecentPosts : 0;
+    const currentStatus = (normalizeOperatorText(current?.status, 20, true) ?? "test") as OperatorContentFocusStatus;
+    const classification = classifyOperatorContentFocusFamily({
+      cadence: authority,
+      current_status: currentStatus,
+      manual_lock: Number(current?.manual_lock ?? 0) === 1 || currentStatus === "retire",
+      fatigue_ratio: fatigueRatio,
+      horizons,
+    });
+    const reference = [...rows].sort((left, right) => right.posted_at_ms - left.posted_at_ms)[0];
+    families.push({
+      source_card_family_id: familyId,
+      source_identity_key: reference.source_identity_key,
+      source_card_id: reference.source_card_id,
+      status: classification.status,
+      recommended_status: classification.recommended_status,
+      confidence_score: classification.confidence_score,
+      confidence_label: classification.confidence_label,
+      allocation_weight: classification.allocation_weight,
+      decision_reason: classification.reason,
+      fatigue_ratio: Number(fatigueRatio.toFixed(4)),
+      horizons,
+      reuse_directives: {
+        source_mechanism: reference.source_mechanism,
+        required_product: reference.required_product,
+        transformation_contract: reference.transformation_contract,
+        recommended_direction: reference.recommended_direction,
+      },
+      stop_directives: {
+        forbidden_surfaces: reference.forbidden_surfaces,
+        danger_surfaces: reference.danger_surfaces,
+        fail_conditions: reference.fail_conditions,
+      },
+    });
+  }
+  return { families, current_by_family: currentByFamily };
+}
+
+function operatorContentFocusDailyCandidates(families: Array<Record<string, unknown>>): Array<{
+  source_card_family_id: string;
+  status: OperatorContentFocusStatus;
+  recommended_status: OperatorContentFocusStatus;
+  operating_score: number | null;
+  baseline_score: number | null;
+  mature_count: number;
+  strong_count: number;
+  weak_count: number;
+  fatigue_ratio: number;
+}> {
+  return families.map((family) => {
+    const horizons = family.horizons as OperatorContentFocusFamilyInput["horizons"];
+    return {
+      source_card_family_id: String(family.source_card_family_id),
+      status: family.status as OperatorContentFocusStatus,
+      recommended_status: family.recommended_status as OperatorContentFocusStatus,
+      operating_score: horizons.operating_7d?.median_overall ?? null,
+      baseline_score: horizons.baseline_30d?.median_overall ?? null,
+      mature_count: Number(horizons.baseline_30d?.mature_count ?? 0),
+      strong_count: Number(horizons.baseline_30d?.strong_count ?? 0),
+      weak_count: Number(horizons.operating_7d?.weak_count ?? 0),
+      fatigue_ratio: Number(family.fatigue_ratio ?? 0),
+    };
+  });
+}
+
 async function refreshOperatorPerformanceEvaluator(
   env: Env,
   brandKey: GptBrandKey,
