@@ -3061,17 +3061,17 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(campaign.structuredContent.campaign).toMatchObject({
       segment: "routes",
-      total_internal_capabilities: 84,
-      total_read_only_capabilities: 37,
+      total_internal_capabilities: 101,
+      total_read_only_capabilities: 41,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
     });
-    expect(campaign.structuredContent.campaign.passed).toBe(84);
+    expect(campaign.structuredContent.campaign.passed).toBe(101);
     expect(campaign.structuredContent.campaign.failed).toBe(0);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
-      read_only: 37,
-      mutation: 47,
+      read_only: 41,
+      mutation: 60,
       mutation_without_required_inputs: 0,
     });
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
