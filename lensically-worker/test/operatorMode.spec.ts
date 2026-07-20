@@ -3133,6 +3133,37 @@ describe("operator mode MCP endpoint", () => {
       search_mode: "bounded_known_file_content",
     });
     expect(routed.structuredContent.matches).toHaveLength(1);
+
+    const directorySpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (
+        request.method === "GET"
+        && url.origin === "https://api.github.com"
+        && url.pathname === "/repos/profitproperly/Lensically/contents/lensically-worker/src"
+        && url.searchParams.get("ref") === "main"
+      ) {
+        return new Response(JSON.stringify([{ type: "file", path: "lensically-worker/src/index.ts" }]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
+    });
+    const directoryPath = await mcpToolCallRaw<Record<string, unknown>>("searchRepoFiles", {
+      prefix: "lensically-worker/src",
+      query: "executeLensicallyIntent",
+      limit: 1,
+    });
+    directorySpy.mockRestore();
+    expect(directoryPath.structuredContent).toMatchObject({
+      ok: false,
+      error: "known_file_path_required",
+      status: 200,
+      path: "lensically-worker/src",
+    });
+    expect(directoryPath.structuredContent.hardening_incident).toBeUndefined();
+    expect(directoryPath.structuredContent.normal_work_blocked).not.toBe(true);
   }, 30000);
 
   it("builds one complete non-mutating Execution Kernel capability campaign", async () => {
