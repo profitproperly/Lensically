@@ -13260,6 +13260,8 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "queueLocalExecutionDeployValidatedSha",
   "queueLocalExecutionWorkerUpdate",
   "cancelLocalExecutionJob",
+  "createLocalExecutionEnrollmentToken",
+  "revokeLocalExecutionNode",
   "getValidationPlaneStatus",
   "executeValidationPlane",
   "listEngineeringAudit",
@@ -13335,6 +13337,8 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "queueLocalExecutionDeployValidatedSha", title: "Queue local deploy validated SHA", description: "Queue deployment for one exact SHA only when a matching local validation receipt exists.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, receipt_id: { type: "string" }, node_id: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha", "receipt_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "queueLocalExecutionWorkerUpdate", title: "Queue local worker update", description: "Queue a signed remotely replaceable worker update into the inactive node slot.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, worker_version: { type: "string" }, node_id: { type: "string" }, package_hash: { type: "string" }, operation_id: { type: "string" } }, required: ["commit_sha", "worker_version", "package_hash"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "cancelLocalExecutionJob", title: "Cancel local execution job", description: "Cancel one pending, claimed, or running local execution job without issuing a replacement.", inputSchema: { type: "object", properties: { job_id: { type: "string" }, node_id: { type: "string" }, reason: { type: "string" } }, required: ["job_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "createLocalExecutionEnrollmentToken", title: "Create local node enrollment token", description: "Create one short-lived single-use enrollment token for a named local execution node.", inputSchema: { type: "object", properties: { node_id: { type: "string" }, display_name: { type: "string" }, ttl_seconds: { type: "integer", minimum: 60, maximum: 3600 }, operation_id: { type: "string" } }, required: ["node_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "revokeLocalExecutionNode", title: "Revoke local execution node", description: "Revoke one local execution node credential without affecting other nodes.", inputSchema: { type: "object", properties: { node_id: { type: "string" }, reason: { type: "string" } }, required: ["node_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "getValidationPlaneStatus", title: "Get validation plane status", description: "Read local-node, Cloudflare Builds, and GitHub Actions availability and routing priority without dispatching work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
   { name: "executeValidationPlane", title: "Execute validation plane", description: "Select the highest-priority available validation plane for one exact frozen SHA and queue a bounded validation job.", inputSchema: { type: "object", properties: { commit_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }, validation_profile: { type: "string", enum: ["sha", "focused", "full"] }, urgency: { type: "string", enum: ["queue", "normal", "urgent"] }, queue_when_local_offline: { type: "boolean" }, require_independent_third_plane: { type: "boolean" }, operation_id: { type: "string" } }, required: ["commit_sha"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "applyRepoTextPatch", title: "Apply repo text patch", description: "Apply one exact find/replace patch to a GitHub repo file and commit directly to the configured branch.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "find", "replace", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -15491,6 +15495,8 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["queueLocalExecutionDeployValidatedSha", "local_execution_deploy_validated_sha"],
   ["queueLocalExecutionWorkerUpdate", "local_execution_update_worker"],
   ["cancelLocalExecutionJob", "local_execution_cancel_job"],
+  ["createLocalExecutionEnrollmentToken", "local_execution_enrollment"],
+  ["revokeLocalExecutionNode", "local_execution_revoke_node"],
   ["getValidationPlaneStatus", "validation_plane_status"],
   ["executeValidationPlane", "validation_plane_execute"],
   ["auditScheduledPost", "scheduled_post_audit"],
@@ -18993,6 +18999,11 @@ async function ensureLocalExecutionTables(env: Env): Promise<void> {
         node_id TEXT PRIMARY KEY,
         display_name TEXT,
         status TEXT NOT NULL DEFAULT 'registered',
+        credential_hash TEXT,
+        enrolled_at TEXT,
+        revoked_at TEXT,
+        revocation_reason TEXT,
+        credential_rotated_at TEXT,
         heartbeat_at TEXT,
         healthy INTEGER NOT NULL DEFAULT 0,
         bootstrap_version TEXT,
@@ -19050,7 +19061,26 @@ async function ensureLocalExecutionTables(env: Env): Promise<void> {
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     ),
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS operator_local_execution_enrollment_tokens (
+        token_hash TEXT PRIMARY KEY,
+        node_id TEXT NOT NULL,
+        display_name TEXT,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        operation_id TEXT
+      )`,
+    ),
   ]);
+  const addColumn = async (sql: string): Promise<void> => {
+    try { await env.DB.prepare(sql).run(); } catch { /* column already exists */ }
+  };
+  await addColumn(`ALTER TABLE operator_local_execution_nodes ADD COLUMN credential_hash TEXT`);
+  await addColumn(`ALTER TABLE operator_local_execution_nodes ADD COLUMN enrolled_at TEXT`);
+  await addColumn(`ALTER TABLE operator_local_execution_nodes ADD COLUMN revoked_at TEXT`);
+  await addColumn(`ALTER TABLE operator_local_execution_nodes ADD COLUMN revocation_reason TEXT`);
+  await addColumn(`ALTER TABLE operator_local_execution_nodes ADD COLUMN credential_rotated_at TEXT`);
 }
 
 function localExecutionDefaultNodeId(env: Env): string {
@@ -19066,7 +19096,8 @@ async function getLocalExecutionNode(env: Env, requestedNodeId?: unknown): Promi
   await ensureLocalExecutionTables(env);
   const nodeId = normalizeOperatorMachineKey(requestedNodeId, "") || localExecutionDefaultNodeId(env);
   const row = await env.DB.prepare(
-    `SELECT node_id, heartbeat_at, healthy, worker_version, bootstrap_version, active_slot, previous_worker_version
+    `SELECT node_id, heartbeat_at, healthy, worker_version, bootstrap_version, active_slot, previous_worker_version,
+            enrolled_at, revoked_at, credential_rotated_at
      FROM operator_local_execution_nodes
      WHERE node_id = ?
      LIMIT 1`,
@@ -19080,6 +19111,12 @@ async function getLocalExecutionNode(env: Env, requestedNodeId?: unknown): Promi
     bootstrap_version: typeof row.bootstrap_version === "string" ? row.bootstrap_version : null,
     active_slot: row.active_slot === "previous" ? "previous" : row.active_slot === "active" ? "active" : null,
     previous_worker_version: typeof row.previous_worker_version === "string" ? row.previous_worker_version : null,
+    enrollment: {
+      status: row.revoked_at ? "revoked" : row.enrolled_at ? "enrolled" : "not_enrolled",
+      enrolled_at: typeof row.enrolled_at === "string" ? row.enrolled_at : null,
+      revoked_at: typeof row.revoked_at === "string" ? row.revoked_at : null,
+      credential_rotated_at: typeof row.credential_rotated_at === "string" ? row.credential_rotated_at : null,
+    },
   };
 }
 
@@ -19233,20 +19270,94 @@ async function queueLocalWorkerUpdate(env: Env, args: Record<string, unknown>): 
   return queueLocalExecutionJob(env, args, "update_worker", "update", ["download", "verify_integrity", "commission", "activate_or_rollback"]);
 }
 
-function localExecutionNodeSecret(env: Env): string {
-  return String((env as unknown as Record<string, unknown>).LENSICALLY_LOCAL_NODE_SECRET ?? "").trim();
+async function createLocalExecutionEnrollmentToken(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureLocalExecutionTables(env);
+  const nodeId = normalizeOperatorMachineKey(args.node_id, "");
+  if (!nodeId) return { ok: false, error: "node_id_required" };
+  const ttlSeconds = Math.min(3600, Math.max(60, Math.trunc(Number(args.ttl_seconds ?? 900))));
+  const now = new Date();
+  const token = `${crypto.randomUUID()}.${crypto.randomUUID()}`;
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
+  await env.DB.prepare(
+    `INSERT INTO operator_local_execution_enrollment_tokens (token_hash, node_id, display_name, created_at, expires_at, operation_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    tokenHash,
+    nodeId,
+    normalizeOperatorText(args.display_name, 160, true) ?? nodeId,
+    now.toISOString(),
+    expiresAt,
+    normalizeOperatorMachineKey(args.operation_id, "") || null,
+  ).run();
+  return { ok: true, node_id: nodeId, enrollment_token: token, expires_at: expiresAt, single_use: true };
 }
 
-function authenticateLocalExecutionNode(request: Request, env: Env): { ok: true; nodeId: string } | { ok: false; response: Response } {
+async function revokeLocalExecutionNode(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureLocalExecutionTables(env);
+  const nodeId = normalizeOperatorMachineKey(args.node_id, "");
+  if (!nodeId) return { ok: false, error: "node_id_required" };
+  const result = await env.DB.prepare(
+    `UPDATE operator_local_execution_nodes
+     SET status = 'revoked', revoked_at = ?, revocation_reason = ?, healthy = 0, updated_at = CURRENT_TIMESTAMP
+     WHERE node_id = ? AND revoked_at IS NULL`,
+  ).bind(new Date().toISOString(), normalizeOperatorText(args.reason, 500, true) ?? "revoked", nodeId).run();
+  return { ok: Number(result.meta.changes ?? 0) === 1, node_id: nodeId, revoked: Number(result.meta.changes ?? 0) === 1 };
+}
+
+async function authenticateLocalExecutionNode(request: Request, env: Env): Promise<{ ok: true; nodeId: string } | { ok: false; response: Response }> {
   const nodeId = normalizeOperatorMachineKey(request.headers.get("x-lensically-node-id"), "");
   if (!nodeId) return { ok: false, response: operatorJsonResponse({ ok: false, error: "node_id_required" }, 401) };
-  const expectedSecret = localExecutionNodeSecret(env);
-  if (!expectedSecret) return { ok: false, response: operatorJsonResponse({ ok: false, error: "local_node_secret_not_configured" }, 503) };
-  const providedSecret = String(request.headers.get("x-lensically-node-secret") ?? "");
-  if (!providedSecret || providedSecret !== expectedSecret) {
-    return { ok: false, response: operatorJsonResponse({ ok: false, error: "invalid_node_secret" }, 401) };
+  const credential = String(request.headers.get("x-lensically-node-credential") ?? "");
+  if (!credential) return { ok: false, response: operatorJsonResponse({ ok: false, error: "node_credential_required" }, 401) };
+  const row = await env.DB.prepare(
+    `SELECT credential_hash, revoked_at FROM operator_local_execution_nodes WHERE node_id = ? LIMIT 1`,
+  ).bind(nodeId).first<{ credential_hash: string | null; revoked_at: string | null }>();
+  if (!row?.credential_hash) return { ok: false, response: operatorJsonResponse({ ok: false, error: "node_not_enrolled" }, 401) };
+  if (row.revoked_at) return { ok: false, response: operatorJsonResponse({ ok: false, error: "node_revoked" }, 403) };
+  const credentialHash = await sha256Hex(credential);
+  if (credentialHash !== row.credential_hash) {
+    return { ok: false, response: operatorJsonResponse({ ok: false, error: "invalid_node_credential" }, 401) };
   }
   return { ok: true, nodeId };
+}
+
+async function enrollLocalExecutionNode(body: Record<string, unknown>, env: Env): Promise<Response> {
+  const nodeId = normalizeOperatorMachineKey(body.node_id, "");
+  const token = normalizeOperatorText(body.enrollment_token, 500, true);
+  const credential = normalizeOperatorText(body.device_credential, 500, true);
+  if (!nodeId || !token || !credential) return operatorJsonResponse({ ok: false, error: "node_id_token_and_credential_required" }, 400);
+  const now = new Date();
+  const tokenHash = await sha256Hex(token);
+  const tokenRow = await env.DB.prepare(
+    `SELECT node_id, display_name, expires_at, used_at
+     FROM operator_local_execution_enrollment_tokens
+     WHERE token_hash = ? LIMIT 1`,
+  ).bind(tokenHash).first<{ node_id: string; display_name: string | null; expires_at: string; used_at: string | null }>();
+  if (!tokenRow || tokenRow.node_id !== nodeId) return operatorJsonResponse({ ok: false, error: "invalid_enrollment_token" }, 401);
+  if (tokenRow.used_at) return operatorJsonResponse({ ok: false, error: "enrollment_token_already_used" }, 409);
+  if (Date.parse(tokenRow.expires_at) <= now.getTime()) return operatorJsonResponse({ ok: false, error: "enrollment_token_expired" }, 401);
+  const credentialHash = await sha256Hex(credential);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO operator_local_execution_nodes (
+        node_id, display_name, status, credential_hash, enrolled_at, credential_rotated_at, healthy, updated_at
+      ) VALUES (?, ?, 'enrolled', ?, ?, ?, 0, CURRENT_TIMESTAMP)
+      ON CONFLICT(node_id) DO UPDATE SET
+        display_name = excluded.display_name,
+        status = 'enrolled',
+        credential_hash = excluded.credential_hash,
+        enrolled_at = COALESCE(operator_local_execution_nodes.enrolled_at, excluded.enrolled_at),
+        revoked_at = NULL,
+        revocation_reason = NULL,
+        credential_rotated_at = excluded.credential_rotated_at,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(nodeId, tokenRow.display_name ?? nodeId, credentialHash, now.toISOString(), now.toISOString()),
+    env.DB.prepare(
+      `UPDATE operator_local_execution_enrollment_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL`,
+    ).bind(now.toISOString(), tokenHash),
+  ]);
+  return operatorJsonResponse({ ok: true, node_id: nodeId, enrolled_at: now.toISOString(), credential_status: "active" });
 }
 
 function signedLocalJobFieldsMatch(payload: Record<string, unknown>, job: Record<string, unknown>): boolean {
@@ -19269,11 +19380,14 @@ function signedLocalJobFieldsMatch(payload: Record<string, unknown>, job: Record
 
 async function handleLocalExecutionNodeEndpoint(request: Request, env: Env, path: string): Promise<Response> {
   await ensureLocalExecutionTables(env);
-  const authentication = authenticateLocalExecutionNode(request, env);
-  if (!authentication.ok) return authentication.response;
-  const nodeId = authentication.nodeId;
   const body = request.method === "POST" ? await request.json().catch(() => ({})) as Record<string, unknown> : {};
   const now = new Date();
+  if (path === "/api/operator/local-node/enroll" && request.method === "POST") {
+    return enrollLocalExecutionNode(body, env);
+  }
+  const authentication = await authenticateLocalExecutionNode(request, env);
+  if (!authentication.ok) return authentication.response;
+  const nodeId = authentication.nodeId;
   if (path === "/api/operator/local-node/heartbeat" && request.method === "POST") {
     await env.DB.prepare(
       `INSERT INTO operator_local_execution_nodes (
@@ -19355,7 +19469,7 @@ async function handleLocalExecutionNodeEndpoint(request: Request, env: Env, path
     });
   }
   if (path === "/api/operator/local-node/result" && request.method === "POST") {
-    const jobId = normalizeOperatorMachineKey(body.job_id, "");
+    const jobId = normalizeOperatorText(body.job_id, 160, true) ?? "";
     const status = normalizeOperatorMachineKey(body.status, "failed");
     if (!jobId) return operatorJsonResponse({ ok: false, error: "job_id_required" }, 400);
     const job = await env.DB.prepare(
@@ -19424,9 +19538,11 @@ async function handleOperatorMcpEngineeringTool(
   }
   if (toolName === "queueLocalExecutionDeployValidatedSha") return deployValidatedLocalSha(env, args);
   if (toolName === "queueLocalExecutionWorkerUpdate") return queueLocalWorkerUpdate(env, args);
+  if (toolName === "createLocalExecutionEnrollmentToken") return createLocalExecutionEnrollmentToken(env, args);
+  if (toolName === "revokeLocalExecutionNode") return revokeLocalExecutionNode(env, args);
   if (toolName === "cancelLocalExecutionJob") {
     await ensureLocalExecutionTables(env);
-    const jobId = normalizeOperatorMachineKey(args.job_id, "");
+    const jobId = normalizeOperatorText(args.job_id, 160, true) ?? "";
     const result = await env.DB.prepare(
       `UPDATE operator_local_execution_jobs
        SET state = 'cancelled', result_status = 'cancelled', result_json = ?, updated_at = CURRENT_TIMESTAMP

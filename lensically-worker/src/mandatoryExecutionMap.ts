@@ -595,6 +595,8 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   queueLocalExecutionDeployValidatedSha: ["local execution deploy validated sha", "deploy locally validated sha"],
   queueLocalExecutionWorkerUpdate: ["local execution update worker", "update local worker", "install local worker update"],
   cancelLocalExecutionJob: ["local execution cancel job", "cancel local job", "cancel local validation"],
+  createLocalExecutionEnrollmentToken: ["local execution enrollment", "create local node enrollment token", "enroll local execution node"],
+  revokeLocalExecutionNode: ["local execution revoke node", "revoke local execution node", "revoke local node credential"],
   getValidationPlaneStatus: ["validation plane status", "validation planes", "execution plane status"],
   executeValidationPlane: ["validation plane execute", "execute validation plane", "route validation plane"],
   getRepoStatus: ["repository status", "repo status", "repository head", "current repository sha", "repository runtime alignment"],
@@ -672,6 +674,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\bvalidation\s+plane\s+status\b/) || has(/\bexecution\s+plane\s+status\b/)) return "getValidationPlaneStatus";
   if (has(/\bvalidation\s+plane\s+execute\b/) || has(/\broute\s+validation\s+plane\b/)) return "executeValidationPlane";
   if (has(/\blocal\s+execution\s+status\b/) || has(/\blocal\s+node\s+status\b/)) return "getLocalExecutionStatus";
+  if (has(/\blocal\s+execution\s+enrollment\b/) || has(/\benroll\s+local\s+execution\s+node\b/)) return "createLocalExecutionEnrollmentToken";
+  if (has(/\blocal\s+execution\s+revoke\s+node\b/) || has(/\brevoke\s+local\s+(node|execution\s+node)\b/)) return "revokeLocalExecutionNode";
   if (has(/\blocal\s+execution\s+full\s+validation\b/) || has(/\bfull\s+local\s+validation\b/)) return "queueLocalExecutionFullValidation";
   if (has(/\blocal\s+execution\s+deploy\s+validated\s+sha\b/) || has(/\bdeploy\s+locally\s+validated\s+sha\b/)) return "queueLocalExecutionDeployValidatedSha";
   if (has(/\blocal\s+execution\s+update\s+worker\b/) || has(/\bupdate\s+local\s+worker\b/)) return "queueLocalExecutionWorkerUpdate";

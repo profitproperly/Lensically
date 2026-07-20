@@ -1,58 +1,117 @@
 param(
+  [ValidateSet("Install", "Repair", "Uninstall", "Commission")]
+  [string]$Mode = "Install",
   [Parameter(Mandatory=$true)][string]$NodeId,
-  [Parameter(Mandatory=$true)][string]$LensicallyOrigin,
-  [string]$InstallRoot = "$env:ProgramData\Lensically\LocalExecutionNode"
+  [string]$LensicallyOrigin = "https://api.lensically.com",
+  [string]$EnrollmentToken,
+  [string]$InstallRoot = "$env:ProgramData\Lensically\LocalExecutionNode",
+  [string]$TaskName = "LensicallyLocalExecutionNode"
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-  throw "Run this installer from an elevated PowerShell session."
+function Test-IsAdmin {
+  return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-$node = Get-Command node.exe -ErrorAction SilentlyContinue
-if (-not $node) { throw "Node.js is required before installing the Lensically Local Execution Node." }
-
-New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
-New-Item -ItemType Directory -Force -Path "$InstallRoot\workers\active" | Out-Null
-New-Item -ItemType Directory -Force -Path "$InstallRoot\workers\previous" | Out-Null
-
-$secretBytes = New-Object byte[] 32
-$rng = [Security.Cryptography.RNGCryptoServiceProvider]::new()
-try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
-$deviceSecret = [Convert]::ToBase64String($secretBytes).TrimEnd("=")
-
-@{
-  node_id = $NodeId
-  lensically_origin = $LensicallyOrigin.TrimEnd("/")
-  device_secret = $deviceSecret
-  repository_path = (Resolve-Path "$PSScriptRoot\..\..").Path
-} | ConvertTo-Json | Set-Content -Encoding UTF8 -Path "$InstallRoot\config.json"
-
-@{
-  active_slot = "active"
-  previous_slot = "previous"
-  worker_version = "local-worker-v1"
-} | ConvertTo-Json | Set-Content -Encoding UTF8 -Path "$InstallRoot\state.json"
-
-Copy-Item -Recurse -Force "$PSScriptRoot\..\worker\src\worker.mjs" "$InstallRoot\workers\active\worker.mjs"
-Copy-Item -Recurse -Force "$PSScriptRoot\..\worker\src\worker.mjs" "$InstallRoot\workers\previous\worker.mjs"
-Copy-Item -Recurse -Force "$PSScriptRoot\..\bootstrap\src\service.mjs" "$InstallRoot\service.mjs"
-
-$serviceName = "LensicallyLocalExecutionNode"
-$existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-if ($existing) {
-  Stop-Service -Name $serviceName -ErrorAction SilentlyContinue
-  sc.exe delete $serviceName | Out-Null
+function New-Secret([int]$Bytes = 32) {
+  $secretBytes = New-Object byte[] $Bytes
+  $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
+  return [Convert]::ToBase64String($secretBytes).TrimEnd("=")
 }
 
-$nodePath = $node.Source
-$bin = "`"$nodePath`" `"$InstallRoot\service.mjs`""
-New-Service -Name $serviceName -DisplayName "Lensically Local Execution Node" -BinaryPathName $bin -StartupType Automatic | Out-Null
-Start-Service -Name $serviceName
+function Write-NodeLog([string]$Message) {
+  $logDir = Join-Path $InstallRoot "logs"
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+  $safe = $Message -replace '[A-Za-z0-9_./+=-]{32,}', '[redacted]'
+  Add-Content -Encoding UTF8 -Path (Join-Path $logDir "install.log") -Value "$(Get-Date -Format o) $safe"
+}
 
-Write-Host "Installed Lensically Local Execution Node."
-Write-Host "Node ID: $NodeId"
-Write-Host "Origin: $LensicallyOrigin"
-Write-Host "Service: $serviceName"
-Write-Host "Pairing secret was written only to $InstallRoot\config.json. Register this device in Lensically before jobs will be issued."
+function Copy-NodeFiles {
+  New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+  New-Item -ItemType Directory -Force -Path "$InstallRoot\workers\active" | Out-Null
+  New-Item -ItemType Directory -Force -Path "$InstallRoot\workers\previous" | Out-Null
+  New-Item -ItemType Directory -Force -Path "$InstallRoot\logs" | Out-Null
+  Copy-Item -Force "$PSScriptRoot\..\worker\src\worker.mjs" "$InstallRoot\workers\active\worker.mjs"
+  Copy-Item -Force "$PSScriptRoot\..\worker\src\worker.mjs" "$InstallRoot\workers\previous\worker.mjs"
+  Copy-Item -Force "$PSScriptRoot\..\bootstrap\src\service.mjs" "$InstallRoot\service.mjs"
+}
+
+function Write-Config {
+  if (-not $EnrollmentToken -and $Mode -eq "Install") { throw "EnrollmentToken is required for first install." }
+  $existing = $null
+  $configPath = Join-Path $InstallRoot "config.json"
+  if (Test-Path $configPath) { $existing = Get-Content -Raw $configPath | ConvertFrom-Json }
+  $credential = if ($existing.device_credential) { $existing.device_credential } else { New-Secret 48 }
+  @{
+    node_id = $NodeId
+    lensically_origin = $LensicallyOrigin.TrimEnd("/")
+    enrollment_token = $EnrollmentToken
+    enrolled_at = $existing.enrolled_at
+    device_credential = $credential
+    repository_path = (Resolve-Path "$PSScriptRoot\..\..").Path
+  } | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $configPath
+
+  @{
+    active_slot = "active"
+    previous_slot = "previous"
+    worker_version = "local-worker-v1"
+  } | ConvertTo-Json | Set-Content -Encoding UTF8 -Path (Join-Path $InstallRoot "state.json")
+}
+
+function Register-NodeTask {
+  if (-not (Test-IsAdmin)) { throw "Elevated PowerShell is required to register the boot-time SYSTEM Scheduled Task." }
+  $node = Get-Command node.exe -ErrorAction SilentlyContinue
+  if (-not $node) { throw "Node.js is required before installing the Lensically Local Execution Node." }
+  $action = New-ScheduledTaskAction -Execute $node.Source -Argument "`"$InstallRoot\service.mjs`"" -WorkingDirectory $InstallRoot
+  $trigger = New-ScheduledTaskTrigger -AtStartup
+  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Days 30)
+  $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
+  Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+}
+
+function Start-NodeTask {
+  Start-ScheduledTask -TaskName $TaskName
+  Start-Sleep -Seconds 3
+  $task = Get-ScheduledTask -TaskName $TaskName
+  $info = Get-ScheduledTaskInfo -TaskName $TaskName
+  Write-NodeLog "Task state=$($task.State) lastResult=$($info.LastTaskResult)"
+  return @{ state = "$($task.State)"; last_result = $info.LastTaskResult }
+}
+
+if ($Mode -eq "Uninstall") {
+  if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+  }
+  Write-NodeLog "Uninstalled scheduled task $TaskName"
+  return
+}
+
+Copy-NodeFiles
+Write-Config
+Register-NodeTask
+$start = Start-NodeTask
+
+if ($Mode -eq "Commission") {
+  $task = Get-ScheduledTask -TaskName $TaskName
+  $info = Get-ScheduledTaskInfo -TaskName $TaskName
+  $logFile = Join-Path $InstallRoot "logs\bootstrap.log"
+  [pscustomobject]@{
+    task_name = $TaskName
+    host_mechanism = "Windows Scheduled Task at boot as SYSTEM"
+    no_interactive_login_required = $true
+    restart_configured = $true
+    state = "$($task.State)"
+    last_task_result = $info.LastTaskResult
+    bootstrap_log_exists = Test-Path $logFile
+    install_root = $InstallRoot
+  } | ConvertTo-Json
+} else {
+  Write-Host "Installed Lensically Local Execution Node as boot-time Scheduled Task."
+  Write-Host "Node ID: $NodeId"
+  Write-Host "Origin: $LensicallyOrigin"
+  Write-Host "Task: $TaskName"
+  Write-Host "Task state: $($start.state)"
+}

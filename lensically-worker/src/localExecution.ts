@@ -40,6 +40,12 @@ export type LocalExecutionNodeStatus = {
   bootstrap_version: string | null;
   active_slot: "active" | "previous" | null;
   previous_worker_version?: string | null;
+  enrollment?: {
+    status: "not_enrolled" | "enrolled" | "revoked";
+    enrolled_at: string | null;
+    revoked_at: string | null;
+    credential_rotated_at: string | null;
+  };
 };
 
 export type LocalExecutionJob = {
@@ -89,6 +95,7 @@ export type ValidationPlanePolicy = {
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const SAFE_ID_PATTERN = /^[a-zA-Z0-9._:-]{1,160}$/;
+const SIGNED_ENVELOPE_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
 export function isExactSha(value: unknown): value is string {
   return typeof value === "string" && SHA_PATTERN.test(value);
@@ -104,7 +111,7 @@ export function validateLocalExecutionJob(job: LocalExecutionJob, now = new Date
   if (!isExactSha(job.commit_sha)) return { ok: false, error: "exact_commit_sha_required" };
   if (!normalizeLocalExecutionJobType(job.job_type)) return { ok: false, error: "unknown_job_type" };
   if (!job.nonce || !SAFE_ID_PATTERN.test(job.nonce)) return { ok: false, error: "invalid_nonce" };
-  if (!job.signature || !SAFE_ID_PATTERN.test(job.signature)) return { ok: false, error: "invalid_signature" };
+  if (!job.signature || !SIGNED_ENVELOPE_PATTERN.test(job.signature) || job.signature.length > 12000) return { ok: false, error: "invalid_signature" };
   if (Date.parse(job.expires_at) <= now.getTime()) return { ok: false, error: "expired_job" };
   if (!Number.isInteger(job.max_runtime_ms) || job.max_runtime_ms < 1 || job.max_runtime_ms > 6 * 60 * 60 * 1000) {
     return { ok: false, error: "invalid_max_runtime" };

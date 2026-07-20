@@ -406,6 +406,28 @@
       "compatibility_bridge": false
     },
     {
+      "capability_id": "deployment.local_execution_enrollment",
+      "directory_entry_id": "deployment.local_execution_enrollment",
+      "canonical_handler": "createLocalExecutionEnrollmentToken",
+      "route_intent": "local execution enrollment",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway creates a short-lived single-use enrollment token and stores only a per-node credential hash after enrollment.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "deployment.local_execution_revoke_node",
+      "directory_entry_id": "deployment.local_execution_revoke_node",
+      "canonical_handler": "revokeLocalExecutionNode",
+      "route_intent": "local execution revoke node",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway revokes one local node credential without affecting other enrolled nodes.",
+      "compatibility_bridge": false
+    },
+    {
       "capability_id": "deployment.validation_plane_status",
       "directory_entry_id": "deployment.validation_plane_status",
       "canonical_handler": "getValidationPlaneStatus",

@@ -945,7 +945,7 @@ describe("System Directory foundation", () => {
       intake_mandatory: true,
             resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification",
                         prevented_client_block_count: 37,
-                                                      safe_request_profile_count: 40,
+                                                      safe_request_profile_count: 42,
       universal_policy_count: 8,
       migrated_legacy_rule_count: 8,
     });
@@ -1380,6 +1380,8 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_status.intent).toBe("local execution status");
     expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_validate_sha.allowed_input_keys).toEqual(expect.arrayContaining(["commit_sha", "node_id"]));
     expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_deploy_validated_sha.allowed_input_keys).toEqual(expect.arrayContaining(["commit_sha", "receipt_id"]));
+    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_enrollment.allowed_input_keys).toEqual(expect.arrayContaining(["node_id", "ttl_seconds"]));
+    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_revoke_node.allowed_input_keys).toEqual(expect.arrayContaining(["node_id", "reason"]));
     expect(CLIENT_SAFE_REQUEST_PROFILES.validation_plane_execute.intent).toBe("validation plane execute");
 
     const tools: MandatoryExecutionToolDefinition[] = [{

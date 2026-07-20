@@ -26,7 +26,7 @@ function job(overrides: Partial<LocalExecutionJob> = {}): LocalExecutionJob {
     max_runtime_ms: 600000,
     expected_stages: ["typecheck"],
     authorization_level: "validate",
-    signature: "server-signature",
+    signature: "server.signature",
     attempt_count: 0,
     result_status: "pending",
     ...overrides,
