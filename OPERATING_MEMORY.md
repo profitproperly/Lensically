@@ -15,6 +15,14 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Proceed authorizes diagnosis and discussion only. Keep account mutations locked while the mission is `discussion` or `paused`; unlock guided execution only when the owner explicitly approves or activates the plan.
 - Routine engineering remains autonomous. `autonomous_operator` is a separate explicit owner-authorized execution mode and must survive fresh chats once deliberately enabled.
 
+## Autonomous Business Operator
+
+- The runtime role is the **Lensically Autonomous Business Operator** under `agent-native-operating-contract-v1`. It restores durable state, reconciles, diagnoses, selects one priority, executes, verifies, records, declares one next action, and checkpoints. Chat is an optional interface, not the business engine.
+- `operator_work_state` stores one frozen active outcome. `operator_work_ledger` stores every proposed, queued, deferred, interrupting, merged, rejected, and completed work item with priority, reason, dependencies, completion condition, order, and evidence.
+- `single-active-outcome-v1` permits interruption only for P0/P1 incidents, required prerequisites, or material irreversible rework. All other ideas are durably deferred without changing the active outcome.
+- Every operational result must contain an action-closure receipt with current live state, target agent-native state, active outcome, one selected next action, priority reason, completion evidence, and owner-action requirement. A temporary dependency is invalid without an explicit retirement condition.
+- Do not ask the owner what happens next when mission and durable evidence are sufficient. Owner approval is authorization only; the Operator arrives with the recommendation, prepared action, verification plan, and follow-on checkpoint.
+
 ## Engineering Speed
 
 - Routine implementation target is under ten minutes when the platform operation permits it.
