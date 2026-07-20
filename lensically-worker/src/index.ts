@@ -14767,7 +14767,7 @@ async function putGithubFiles(
     return { ok: false, status: failedBlob.status, commit_sha: null, head_sha: headSha, data: { phase: "create_blob", path: failedBlob.path, response: failedBlob.response } };
   }
 
-  const tree = await githubRepoApi(env, "/git/trees", {
+  const tree = await githubRepoApiRetryable(env, "/git/trees", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
