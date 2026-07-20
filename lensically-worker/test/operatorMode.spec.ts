@@ -3167,9 +3167,8 @@ describe("operator mode MCP endpoint", () => {
     let eligibleReads = 0;
     let failedReads = 0;
     for (const [transportSegment, canonicalSegment] of readSegments) {
-      const result = await mcpToolCallRaw<typeof campaign.structuredContent>("executeLensicallyIntent", {
-        profile_id: "run_mcp_tests",
-        inputs: { segment: transportSegment },
+      const result = await mcpToolCallRaw<typeof campaign.structuredContent>("runMcpTests", {
+        segment: transportSegment,
       });
       expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
       expect(result.structuredContent.campaign.route_only).toBe(false);
