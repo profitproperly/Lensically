@@ -3680,7 +3680,7 @@ describe("operator mode MCP endpoint", () => {
       throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
     });
     const alignment = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
-      profile_id: "get_repo_status",
+            profile_id: "repository_status",
       inputs: {},
     });
     repoStatusFetchSpy.mockRestore();
