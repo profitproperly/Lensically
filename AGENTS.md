@@ -102,4 +102,3 @@
 - Preserve strict TypeScript safety.
 - Destructive or irreversible business actions require the existing owner-ratified protections.
 - Do not invent placeholder UI, fake navigation, dead controls, or environment-specific secrets.
-- When the correct integration point is genuinely unknown and a wrong guess could damage business state, investigate the repository and runtime first; do not improvise a parallel system.
