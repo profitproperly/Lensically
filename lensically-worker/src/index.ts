@@ -18794,6 +18794,9 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "getHardeningStatus") return getHardeningStatus(env, args);
   if (toolName === "advanceHardeningIncident") return advanceHardeningIncident(env, args);
   if (toolName === "recordOperationalObservation") return recordOperationalObservation(env, args);
+  if (toolName === "getOperatorWorkState") return getOperatorWorkState(env, args);
+  if (toolName === "intakeOperatorWork") return intakeOperatorWork(env, args);
+  if (toolName === "advanceOperatorWork") return advanceOperatorWork(env, args);
 
   if (toolName === "engineeringPrecheck") {
     const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
