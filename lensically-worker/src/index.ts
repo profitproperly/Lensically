@@ -16407,6 +16407,192 @@ async function recordOperationalObservation(env: Env, args: Record<string, unkno
   };
 }
 
+function serializeOperatorWorkState(row: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!row) return null;
+  return {
+    contract_version: row.contract_version,
+    policy_version: row.policy_version,
+    role: row.role,
+    active_outcome_key: row.active_outcome_key,
+    active_outcome_title: row.active_outcome_title,
+    active_scope: safeParseJsonString(String(row.active_scope_json ?? "[]")) ?? [],
+    status: row.status,
+    scope_frozen: Number(row.scope_frozen ?? 0) === 1,
+    active_interrupt_key: row.active_interrupt_key ?? null,
+    next_action: row.next_action,
+    completion_evidence: safeParseJsonString(String(row.completion_evidence_json ?? "[]")) ?? [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function serializeOperatorWorkItem(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    work_key: row.work_key,
+    title: row.title,
+    summary: row.summary,
+    priority: row.priority,
+    status: row.status,
+    intake_decision: row.intake_decision,
+    intake_reason: row.intake_reason,
+    required_for_active_outcome: Number(row.required_for_active_outcome ?? 0) === 1,
+    dependencies: safeParseJsonString(String(row.dependencies_json ?? "[]")) ?? [],
+    completion_condition: row.completion_condition,
+    execution_order: Number(row.execution_order ?? 1000),
+    evidence: safeParseJsonString(String(row.evidence_json ?? "[]")) ?? [],
+    merged_into_work_key: row.merged_into_work_key ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    completed_at: row.completed_at ?? null,
+  };
+}
+
+async function getOperatorWorkState(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100);
+  const status = normalizeOperatorMachineKey(args.status, "");
+  const state = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>();
+  const result = status
+    ? await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE status = ? ORDER BY required_for_active_outcome DESC, execution_order ASC, datetime(updated_at) DESC LIMIT ?`).bind(status, limit).all<Record<string, unknown>>()
+    : await env.DB.prepare(`SELECT * FROM operator_work_ledger ORDER BY CASE status WHEN 'interrupting' THEN 0 WHEN 'queued' THEN 1 WHEN 'deferred' THEN 2 ELSE 3 END, required_for_active_outcome DESC, execution_order ASC, datetime(updated_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
+  const items = (result.results ?? []).map(serializeOperatorWorkItem);
+  return {
+    ok: true,
+    operating_contract: AGENT_NATIVE_OPERATING_CONTRACT,
+    work_state: serializeOperatorWorkState(state),
+    items,
+    queued_required_count: items.filter((item) => item.status === "queued" && item.required_for_active_outcome === true).length,
+    deferred_count: items.filter((item) => item.status === "deferred").length,
+  };
+}
+
+async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const workKey = normalizeOperatorMachineKey(args.work_key, "");
+  const title = normalizeOperatorText(args.title, 300, true);
+  const summary = normalizeOperatorText(args.summary, 2000, true);
+  const completionCondition = normalizeOperatorText(args.completion_condition, 1200, true);
+  if (!workKey || !title || !summary || !completionCondition) return { ok: false, error: "work_intake_required_fields_missing" };
+  const state = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>();
+  const existing = await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE work_key = ? LIMIT 1`).bind(workKey).first<Record<string, unknown>>();
+  const severityValue = normalizeOperatorMachineKey(args.severity, "") as HardeningSeverity;
+  const severity: HardeningSeverity | null = (["P0", "P1", "P2", "P3"] as string[]).includes(severityValue) ? severityValue : null;
+  const duplicateOf = normalizeOperatorMachineKey(args.duplicate_of, "") || (existing ? workKey : null);
+  const intake = classifyOperatorWorkIntake({
+    active_outcome_key: normalizeOperatorText(state?.active_outcome_key, 200, true),
+    proposed_work_key: workKey,
+    severity,
+    prerequisite_for_active_outcome: args.prerequisite_for_active_outcome === true,
+    irreversible_rework_if_deferred: args.irreversible_rework_if_deferred === true,
+    duplicate_of: duplicateOf,
+    conflicts_with_mission: args.conflicts_with_mission === true,
+  });
+  const status: OperatorWorkItemStatus = intake.decision === "activate"
+    ? state?.active_outcome_key ? "interrupting" : "queued"
+    : intake.decision === "defer" ? "deferred" : intake.decision === "merge" ? "merged" : "rejected";
+  const priority = severity ?? "P3";
+  await env.DB.prepare(
+    `INSERT INTO operator_work_ledger (
+      id, work_key, title, summary, priority, status, intake_decision, intake_reason,
+      required_for_active_outcome, dependencies_json, completion_condition, execution_order, merged_into_work_key
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(work_key) DO UPDATE SET
+      title = excluded.title, summary = excluded.summary, priority = excluded.priority,
+      status = excluded.status, intake_decision = excluded.intake_decision,
+      intake_reason = excluded.intake_reason, required_for_active_outcome = excluded.required_for_active_outcome,
+      dependencies_json = excluded.dependencies_json, completion_condition = excluded.completion_condition,
+      execution_order = excluded.execution_order, merged_into_work_key = excluded.merged_into_work_key,
+      updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    crypto.randomUUID(), workKey, title, summary, priority, status, intake.decision, intake.reason,
+    args.prerequisite_for_active_outcome === true ? 1 : 0,
+    normalizeOperatorJson(Array.isArray(args.dependencies) ? args.dependencies : [], []),
+    completionCondition,
+    Math.max(1, Math.trunc(Number(args.execution_order ?? 1000))),
+    intake.decision === "merge" ? duplicateOf : null,
+  ).run();
+  if (status === "interrupting") {
+    await env.DB.prepare(
+      `UPDATE operator_work_state SET active_interrupt_key = ?, next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
+    ).bind(workKey, `Resolve interrupting work item ${workKey}, then resume the frozen active outcome from its checkpoint.`).run();
+  }
+  return {
+    ok: true,
+    intake_decision: intake.decision,
+    reason: intake.reason,
+    active_outcome_unchanged: intake.active_outcome_unchanged,
+    item: serializeOperatorWorkItem((await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE work_key = ?`).bind(workKey).first<Record<string, unknown>>()) ?? {}),
+    active_outcome: serializeOperatorWorkState(await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton'`).first<Record<string, unknown>>()),
+  };
+}
+
+async function advanceOperatorWork(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  await ensureOperatorMcpAdminTables(env);
+  const workKey = normalizeOperatorMachineKey(args.work_key, "");
+  const status = normalizeOperatorMachineKey(args.status, "") as OperatorWorkItemStatus;
+  const allowed = new Set<OperatorWorkItemStatus>(["queued", "deferred", "interrupting", "completed", "merged", "rejected"]);
+  if (!workKey || !allowed.has(status)) return { ok: false, error: "work_key_and_valid_status_required" };
+  const evidence = Array.isArray(args.evidence) ? args.evidence.map(String).filter(Boolean) : [];
+  const nextAction = normalizeOperatorText(args.next_action, 1200, true);
+  const result = await env.DB.prepare(
+    `UPDATE operator_work_ledger SET status = ?, evidence_json = ?,
+      completed_at = CASE WHEN ? = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+      updated_at = CURRENT_TIMESTAMP WHERE work_key = ?`,
+  ).bind(status, normalizeOperatorJson(evidence, []), status, workKey).run();
+  if (Number(result.meta?.changes ?? 0) < 1) return { ok: false, error: "operator_work_item_not_found" };
+  const state = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton'`).first<Record<string, unknown>>();
+  if (state?.active_interrupt_key === workKey && status === "completed") {
+    await env.DB.prepare(
+      `UPDATE operator_work_state SET active_interrupt_key = NULL, next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
+    ).bind(nextAction ?? "Resume the frozen active outcome from the last verified checkpoint.").run();
+  } else if (nextAction) {
+    await env.DB.prepare(`UPDATE operator_work_state SET next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`).bind(nextAction).run();
+  }
+  if (args.complete_active_outcome === true) {
+    await env.DB.prepare(
+      `UPDATE operator_work_state SET status = 'completed', scope_frozen = 0, completion_evidence_json = ?, next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
+    ).bind(normalizeOperatorJson(evidence, []), nextAction ?? "Select the highest-value deferred outcome and activate it through the intake guard.").run();
+  }
+  return getOperatorWorkState(env, { limit: args.limit ?? 50 });
+}
+
+function buildOperatorActionClosure(toolName: string, result: Record<string, unknown>): Record<string, unknown> {
+  const explicitNextAction = normalizeOperatorText(
+    result.next_action ?? result.recommended_next_action ?? result.required_action,
+    1200,
+    true,
+  );
+  const failed = result.ok === false;
+  const hasIncident = Boolean(result.hardening_incident);
+  const nextAction = explicitNextAction
+    ?? (hasIncident
+      ? "Advance the blocking hardening incident through evidence-gated closure before resuming the interrupted objective."
+      : failed
+        ? "Contain and classify this failure, preserve the safe checkpoint, and repair the shared cause before retrying."
+        : operatorToolMutatesState(toolName)
+          ? "Verify the completed mutation, record evidence, and continue the frozen active outcome from the resulting checkpoint."
+          : "Use this evidence to execute the highest-priority queued prerequisite for the frozen active outcome.");
+  const ownerActionRequired = result.owner_action_required === true
+    || ["explicit_proceed_required", "owner_ratification_required", "growth_plan_approval_required"].includes(normalizeOperatorMachineKey(result.error ?? result.error_code, ""));
+  const closure = {
+    version: AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
+    role: AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
+    current_live_state: `tool:${toolName}; outcome:${failed ? "failed" : "completed"}; production_commit:${String(result.runtime_commit_sha ?? "runtime-bound")}`,
+    target_agent_native_state: "Mission-driven scheduled operation with durable state, one active outcome, evidence-gated execution, and optional owner interaction.",
+    active_outcome: OPERATOR_ACTIVE_OUTCOME_TITLE,
+    next_action: nextAction,
+    priority_reason: hasIncident ? "P0/P1 hardening incidents supersede normal work." : "Single-active-outcome scope is frozen until exact-head release and live verification complete.",
+    completion_evidence: failed
+      ? ["shared cause repaired", "focused regression passed", "exact tested head released", "live behavior verified"]
+      : ["result verified", "durable state updated", "next checkpoint selected"],
+    owner_action_required: ownerActionRequired,
+    deferred_work_ledger: "operator_work_ledger",
+  };
+  const validation = validateOperatorActionClosure(closure);
+  return { ...closure, guard_passed: validation.ok, guard_errors: validation.errors };
+}
+
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_execution_events (
