@@ -2726,9 +2726,9 @@ describe("operator mode MCP endpoint", () => {
       };
       account_data_loaded: boolean;
       no_account_sections_present: boolean;
-      tool_surface: { total_tools: number; engineering_tools: string[]; admin_tools: string[]; operator_tools: string[] };
+            tool_surface: { public_tool_count: number; categories: { engineering: number; admin: number; operator: number } };
       runtime: { mcp_version: string; registry_generation: string };
-      source_documents: Array<{ path: string; excerpt: string }>;
+      source_documents: Array<{ path: string; ok: boolean; status: number; size: number }>;
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
     expect(startup.bootstrap_version).toBe("operator-startup-v4");
@@ -2741,10 +2741,10 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(startup.account_data_loaded).toBe(false);
     expect(startup.no_account_sections_present).toBe(true);
-    expect(startup.tool_surface.total_tools).toBe(registry.tools.length);
+        expect(startup.tool_surface.public_tool_count).toBe(registry.tools.length);
     expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v1" });
     expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
-    expect(startup.source_documents.every((document) => document.excerpt.length <= 2500)).toBe(true);
+        expect(startup.source_documents.every((document) => !Object.prototype.hasOwnProperty.call(document, "excerpt"))).toBe(true);
     expect(startup.boundary.first_key_response_template).toHaveLength(4);
     expect(startup.boundary.before_proceed_forbidden).toContain("account_state");
     const serialized = JSON.stringify(startup);
@@ -2918,16 +2918,16 @@ describe("operator mode MCP endpoint", () => {
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-    const startup = await mcpTool<{ boundary: { first_key_response_template: string[] }; tool_surface: { total_tools: number } }>("getOperatorStartupContext");
+        const startup = await mcpTool<{ boundary: { first_key_response_template: string[] }; tool_surface: { public_tool_count: number } }>("getOperatorStartupContext");
     for (const key of ALL_BRAND_KEYS) {
       const selected = await mcpToolRaw<{ handshake: string[]; tool_count: number; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: key });
       expect(selected.isError).not.toBe(true);
       expect(selected.structuredContent.account_data_loaded).toBe(false);
-      expect(selected.structuredContent.tool_count).toBe(startup.tool_surface.total_tools);
+            expect(selected.structuredContent.tool_count).toBe(startup.tool_surface.public_tool_count);
       expect(selected.structuredContent.handshake).toEqual([
         "Lensically Operator Mode MCP is active.",
         `Selected key: ${key}`,
-        `Full tool surface loaded: ${startup.tool_surface.total_tools} tools available and usable.`,
+        `Full tool surface loaded: ${startup.tool_surface.public_tool_count} tools available and usable.`,
         "Proceed to the next step?",
       ]);
       expect(selected.structuredContent.handshake).toEqual(startup.boundary.first_key_response_template.map((line) => line.replace("<canonical_brand_key>", key)));
