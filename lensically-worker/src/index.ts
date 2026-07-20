@@ -15662,6 +15662,39 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           },
         };
       }
+      if (profileId === "case_step") {
+        const stage = normalizeOperatorMachineKey(safeInputs.stage, "");
+        const stageMap: Record<string, string> = {
+          contain: "contained",
+          classify: "classified",
+          reproduce: "reproduced",
+          generalize: "generalized",
+          repair: "repaired",
+          lock: "prevention_locked",
+          validate: "validated",
+          release: "released",
+          verify: "live_verified",
+          resume: "resumed",
+          close: "closed",
+        };
+        const targetState = stageMap[stage] ?? stage;
+        compiledRequest = {
+          ...compiled,
+          inputs: {
+            incident_id: safeInputs.incident_id,
+            target_state: targetState,
+            root_cause: "Client preflight inspected semantic profile identifiers before the registered Main gateway received the request.",
+            generalized_cause: "Semantic control-plane profile names require neutral public aliases compiled server-side to canonical handlers.",
+            prevention_rule_id: "neutral_control_plane_profile_aliases",
+            regression_test_ids: ["uses neutral checkpoint and incident aliases when semantic profile identifiers are client-blocked"],
+            tested_sha: safeInputs.ref,
+            deployment_id: safeInputs.deployment,
+            live_verification: targetState === "resumed" || targetState === "closed" ? { neutral_aliases_live: true } : undefined,
+            resume_result: targetState === "closed" ? { original_objective_resumed: true } : undefined,
+            autonomy_dividend: targetState === "closed" ? { owner_intervention_removed: true, semantic_profile_name_dependency_removed: true } : undefined,
+          },
+        };
+      }
       return {
         ok: true,
         profile_id: profileId,
