@@ -1353,8 +1353,10 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_state.allowed_input_keys).toEqual(["status", "limit"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.checkpoint_read).toMatchObject({ intent: "get operator work state", allowed_input_keys: [] });
     expect(CLIENT_SAFE_REQUEST_PROFILES.case_open).toMatchObject({ intent: "record hardening incident", allowed_input_keys: [] });
+    expect(CLIENT_SAFE_REQUEST_PROFILES.case_step).toMatchObject({ intent: "advance hardening incident", allowed_input_keys: ["incident_id", "stage", "ref", "deployment"] });
     expect(buildClientSafeGatewayRequest("checkpoint_read", {})).toMatchObject({ intent: "get operator work state", inputs: {} });
     expect(buildClientSafeGatewayRequest("case_open", {})).toMatchObject({ intent: "record hardening incident", inputs: {} });
+    expect(buildClientSafeGatewayRequest("case_step", { incident_id: "incident-1", stage: "contain" })).toMatchObject({ intent: "advance hardening incident" });
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_intake.allowed_input_keys).toContain("completion_condition");
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_transition.allowed_input_keys).toContain("complete_active_outcome");
     expect(CLIENT_BLOCK_INTAKE_CONTRACT.sequence).toEqual(expect.arrayContaining([
