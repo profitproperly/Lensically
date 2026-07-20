@@ -20830,9 +20830,10 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             source_defined: true,
             model_tool_choice_allowed: false,
           },
-                    lifecycle: mapLifecycle,
+                                        lifecycle: mapLifecycle,
           policy: executionPolicy,
         };
+        resultPayload.mandatory_execution_map = mapLifecycle;
                 resultPayload.routed_execution = routedGatewayMetadata;
         resultPayload.execution_guard_enforcement = {
           version: OPERATOR_EXECUTION_GUARD_VERSION,
