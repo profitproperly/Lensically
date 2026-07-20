@@ -3131,10 +3131,7 @@ describe("operator mode MCP endpoint", () => {
         mutation_preflights: { eligible: number; executed: number; passed: number; failed: number; failures: Array<Record<string, unknown>>; side_effects_executed: number };
         risk_groups: { read_only: number; mutation: number };
       };
-    }>("executeLensicallyIntent", {
-      profile_id: "run_mcp_tests",
-      inputs: { segment: "s0" },
-    });
+    }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
       segment: "routes",
       total_internal_capabilities: 101,
