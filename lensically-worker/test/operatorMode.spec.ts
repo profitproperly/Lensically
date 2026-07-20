@@ -786,7 +786,6 @@ describe("operator mode backend spine", () => {
       content_focus: { version: string; reviews: Record<string, unknown>; family_states: unknown[] };
     }>("get_content_focus", {
       brand_key: "manifest_mental",
-      proceed_confirmed: true,
     });
     expect(result.isError).not.toBe(true);
     expect(result.structuredContent).toMatchObject({
