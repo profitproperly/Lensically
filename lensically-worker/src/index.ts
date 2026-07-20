@@ -27410,9 +27410,11 @@ async function getLatestOperatorPerformanceLearning(
        ORDER BY s.checkpoint_hours DESC, datetime(s.updated_at) DESC LIMIT 100`,
     ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
+  const contentFocus = await getLatestOperatorContentFocus(env, brandKey);
   return {
     available: Boolean(briefRow),
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    content_focus: contentFocus,
     brief_id: briefRow?.id ?? null,
     checkpoint_hours: briefRow?.checkpoint_hours ?? null,
     sample_size: Number(briefRow?.sample_size ?? 0),
