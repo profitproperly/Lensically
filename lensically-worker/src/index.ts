@@ -10265,7 +10265,8 @@ async function ensureManifestSourceBatchForDate(
     ...(exclusions.results ?? []).map((row) => String(row.source_identity_key)),
     ...(claims.results ?? []).map((row) => String(row.source_identity_key)),
   ]);
-  const eligiblePool = qualifiedPool.filter((candidate) => !unavailable.has(String(candidate.source_identity_key ?? "")));
+  const focusedPool = await applyManifestContentFocusToPool(env, brand.brand_key, qualifiedPool);
+  const eligiblePool = focusedPool.filter((candidate) => !unavailable.has(String(candidate.source_identity_key ?? "")));
   if (eligiblePool.length < MANIFEST_DAILY_SOURCE_DRAW_SIZE) {
     throw new Error(`insufficient_qualified_sources:${eligiblePool.length}`);
   }
