@@ -155,6 +155,32 @@ if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-rou
   errors.push("static_execution_router_contract_missing");
 }
 
+if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-operating-contract-v1"')
+    || !router.includes('SINGLE_ACTIVE_OUTCOME_POLICY_VERSION = "single-active-outcome-v1"')
+    || !router.includes('AUTONOMOUS_BUSINESS_OPERATOR_ROLE = "Lensically Autonomous Business Operator"')
+    || !router.includes("classifyOperatorWorkIntake")
+    || !router.includes("validateOperatorActionClosure")
+    || !source.includes("CREATE TABLE IF NOT EXISTS operator_work_state")
+    || !source.includes("CREATE TABLE IF NOT EXISTS operator_work_ledger")
+    || !source.includes('name: "getOperatorWorkState"')
+    || !source.includes('name: "intakeOperatorWork"')
+    || !source.includes('name: "advanceOperatorWork"')
+    || !source.includes("active_outcome_requirements_incomplete")
+    || !source.includes("operator_work_self_merge_forbidden")
+    || !source.includes("resultPayload.operator_action_closure = await buildOperatorActionClosure")
+    || !clientSafety.includes("operator_work_state")
+    || !clientSafety.includes("operator_work_intake")
+    || !clientSafety.includes("operator_work_transition")
+    || !systemDirectoryTests.includes("defines the autonomous business operator as a durable runtime contract")
+    || !systemDirectoryTests.includes("defers noncritical scope while allowing only mandatory interruptions")
+    || !systemDirectoryTests.includes("blocks operational closure without a selected next action and dependency retirement path")
+    || !systemDirectoryTests.includes("registers the durable operator work capabilities")
+    || !agentRules.includes("Lensically Autonomous Business Operator")
+    || !currentState.includes("single-active-outcome-v1")
+    || !operatingMemory.includes("operator_work_ledger")) {
+  errors.push("autonomous_business_operator_contract_missing");
+}
+
 if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v1"')
     || !router.includes("WINNING_PATH_PROMOTIONS")
     || !router.includes("resolvePromotedWinningPath")
