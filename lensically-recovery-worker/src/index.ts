@@ -597,12 +597,15 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         unique_count: new Set(toolNames).size,
         names: toolNames,
         public_contract_enforced: publicContractSucceeded,
-        legacy_profile_schema_retired: Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id")
-          && !Object.prototype.hasOwnProperty.call(gatewayProperties, "objective")
-          && !Object.prototype.hasOwnProperty.call(gatewayProperties, "intent"),
-        legacy_freehand_contract_retired: legacyFreehandRetired,
-        required: gatewayRequired,
-        properties: Object.keys(gatewayProperties),
+        direct_typed_tools: directSurface,
+        generic_gateway_retired: !toolNames.includes("executeLensicallyIntent"),
+        closed_schema_count: tools.filter((tool) => {
+          const schema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
+            ? tool.inputSchema as Record<string, unknown>
+            : null;
+          return schema?.type === "object" && schema.additionalProperties === false;
+        }).length,
+        required_direct_tools: requiredDirectTools,
       },
       session_freshness: {
         version: "deployment-scoped-mcp-session-v1",
