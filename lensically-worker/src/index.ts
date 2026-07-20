@@ -20489,7 +20489,6 @@ async function handleOperatorMcpEngineeringTool(
 
     const startupContent = structured(startup.payload);
     const selectContent = structured(select.payload);
-    const blockedContent = structured(blocked.payload);
     const allowedContent = structured(allowed.payload);
     const coverageContent = structured(coverage.payload);
     const boundaryTest = {
