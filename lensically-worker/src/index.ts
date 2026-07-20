@@ -16517,7 +16517,7 @@ async function getHardeningStatus(env: Env, args: Record<string, unknown>): Prom
 async function advanceHardeningIncident(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
   let incidentId = normalizeOperatorText(args.incident_id, 120, true);
-  const target = normalizeHardeningState(args.target_state);
+  const requestedTarget = normalizeOperatorMachineKey(args.target_state, "");
   if (incidentId === "__active__") {
     const active = await env.DB.prepare(
       `SELECT id FROM operator_hardening_incidents
