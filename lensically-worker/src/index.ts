@@ -15085,10 +15085,10 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-    "Submit every external operation through executeLensicallyIntent; direct operational tool calls are rejected.",
-    "The source-defined router selects one typed internal handler before execution. Database route lookup, phonebook overrides, discovery incidents, and model tool choice are disabled.",
-    "Use bounded repository reads and searches. Empty code search automatically falls through to the compact repository fallback.",
-    "Use one atomic patch set for related edits and one exact-SHA engineering release after the final change.",
+    "Call one advertised direct typed Main tool for each external operation; do not use profile IDs, generic inputs envelopes, or wrapper routing.",
+    "Server-side continuity, authorization, idempotency, gates, and scheduler safety remain mandatory after the direct call arrives.",
+    "Use bounded known-file repository reads and searches; a complete known-file search reports its scanned line count and match count.",
+    "Use one atomic patch set for related edits and one exact-head engineering release after the final change.",
     "Keep engineering receipts compact. Never echo patch bodies or full repository files through the client.",
     "Use the independent Recovery plane only when the main Worker or its deployment plane cannot receive the request.",
   ];
