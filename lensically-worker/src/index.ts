@@ -30188,7 +30188,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return operatorMcpOAuthJson({
         status: "ok",
         ...operatorRuntimeMetadata(env),
-        live_tool_count: (await buildOperatorMcpTools(env, false, false)).length,
+        live_tool_count: await operatorPublicMcpToolCount(env),
         retired_execution_infrastructure: true,
         timestamp: new Date().toISOString(),
       });
