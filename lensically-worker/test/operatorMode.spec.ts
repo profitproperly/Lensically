@@ -805,6 +805,71 @@ describe("operator mode backend spine", () => {
     expect(observation.rates.propagation_rate).toBeCloseTo(6 / 260, 6);
     expect(observation.velocity.interval_views_per_hour).toBeCloseTo(160 / 6, 3);
     expect(JSON.stringify(observation)).not.toContain("follower");
+    });
+
+  it("classifies source-card families with daily, weekly, and monthly authority", () => {
+    const strong = classifyOperatorContentFocusFamily({
+      cadence: "weekly",
+      horizons: {
+        operating_7d: { post_count: 3, mature_count: 3, strong_count: 2, weak_count: 0, median_overall: 72, latest_overall: 75 },
+        baseline_30d: { post_count: 4, mature_count: 4, strong_count: 3, weak_count: 0, median_overall: 70, latest_overall: 75 },
+        strategic_90d: { post_count: 5, mature_count: 5, strong_count: 3, weak_count: 0, median_overall: 68, latest_overall: 75 },
+      },
+    });
+    expect(strong.status).toBe("repeat");
+    expect(strong.allocation_weight).toBe(1.5);
+
+    const daily = classifyOperatorContentFocusFamily({
+      cadence: "daily",
+      current_status: "repeat",
+      fatigue_ratio: 0.6,
+      horizons: {
+        operating_7d: { post_count: 5, mature_count: 3, strong_count: 0, weak_count: 3, median_overall: 34, latest_overall: 30 },
+        baseline_30d: { post_count: 6, mature_count: 4, strong_count: 2, weak_count: 2, median_overall: 55, latest_overall: 30 },
+      },
+    });
+    expect(daily.status).toBe("repeat");
+    expect(daily.recommended_status).toBe("hold");
+
+    const weakHorizons = {
+      operating_7d: { post_count: 4, mature_count: 3, strong_count: 0, weak_count: 3, median_overall: 30, latest_overall: 28 },
+      baseline_30d: { post_count: 6, mature_count: 5, strong_count: 0, weak_count: 4, median_overall: 32, latest_overall: 28 },
+      strategic_90d: { post_count: 8, mature_count: 7, strong_count: 0, weak_count: 6, median_overall: 29, latest_overall: 28 },
+    };
+    expect(classifyOperatorContentFocusFamily({ cadence: "weekly", horizons: weakHorizons }).status).toBe("hold");
+    expect(classifyOperatorContentFocusFamily({ cadence: "monthly", horizons: weakHorizons }).status).toBe("retire");
+  });
+
+  it("limits daily focus to use-more, use-less, and learn-next decisions", () => {
+    const decisions = buildOperatorContentFocusDailyDecisions([
+      { source_card_family_id: "winner", status: "repeat", operating_score: 76, baseline_score: 72, mature_count: 5, strong_count: 3, weak_count: 0, fatigue_ratio: 0.2 },
+      { source_card_family_id: "fatigued", status: "hold", operating_score: 31, baseline_score: 44, mature_count: 4, strong_count: 0, weak_count: 3, fatigue_ratio: 0.55 },
+      { source_card_family_id: "question", status: "test", recommended_status: "expand", operating_score: 55, baseline_score: 58, mature_count: 1, strong_count: 1, weak_count: 0, fatigue_ratio: 0.1 },
+    ]);
+    expect(decisions).toHaveLength(3);
+    expect(decisions.map((decision) => decision.role)).toEqual(["use_more", "use_less", "learn_next"]);
+    expect(new Set(decisions.map((decision) => decision.source_card_family_id)).size).toBe(3);
+  });
+
+  it("enforces focus allocation and excludes zero-allocation source families", () => {
+    const result = selectOperatorContentFocusSources([
+      { source_identity_key: "repeat-1", focus_status: "repeat", focus_weight: 1.5, focus_observed: true },
+      { source_identity_key: "repeat-2", focus_status: "repeat", focus_weight: 1.5, focus_observed: true },
+      { source_identity_key: "expand-1", focus_status: "expand", focus_weight: 1.25, focus_observed: true },
+      { source_identity_key: "test-1", focus_status: "test", focus_weight: 1, focus_observed: true },
+      { source_identity_key: "new-1", focus_status: "test", focus_weight: 1, focus_observed: false },
+      { source_identity_key: "hold-1", focus_status: "hold", focus_weight: 0, focus_observed: true },
+      { source_identity_key: "retire-1", focus_status: "retire", focus_weight: 0, focus_observed: true },
+      { source_identity_key: "blocked-1", focus_status: "blocked", focus_weight: 0, focus_observed: true },
+    ], 4, () => 0.5);
+    const selected = result.selected.map((item) => item.source_identity_key);
+    expect(selected).toHaveLength(4);
+    expect(selected).toEqual(expect.arrayContaining(["repeat-1", "repeat-2", "expand-1", "test-1"]));
+    expect(selected).not.toEqual(expect.arrayContaining(["hold-1", "retire-1", "blocked-1"]));
+    expect(result.allocation).toMatchObject({
+      percentages: { repeat: 50, expand: 25, test: 20, exploration: 5 },
+      excluded_zero_allocation_count: 3,
+    });
   });
 
     it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
