@@ -25,7 +25,7 @@ function redactOutput(output) {
   return String(output || "").replace(/[A-Za-z0-9_./+=-]{32,}/g, "[redacted]");
 }
 
-function run(command, args, cwd) {
+function run(command, args, cwd, timeoutMs = 120000) {
   const started = Date.now();
   const nodeRoot = process.execPath.replace(/\\node\.exe$/i, "");
   const executable = process.platform === "win32" && (command === "npm" || command === "npx")
@@ -36,16 +36,18 @@ function run(command, args, cwd) {
   const commandArgs = process.platform === "win32" && (command === "npm" || command === "npx")
     ? [join(nodeRoot, "node_modules", "npm", "bin", command === "npm" ? "npm-cli.js" : "npx-cli.js"), ...args]
     : args;
-  const result = spawnSync(executable, commandArgs, { cwd, encoding: "utf8" });
+  const result = spawnSync(executable, commandArgs, { cwd, encoding: "utf8", timeout: timeoutMs });
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
   const allowExactShaOutput = command === "git" && args.join(" ") === "rev-parse HEAD";
+  const timedOut = result.error?.code === "ETIMEDOUT";
   return {
     name: [command, ...args].join(" "),
-    status: result.status === 0 ? "passed" : "failed",
+    status: !timedOut && result.status === 0 ? "passed" : "failed",
     exit_code: result.status,
+    error_kind: timedOut ? "timeout" : result.error?.code || null,
     duration_ms: Date.now() - started,
     output_hash: createHash("sha256").update(output).digest("hex"),
-    output_tail: (allowExactShaOutput ? output : redactOutput(output)).slice(-12000),
+    output_tail: (timedOut ? `${output}\ncommand timed out after ${timeoutMs}ms` : (allowExactShaOutput ? output : redactOutput(output))).slice(-12000),
   };
 }
 
@@ -53,11 +55,11 @@ function assertCleanJobPath(path) {
   if (!path || /[<>:"|?*]/.test(path)) throw new Error("invalid_job_path");
 }
 
-function git(commandArgs, cwd) {
-  return run("git", commandArgs, cwd);
+function git(commandArgs, cwd, timeoutMs = 120000) {
+  return run("git", commandArgs, cwd, timeoutMs);
 }
 
-function acquireExactSource(job) {
+function acquireExactSource(job, timeoutMs = 120000) {
   if (!/^[a-f0-9]{40}$/i.test(job.commit_sha || "")) throw new Error("exact_sha_required");
   const root = process.env.LENSICALLY_LOCAL_NODE_ROOT || installedWorkerRoot;
   const sourceRoot = join(root, "source");
@@ -74,23 +76,23 @@ function acquireExactSource(job) {
   const remoteUrl = String(job.inputs?.repository_url || "").trim();
   if (!existsSync(cacheDir)) {
     const source = remoteUrl || configuredRepo;
-    const clone = git(["clone", "--bare", source, cacheDir], sourceRoot);
+    const clone = git(["clone", "--bare", source, cacheDir], sourceRoot, timeoutMs);
     if (clone.status !== "passed") throw new Error(`source_clone_failed:${clone.output_tail.slice(0, 200)}`);
   }
-  const configAutocrlf = git(["config", "core.autocrlf", "false"], cacheDir);
+  const configAutocrlf = git(["config", "core.autocrlf", "false"], cacheDir, 30000);
   if (configAutocrlf.status !== "passed") throw new Error("source_config_failed");
 
   const fetchArgs = remoteUrl
     ? ["fetch", "--force", "--prune", remoteUrl, job.commit_sha]
     : ["fetch", "--force", "--prune", "origin", job.commit_sha];
-  const fetched = git(fetchArgs, cacheDir);
+  const fetched = git(fetchArgs, cacheDir, timeoutMs);
   if (fetched.status !== "passed") throw new Error(`source_fetch_failed:${fetched.output_tail.slice(0, 200)}`);
-  const exists = git(["cat-file", "-e", `${job.commit_sha}^{commit}`], cacheDir);
+  const exists = git(["cat-file", "-e", `${job.commit_sha}^{commit}`], cacheDir, 30000);
   if (exists.status !== "passed") throw new Error("requested_commit_unavailable");
-  git(["worktree", "prune"], cacheDir);
-  const add = git(["-c", "core.autocrlf=false", "worktree", "add", "--detach", worktreeDir, job.commit_sha], cacheDir);
+  git(["worktree", "prune"], cacheDir, 30000);
+  const add = git(["-c", "core.autocrlf=false", "worktree", "add", "--detach", worktreeDir, job.commit_sha], cacheDir, 60000);
   if (add.status !== "passed") throw new Error(`source_worktree_failed:${add.output_tail.slice(0, 200)}`);
-  const head = git(["rev-parse", "HEAD"], worktreeDir);
+  const head = git(["rev-parse", "HEAD"], worktreeDir, 30000);
   if (head.status !== "passed" || !head.output_tail.includes(job.commit_sha)) {
     rmSync(worktreeDir, { recursive: true, force: true });
     throw new Error("isolated_head_mismatch");
@@ -210,6 +212,8 @@ function main() {
   const job = JSON.parse(process.argv[2] || "{}");
   if (!allowed.has(job.job_type)) throw new Error("unknown_job_type");
   const stages = [];
+  const jobTimeoutMs = Math.max(30000, Number(job.max_runtime_ms || 600000));
+  const stageTimeoutMs = Math.max(30000, Math.floor(jobTimeoutMs / 3));
   if (job.job_type === "node_status") {
     console.log(JSON.stringify({ ok: true, worker_version: WORKER_VERSION, platform: process.platform }));
     return;
@@ -219,25 +223,25 @@ function main() {
     return;
   }
   const source = ["validate_sha", "run_typecheck", "run_focused_tests", "run_full_validation", "build_worker", "deploy_validated_sha"].includes(job.job_type)
-    ? acquireExactSource(job)
+    ? acquireExactSource(job, stageTimeoutMs)
     : null;
   const stageRoot = source?.worktreeDir || process.cwd();
   if (source && ["validate_sha", "run_typecheck", "run_focused_tests", "run_full_validation", "build_worker"].includes(job.job_type)) {
-    stages.push(run("npm", ["ci"], join(stageRoot, "lensically-worker")));
+    stages.push(run("npm", ["ci"], join(stageRoot, "lensically-worker"), stageTimeoutMs));
   }
-  if (job.job_type === "run_typecheck" || job.job_type === "validate_sha" || job.job_type === "run_full_validation") {
-    stages.push(run("npx", ["tsc", "--noEmit"], join(stageRoot, "lensically-worker")));
+  if (!stages.some((stage) => stage.status !== "passed") && (job.job_type === "run_typecheck" || job.job_type === "validate_sha" || job.job_type === "run_full_validation")) {
+    stages.push(run("npx", ["tsc", "--noEmit"], join(stageRoot, "lensically-worker"), stageTimeoutMs));
   }
-  if (job.job_type === "run_focused_tests" || job.job_type === "validate_sha" || job.job_type === "run_full_validation") {
+  if (!stages.some((stage) => stage.status !== "passed") && (job.job_type === "run_focused_tests" || job.job_type === "validate_sha" || job.job_type === "run_full_validation")) {
     ensureWorkerTestEnv(stageRoot);
     const testPath = String(job.inputs?.test_path || "test/localExecution.spec.ts");
-    stages.push(run("npm", ["run", "test", "--", "--run", testPath, "--reporter=dot", "--bail=1"], join(stageRoot, "lensically-worker")));
+    stages.push(run("npm", ["run", "test", "--", "--run", testPath, "--reporter=dot", "--bail=1"], join(stageRoot, "lensically-worker"), stageTimeoutMs));
   }
-  if (job.job_type === "run_full_validation") {
-    stages.push(run("node", ["scripts/run-cloudflare-validation.mjs"], join(stageRoot, "lensically-worker")));
+  if (!stages.some((stage) => stage.status !== "passed") && job.job_type === "run_full_validation") {
+    stages.push(run("node", ["scripts/run-cloudflare-validation.mjs"], join(stageRoot, "lensically-worker"), jobTimeoutMs));
   }
-  if (job.job_type === "build_worker") {
-    stages.push(run("npm", ["ci"], join(stageRoot, "lensically-worker")));
+  if (!stages.some((stage) => stage.status !== "passed") && job.job_type === "build_worker") {
+    stages.push(run("npm", ["ci"], join(stageRoot, "lensically-worker"), stageTimeoutMs));
   }
   if (job.job_type === "update_worker") {
     stages.push(...updateWorker(job));
