@@ -200,7 +200,7 @@ jobs:
           echo "Wrangler-managed Cloudflare cron triggers verified from wrangler.jsonc without mutation."
 
       - name: Verify safe scheduler activation state
-        if: ${{ inputs.task == 'worker-deploy' }}
+        if: ${{ inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
         run: |
           set -euo pipefail
           scheduler_url="https://api.lensically.com/api/operator/scheduler-health"
