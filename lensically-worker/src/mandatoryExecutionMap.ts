@@ -118,6 +118,9 @@ export function validateOperatorActionClosure(input: OperatorActionClosureInput)
   if (!input.priority_reason?.trim()) errors.push("priority_reason_required");
   if (!input.completion_evidence?.length) errors.push("completion_evidence_required");
   if (typeof input.owner_action_required !== "boolean") errors.push("owner_action_required_boolean");
+  if (input.progress_recorded !== true) errors.push("progress_recorded_required");
+  if (input.deferred_work_preserved !== true) errors.push("deferred_work_preserved_required");
+  if (!input.checkpoint?.trim()) errors.push("checkpoint_required");
   if (input.temporary_dependency?.trim() && !input.retirement_condition?.trim()) errors.push("dependency_retirement_condition_required");
   return { ok: errors.length === 0, errors };
 }
