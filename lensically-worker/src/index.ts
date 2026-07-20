@@ -15096,7 +15096,7 @@ function operatorStartupFallbackRoutes(): string[] {
 
 async function buildOperatorStartupContext(request: Request, env: Env): Promise<Record<string, unknown>> {
   const config = githubRepoConfig(env);
-  const tools = await buildOperatorMcpTools(env, false, false);
+  const tools = await buildOperatorPublicMcpTools(env);
   const toolNames = tools.map((tool) => tool.name);
   const adminNames = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES);
   const engineeringNames = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES);
