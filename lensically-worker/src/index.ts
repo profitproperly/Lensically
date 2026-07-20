@@ -27137,10 +27137,12 @@ async function refreshOperatorPerformanceEvaluator(
   ).bind(
     briefId, brandKey, selectedCheckpoint?.checkpoint ?? null, matureSampleSize,
     normalizeOperatorJson(brief, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION, generatedAt,
-  ).run();
+    ).run();
+  const contentFocus = await refreshOperatorContentFocus(env, brandKey);
   return {
     ok: true,
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    content_focus: contentFocus,
     fingerprinted_posts: fingerprintedPosts,
     maturity_scores_upserted: maturityScores,
     evidence_records: evidenceRows.length,
