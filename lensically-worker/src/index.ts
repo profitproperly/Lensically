@@ -14673,7 +14673,7 @@ async function putGithubFile(env: Env, input: { path: string; content: string; m
     return { ok: false, status: parent.status, commit_sha: null, data: { phase: "read_parent_commit", response: parent.data } };
   }
 
-  const blob = await githubRepoApi(env, "/git/blobs", {
+  const blob = await githubRepoApiRetryable(env, "/git/blobs", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ content: input.content, encoding: "utf-8" }),
