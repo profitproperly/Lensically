@@ -1309,4 +1309,28 @@ describe("System Directory foundation", () => {
     ]));
     expect(validateClientSafetyRegistry()).toEqual({ ok: true, errors: [] });
   });
+
+  it("registers the hardening controller capabilities", () => {
+    expect(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.map((entry) => entry.id)).toEqual(expect.arrayContaining([
+      "engineering.hardening_incident_intake",
+      "engineering.hardening_status",
+      "engineering.hardening_transition",
+      "engineering.operational_observation",
+    ]));
+    expect(CLIENT_SAFE_REQUEST_PROFILES.client_block_intake.intent).toBe("record hardening incident");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.hardening_status.intent).toBe("get hardening status");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.hardening_transition.intent).toBe("advance hardening incident");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operational_observation.intent).toBe("record operational observation");
+  });
+
+  it("registers the durable operator work capabilities", () => {
+    expect(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.map((entry) => entry.id)).toEqual(expect.arrayContaining([
+      "operating.work_state",
+      "operating.work_intake",
+      "operating.work_transition",
+    ]));
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_state.intent).toBe("get operator work state");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_intake.intent).toBe("intake operator work");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_transition.intent).toBe("advance operator work");
+  });
 });
