@@ -61,8 +61,8 @@
 ## Recovery Plane
 
 - `lensically-recovery-worker/` is an independent engineering control Worker and ChatGPT app.
-- Recovery has direct source-defined GitHub and Cloudflare controls for free-text source discovery, exact patches, terminal workflow diagnostics, verified deployment dispatch, health checks, deployment inspection, telemetry, rollback, and main-MCP smoke testing.
-- Recovery remains separate from the main Worker, D1, account workflows, and Operator router. It is the canonical surface for registered client-blocked engineering classes and the break-glass plane when the main Worker cannot receive or complete a repair.
+- Recovery has direct source-defined GitHub and Cloudflare controls for free-text source discovery, exact repairs, terminal workflow diagnostics, health checks, deployment inspection, telemetry, rollback, and main-MCP smoke testing.
+- Recovery remains separate from the main Worker, D1, account workflows, and Operator router. It is break-glass infrastructure only when Main or its deployment plane cannot receive or complete the required repair; normal engineering state, hardening, work intake, validation, and release remain Main-owned.
 
 ## Account Workflow
 
