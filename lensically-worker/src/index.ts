@@ -16650,6 +16650,53 @@ async function getActiveBlockingHardeningIncident(env: Env): Promise<Record<stri
   return row ? serializeHardeningIncident(row) : null;
 }
 
+async function closeResolvedHardeningIncidentsForRequest(
+  env: Env,
+  toolName: string,
+  args: Record<string, unknown>,
+  result: Record<string, unknown>,
+): Promise<number> {
+  await ensureOperatorMcpAdminTables(env);
+  const requestFingerprint = await operatorExecutionFingerprint(toolName, args);
+  const rows = await env.DB.prepare(
+    `SELECT id, state FROM operator_hardening_incidents
+     WHERE request_fingerprint = ? AND state <> 'closed'
+     ORDER BY datetime(created_at) ASC`,
+  ).bind(requestFingerprint).all<{ id: string; state: string }>();
+  const incidents = rows.results ?? [];
+  if (incidents.length === 0) return 0;
+  const runtime = operatorRuntimeMetadata(env);
+  const deploymentId = normalizeOperatorText(runtime.deployment_id, 160, true);
+  const testedSha = normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 40, true);
+  const evidence = {
+    resolution: "exact_request_replayed_successfully",
+    tool_name: toolName,
+    result: {
+      ok: result.ok ?? null,
+      error: result.error ?? result.error_code ?? null,
+      status: result.status ?? null,
+    },
+    tested_sha: testedSha,
+    deployment_id: deploymentId,
+    verified_at: new Date().toISOString(),
+  };
+  for (const incident of incidents) {
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE operator_hardening_incidents SET
+          state = 'closed', tested_sha = ?, deployment_id = ?, live_verification_json = ?,
+          resume_result_json = ?, closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND state <> 'closed'`,
+      ).bind(testedSha, deploymentId, JSON.stringify(evidence), JSON.stringify(evidence), incident.id),
+      env.DB.prepare(
+        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+         VALUES (?, ?, ?, 'closed', ?)`,
+      ).bind(crypto.randomUUID(), incident.id, incident.state, JSON.stringify(evidence)),
+    ]);
+  }
+  return incidents.length;
+}
+
 async function recordHardeningIncident(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
   const boundary = normalizeHardeningBoundary(args.boundary);
