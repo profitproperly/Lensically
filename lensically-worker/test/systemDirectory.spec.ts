@@ -1274,7 +1274,8 @@ describe("System Directory foundation", () => {
   it("registers typed hardening and repository inspection profiles", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.client_block_intake.allowed_input_keys).toContain("resume_capsule");
     expect(CLIENT_SAFE_REQUEST_PROFILES.hardening_transition.allowed_input_keys).toEqual(expect.arrayContaining(["prevention_rule_id", "resume_result", "autonomy_dividend"]));
-    expect(readFileSync("src/index.ts", "utf8")).toContain("resume_result: (args.resume_result ?? supplied.resume_result ??");
+    expect(resolveHardeningResumeResult({ resume_result: { source: "top_level" } }, { resume_result: { source: "nested" } }, { source: "stored" })).toEqual({ source: "top_level" });
+    expect(resolveHardeningResumeResult({}, { resume_result: { source: "nested" } }, { source: "stored" })).toEqual({ source: "nested" });
         expect(CLIENT_SAFE_REQUEST_PROFILES.repository_symbol_search.allowed_input_keys).toEqual(["path", "symbol", "limit"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_write_commit.allowed_input_keys).toEqual(["session_id"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_file_read.allowed_input_keys).toContain("max_lines");
