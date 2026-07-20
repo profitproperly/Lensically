@@ -16,7 +16,7 @@ const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifec
 const tests = read("test/operatorMode.spec.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
-const validationWorkflow = read("../.github/workflows/lensically-validation.yml").replace(/\r\n/g, "\n");
+
 const agentRules = read("../AGENTS.md");
 const currentState = read("../CURRENT_STATE.md");
 const operatingMemory = read("../OPERATING_MEMORY.md");
@@ -110,12 +110,12 @@ for (const toolName of toolDefinitionNames) {
 for (const entryId of directoryEntryIds) {
   if (!lifecycleBaselineDirectoryIds.has(entryId) && !declaredDirectoryIds.has(entryId)) lifecycleErrors.push(`undeclared_new_directory_entry:${entryId}`);
 }
-if (!validationWorkflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) lifecycleErrors.push("capability_lifecycle_fast_validation_gate_missing");
-if (!validationWorkflow.includes("[typecheck]")
-    || !validationWorkflow.includes("[acceptance-regressions]")
-    || !validationWorkflow.includes('scope="acceptance"')) {
-  lifecycleErrors.push("main_validation_push_markers_missing");
+if (!workflow.includes("fast-validation:")
+    || !workflow.includes("Typecheck and lifecycle gate")
+    || !workflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) {
+  lifecycleErrors.push("capability_lifecycle_fast_validation_gate_missing");
 }
+
 if (!workflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) lifecycleErrors.push("capability_lifecycle_engineering_gate_missing");
 
 if (lifecycleErrors.length > 0) {
@@ -257,13 +257,16 @@ if (!workflow.includes("cancel-in-progress: true")) errors.push("workflow_concur
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
 if (!workflow.includes("release_id:")) errors.push("workflow_release_id_missing");
 if (!workflow.includes("release_sha:")) errors.push("workflow_release_sha_missing");
-if (!workflow.includes("- name: System Directory tests")
-    || !workflow.includes("inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy'")) {
+if (!workflow.includes("test/systemDirectory.spec.ts")
+    || !workflow.includes("Run exact-head release gates")) {
   errors.push("system_directory_release_gate_missing");
 }
-if (!workflow.includes("worker:\n    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}")) {
-  errors.push("worker_job_must_exclude_parallel_operator_tests");
+if (!workflow.includes("fast-validation:")
+    || !workflow.includes("inputs.task != 'operator-tests'")
+    || !workflow.includes("inputs.task != 'worker-deploy'")) {
+  errors.push("fast_validation_must_exclude_parallel_tests_and_release");
 }
+
 if (!workflow.includes("operator-test-shards:")
     || !workflow.includes("name: Operator shard ${{ matrix.shard }}/8")
     || !workflow.includes("shard: [1, 2, 3, 4, 5, 6, 7, 8]")
@@ -278,22 +281,24 @@ if (!workflow.includes("operator-test-shards:")
 if (workflow.includes("Full Operator MCP tests") || workflow.includes("/tmp/lensically-operator-tests.log")) {
   errors.push("serial_operator_test_monolith_forbidden");
 }
-if (!validationWorkflow.includes("[verified-worker-release]")
-    || !validationWorkflow.includes("Run verified release supporting gates")
-    || !validationWorkflow.includes("Deploy verified Worker head")
-    || !validationWorkflow.includes("npx wrangler deploy")) {
-  errors.push("verified_release_marker_dispatch_missing");
+if (!workflow.includes("worker-release:")
+    || !workflow.includes("inputs.task == 'worker-deploy'")
+    || !workflow.includes("Deploy exact validated Worker head")
+    || !workflow.includes("npx wrangler deploy")) {
+  errors.push("explicit_exact_sha_release_path_missing");
 }
+
 if (workflow.includes("git push origin HEAD:main") || workflow.includes("RECOVERY_TYPECHECK_LOG.txt")) {
   errors.push("workflow_self_commit_forbidden");
 }
 if (!workflow.includes('ref: ${{ inputs.release_sha || github.sha }}')) errors.push("workflow_exact_sha_checkout_missing");
 if (!workflow.includes('test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"')) errors.push("workflow_exact_sha_verification_missing");
-if (!validationWorkflow.includes('.healthy == true and .operational == true and .heartbeat_fresh == true')
-        || !validationWorkflow.includes('(.control.mode == "normal")')
-        || validationWorkflow.includes('(.control.mode == "paused") or')) {
+if (!workflow.includes('.healthy == true and .operational == true and .heartbeat_fresh == true')
+        || !workflow.includes('(.control.mode == "normal")')
+        || workflow.includes('(.control.mode == "paused") or')) {
   errors.push("scheduler_release_gate_must_require_operational_normal_mode");
 }
+
 if (!source.includes("quarantineScheduledPostPublishAttempt")
     || !source.includes("finalizeScheduledPostPublished")
     || !source.includes("datetime(processing_started_at) <= datetime(?)")
@@ -323,23 +328,16 @@ if (!threadsPublishService.includes('publishCreateBody.set("auto_publish_text", 
     || !workflow.includes("test/threadsPublishService.spec.ts")) {
   errors.push("threads_text_auto_publish_contract_missing");
 }
-// Main release-marker commits are exact-SHA triggers; the validation workflow rechecks the marker head.
-if (false && !source.includes("Worker deployment is triggered by a verified source-control release marker through the Main engineering path")
-    || !clientSafety.includes('Main repository patch path')
-    || !systemDirectoryTests.includes("routes deployment through the Main verified source marker")
-        || !validationWorkflow.includes("[verified-worker-release]")
-        || !validationWorkflow.includes("Run verified release supporting gates")
-    || !workflow.includes("--field release_id=\"${RELEASE_SHA:0:12}\"")
-    || !workflow.includes("--field release_sha=\"${RELEASE_SHA}\"")) {
-    errors.push("verified_release_marker_contract_missing");
+// Production release is an explicit exact-SHA workflow dispatch after validation.
+if (!workflow.includes("release_sha:")
+    || !workflow.includes('ref: ${{ inputs.release_sha }}')
+    || !workflow.includes('test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"')
+    || !workflow.includes("Run exact-head release gates")
+    || !workflow.includes("Deploy exact validated Worker head")
+    || !workflow.includes("Verify production runtime and scheduler")) {
+  errors.push("explicit_exact_sha_release_contract_missing");
 }
-if (!clientSafety.includes('Main repository patch path')
-    || !systemDirectoryTests.includes("routes deployment through the Main verified source marker")
-    || !validationWorkflow.includes("Run verified release supporting gates")
-    || !validationWorkflow.includes("Deploy verified Worker head")
-    || !validationWorkflow.includes("Verify deployed scheduler health")) {
-  errors.push("verified_release_marker_contract_missing");
-}
+
 
 if (!source.includes('name: "get_monthly_growth_review"')
     || !source.includes("OPERATOR_MCP_MAX_STRUCTURED_BYTES = 24_000")
