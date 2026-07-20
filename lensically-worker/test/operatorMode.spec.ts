@@ -2695,7 +2695,7 @@ describe("operator mode MCP endpoint", () => {
   }, 30000);
 
   it("loads a compact source-defined startup bootstrap", async () => {
-    const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
+    const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const startup = await mcpTool<{
       bootstrap_version: string;
       operating_contract: {
