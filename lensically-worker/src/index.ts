@@ -18803,8 +18803,6 @@ async function handleOperatorMcpAdminTool(
       getEngineeringAccessState: {},
       getHardeningStatus: {},
       getOperatorWorkState: {},
-      getLocalExecutionStatus: {},
-      getValidationPlaneStatus: {},
       listRepoFiles: { prefix: "lensically-worker/src", limit: 1 },
       searchRepoFiles: { query: "executeLensicallyIntent", prefix: "lensically-worker/src/index.ts", limit: 1 },
       readRepoFile: { path: "AGENTS.md", start_line: 1, max_lines: 1 },
