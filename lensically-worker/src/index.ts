@@ -18886,6 +18886,7 @@ async function handleOperatorMcpAdminTool(
         : null,
       get_monthly_growth_review: { ...accountBase, date_from: weekAgo, date_to: today, timezone: WORKSPACE_DEFAULT_TIMEZONE, top_limit: 1 },
       get_performance_learning: { ...accountBase, include_posts: false },
+      get_content_focus: { ...accountBase },
     };
     const liveReadRows: Array<Record<string, unknown>> = [];
     const canonicalLiveHost = new URL(request.url).hostname === new URL(DEFAULT_WORKER_ORIGIN).hostname;
