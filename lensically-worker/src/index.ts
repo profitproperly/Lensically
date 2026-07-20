@@ -14743,7 +14743,7 @@ async function putGithubFiles(
     return { ok: false, status: 409, commit_sha: null, head_sha: headSha, data: { phase: "head_changed", expected_head_sha: input.expectedHeadSha, actual_head_sha: headSha } };
   }
 
-  const parent = await githubRepoApi(env, `/git/commits/${headSha}`);
+  const parent = await githubRepoApiRetryable(env, `/git/commits/${headSha}`);
   const parentData = parent.data && typeof parent.data === "object" && !Array.isArray(parent.data) ? parent.data as Record<string, unknown> : null;
   const parentTree = parentData?.tree && typeof parentData.tree === "object" && !Array.isArray(parentData.tree)
     ? parentData.tree as Record<string, unknown>
