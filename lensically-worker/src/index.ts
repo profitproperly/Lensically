@@ -15692,7 +15692,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         const ordinalTargets = ["contained", "classified", "reproduced", "generalized", "repaired", "prevention_locked", "validated", "released", "live_verified", "resumed", "closed"];
         const ordinalMatch = /^(?:a)?(\d+)$/.exec(compactStage);
         const ordinalIndex = ordinalMatch ? Number(ordinalMatch[1]) : -1;
-        const targetState = stageMap[stage] ?? stageMap[compactStage] ?? ordinalTargets[ordinalIndex] ?? stage;
+        const targetState = compactStage === "n" ? "__next__" : stageMap[stage] ?? stageMap[compactStage] ?? ordinalTargets[ordinalIndex] ?? stage;
         const transitionInputs: Record<string, unknown> = {
           incident_id: "__active__",
           target_state: targetState,
