@@ -20526,7 +20526,7 @@ async function handleOperatorMcpEngineeringTool(
         && allowed.status < 400
         && coverage.status < 400
         && boundaryTest.blocked_before_proceed
-        && boundaryTest.startup_through_gateway
+        && boundaryTest.startup_direct
         && boundaryTest.proceed_confirmed
         && boundaryTest.continuity_auto_resolved
         && boundaryTest.calendar_coverage_loaded
