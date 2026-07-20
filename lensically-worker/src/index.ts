@@ -14299,8 +14299,15 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "get_performance_learning",
     title: "Get performance learning",
-    description: "Read the latest maturity-normalized post evidence, hypotheses, fatigue signals, and generation learning brief. Follower totals remain account-level only and are never attributed to posts or posting periods.",
+    description: "Read the latest maturity-normalized post evidence, hypotheses, fatigue signals, generation learning brief, and current Content Focus state. Follower totals remain account-level only and are never attributed to posts or posting periods.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, include_posts: { type: "boolean" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "get_content_focus",
+    title: "Get Content Focus",
+    description: "Read the latest persisted daily, weekly, monthly, and quarterly Content Focus decisions and source-card family states for the selected account.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
 ];
