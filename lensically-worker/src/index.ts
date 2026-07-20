@@ -15095,20 +15095,11 @@ async function recordEngineeringAudit(env: Env, input: {
 }
 
 function compactStartupDocument(path: string, file: { ok: boolean; status: number; content: string | null; size: number }): Record<string, unknown> {
-  const content = file.content ?? "";
-  const excerpt = content
-    .split(/\r?\n/)
-    .filter((line) => line.trim())
-    .slice(0, 40)
-    .join("\n")
-    .slice(0, 2500);
   return {
     path,
     ok: file.ok,
     status: file.status,
     size: file.size,
-    excerpt,
-    truncated: content.length > excerpt.length,
   };
 }
 
@@ -15117,7 +15108,7 @@ function operatorStartupFallbackRoutes(): string[] {
     "Call one advertised direct typed Main tool for each external operation; do not use profile IDs, generic inputs envelopes, or wrapper routing.",
     "Server-side continuity, authorization, idempotency, gates, and scheduler safety remain mandatory after the direct call arrives.",
     "Use bounded known-file repository reads and searches; a complete known-file search reports its scanned line count and match count.",
-    "Use one atomic patch set for related edits and one exact-head engineering release after the final change.",
+        "Use one atomic patch set for related edits. Routine pushes use fast validation; production uses one explicit exact-SHA release after the final change.",
     "Keep engineering receipts compact. Never echo patch bodies or full repository files through the client.",
     "Use the independent Recovery plane only when the main Worker or its deployment plane cannot receive the request.",
   ];
@@ -15144,7 +15135,21 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     getGithubFile(env, "OPERATING_MEMORY.md"),
   ]);
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
-  const operatorWorkState = await getOperatorWorkState(env, { limit: 30 });
+    const operatorWorkState = await getOperatorWorkState(env, { limit: 30 });
+  const rawWorkState = operatorWorkState.work_state && typeof operatorWorkState.work_state === "object" && !Array.isArray(operatorWorkState.work_state)
+    ? operatorWorkState.work_state as Record<string, unknown>
+    : null;
+  const operatorWorkSummary = {
+    ok: operatorWorkState.ok === true,
+    status: rawWorkState?.status ?? null,
+    active_outcome_key: rawWorkState?.active_outcome_key ?? null,
+    active_outcome_title: rawWorkState?.active_outcome_title ?? null,
+    next_action: rawWorkState?.next_action ?? null,
+    updated_at: rawWorkState?.updated_at ?? null,
+    queued_required_count: operatorWorkState.queued_required_count ?? 0,
+    deferred_count: operatorWorkState.deferred_count ?? 0,
+    detail: "Durable work items remain server-side and are omitted from startup payloads.",
+  };
   return {
     ok: true,
     bootstrap_version: "operator-startup-v4",
@@ -15177,7 +15182,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       ],
       after_explicit_proceed: "confirmOperatorProceed restores canonical account state, produces the current Growth Mission Brief, and opens an owner-model planning discussion. It does not authorize account mutations. Later account calls send proceed_confirmed=true; the approved persistent mission and continuity are verified from server-side state.",
     },
-    operator_work_state: operatorWorkState,
+        operator_work_state: operatorWorkSummary,
     growth_mission_contract: {
       version: OPERATOR_GROWTH_MISSION_VERSION,
       permanent_mission: MANIFEST_AUTONOMY_OBJECTIVE,
@@ -15191,16 +15196,14 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       read_tool: "getGrowthMission",
       update_tool: "updateGrowthMission",
     },
-    tool_surface: {
-      total_tools: tools.length,
-      engineering_tools: activeEngineeringTools,
-      admin_tools: activeAdminTools,
-      operator_tools: operatorTools,
+        tool_surface: {
+      public_tool_count: tools.length,
       categories: {
         engineering: activeEngineeringTools.length,
         admin: activeAdminTools.length,
         operator: operatorTools.length,
       },
+      detail: "Tool definitions are available through listMcpTools and readMcpToolDefinition.",
     },
     repository: {
       owner: config.owner,
@@ -15215,8 +15218,10 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     mandatory_fallback_execution_routes: operatorStartupFallbackRoutes(),
     implementation_scope_rule: "Infrastructure, gateway, schema, workflow, continuity, idempotency, release, and regression-prevention fixes default to universal unless a real account-specific reason exists.",
     completion_recording_rule: "Completed fixes are source-controlled, covered by focused tests, documented only when active architecture changes, and recorded once in the engineering audit.",
-    payload_limits: {
-      source_documents: "3 docs, first 40 nonblank lines each, 2500 chars max per doc",
+        payload_limits: {
+      source_documents: "metadata only",
+      durable_work_items: "summary only",
+      tool_surface: "counts only",
     },
     no_account_sections_present: true,
     request_url_origin: new URL(request.url).origin,
@@ -19982,19 +19987,20 @@ async function handleOperatorMcpEngineeringTool(
         github_status: branch.status,
         github_available: branch.ok,
       },
-      tool_surface: {
-        total_tools: buildOperatorMcpBaseTools(false).length,
-        engineering_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
-        admin_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
+            tool_surface: {
+        public_tool_count: await operatorPublicMcpToolCount(env),
+        internal_handler_count: buildOperatorMcpBaseTools(false).length,
+        engineering_public_tools: OPERATOR_MCP_ENGINEERING_TOOL_NAMES.length,
+        admin_public_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
-      tool_block_prevention: [
-        "Call executeLensicallyIntent with profile_id='startup' and empty inputs once at fresh-session startup before engineering/admin/workflow/account work.",
-        "Use the production System Directory directive before the static router.",
+            tool_block_prevention: [
+        "Use getOperatorStartupContext only for deliberate non-account bootstrap; engineeringPrecheck is sufficient for routine engineering.",
+        "Call one advertised direct typed Main tool for each external operation.",
         "Use readRepoFile with line bounds for known files.",
         "Use applyRepoTextPatch only for one isolated replacement.",
         "Use applyRepoPatchSet for related multi-file or multi-replacement work so one commit advances main.",
-        "Use Recovery for free-text source discovery, terminal workflow failure details, exact deployment dispatch, or a main/client path that cannot receive the operation.",
-        "Read one active workflow status once, then use compact activity or Recovery for terminal diagnostics.",
+        "Use the explicit exact-SHA Main release workflow for production deployment.",
+        "Use Recovery only when Main or its deployment plane cannot receive or complete the repair.",
         ...operatorStartupFallbackRoutes(),
         "Keep workflow dispatch output compact.",
       ],
@@ -20004,8 +20010,8 @@ async function handleOperatorMcpEngineeringTool(
         d1_policy_lookup_required: false,
         model_tool_choice_allowed: false,
       },
-      payload_limits: {
-        full_startup_context: "not returned by status/precheck; use intent=startup only for deliberate non-engineering bootstrap",
+            payload_limits: {
+        full_startup_context: "not returned by engineeringPrecheck; use getOperatorStartupContext only for deliberate bootstrap",
       },
     };
   }
