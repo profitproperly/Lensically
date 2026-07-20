@@ -16332,7 +16332,8 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
   "find_must_match_once", "path_find_message_required", "patches_1_to_20_and_message_required", "patch_path_and_find_required",
   "patch_set_file_limit_exceeded", "path_mode_message_required", "path_message_required", "path_message_owner_approval_required",
       "file_not_found", "query_and_known_file_prefix_required", "run_id_required", "validation_task_required", "workflow_stage_blocked",
-  "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
+    "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
+  "owner_response_required_for_growth_plan_approval",
 ]);
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
