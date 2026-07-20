@@ -112,7 +112,7 @@ jobs:
 
       - name: System Directory tests
         id: system_directory_tests
-        if: ${{ inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy' }}
+        if: ${{ inputs.task == 'system-directory-tests' || inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
           set -o pipefail
@@ -131,7 +131,7 @@ jobs:
 
       - name: Threads publish readiness tests
         id: threads_publish_tests
-        if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'worker-deploy' }}
+        if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
           set -o pipefail
