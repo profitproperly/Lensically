@@ -1246,4 +1246,67 @@ describe("System Directory foundation", () => {
       inputs: { path: "lensically-worker/src/index.ts", symbol: "validateHardeningTransition", limit: 5 },
     });
   });
+
+  it("defines the autonomous business operator as a durable runtime contract", () => {
+    expect(AGENT_NATIVE_OPERATING_CONTRACT_VERSION).toBe("agent-native-operating-contract-v1");
+    expect(SINGLE_ACTIVE_OUTCOME_POLICY_VERSION).toBe("single-active-outcome-v1");
+    expect(AUTONOMOUS_BUSINESS_OPERATOR_ROLE).toBe("Lensically Autonomous Business Operator");
+    expect(AGENT_NATIVE_OPERATING_CONTRACT).toMatchObject({
+      action_closure_required: true,
+      single_active_outcome: true,
+      owner_role: "authorize_only_when_required",
+    });
+    expect(AGENT_NATIVE_OPERATING_CONTRACT.execution_loop.at(-1)).toBe("checkpoint");
+  });
+
+  it("defers noncritical scope while allowing only mandatory interruptions", () => {
+    expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "nice_to_have", severity: "P3" })).toEqual({
+      decision: "defer",
+      active_outcome_unchanged: true,
+      reason: "single_active_outcome_guard",
+    });
+    expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "blocking_fix", prerequisite_for_active_outcome: true })).toMatchObject({
+      decision: "activate",
+      reason: "required_prerequisite",
+    });
+    expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "incident", severity: "P0" })).toMatchObject({
+      decision: "activate",
+      reason: "incident_interrupt:P0",
+    });
+    expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "duplicate", duplicate_of: "existing" })).toMatchObject({
+      decision: "merge",
+      active_outcome_unchanged: true,
+    });
+  });
+
+  it("blocks operational closure without a selected next action and dependency retirement path", () => {
+    const complete = {
+      current_live_state: "production remains on the verified head",
+      target_agent_native_state: "scheduled autonomous operation",
+      active_outcome: "release the CHL foundation",
+      next_action: "run exact-head validation",
+      priority_reason: "the release scope is frozen",
+      completion_evidence: ["validation receipt"],
+      owner_action_required: false,
+    };
+    expect(validateOperatorActionClosure(complete)).toEqual({ ok: true, errors: [] });
+    expect(validateOperatorActionClosure({ ...complete, next_action: "" })).toMatchObject({ ok: false, errors: ["next_action_required"] });
+    expect(validateOperatorActionClosure({ ...complete, temporary_dependency: "Recovery" })).toMatchObject({
+      ok: false,
+      errors: ["dependency_retirement_condition_required"],
+    });
+  });
+
+  it("registers bounded work-state profiles and the complete hardening release sequence", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_state.allowed_input_keys).toEqual(["status", "limit"]);
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_intake.allowed_input_keys).toContain("completion_condition");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_transition.allowed_input_keys).toContain("complete_active_outcome");
+    expect(CLIENT_BLOCK_INTAKE_CONTRACT.sequence).toEqual(expect.arrayContaining([
+      "release_exact_tested_head",
+      "verify_live",
+      "record_autonomy_dividend",
+      "close_incident",
+    ]));
+    expect(validateClientSafetyRegistry()).toEqual({ ok: true, errors: [] });
+  });
 });
