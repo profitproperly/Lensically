@@ -502,14 +502,12 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && schemasClosed;
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const accountKeyContent = ((accountKey.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const mappedContent = ((mapped.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const legacyMappedContent = ((legacyMapped.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
+    const engineeringAccessContent = ((engineeringAccess.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const schedulerContent = ((scheduler.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const campaignContent = ((campaign.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const scheduledTodayContent = ((scheduledToday.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const scheduledTomorrowContent = ((scheduledTomorrow.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const mappedSurface = toolNames.length === 1 && toolNames.includes("executeLensicallyIntent") && publicContractSucceeded;
+    const directSurface = publicContractSucceeded;
     const staleSessionError = staleSession.body?.error && typeof staleSession.body.error === "object" && !Array.isArray(staleSession.body.error)
       ? staleSession.body.error as Record<string, unknown>
       : null;
