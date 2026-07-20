@@ -15120,9 +15120,9 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     ok: true,
     bootstrap_version: "operator-startup-v4",
     operating_contract: {
-      public_gateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-      router: OPERATOR_REGISTRY_GENERATION,
-      model_tool_choice_allowed: false,
+      public_gateway: "direct_typed_tools",
+      router: "direct_handler_dispatch_v1",
+      model_tool_choice_allowed: true,
       d1_route_lookup_required: false,
       recovery_role: "independent_break_glass_only",
       agent_native_operator: AGENT_NATIVE_OPERATING_CONTRACT,
