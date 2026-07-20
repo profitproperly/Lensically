@@ -778,6 +778,26 @@ describe("operator mode backend spine", () => {
     expect(JSON.stringify(observation)).not.toContain("follower");
     });
 
+  it("reads Content Focus through a direct typed Main tool after Proceed", async () => {
+    await ensureMcpAccountOpen("manifest_mental");
+    const result = await mcpToolRaw<{
+      success: boolean;
+      brand_key: string;
+      content_focus: { version: string; reviews: Record<string, unknown>; family_states: unknown[] };
+    }>("get_content_focus", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+    });
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      success: true,
+      brand_key: "manifest_mental",
+      content_focus: { version: "content-focus-v1" },
+    });
+    expect(result.structuredContent.content_focus.reviews).toBeTruthy();
+    expect(Array.isArray(result.structuredContent.content_focus.family_states)).toBe(true);
+  }, 30000);
+
   it("classifies source-card families with daily, weekly, and monthly authority", () => {
     const strong = classifyOperatorContentFocusFamily({
       cadence: "weekly",
