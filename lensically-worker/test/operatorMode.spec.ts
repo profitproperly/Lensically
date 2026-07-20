@@ -2714,9 +2714,9 @@ describe("operator mode MCP endpoint", () => {
     }>("getOperatorStartupContext");
     expect(startup.bootstrap_version).toBe("operator-startup-v4");
     expect(startup.operating_contract).toMatchObject({
-      public_gateway: "executeLensicallyIntent",
-      router: "static-execution-router-v1",
-      model_tool_choice_allowed: false,
+      public_gateway: "direct_typed_tools",
+      router: "direct_handler_dispatch_v1",
+      model_tool_choice_allowed: true,
       d1_route_lookup_required: false,
       recovery_role: "independent_break_glass_only",
     });
