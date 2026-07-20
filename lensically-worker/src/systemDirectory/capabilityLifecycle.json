@@ -338,116 +338,16 @@
       "release_scope": "system-directory-tests",
       "live_verification": "The exact deployed Main gateway checkpoints one work item with evidence, clears a completed interruption, resumes the frozen active outcome, and refuses analysis-only closure by always returning an action-closure receipt.",
       "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_node",
-      "directory_entry_id": "deployment.local_execution_node",
-      "canonical_handler": "executeValidationPlane",
-      "route_intent": "validation plane execute",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway reports local-node heartbeat status, queues a signed exact-SHA validation job when the node is healthy or queue policy permits it, conserves hosted fallbacks, and rejects deploy requests without a matching local-validation-receipt-v1.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_status",
-      "directory_entry_id": "deployment.local_execution_status",
-      "canonical_handler": "getLocalExecutionStatus",
-      "route_intent": "local execution status",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway returns local node heartbeat, worker version, bootstrap version, active slot, queue counts, and latest local-validation-receipt-v1 without account mutation.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_validate_sha",
-      "directory_entry_id": "deployment.local_execution_validate_sha",
-      "canonical_handler": "queueLocalExecutionValidation",
-      "route_intent": "local execution validate sha",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway queues one signed exact-SHA validate_sha job with nonce, expiration, node identity, bounded inputs, and expected stages.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_full_validation",
-      "directory_entry_id": "deployment.local_execution_full_validation",
-      "canonical_handler": "queueLocalExecutionFullValidation",
-      "route_intent": "local execution full validation",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway queues one signed exact-SHA run_full_validation job with the complete local validation stage list.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_deploy_validated_sha",
-      "directory_entry_id": "deployment.local_execution_deploy_validated_sha",
-      "canonical_handler": "queueLocalExecutionDeployValidatedSha",
-      "route_intent": "local execution deploy validated sha",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway rejects deployment unless the requested SHA has a matching successful local-validation-receipt-v1, then queues a deploy_validated_sha job.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_update_worker",
-      "directory_entry_id": "deployment.local_execution_update_worker",
-      "canonical_handler": "queueLocalExecutionWorkerUpdate",
-      "route_intent": "local execution update worker",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway queues a signed update_worker job only for an exact SHA and an inactive-slot worker update that does not change signing authority.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_cancel_job",
-      "directory_entry_id": "deployment.local_execution_cancel_job",
-      "canonical_handler": "cancelLocalExecutionJob",
-      "route_intent": "local execution cancel job",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway marks one pending, claimed, or running local execution job cancelled without issuing a replacement.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_enrollment",
-      "directory_entry_id": "deployment.local_execution_enrollment",
-      "canonical_handler": "createLocalExecutionEnrollmentToken",
-      "route_intent": "local execution enrollment",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway creates a short-lived single-use enrollment token and stores only a per-node credential hash after enrollment.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.local_execution_revoke_node",
-      "directory_entry_id": "deployment.local_execution_revoke_node",
-      "canonical_handler": "revokeLocalExecutionNode",
-      "route_intent": "local execution revoke node",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway revokes one local node credential without affecting other enrolled nodes.",
-      "compatibility_bridge": false
-    },
-    {
-      "capability_id": "deployment.validation_plane_status",
-      "directory_entry_id": "deployment.validation_plane_status",
-      "canonical_handler": "getValidationPlaneStatus",
-      "route_intent": "validation plane status",
-      "implementation_mode": "new_handler",
-      "focused_regression": "registers local execution node profiles and enforces exact-SHA receipts",
-      "release_scope": "system-directory-tests",
-      "live_verification": "The exact deployed Main gateway reports Local, Cloudflare Builds, and GitHub Actions priority and availability without dispatching hosted work.",
-      "compatibility_bridge": false
-    }
+        }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
   ]
 }
