@@ -9363,11 +9363,12 @@ async function buildOperatorManifestProceedCapsule(
     3,
     null,
   );
-  const activeReviewRow = await env.DB.prepare(
+    const activeReviewRow = await env.DB.prepare(
     `SELECT id FROM operator_review_batches
      WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
-     ORDER BY datetime(updated_at) DESC LIMIT 1`,
-  ).bind(brand.brand_key).first<{ id: string }>();
+     ORDER BY CASE WHEN workflow_session_id = ? THEN 0 ELSE 1 END,
+              datetime(updated_at) DESC LIMIT 1`,
+  ).bind(brand.brand_key, sessionId ?? "").first<{ id: string }>();
   const activeReviewBatch = activeReviewRow?.id
     ? await serializeManifestReviewBatch(env, brand, activeReviewRow.id)
     : null;
@@ -18252,6 +18253,16 @@ async function handleOperatorMcpAdminTool(
         "schedule_approved_draft",
       ]),
     };
+        const assignedMutationTools = new Set(
+      Object.values(mutationSegments).flatMap((segment) => [...segment]),
+    );
+    for (const tool of campaignTools) {
+      const annotations = (tool as OperatorMcpToolDefinition & { annotations?: Record<string, unknown> }).annotations ?? {};
+      if (annotations.readOnlyHint !== true && !assignedMutationTools.has(tool.name)) {
+        mutationSegments.account_mutations_b.add(tool.name);
+        assignedMutationTools.add(tool.name);
+      }
+    }
     const selectedLiveReadTools = liveReadSegments[campaignSegment] ?? new Set<string>();
     const selectedMutationTools = mutationSegments[campaignSegment] ?? new Set<string>();
     const campaignRows: Array<Record<string, unknown>> = [];
