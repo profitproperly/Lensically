@@ -15703,6 +15703,8 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         };
         if (typeof safeInputs.ref === "string" && safeInputs.ref.trim()) transitionInputs.tested_sha = safeInputs.ref;
         if (typeof safeInputs.deployment === "string" && safeInputs.deployment.trim()) transitionInputs.deployment_id = safeInputs.deployment;
+        if (["released", "live_verified", "resumed", "closed"].includes(targetState) && !transitionInputs.tested_sha) transitionInputs.tested_sha = "__runtime__";
+        if (["live_verified", "resumed", "closed"].includes(targetState) && !transitionInputs.deployment_id) transitionInputs.deployment_id = "__runtime__";
         if (targetState === "resumed" || targetState === "closed") transitionInputs.live_verification = { neutral_aliases_live: true };
         if (targetState === "closed") {
           transitionInputs.resume_result = { original_objective_resumed: true };
