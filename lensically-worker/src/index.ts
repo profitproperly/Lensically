@@ -723,13 +723,17 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
     ok: payload.ok !== false,
     error: payload.error ?? null,
     status: payload.status ?? null,
-    brand_key: payload.brand_key ?? null,
+        brand_key: payload.brand_key ?? null,
+    continuity_capsule: continuityCapsule && typeof continuityCapsule === "object" && !Array.isArray(continuityCapsule)
+      ? compactOperatorPayloadValue(compactOperatorContinuityCapsule(continuityCapsule), "continuity_capsule", { arrayItems: MANIFEST_REVIEW_BATCH_SIZE, stringChars: 120, objectKeys: 32, maxDepth: 6 }, [])
+      : null,
     payload_contract: {
       server_bounded: true,
       model_payload_sizing: false,
       byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
       original_bytes: originalBytes,
       truncated: true,
+      continuity_receipt_preserved: Boolean(continuityCapsule),
       fallback_summary: true,
       available_top_level_fields: Object.keys(payload).slice(0, 60),
     },
