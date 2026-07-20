@@ -16627,10 +16627,27 @@ async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Prom
     Math.max(1, Math.trunc(Number(args.execution_order ?? 1000))),
     intake.decision === "merge" ? duplicateOf : null,
   ).run();
-  if (status === "interrupting") {
+  if (!activeOutcomeExists && intake.decision === "activate") {
+    await env.DB.prepare(
+      `UPDATE operator_work_state SET
+        active_outcome_key = ?, active_outcome_title = ?, active_scope_json = ?, status = 'active',
+        scope_frozen = 1, active_interrupt_key = NULL, completion_evidence_json = '[]',
+        next_action = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = 'singleton'`,
+    ).bind(
+      workKey,
+      title,
+      JSON.stringify([summary]),
+      `Execute ${workKey}, verify its completion condition, record evidence, and select the following checkpoint.`,
+    ).run();
+  } else if (status === "interrupting") {
     await env.DB.prepare(
       `UPDATE operator_work_state SET active_interrupt_key = ?, next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
     ).bind(workKey, `Resolve interrupting work item ${workKey}, then resume the frozen active outcome from its checkpoint.`).run();
+  } else if (status === "queued" && requiredForActiveOutcome === 1) {
+    await env.DB.prepare(
+      `UPDATE operator_work_state SET next_action = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'singleton'`,
+    ).bind(`Execute required prerequisite ${workKey}, record completion evidence, and resume the frozen active outcome.`).run();
   }
   return {
     ok: true,
