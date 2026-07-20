@@ -14366,6 +14366,68 @@ const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
   "resolveContinuationContext",
 ]);
 
+const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
+  "getOperatorStartupContext",
+  "selectOperatorKey",
+  "confirmOperatorProceed",
+  "getGrowthMission",
+  "updateGrowthMission",
+  "getOperatorDecisionState",
+  "resolveOperatorDecision",
+  "list_accounts",
+  "get_account_state",
+  "read_lensically_ui_surface",
+  "get_hourly_coverage",
+  "get_production_board",
+  "getWorkflowStatus",
+  "prepareFullPreflight",
+  "get_monthly_growth_review",
+  "get_performance_learning",
+  "get_content_focus",
+  "claim_manifest_review_batch",
+  "get_manifest_review_batch",
+  "attach_manifest_review_draft",
+  "skip_manifest_review_source",
+  "discard_manifest_review_batch",
+  "schedule_manifest_review_batch",
+  "list_source_candidates",
+  "get_source_candidate_batch",
+  "create_source_card",
+  "lock_source_card",
+  "get_source_card",
+  "create_generation_run",
+  "submit_candidate_draft",
+  "mark_draft_shown",
+  "approve_draft",
+  "reject_draft",
+  "list_active_gates",
+  "list_strategy_memory",
+  "save_strategy_memory",
+  "list_scheduled_posts",
+  "edit_scheduled_post",
+  "schedule_approved_draft",
+  "get_post_results",
+  "getScheduledPostSchedulerState",
+  "auditScheduledPost",
+  "setScheduledPostSchedulerMode",
+  "recoverOverdueScheduledPosts",
+  "runApprovedPostCanary",
+  "getRepoStatus",
+  "readRepoFile",
+  "searchRepoFiles",
+  "applyRepoTextPatch",
+  "applyRepoPatchSet",
+  "listGitHubWorkflowRuns",
+  "getGitHubWorkflowRun",
+  "runGitHubWorkflow",
+  "verifyDeployedMcpVersion",
+  "listEngineeringAudit",
+]);
+
+function isOperatorPublicDirectToolName(value: string): boolean {
+  return OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.has(value);
+}
+
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   assertClientSafetyRegistry();
   const scopedWrapperTools = includeScopedWrappers ? [
