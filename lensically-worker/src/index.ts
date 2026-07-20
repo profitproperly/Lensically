@@ -14754,7 +14754,7 @@ async function putGithubFiles(
   }
 
   const blobResults = await Promise.all(input.files.map(async (file) => {
-    const blob = await githubRepoApi(env, "/git/blobs", {
+    const blob = await githubRepoApiRetryable(env, "/git/blobs", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ content: file.content, encoding: "utf-8" }),
