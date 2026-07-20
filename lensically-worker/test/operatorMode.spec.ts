@@ -3018,25 +3018,29 @@ describe("operator mode MCP endpoint", () => {
     });
 
     const routed = await mcpToolCallRaw<{
-      error: string;
-      map_state: string;
-      map_entry: { tool_name: string; source_type: string };
-      missing_inputs: string[];
+      ok: boolean;
+      query: string;
+      path: string;
+      matches: Array<{ line_number: number; line: string }>;
+      verified_complete_for_known_file: boolean;
+      search_mode: string;
     }>("executeLensicallyIntent", {
-      objective: "Find executeLensicallyIntent in a known repository file.",
-      intent: "search repository files",
-      inputs: { query: "executeLensicallyIntent" },
-    });
-    expect(routed.isError).toBe(true);
-    expect(routed.structuredContent).toMatchObject({
-      error: "static_router_inputs_missing",
-      map_state: "known",
-      map_entry: {
-        tool_name: "searchRepoFiles",
-        source_type: "source_defined_direct_engineering",
+      profile_id: "repository_symbol_search",
+      inputs: {
+        path: "lensically-worker/src/index.ts",
+        symbol: "executeLensicallyIntent",
+        limit: 1,
       },
-      missing_inputs: ["prefix"],
     });
+    expect(routed.isError, JSON.stringify(routed.structuredContent)).not.toBe(true);
+    expect(routed.structuredContent).toMatchObject({
+      ok: true,
+      query: "executeLensicallyIntent",
+      path: "lensically-worker/src/index.ts",
+      verified_complete_for_known_file: true,
+      search_mode: "bounded_known_file_content",
+    });
+    expect(routed.structuredContent.matches).toHaveLength(1);
   }, 30000);
 
   it("builds one complete non-mutating Execution Kernel capability campaign", async () => {
