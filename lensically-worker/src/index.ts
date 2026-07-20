@@ -25,6 +25,7 @@ import {
   prepareSourceDefinedDirectEngineeringCall,
   resolvePromotedWinningPath,
   validateHardeningTransition,
+  validateOperatorActionClosure,
   type ExecutionPolicyLibrarySource,
   type HardeningBoundary,
   type HardeningClassification,
