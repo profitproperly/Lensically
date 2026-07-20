@@ -27240,6 +27240,137 @@ async function upsertOperatorContentFocusFamilyState(
   ).run();
 }
 
+async function refreshOperatorContentFocus(
+  env: Env,
+  brandKey: GptBrandKey,
+): Promise<Record<string, unknown>> {
+  await ensureOperatorPerformanceEvaluatorTables(env);
+  const nowMs = Date.now();
+  const anchorDate = operatorLocalDateTimeParts(new Date(nowMs), THREADS_INSIGHTS_TIME_ZONE).date;
+  const recentReviews = await env.DB.prepare(
+    `SELECT cadence, period_key FROM operator_content_focus_reviews
+     WHERE brand_key = ? ORDER BY datetime(generated_at) DESC LIMIT 20`,
+  ).bind(brandKey).all<{ cadence: string; period_key: string }>();
+  const existingPeriods = new Set((recentReviews.results ?? []).map((row) => `${row.cadence}:${row.period_key}`));
+  const cadences: OperatorContentFocusCadence[] = ["daily"];
+  for (const cadence of ["weekly", "monthly", "quarterly"] as OperatorContentFocusCadence[]) {
+    const periodKey = operatorContentFocusPeriodKey(cadence, anchorDate);
+    if (!existingPeriods.has(`${cadence}:${periodKey}`)) cadences.push(cadence);
+  }
+  const authority: OperatorContentFocusCadence = cadences.includes("quarterly") ? "quarterly"
+    : cadences.includes("monthly") ? "monthly"
+      : cadences.includes("weekly") ? "weekly" : "daily";
+  const built = await buildOperatorContentFocusFamilies(env, brandKey, authority, nowMs);
+  const families = built.families;
+  const dailyDecisions = buildOperatorContentFocusDailyDecisions(operatorContentFocusDailyCandidates(families));
+  const generatedAt = new Date(nowMs).toISOString();
+  const reviewIds = new Map<OperatorContentFocusCadence, string>();
+  for (const cadence of cadences) {
+    const decisions = cadence === "daily" ? dailyDecisions : families.map((family) => ({
+      source_card_family_id: family.source_card_family_id,
+      status: family.status,
+      recommended_status: family.recommended_status,
+      confidence_score: family.confidence_score,
+      reason: family.decision_reason,
+    }));
+    const reviewId = await upsertOperatorContentFocusReview(env, {
+      brand_key: brandKey,
+      cadence,
+      period_key: operatorContentFocusPeriodKey(cadence, anchorDate),
+      anchor_date: anchorDate,
+      family_count: families.length,
+      decisions,
+      generated_at: generatedAt,
+    });
+    reviewIds.set(cadence, reviewId);
+  }
+  const authorityReviewId = reviewIds.get(authority) ?? reviewIds.get("daily") ?? null;
+  const decisionByFamily = new Map(dailyDecisions.map((decision) => [decision.source_card_family_id, decision]));
+  for (const family of families) {
+    const familyId = String(family.source_card_family_id);
+    await upsertOperatorContentFocusFamilyState(
+      env,
+      brandKey,
+      family,
+      built.current_by_family.get(familyId),
+      authorityReviewId,
+      decisionByFamily.get(familyId),
+    );
+  }
+  return {
+    version: OPERATOR_CONTENT_FOCUS_VERSION,
+    anchor_date: anchorDate,
+    authority_cadence: authority,
+    cadences_generated: cadences,
+    family_count: families.length,
+    daily_decisions: dailyDecisions,
+    allocation: OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION,
+  };
+}
+
+async function getLatestOperatorContentFocus(
+  env: Env,
+  brandKey: GptBrandKey,
+): Promise<Record<string, unknown>> {
+  await ensureOperatorPerformanceEvaluatorTables(env);
+  const reviewRows = await env.DB.prepare(
+    `SELECT cadence, period_key, anchor_date, decisions_json, allocation_json, generated_at
+     FROM operator_content_focus_reviews
+     WHERE brand_key = ?
+     ORDER BY datetime(generated_at) DESC LIMIT 20`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const latestByCadence = new Map<string, Record<string, unknown>>();
+  for (const row of reviewRows.results ?? []) {
+    const cadence = String(row.cadence ?? "");
+    if (cadence && !latestByCadence.has(cadence)) latestByCadence.set(cadence, row);
+  }
+  const familyRows = await env.DB.prepare(
+    `SELECT source_card_family_id, source_identity_key, status, recommended_status,
+            confidence_score, confidence_label, allocation_weight, decision_reason,
+            reuse_directives_json, stop_directives_json, horizon_evidence_json,
+            manual_lock, updated_at
+     FROM operator_content_focus_family_states
+     WHERE brand_key = ?
+     ORDER BY allocation_weight DESC, confidence_score DESC, updated_at DESC`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const review = (cadence: OperatorContentFocusCadence): Record<string, unknown> | null => {
+    const row = latestByCadence.get(cadence);
+    return row ? {
+      cadence,
+      period_key: row.period_key,
+      anchor_date: row.anchor_date,
+      decisions: safeParseJsonString(String(row.decisions_json ?? "[]")) ?? [],
+      allocation: safeParseJsonString(String(row.allocation_json ?? "{}")) ?? {},
+      generated_at: row.generated_at,
+    } : null;
+  };
+  return {
+    available: familyRows.results !== undefined,
+    version: OPERATOR_CONTENT_FOCUS_VERSION,
+    reviews: {
+      daily: review("daily"),
+      weekly: review("weekly"),
+      monthly: review("monthly"),
+      quarterly: review("quarterly"),
+    },
+    family_states: (familyRows.results ?? []).map((row) => ({
+      source_card_family_id: row.source_card_family_id,
+      source_identity_key: row.source_identity_key,
+      status: row.status,
+      recommended_status: row.recommended_status,
+      confidence_score: Number(row.confidence_score ?? 0),
+      confidence_label: row.confidence_label,
+      allocation_weight: Number(row.allocation_weight ?? 0),
+      decision_reason: row.decision_reason,
+      reuse_directives: safeParseJsonString(String(row.reuse_directives_json ?? "{}")) ?? {},
+      stop_directives: safeParseJsonString(String(row.stop_directives_json ?? "{}")) ?? {},
+      horizons: safeParseJsonString(String(row.horizon_evidence_json ?? "{}")) ?? {},
+      manual_lock: Number(row.manual_lock ?? 0) === 1,
+      updated_at: row.updated_at,
+    })),
+  };
+}
+
 async function getLatestOperatorPerformanceLearning(
   env: Env,
   brandKey: GptBrandKey,
