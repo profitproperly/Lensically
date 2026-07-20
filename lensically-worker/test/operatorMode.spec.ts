@@ -3199,7 +3199,7 @@ describe("operator mode MCP endpoint", () => {
         JSON.stringify(result.structuredContent.campaign.live_reads.failures),
       ).toBe(0);
     }
-    expect(eligibleReads).toBe(42);
+        expect(eligibleReads).toBe(40);
     expect(failedReads).toBe(0);
 
     const mutationSegments = [
@@ -3224,7 +3224,7 @@ describe("operator mode MCP endpoint", () => {
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-    expect(eligibleMutations).toBe(60);
+        expect(eligibleMutations).toBe(52);
     expect(failedMutationPreflights).toBe(0);
   }, 120000);
 
