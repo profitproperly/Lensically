@@ -706,6 +706,7 @@ describe("System Directory foundation", () => {
 
       it("keeps one permanent registry for every known prevented client-block signature", () => {
     expect(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).toEqual([
+      "typed_repository_symbol_false_positive",
       "public_internal_handler_identifier",
       "public_release_intent_or_exact_identifier",
       "public_account_alias_enumeration",
