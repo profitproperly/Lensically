@@ -7056,6 +7056,97 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
   ).run();
 
   await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_work_state (
+      id TEXT PRIMARY KEY CHECK (id = 'singleton'),
+      contract_version TEXT NOT NULL,
+      policy_version TEXT NOT NULL,
+      role TEXT NOT NULL,
+      active_outcome_key TEXT NOT NULL,
+      active_outcome_title TEXT NOT NULL,
+      active_scope_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      scope_frozen INTEGER NOT NULL DEFAULT 1,
+      active_interrupt_key TEXT,
+      next_action TEXT NOT NULL,
+      completion_evidence_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_work_ledger (
+      id TEXT PRIMARY KEY,
+      work_key TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      priority TEXT NOT NULL,
+      status TEXT NOT NULL,
+      intake_decision TEXT NOT NULL,
+      intake_reason TEXT NOT NULL,
+      required_for_active_outcome INTEGER NOT NULL DEFAULT 0,
+      dependencies_json TEXT NOT NULL DEFAULT '[]',
+      completion_condition TEXT NOT NULL,
+      execution_order INTEGER NOT NULL DEFAULT 1000,
+      evidence_json TEXT NOT NULL DEFAULT '[]',
+      merged_into_work_key TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_work_ledger_status_order
+     ON operator_work_ledger (status, priority, execution_order, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO operator_work_state (
+      id, contract_version, policy_version, role, active_outcome_key, active_outcome_title,
+      active_scope_json, status, scope_frozen, next_action
+    ) VALUES ('singleton', ?, ?, ?, ?, ?, ?, 'active', 1, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      contract_version = excluded.contract_version,
+      policy_version = excluded.policy_version,
+      role = excluded.role,
+      active_outcome_key = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.active_outcome_key ELSE excluded.active_outcome_key END,
+      active_outcome_title = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.active_outcome_title ELSE excluded.active_outcome_title END,
+      active_scope_json = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.active_scope_json ELSE excluded.active_scope_json END,
+      scope_frozen = CASE WHEN operator_work_state.status = 'completed' THEN operator_work_state.scope_frozen ELSE 1 END,
+      updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
+    SINGLE_ACTIVE_OUTCOME_POLICY_VERSION,
+    AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
+    OPERATOR_ACTIVE_OUTCOME_KEY,
+    OPERATOR_ACTIVE_OUTCOME_TITLE,
+    JSON.stringify(OPERATOR_ACTIVE_OUTCOME_SCOPE),
+    "Complete the frozen CHL release prerequisites, validate one exact head, and release only after proof.",
+  ).run();
+  for (const item of DEFAULT_OPERATOR_WORK_LEDGER) {
+    await env.DB.prepare(
+      `INSERT INTO operator_work_ledger (
+        id, work_key, title, summary, priority, status, intake_decision, intake_reason,
+        required_for_active_outcome, completion_condition, execution_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(work_key) DO UPDATE SET
+        title = excluded.title,
+        summary = excluded.summary,
+        priority = excluded.priority,
+        required_for_active_outcome = excluded.required_for_active_outcome,
+        completion_condition = excluded.completion_condition,
+        execution_order = excluded.execution_order,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      crypto.randomUUID(), item.work_key, item.title, item.summary, item.priority,
+      item.required_for_active_outcome ? "queued" : "deferred",
+      item.required_for_active_outcome ? "activate" : "defer",
+      item.required_for_active_outcome ? "required_prerequisite" : "single_active_outcome_guard",
+      item.required_for_active_outcome ? 1 : 0,
+      item.completion_condition,
+      item.execution_order,
+    ).run();
+  }
+
+  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_repo_write_sessions (
       id TEXT PRIMARY KEY,
       path TEXT NOT NULL,
