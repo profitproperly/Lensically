@@ -20474,10 +20474,10 @@ async function handleOperatorMcpEngineeringTool(
         : {};
     };
     let nextLiveId = 3;
-    const callGatewayLiveProfile = async (profileId: string, args: Record<string, unknown>) =>
+    const callDirectLiveTool = async (toolName: string, args: Record<string, unknown>) =>
       callLiveMcp(nextLiveId++, "tools/call", {
-        name: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-        arguments: { profile_id: profileId, inputs: args },
+        name: toolName,
+        arguments: args,
       });
 
     const listed = await callLiveMcp(2, "tools/list", {});
