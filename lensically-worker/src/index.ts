@@ -16573,22 +16573,40 @@ async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Prom
   if (!workKey || !title || !summary || !completionCondition) return { ok: false, error: "work_intake_required_fields_missing" };
   const state = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>();
   const existing = await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE work_key = ? LIMIT 1`).bind(workKey).first<Record<string, unknown>>();
+  const explicitDuplicateOf = normalizeOperatorMachineKey(args.duplicate_of, "");
+  if (explicitDuplicateOf === workKey) return { ok: false, error: "operator_work_self_merge_forbidden" };
+  if (existing && !explicitDuplicateOf) {
+    return {
+      ok: true,
+      intake_decision: "merge",
+      reason: "existing_work_key",
+      active_outcome_unchanged: true,
+      item: serializeOperatorWorkItem(existing),
+      active_outcome: serializeOperatorWorkState(state ?? null),
+    };
+  }
   const severityValue = (normalizeOperatorText(args.severity, 2, true) ?? "").toUpperCase() as HardeningSeverity;
   const severity: HardeningSeverity | null = (["P0", "P1", "P2", "P3"] as string[]).includes(severityValue) ? severityValue : null;
-  const duplicateOf = normalizeOperatorMachineKey(args.duplicate_of, "") || (existing ? workKey : null);
+  const activeOutcomeKey = state?.status === "active" ? normalizeOperatorText(state.active_outcome_key, 200, true) : null;
+  const activeOutcomeExists = Boolean(activeOutcomeKey);
+  const incidentInterrupt = severity === "P0" || severity === "P1";
+  const requiredPrerequisite = args.prerequisite_for_active_outcome === true || args.irreversible_rework_if_deferred === true;
   const intake = classifyOperatorWorkIntake({
-    active_outcome_key: normalizeOperatorText(state?.active_outcome_key, 200, true),
+    active_outcome_key: activeOutcomeKey,
     proposed_work_key: workKey,
     severity,
     prerequisite_for_active_outcome: args.prerequisite_for_active_outcome === true,
     irreversible_rework_if_deferred: args.irreversible_rework_if_deferred === true,
-    duplicate_of: duplicateOf,
+    duplicate_of: explicitDuplicateOf || null,
     conflicts_with_mission: args.conflicts_with_mission === true,
   });
   const status: OperatorWorkItemStatus = intake.decision === "activate"
-    ? state?.active_outcome_key ? "interrupting" : "queued"
+    ? activeOutcomeExists && incidentInterrupt ? "interrupting" : "queued"
     : intake.decision === "defer" ? "deferred" : intake.decision === "merge" ? "merged" : "rejected";
   const priority = severity ?? "P3";
+  const requiredForActiveOutcome = intake.decision === "activate" && !incidentInterrupt
+    ? 1
+    : requiredPrerequisite ? 1 : 0;
   await env.DB.prepare(
     `INSERT INTO operator_work_ledger (
       id, work_key, title, summary, priority, status, intake_decision, intake_reason,
