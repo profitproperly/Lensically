@@ -1,6 +1,7 @@
 name: Lensically Engineering
 # [operator-tests] exact-head fallback runs focused Operator diagnostics before the final full regression suite.
 # [system-directory-tests] exact-head fallback runs isolated System Directory validation.
+# [threads-publish-tests] exact-head fallback runs isolated Threads publishing readiness validation.
 # verified-release-marker: release-44
 # verified-release-trigger: r44
 # verified-operator-shards-marker: shards-16
@@ -17,7 +18,8 @@ on:
         type: choice
         options:
           - typecheck
-          - system-directory-tests
+                    - system-directory-tests
+          - threads-publish-tests
           - operator-tests
           - gpt-memory-tests
           - worker-deploy
@@ -129,7 +131,7 @@ jobs:
 
       - name: Threads publish readiness tests
         id: threads_publish_tests
-        if: ${{ inputs.task == 'worker-deploy' }}
+                if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
           set -o pipefail
