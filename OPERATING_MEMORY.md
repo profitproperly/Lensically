@@ -56,9 +56,10 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 ## Validation and Deployment
 
-- Normal release order: dependency-free preflight, `npx tsc --noEmit`, mandatory System Directory tests, focused Operator release gate, GPT-memory tests, Worker deployment, cron verification, and scheduler safety verification.
-- Full Operator diagnostics run as eight deterministic parallel shards. Do not restore the serial single-file workflow; every active test title must remain assigned to exactly one shard and any shard failure must fail the overall run.
-- Recovery dispatches releases using the configured branch plus the exact commit in `release_sha`. Checkout must equal that SHA before validation and deployment; the main gateway never dispatches deployment.
+- Normal release order: Cloudflare exact-head validation, TypeScript, capability lifecycle preflight, Operator acceptance, mandatory System Directory tests, Threads publishing tests, GPT-memory tests, receipt creation, one `[verified-worker-release]` marker, gated deployment of the same SHA, and live verification.
+- Ordinary commits validate and intentionally skip deployment. `cloudflare-deploy-gate.mjs` may deploy only when the validation receipt matches the current commit and its message contains the verified release marker.
+- Full Operator diagnostics remain available as eight deterministic parallel shards when focused evidence is insufficient. GitHub Actions billing or availability is not a normal release dependency.
+- Recovery cannot bypass the exact-head Cloudflare receipt. It may restore Main or inspect a broken deployment plane, then normal validation and release return to the gated path.
 - A superseded or cancelled workflow is not an implementation failure when a newer run for the same intended commit is authoritative.
 - Version changes require synchronized runtime constants, exact test assertions, and `CURRENT_STATE.md`. Do not bump versions for architecture cleanup unless the public/runtime contract requires it.
 - Live completion requires health on the exact commit, OAuth and initialize success, one-tool discovery, direct-call rejection, mapped execution success, and the expected registry generation.
