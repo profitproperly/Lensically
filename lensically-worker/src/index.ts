@@ -20682,29 +20682,34 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       const requestedArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
         ? message.params.arguments as Record<string, unknown>
         : {};
-      const gatewayAccountDataLoaded = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY
+      const directPublicEntry = isOperatorPublicDirectToolName(requestedToolName);
+      const legacyGatewayEntry = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
+      const gatewayAccountDataLoaded = directPublicEntry || legacyGatewayEntry
         ? await operatorGatewayAccountDataLoaded(env, requestedArgs)
         : false;
-      const directEntryAllowed = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
-      if (!directEntryAllowed) {
+      if (!directPublicEntry && !legacyGatewayEntry) {
         return mcpJsonResponse({
           jsonrpc: "2.0",
           id: id ?? null,
           result: {
             structuredContent: {
               ok: false,
-              error: "routed_execution_gateway_required",
+              error: "public_direct_tool_required",
               requested_tool: requestedToolName,
-              required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
               account_data_loaded: false,
             },
-            content: [{ type: "text", text: "Lensically operational calls must enter through the routed execution gateway." }],
+            content: [{ type: "text", text: "Lensically accepts only advertised direct typed Main tools." }],
             isError: true,
           },
         });
       }
       let toolName = requestedToolName;
-      let rawArgs = requestedArgs;
+      let rawArgs = directPublicEntry
+        ? {
+            ...requestedArgs,
+            execution_guard: await createOperatorExecutionGuard(env, requestedToolName, requestedArgs),
+          }
+        : requestedArgs;
       let routedGatewayMetadata: Record<string, unknown> | null = null;
       if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
         const compiledProfile = compileOperatorPublicProfileRequest(requestedArgs);
