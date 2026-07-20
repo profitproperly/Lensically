@@ -1275,9 +1275,9 @@ describe("System Directory foundation", () => {
         expect(CLIENT_SAFE_REQUEST_PROFILES.repository_symbol_search.allowed_input_keys).toEqual(["path", "symbol", "limit"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_write_commit.allowed_input_keys).toEqual(["session_id"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.repository_file_read.allowed_input_keys).toContain("max_lines");
-    expect(buildClientSafeGatewayRequest("repository_symbol_search", { path: "lensically-worker/src/index.ts", symbol: "hardening transition", limit: 5 })).toMatchObject({
+        expect(buildClientSafeGatewayRequest("repository_symbol_search", { path: "lensically-worker/src/index.ts", symbol: "executeLensicallyIntent", limit: 5 })).toMatchObject({
       intent: "search repository symbol",
-      inputs: { path: "lensically-worker/src/index.ts", symbol: "hardening transition", limit: 5 },
+      inputs: { path: "lensically-worker/src/index.ts", symbol: "executeLensicallyIntent", limit: 5 },
     });
   });
 

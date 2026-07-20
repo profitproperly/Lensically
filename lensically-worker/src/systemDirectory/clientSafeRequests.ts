@@ -159,7 +159,7 @@ function inspectValue(value: unknown, path: string, violations: string[]): void 
   if (typeof value === "string") {
         const trimmed = value.trim();
     if (/^inputs\.patches\[\d+\]\.(find|replace)$/.test(path)) return;
-    if (INTERNAL_HANDLER_IDENTIFIER.test(trimmed)) violations.push(`internal_handler_identifier:${path}`);
+        if (path !== "inputs.symbol" && INTERNAL_HANDLER_IDENTIFIER.test(trimmed)) violations.push(`internal_handler_identifier:${path}`);
     if (INTERNAL_ACTION_KEY.test(trimmed)) violations.push(`internal_action_key:${path}`);
     if (path !== "inputs.brand_key" && containsTypedOnlyAccountIdentifier(trimmed)) violations.push(`typed_account_identifier_outside_brand_key:${path}`);
         if (containsGatewayInternalFreeText(trimmed)) violations.push(`gateway_internal_free_text:${path}`);
