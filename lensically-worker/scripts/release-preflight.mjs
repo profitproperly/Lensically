@@ -224,33 +224,31 @@ if (!source.includes("const RETIRED_EXECUTION_TABLES")
   errors.push("legacy_execution_storage_retirement_missing");
 }
 
-const singleGatewayContractChecks = [
-  ["public_tool", source.includes('name: "executeLensicallyIntent"')],
-  ["profile_inputs_required", source.includes('required: ["profile_id", "inputs"]')],
-  ["retired_freehand_required_absent", !source.includes('required: ["objective", "intent", "inputs"]')],
-  ["server_compilation_description", source.includes("Lensically compiles the canonical objective and intent server-side")],
-  ["profile_contract_metadata", source.includes('public_contract: "profile_id_inputs_v1"')],
-  ["legacy_compatibility_metadata", source.includes("legacy_freehand_compatibility: true")],
+const directMainContractChecks = [
+  ["public_allowlist", source.includes("const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")],
+  ["public_tool_builder", source.includes("buildOperatorPublicMcpTools")],
+  ["direct_contract_metadata", source.includes('public_contract: "direct_typed_tools_v1"')],
+  ["direct_discovery", source.includes("const tools = await buildOperatorPublicMcpTools(env)")],
+  ["direct_entry_gate", source.includes("const directPublicEntry = isOperatorPublicDirectToolName(requestedToolName)")],
+  ["legacy_gateway_hidden", source.includes("const legacyGatewayEntry = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY")],
+  ["direct_server_guard", source.includes("execution_guard: await createOperatorExecutionGuard(env, requestedToolName, requestedArgs)")],
+  ["generic_gateway_not_advertised", tests.includes('expect(names).not.toEqual(expect.arrayContaining([\n      "executeLensicallyIntent"')],
+  ["closed_public_schemas", tests.includes("tool.inputSchema?.additionalProperties === false")],
+  ["server_side_proceed", source.includes("Later direct account calls use server-side continuity and do not send a Proceed flag")],
   ["execution_kernel_name", source.includes('export const EXECUTION_KERNEL_NAME = "Execution Kernel"')],
   ["execution_kernel_version", source.includes('export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1"')],
   ["session_creation", source.includes("createOperatorMcpSessionId")],
   ["session_verification", source.includes("verifyOperatorMcpSession")],
   ["stale_session_rejection", source.includes("stale_mcp_deployment_session")],
-  ["profile_compiler", source.includes("compileOperatorPublicProfileRequest")],
-  ["canonical_profile_gate", source.includes("canonical_safe_profile_required")],
-  ["routed_gateway_gate", source.includes("routed_execution_gateway_required")],
-  ["map_prepare", source.includes("prepareMandatoryExecutionMapCall")],
-  ["map_finalize", source.includes("finalizeMandatoryExecutionMapCall")],
-  ["execution_kernel_receipt", source.includes("resultPayload.execution_kernel")],
 ];
-for (const [checkId, present] of singleGatewayContractChecks) {
-  if (!present) errors.push(`single_gateway_contract_missing:${checkId}`);
+for (const [checkId, present] of directMainContractChecks) {
+  if (!present) errors.push(`direct_main_contract_missing:${checkId}`);
 }
 
-if (!source.includes("const sourceDefinedStaticRoute = routedMapExecution?.d1_execution_library_bypassed === true;")
+if (!source.includes("const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;")
     || !source.includes("const preCallRouting = sourceDefinedStaticRoute")
     || !source.includes("if (!sourceDefinedStaticRoute) {\n        await recordOperatorExecutionDecision")) {
-  errors.push("static_route_runtime_bypass_missing");
+  errors.push("direct_static_route_runtime_bypass_missing");
 }
 
 if (!workflow.includes("run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}")) errors.push("workflow_run_name_missing");
