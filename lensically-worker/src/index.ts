@@ -25969,6 +25969,151 @@ export function classifyOperatorContentFocusFamily(input: OperatorContentFocusFa
   };
 }
 
+export type OperatorContentFocusDecision = {
+  role: "use_more" | "use_less" | "learn_next";
+  source_card_family_id: string;
+  status: OperatorContentFocusStatus;
+  action: string;
+  rationale: string;
+};
+
+export function buildOperatorContentFocusDailyDecisions(families: Array<{
+  source_card_family_id: string;
+  status: OperatorContentFocusStatus;
+  recommended_status?: OperatorContentFocusStatus;
+  operating_score: number | null;
+  baseline_score: number | null;
+  mature_count: number;
+  strong_count: number;
+  weak_count: number;
+  fatigue_ratio: number;
+}>): OperatorContentFocusDecision[] {
+  const decisions: OperatorContentFocusDecision[] = [];
+  const used = new Set<string>();
+  const useMore = families
+    .filter((family) => !["hold", "retire", "blocked"].includes(family.status))
+    .filter((family) => family.strong_count > 0 || Number(family.operating_score ?? 0) >= 55)
+    .sort((left, right) =>
+      right.strong_count - left.strong_count
+      || Number(right.operating_score ?? 0) - Number(left.operating_score ?? 0)
+      || Number(right.baseline_score ?? 0) - Number(left.baseline_score ?? 0),
+    )[0];
+  if (useMore) {
+    used.add(useMore.source_card_family_id);
+    decisions.push({
+      role: "use_more",
+      source_card_family_id: useMore.source_card_family_id,
+      status: useMore.status,
+      action: "Increase near-term allocation modestly and preserve the verified winning mechanism.",
+      rationale: "This family has the strongest current combination of mature wins and operating-window performance.",
+    });
+  }
+
+  const useLess = families
+    .filter((family) => !used.has(family.source_card_family_id) && !["retire", "blocked"].includes(family.status))
+    .filter((family) => family.status === "hold" || family.fatigue_ratio >= 0.5 || (family.mature_count >= 3 && Number(family.operating_score ?? 100) <= 40))
+    .sort((left, right) =>
+      Number(left.operating_score ?? 100) - Number(right.operating_score ?? 100)
+      || right.fatigue_ratio - left.fatigue_ratio
+      || right.weak_count - left.weak_count,
+    )[0];
+  if (useLess) {
+    used.add(useLess.source_card_family_id);
+    decisions.push({
+      role: "use_less",
+      source_card_family_id: useLess.source_card_family_id,
+      status: useLess.status,
+      action: "Reduce or pause near-term allocation until new evidence justifies reuse.",
+      rationale: "Recent weakness or concentration indicates underperformance or fatigue risk.",
+    });
+  }
+
+  const learnNext = families
+    .filter((family) => !used.has(family.source_card_family_id) && !["hold", "retire", "blocked"].includes(family.status))
+    .filter((family) => family.status === "test" || family.mature_count < 3 || family.recommended_status === "expand")
+    .sort((left, right) =>
+      Number(right.baseline_score ?? right.operating_score ?? 50) - Number(left.baseline_score ?? left.operating_score ?? 50)
+      || left.mature_count - right.mature_count,
+    )[0];
+  if (learnNext) {
+    decisions.push({
+      role: "learn_next",
+      source_card_family_id: learnNext.source_card_family_id,
+      status: learnNext.status,
+      action: "Run one controlled variation that changes a single surface while preserving the source mechanism.",
+      rationale: "This family has useful potential but not enough mature evidence for a stronger classification.",
+    });
+  }
+  return decisions.slice(0, 3);
+}
+
+function operatorContentFocusRandomUnit(): number {
+  const random = new Uint32Array(1);
+  crypto.getRandomValues(random);
+  return (random[0] + 1) / 4294967297;
+}
+
+export function selectOperatorContentFocusSources<T extends Record<string, unknown>>(
+  candidates: T[],
+  requestedCount: number,
+  random: () => number = operatorContentFocusRandomUnit,
+): { selected: T[]; allocation: Record<string, unknown> } {
+  const count = Math.max(0, Math.trunc(requestedCount));
+  const active = candidates.filter((candidate) => {
+    const status = String(candidate.focus_status ?? "test") as OperatorContentFocusStatus;
+    return !["hold", "retire", "blocked"].includes(status) && Number(candidate.focus_weight ?? 1) > 0;
+  });
+  const rawTargets = Object.entries(OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION).map(([key, percent]) => ({ key, raw: count * Number(percent) / 100 }));
+  const targets = Object.fromEntries(rawTargets.map((item) => [item.key, Math.floor(item.raw)])) as Record<string, number>;
+  let remaining = count - Object.values(targets).reduce((sum, value) => sum + value, 0);
+  for (const item of [...rawTargets].sort((left, right) => (right.raw % 1) - (left.raw % 1))) {
+    if (remaining <= 0) break;
+    targets[item.key] += 1;
+    remaining -= 1;
+  }
+  const weighted = (items: T[]) => [...items].map((item) => ({
+    item,
+    key: -Math.log(Math.max(random(), Number.EPSILON)) / Math.max(Number(item.focus_weight ?? 1), 0.05),
+  })).sort((left, right) => left.key - right.key).map((entry) => entry.item);
+  const buckets: Record<string, T[]> = {
+    repeat: active.filter((item) => item.focus_observed === true && item.focus_status === "repeat"),
+    expand: active.filter((item) => item.focus_observed === true && item.focus_status === "expand"),
+    test: active.filter((item) => item.focus_observed === true && item.focus_status === "test"),
+    exploration: active.filter((item) => item.focus_observed !== true),
+  };
+  const selected: T[] = [];
+  const selectedIds = new Set<string>();
+  const selectedCounts: Record<string, number> = {};
+  for (const key of ["repeat", "expand", "test", "exploration"]) {
+    for (const pick of weighted(buckets[key]).slice(0, targets[key] ?? 0)) {
+      const id = String(pick.source_identity_key ?? pick.source_candidate_id ?? "");
+      if (!id || selectedIds.has(id)) continue;
+      selected.push(pick);
+      selectedIds.add(id);
+      selectedCounts[key] = Number(selectedCounts[key] ?? 0) + 1;
+    }
+  }
+  for (const pick of weighted(active.filter((item) => {
+    const id = String(item.source_identity_key ?? item.source_candidate_id ?? "");
+    return id && !selectedIds.has(id);
+  }))) {
+    if (selected.length >= count) break;
+    const id = String(pick.source_identity_key ?? pick.source_candidate_id ?? "");
+    if (!id || selectedIds.has(id)) continue;
+    selected.push(pick);
+    selectedIds.add(id);
+  }
+  return {
+    selected: selected.slice(0, count),
+    allocation: {
+      percentages: OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION,
+      targets,
+      selected_counts: selectedCounts,
+      excluded_zero_allocation_count: candidates.length - active.length,
+    },
+  };
+}
+
 type OperatorMetricRecord = {
   views: number;
   likes: number;
