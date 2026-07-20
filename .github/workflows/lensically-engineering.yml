@@ -9,6 +9,9 @@ name: Lensically Engineering
 run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       task:
