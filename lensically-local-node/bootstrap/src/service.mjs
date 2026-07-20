@@ -73,15 +73,21 @@ async function verifyJob(job, config) {
 }
 
 async function postJson(url, body, config, options = {}) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-lensically-node-id": config.node_id,
-      ...(options.enrollment ? {} : { "x-lensically-node-credential": config.device_credential }),
-    },
-    body: JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-lensically-node-id": config.node_id,
+        ...(options.enrollment ? {} : { "x-lensically-node-credential": config.device_credential }),
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    log("request_exception", { url, error: error?.message || String(error), cause: error?.cause?.message || null });
+    throw error;
+  }
   const json = await response.json().catch(() => ({ ok: false, error: "invalid_json_response", status: response.status }));
   if (!response.ok) log("request_failed", { url, status: response.status, error: json?.error });
   return json;
@@ -99,11 +105,14 @@ function runWorker(job, config, state) {
   const parsed = (() => {
     try { return JSON.parse(stdout); } catch { return null; }
   })();
+  const parsedPayload = parsed && typeof parsed === "object";
   return {
     status: result.status === 0 ? "completed" : "failed",
     exit_code: result.status,
-    stdout: stdout.slice(-20000),
+    error_kind: result.error?.code || parsed?.error_kind || null,
+    stdout: parsedPayload ? "" : stdout.slice(-20000),
     stderr: String(result.stderr || "").replace(/[A-Za-z0-9_=-]{32,}/g, "[redacted]").slice(-20000),
+    ...(parsed?.stages ? { stages: parsed.stages } : {}),
     ...(parsed?.evidence ? { evidence: parsed.evidence } : {}),
   };
 }
