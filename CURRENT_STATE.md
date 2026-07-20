@@ -9,7 +9,7 @@
 
 ## Operator MCP
 
-- Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/index.ts`; architecture documentation does not duplicate the writable semantic version. It is exposed at `/api/operator/mcp` with OAuth and one permanent public tool: `executeLensicallyIntent`.
+- Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/index.ts`; architecture documentation does not duplicate the writable semantic version. It is exposed at `/api/operator/mcp` with OAuth and a curated public surface of direct typed tools.
 - Engineering failures and explicit contradictions pass through `defect-generalization-gate-v1`. Successful known paths bypass it; duplicated assumptions, contract drift, architectural drift, and known recurrences require a targeted sibling scan and prevention disposition before the interrupted objective resumes.
 - `winning-path-promotion-v1` converts proven resolutions into source-controlled matching conditions, prohibited losing paths, mandatory winning procedures, enforcement points, regressions, and supersession rules. Matching known work follows the promoted winner before action; unknown terrain remains available for bounded discovery, and preventable incidents cannot close before promotion and enforcement.
 - Operator UI parity reads use one canonical paginated handler for the same Dashboard, Followers, live Insights, Post Archive, and Saved Patterns services used by the web UI. Stale Manifest review batches have a separate canonical retirement action that preserves all underlying sources, analytics, and lineage.
@@ -19,7 +19,7 @@
 - Each MCP initialize response issues a signed deployment-scoped `Mcp-Session-Id`. A request carrying a session from an older Worker deployment or kernel version receives HTTP 404 and a replacement session identifier before routing, forcing reinitialization instead of executing stale behavior.
 - Route selection does not read D1, compile dynamic policy, scan repository knowledge, create incidents, promote routes, or consult OpsMemory or a phonebook. Legacy top-level receipt names are retired; the Execution Kernel is the sole execution receipt.
 - Known engineering operations execute through the direct source-defined lane before account bootstrap. Recovery remains independent while the post-consolidation call campaign identifies and removes any remaining normal-path dependency before cleanup.
-- Related repository edits use one atomic patch set when practical. Normal releases use one exact-SHA validate-and-deploy workflow.
+- Related repository edits use one atomic patch set when practical. Routine pushes use one fast validation workflow; production releases use one explicit exact-SHA validate-and-deploy workflow.
 - The mandatory autonomous capability lifecycle is source-controlled in `lensically-worker/src/systemDirectory/capabilityLifecycle.json`. Future models resolve and reuse existing capabilities first; when a capability is missing, they create and store its declaration, Directory entry, canonical typed handler, static route, focused regression, validation scope, exact-head release plan, and live-verification contract without routine owner prompting.
 - Fast validation and release preflight fail closed when a new tool or Directory entry lacks a complete lifecycle declaration. Compatibility bridges and duplicate implementation paths are forbidden.
 - Mandatory startup reports the lifecycle version, canonical location, autonomous execution rule, and required completion sequence.
