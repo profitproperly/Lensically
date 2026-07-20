@@ -26147,6 +26147,12 @@ function operatorRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function operatorArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  const parsed = safeParseJsonString(String(value ?? "[]"));
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 function normalizeOperatorFeatureValue(value: unknown, fallback = "unknown"): string {
   return normalizeGptStrategyToken(value, 120) ?? fallback;
 }
