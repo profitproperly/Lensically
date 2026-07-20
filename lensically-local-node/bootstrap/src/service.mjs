@@ -25,7 +25,7 @@ const allowedJobTypes = new Set([
 
 function loadJson(path, fallback) {
   if (!existsSync(path)) return fallback;
-  return JSON.parse(readFileSync(path, "utf8"));
+  return JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
 }
 
 function saveJson(path, value) {
