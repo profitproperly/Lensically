@@ -14396,6 +14396,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "markOperatorDecisionExecuted",
   "list_accounts",
   "get_account_state",
+  "start_workflow_session",
+  "admit_context",
   "read_lensically_ui_surface",
   "get_hourly_coverage",
   "get_production_board",
