@@ -220,7 +220,14 @@ async function commitRepoFileViaGitData(env: Env, path: string, content: string,
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ sha: commitSha, force: false }),
   });
-  return { ok: update.ok, status: update.status, commit_sha: update.ok ? commitSha : null, phase: update.ok ? undefined : "update_ref" };
+  if (update.ok) return { ok: true, status: update.status, commit_sha: commitSha };
+
+  const reconciled = await github(env, refPath);
+  const reconciledData = reconciled.data && typeof reconciled.data === "object" && !Array.isArray(reconciled.data) ? reconciled.data as Record<string, unknown> : null;
+  const reconciledObject = reconciledData?.object && typeof reconciledData.object === "object" && !Array.isArray(reconciledData.object) ? reconciledData.object as Record<string, unknown> : null;
+  const reconciledSha = typeof reconciledObject?.sha === "string" ? reconciledObject.sha : null;
+  if (reconciled.ok && reconciledSha === commitSha) return { ok: true, status: update.status, commit_sha: commitSha, phase: "update_ref_reconciled" };
+  return { ok: false, status: update.status, commit_sha: null, phase: reconciled.ok && reconciledSha === headSha ? "update_ref_unchanged" : "update_ref_conflicted" };
 }
 
 async function toolCall(name: string, args: Record<string, unknown>, env: Env): Promise<Record<string, unknown>> {
