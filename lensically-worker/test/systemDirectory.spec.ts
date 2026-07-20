@@ -134,11 +134,12 @@ describe("System Directory foundation", () => {
     );
   });
 
-        it("requires System Directory validation before Worker deployment", () => {
+        it("requires explicit exact-SHA validation before Worker deployment", () => {
     const deployment = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker");
     expect(deployment?.related_entry_ids).toContain("engineering.operator_validation");
     expect(deployment?.hard_gates).toEqual(expect.arrayContaining([
-            "Main releases require a verified repository head and an exact-SHA validation receipt.",
+      "Production releases require one explicit exact 40-character repository SHA.",
+      "The release workflow validates, deploys, and verifies the same SHA.",
     ]));
   });
 
