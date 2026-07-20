@@ -75,7 +75,7 @@ jobs:
 
       - name: Fast release preflight
         id: release_preflight
-        if: ${{ inputs.task == 'worker-deploy' }}
+        if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
           set -o pipefail
