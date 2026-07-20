@@ -15244,8 +15244,8 @@ function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
     version: EXECUTION_KERNEL_VERSION,
     deployment_id: env.CF_VERSION_METADATA?.id ?? null,
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
-    public_gateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-    public_contract: "profile_id_inputs_v1",
+    public_gateway: "direct_typed_tools",
+    public_contract: "direct_typed_tools_v1",
         deployment_fresh_sessions: true,
     router_version: OPERATOR_REGISTRY_GENERATION,
     components: [
