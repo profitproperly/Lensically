@@ -134,7 +134,7 @@ jobs:
 
       - name: Threads publish readiness tests
         id: threads_publish_tests
-        if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' }}
+        if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
         continue-on-error: true
         run: |
           set -o pipefail
