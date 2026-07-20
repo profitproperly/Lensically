@@ -19974,6 +19974,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         resultPayload.hardening_incident = automaticIncident.incident;
         resultPayload.normal_work_blocked = automaticIncident.normal_work_blocked;
       }
+      resultPayload.operator_action_closure = buildOperatorActionClosure(toolName, resultPayload);
+      resultPayload = enforceOperatorPayloadBudget(resultPayload);
       if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
       }
