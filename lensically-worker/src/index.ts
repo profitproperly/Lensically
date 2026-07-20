@@ -14817,6 +14817,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     getGithubFile(env, "OPERATING_MEMORY.md"),
   ]);
   const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
+  const operatorWorkState = await getOperatorWorkState(env, { limit: 30 });
   return {
     ok: true,
     bootstrap_version: "operator-startup-v4",
