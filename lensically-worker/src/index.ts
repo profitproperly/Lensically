@@ -26445,9 +26445,56 @@ async function ensureOperatorPerformanceEvaluatorTables(env: Env): Promise<void>
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_generation_learning_briefs_active
      ON operator_generation_learning_briefs (brand_key, active, generated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_content_focus_reviews (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      period_key TEXT NOT NULL,
+      anchor_date TEXT NOT NULL,
+      windows_json TEXT NOT NULL,
+      decisions_json TEXT NOT NULL,
+      allocation_json TEXT NOT NULL,
+      generated_at TEXT NOT NULL,
+      evaluator_version TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, cadence, period_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_content_focus_reviews_latest
+     ON operator_content_focus_reviews (brand_key, cadence, generated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_content_focus_family_states (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      source_card_family_id TEXT NOT NULL,
+      source_identity_key TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'test',
+      recommended_status TEXT NOT NULL DEFAULT 'test',
+      confidence_score REAL NOT NULL DEFAULT 0,
+      confidence_label TEXT NOT NULL DEFAULT 'insufficient',
+      allocation_weight REAL NOT NULL DEFAULT 1,
+      decision_reason TEXT NOT NULL,
+      reuse_directives_json TEXT NOT NULL DEFAULT '{}',
+      stop_directives_json TEXT NOT NULL DEFAULT '{}',
+      horizon_evidence_json TEXT NOT NULL DEFAULT '{}',
+      manual_lock INTEGER NOT NULL DEFAULT 0,
+      last_review_id TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, source_card_family_id)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_content_focus_family_selection
+     ON operator_content_focus_family_states (brand_key, status, allocation_weight DESC, updated_at DESC)`,
   ).run();
 }
 
