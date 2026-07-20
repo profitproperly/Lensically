@@ -14383,6 +14383,9 @@ const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
 
 const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "getOperatorStartupContext",
+  "engineeringPrecheck",
+  "getEngineeringAccessState",
+  "listRepoFiles",
   "selectOperatorKey",
   "confirmOperatorProceed",
   "getGrowthMission",
