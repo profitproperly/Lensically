@@ -20475,8 +20475,7 @@ async function handleOperatorMcpEngineeringTool(
       : [];
     const startup = await callDirectLiveTool("getOperatorStartupContext", {});
     const select = await callDirectLiveTool("selectOperatorKey", { brand_key: "manifest_mental" });
-    const blocked = await callDirectLiveTool("getWorkflowStatus", { brand_key: "manifest_mental" });
-    const proceed = await callDirectLiveTool("confirmOperatorProceed", { brand_key: "manifest_mental" });
+    const proceed = await callDirectLiveTool("confirmOperatorProceed", { brand_key: "manifest_mental", proceed_confirmed: true });
     const proceedContent = structured(proceed.payload);
     const allowed = await callDirectLiveTool("getWorkflowStatus", {
       brand_key: "manifest_mental",
