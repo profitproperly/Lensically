@@ -837,10 +837,18 @@ describe("System Directory foundation", () => {
     expect(() => buildClientSafeGatewayRequest("recovery_workflow_status", { run_id: 1 })).toThrow("client_safe_request_external_surface:recovery_workflow_status");
   });
 
-  it("reads repository status through Recovery after a main-gateway block", () => {
-    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_repo_status).toMatchObject({ surface: "recovery_plane", allowed_input_keys: [] });
-    expect(() => buildClientSafeGatewayRequest("recovery_repo_status")).toThrow("client_safe_request_external_surface:recovery_repo_status");
-    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_repository_status_request")?.safe_profile_id).toBe("recovery_repo_status");
+  it("reads repository and validation status through the exact Main profile", () => {
+    expect(CLIENT_SAFE_REQUEST_PROFILES.repository_status).toMatchObject({
+      intent: "get repository status",
+      allowed_input_keys: [],
+    });
+    expect(buildClientSafeGatewayRequest("repository_status")).toMatchObject({
+      objective: "Read the current repository head and bounded validation checks.",
+      intent: "get repository status",
+      inputs: {},
+    });
+    expect(PREVENTED_CLIENT_BLOCKS.find((incident) => incident.id === "public_repository_status_request")?.safe_profile_id).toBe("repository_status");
+    expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_repo_status).toMatchObject({ surface: "recovery_plane" });
   });
 
   it("uses phrase-level Recovery patches for long source-contract text", () => {
