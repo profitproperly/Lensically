@@ -1,4 +1,5 @@
 name: Lensically Validation
+# verified-release-marker: release-45
 # Fast routine validation. This workflow never deploys either Worker.
 # Push markers: [typecheck], [acceptance-regressions], [operator-smoke], [operator-analytics], [operator-scheduler],
 # [operator-content], [operator-accounts], [operator-engineering], [system-directory-tests], [operator-full], [gpt-memory-tests], [verified-worker-release].
