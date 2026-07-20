@@ -42,6 +42,72 @@ export function validateHardeningTransition(current: HardeningState, target: Har
   return { allowed: errors.length === 0, errors };
 }
 
+export const AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-operating-contract-v1";
+export const SINGLE_ACTIVE_OUTCOME_POLICY_VERSION = "single-active-outcome-v1";
+export const AUTONOMOUS_BUSINESS_OPERATOR_ROLE = "Lensically Autonomous Business Operator";
+
+export type OperatorWorkIntakeDecision = "activate" | "defer" | "merge" | "reject";
+export type OperatorWorkIntakeInput = {
+  active_outcome_key?: string | null;
+  proposed_work_key: string;
+  severity?: HardeningSeverity | null;
+  prerequisite_for_active_outcome?: boolean;
+  irreversible_rework_if_deferred?: boolean;
+  duplicate_of?: string | null;
+  conflicts_with_mission?: boolean;
+};
+
+export type OperatorActionClosureInput = {
+  current_live_state?: string | null;
+  target_agent_native_state?: string | null;
+  active_outcome?: string | null;
+  next_action?: string | null;
+  priority_reason?: string | null;
+  completion_evidence?: string[];
+  owner_action_required?: boolean;
+  temporary_dependency?: string | null;
+  retirement_condition?: string | null;
+};
+
+export const AGENT_NATIVE_OPERATING_CONTRACT = {
+  version: AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
+  role: AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
+  mission_source: "durable_state_not_chat_memory",
+  execution_loop: ["restore_state", "reconcile", "diagnose", "select_priority", "execute", "verify", "record", "declare_next_action", "checkpoint"],
+  action_closure_required: true,
+  single_active_outcome: true,
+  incident_interruptions: ["P0", "P1"],
+  owner_role: "authorize_only_when_required",
+  prohibited_closures: ["analysis_without_action", "untracked_scope_expansion", "temporary_dependency_without_retirement_condition", "routine_question_back_to_owner"],
+} as const;
+
+export function classifyOperatorWorkIntake(input: OperatorWorkIntakeInput): {
+  decision: OperatorWorkIntakeDecision;
+  active_outcome_unchanged: boolean;
+  reason: string;
+} {
+  if (input.duplicate_of?.trim()) return { decision: "merge", active_outcome_unchanged: true, reason: `duplicate_of:${input.duplicate_of.trim()}` };
+  if (input.conflicts_with_mission) return { decision: "reject", active_outcome_unchanged: true, reason: "conflicts_with_mission" };
+  if (!input.active_outcome_key?.trim()) return { decision: "activate", active_outcome_unchanged: false, reason: "no_active_outcome" };
+  if (input.severity === "P0" || input.severity === "P1") return { decision: "activate", active_outcome_unchanged: false, reason: `incident_interrupt:${input.severity}` };
+  if (input.prerequisite_for_active_outcome) return { decision: "activate", active_outcome_unchanged: false, reason: "required_prerequisite" };
+  if (input.irreversible_rework_if_deferred) return { decision: "activate", active_outcome_unchanged: false, reason: "material_rework_prevention" };
+  return { decision: "defer", active_outcome_unchanged: true, reason: "single_active_outcome_guard" };
+}
+
+export function validateOperatorActionClosure(input: OperatorActionClosureInput): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (!input.current_live_state?.trim()) errors.push("current_live_state_required");
+  if (!input.target_agent_native_state?.trim()) errors.push("target_agent_native_state_required");
+  if (!input.active_outcome?.trim()) errors.push("active_outcome_required");
+  if (!input.next_action?.trim()) errors.push("next_action_required");
+  if (!input.priority_reason?.trim()) errors.push("priority_reason_required");
+  if (!input.completion_evidence?.length) errors.push("completion_evidence_required");
+  if (typeof input.owner_action_required !== "boolean") errors.push("owner_action_required_boolean");
+  if (input.temporary_dependency?.trim() && !input.retirement_condition?.trim()) errors.push("dependency_retirement_condition_required");
+  return { ok: errors.length === 0, errors };
+}
+
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
 export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
 export type WinningPathPromotion = {
