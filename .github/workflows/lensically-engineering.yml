@@ -202,14 +202,17 @@ jobs:
           expected_sha="$(git rev-parse HEAD)"
           verified=false
           for attempt in $(seq 1 12); do
-            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
-              && jq -e --arg sha "${expected_sha}" '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0) and (.runtime.commit_sha == $sha or .commit_sha == $sha)' /tmp/lensically-scheduler-health.json > /dev/null; then
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
+              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .public_gateway == "direct_typed_tools" and .live_tool_count == 84' /tmp/lensically-runtime-health.json > /dev/null \
+              && curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
+              && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
               verified=true
               break
             fi
             sleep 5
           done
           if [ "${verified}" != "true" ]; then
+            cat /tmp/lensically-runtime-health.json || true
             cat /tmp/lensically-scheduler-health.json || true
             exit 1
           fi
