@@ -1,5 +1,5 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker, {
     ScheduledPostScheduler,
   activateNextApprovedScheduledPostCanary,
@@ -3017,6 +3017,26 @@ describe("operator mode MCP endpoint", () => {
       truncated: true,
     });
 
+        const repositorySource = "export async function executeLensicallyIntent(profileId: string) {\n  return profileId;\n}\n";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (
+        request.method === "GET"
+        && url.origin === "https://api.github.com"
+        && url.pathname === "/repos/profitproperly/Lensically/contents/lensically-worker/src/index.ts"
+        && url.searchParams.get("ref") === "main"
+      ) {
+        return new Response(JSON.stringify({
+          sha: "vitest-index-sha",
+          size: repositorySource.length,
+          content: btoa(repositorySource),
+          encoding: "base64",
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
+    });
+
     const routed = await mcpToolCallRaw<{
       ok: boolean;
       query: string;
@@ -3032,6 +3052,7 @@ describe("operator mode MCP endpoint", () => {
         limit: 1,
       },
     });
+        fetchSpy.mockRestore();
     expect(routed.isError, JSON.stringify(routed.structuredContent)).not.toBe(true);
     expect(routed.structuredContent).toMatchObject({
       ok: true,
