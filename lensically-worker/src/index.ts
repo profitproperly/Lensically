@@ -10187,6 +10187,33 @@ async function getOperatorHourlyCoverage(
   };
 }
 
+async function applyManifestContentFocusToPool(
+  env: Env,
+  brandKey: GptBrandKey,
+  candidates: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  await ensureOperatorPerformanceEvaluatorTables(env);
+  const rows = await env.DB.prepare(
+    `SELECT source_card_family_id, source_identity_key, status, allocation_weight,
+            reuse_directives_json, stop_directives_json
+     FROM operator_content_focus_family_states
+     WHERE brand_key = ?`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const byIdentity = new Map((rows.results ?? []).map((row) => [String(row.source_identity_key), row]));
+  return candidates.map((candidate) => {
+    const focus = byIdentity.get(String(candidate.source_identity_key ?? ""));
+    return {
+      ...candidate,
+      focus_observed: Boolean(focus),
+      focus_family_id: focus?.source_card_family_id ?? null,
+      focus_status: focus?.status ?? "test",
+      focus_weight: focus ? Number(focus.allocation_weight ?? 1) : 1,
+      focus_reuse_directives: focus ? safeParseJsonString(String(focus.reuse_directives_json ?? "{}")) ?? {} : {},
+      focus_stop_directives: focus ? safeParseJsonString(String(focus.stop_directives_json ?? "{}")) ?? {} : {},
+    };
+  });
+}
+
 async function ensureManifestSourceBatchForDate(
   env: Env,
   brand: GptResolvedBrand,
