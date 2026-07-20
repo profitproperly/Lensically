@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker, {
     ScheduledPostScheduler,
   activateNextApprovedScheduledPostCanary,
+    buildOperatorContentFocusDailyDecisions,
   buildOperatorMaturityObservation,
   buildOperatorPostFingerprint,
+  classifyOperatorContentFocusFamily,
   evaluateThreadsPostMetricsForLearning,
     finalizeScheduledPostPublished,
   getScheduledPostPublishLineageStatus,
@@ -13,7 +15,8 @@ import worker, {
   searchKnownRepositoryFileContent,
   quarantineScheduledPostPublishAttempt,
   recoverStalePostingScheduledPosts,
-  OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
+    OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
+  selectOperatorContentFocusSources,
   shouldAutoArmScheduledPostAlarm,
 
 } from "../src";
