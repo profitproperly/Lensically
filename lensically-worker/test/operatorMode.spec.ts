@@ -2385,13 +2385,12 @@ describe("operator mode MCP endpoint", () => {
     const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
     const names = registry.tools.map((tool) => tool.name);
     const startup = await mcpTool<{
-      execution_kernel?: { name?: string; version?: string; public_contract?: string; legacy_freehand_compatibility?: boolean; deployment_fresh_sessions?: boolean };
+      execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean };
     }>("getOperatorStartupContext");
     expect(startup.execution_kernel).toMatchObject({
       name: "Execution Kernel",
       version: "lensically-execution-kernel-v1",
       public_contract: "profile_id_inputs_v1",
-      legacy_freehand_compatibility: true,
       deployment_fresh_sessions: true,
     });
     expect(new Set(names).size).toBe(names.length);
