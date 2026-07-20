@@ -15681,7 +15681,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         compiledRequest = {
           ...compiled,
           inputs: {
-            incident_id: safeInputs.incident_id,
+            incident_id: gatewayArgs.incident_id,
             target_state: targetState,
             root_cause: "Client preflight inspected semantic profile identifiers before the registered Main gateway received the request.",
             generalized_cause: "Semantic control-plane profile names require neutral public aliases compiled server-side to canonical handlers.",
