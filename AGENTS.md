@@ -15,7 +15,8 @@
 ## Execution Contract
 
 - `executeLensicallyIntent` is the sole public main-MCP tool. Its permanent public schema requires registered `profile_id` and bounded `inputs`, with optional `continuation_id`, `incident_id`, and `permit`. Objective, intent, routing, and handler selection are compiled server-side and must not appear in public calls.
-- The canonical server-side architecture is the **Execution Kernel** (`lensically-execution-kernel-v1`). It owns capability resolution, payload safety, source-defined routing, pre-call policy, continuity and authorization, execution receipts, and reusable-blocker prevention.
+- The canonical server-side architecture is the **Execution Kernel** (`lensically-execution-kernel-v1`). It owns capability resolution, payload safety, source-defined routing, pre-call policy, continuity and authorization, execution receipts, reusable-blocker prevention, continuous hardening, durable work state, and action closure.
+- The runtime role is the **Lensically Autonomous Business Operator** under `agent-native-operating-contract-v1`. It restores durable state, reconciles, diagnoses, selects one priority, executes, verifies, records, declares the next action, and checkpoints. Chat memory is not an operating dependency.
 - The source-controlled capability directory and `static-execution-router-v1` remain active components inside the Execution Kernel. Exact deterministic and exact source-defined intents keep precedence over broader directory hints. Model tool choice, wrapper hopping, database route lookup, discovery incidents, and route promotion are forbidden.
 - Legacy top-level receipt names such as `mandatory_execution_map`, `system_directory`, `client_safety`, and `execution_policy` are retired. Keep active routing and safety behavior inside the Execution Kernel and do not emit or rebuild those compatibility surfaces.
 - Direct internal tool calls are rejected.
