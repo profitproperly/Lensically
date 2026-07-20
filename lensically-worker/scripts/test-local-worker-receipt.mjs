@@ -54,7 +54,7 @@ if (evidence?.evidence_version !== "local-stage-evidence-v1") throw new Error("e
 for (const field of ["repository_sha", "checked_out_sha", "validated_sha", "release_candidate_sha"]) {
   if (evidence[field] !== sha) throw new Error(`evidence_sha_mismatch:${field}`);
 }
-if (!String(evidence.isolated_worktree || "").includes(sha)) throw new Error("isolated_worktree_missing");
+if (!String(evidence.isolated_worktree || "").includes(sha.slice(0, 12))) throw new Error("isolated_worktree_missing");
 if (!Array.isArray(evidence.stages) || evidence.stages.some((stage) => stage.status !== "passed")) {
   throw new Error("evidence_stage_failed");
 }

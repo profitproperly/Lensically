@@ -63,9 +63,9 @@ function acquireExactSource(job) {
   const sourceRoot = join(root, "source");
   const cacheDir = join(sourceRoot, "repo-cache.git");
   const jobsDir = join(sourceRoot, "jobs");
-  const jobSafeId = String(job.job_id || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  const jobSafeId = createHash("sha256").update(String(job.job_id || "")).digest("hex").slice(0, 12);
   assertCleanJobPath(jobSafeId);
-  const worktreeDir = join(jobsDir, `${jobSafeId}-${job.commit_sha}`);
+  const worktreeDir = join(jobsDir, `${jobSafeId}-${String(job.commit_sha).slice(0, 12)}`);
   mkdirSync(sourceRoot, { recursive: true });
   mkdirSync(jobsDir, { recursive: true });
   if (existsSync(worktreeDir)) rmSync(worktreeDir, { recursive: true, force: true });
@@ -87,6 +87,7 @@ function acquireExactSource(job) {
   if (fetched.status !== "passed") throw new Error(`source_fetch_failed:${fetched.output_tail.slice(0, 200)}`);
   const exists = git(["cat-file", "-e", `${job.commit_sha}^{commit}`], cacheDir);
   if (exists.status !== "passed") throw new Error("requested_commit_unavailable");
+  git(["worktree", "prune"], cacheDir);
   const add = git(["-c", "core.autocrlf=false", "worktree", "add", "--detach", worktreeDir, job.commit_sha], cacheDir);
   if (add.status !== "passed") throw new Error(`source_worktree_failed:${add.output_tail.slice(0, 200)}`);
   const head = git(["rev-parse", "HEAD"], worktreeDir);
@@ -135,6 +136,18 @@ function writeJson(path, value) {
 
 function hashFile(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function ensureWorkerTestEnv(stageRoot) {
+  const envPath = join(stageRoot, "lensically-worker", ".dev.vars");
+  if (existsSync(envPath)) return;
+  writeFileSync(envPath, [
+    "LENSICALLY_GPT_API_KEY=test-gpt-key",
+    "LENSICALLY_MCP_ACCESS_TOKEN=test-mcp-token",
+    "LENSICALLY_MCP_OAUTH_CLIENT_SECRET=test-oauth-secret",
+    "INTERNAL_API_KEY=test-internal-key",
+    "",
+  ].join("\n"));
 }
 
 function updateWorker(job) {
@@ -216,6 +229,7 @@ function main() {
     stages.push(run("npx", ["tsc", "--noEmit"], join(stageRoot, "lensically-worker")));
   }
   if (job.job_type === "run_focused_tests" || job.job_type === "validate_sha" || job.job_type === "run_full_validation") {
+    ensureWorkerTestEnv(stageRoot);
     const testPath = String(job.inputs?.test_path || "test/localExecution.spec.ts");
     stages.push(run("npm", ["run", "test", "--", "--run", testPath, "--reporter=dot", "--bail=1"], join(stageRoot, "lensically-worker")));
   }
