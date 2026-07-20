@@ -20014,8 +20014,11 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "readRepoFile") {
     const path = sanitizeRepoPath(args.path);
     const file = path ? await getGithubFile(env, path) : null;
+    if (file?.status === 200 && file.content === null) {
+      return { ok: false, error: "known_file_path_required", status: file.status, path };
+    }
     if (!file?.ok || file.content === null) {
-      return { ok: false, error: "repo_file_read_failed", status: file?.status ?? 400 };
+      return { ok: false, error: "repo_file_read_failed", status: file?.status ?? 400, path };
     }
     const startLine = Math.max(Number(args.start_line ?? 1), 1);
     const maxLines = Math.min(Math.max(Number(args.max_lines ?? 200), 1), 400);
