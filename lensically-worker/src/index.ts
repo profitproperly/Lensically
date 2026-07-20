@@ -14626,7 +14626,7 @@ async function getGithubFile(env: Env, repoPath: string): Promise<{ ok: boolean;
     }
   }
 
-  const tree = await githubRepoApi(env, `/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
+  const tree = await githubRepoApiRetryable(env, `/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
   const entries = tree.data && typeof tree.data === "object" && !Array.isArray(tree.data) && Array.isArray((tree.data as Record<string, unknown>).tree)
     ? (tree.data as Record<string, unknown>).tree as Array<Record<string, unknown>>
     : [];
