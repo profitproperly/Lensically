@@ -4,7 +4,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 ## Execution Architecture
 
-- Every main-MCP operation enters through the sole public tool `executeLensicallyIntent` using registered `profile_id` and bounded `inputs`; optional continuation fields are `continuation_id`, `incident_id`, and `permit`. Public `objective` and `intent` fields are retired and compiled server-side. This public contract is permanent; internal capabilities may change without changing the client schema.
+- Main MCP advertises curated direct typed tools with closed bounded schemas. The generic `executeLensicallyIntent` transport, `profile_id`, generic `inputs`, objective/intent routing text, wrappers, and internal handler names are not public. Internal capabilities may change behind stable direct tool contracts; any real public schema change requires an app refresh.
 - The canonical architecture is the **Execution Kernel** (`lensically-execution-kernel-v1`). It resolves the capability directory, payload contract, source-defined route, pre-call policy, continuity and authorization, execution receipt, blocker prevention, continuous hardening, durable work state, and action closure before one typed handler executes.
 - Exact deterministic and exact source-defined intents keep precedence over broader directory guidance. The model does not choose tools, wrappers, retries, or fallbacks.
 - Route selection must remain D1-independent. Do not reintroduce execution-library compilation, dynamic maps, route incidents, promotions, phonebook overrides, OpsMemory routing, or execution-event recording. Retired top-level receipt names must not be emitted or restored.
