@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 
 const steps = [
   ["npx", ["tsc", "--noEmit"], "TypeScript"],
-  ["node", ["scripts/release-preflight.mjs", "--capability-lifecycle-only"], "Capability lifecycle"],
+  ["node", ["scripts/release-preflight.mjs"], "Release preflight"],
   ["node", ["scripts/run-operator-validation.mjs", "acceptance"], "Operator acceptance"],
   ["npm", ["run", "test", "--", "--run", "test/systemDirectory.spec.ts", "--reporter=dot", "--bail=1"], "System directory"],
   ["npm", ["run", "test", "--", "--run", "test/threadsPublishService.spec.ts", "--reporter=dot", "--bail=1"], "Threads publishing"],
