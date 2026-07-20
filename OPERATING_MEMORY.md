@@ -57,6 +57,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Validation and Deployment
 
 - Normal release order: Cloudflare exact-head validation, TypeScript, capability lifecycle preflight, Operator acceptance, mandatory System Directory tests, Threads publishing tests, GPT-memory tests, receipt creation, one `[verified-worker-release]` marker, gated deployment of the same SHA, and live verification.
+- Failed: `spawnSync("npm", args, { shell: process.platform === "win32" })` in `lensically-worker/scripts/run-operator-validation.mjs`, `lensically-worker/scripts/run-cloudflare-validation.mjs`, or local-node worker command dispatch when `--testNamePattern` contains `|`. Use: invoke `node.exe` with `C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js` or `npx-cli.js` and pass the original args array without shell parsing. Applies when: running Lensically validation scripts or local execution node jobs on Windows.
 - Ordinary commits validate and intentionally skip deployment. `cloudflare-deploy-gate.mjs` may deploy only when the validation receipt matches the current commit and its message contains the verified release marker.
 - Full Operator diagnostics remain available as eight deterministic parallel shards when focused evidence is insufficient. GitHub Actions billing or availability is not a normal release dependency.
 - Recovery cannot bypass the exact-head Cloudflare receipt. It may restore Main or inspect a broken deployment plane, then normal validation and release return to the gated path.
