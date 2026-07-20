@@ -14792,17 +14792,15 @@ async function putGithubFiles(
     return { ok: false, status: commit.status, commit_sha: null, head_sha: headSha, data: { phase: "create_commit", response: commit.data } };
   }
 
-  const update = await githubRepoApi(env, `/git/refs/heads/${branchRef}`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sha: commitSha, force: false }),
-  });
+  const update = await updateGithubBranchRefWithReconciliation(env, branchRef, headSha, commitSha);
   return {
     ok: update.ok,
     status: update.status,
-    commit_sha: update.ok ? commitSha : null,
+    commit_sha: update.committed_sha,
     head_sha: headSha,
-    data: update.ok ? { write_mode: "git_data_api_atomic", commit: commit.data } : { phase: "update_ref", response: update.data },
+    data: update.ok
+      ? { write_mode: "git_data_api_atomic", commit: commit.data, ref_update: update.data }
+      : update.data,
   };
 }
 
