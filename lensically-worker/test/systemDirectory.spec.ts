@@ -1,7 +1,6 @@
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { AGENT_NATIVE_OPERATING_CONTRACT, AGENT_NATIVE_OPERATING_CONTRACT_VERSION, AUTONOMOUS_BUSINESS_OPERATOR_ROLE, classifyDefectForGeneralization, classifyOperatorWorkIntake, CONTINUOUS_HARDENING_VERSION, deriveExternalValidationState, evaluatePreventableIncidentClosure, finalizeMandatoryExecutionMapCall, HARDENING_ALLOWED_TRANSITIONS, prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, resolvePromotedWinningPath, SINGLE_ACTIVE_OUTCOME_POLICY_VERSION, validateHardeningTransition, validateOperatorActionClosure, validateWinningPathPromotions, WINNING_PATH_PROMOTIONS, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
+import { AGENT_NATIVE_OPERATING_CONTRACT, AGENT_NATIVE_OPERATING_CONTRACT_VERSION, AUTONOMOUS_BUSINESS_OPERATOR_ROLE, classifyDefectForGeneralization, classifyOperatorWorkIntake, CONTINUOUS_HARDENING_VERSION, deriveExternalValidationState, evaluatePreventableIncidentClosure, finalizeMandatoryExecutionMapCall, HARDENING_ALLOWED_TRANSITIONS, prepareMandatoryExecutionMapCall, prepareSourceDefinedDirectEngineeringCall, resolveHardeningResumeResult, resolvePromotedWinningPath, SINGLE_ACTIVE_OUTCOME_POLICY_VERSION, validateHardeningTransition, validateOperatorActionClosure, validateWinningPathPromotions, WINNING_PATH_PROMOTIONS, type MandatoryExecutionToolDefinition } from "../src/mandatoryExecutionMap";
 import {
       assertClientSafetyRegistry,
   buildClientSafeGatewayRequest,
