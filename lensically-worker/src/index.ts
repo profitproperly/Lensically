@@ -16727,7 +16727,17 @@ async function advanceOperatorWork(env: Env, args: Record<string, unknown>): Pro
   return getOperatorWorkState(env, { limit: args.limit ?? 50 });
 }
 
-function buildOperatorActionClosure(toolName: string, result: Record<string, unknown>): Record<string, unknown> {
+async function buildOperatorActionClosure(env: Env, toolName: string, result: Record<string, unknown>): Promise<Record<string, unknown>> {
+  let workState: Record<string, unknown> | null = null;
+  try {
+    workState = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>() ?? null;
+  } catch (error) {
+    if (!getErrorMessage(error).includes("no such table: operator_work_state")) throw error;
+  }
+  const durableOutcome = workState?.status === "active"
+    ? normalizeOperatorText(workState.active_outcome_title, 500, true)
+    : null;
+  const durableNextAction = normalizeOperatorText(workState?.next_action, 1200, true);
   const explicitNextAction = normalizeOperatorText(
     result.next_action ?? result.recommended_next_action ?? result.required_action,
     1200,
@@ -16736,27 +16746,36 @@ function buildOperatorActionClosure(toolName: string, result: Record<string, unk
   const failed = result.ok === false;
   const hasIncident = Boolean(result.hardening_incident);
   const nextAction = explicitNextAction
+    ?? durableNextAction
     ?? (hasIncident
       ? "Advance the blocking hardening incident through evidence-gated closure before resuming the interrupted objective."
       : failed
         ? "Contain and classify this failure, preserve the safe checkpoint, and repair the shared cause before retrying."
         : operatorToolMutatesState(toolName)
-          ? "Verify the completed mutation, record evidence, and continue the frozen active outcome from the resulting checkpoint."
-          : "Use this evidence to execute the highest-priority queued prerequisite for the frozen active outcome.");
+          ? "Verify the completed mutation, record evidence, and continue the active outcome from the resulting checkpoint."
+          : "Use this evidence to execute the highest-priority queued prerequisite for the active outcome.");
   const ownerActionRequired = result.owner_action_required === true
     || ["explicit_proceed_required", "owner_ratification_required", "growth_plan_approval_required"].includes(normalizeOperatorMachineKey(result.error ?? result.error_code, ""));
+  const temporaryDependency = normalizeOperatorText(result.temporary_dependency, 500, true);
+  const retirementCondition = normalizeOperatorText(result.retirement_condition, 1000, true);
   const closure = {
     version: AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
     role: AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
-    current_live_state: `tool:${toolName}; outcome:${failed ? "failed" : "completed"}; production_commit:${String(result.runtime_commit_sha ?? "runtime-bound")}`,
+    current_live_state: `tool:${toolName}; outcome:${failed ? "failed" : "completed"}; production_commit:${env.LENSICALLY_COMMIT_SHA?.trim() || "runtime-bound"}`,
     target_agent_native_state: "Mission-driven scheduled operation with durable state, one active outcome, evidence-gated execution, and optional owner interaction.",
-    active_outcome: OPERATOR_ACTIVE_OUTCOME_TITLE,
+    active_outcome: durableOutcome ?? "Select and activate the highest-value deferred outcome through the durable intake guard.",
     next_action: nextAction,
-    priority_reason: hasIncident ? "P0/P1 hardening incidents supersede normal work." : "Single-active-outcome scope is frozen until exact-head release and live verification complete.",
+    priority_reason: hasIncident
+      ? "P0/P1 hardening incidents supersede normal work."
+      : workState?.scope_frozen === 1
+        ? "The durable active-outcome scope is frozen until its recorded completion conditions pass."
+        : "The operator must select the highest-value eligible deferred outcome before new execution begins.",
     completion_evidence: failed
       ? ["shared cause repaired", "focused regression passed", "exact tested head released", "live behavior verified"]
       : ["result verified", "durable state updated", "next checkpoint selected"],
     owner_action_required: ownerActionRequired,
+    temporary_dependency: temporaryDependency,
+    retirement_condition: retirementCondition,
     deferred_work_ledger: "operator_work_ledger",
   };
   const validation = validateOperatorActionClosure(closure);
