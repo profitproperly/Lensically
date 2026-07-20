@@ -1,29 +1,25 @@
 name: Lensically Engineering
-# [operator-tests] exact-head fallback runs focused Operator diagnostics before the final full regression suite.
-# [system-directory-tests] exact-head fallback runs isolated System Directory validation.
-# [threads-publish-tests] exact-head fallback runs isolated Threads publishing readiness validation.
-# verified-release-marker: release-49
-# verified-release-trigger: r46
-# verified-operator-shards-marker: shards-16
-# verified-release-dispatch-fields: --field release_id="${RELEASE_SHA:0:12}" --field release_sha="${RELEASE_SHA}"
-run-name: Lensically ${{ github.event.inputs.task || 'marker-push' }} · ${{ github.event.inputs.release_id || github.sha }}
+run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - "lensically-worker/**"
+      - ".github/workflows/lensically-engineering.yml"
   workflow_dispatch:
     inputs:
       task:
-        description: Engineering task to run
+        description: Validation or release task
         required: true
         default: typecheck
         type: choice
         options:
           - typecheck
+          - operator-smoke
+          - operator-tests
           - system-directory-tests
           - threads-publish-tests
-          - operator-tests
           - gpt-memory-tests
           - worker-deploy
       release_id:
@@ -32,64 +28,31 @@ on:
         default: ""
         type: string
       release_sha:
-        description: Exact commit SHA to validate and deploy
+        description: Exact commit SHA to validate or deploy
         required: false
         default: ""
         type: string
 
 concurrency:
-  group: lensically-engineering-${{ github.event.inputs.task || 'manual' }}
-  cancel-in-progress: true
+  group: lensically-engineering-${{ github.event_name }}-${{ inputs.task || 'push' }}
+  cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}
 
 permissions:
   contents: read
   actions: write
 
 jobs:
-  worker:
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
+  fast-validation:
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' && inputs.task != 'worker-deploy') }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: lensically-worker
     steps:
-      - name: Checkout
+      - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha || github.sha }}
-
-      - name: Verify exact release identity
-        if: ${{ inputs.task == 'worker-deploy' && inputs.release_sha != '' }}
-        run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
-
-      - name: Capability lifecycle gate
-        id: capability_lifecycle_gate
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          node scripts/release-preflight.mjs --capability-lifecycle-only 2>&1 | tee /tmp/lensically-capability-lifecycle.log
-
-      - name: Surface capability lifecycle failure
-        if: ${{ steps.capability_lifecycle_gate.outcome == 'failure' }}
-        run: |
-          diagnostic=$(tail -n 120 /tmp/lensically-capability-lifecycle.log | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=Capability lifecycle failure::$diagnostic"
-          exit 1
-
-      - name: Fast release preflight
-        id: release_preflight
-        if: ${{ inputs.task == 'typecheck' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          node scripts/release-preflight.mjs 2>&1 | tee /tmp/lensically-release-preflight.log
-
-      - name: Surface release preflight failure
-        if: ${{ steps.release_preflight.outcome == 'failure' }}
-        run: |
-          diagnostic=$(tail -n 120 /tmp/lensically-release-preflight.log | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=Release preflight failure::$diagnostic"
-          exit 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -99,127 +62,35 @@ jobs:
           cache-dependency-path: lensically-worker/package-lock.json
 
       - name: Restore worker dependencies
-        id: worker-dependency-cache
+        id: worker-cache
         uses: actions/cache@v4
         with:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
       - name: Install worker dependencies
-        if: ${{ steps.worker-dependency-cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.worker-cache.outputs.cache-hit != 'true' }}
         run: npm ci
 
-      - name: Typecheck
-        if: ${{ inputs.task == 'typecheck' || inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        run: npx tsc --noEmit
-
-      - name: System Directory tests
-        id: system_directory_tests
-        if: ${{ inputs.task == 'system-directory-tests' || inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-system-directory-tests.log
-
-      - name: Surface System Directory test failure
-        if: ${{ steps.system_directory_tests.outcome == 'failure' }}
-        run: |
-          failure_lines=$(grep -aE '(^|[[:space:]])(×|→)|AssertionError|expected .*|received|FAIL|Test Files|Tests[[:space:]]' /tmp/lensically-system-directory-tests.log | tail -n 80 || true)
-          if [ -z "$failure_lines" ]; then
-            failure_lines=$(tail -n 80 /tmp/lensically-system-directory-tests.log)
-          fi
-          diagnostic=$(printf '%s\n' "$failure_lines" | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=System Directory test failure::$diagnostic"
-          exit 1
-
-      - name: Threads publish readiness tests
-        id: threads_publish_tests
-        if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-threads-publish-tests.log
-
-      - name: Surface Threads publish readiness test failure
-        if: ${{ steps.threads_publish_tests.outcome == 'failure' }}
-        run: |
-          diagnostic=$(tail -n 80 /tmp/lensically-threads-publish-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=Threads publish readiness test failure::$diagnostic"
-          exit 1
-
-      - name: Fast Operator release gate
-        id: operator_release_gate
-        if: ${{ inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run test -- --run test/operatorMode.spec.ts --testNamePattern="makes the static router the only public action path|routes operational status and engineering intents deterministically away from content procedures|routes bounded known-file repository search through the main Execution Kernel without Recovery|builds one complete non-mutating Execution Kernel capability campaign|rejects an MCP session created by a previous Worker deployment before routing|lists only the active static MCP registry and concise instructions|arms, executes, and re-arms the independent scheduled-post alarm with shared cron health|recovers a known Saved Pattern into complete published-post lineage" --reporter=dot --bail=1 2>&1 | tee /tmp/lensically-operator-release-gate.log
-
-      - name: Surface fast Operator release-gate failure
-        if: ${{ steps.operator_release_gate.outcome == 'failure' }}
-        run: |
-          diagnostic=$(tail -n 80 /tmp/lensically-operator-release-gate.log | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=Fast Operator release gate failure::$diagnostic"
-          exit 1
-
-      - name: GPT memory tests
-        id: gpt_memory_tests
-        if: ${{ inputs.task == 'gpt-memory-tests' || inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=verbose 2>&1 | tee /tmp/lensically-gpt-memory-tests.log
-
-      - name: Surface GPT memory test failure
-        if: ${{ steps.gpt_memory_tests.outcome == 'failure' }}
-        run: |
-          diagnostic=$(tail -n 120 /tmp/lensically-gpt-memory-tests.log | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=GPT memory test failure::$diagnostic"
-          exit 1
-
-      - name: Deploy worker
-        if: ${{ inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
-
-      - name: Verify Wrangler-managed cron triggers
-        if: ${{ inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Typecheck and lifecycle gate
         run: |
           set -euo pipefail
-          schedules_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/lensically-worker/schedules"
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${schedules_url}" > /tmp/lensically-cron-get.json
-          jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
-          expected_crons=$(node scripts/release-preflight.mjs --print-crons | sort)
-          actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
-          test "${actual_crons}" = "${expected_crons}"
-          echo "Wrangler-managed Cloudflare cron triggers verified from wrangler.jsonc without mutation."
+          npx tsc --noEmit
+          node scripts/release-preflight.mjs --capability-lifecycle-only
 
-      - name: Verify safe scheduler activation state
-        if: ${{ inputs.task == 'worker-deploy' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
+      - name: Run selected fast validation
+        env:
+          TASK: ${{ inputs.task || 'operator-smoke' }}
         run: |
           set -euo pipefail
-          scheduler_url="https://api.lensically.com/api/operator/scheduler-health"
-          scheduler_safe=false
-          for attempt in $(seq 1 12); do
-            if curl --fail-with-body --silent --show-error "${scheduler_url}" > /tmp/lensically-scheduler-health.json \
-              && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and ((.current_overdue_count | type) == "number") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
-              scheduler_safe=true
-              break
-            fi
-            echo "Waiting for scheduler-health propagation (${attempt}/12)..."
-            sleep 5
-          done
-          if [ "${scheduler_safe}" != "true" ]; then
-            echo "Scheduler activation state did not become safely verifiable."
-            cat /tmp/lensically-scheduler-health.json || true
-            exit 1
-          fi
-          echo "Scheduler activation state verified: operational normal mode with an empty overdue queue."
+          case "${TASK}" in
+            typecheck) ;;
+            operator-smoke) node scripts/run-operator-validation.mjs smoke ;;
+            system-directory-tests) npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1 ;;
+            threads-publish-tests) npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1 ;;
+            gpt-memory-tests) npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1 ;;
+            *) echo "Unsupported fast-validation task: ${TASK}"; exit 2 ;;
+          esac
 
   operator-test-shards:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests' }}
@@ -233,13 +104,10 @@ jobs:
       run:
         working-directory: lensically-worker
     steps:
-      - name: Checkout
+      - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha || github.sha }}
-
-      - name: Capability lifecycle gate
-        run: node scripts/release-preflight.mjs --capability-lifecycle-only
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -249,64 +117,99 @@ jobs:
           cache-dependency-path: lensically-worker/package-lock.json
 
       - name: Restore worker dependencies
-        id: operator-shard-dependency-cache
+        id: operator-cache
         uses: actions/cache@v4
         with:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
       - name: Install worker dependencies
-        if: ${{ steps.operator-shard-dependency-cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.operator-cache.outputs.cache-hit != 'true' }}
         run: npm ci
 
-      - name: Run deterministic Operator shard
-        id: operator_shard
-        continue-on-error: true
+      - name: Verify lifecycle and run deterministic shard
         run: |
-          set -o pipefail
-          node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8 2>&1 | tee /tmp/lensically-operator-shard.log
+          set -euo pipefail
+          node scripts/release-preflight.mjs --capability-lifecycle-only
+          node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
-      - name: Surface deterministic Operator shard failure
-        if: ${{ steps.operator_shard.outcome == 'failure' }}
-        run: |
-          failure_lines=$(tail -n 140 /tmp/lensically-operator-shard.log)
-          diagnostic=$(printf '%s\n' "$failure_lines" | tr '\n' ' ' | sed 's/%/%25/g')
-          echo "::error title=Operator shard ${{ matrix.shard }}/8 failure::$diagnostic"
-          exit 1
-
-  recovery:
-    if: ${{ github.event_name == 'push' }}
+  worker-release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task == 'worker-deploy' && inputs.release_sha != '' }}
     runs-on: ubuntu-latest
+    environment: production
     defaults:
       run:
-        working-directory: lensically-recovery-worker
+        working-directory: lensically-worker
     steps:
-      - name: Checkout
+      - name: Checkout exact release head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+
+      - name: Verify exact release identity
+        run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: lensically-recovery-worker/package-lock.json
+          cache-dependency-path: lensically-worker/package-lock.json
 
-      - name: Restore recovery dependencies
-        id: recovery-dependency-cache
+      - name: Restore worker dependencies
+        id: release-cache
         uses: actions/cache@v4
         with:
-          path: lensically-recovery-worker/node_modules
-          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install recovery dependencies
-        if: ${{ steps.recovery-dependency-cache.outputs.cache-hit != 'true' }}
+      - name: Install worker dependencies
+        if: ${{ steps.release-cache.outputs.cache-hit != 'true' }}
         run: npm ci
 
-      - name: Typecheck recovery worker
-        run: npx tsc --noEmit
+      - name: Run exact-head release gates
+        run: |
+          set -euo pipefail
+          node scripts/release-preflight.mjs
+          npx tsc --noEmit
+          npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorMode.spec.ts --testNamePattern="makes the static router the only public action path|routes operational status and engineering intents deterministically away from content procedures|routes bounded known-file repository search through the main Execution Kernel without Recovery|builds one complete non-mutating Execution Kernel capability campaign|rejects an MCP session created by a previous Worker deployment before routing|lists only the active static MCP registry and concise instructions|arms, executes, and re-arms the independent scheduled-post alarm with shared cron health|recovers a known Saved Pattern into complete published-post lineage" --reporter=dot --bail=1
 
-      - name: Deploy recovery worker
+      - name: Deploy exact validated Worker head
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:${{ github.sha }}"
+        run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
+
+      - name: Verify Wrangler-managed cron triggers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          schedules_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/lensically-worker/schedules"
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${schedules_url}" > /tmp/lensically-cron-get.json
+          jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
+          expected_crons=$(node scripts/release-preflight.mjs --print-crons | sort)
+          actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
+          test "${actual_crons}" = "${expected_crons}"
+
+      - name: Verify production runtime and scheduler
+        run: |
+          set -euo pipefail
+          expected_sha="$(git rev-parse HEAD)"
+          verified=false
+          for attempt in $(seq 1 12); do
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
+              && jq -e --arg sha "${expected_sha}" '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0) and (.runtime.commit_sha == $sha or .commit_sha == $sha)' /tmp/lensically-scheduler-health.json > /dev/null; then
+              verified=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "${verified}" != "true" ]; then
+            cat /tmp/lensically-scheduler-health.json || true
+            exit 1
+          fi
