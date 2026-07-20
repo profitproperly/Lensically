@@ -15647,6 +15647,21 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         const requestedLines = Number(safeInputs.max_lines ?? (Number(safeInputs.max_characters ?? 0) > 0 ? Math.ceil(Number(safeInputs.max_characters) / 100) : 200));
         compiledRequest = { ...compiled, inputs: { path: safeInputs.path, start_line: safeInputs.start_line ?? 1, max_lines: Math.min(Math.max(Math.trunc(requestedLines), 1), 200) } };
       }
+      if (profileId === "case_open") {
+        compiledRequest = {
+          ...compiled,
+          inputs: {
+            boundary: "client",
+            blocked_profile_id: "operator_work_state",
+            request_fingerprint: "client-preflight-blocked-profile-name",
+            error_category: "client_side_rejection",
+            operation_class: "read",
+            expected_outcome: "read durable work checkpoint",
+            observed_outcome: { blocked_before_gateway: true },
+            resume_capsule: { profile_id: "checkpoint_read", inputs: {} },
+          },
+        };
+      }
       return {
         ok: true,
         profile_id: profileId,
