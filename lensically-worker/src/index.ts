@@ -18041,7 +18041,7 @@ async function handleOperatorMcpAdminTool(
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
     }
-        const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
+        const toolCount = await operatorPublicMcpToolCount(env);
     const handshake = operatorKeyHandshakeLines(toolCount, brandKey);
 
     return {
