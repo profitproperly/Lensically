@@ -16484,7 +16484,7 @@ async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Prom
   if (!workKey || !title || !summary || !completionCondition) return { ok: false, error: "work_intake_required_fields_missing" };
   const state = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>();
   const existing = await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE work_key = ? LIMIT 1`).bind(workKey).first<Record<string, unknown>>();
-  const severityValue = normalizeOperatorMachineKey(args.severity, "") as HardeningSeverity;
+  const severityValue = (normalizeOperatorText(args.severity, 2, true) ?? "").toUpperCase() as HardeningSeverity;
   const severity: HardeningSeverity | null = (["P0", "P1", "P2", "P3"] as string[]).includes(severityValue) ? severityValue : null;
   const duplicateOf = normalizeOperatorMachineKey(args.duplicate_of, "") || (existing ? workKey : null);
   const intake = classifyOperatorWorkIntake({
