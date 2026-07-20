@@ -3140,6 +3140,16 @@ describe("operator mode MCP endpoint", () => {
       if (
         request.method === "GET"
         && url.origin === "https://api.github.com"
+        && url.pathname === "/repos/profitproperly/Lensically/git/trees/main"
+        && url.searchParams.get("recursive") === "1"
+      ) {
+        return new Response(JSON.stringify({
+          tree: [{ type: "blob", path: "lensically-worker/src/index.ts", size: 100 }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (
+        request.method === "GET"
+        && url.origin === "https://api.github.com"
         && url.pathname === "/repos/profitproperly/Lensically/contents/lensically-worker/src"
         && url.searchParams.get("ref") === "main"
       ) {
