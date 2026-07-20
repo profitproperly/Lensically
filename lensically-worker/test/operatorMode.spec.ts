@@ -2483,9 +2483,9 @@ describe("operator mode MCP endpoint", () => {
     expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
     const startup = await mcpTool<{
-      execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean };
+      runtime?: { execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean } };
     }>("getOperatorStartupContext");
-    expect(startup.execution_kernel).toMatchObject({
+    expect(startup.runtime?.execution_kernel).toMatchObject({
       name: "Execution Kernel",
       version: "lensically-execution-kernel-v1",
       public_contract: "direct_typed_tools_v1",
