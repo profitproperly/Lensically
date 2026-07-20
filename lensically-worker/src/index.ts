@@ -17783,12 +17783,10 @@ async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<
 function operatorMcpInstructions(toolCount: number): string {
   return [
     "Use Lensically Operator Mode as the source of truth.",
-    CLIENT_SAFETY_STARTUP_INSTRUCTION,
-    "The server-side Execution Kernel resolves the live capability, payload contract, deterministic route, policy, continuity, and execution receipt. Do not choose internal tools, wrappers, retries, or fallbacks.",
-    "Execution Kernel routing is source-defined and database-independent. Retired dynamic execution libraries, maps, incidents, phonebook routes, and OpsMemory routing are compatibility history only.",
-        "Call the registered startup profile once in a fresh session. Select one canonical brand key and wait for explicit Proceed before account data loads.",
+    "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
+    "Select one canonical brand key and wait for explicit Proceed before account data loads.",
     "After Proceed, restore account continuity and present the guided Growth Mission Brief. Brainstorm, revise, and obtain explicit plan approval before account mutation; routine engineering remains autonomous.",
-    "Routine engineering uses bounded inspection, one coherent change set, focused validation, one exact-SHA release, and compact receipts.",
+    "Routine engineering uses bounded known-file inspection, one coherent change set, focused validation, one exact-head release, and compact receipts.",
     "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
     "Canonical brand keys are manifest_mental, opmg_deadman, and vectrix.",
     "Use the exact four-line selected-key handshake returned by the server:",
