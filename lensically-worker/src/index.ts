@@ -4906,8 +4906,9 @@ async function ensureOperatorPostMetricSnapshotsTable(env: Env): Promise<void> {
       id TEXT PRIMARY KEY,
       brand_key TEXT NOT NULL,
       published_post_id TEXT NOT NULL,
-      scheduled_post_id INTEGER,
+            scheduled_post_id INTEGER,
       draft_id TEXT,
+      generation_run_id TEXT,
       source_card_id TEXT,
       source_selection_id TEXT,
       metrics_json TEXT NOT NULL,
@@ -4918,6 +4919,7 @@ async function ensureOperatorPostMetricSnapshotsTable(env: Env): Promise<void> {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   ).run();
+    await addColumnIfMissing(env, "operator_post_metric_snapshots", "generation_run_id", "TEXT");
   await addColumnIfMissing(env, "operator_post_metric_snapshots", "valid_for_learning", "INTEGER NOT NULL DEFAULT 1");
   await addColumnIfMissing(env, "operator_post_metric_snapshots", "anomaly_reason", "TEXT");
   await addColumnIfMissing(env, "operator_post_metric_snapshots", "collection_source", "TEXT NOT NULL DEFAULT 'operator'");
@@ -6500,8 +6502,9 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
       id TEXT PRIMARY KEY,
       brand_key TEXT NOT NULL,
       published_post_id TEXT NOT NULL,
-      scheduled_post_id INTEGER,
+            scheduled_post_id INTEGER,
       draft_id TEXT,
+      generation_run_id TEXT,
       source_card_id TEXT,
       source_selection_id TEXT,
       metrics_json TEXT NOT NULL,
@@ -11684,8 +11687,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
             FROM operator_post_metric_snapshots m
            WHERE m.brand_key = ?
              AND m.published_post_id = w.post_id
-             AND m.scheduled_post_id = s.id
+                          AND m.scheduled_post_id = s.id
              AND m.draft_id = d.id
+             AND m.generation_run_id = r.id
              AND m.source_card_id = c.id
              AND m.source_selection_id = sel.id) AS linked_metric_snapshot_count
        FROM winners w
@@ -13077,11 +13081,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(brand.brand_key, publishedPostId).first<{ metrics_json: string }>();
       if (latestSnapshot?.metrics_json !== serializedMetrics) {
         await env.DB.prepare(
-          `INSERT INTO operator_post_metric_snapshots (
-            id, brand_key, published_post_id, scheduled_post_id, draft_id,
+                    `INSERT INTO operator_post_metric_snapshots (
+            id, brand_key, published_post_id, scheduled_post_id, draft_id, generation_run_id,
             source_card_id, source_selection_id, metrics_json, captured_at,
             valid_for_learning, anomaly_reason, collection_source
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'get_post_results')`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'get_post_results')`,
         ).bind(
           crypto.randomUUID(),
           brand.brand_key,
@@ -13089,7 +13093,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           lineageRow?.scheduled_post_id === null || lineageRow?.scheduled_post_id === undefined
             ? null
             : Number(lineageRow.scheduled_post_id),
-          lineageRow?.draft_id ? String(lineageRow.draft_id) : null,
+                    lineageRow?.draft_id ? String(lineageRow.draft_id) : null,
+          lineageRow?.run_id ? String(lineageRow.run_id) : null,
           sourceCardId,
           sourceSelection?.id ? String(sourceSelection.id) : null,
           serializedMetrics,
@@ -26773,7 +26778,8 @@ async function appendOperatorMetricSnapshotsForPosts(
     }
 
     const scheduled = await env.DB.prepare(
-      `SELECT s.id AS scheduled_post_id, d.id AS draft_id, d.source_card_id, c.source_selection_id
+            `SELECT s.id AS scheduled_post_id, d.id AS draft_id, d.run_id AS generation_run_id,
+              d.source_card_id, c.source_selection_id
        FROM scheduled_posts s
        LEFT JOIN gpt_generation_drafts d
          ON d.scheduled_post_id = s.id AND d.account_id = ?
@@ -26784,7 +26790,8 @@ async function appendOperatorMetricSnapshotsForPosts(
        LIMIT 1`,
     ).bind(accountId, brandKey, threadsUserId, post.id).first<Record<string, unknown>>();
     const fallback = scheduled ? null : await env.DB.prepare(
-      `SELECT d.scheduled_post_id, d.id AS draft_id, d.source_card_id, c.source_selection_id
+            `SELECT d.scheduled_post_id, d.id AS draft_id, d.run_id AS generation_run_id,
+              d.source_card_id, c.source_selection_id
        FROM gpt_generation_drafts d
        LEFT JOIN operator_source_cards c
          ON c.id = d.source_card_id AND c.brand_key = ?
@@ -26797,17 +26804,18 @@ async function appendOperatorMetricSnapshotsForPosts(
     if (!evaluated.validForLearning) anomalous += 1;
 
     await env.DB.prepare(
-      `INSERT INTO operator_post_metric_snapshots (
-        id, brand_key, published_post_id, scheduled_post_id, draft_id,
+            `INSERT INTO operator_post_metric_snapshots (
+        id, brand_key, published_post_id, scheduled_post_id, draft_id, generation_run_id,
         source_card_id, source_selection_id, metrics_json, captured_at,
         valid_for_learning, anomaly_reason, collection_source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       crypto.randomUUID(),
       brandKey,
       post.id,
       lineage?.scheduled_post_id === null || lineage?.scheduled_post_id === undefined ? null : Number(lineage.scheduled_post_id),
-      lineage?.draft_id ? String(lineage.draft_id) : null,
+            lineage?.draft_id ? String(lineage.draft_id) : null,
+      lineage?.generation_run_id ? String(lineage.generation_run_id) : null,
       lineage?.source_card_id ? String(lineage.source_card_id) : null,
       lineage?.source_selection_id ? String(lineage.source_selection_id) : null,
       metricsJson,

@@ -532,12 +532,13 @@ export async function recoverPublishedPostLineage(
     if (!draft?.id) return failure("draft_lineage_recovery_failed", 500, { published_post_id: post.published_post_id });
 
     await env.DB.prepare(
-      `UPDATE operator_post_metric_snapshots
-       SET scheduled_post_id = ?, draft_id = ?, source_card_id = ?, source_selection_id = ?
+            `UPDATE operator_post_metric_snapshots
+       SET scheduled_post_id = ?, draft_id = ?, generation_run_id = ?, source_card_id = ?, source_selection_id = ?
        WHERE brand_key = ? AND published_post_id = ?`,
     ).bind(
-      post.scheduled_post_id,
+            post.scheduled_post_id,
       String(draft.id),
+      String(run.id),
       sourceCardId,
       String(selection.id),
       brand.brand_key,
@@ -559,16 +560,17 @@ export async function recoverPublishedPostLineage(
         engagement_total: Number(post.archive.engagement_total ?? 0),
       };
       await env.DB.prepare(
-        `INSERT INTO operator_post_metric_snapshots (
-          id, brand_key, published_post_id, scheduled_post_id, draft_id,
+                `INSERT INTO operator_post_metric_snapshots (
+          id, brand_key, published_post_id, scheduled_post_id, draft_id, generation_run_id,
           source_card_id, source_selection_id, metrics_json, captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         crypto.randomUUID(),
         brand.brand_key,
         post.published_post_id,
-        post.scheduled_post_id,
+                post.scheduled_post_id,
         String(draft.id),
+        String(run.id),
         sourceCardId,
         String(selection.id),
         json(metrics, {}),

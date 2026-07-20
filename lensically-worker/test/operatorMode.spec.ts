@@ -1328,7 +1328,12 @@ describe("operator mode backend spine", () => {
     });
     const completeWinner = auditAfter.posts.find((post) => post.published_post_id === publishedPostId);
     expect(completeWinner).toMatchObject({ complete: true, missing_stages: [] });
-    expect(completeWinner?.lineage.linked_metric_snapshot_count).toBeGreaterThan(0);
+        expect(completeWinner?.lineage.linked_metric_snapshot_count).toBeGreaterThan(0);
+    const linkedSnapshot = await env.DB.prepare(
+      `SELECT generation_run_id FROM operator_post_metric_snapshots
+       WHERE brand_key = 'manifest_mental' AND published_post_id = ? LIMIT 1`,
+    ).bind(publishedPostId).first<{ generation_run_id: string | null }>();
+    expect(linkedSnapshot?.generation_run_id).toBe(recovered.recovered_posts[0].generation_run_id);
 
     const results = await operatorTool<{
       metrics: { likes: number };
