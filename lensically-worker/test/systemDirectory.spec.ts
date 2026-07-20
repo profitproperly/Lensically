@@ -851,6 +851,14 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.recovery_repo_status).toMatchObject({ surface: "recovery_plane" });
   });
 
+  it("classifies bounded Cloudflare validation checks", () => {
+    expect(deriveExternalValidationState([])).toBe("not_reported");
+    expect(deriveExternalValidationState([{ status: "queued" }])).toBe("pending");
+    expect(deriveExternalValidationState([{ status: "completed", conclusion: "failure" }])).toBe("failed");
+    expect(deriveExternalValidationState([{ status: "completed", conclusion: "success" }, { state: "success" }])).toBe("passed");
+    expect(deriveExternalValidationState([{ status: "completed", conclusion: null }])).toBe("unknown");
+  });
+
   it("uses phrase-level Recovery patches for long source-contract text", () => {
     const incident = PREVENTED_CLIENT_BLOCKS.find((item) => item.id === "recovery_full_gateway_description_patch");
     expect(incident?.safe_profile_id).toBe("recovery_exact_patch");
