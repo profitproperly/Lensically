@@ -14434,6 +14434,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "approve_draft",
   "reject_draft",
   "list_active_gates",
+  "create_or_update_gate",
+  "promote_memory_to_gate",
   "list_strategy_memory",
   "save_strategy_memory",
   "list_scheduled_posts",
