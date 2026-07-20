@@ -10273,7 +10273,8 @@ async function ensureManifestSourceBatchForDate(
 
   const selectedAt = new Date().toISOString();
   const batchId = crypto.randomUUID();
-  const selectedCandidates = shuffleOperatorSources(eligiblePool).slice(0, MANIFEST_DAILY_SOURCE_DRAW_SIZE);
+  const focusSelection = selectOperatorContentFocusSources(eligiblePool, MANIFEST_DAILY_SOURCE_DRAW_SIZE);
+  const selectedCandidates = focusSelection.selected;
   const statements = [
     env.DB.prepare(
       `INSERT INTO operator_source_selection_batches (
