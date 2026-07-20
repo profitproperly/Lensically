@@ -77,7 +77,10 @@ function safePath(value: unknown): string {
 }
 
 async function github(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
-  const response = await fetch(`https://api.github.com${path}`, { ...init, headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_TOKEN}`, "user-agent": "lensically-recovery", "x-github-api-version": "2022-11-28", ...(init.headers || {}) } });
+  const request = () => fetch(`https://api.github.com${path}`, { ...init, headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_TOKEN}`, "user-agent": "lensically-recovery", "x-github-api-version": "2022-11-28", ...(init.headers || {}) } });
+  let response = await request();
+  const method = String(init.method || "GET").toUpperCase();
+  if (["GET", "HEAD"].includes(method) && [502, 503, 504].includes(response.status)) response = await request();
   return { ok: response.ok, status: response.status, data: await response.json().catch(() => null) };
 }
 
