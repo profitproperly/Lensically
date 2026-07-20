@@ -108,6 +108,23 @@ export function validateOperatorActionClosure(input: OperatorActionClosureInput)
   return { ok: errors.length === 0, errors };
 }
 
+export type ExternalValidationState = "not_reported" | "pending" | "failed" | "passed" | "unknown";
+export type ExternalValidationCheck = {
+  status?: unknown;
+  conclusion?: unknown;
+  state?: unknown;
+};
+
+export function deriveExternalValidationState(checks: ExternalValidationCheck[]): ExternalValidationState {
+  if (checks.length === 0) return "not_reported";
+  const normalize = (value: unknown) => typeof value === "string" ? value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
+  const failed = new Set(["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale", "error"]);
+  if (checks.some((check) => failed.has(normalize(check.conclusion ?? check.state)))) return "failed";
+  if (checks.some((check) => ["queued", "in_progress", "pending", "requested", "waiting"].includes(normalize(check.status ?? check.state)))) return "pending";
+  if (checks.every((check) => ["success", "neutral", "skipped"].includes(normalize(check.conclusion ?? check.state)))) return "passed";
+  return "unknown";
+}
+
 export type DefectClass = "isolated" | "duplicated_assumption" | "contract_drift" | "architectural_drift" | "known_recurrence" | "external_transient";
 export type WinningPathSurface = "main_gateway" | "recovery_plane" | "runtime_guard" | "source_control";
 export type WinningPathPromotion = {
