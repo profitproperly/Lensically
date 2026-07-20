@@ -14533,14 +14533,16 @@ function base64ToTextUtf8(value: string): string {
 
 async function githubApi(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
   const config = githubRepoConfig(env);
-  if (!config.token) {
+  const method = String(init.method ?? "GET").toUpperCase();
+  const publicRead = method === "GET" || method === "HEAD";
+  if (!config.token && !publicRead) {
     return { ok: false, status: 401, data: { error: "github_token_missing" } };
   }
   const response = await fetch(`https://api.github.com${path}`, {
     ...init,
     headers: {
       "accept": "application/vnd.github+json",
-      "authorization": `Bearer ${config.token}`,
+      ...(config.token ? { "authorization": `Bearer ${config.token}` } : {}),
       "user-agent": "lensically-engineering-mcp",
       "x-github-api-version": "2022-11-28",
       ...(init.headers ?? {}),
