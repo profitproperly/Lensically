@@ -18475,6 +18475,7 @@ async function handleOperatorMcpAdminTool(
         "get_post_results",
         "get_monthly_growth_review",
         "get_performance_learning",
+        "get_content_focus",
       ]),
     };
     const mutationSegments: Record<string, Set<string>> = {
