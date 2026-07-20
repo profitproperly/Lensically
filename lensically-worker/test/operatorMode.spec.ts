@@ -1242,8 +1242,7 @@ describe("operator mode backend spine", () => {
       posts: Array<{ published_post_id: string; complete: boolean; missing_stages: string[] }>;
       error?: string;
     }>("executeLensicallyIntent", {
-      objective: "Audit proven Manifest winners without mutating account data.",
-      intent: "audit published post lineage",
+      profile_id: "audit_published_post_lineage",
       inputs: {
         brand_key: "manifest_mental",
         proceed_confirmed: true,
