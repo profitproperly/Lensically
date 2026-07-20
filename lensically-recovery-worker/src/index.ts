@@ -456,6 +456,10 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const existing = await repoFile(env, session.path);
     if (session.mode === "create" && existing.ok) return { ok: false, error: "repo_file_now_exists" };
     if (session.mode === "replace" && (!existing.ok || !existing.sha)) return { ok: false, error: "repo_file_no_longer_available" };
+    if (session.mode === "replace" && existing.content === session.content) {
+      await env.RECOVERY_SESSIONS.delete(`write:${id}`);
+      return { ok: true, status: 200, path: session.path, commit_sha: null, phase: "no_change", write_mode: "git_data_api" };
+    }
     const result = await commitRepoFileViaGitData(env, session.path, session.content, session.message);
     if (result.ok) await env.RECOVERY_SESSIONS.delete(`write:${id}`);
     return { ok: result.ok, status: result.status, path: session.path, commit_sha: result.commit_sha, phase: result.phase ?? null, write_mode: "git_data_api" };
