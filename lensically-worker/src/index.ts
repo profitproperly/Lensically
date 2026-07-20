@@ -14850,6 +14850,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       ],
       after_explicit_proceed: "confirmOperatorProceed restores canonical account state, produces the current Growth Mission Brief, and opens an owner-model planning discussion. It does not authorize account mutations. Later account calls send proceed_confirmed=true; the approved persistent mission and continuity are verified from server-side state.",
     },
+    operator_work_state: operatorWorkState,
     growth_mission_contract: {
       version: OPERATOR_GROWTH_MISSION_VERSION,
       permanent_mission: MANIFEST_AUTONOMY_OBJECTIVE,
