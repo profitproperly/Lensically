@@ -21166,12 +21166,17 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
             const isError = resultPayload.ok === false;
       const resultError = normalizeOperatorMachineKey(resultPayload.error ?? resultPayload.error_code, "unexpected_result");
+      const expectedControl = isError && HARDENING_EXPECTED_CONTROL_ERRORS.has(resultError);
       const unexplainedZero = !isError
         && toolName === "searchRepoFiles"
         && Number(resultPayload.returned_count ?? 0) === 0
         && resultPayload.verified_complete_for_known_file !== true;
+      if ((!isError || expectedControl) && !unexplainedZero) {
+        const resolvedIncidentCount = await closeResolvedHardeningIncidentsForRequest(env, toolName, args, resultPayload);
+        if (resolvedIncidentCount > 0) resultPayload.resolved_hardening_incidents = resolvedIncidentCount;
+      }
       if (!HARDENING_CONTROLLER_TOOLS.has(toolName)
-          && ((isError && !HARDENING_EXPECTED_CONTROL_ERRORS.has(resultError)) || unexplainedZero)) {
+          && ((isError && !expectedControl) || unexplainedZero)) {
         const automaticIncident = await recordHardeningIncident(env, {
           boundary: isOperatorMcpEngineeringToolName(toolName) ? "server" : "quality",
           blocked_profile_id: routedGatewayMetadata?.profile_id ?? operatorPublicProfileIdForToolName(toolName),
