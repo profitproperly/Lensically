@@ -17980,7 +17980,7 @@ async function getOperatorMcpBoundaryBlock(
   }
   const requestedBrand = requestedMcpBrandKey(toolName, args);
   if (!operatorMcpProceedConfirmed(toolName, args)) {
-    const toolCount = (await buildOperatorMcpTools(env, false, false)).length;
+    const toolCount = await operatorPublicMcpToolCount(env);
     return {
       ok: false,
       error: "explicit_proceed_required",
