@@ -16,7 +16,7 @@ on:
         required: true
         default: typecheck
         type: choice
-                options:
+        options:
           - typecheck
           - system-directory-tests
           - threads-publish-tests
@@ -129,7 +129,7 @@ jobs:
           echo "::error title=System Directory test failure::$diagnostic"
           exit 1
 
-            - name: Threads publish readiness tests
+      - name: Threads publish readiness tests
         id: threads_publish_tests
         if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
