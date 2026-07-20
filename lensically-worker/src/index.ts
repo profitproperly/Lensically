@@ -16195,6 +16195,7 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
 ]);
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
+  "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
   "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
 ]);
