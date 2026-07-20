@@ -61,9 +61,10 @@
 
 ## Validation and Release
 
-- Normal backend release order is preflight, TypeScript validation, mandatory System Directory tests, focused Operator release gate, GPT-memory tests, deployment, cron verification, and scheduler safety verification.
+- Normal backend release order is exact-head Cloudflare validation, required focused tests, a validation receipt bound to that SHA, one `[verified-worker-release]` marker commit, gated deployment of that same SHA, live runtime verification, and scheduler safety verification when publishing behavior changed.
+- Ordinary commits run `npm ci && npm run validate:cloudflare`; `npm run deploy:cloudflare-gated` intentionally skips deployment unless the exact validated commit carries the verified release marker.
 - Full Operator tests are diagnostic and run separately when broad account behavior changed or focused checks are insufficient.
-- Recovery dispatches releases on the configured branch with the exact intended commit in `release_sha`; checkout must equal that SHA. The main gateway does not dispatch deployments.
+- Recovery may repair or inspect a broken Main plane, but it must not bypass the Cloudflare exact-head validation receipt or become the normal deployment path.
 - Avoid separate full validation and deployment workflows for one coherent change.
 - Use bounded workflow status reads. Detailed failure diagnostics are read only after a terminal failure.
 - Version changes require synchronized runtime constants, exact assertions, and current-state documentation. Do not bump versions for cleanup alone.
