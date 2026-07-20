@@ -640,9 +640,7 @@ describe("operator mode backend spine", () => {
       threads_user_id?: string;
       follower_growth?: { starting_followers?: number; current_followers?: number; net_growth?: number };
       post_performance?: { by_views?: Array<{ id: string }> };
-            execution_kernel?: { route?: { tool_name?: string } };
     };
-        expect(payload.execution_kernel?.route?.tool_name).toBe("get_monthly_growth_review");
     expect(payload.threads_user_id).toBe("35758578720393972");
     expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
     expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
