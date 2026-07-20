@@ -19081,16 +19081,81 @@ async function handleOperatorMcpEngineeringTool(
   }
 
   if (toolName === "getRepoStatus") {
-    const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
+    const branch = await githubRepoApiRetryable(env, `/branches/${encodeURIComponent(config.branch)}`);
     const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
       ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
       : undefined;
+    const latestSha = typeof commit?.sha === "string" ? commit.sha : null;
+    const [checkRunsResponse, commitStatusResponse] = latestSha
+      ? await Promise.all([
+          githubRepoApiRetryable(env, `/commits/${encodeURIComponent(latestSha)}/check-runs?per_page=100`),
+          githubRepoApiRetryable(env, `/commits/${encodeURIComponent(latestSha)}/status`),
+        ])
+      : [
+          { ok: false, status: 400, data: null },
+          { ok: false, status: 400, data: null },
+        ];
+    const checkRunsData = checkRunsResponse.data && typeof checkRunsResponse.data === "object" && !Array.isArray(checkRunsResponse.data)
+      ? checkRunsResponse.data as Record<string, unknown>
+      : {};
+    const rawCheckRuns = Array.isArray(checkRunsData.check_runs) ? checkRunsData.check_runs as Array<Record<string, unknown>> : [];
+    const checkRuns = rawCheckRuns.slice(0, 40).map((run) => {
+      const app = run.app && typeof run.app === "object" && !Array.isArray(run.app) ? run.app as Record<string, unknown> : {};
+      return {
+        name: normalizeOperatorText(run.name, 200, true),
+        status: normalizeOperatorMachineKey(run.status, "unknown"),
+        conclusion: normalizeOperatorMachineKey(run.conclusion, "") || null,
+        app: normalizeOperatorText(app.name ?? app.slug, 160, true),
+        started_at: run.started_at ?? null,
+        completed_at: run.completed_at ?? null,
+      };
+    });
+    const commitStatusData = commitStatusResponse.data && typeof commitStatusResponse.data === "object" && !Array.isArray(commitStatusResponse.data)
+      ? commitStatusResponse.data as Record<string, unknown>
+      : {};
+    const rawStatuses = Array.isArray(commitStatusData.statuses) ? commitStatusData.statuses as Array<Record<string, unknown>> : [];
+    const commitStatuses = rawStatuses.slice(0, 40).map((status) => ({
+      context: normalizeOperatorText(status.context, 200, true),
+      state: normalizeOperatorMachineKey(status.state, "unknown"),
+      description: normalizeOperatorText(status.description, 300, true),
+      updated_at: status.updated_at ?? status.created_at ?? null,
+    }));
+    const isCloudflareCheck = (value: Record<string, unknown>) => JSON.stringify(value).toLowerCase().includes("cloudflare")
+      || JSON.stringify(value).toLowerCase().includes("workers builds");
+    const cloudflareChecks = [...checkRuns, ...commitStatuses].filter(isCloudflareCheck);
+    const failedConclusions = new Set(["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale", "error"]);
+    const cloudflareValidationState = cloudflareChecks.length === 0
+      ? "not_reported"
+      : cloudflareChecks.some((check) => {
+          const state = normalizeOperatorMachineKey(check.conclusion ?? check.state, "");
+          return failedConclusions.has(state);
+        })
+        ? "failed"
+        : cloudflareChecks.some((check) => {
+            const state = normalizeOperatorMachineKey(check.status ?? check.state, "");
+            return ["queued", "in_progress", "pending", "requested", "waiting"].includes(state);
+          })
+          ? "pending"
+          : cloudflareChecks.every((check) => {
+              const state = normalizeOperatorMachineKey(check.conclusion ?? check.state, "");
+              return ["success", "neutral", "skipped"].includes(state);
+            })
+            ? "passed"
+            : "unknown";
     return {
       ok: branch.ok,
       repo: `${config.owner}/${config.repo}`,
       branch: config.branch,
-      latest_sha: commit?.sha ?? null,
+      latest_sha: latestSha,
       github_status: branch.status,
+      validation_checks_available: checkRunsResponse.ok || commitStatusResponse.ok,
+      check_runs_status: checkRunsResponse.status,
+      commit_status_status: commitStatusResponse.status,
+      check_runs: checkRuns,
+      commit_statuses: commitStatuses,
+      cloudflare_checks: cloudflareChecks,
+      cloudflare_validation_state: cloudflareValidationState,
+      external_requests: latestSha ? 3 : 1,
       direct_engineering_contract: true,
     };
   }
