@@ -787,7 +787,7 @@ describe("operator mode backend spine", () => {
     }>("get_content_focus", {
       brand_key: "manifest_mental",
     });
-    expect(result.isError).not.toBe(true);
+    expect(result.isError, JSON.stringify(result.structuredContent)).not.toBe(true);
     expect(result.structuredContent).toMatchObject({
       success: true,
       brand_key: "manifest_mental",
