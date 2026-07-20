@@ -3,11 +3,12 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 
 const repoRoot = join(process.cwd(), "..");
 const sourcePath = join(repoRoot, "lensically-local-node", "worker", "src", "worker.mjs");
-const root = mkdtempSync(join(tmpdir(), "lensically-local-node-update-"));
+const testRootBase = "C:\\LensicallyLocalNodeTest";
+mkdirSync(testRootBase, { recursive: true });
+const root = mkdtempSync(join(testRootBase, "update-"));
 mkdirSync(join(root, "workers", "active"), { recursive: true });
 mkdirSync(join(root, "workers", "previous"), { recursive: true });
 writeFileSync(join(root, "workers", "active", "worker.mjs"), readFileSync(sourcePath));
@@ -17,8 +18,10 @@ writeFileSync(join(root, "state.json"), JSON.stringify({
   worker_version: "local-worker-v1",
 }, null, 2));
 
-const packageHash = createHash("sha256").update(readFileSync(sourcePath)).digest("hex");
 const sha = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).stdout.trim();
+const committedWorker = spawnSync("git", ["show", `${sha}:lensically-local-node/worker/src/worker.mjs`], { cwd: repoRoot, encoding: "buffer" });
+if (committedWorker.status !== 0) throw new Error("committed_worker_missing");
+const committedPackageHash = createHash("sha256").update(committedWorker.stdout).digest("hex");
 
 function runUpdate(package_hash) {
   const job = {
@@ -27,8 +30,9 @@ function runUpdate(package_hash) {
     node_id: "test-node",
     commit_sha: sha,
     inputs: {
-      worker_source_path: sourcePath,
+      repository_path: repoRoot,
       package_hash,
+      package_sha: sha,
       worker_version: "local-worker-v1-test",
     },
   };
@@ -40,7 +44,7 @@ function runUpdate(package_hash) {
   });
 }
 
-const success = runUpdate(packageHash);
+const success = runUpdate(committedPackageHash);
 if (success.status !== 0) throw new Error(`update_success_failed:${success.stderr || success.stdout}`);
 const stateAfterSuccess = JSON.parse(readFileSync(join(root, "state.json"), "utf8"));
 if (stateAfterSuccess.active_slot !== "previous" || stateAfterSuccess.previous_slot !== "active") {

@@ -18,7 +18,7 @@ async function postJson<T>(path: string, body: Record<string, unknown>, headers:
     body: JSON.stringify(body),
   });
   const data = await response.json() as T & { ok?: boolean; error?: string };
-  expect(response.status, `${path}: ${data.error ?? ""}`).toBeLessThan(400);
+  expect(response.status, `${path}: ${data.error ?? JSON.stringify(data)}`).toBeLessThan(400);
   return data;
 }
 
@@ -162,8 +162,8 @@ describe("local execution node integration", () => {
     const verified = await postJson("/api/operator/local-node/verify-job", { job: poll.job }, nodeHeaders);
     expect(verified.ok).toBe(true);
 
-    const receipt = {
-      version: LOCAL_VALIDATION_RECEIPT_VERSION,
+    const evidence = {
+      evidence_version: "local-stage-evidence-v1",
       repository_sha: sha,
       checked_out_sha: sha,
       validated_sha: sha,
@@ -178,13 +178,12 @@ describe("local execution node integration", () => {
       duration_ms: 1,
       environment: { os: "test", node: "test" },
       result_hashes: { integration: "h1" },
-      integrity: { algorithm: "server-hmac-sha256", signature: "integration-signature" },
     };
 
     const result = await postJson<{ receipt_id: string; validation: { ok: boolean } }>("/api/operator/local-node/result", {
       job_id: poll.job.job_id,
       status: "completed",
-      receipt,
+      evidence,
     }, nodeHeaders);
     expect(result.validation.ok).toBe(true);
 
@@ -199,6 +198,7 @@ describe("local execution node integration", () => {
       validated_sha: sha,
       release_candidate_sha: sha,
       node_id: nodeId,
+      integrity: { algorithm: "server-hmac-sha256" },
     });
   });
 });

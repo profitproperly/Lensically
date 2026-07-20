@@ -72,6 +72,7 @@ export type LocalValidationReceipt = {
   checked_out_sha: string;
   validated_sha: string;
   release_candidate_sha: string;
+  deployment_sha?: string;
   node_id: string;
   worker_version: string;
   bootstrap_version: string;
@@ -82,6 +83,8 @@ export type LocalValidationReceipt = {
   duration_ms: number;
   environment: Record<string, string>;
   result_hashes: Record<string, string>;
+  expires_at?: string;
+  source_evidence_hash?: string;
   integrity: { algorithm: "server-hmac-sha256"; signature: string };
 };
 
@@ -158,6 +161,7 @@ export function validateLocalValidationReceipt(receipt: LocalValidationReceipt, 
     || receipt.checked_out_sha !== requestedSha
     || receipt.validated_sha !== requestedSha
     || receipt.release_candidate_sha !== requestedSha
+    || (receipt.deployment_sha && receipt.deployment_sha !== requestedSha)
   ) {
     return { ok: false, error: "receipt_sha_mismatch" };
   }

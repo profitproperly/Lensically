@@ -38,6 +38,17 @@ function Copy-NodeFiles {
   Copy-Item -Force "$PSScriptRoot\..\bootstrap\src\service.mjs" "$InstallRoot\service.mjs"
 }
 
+function Protect-NodeAcl {
+  New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+  & icacls $InstallRoot /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Failed to harden install root ACL." }
+  $configPath = Join-Path $InstallRoot "config.json"
+  if (Test-Path $configPath) {
+    & icacls $configPath /inheritance:r /grant:r "SYSTEM:F" "Administrators:F" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to harden config ACL." }
+  }
+}
+
 function Write-Config {
   if (-not $EnrollmentToken -and $Mode -eq "Install") { throw "EnrollmentToken is required for first install." }
   $existing = $null
@@ -52,6 +63,7 @@ function Write-Config {
     device_credential = $credential
     repository_path = (Resolve-Path "$PSScriptRoot\..\..").Path
   } | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $configPath
+  Protect-NodeAcl
 
   @{
     active_slot = "active"
@@ -90,6 +102,7 @@ if ($Mode -eq "Uninstall") {
 }
 
 Copy-NodeFiles
+Protect-NodeAcl
 Write-Config
 Register-NodeTask
 $start = Start-NodeTask

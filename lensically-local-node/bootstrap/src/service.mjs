@@ -103,7 +103,7 @@ function runWorker(job, config, state) {
     exit_code: result.status,
     stdout: stdout.slice(-20000),
     stderr: String(result.stderr || "").replace(/[A-Za-z0-9_=-]{32,}/g, "[redacted]").slice(-20000),
-    ...(parsed?.receipt ? { receipt: parsed.receipt } : {}),
+    ...(parsed?.evidence ? { evidence: parsed.evidence } : {}),
   };
 }
 

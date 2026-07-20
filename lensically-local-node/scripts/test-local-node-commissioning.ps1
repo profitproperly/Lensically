@@ -13,6 +13,10 @@ if ($installerText -notmatch "New-ScheduledTaskTrigger -AtStartup") { throw "sta
 if ($installerText -notmatch "New-ScheduledTaskPrincipal -UserId `"SYSTEM`"") { throw "system_principal_missing" }
 if ($installerText -notmatch "RestartCount") { throw "restart_policy_missing" }
 if ($installerText -notmatch "Unregister-ScheduledTask") { throw "uninstall_path_missing" }
+if ($installerText -notmatch "icacls") { throw "acl_hardening_missing" }
+if ($installerText -notmatch "/inheritance:r") { throw "acl_inheritance_disable_missing" }
+if ($installerText -notmatch "SYSTEM:F") { throw "config_system_acl_missing" }
+if ($installerText -notmatch "Administrators:F") { throw "config_admin_acl_missing" }
 if ($bootstrapText -notmatch "/api/operator/local-node/enroll") { throw "enrollment_call_missing" }
 if ($bootstrapText -notmatch "x-lensically-node-credential") { throw "per_node_credential_header_missing" }
 if ($bootstrapText -match "x-lensically-node-secret") { throw "global_node_secret_header_forbidden" }

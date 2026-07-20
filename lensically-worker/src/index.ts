@@ -19254,7 +19254,9 @@ async function deployValidatedLocalSha(env: Env, args: Record<string, unknown>):
   const receipt = JSON.parse(row.receipt_json) as LocalValidationReceipt;
   const validation = validateLocalValidationReceipt(receipt, commitSha);
   if (!validation.ok) return validation;
-  return queueLocalExecutionJob(env, args, "deploy_validated_sha", "deploy", ["deploy_gate"]);
+  const integrity = await verifyServerLocalValidationReceipt(env, receipt, receiptId);
+  if (!integrity.ok) return integrity;
+  return queueLocalExecutionJob(env, { ...args, receipt_id: receiptId }, "deploy_validated_sha", "deploy", ["deploy_gate"]);
 }
 
 async function queueLocalWorkerUpdate(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -19358,6 +19360,81 @@ async function enrollLocalExecutionNode(body: Record<string, unknown>, env: Env)
     ).bind(now.toISOString(), tokenHash),
   ]);
   return operatorJsonResponse({ ok: true, node_id: nodeId, enrolled_at: now.toISOString(), credential_status: "active" });
+}
+
+function canonicalLocalReceiptPayload(receipt: LocalValidationReceipt, receiptId: string): Record<string, unknown> {
+  return {
+    receipt_id: receiptId,
+    version: receipt.version,
+    repository_sha: receipt.repository_sha,
+    checked_out_sha: receipt.checked_out_sha,
+    validated_sha: receipt.validated_sha,
+    release_candidate_sha: receipt.release_candidate_sha,
+    deployment_sha: receipt.deployment_sha ?? receipt.release_candidate_sha,
+    node_id: receipt.node_id,
+    worker_version: receipt.worker_version,
+    bootstrap_version: receipt.bootstrap_version,
+    validation_profile: receipt.validation_profile,
+    stages: receipt.stages,
+    started_at: receipt.started_at,
+    completed_at: receipt.completed_at,
+    duration_ms: receipt.duration_ms,
+    environment: receipt.environment,
+    result_hashes: receipt.result_hashes,
+    expires_at: receipt.expires_at,
+    source_evidence_hash: receipt.source_evidence_hash,
+  };
+}
+
+async function createServerLocalValidationReceipt(
+  env: Env,
+  receiptId: string,
+  job: { commit_sha: string; node_id: string; job_type?: string | null; expires_at?: string | null },
+  evidence: Record<string, unknown>,
+): Promise<LocalValidationReceipt | { error: string }> {
+  if (evidence.evidence_version !== "local-stage-evidence-v1") return { error: "invalid_evidence_version" };
+  const shaFields = ["repository_sha", "checked_out_sha", "validated_sha", "release_candidate_sha"];
+  if (shaFields.some((field) => evidence[field] !== job.commit_sha)) return { error: "evidence_sha_mismatch" };
+  if (evidence.node_id !== job.node_id) return { error: "evidence_node_mismatch" };
+  const stages = Array.isArray(evidence.stages) ? evidence.stages as LocalValidationReceipt["stages"] : [];
+  if (!stages.length || stages.some((stage) => stage.status !== "passed")) return { error: "evidence_stage_failed" };
+  const sourceEvidenceHash = await sha256Hex(JSON.stringify(evidence));
+  const unsigned: LocalValidationReceipt = {
+    version: LOCAL_VALIDATION_RECEIPT_VERSION,
+    repository_sha: job.commit_sha,
+    checked_out_sha: job.commit_sha,
+    validated_sha: job.commit_sha,
+    release_candidate_sha: job.commit_sha,
+    deployment_sha: job.commit_sha,
+    node_id: job.node_id,
+    worker_version: normalizeOperatorText(evidence.worker_version, 160, true) ?? "unknown",
+    bootstrap_version: normalizeOperatorText(evidence.bootstrap_version, 160, true) ?? LOCAL_EXECUTION_BOOTSTRAP_VERSION,
+    validation_profile: normalizeOperatorMachineKey(evidence.validation_profile, job.job_type === "run_full_validation" ? "full" : "focused"),
+    stages,
+    started_at: normalizeOperatorText(evidence.started_at, 80, true) ?? new Date().toISOString(),
+    completed_at: normalizeOperatorText(evidence.completed_at, 80, true) ?? new Date().toISOString(),
+    duration_ms: Math.max(0, Math.trunc(Number(evidence.duration_ms ?? 0))),
+    environment: evidence.environment && typeof evidence.environment === "object" && !Array.isArray(evidence.environment)
+      ? evidence.environment as Record<string, string>
+      : {},
+    result_hashes: evidence.result_hashes && typeof evidence.result_hashes === "object" && !Array.isArray(evidence.result_hashes)
+      ? evidence.result_hashes as Record<string, string>
+      : Object.fromEntries(stages.map((stage) => [stage.name, stage.output_hash ?? ""])),
+    expires_at: job.expires_at ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    source_evidence_hash: sourceEvidenceHash,
+    integrity: { algorithm: "server-hmac-sha256", signature: "" },
+  };
+  unsigned.integrity.signature = await hmacSha256Base64Url(operatorMcpOAuthSecret(env), JSON.stringify(canonicalLocalReceiptPayload(unsigned, receiptId)));
+  return unsigned;
+}
+
+async function verifyServerLocalValidationReceipt(env: Env, receipt: LocalValidationReceipt, receiptId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (receipt.integrity?.algorithm !== "server-hmac-sha256" || !receipt.integrity.signature) return { ok: false, error: "server_receipt_signature_required" };
+  if (receipt.expires_at && Date.parse(receipt.expires_at) <= Date.now()) return { ok: false, error: "local_receipt_expired" };
+  const expected = canonicalLocalReceiptPayload(receipt, receiptId);
+  const expectedSignature = await hmacSha256Base64Url(operatorMcpOAuthSecret(env), JSON.stringify(expected));
+  if (receipt.integrity.signature !== expectedSignature) return { ok: false, error: "invalid_server_receipt_signature" };
+  return { ok: true };
 }
 
 function signedLocalJobFieldsMatch(payload: Record<string, unknown>, job: Record<string, unknown>): boolean {
@@ -19473,24 +19550,30 @@ async function handleLocalExecutionNodeEndpoint(request: Request, env: Env, path
     const status = normalizeOperatorMachineKey(body.status, "failed");
     if (!jobId) return operatorJsonResponse({ ok: false, error: "job_id_required" }, 400);
     const job = await env.DB.prepare(
-      `SELECT commit_sha, node_id FROM operator_local_execution_jobs WHERE job_id = ? AND node_id = ? LIMIT 1`,
-    ).bind(jobId, nodeId).first<{ commit_sha: string; node_id: string }>();
+      `SELECT commit_sha, node_id, job_type, expires_at FROM operator_local_execution_jobs WHERE job_id = ? AND node_id = ? LIMIT 1`,
+    ).bind(jobId, nodeId).first<{ commit_sha: string; node_id: string; job_type: string; expires_at: string }>();
     if (!job) return operatorJsonResponse({ ok: false, error: "job_not_found" }, 404);
     await env.DB.prepare(
       `UPDATE operator_local_execution_jobs
        SET state = ?, result_status = ?, result_json = ?, updated_at = CURRENT_TIMESTAMP
        WHERE job_id = ? AND node_id = ?`,
     ).bind(status === "completed" ? "completed" : "failed", status, JSON.stringify(body), jobId, nodeId).run();
-    const maybeReceipt = body.receipt && typeof body.receipt === "object" && !Array.isArray(body.receipt)
-      ? body.receipt as LocalValidationReceipt
+    const maybeEvidence = body.evidence && typeof body.evidence === "object" && !Array.isArray(body.evidence)
+      ? body.evidence as Record<string, unknown>
       : null;
-    if (maybeReceipt) {
-      const validation = validateLocalValidationReceipt(maybeReceipt, job.commit_sha);
+    if (maybeEvidence) {
       const receiptId = crypto.randomUUID();
+      const receipt = await createServerLocalValidationReceipt(env, receiptId, job, maybeEvidence);
+      if ("error" in receipt) return operatorJsonResponse({ ok: false, validation: { ok: false, error: receipt.error } }, 400);
+      const validation = validateLocalValidationReceipt(receipt, job.commit_sha);
+      if (validation.ok) {
+        const signature = await verifyServerLocalValidationReceipt(env, receipt, receiptId);
+        if (!signature.ok) return operatorJsonResponse({ ok: false, receipt_id: receiptId, validation: signature }, 400);
+      }
       await env.DB.prepare(
         `INSERT INTO operator_local_validation_receipts (receipt_id, commit_sha, node_id, validation_profile, receipt_json, ok)
          VALUES (?, ?, ?, ?, ?, ?)`,
-      ).bind(receiptId, job.commit_sha, nodeId, maybeReceipt.validation_profile ?? "unknown", JSON.stringify(maybeReceipt), validation.ok ? 1 : 0).run();
+      ).bind(receiptId, job.commit_sha, nodeId, receipt.validation_profile ?? "unknown", JSON.stringify(receipt), validation.ok ? 1 : 0).run();
       return operatorJsonResponse({ ok: validation.ok, receipt_id: receiptId, validation });
     }
     return operatorJsonResponse({ ok: true, job_id: jobId, status });
