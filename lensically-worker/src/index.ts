@@ -20591,7 +20591,7 @@ async function operatorGatewayAccountDataLoaded(
 ): Promise<boolean> {
   const rawInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
     ? gatewayArgs.inputs as Record<string, unknown>
-    : {};
+    : gatewayArgs;
   const brandKey = normalizeGptBrandKey(rawInputs.brand_key ?? gatewayArgs.brand_key);
   if (!brandKey) return false;
   try {
