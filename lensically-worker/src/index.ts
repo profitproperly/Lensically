@@ -16206,6 +16206,10 @@ const HARDENING_CONTROLLER_TOOLS = new Set<string>(["recordHardeningIncident", "
 const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
   "explicit_proceed_required", "continuity_context_required", "continuity_session_mismatch", "growth_plan_approval_required",
   "owner_ratification_required", "hardening_incident_active", "operation_already_in_progress", "idempotency_key_payload_mismatch",
+  "large_file_requires_chunked_write", "file_already_exists", "file_missing_for_replace", "write_session_not_found",
+  "find_must_match_once", "path_find_message_required", "patches_1_to_20_and_message_required", "patch_path_and_find_required",
+  "patch_set_file_limit_exceeded", "path_mode_message_required", "path_message_required", "path_message_owner_approval_required",
+  "file_not_found", "query_and_known_file_prefix_required", "run_id_required", "validation_task_required",
 ]);
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
