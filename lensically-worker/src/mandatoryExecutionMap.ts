@@ -89,9 +89,9 @@ export function classifyOperatorWorkIntake(input: OperatorWorkIntakeInput): {
   if (input.duplicate_of?.trim()) return { decision: "merge", active_outcome_unchanged: true, reason: `duplicate_of:${input.duplicate_of.trim()}` };
   if (input.conflicts_with_mission) return { decision: "reject", active_outcome_unchanged: true, reason: "conflicts_with_mission" };
   if (!input.active_outcome_key?.trim()) return { decision: "activate", active_outcome_unchanged: false, reason: "no_active_outcome" };
-  if (input.severity === "P0" || input.severity === "P1") return { decision: "activate", active_outcome_unchanged: false, reason: `incident_interrupt:${input.severity}` };
-  if (input.prerequisite_for_active_outcome) return { decision: "activate", active_outcome_unchanged: false, reason: "required_prerequisite" };
-  if (input.irreversible_rework_if_deferred) return { decision: "activate", active_outcome_unchanged: false, reason: "material_rework_prevention" };
+  if (input.severity === "P0" || input.severity === "P1") return { decision: "activate", active_outcome_unchanged: true, reason: `incident_interrupt:${input.severity}` };
+  if (input.prerequisite_for_active_outcome) return { decision: "activate", active_outcome_unchanged: true, reason: "required_prerequisite" };
+  if (input.irreversible_rework_if_deferred) return { decision: "activate", active_outcome_unchanged: true, reason: "material_rework_prevention" };
   return { decision: "defer", active_outcome_unchanged: true, reason: "single_active_outcome_guard" };
 }
 
