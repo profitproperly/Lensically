@@ -23,7 +23,7 @@ import {
   validateClientSafetyRegistry,
   type SystemDirectoryEntry,
 } from "../src/systemDirectory";
-import { LOCAL_VALIDATION_RECEIPT_VERSION } from "../src/localExecution";
+
 
 const entries: SystemDirectoryEntry[] = [
   {
@@ -1392,56 +1392,21 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_transition.intent).toBe("advance operator work");
   });
 
-  it("registers local execution node profiles and enforces exact-SHA receipts", async () => {
-    expect(LOCAL_VALIDATION_RECEIPT_VERSION).toBe("local-validation-receipt-v1");
-    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_status.intent).toBe("local execution status");
-    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_validate_sha.allowed_input_keys).toEqual(expect.arrayContaining(["commit_sha", "node_id"]));
-    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_deploy_validated_sha.allowed_input_keys).toEqual(expect.arrayContaining(["commit_sha", "receipt_id"]));
-    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_enrollment.allowed_input_keys).toEqual(expect.arrayContaining(["node_id", "ttl_seconds"]));
-    expect(CLIENT_SAFE_REQUEST_PROFILES.local_execution_revoke_node.allowed_input_keys).toEqual(expect.arrayContaining(["node_id", "reason"]));
-    expect(CLIENT_SAFE_REQUEST_PROFILES.validation_plane_execute.intent).toBe("validation plane execute");
-
-    const tools: MandatoryExecutionToolDefinition[] = [{
-      name: "executeValidationPlane",
-      title: "Execute validation plane",
-      description: "Select the highest-priority available validation plane.",
-      inputSchema: {
-        type: "object",
-        properties: { commit_sha: { type: "string" }, validation_profile: { type: "string" } },
-        required: ["commit_sha"],
-      },
-    }];
-    const prepared = await prepareMandatoryExecutionMapCall(
-      null as unknown as D1Database,
-      {
-        intent: "validation plane execute",
-        objective: "Validate a frozen exact SHA using the preferred execution plane.",
-        inputs: { commit_sha: "38f4e6e0ff155812005214d761fc5dd3811b59b0", validation_profile: "full" },
-      },
-      tools,
-      { signPermit: async () => "unused", verifyPermit: async () => null },
-    );
-    expect(prepared).toMatchObject({
-      ok: true,
-      tool_name: "executeValidationPlane",
-      arguments: { commit_sha: "38f4e6e0ff155812005214d761fc5dd3811b59b0", validation_profile: "full" },
+  
+  it("routes deployment through the explicit exact-SHA Main workflow", () => {
+    const deployment = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker");
+    expect(deployment).toMatchObject({
+      route_intent: "run github workflow",
+      recommended_next_planes: ["engineering"],
     });
-  });
-
-  it("makes the local execution node the primary validation plane before hosted fallbacks", () => {
-    const local = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.local_execution_node");
-    expect(local).toMatchObject({
-      route_intent: "validation plane execute",
-      recommended_next_planes: ["deployment", "engineering"],
-    });
-    expect(local?.hard_gates).toEqual(expect.arrayContaining([
-      "Local node is the primary free validation plane when heartbeat is healthy.",
-      "Code/test failures must be repaired and must not be hidden by switching planes.",
+    expect(deployment?.hard_gates).toEqual(expect.arrayContaining([
+      "Production releases require one explicit exact 40-character repository SHA.",
+      "The release workflow validates, deploys, and verifies the same SHA.",
     ]));
-    expect(resolveLensicallySystemDirectory("validate sha locally through the local execution node")).toMatchObject({
-      entry_id: "deployment.local_execution_node",
-      route_intent: "validation plane execute",
+    expect(resolveLensicallySystemDirectory("deploy the exact validated sha through the main workflow")).toMatchObject({
+      entry_id: "deployment.main_worker",
+      route_intent: "run github workflow",
     });
-    expect(LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker")?.related_entry_ids).toContain("deployment.local_execution_node");
   });
+
 });

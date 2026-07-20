@@ -60,7 +60,7 @@
 
 ## Validation and Release
 
-- Normal backend release order is exact-head Cloudflare validation, required focused tests, a validation receipt bound to that SHA, one `[verified-worker-release]` marker commit, gated deployment of that same SHA, live runtime verification, and scheduler safety verification when publishing behavior changed.
+- Normal backend release order is fast push validation, one full exact-SHA Operator shard run when required, an explicit `worker-deploy` dispatch for that same SHA, live runtime verification, and scheduler safety verification when publishing behavior changed.
 - Ordinary commits run `npm ci && npm run validate:cloudflare`; `npm run deploy:cloudflare-gated` intentionally skips deployment unless the exact validated commit carries the verified release marker.
 - Full Operator tests are diagnostic and run separately when broad account behavior changed or focused checks are insufficient.
 - Recovery may repair or inspect a broken Main plane, but it must not bypass the Cloudflare exact-head validation receipt or become the normal deployment path.
