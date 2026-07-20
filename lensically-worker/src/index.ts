@@ -12,7 +12,12 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { sanitizeForLog, sanitizeLogMessage } from "../auth/logSanitizer.js";
 import { logAuthEvent, logWorkerOperationalEvent } from "../auth/operationalLog.js";
 import {
+  AGENT_NATIVE_OPERATING_CONTRACT,
+  AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
+  AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
   CONTINUOUS_HARDENING_VERSION,
+  SINGLE_ACTIVE_OUTCOME_POLICY_VERSION,
+  classifyOperatorWorkIntake,
   finalizeMandatoryExecutionMapCall,
   getMandatoryExecutionMapSummary,
   MANDATORY_EXECUTION_MAP_VERSION,
