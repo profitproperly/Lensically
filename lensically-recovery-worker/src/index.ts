@@ -302,6 +302,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const occurrences = file.content.split(find).length - 1;
     if (occurrences !== 1) return { ok: false, error: "find_text_must_match_exactly_once", occurrences };
     const content = file.content.replace(find, replace);
+    if (content === file.content) return { ok: true, status: 200, path, commit_sha: null, phase: "no_change", write_mode: "git_data_api" };
     const result = await commitRepoFileViaGitData(env, path, content, message);
     return { ok: result.ok, status: result.status, path, commit_sha: result.commit_sha, phase: result.phase ?? null, write_mode: "git_data_api" };
   }
