@@ -14531,6 +14531,82 @@ async function githubRepoApiRetryable(env: Env, path: string, init: RequestInit 
   return result;
 }
 
+function githubRefObjectSha(data: unknown): string | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const refObject = (data as Record<string, unknown>).object;
+  return refObject && typeof refObject === "object" && !Array.isArray(refObject) && typeof (refObject as Record<string, unknown>).sha === "string"
+    ? String((refObject as Record<string, unknown>).sha)
+    : null;
+}
+
+async function updateGithubBranchRefWithReconciliation(
+  env: Env,
+  branchRef: string,
+  previousHeadSha: string,
+  intendedCommitSha: string,
+): Promise<{ ok: boolean; status: number; committed_sha: string | null; data: Record<string, unknown> }> {
+  const patchRef = () => githubRepoApi(env, `/git/refs/heads/${branchRef}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sha: intendedCommitSha, force: false }),
+  });
+  const first = await patchRef();
+  if (first.ok) {
+    return { ok: true, status: first.status, committed_sha: intendedCommitSha, data: { phase: "update_ref", reconciled: false, retried: false, response: first.data } };
+  }
+  if (![502, 503, 504].includes(first.status)) {
+    return { ok: false, status: first.status, committed_sha: null, data: { phase: "update_ref", reconciled: false, retried: false, response: first.data } };
+  }
+  const observedAfterFirst = await githubRepoApiRetryable(env, `/git/ref/heads/${branchRef}`);
+  const observedSha = githubRefObjectSha(observedAfterFirst.data);
+  if (observedAfterFirst.ok && observedSha === intendedCommitSha) {
+    return { ok: true, status: 200, committed_sha: intendedCommitSha, data: { phase: "update_ref", reconciled: true, retried: false, first_status: first.status, observed_sha: observedSha } };
+  }
+  if (!observedAfterFirst.ok || observedSha !== previousHeadSha) {
+    return {
+      ok: false,
+      status: observedAfterFirst.ok ? 409 : observedAfterFirst.status,
+      committed_sha: null,
+      data: {
+        phase: "update_ref_reconciliation",
+        state: observedAfterFirst.ok ? "conflict" : "uncertain",
+        first_status: first.status,
+        previous_head_sha: previousHeadSha,
+        intended_commit_sha: intendedCommitSha,
+        observed_sha: observedSha,
+        read_status: observedAfterFirst.status,
+      },
+    };
+  }
+  const retry = await patchRef();
+  if (retry.ok) {
+    return { ok: true, status: retry.status, committed_sha: intendedCommitSha, data: { phase: "update_ref", reconciled: true, retried: true, first_status: first.status, response: retry.data } };
+  }
+  if (![502, 503, 504].includes(retry.status)) {
+    return { ok: false, status: retry.status, committed_sha: null, data: { phase: "update_ref", reconciled: true, retried: true, first_status: first.status, response: retry.data } };
+  }
+  const observedAfterRetry = await githubRepoApiRetryable(env, `/git/ref/heads/${branchRef}`);
+  const finalSha = githubRefObjectSha(observedAfterRetry.data);
+  if (observedAfterRetry.ok && finalSha === intendedCommitSha) {
+    return { ok: true, status: 200, committed_sha: intendedCommitSha, data: { phase: "update_ref", reconciled: true, retried: true, retry_status: retry.status, observed_sha: finalSha } };
+  }
+  return {
+    ok: false,
+    status: observedAfterRetry.ok ? (finalSha === previousHeadSha ? retry.status : 409) : observedAfterRetry.status,
+    committed_sha: null,
+    data: {
+      phase: "update_ref_reconciliation",
+      state: observedAfterRetry.ok ? (finalSha === previousHeadSha ? "unchanged_after_retry" : "conflict") : "uncertain",
+      first_status: first.status,
+      retry_status: retry.status,
+      previous_head_sha: previousHeadSha,
+      intended_commit_sha: intendedCommitSha,
+      observed_sha: finalSha,
+      read_status: observedAfterRetry.status,
+    },
+  };
+}
+
 async function getGithubFile(env: Env, repoPath: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number }> {
   const config = githubRepoConfig(env);
   const encodedPath = encodeURIComponent(repoPath).replace(/%2F/g, "/");
