@@ -533,13 +533,16 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && executionKernel?.public_contract === "profile_id_inputs_v1"
       && executionKernel?.deployment_fresh_sessions === true;
     const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
-    const startupPolicySucceeded = mapSummary?.version === "static-execution-router-v1"
-      && mapSummary?.map_state === "source_defined_route_completed"
-      && mapSummary?.route_mode === "source_defined_static_route"
-      && mapSummary?.mandatory_path_followed === true
-      && mapSummary?.d1_execution_library_bypassed === true
-      && mapSummary?.discovery_allowed === false
-      && mapSummary?.model_tool_choice_allowed === false;
+    const executionLifecycle = executionKernel?.lifecycle && typeof executionKernel.lifecycle === "object" && !Array.isArray(executionKernel.lifecycle)
+      ? executionKernel.lifecycle as Record<string, unknown>
+      : null;
+    const startupPolicySucceeded = executionLifecycle?.version === "static-execution-router-v1"
+      && executionLifecycle?.map_state === "source_defined_route_completed"
+      && executionLifecycle?.route_mode === "source_defined_static_route"
+      && executionLifecycle?.mandatory_path_followed === true
+      && executionLifecycle?.d1_execution_library_bypassed === true
+      && executionLifecycle?.discovery_allowed === false
+      && executionLifecycle?.model_tool_choice_allowed === false;
     const accountKeyRoute = accountKeyContent?.routed_execution as Record<string, unknown> | undefined;
     const accountKeySucceeded = accountKey.status === 200
       && accountKeyContent?.ok === true
