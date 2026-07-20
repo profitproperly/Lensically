@@ -2424,64 +2424,55 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
-  it("lists only the active static MCP registry and concise instructions", async () => {
+  it("advertises the curated direct typed Main surface and concise instructions", async () => {
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-    const listed = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { required?: string[]; properties?: Record<string, unknown> } }> }>("tools/list");
-    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
-    expect(listed.tools[0]?.inputSchema?.required).toEqual(["profile_id", "inputs"]);
-    expect(Object.keys(listed.tools[0]?.inputSchema?.properties ?? {})).toEqual(expect.arrayContaining([
-      "profile_id",
-      "inputs",
-      "continuation_id",
-      "incident_id",
-      "permit",
+    const listed = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { additionalProperties?: boolean; properties?: Record<string, unknown> } }> }>("tools/list");
+    const names = listed.tools.map((tool) => tool.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(expect.arrayContaining([
+      "getOperatorStartupContext",
+      "selectOperatorKey",
+      "confirmOperatorProceed",
+      "getGrowthMission",
+      "getWorkflowStatus",
+      "get_performance_learning",
+      "get_content_focus",
+      "get_manifest_review_batch",
+      "create_source_card",
+      "create_generation_run",
+      "schedule_approved_draft",
+      "getScheduledPostSchedulerState",
+      "getRepoStatus",
+      "readRepoFile",
+      "searchRepoFiles",
+      "applyRepoPatchSet",
+      "verifyDeployedMcpVersion",
     ]));
-    expect(listed.tools[0]?.inputSchema?.properties).not.toHaveProperty("objective");
-    expect(listed.tools[0]?.inputSchema?.properties).not.toHaveProperty("intent");
-    const registry = await mcpTool<{ tools: Array<{ name: string }> }>("listMcpTools");
-    const names = registry.tools.map((tool) => tool.name);
+    expect(names).not.toEqual(expect.arrayContaining([
+      "executeLensicallyIntent",
+      "listMcpTools",
+      "readMcpToolDefinition",
+      "recordHardeningIncident",
+      "runEngineeringTool",
+      "recordOpsMemory",
+      "listOpsMemory",
+    ]));
+    expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
+    expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
     const startup = await mcpTool<{
       execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean };
     }>("getOperatorStartupContext");
     expect(startup.execution_kernel).toMatchObject({
       name: "Execution Kernel",
       version: "lensically-execution-kernel-v1",
-      public_contract: "profile_id_inputs_v1",
+      public_contract: "direct_typed_tools_v1",
       deployment_fresh_sessions: true,
     });
-    expect(new Set(names).size).toBe(names.length);
-    expect(names).toEqual(expect.arrayContaining([
-      "engineeringPrecheck",
-      "getRepoStatus",
-      "readRepoFile",
-      "searchRepoFiles",
-      "applyRepoPatchSet",
-      "verifyDeployedMcpVersion",
-      "selectOperatorKey",
-      "confirmOperatorProceed",
-      "getWorkflowStatus",
-      "get_hourly_coverage",
-      "create_source_card",
-      "create_generation_run",
-      "schedule_approved_draft",
-    ]));
-    expect(names).not.toEqual(expect.arrayContaining([
-      "runEngineeringTool",
-      "recordOpsMemory",
-      "listOpsMemory",
-      "listPreCallRoutes",
-      "createMcpTool",
-      "updateMcpToolSchema",
-      "deployMcpChanges",
-      "createImplementationBacklogItem",
-    ]));
-    expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
-    expect(initialized.instructions).toContain("server-side Execution Kernel");
-    expect(initialized.instructions).toContain("OpsMemory routing are compatibility history only");
+    expect(initialized.instructions).toContain("advertised direct typed tool");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
     expect(initialized.instructions.length).toBeLessThan(5000);
   }, 30000);
