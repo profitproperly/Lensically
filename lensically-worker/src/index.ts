@@ -16526,11 +16526,15 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
     ).first<Record<string, unknown>>();
     incidentId = normalizeOperatorText(active?.id, 120, true);
   }
-  if (!incidentId || !target) return { ok: false, error: "hardening_incident_and_target_required" };
+  if (!incidentId || !requestedTarget) return { ok: false, error: "hardening_incident_and_target_required" };
   const row = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ? LIMIT 1`).bind(incidentId).first<Record<string, unknown>>();
   if (!row) return { ok: false, error: "hardening_incident_not_found" };
   const current = normalizeHardeningState(row.state);
   if (!current) return { ok: false, error: "hardening_incident_state_invalid" };
+  const target = requestedTarget === "next"
+    ? HARDENING_STATE_ORDER[HARDENING_STATE_ORDER.indexOf(current) + 1] ?? null
+    : normalizeHardeningState(args.target_state);
+  if (!target) return { ok: false, error: "hardening_incident_and_target_required" };
   const supplied = args.evidence && typeof args.evidence === "object" && !Array.isArray(args.evidence) ? args.evidence as Record<string, unknown> : {};
     const priorRegressions = safeParseJsonString(String(row.regression_test_ids_json ?? "[]"));
   const evidence: HardeningTransitionEvidence = {
