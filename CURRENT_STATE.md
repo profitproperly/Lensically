@@ -25,6 +25,14 @@
 - Mandatory startup reports the lifecycle version, canonical location, autonomous execution rule, and required completion sequence.
 - Account workflow calls still retain the controls that protect real business state: selected account, explicit Proceed boundary, server-side continuity, idempotency, authorization, content gates, scheduling ownership, and scheduler safety.
 
+## Continuous Hardening and Autonomous Operation
+
+- `continuous-hardening-loop-v1` persists incidents and evidence through Detected, Contained, Classified, Reproduced, Generalized, Repaired, Prevention-locked, Validated, Released, Live-verified, Resumed, and Closed. P0/P1 incidents block normal work; P2 requires a safe checkpoint.
+- The runtime role is the **Lensically Autonomous Business Operator** under `agent-native-operating-contract-v1`, not a chat-dependent assistant. Each activation restores durable state, reconciles, diagnoses, selects a priority, executes, verifies, records, declares one next action, and checkpoints.
+- `single-active-outcome-v1` persists one frozen active implementation outcome in `operator_work_state`. Proposed work is explicitly activated, deferred, merged, or rejected in `operator_work_ledger`; only P0/P1 incidents, required prerequisites, or material irreversible rework may interrupt the active outcome.
+- Every gateway result includes an action-closure receipt containing current live state, target agent-native state, active outcome, selected next action, priority reason, completion evidence, owner-action requirement, and a retirement condition whenever a temporary dependency exists.
+- The current active outcome is to complete, validate, release, and live-verify the Continuous Hardening Loop and Autonomous Business Operator foundation. Content lineage, scheduled autonomous runs, human-gate retirement, and posting continuity remain durably ordered without silently expanding the release scope.
+
 ## Guided Growth Mission
 
 - Manifest's permanent mission is to reach 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.
