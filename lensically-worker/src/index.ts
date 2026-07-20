@@ -16499,8 +16499,16 @@ async function getHardeningStatus(env: Env, args: Record<string, unknown>): Prom
 
 async function advanceHardeningIncident(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
-  const incidentId = normalizeOperatorText(args.incident_id, 120, true);
+  let incidentId = normalizeOperatorText(args.incident_id, 120, true);
   const target = normalizeHardeningState(args.target_state);
+  if (incidentId === "__active__") {
+    const active = await env.DB.prepare(
+      `SELECT id FROM operator_hardening_incidents
+       WHERE state != 'closed' AND severity IN ('P0', 'P1')
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).first<Record<string, unknown>>();
+    incidentId = normalizeOperatorText(active?.id, 120, true);
+  }
   if (!incidentId || !target) return { ok: false, error: "hardening_incident_and_target_required" };
   const row = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ? LIMIT 1`).bind(incidentId).first<Record<string, unknown>>();
   if (!row) return { ok: false, error: "hardening_incident_not_found" };
