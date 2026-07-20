@@ -211,7 +211,8 @@ export function validateClientSafetyRegistry(): { ok: boolean; errors: string[] 
   if (!CLIENT_BLOCK_INTAKE_CONTRACT.mandatory) errors.push("client_block_intake_not_mandatory");
   if (CLIENT_BLOCK_INTAKE_CONTRACT.canonical_location !== CLIENT_SAFETY_CANONICAL_LOCATION) errors.push("client_block_intake_wrong_location");
   if (!CLIENT_BLOCK_INTAKE_CONTRACT.sequence.includes("do_not_retry_identical_payload")) errors.push("client_block_retry_gate_missing");
-  if (!CLIENT_BLOCK_INTAKE_CONTRACT.sequence.includes("deploy_updated_public_contract")) errors.push("client_block_deploy_gate_missing");
+  if (!CLIENT_BLOCK_INTAKE_CONTRACT.sequence.includes("release_exact_tested_head")) errors.push("client_block_release_gate_missing");
+  if (!CLIENT_BLOCK_INTAKE_CONTRACT.sequence.includes("verify_live")) errors.push("client_block_live_verification_gate_missing");
   return { ok: errors.length === 0, errors };
 }
 
