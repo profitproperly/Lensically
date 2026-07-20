@@ -47,7 +47,7 @@ permissions:
 
 jobs:
   worker:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}
     runs-on: ubuntu-latest
     defaults:
       run:
