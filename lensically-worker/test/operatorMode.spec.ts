@@ -77,24 +77,6 @@ async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, arg
   });
 }
 
-const MCP_DIRECT_ENTRY_TOOLS = new Set(["executeLensicallyIntent"]);
-
-function testProfileId(toolName: string): string {
-  const requiredSafeProfiles: Record<string, string> = {
-    getOperatorStartupContext: "startup",
-    selectOperatorKey: "account_key_selection",
-    confirmOperatorProceed: "account_proceed",
-    listGitHubWorkflowRuns: "workflow_run_list",
-    getGitHubWorkflowRun: "workflow_run_status",
-    readRepoFile: "repository_file_read",
-    readMcpToolDefinition: "capability_definition",
-    auditScheduledPost: "scheduled_post_audit",
-    recoverOverdueScheduledPosts: "protected_scheduler_recovery",
-  };
-  return requiredSafeProfiles[toolName]
-    ?? toolName.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
-}
-
 async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
   return mcpToolCallRaw<T>(toolName, args);
 }
