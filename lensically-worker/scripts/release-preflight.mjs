@@ -262,7 +262,7 @@ if (!workflow.includes("- name: System Directory tests")
     || !workflow.includes("inputs.task == 'system-directory-tests' || inputs.task == 'worker-deploy'")) {
   errors.push("system_directory_release_gate_missing");
 }
-if (!workflow.includes("worker:\n    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' }}")) {
+if (!workflow.includes("worker:\n    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verified-worker-release]')) }}")) {
   errors.push("worker_job_must_exclude_parallel_operator_tests");
 }
 if (!workflow.includes("operator-test-shards:")
