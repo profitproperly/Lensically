@@ -20484,16 +20484,16 @@ async function handleOperatorMcpEngineeringTool(
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
-    const startup = await callGatewayLiveProfile("startup", {});
-    const select = await callGatewayLiveProfile("account_key_selection", { brand_key: "manifest_mental" });
-    const blocked = await callGatewayLiveProfile("get_workflow_status", { brand_key: "manifest_mental" });
-    const proceed = await callGatewayLiveProfile("confirm_operator_proceed", { brand_key: "manifest_mental" });
+    const startup = await callDirectLiveTool("getOperatorStartupContext", {});
+    const select = await callDirectLiveTool("selectOperatorKey", { brand_key: "manifest_mental" });
+    const blocked = await callDirectLiveTool("getWorkflowStatus", { brand_key: "manifest_mental" });
+    const proceed = await callDirectLiveTool("confirmOperatorProceed", { brand_key: "manifest_mental" });
     const proceedContent = structured(proceed.payload);
-    const allowed = await callGatewayLiveProfile("get_workflow_status", {
+    const allowed = await callDirectLiveTool("getWorkflowStatus", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
     });
-    const coverage = await callGatewayLiveProfile("get_hourly_coverage", {
+    const coverage = await callDirectLiveTool("get_hourly_coverage", {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
       timezone: "America/New_York",
