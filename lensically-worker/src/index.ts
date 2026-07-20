@@ -10281,7 +10281,7 @@ async function ensureManifestSourceBatchForDate(
         id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
         qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
         production_date, status
-      ) VALUES (?, ?, ?, 'uniform_random_without_replacement', ?, ?, ?, ?, ?, ?, ?, 'active')`,
+            ) VALUES (?, ?, ?, 'content_focus_weighted_without_replacement', ?, ?, ?, ?, ?, ?, ?, 'active')`,
     ).bind(
       batchId,
       brand.brand_key,
@@ -10295,8 +10295,10 @@ async function ensureManifestSourceBatchForDate(
         production_date: productionDate,
         cross_day_cooldown_applied: false,
         cross_day_repetition_allowed: true,
-        same_day_source_claims_enforced: true,
-        performance_weighting_applied: false,
+                same_day_source_claims_enforced: true,
+        performance_weighting_applied: true,
+        content_focus_version: OPERATOR_CONTENT_FOCUS_VERSION,
+        content_focus_allocation: focusSelection.allocation,
       }, {}),
       productionDate,
     ),
