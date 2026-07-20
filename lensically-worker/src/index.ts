@@ -26513,6 +26513,79 @@ function chooseOperatorCheckpointSnapshot(
     .sort((left, right) => left.ageHours - right.ageHours)[0] ?? null;
 }
 
+type OperatorContentFocusScoreRow = {
+  published_post_id: string;
+  posted_at_ms: number;
+  checkpoint_hours: number;
+  overall: number;
+  source_card_family_id: string;
+  source_identity_key: string;
+  source_card_id: string | null;
+  source_mechanism: string | null;
+  required_product: string | null;
+  recommended_direction: string | null;
+  transformation_contract: Record<string, unknown>;
+  forbidden_surfaces: unknown[];
+  danger_surfaces: unknown[];
+  fail_conditions: unknown[];
+};
+
+function operatorContentFocusSummary(rows: OperatorContentFocusScoreRow[]): OperatorContentFocusHorizonSummary {
+  const mature = rows.filter((row) => row.checkpoint_hours === 24);
+  const scores = mature.map((row) => row.overall).filter(Number.isFinite).sort((left, right) => left - right);
+  const latest = [...rows].sort((left, right) => right.posted_at_ms - left.posted_at_ms || right.checkpoint_hours - left.checkpoint_hours)[0];
+  return {
+    post_count: new Set(rows.map((row) => row.published_post_id)).size,
+    mature_count: mature.length,
+    strong_count: mature.filter((row) => row.overall >= OPERATOR_CONTENT_FOCUS_STRONG_SCORE).length,
+    weak_count: mature.filter((row) => row.overall <= OPERATOR_CONTENT_FOCUS_WEAK_SCORE).length,
+    median_overall: scores.length ? Number(calculateMedian(scores).toFixed(2)) : null,
+    latest_overall: latest ? Number(latest.overall.toFixed(2)) : null,
+  };
+}
+
+function operatorContentFocusPeriodKey(cadence: OperatorContentFocusCadence, anchorDate: string): string {
+  if (cadence === "daily") return anchorDate;
+  const date = new Date(`${anchorDate}T12:00:00.000Z`);
+  if (cadence === "monthly") return anchorDate.slice(0, 7);
+  if (cadence === "quarterly") return `${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`;
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() - day + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function operatorContentFocusWindowRows(
+  rows: OperatorContentFocusScoreRow[],
+  nowMs: number,
+  days: number | null,
+  ytd = false,
+): OperatorContentFocusScoreRow[] {
+  if (ytd) {
+    const yearStart = Date.UTC(new Date(nowMs).getUTCFullYear(), 0, 1);
+    return rows.filter((row) => row.posted_at_ms >= yearStart);
+  }
+  if (days === null) return rows;
+  const cutoff = nowMs - days * 86400000;
+  return rows.filter((row) => row.posted_at_ms >= cutoff);
+}
+
+function operatorContentFocusHorizons(rows: OperatorContentFocusScoreRow[], nowMs: number): OperatorContentFocusFamilyInput["horizons"] {
+  const latestByPost = new Map<string, OperatorContentFocusScoreRow>();
+  for (const row of rows) {
+    const existing = latestByPost.get(row.published_post_id);
+    if (!existing || row.checkpoint_hours > existing.checkpoint_hours) latestByPost.set(row.published_post_id, row);
+  }
+  const immediateRows = Array.from(latestByPost.values()).filter((row) => row.posted_at_ms >= nowMs - 86400000);
+  return {
+    immediate_24h: operatorContentFocusSummary(immediateRows),
+    operating_7d: operatorContentFocusSummary(operatorContentFocusWindowRows(rows, nowMs, 7)),
+    baseline_30d: operatorContentFocusSummary(operatorContentFocusWindowRows(rows, nowMs, 30)),
+    strategic_90d: operatorContentFocusSummary(operatorContentFocusWindowRows(rows, nowMs, 90)),
+    ytd: operatorContentFocusSummary(operatorContentFocusWindowRows(rows, nowMs, null, true)),
+    all_time: operatorContentFocusSummary(rows),
+  };
+}
+
 async function refreshOperatorPerformanceEvaluator(
   env: Env,
   brandKey: GptBrandKey,
