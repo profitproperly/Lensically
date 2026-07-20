@@ -14462,6 +14462,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "getGitHubWorkflowRun",
   "runGitHubWorkflow",
   "verifyDeployedMcpVersion",
+  "listMcpTools",
+  "readMcpToolDefinition",
   "runMcpTests",
   "listEngineeringAudit",
 ]);
