@@ -15142,7 +15142,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       backend_proceed_flag_enforced: true,
       key_selection_tool: "selectOperatorKey",
       proceed_confirmation_tool: "confirmOperatorProceed",
-      account_call_requirement: { proceed_confirmed: true },
+      account_call_requirement: { server_side_continuity_required: true },
       before_proceed_forbidden: ["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"],
       first_key_response_template: [
         "Lensically Operator Mode MCP is active.",
