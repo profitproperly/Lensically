@@ -16892,7 +16892,7 @@ async function recordOperatorExecutionDecision(
 
 function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
-    "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "listRepoFiles", "readRepoFile",
+    "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
