@@ -167,6 +167,7 @@ if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-op
     || !source.includes('name: "advanceOperatorWork"')
     || !source.includes("active_outcome_requirements_incomplete")
     || !source.includes("operator_work_self_merge_forbidden")
+    || source.includes("active_outcome_key = CASE WHEN operator_work_state.status")
     || !source.includes("resultPayload.operator_action_closure = await buildOperatorActionClosure")
     || !clientSafety.includes("operator_work_state")
     || !clientSafety.includes("operator_work_intake")
