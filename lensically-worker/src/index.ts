@@ -2204,6 +2204,24 @@ async function processScheduledPost(
   env: Env,
   post: DueScheduledPost,
 ): Promise<void> {
+  const lineage = await getScheduledPostPublishLineageStatus(env, post.id, post.threads_user_id);
+  if (lineage.required === true && lineage.complete !== true) {
+    const missingStages = Array.isArray(lineage.missing_stages) ? lineage.missing_stages.map(String) : [];
+    await env.DB.prepare(
+      `UPDATE scheduled_posts SET publish_error_message = ? WHERE id = ? AND status = ?`,
+    ).bind(
+      `manifest_lineage_incomplete:${missingStages.join(",") || "unknown"}`,
+      post.id,
+      SCHEDULED_POST_STATUS_APPROVED,
+    ).run();
+    logWorkerEvent("SCHEDULED_POST_LINEAGE_BLOCKED", {
+      scheduled_post_id: post.id,
+      threads_user_id: post.threads_user_id,
+      missing_stages: missingStages,
+    }, "error");
+    return;
+  }
+
   const claimed = await transitionScheduledPostStatus(
     env,
     post.id,
@@ -2526,7 +2544,48 @@ async function resolveGptBrandForThreadsUserId(
   if (!brandKey) {
     return null;
   }
-  return resolveGptBrand(env, brandKey);
+    return resolveGptBrand(env, brandKey);
+}
+
+export async function getScheduledPostPublishLineageStatus(
+  env: Env,
+  scheduledPostId: number,
+  threadsUserId: string,
+): Promise<Record<string, unknown>> {
+  const profile = (await getConfiguredThreadsProfiles(env))
+    .find((candidate) => candidate.threads_user_id === threadsUserId) ?? null;
+  const brandKey = profile ? gptBrandKeyForAccountId(profile.account_id) : null;
+  if (brandKey !== "manifest_mental") {
+    return { required: false, complete: true, brand_key: brandKey, missing_stages: [] };
+  }
+  await ensureOperatorWorkflowTables(env);
+  const row = await env.DB.prepare(
+    `SELECT d.id AS draft_id, r.id AS generation_run_id, c.id AS source_card_id,
+            s.id AS source_selection_id, s.batch_id AS source_batch_id
+     FROM gpt_generation_drafts d
+     LEFT JOIN gpt_generation_runs r
+       ON r.id = d.run_id AND r.account_id = d.account_id
+      AND r.threads_user_id = d.threads_user_id AND r.source_card_id = d.source_card_id
+     LEFT JOIN operator_source_cards c
+       ON c.id = d.source_card_id AND c.brand_key = ?
+     LEFT JOIN operator_source_selections s
+       ON s.id = c.source_selection_id AND s.brand_key = c.brand_key
+     WHERE d.scheduled_post_id = ? AND d.account_id = ? AND d.threads_user_id = ?
+     ORDER BY datetime(d.updated_at) DESC LIMIT 1`,
+  ).bind(brandKey, scheduledPostId, profile.account_id, threadsUserId).first<Record<string, unknown>>();
+  const missingStages: string[] = [];
+  if (!row?.source_selection_id || !row?.source_batch_id) missingStages.push("source");
+  if (!row?.source_card_id) missingStages.push("source_card");
+  if (!row?.generation_run_id) missingStages.push("generation_run");
+  if (!row?.draft_id) missingStages.push("draft");
+  return {
+    required: true,
+    complete: missingStages.length === 0,
+    brand_key: brandKey,
+    scheduled_post_id: scheduledPostId,
+    missing_stages: missingStages,
+    lineage: row ?? null,
+  };
 }
 
 function isValidIsoDate(value: string): boolean {

@@ -6,7 +6,8 @@ import worker, {
   buildOperatorMaturityObservation,
   buildOperatorPostFingerprint,
   evaluateThreadsPostMetricsForLearning,
-  finalizeScheduledPostPublished,
+    finalizeScheduledPostPublished,
+  getScheduledPostPublishLineageStatus,
   isSixHourInsightsRefreshWindow,
   OPERATOR_MCP_VERSION,
   searchKnownRepositoryFileContent,
@@ -1131,6 +1132,25 @@ describe("operator mode backend spine", () => {
       owner_response: "Proceed",
     });
   }, 30000);
+
+    it("fails closed when a Manifest scheduled post has no generation lineage", async () => {
+    await operatorTool("list_accounts");
+    const scheduled = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', '35758578720393972', 'Unlinked fixture', 'approved', '2026-07-20T12:00:00Z')`,
+    ).run();
+    const status = await getScheduledPostPublishLineageStatus(
+      env,
+      Number(scheduled.meta?.last_row_id ?? 0),
+      "35758578720393972",
+    );
+    expect(status).toMatchObject({
+      required: true,
+      complete: false,
+      brand_key: "manifest_mental",
+      missing_stages: ["source", "source_card", "generation_run", "draft"],
+    });
+  });
 
   it("recovers a known Saved Pattern into complete published-post lineage", async () => {
     await operatorTool("list_accounts");
