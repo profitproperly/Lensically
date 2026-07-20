@@ -660,6 +660,7 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
       "account_execution_locked_until_growth_plan_approval",
       "required_next_owner_action",
       "next_call_requirement",
+      "operator_action_closure",
     ];
     const criticalPayload = Object.fromEntries(
       criticalTopLevelKeys
