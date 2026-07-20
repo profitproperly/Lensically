@@ -21119,7 +21119,8 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
             const isError = resultPayload.ok === false;
       const resultError = normalizeOperatorMachineKey(resultPayload.error ?? resultPayload.error_code, "unexpected_result");
-      const unexplainedZero = toolName === "searchRepoFiles"
+      const unexplainedZero = !isError
+        && toolName === "searchRepoFiles"
         && Number(resultPayload.returned_count ?? 0) === 0
         && resultPayload.verified_complete_for_known_file !== true;
       if (!HARDENING_CONTROLLER_TOOLS.has(toolName)
