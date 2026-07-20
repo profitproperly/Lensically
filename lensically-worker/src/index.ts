@@ -14827,8 +14827,9 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       model_tool_choice_allowed: false,
       d1_route_lookup_required: false,
       recovery_role: "independent_break_glass_only",
+      agent_native_operator: AGENT_NATIVE_OPERATING_CONTRACT,
       account_controls: ["explicit_proceed", "guided_growth_mission", "owner_plan_approval", "server_side_continuity", "idempotency", "authorization", "content_gates", "scheduler_safety"],
-      engineering_flow: ["bounded_inspection", "coherent_change_set", "focused_validation", "exact_sha_release", "live_verification"],
+      engineering_flow: ["bounded_inspection", "coherent_change_set", "focused_validation", "exact_sha_release", "live_verification", "action_closure", "checkpoint"],
     },
     captured_at: new Date().toISOString(),
 
