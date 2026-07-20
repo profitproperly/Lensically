@@ -20675,7 +20675,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
     }
 
     if (method === "tools/list") {
-      const tools = (await buildOperatorMcpTools(env, false, false)).filter((tool) => isOperatorPublicDirectToolName(tool.name));
+      const tools = await buildOperatorPublicMcpTools(env);
       return mcpJsonResponse({
         jsonrpc: "2.0",
         id: id ?? null,
