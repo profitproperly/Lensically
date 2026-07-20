@@ -14421,6 +14421,7 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "discard_manifest_review_batch",
   "schedule_manifest_review_batch",
   "list_source_candidates",
+  "draw_source_candidate_batch",
   "get_source_candidate_batch",
   "create_source_card",
   "lock_source_card",
