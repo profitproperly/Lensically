@@ -19124,25 +19124,7 @@ async function handleOperatorMcpEngineeringTool(
     const isCloudflareCheck = (value: Record<string, unknown>) => JSON.stringify(value).toLowerCase().includes("cloudflare")
       || JSON.stringify(value).toLowerCase().includes("workers builds");
     const cloudflareChecks = [...checkRuns, ...commitStatuses].filter(isCloudflareCheck);
-    const failedConclusions = new Set(["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale", "error"]);
-    const cloudflareValidationState = cloudflareChecks.length === 0
-      ? "not_reported"
-      : cloudflareChecks.some((check) => {
-          const state = normalizeOperatorMachineKey(check.conclusion ?? check.state, "");
-          return failedConclusions.has(state);
-        })
-        ? "failed"
-        : cloudflareChecks.some((check) => {
-            const state = normalizeOperatorMachineKey(check.status ?? check.state, "");
-            return ["queued", "in_progress", "pending", "requested", "waiting"].includes(state);
-          })
-          ? "pending"
-          : cloudflareChecks.every((check) => {
-              const state = normalizeOperatorMachineKey(check.conclusion ?? check.state, "");
-              return ["success", "neutral", "skipped"].includes(state);
-            })
-            ? "passed"
-            : "unknown";
+    const cloudflareValidationState = deriveExternalValidationState(cloudflareChecks);
     return {
       ok: branch.ok,
       repo: `${config.owner}/${config.repo}`,
