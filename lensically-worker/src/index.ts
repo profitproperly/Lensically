@@ -16470,7 +16470,7 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
         tested_sha: normalizeOperatorText(args.tested_sha ?? row.tested_sha, 120, true),
     deployment_id: normalizeOperatorText(args.deployment_id ?? row.deployment_id, 160, true),
     live_verification: (args.live_verification ?? safeParseJsonString(String(row.live_verification_json ?? ""))) as Record<string, unknown> | null,
-    resume_result: (args.resume_result ?? supplied.resume_result ?? safeParseJsonString(String(row.resume_result_json ?? ""))) as Record<string, unknown> | null,
+    resume_result: resolveHardeningResumeResult(args, supplied, safeParseJsonString(String(row.resume_result_json ?? ""))),
         autonomy_dividend: (args.autonomy_dividend ?? safeParseJsonString(String(row.autonomy_dividend_json ?? ""))) as Record<string, unknown> | null,
   };
   const validation = validateHardeningTransition(current, target, evidence);
