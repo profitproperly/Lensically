@@ -573,13 +573,14 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         && startup.status === 200
         && startupContent?.ok === true
         && accountKeySucceeded
-        && mappedSurface
+        && directSurface
         && sessionIssued
         && staleSessionRejected
         && executionKernelSucceeded
-        && directRejected
-        && mappedSucceeded
-        && legacyFreehandRetired
+        && engineeringAccessSucceeded
+        && schedulerSucceeded
+        && campaignSucceeded
+        && inventorySucceeded
         && startupPolicySucceeded,
       oauth: { authorize: authorize.status, token: tokenResponse.status },
       initialize: {
