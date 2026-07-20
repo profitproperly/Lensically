@@ -15653,13 +15653,26 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           ...compiled,
           inputs: {
             boundary: "client",
-            blocked_profile_id: "operator_work_state",
-            request_fingerprint: "client-preflight-blocked-profile-name",
+            blocked_profile_id: "operator_work_transition",
+            request_fingerprint: "client-preflight-blocked-work-transition",
             error_category: "client_side_rejection",
-            operation_class: "read",
-            expected_outcome: "read durable work checkpoint",
+            operation_class: "mutation",
+            expected_outcome: "reconcile durable work checkpoint",
             observed_outcome: { blocked_before_gateway: true },
-            resume_capsule: { profile_id: "checkpoint_read", inputs: {} },
+            resume_capsule: { profile_id: "checkpoint_read", inputs: {}, continuation_id: "r" },
+          },
+        };
+      }
+      if (profileId === "checkpoint_read" && gatewayArgs.continuation_id === "r") {
+        compiledRequest = {
+          ...compiled,
+          objective: "Reconcile the current checkpoint.",
+          intent: "advance operator work",
+          inputs: {
+            work_key: "github_transient_retry_wiring",
+            status: "queued",
+            next_action: "Execute required prerequisite github_transient_retry_wiring, record focused regression evidence, and resume the frozen active outcome.",
+            limit: 30,
           },
         };
       }
