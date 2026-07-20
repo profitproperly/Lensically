@@ -25,6 +25,7 @@ import {
     prepareMandatoryExecutionMapCall,
   prepareSourceDefinedDirectEngineeringCall,
   resolvePromotedWinningPath,
+  resolveHardeningResumeResult,
   validateHardeningTransition,
   validateOperatorActionClosure,
   type ExecutionPolicyLibrarySource,
