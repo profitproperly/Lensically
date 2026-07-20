@@ -14440,6 +14440,7 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "save_strategy_memory",
   "list_scheduled_posts",
   "edit_scheduled_post",
+  "schedule_owner_approved_batch",
   "schedule_approved_draft",
   "get_post_results",
   "getScheduledPostSchedulerState",
