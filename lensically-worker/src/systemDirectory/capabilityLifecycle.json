@@ -250,6 +250,83 @@
       "release_scope": "operator-content",
       "live_verification": "The deployed Worker retires the selected stale review batch, removes it from active continuity, and reports that Saved Pattern, archive, analytics, and lineage records remain preserved.",
       "compatibility_bridge": false
+    },
+    {
+      "capability_id": "engineering.record_hardening_incident",
+      "directory_entry_id": "engineering.hardening_incident_intake",
+      "canonical_handler": "recordHardeningIncident",
+      "route_intent": "record hardening incident",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the hardening controller capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway accepts the typed client-block intake profile, deduplicates identical open incidents, classifies prevention recurrences, and returns the durable incident identifier without account mutation.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "engineering.read_hardening_status",
+      "directory_entry_id": "engineering.hardening_status",
+      "canonical_handler": "getHardeningStatus",
+      "route_intent": "get hardening status",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the hardening controller capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway returns bounded active hardening incidents, transition evidence, and the normal-work blocking state through the registered hardening status profile.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "engineering.advance_hardening_incident",
+      "directory_entry_id": "engineering.hardening_transition",
+      "canonical_handler": "advanceHardeningIncident",
+      "route_intent": "advance hardening incident",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the hardening controller capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway rejects skipped lifecycle states and advances a bounded test incident only when each required root-cause, prevention, regression, tested-head, deployment, live-verification, resume, and autonomy-dividend field is present.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "engineering.record_operational_observation",
+      "directory_entry_id": "engineering.operational_observation",
+      "canonical_handler": "recordOperationalObservation",
+      "route_intent": "record operational observation",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the hardening controller capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway stores one compact operational observation and opens an efficiency incident only when call, duration, repetition, or progress evidence exceeds the recent successful baseline.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.read_operator_work_state",
+      "directory_entry_id": "operating.work_state",
+      "canonical_handler": "getOperatorWorkState",
+      "route_intent": "get operator work state",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the durable operator work capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed startup and registered work-state profile return one frozen active outcome, ordered queued prerequisites, deferred work, any active interrupt, and the durable operator-selected next action.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.intake_operator_work",
+      "directory_entry_id": "operating.work_intake",
+      "canonical_handler": "intakeOperatorWork",
+      "route_intent": "intake operator work",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the durable operator work capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway activates a required prerequisite, defers a noncritical item without changing the active outcome, merges a duplicate, and rejects a mission conflict through bounded synthetic work items.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.advance_operator_work",
+      "directory_entry_id": "operating.work_transition",
+      "canonical_handler": "advanceOperatorWork",
+      "route_intent": "advance operator work",
+      "implementation_mode": "new_handler",
+      "focused_regression": "registers the durable operator work capabilities",
+      "release_scope": "system-directory-tests",
+      "live_verification": "The exact deployed Main gateway checkpoints one work item with evidence, clears a completed interruption, resumes the frozen active outcome, and refuses analysis-only closure by always returning an action-closure receipt.",
+      "compatibility_bridge": false
     }
   ]
 }
