@@ -3053,7 +3053,8 @@ describe("operator mode MCP endpoint", () => {
     expect(proceeded.isError).not.toBe(true);
     expect(proceeded.structuredContent).toMatchObject({ proceeded: true, account_data_loaded: true, continuity_loaded: true, continuation_choice_required: false });
         expect(proceeded.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
-    expect(proceeded.structuredContent.next_call_requirement).toMatchObject({ brand_key: "vectrix", proceed_confirmed: true });
+    expect(proceeded.structuredContent.next_call_requirement).toMatchObject({ brand_key: "vectrix" });
+    expect(proceeded.structuredContent.next_call_requirement).not.toHaveProperty("proceed_confirmed");
     expect(proceeded.structuredContent.next_call_requirement.continuity_loaded).toBeUndefined();
 
     const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string; limit: number; source: string; coverage_status: string }> }>("prepareFullPreflight", {
