@@ -561,14 +561,12 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && executionLifecycle?.d1_execution_library_bypassed === true
       && executionLifecycle?.discovery_allowed === false
       && executionLifecycle?.model_tool_choice_allowed === false;
-    const accountKeyRoute = accountKeyContent?.routed_execution as Record<string, unknown> | undefined;
     const accountKeySucceeded = accountKey.status === 200
       && accountKeyContent?.ok === true
       && accountKeyContent?.selected_key === "manifest_mental"
       && accountKeyContent?.account_data_loaded === false
-      && accountKeyContent?.next_profile_id === "account_proceed"
-      && accountKeyRoute?.profile_id === "account_key_selection"
-      && accountKeyRoute?.executed_tool === "selectOperatorKey";
+      && accountKeyContent?.proceed_required === true
+      && accountKeyContent?.next_tool === "confirmOperatorProceed";
     return {
       ok: initialize.status === 200
         && listed.status === 200
