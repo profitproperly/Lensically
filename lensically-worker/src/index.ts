@@ -14635,7 +14635,7 @@ async function getGithubFile(env: Env, repoPath: string): Promise<{ ok: boolean;
   if (!tree.ok || !blobSha) {
     return { ok: false, status: tree.status || contents.status, sha: null, content: null, size: 0 };
   }
-  const blob = await githubRepoApi(env, `/git/blobs/${blobSha}`);
+  const blob = await githubRepoApiRetryable(env, `/git/blobs/${blobSha}`);
   if (!blob.ok || !blob.data || typeof blob.data !== "object" || Array.isArray(blob.data)) {
     return { ok: false, status: blob.status, sha: null, content: null, size: 0 };
   }
