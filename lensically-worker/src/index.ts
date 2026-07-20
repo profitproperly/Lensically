@@ -25865,6 +25865,109 @@ export function evaluateThreadsPostMetricsForLearning(post: CachedThreadsPost): 
 const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v2";
 const OPERATOR_POST_FINGERPRINT_VERSION = "post-fingerprint-v1";
 export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 18, 24] as const;
+const OPERATOR_CONTENT_FOCUS_VERSION = "content-focus-v1";
+const OPERATOR_CONTENT_FOCUS_STRONG_SCORE = 65;
+const OPERATOR_CONTENT_FOCUS_WEAK_SCORE = 35;
+const OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION = { repeat: 50, expand: 25, test: 20, exploration: 5 } as const;
+
+export type OperatorContentFocusStatus = "repeat" | "expand" | "test" | "hold" | "retire" | "blocked";
+export type OperatorContentFocusCadence = "daily" | "weekly" | "monthly" | "quarterly";
+
+type OperatorContentFocusHorizonSummary = {
+  post_count: number;
+  mature_count: number;
+  strong_count: number;
+  weak_count: number;
+  median_overall: number | null;
+  latest_overall: number | null;
+};
+
+type OperatorContentFocusFamilyInput = {
+  cadence: OperatorContentFocusCadence;
+  current_status?: OperatorContentFocusStatus | null;
+  manual_lock?: boolean;
+  fatigue_ratio?: number;
+  horizons: Partial<Record<"immediate_24h" | "operating_7d" | "baseline_30d" | "strategic_90d" | "ytd" | "all_time", OperatorContentFocusHorizonSummary>>;
+};
+
+export function classifyOperatorContentFocusFamily(input: OperatorContentFocusFamilyInput): {
+  status: OperatorContentFocusStatus;
+  recommended_status: OperatorContentFocusStatus;
+  confidence_label: "insufficient" | "directional" | "reliable";
+  confidence_score: number;
+  allocation_weight: number;
+  reason: string;
+} {
+  const currentStatus = input.current_status ?? "test";
+  const weight = (status: OperatorContentFocusStatus): number => status === "repeat" ? 1.5 : status === "expand" ? 1.25 : status === "test" ? 1 : 0;
+  if (input.manual_lock || currentStatus === "blocked") {
+    return {
+      status: currentStatus,
+      recommended_status: currentStatus,
+      confidence_label: "reliable",
+      confidence_score: 100,
+      allocation_weight: weight(currentStatus),
+      reason: "Owner-locked focus status is preserved.",
+    };
+  }
+
+  const operating = input.horizons.operating_7d;
+  const baseline = input.horizons.baseline_30d;
+  const strategic = input.horizons.strategic_90d;
+  const fatigueRatio = Math.max(0, Number(input.fatigue_ratio ?? 0));
+  let recommended: OperatorContentFocusStatus = "test";
+  let reason = "Evidence remains insufficient or mixed, so the family stays in controlled testing.";
+  const canRetire = input.cadence === "monthly" || input.cadence === "quarterly";
+
+  if (
+    canRetire
+    && Number(strategic?.mature_count ?? 0) >= 5
+    && Number(strategic?.median_overall ?? 100) <= OPERATOR_CONTENT_FOCUS_WEAK_SCORE
+    && Number(strategic?.weak_count ?? 0) >= 4
+    && Number(strategic?.strong_count ?? 0) === 0
+  ) {
+    recommended = "retire";
+    reason = "Repeated mature weakness across the 90-day strategic window supports retirement.";
+  } else if (
+    (Number(operating?.mature_count ?? 0) >= 3 && Number(operating?.median_overall ?? 100) <= 40)
+    || (fatigueRatio >= 0.5 && Number(operating?.post_count ?? 0) >= 4)
+  ) {
+    recommended = "hold";
+    reason = fatigueRatio >= 0.5
+      ? "Recent use is concentrated enough to create fatigue risk, so the family should pause."
+      : "Several mature seven-day results are weak, so the family should pause before more allocation.";
+  } else if (
+    Number(baseline?.mature_count ?? 0) >= 3
+    && Number(baseline?.median_overall ?? 0) >= OPERATOR_CONTENT_FOCUS_STRONG_SCORE
+    && Number(baseline?.strong_count ?? 0) >= 2
+  ) {
+    recommended = "repeat";
+    reason = "Multiple mature 30-day results confirm a repeatable winning family.";
+  } else if (
+    Number(baseline?.strong_count ?? 0) >= 1
+    || (Number(operating?.mature_count ?? 0) >= 2 && Number(operating?.median_overall ?? 0) >= 58)
+  ) {
+    recommended = "expand";
+    reason = "Promising mature evidence supports controlled variations without declaring the family fully proven.";
+  }
+
+  const evidenceCount = Math.max(Number(baseline?.mature_count ?? 0), Number(strategic?.mature_count ?? 0));
+  const confidenceLabel = evidenceCount >= 8 ? "reliable" : evidenceCount >= 3 ? "directional" : "insufficient";
+  const effectDistance = Math.max(
+    Math.abs(Number(baseline?.median_overall ?? 50) - 50),
+    Math.abs(Number(strategic?.median_overall ?? 50) - 50),
+  );
+  const confidenceScore = Number(((Math.min(1, evidenceCount / 8) * 0.75 + Math.min(1, effectDistance / 25) * 0.25) * 100).toFixed(2));
+  const status = input.cadence === "daily" && input.current_status ? currentStatus : recommended;
+  return {
+    status,
+    recommended_status: recommended,
+    confidence_label: confidenceLabel,
+    confidence_score: confidenceScore,
+    allocation_weight: weight(status),
+    reason,
+  };
+}
 
 type OperatorMetricRecord = {
   views: number;
