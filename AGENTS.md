@@ -98,7 +98,7 @@
 
 ## Handoff and Safety
 
-- Owner-facing engineering updates state what completed, what is being checked, and the next action. Surface a blocker only when owner action is genuinely required.
+- Owner-facing engineering updates state current live state, target agent-native state, active outcome, completed evidence, one operator-selected next action, and whether owner action is genuinely required. Analysis-only closure and vague future promises are forbidden.
 - Final handoffs state what changed, what was verified, what was deployed, and any remaining external risk.
 - Preserve strict TypeScript safety.
 - Destructive or irreversible business actions require the existing owner-ratified protections.
