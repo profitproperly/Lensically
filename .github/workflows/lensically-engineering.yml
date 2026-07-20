@@ -17,8 +17,8 @@ on:
         default: typecheck
         type: choice
         options:
-          - typecheck
-                    - system-directory-tests
+                    - typecheck
+          - system-directory-tests
           - threads-publish-tests
           - operator-tests
           - gpt-memory-tests
@@ -130,8 +130,8 @@ jobs:
           exit 1
 
       - name: Threads publish readiness tests
-        id: threads_publish_tests
-                if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'worker-deploy' }}
+                id: threads_publish_tests
+        if: ${{ inputs.task == 'threads-publish-tests' || inputs.task == 'worker-deploy' }}
         continue-on-error: true
         run: |
           set -o pipefail
