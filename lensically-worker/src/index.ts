@@ -15693,7 +15693,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           transitionInputs.resume_result = { original_objective_resumed: true };
           transitionInputs.autonomy_dividend = { owner_intervention_removed: true, semantic_profile_name_dependency_removed: true };
         }
-        compiledRequest = { ...compiled, inputs: transitionInputs };
+        compiledRequest = { ...compiled, objective: "Advance one blocked-call record.", intent: "advance hardening incident", inputs: transitionInputs };
       }
       return {
         ok: true,
