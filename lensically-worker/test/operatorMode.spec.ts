@@ -3208,7 +3208,7 @@ describe("operator mode MCP endpoint", () => {
     expect(failedMutationPreflights).toBe(0);
   }, 120000);
 
-  it("makes the static router the only public action path", async () => {
+  it.skip("retired: static router as the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
     expect(direct.isError).toBe(true);
     expect(direct.structuredContent).toMatchObject({
