@@ -17983,19 +17983,6 @@ async function getOperatorMcpBoundaryBlock(
     return null;
   }
   const requestedBrand = requestedMcpBrandKey(toolName, args);
-  if (!operatorMcpProceedConfirmed(toolName, args)) {
-    const toolCount = await operatorPublicMcpToolCount(env);
-    return {
-      ok: false,
-      error: "explicit_proceed_required",
-      selected_key: requestedBrand,
-      account_data_loaded: false,
-      handshake: requestedBrand ? operatorKeyHandshakeLines(toolCount, requestedBrand) : null,
-      required_next_tool: "confirmOperatorProceed",
-      required_argument: { proceed_confirmed: true },
-      message: "Wait for explicit user approval, call confirmOperatorProceed for the selected key, then retry with proceed_confirmed=true. Account data was not loaded.",
-    };
-  }
   const serverContinuity = requestedBrand
     ? await readLatestOperatorContinuityState(env, "continuity_context", requestedBrand)
     : null;
@@ -18004,14 +17991,16 @@ async function getOperatorMcpBoundaryBlock(
   const legacyContinuity = serverContinuity || legacyReference ? null : await verifyOperatorContinuityToken(env, legacyCredential, requestedBrand);
   const continuity = serverContinuity ?? legacyReference ?? legacyContinuity;
   if (!continuity) {
+    const toolCount = await operatorPublicMcpToolCount(env);
     return {
       ok: false,
-      error: "continuity_context_required",
+      error: "explicit_proceed_required",
       selected_key: requestedBrand,
       account_data_loaded: false,
-            required_next_tool: "confirmOperatorProceed",
-            required_arguments: { proceed_confirmed: true },
-      message: "Call confirmOperatorProceed once for the selected key. Later direct account calls send proceed_confirmed=true; Lensically verifies canonical continuity from server-side state.",
+      handshake: requestedBrand ? operatorKeyHandshakeLines(toolCount, requestedBrand) : null,
+      required_next_tool: "confirmOperatorProceed",
+      required_arguments: requestedBrand ? { brand_key: requestedBrand } : {},
+      message: "Wait for explicit user approval, then call confirmOperatorProceed once for the selected key. Later direct account calls use server-side continuity and do not send a Proceed flag.",
     };
   }
   const tokenSession = normalizeOperatorText(continuity.workflow_session_id, 120, true);
