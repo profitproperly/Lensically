@@ -16667,12 +16667,25 @@ async function advanceOperatorWork(env: Env, args: Record<string, unknown>): Pro
   if (!workKey || !allowed.has(status)) return { ok: false, error: "work_key_and_valid_status_required" };
   const evidence = Array.isArray(args.evidence) ? args.evidence.map(String).filter(Boolean) : [];
   const nextAction = normalizeOperatorText(args.next_action, 1200, true);
-  const result = await env.DB.prepare(
-    `UPDATE operator_work_ledger SET status = ?, evidence_json = ?,
-      completed_at = CASE WHEN ? = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END,
-      updated_at = CURRENT_TIMESTAMP WHERE work_key = ?`,
-  ).bind(status, normalizeOperatorJson(evidence, []), status, workKey).run();
-  if (Number(result.meta?.changes ?? 0) < 1) return { ok: false, error: "operator_work_item_not_found" };
+  const currentItem = await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE work_key = ? LIMIT 1`).bind(workKey).first<Record<string, unknown>>();
+  if (!currentItem) return { ok: false, error: "operator_work_item_not_found" };
+  const currentStatus = String(currentItem.status ?? "deferred") as OperatorWorkItemStatus;
+  const transitionAllowed = currentStatus === status
+    || (currentStatus === "queued" && ["completed", "deferred", "interrupting"].includes(status))
+    || (currentStatus === "deferred" && ["queued", "interrupting", "completed", "merged", "rejected"].includes(status))
+    || (currentStatus === "interrupting" && ["completed", "deferred"].includes(status));
+  if (!transitionAllowed) return { ok: false, error: "operator_work_transition_forbidden", current_status: currentStatus, target_status: status };
+  if (currentStatus !== status) {
+    await env.DB.prepare(
+      `UPDATE operator_work_ledger SET status = ?, evidence_json = ?,
+        completed_at = CASE WHEN ? = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+        updated_at = CURRENT_TIMESTAMP WHERE work_key = ?`,
+    ).bind(status, normalizeOperatorJson(evidence, []), status, workKey).run();
+  } else if (evidence.length > 0) {
+    await env.DB.prepare(
+      `UPDATE operator_work_ledger SET evidence_json = ?, updated_at = CURRENT_TIMESTAMP WHERE work_key = ?`,
+    ).bind(normalizeOperatorJson(evidence, []), workKey).run();
+  }
   const state = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton'`).first<Record<string, unknown>>();
   if (state?.active_interrupt_key === workKey && status === "completed") {
     await env.DB.prepare(
