@@ -18,6 +18,7 @@ import {
   CONTINUOUS_HARDENING_VERSION,
   SINGLE_ACTIVE_OUTCOME_POLICY_VERSION,
   classifyOperatorWorkIntake,
+  deriveExternalValidationState,
   finalizeMandatoryExecutionMapCall,
   getMandatoryExecutionMapSummary,
   MANDATORY_EXECUTION_MAP_VERSION,
