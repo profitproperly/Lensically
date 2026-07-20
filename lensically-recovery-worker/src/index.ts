@@ -488,22 +488,18 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const scheduledTomorrow = await mainMcpRequest(origin, token, 10, "tools/call", { name: "list_scheduled_posts", arguments: { brand_key: "manifest_mental", date: "2026-07-21", timezone: "America/New_York", proceed_confirmed: true } }, sessionId);
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
-    const gatewayTool = tools.find((tool) => tool.name === "executeLensicallyIntent") ?? null;
-    const gatewaySchema = gatewayTool?.inputSchema && typeof gatewayTool.inputSchema === "object" && !Array.isArray(gatewayTool.inputSchema)
-      ? gatewayTool.inputSchema as Record<string, unknown>
-      : null;
-    const gatewayProperties = gatewaySchema?.properties && typeof gatewaySchema.properties === "object" && !Array.isArray(gatewaySchema.properties)
-      ? gatewaySchema.properties as Record<string, unknown>
-      : {};
-    const gatewayRequired = Array.isArray(gatewaySchema?.required) ? gatewaySchema.required.map(String) : [];
-    const publicContractSucceeded = gatewayRequired.length === 2
-      && gatewayRequired.includes("profile_id")
-      && gatewayRequired.includes("inputs")
-      && Object.prototype.hasOwnProperty.call(gatewayProperties, "profile_id")
-      && Object.prototype.hasOwnProperty.call(gatewayProperties, "inputs")
-      && !Object.prototype.hasOwnProperty.call(gatewayProperties, "objective")
-      && !Object.prototype.hasOwnProperty.call(gatewayProperties, "intent")
-      && gatewaySchema?.additionalProperties === false;
+    const requiredDirectTools = ["getOperatorStartupContext", "selectOperatorKey", "getEngineeringAccessState", "getScheduledPostSchedulerState", "runMcpTests", "list_scheduled_posts"];
+    const schemasClosed = tools.every((tool) => {
+      const schema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
+        ? tool.inputSchema as Record<string, unknown>
+        : null;
+      return schema?.type === "object" && schema.additionalProperties === false;
+    });
+    const publicContractSucceeded = tools.length === 84
+      && new Set(toolNames).size === 84
+      && requiredDirectTools.every((toolName) => toolNames.includes(toolName))
+      && !toolNames.includes("executeLensicallyIntent")
+      && schemasClosed;
     const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const accountKeyContent = ((accountKey.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
     const directContent = ((direct.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
