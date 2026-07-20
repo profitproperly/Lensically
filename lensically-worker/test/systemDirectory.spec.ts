@@ -1279,6 +1279,11 @@ describe("System Directory foundation", () => {
       decision: "merge",
       active_outcome_unchanged: true,
     });
+    expect(classifyOperatorWorkIntake({ active_outcome_key: null, proposed_work_key: "next_outcome" })).toEqual({
+      decision: "activate",
+      active_outcome_unchanged: false,
+      reason: "no_active_outcome",
+    });
   });
 
   it("blocks operational closure without a selected next action and dependency retirement path", () => {
