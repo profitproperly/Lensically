@@ -129,7 +129,7 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
   let callArgs = args;
   if (requestedBrand && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") {
     await ensureMcpAccountOpen(requestedBrand);
-                        callArgs = { ...args, proceed_confirmed: true };
+    callArgs = args;
   }
   let result = await mcpToolRaw<Record<string, unknown>>(toolName, callArgs);
   if (result.isError && result.structuredContent.error === "approved_growth_mission_required") {
