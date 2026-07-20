@@ -18101,7 +18101,6 @@ async function handleOperatorMcpAdminTool(
         : null,
       next_call_requirement: {
         brand_key: operatorClientSafeBrandKey(brandKey),
-        proceed_confirmed: true,
         operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
       },
     };
