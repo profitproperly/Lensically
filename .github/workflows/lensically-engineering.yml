@@ -2,7 +2,7 @@ name: Lensically Engineering
 # [operator-tests] exact-head fallback runs focused Operator diagnostics before the final full regression suite.
 # [system-directory-tests] exact-head fallback runs isolated System Directory validation.
 # [threads-publish-tests] exact-head fallback runs isolated Threads publishing readiness validation.
-# verified-release-marker: release-48
+# verified-release-marker: release-49
 # verified-release-trigger: r46
 # verified-operator-shards-marker: shards-16
 # verified-release-dispatch-fields: --field release_id="${RELEASE_SHA:0:12}" --field release_sha="${RELEASE_SHA}"
