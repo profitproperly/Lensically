@@ -1333,9 +1333,15 @@ describe("System Directory foundation", () => {
       priority_reason: "the release scope is frozen",
       completion_evidence: ["validation receipt"],
       owner_action_required: false,
+      progress_recorded: true,
+      deferred_work_preserved: true,
+      checkpoint: "resume from durable work state",
     };
     expect(validateOperatorActionClosure(complete)).toEqual({ ok: true, errors: [] });
     expect(validateOperatorActionClosure({ ...complete, next_action: "" })).toMatchObject({ ok: false, errors: ["next_action_required"] });
+    expect(validateOperatorActionClosure({ ...complete, progress_recorded: false })).toMatchObject({ ok: false, errors: ["progress_recorded_required"] });
+    expect(validateOperatorActionClosure({ ...complete, deferred_work_preserved: false })).toMatchObject({ ok: false, errors: ["deferred_work_preserved_required"] });
+    expect(validateOperatorActionClosure({ ...complete, checkpoint: "" })).toMatchObject({ ok: false, errors: ["checkpoint_required"] });
     expect(validateOperatorActionClosure({ ...complete, temporary_dependency: "Recovery" })).toMatchObject({
       ok: false,
       errors: ["dependency_retirement_condition_required"],
