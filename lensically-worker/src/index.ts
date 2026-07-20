@@ -15647,7 +15647,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         const requestedLines = Number(safeInputs.max_lines ?? (Number(safeInputs.max_characters ?? 0) > 0 ? Math.ceil(Number(safeInputs.max_characters) / 100) : 200));
         compiledRequest = { ...compiled, inputs: { path: safeInputs.path, start_line: safeInputs.start_line ?? 1, max_lines: Math.min(Math.max(Math.trunc(requestedLines), 1), 200) } };
       }
-      if (profileId === "case_open") {
+      if (profileId === "case_open" && typeof gatewayArgs.continuation_id !== "string") {
         compiledRequest = {
           ...compiled,
           inputs: {
@@ -15662,8 +15662,8 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           },
         };
       }
-      if (profileId === "case_step") {
-        const stage = normalizeOperatorMachineKey(safeInputs.stage, "");
+      if (profileId === "case_step" || (profileId === "case_open" && typeof gatewayArgs.continuation_id === "string")) {
+        const stage = normalizeOperatorMachineKey(profileId === "case_open" ? gatewayArgs.continuation_id : safeInputs.stage, "");
         const stageMap: Record<string, string> = {
           contain: "contained",
           classify: "classified",
