@@ -20506,7 +20506,7 @@ async function handleOperatorMcpEngineeringTool(
     const coverageContent = structured(coverage.payload);
     const boundaryTest = {
       selected_key: selectContent.selected_key ?? null,
-      startup_through_gateway: startupContent.gateway && (startupContent.gateway as Record<string, unknown>).intent === "startup",
+      startup_direct: startupContent.ok === true && startupContent.bootstrap_version !== undefined,
       handshake: selectContent.handshake ?? null,
       blocked_before_proceed: blockedContent.error === "explicit_proceed_required" && blockedContent.account_data_loaded === false,
       blocked_error: blockedContent.error ?? null,
