@@ -96,7 +96,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Recovery and Client Boundaries
 
 - Recovery remains independently deployed and source-defined. It must not depend on the main gateway, main D1 preparation, account data, or Operator routing.
-- Use Recovery for registered control-plane classes: free-text repository discovery, terminal workflow failure diagnostics, exact repair when the main client blocks the payload, verified Worker deployment, and main-path break-glass recovery. Keep known-file reads and normal account work on the main source-defined route.
+- Use Recovery only for break-glass classes that Main or its deployment plane cannot receive or complete: free-text discovery when the location is unknown, terminal failure diagnostics, exact repair of a blocked Main contract, health inspection, rollback, and smoke verification. Return normal engineering state, work intake, validation, and release to Main immediately after repair.
 - ChatGPT may cache a public MCP schema after a deployment. Server smoke proves the live schema; the installed app may still require an explicit Refresh when the public tool schema itself changes.
 - The public main schema is frozen at one tool. Internal handler additions and implementation changes should not require a ChatGPT app schema refresh.
 - Keep client payloads narrow enough to pass preflight: compact intent and typed variable inputs only.
