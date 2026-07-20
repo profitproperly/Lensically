@@ -15442,6 +15442,7 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["getOperatorStartupContext", "startup"],
   ["listGitHubWorkflowRuns", "workflow_run_list"],
   ["getGitHubWorkflowRun", "workflow_run_status"],
+  ["getRepoStatus", "repository_status"],
     ["readRepoFile", "repository_file_read"],
   ["applyRepoPatchSet", "repository_patch_set"],
   ["readMcpToolDefinition", "capability_definition"],
