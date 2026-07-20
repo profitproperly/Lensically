@@ -20491,15 +20491,18 @@ async function handleOperatorMcpEngineeringTool(
     const selectContent = structured(select.payload);
     const allowedContent = structured(allowed.payload);
     const coverageContent = structured(coverage.payload);
+    const continuityCapsule = proceedContent.continuity_capsule && typeof proceedContent.continuity_capsule === "object" && !Array.isArray(proceedContent.continuity_capsule)
+      ? proceedContent.continuity_capsule as Record<string, unknown>
+      : null;
     const boundaryTest = {
       selected_key: selectContent.selected_key ?? null,
       startup_direct: startupContent.ok === true && startupContent.bootstrap_version !== undefined,
       handshake: selectContent.handshake ?? null,
-      blocked_before_proceed: blockedContent.error === "explicit_proceed_required" && blockedContent.account_data_loaded === false,
-      blocked_error: blockedContent.error ?? null,
-      proceed_confirmed: proceedContent.proceeded === true,
-      continuity_auto_resolved: proceedContent.continuity_loaded === true && proceedContent.continuation_choice_required === false,
-      continuity_capsule_version: (proceedContent.continuity_capsule as Record<string, unknown> | undefined)?.version ?? null,
+      key_selection_requires_proceed: selectContent.proceed_required === true
+        && selectContent.account_data_loaded === false
+        && selectContent.next_tool === "confirmOperatorProceed",
+      proceed_accepted: proceed.status < 400 && proceedContent.ok === true && continuityCapsule?.brand_key === "manifest_mental",
+      continuity_capsule_version: continuityCapsule?.version ?? null,
       calendar_coverage_loaded: Array.isArray(coverageContent.open_slots),
       allowed_after_proceed: allowedContent.ok === true,
     };
