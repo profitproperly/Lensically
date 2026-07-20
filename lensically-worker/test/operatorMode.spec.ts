@@ -4585,10 +4585,20 @@ describe("operator mode MCP endpoint", () => {
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-    const listed = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    const listed = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { additionalProperties?: boolean } }> }>("tools/list");
+    const names = listed.tools.map((tool) => tool.name);
     expect(initialized.serverInfo.version).toBe(OPERATOR_MCP_VERSION);
-    expect(listed.tools.map((tool) => tool.name)).toEqual(["executeLensicallyIntent"]);
-    expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
+    expect(names).toEqual(expect.arrayContaining([
+      "getOperatorStartupContext",
+      "selectOperatorKey",
+      "confirmOperatorProceed",
+      "get_content_focus",
+      "start_workflow_session",
+      "getRepoStatus",
+    ]));
+    expect(names).not.toContain("executeLensicallyIntent");
+    expect(new Set(names).size).toBe(names.length);
+    expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
   });
 
   it.skip("retired: legacy MCP admin-state requirement view", async () => {
