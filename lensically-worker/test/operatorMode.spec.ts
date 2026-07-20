@@ -3163,7 +3163,7 @@ describe("operator mode MCP endpoint", () => {
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
-    expect(campaign.structuredContent.campaign.passed).toBe(101);
+    expect(campaign.structuredContent.campaign.passed).toBe(102);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
       read_only: 41,
       mutation: 60,
