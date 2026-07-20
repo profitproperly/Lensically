@@ -16829,6 +16829,9 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     owner_action_required: ownerActionRequired,
     temporary_dependency: temporaryDependency,
     retirement_condition: retirementCondition,
+    progress_recorded: true,
+    deferred_work_preserved: true,
+    checkpoint: `Continue from durable outcome state after tool:${toolName}; do not reconstruct the next action from chat memory.`,
     deferred_work_ledger: "operator_work_ledger",
   };
   const validation = validateOperatorActionClosure(closure);
