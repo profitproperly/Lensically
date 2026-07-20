@@ -19988,6 +19988,9 @@ async function handleOperatorMcpEngineeringTool(
       return { ok: false, error: "query_and_known_file_prefix_required" };
     }
     const file = await getGithubFile(env, path);
+    if (file.status === 200 && file.content === null) {
+      return { ok: false, error: "known_file_path_required", status: file.status, path };
+    }
     if (!file.ok || file.content === null) {
       return { ok: false, error: "repo_file_read_failed", status: file.status, path };
     }
