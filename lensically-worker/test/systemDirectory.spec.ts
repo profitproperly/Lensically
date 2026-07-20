@@ -1267,10 +1267,12 @@ describe("System Directory foundation", () => {
     });
     expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "blocking_fix", prerequisite_for_active_outcome: true })).toMatchObject({
       decision: "activate",
+      active_outcome_unchanged: true,
       reason: "required_prerequisite",
     });
     expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "incident", severity: "P0" })).toMatchObject({
       decision: "activate",
+      active_outcome_unchanged: true,
       reason: "incident_interrupt:P0",
     });
     expect(classifyOperatorWorkIntake({ active_outcome_key: "active", proposed_work_key: "duplicate", duplicate_of: "existing" })).toMatchObject({
