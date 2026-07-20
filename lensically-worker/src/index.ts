@@ -17238,7 +17238,7 @@ function operatorToolMutatesState(toolName: string): boolean {
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
     "list_accounts", "get_account_state", "read_lensically_ui_surface", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
-    "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results", "get_monthly_growth_review", "get_performance_learning", "audit_published_post_lineage",
+    "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results", "get_monthly_growth_review", "get_performance_learning", "get_content_focus", "audit_published_post_lineage",
   ]);
   return !readOnly.has(toolName);
 }
