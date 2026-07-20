@@ -2554,8 +2554,8 @@ export async function getScheduledPostPublishLineageStatus(
 ): Promise<Record<string, unknown>> {
   const profile = (await getConfiguredThreadsProfiles(env))
     .find((candidate) => candidate.threads_user_id === threadsUserId) ?? null;
-  const brandKey = profile ? gptBrandKeyForAccountId(profile.account_id) : null;
-  if (brandKey !== "manifest_mental") {
+    const brandKey = profile ? gptBrandKeyForAccountId(profile.account_id) : null;
+  if (!profile || brandKey !== "manifest_mental") {
     return { required: false, complete: true, brand_key: brandKey, missing_stages: [] };
   }
   await ensureOperatorWorkflowTables(env);
