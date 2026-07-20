@@ -26,6 +26,17 @@ export type HardeningTransitionEvidence = {
   autonomy_dividend?: Record<string, unknown> | null;
 };
 
+export function resolveHardeningResumeResult(
+  args: Record<string, unknown>,
+  supplied: Record<string, unknown>,
+  stored: unknown,
+): Record<string, unknown> | null {
+  const candidate = args.resume_result ?? supplied.resume_result ?? stored;
+  return candidate && typeof candidate === "object" && !Array.isArray(candidate)
+    ? candidate as Record<string, unknown>
+    : null;
+}
+
 export function validateHardeningTransition(current: HardeningState, target: HardeningState, evidence: HardeningTransitionEvidence = {}): { allowed: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!HARDENING_ALLOWED_TRANSITIONS[current].includes(target)) errors.push(`invalid_transition:${current}:${target}`);
