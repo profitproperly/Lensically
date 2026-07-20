@@ -3117,8 +3117,7 @@ describe("operator mode MCP endpoint", () => {
     let failedMutationPreflights = 0;
     for (const [transportSegment, canonicalSegment] of mutationSegments) {
       const result = await mcpToolCallRaw<typeof campaign.structuredContent>("executeLensicallyIntent", {
-        objective: `Validate ${transportSegment}.`,
-        intent: "checkup",
+        profile_id: "run_mcp_tests",
         inputs: { segment: transportSegment },
       });
       expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
