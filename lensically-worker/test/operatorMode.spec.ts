@@ -3050,6 +3050,7 @@ describe("operator mode MCP endpoint", () => {
         passed: number;
         failed: number;
         failure_classes: Record<string, number>;
+        failures: Array<Record<string, unknown>>;
         live_reads: { eligible: number; executed: number; passed: number; skipped: number; failed: number; failures: Array<Record<string, unknown>> };
         mutation_preflights: { eligible: number; executed: number; passed: number; failed: number; failures: Array<Record<string, unknown>>; side_effects_executed: number };
         risk_groups: { read_only: number; mutation: number };
