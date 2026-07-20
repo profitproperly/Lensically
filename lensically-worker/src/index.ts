@@ -27151,6 +27151,95 @@ async function refreshOperatorPerformanceEvaluator(
   };
 }
 
+async function upsertOperatorContentFocusReview(
+  env: Env,
+  input: {
+    brand_key: GptBrandKey;
+    cadence: OperatorContentFocusCadence;
+    period_key: string;
+    anchor_date: string;
+    family_count: number;
+    decisions: unknown[];
+    generated_at: string;
+  },
+): Promise<string> {
+  const existing = await env.DB.prepare(
+    `SELECT id FROM operator_content_focus_reviews
+     WHERE brand_key = ? AND cadence = ? AND period_key = ? LIMIT 1`,
+  ).bind(input.brand_key, input.cadence, input.period_key).first<{ id: string }>();
+  const reviewId = existing?.id ?? crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_content_focus_reviews (
+      id, brand_key, cadence, period_key, anchor_date, windows_json,
+      decisions_json, allocation_json, generated_at, evaluator_version
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(brand_key, cadence, period_key) DO UPDATE SET
+      anchor_date = excluded.anchor_date,
+      windows_json = excluded.windows_json,
+      decisions_json = excluded.decisions_json,
+      allocation_json = excluded.allocation_json,
+      generated_at = excluded.generated_at,
+      evaluator_version = excluded.evaluator_version,
+      updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    reviewId, input.brand_key, input.cadence, input.period_key, input.anchor_date,
+    normalizeOperatorJson({
+      family_count: input.family_count,
+      horizons: ["24h", "7d", "30d", "90d", "ytd", "all_time"],
+      daily_authority: "near_term_allocation_only",
+      weekly_authority: "family_reclassification",
+      monthly_authority: "retirement_and_structural_rebalance",
+      historical_authority: "context_only",
+    }, {}),
+    normalizeOperatorJson(input.decisions, []),
+    normalizeOperatorJson(OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION, {}),
+    input.generated_at, OPERATOR_CONTENT_FOCUS_VERSION,
+  ).run();
+  return reviewId;
+}
+
+async function upsertOperatorContentFocusFamilyState(
+  env: Env,
+  brandKey: GptBrandKey,
+  family: Record<string, unknown>,
+  current: Record<string, unknown> | undefined,
+  reviewId: string | null,
+  decision: OperatorContentFocusDecision | undefined,
+): Promise<void> {
+  const status = family.status as OperatorContentFocusStatus;
+  let weight = Number(family.allocation_weight ?? 0);
+  if (weight > 0 && decision?.role === "use_more") weight += 0.2;
+  if (weight > 0 && decision?.role === "use_less") weight = Math.max(0.05, weight - 0.3);
+  if (weight > 0 && decision?.role === "learn_next") weight += 0.05;
+  await env.DB.prepare(
+    `INSERT INTO operator_content_focus_family_states (
+      id, brand_key, source_card_family_id, source_identity_key, status,
+      recommended_status, confidence_score, confidence_label, allocation_weight,
+      decision_reason, reuse_directives_json, stop_directives_json,
+      horizon_evidence_json, manual_lock, last_review_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(brand_key, source_card_family_id) DO UPDATE SET
+      source_identity_key = excluded.source_identity_key,
+      status = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.status ELSE excluded.status END,
+      recommended_status = excluded.recommended_status,
+      confidence_score = excluded.confidence_score,
+      confidence_label = excluded.confidence_label,
+      allocation_weight = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.allocation_weight ELSE excluded.allocation_weight END,
+      decision_reason = excluded.decision_reason,
+      reuse_directives_json = excluded.reuse_directives_json,
+      stop_directives_json = excluded.stop_directives_json,
+      horizon_evidence_json = excluded.horizon_evidence_json,
+      last_review_id = excluded.last_review_id,
+      updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    current?.id ?? crypto.randomUUID(), brandKey, family.source_card_family_id,
+    family.source_identity_key, status, family.recommended_status,
+    family.confidence_score, family.confidence_label, weight, family.decision_reason,
+    normalizeOperatorJson(family.reuse_directives, {}), normalizeOperatorJson(family.stop_directives, {}),
+    normalizeOperatorJson(family.horizons, {}), Number(current?.manual_lock ?? 0), reviewId,
+  ).run();
+}
+
 async function getLatestOperatorPerformanceLearning(
   env: Env,
   brandKey: GptBrandKey,
