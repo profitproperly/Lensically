@@ -11214,12 +11214,14 @@ async function prepareManifestAutonomousCycle(
   const databaseTimeIso = databaseClockRaw
     ? `${databaseClockRaw.replace(" ", "T").replace(/Z$/, "")}Z`
     : null;
-  const clock = resolveManifestAutonomousClock(
+    const clock = resolveManifestAutonomousClock(
     runtimeNowIso,
     threadsSnapshot.threads_server_time_iso,
     databaseTimeIso,
     threadsSnapshot.latest_published_at,
+    trustedUtcTimeIso,
   );
+
   const effectiveNowMs = parseOperatorTimestampMs(clock.effective_now_iso) ?? Date.now();
   const local = operatorLocalDateTimeParts(new Date(effectiveNowMs), timezone);
   const operationId = explicitOperationId ?? `${brand.brand_key}:autonomous-runway:${local.date}:${String(local.hour).padStart(2, "0")}`;
