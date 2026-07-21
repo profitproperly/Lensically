@@ -10966,8 +10966,9 @@ async function commitManifestAutonomousRunway(
   if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
     return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
   }
-  const cycleId = normalizeOperatorText(payload.cycle_id, 120);
-  const cycle = cycleId ? await readManifestAutonomousCycle(env, brand.brand_key, cycleId) : null;
+    const cycleId = normalizeOperatorText(payload.cycle_id, 120);
+  if (!cycleId) return { success: false, error: "autonomous_cycle_id_required" };
+  const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
   if (!cycle) return { success: false, error: "autonomous_cycle_not_found" };
   const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
     ? payload.strategic_thesis as Record<string, unknown>
@@ -11011,7 +11012,7 @@ async function commitManifestAutonomousRunway(
     const familyId = normalizeOperatorText(sourceCard.family_id, 120, true);
     const runId = crypto.randomUUID();
     const draftId = crypto.randomUUID();
-    const strategy = {
+        const strategy: Record<string, unknown> = {
       ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy)
         ? post.strategy as Record<string, unknown>
         : {}),
@@ -11212,9 +11213,10 @@ async function reviewManifestScheduledPost(
   const action = normalizeOperatorMachineKey(payload.action, "");
   const feedback = normalizeOperatorText(payload.feedback, 8000);
   const lessonScope = normalizeOperatorMachineKey(payload.lesson_scope, "post_specific");
-  if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !["keep", "rewrite", "reject_replace"].includes(action) || !feedback) {
-    return { success: false, error: "scheduled_post_action_feedback_required" };
+    if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !["keep", "rewrite", "reject_replace"].includes(action)) {
+    return { success: false, error: "scheduled_post_action_required" };
   }
+  if (!feedback) return { success: false, error: "scheduled_post_feedback_required" };
   const scheduled = await env.DB.prepare(
     `SELECT * FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
   ).bind(scheduledPostId, brand.profile.threads_user_id).first<Record<string, unknown>>();
@@ -11291,15 +11293,15 @@ async function reviewManifestScheduledPost(
     brand.brand_key,
     scheduledPostId,
   ).run();
-  const memoryKind = lessonScope === "permanent_rule"
-    ? "rule"
+    const memoryKind: GptStrategyMemoryKind = lessonScope === "permanent_rule"
+    ? "approved_rule"
     : lessonScope === "temporary_repetition"
       ? "cooldown"
-      : lessonScope === "performance_hypothesis"
+      : lessonScope === "performance_hypothesis" || lessonScope === "experiment"
         ? "experiment"
         : lessonScope === "family_strategy"
-          ? "strategy"
-          : "owner_feedback";
+          ? "current_belief"
+          : "approval_feedback";
   await saveGptStrategyMemory(env, {
     accountId: brand.account_id,
     threadsUserId: brand.profile.threads_user_id,
