@@ -697,7 +697,7 @@ describe("operator mode backend spine", () => {
     expect(proceeded.structuredContent.account_execution_locked_until_growth_plan_approval).toBe(true);
     expect(proceeded.structuredContent.required_next_owner_action).toContain("Growth Mission Brief");
     expect(proceeded.structuredContent.continuity_capsule.growth_mission_brief).toMatchObject({
-      version: "guided-growth-mission-v1",
+            version: "autonomous-growth-mission-v2",
       status: "discussion",
       proposed_plan: { target_followers: 1000000, execution_mode: "guided_owner_approval" },
       discussion_contract: { execution_locked: true, no_account_mutation_before_approval: true },
