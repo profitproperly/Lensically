@@ -2551,8 +2551,8 @@ describe("operator mode MCP endpoint", () => {
       "get_performance_learning",
       "get_content_focus",
             "get_manifest_review_batch",
-      "prepare_manifest_autonomous_cycle",
-      "commit_manifest_autonomous_runway",
+            "prepare_manifest_autonomous_cycle",
+      "persist_manifest_autonomous_post",
       "review_manifest_scheduled_post",
       "create_source_card",
       "create_generation_run",
@@ -2579,9 +2579,10 @@ describe("operator mode MCP endpoint", () => {
     const saveStrategyMemoryKind = saveStrategyMemoryTool?.inputSchema?.properties?.kind as { enum?: string[] } | undefined;
     expect(saveStrategyMemoryKind?.enum).toEqual(expect.arrayContaining(["approved_rule", "voice_rule", "rejection_feedback"]));
     expect(saveStrategyMemoryKind?.enum).not.toContain("generation_rule");
-    const autonomousCommitTool = listed.tools.find((tool) => tool.name === "commit_manifest_autonomous_runway");
-    const autonomousPostsSchema = autonomousCommitTool?.inputSchema?.properties?.posts as { maxItems?: number } | undefined;
-    expect(autonomousPostsSchema?.maxItems).toBe(4);
+        const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
+    expect(autonomousPersistTool?.inputSchema?.properties?.post).toBeTruthy();
+    expect(autonomousPersistTool?.inputSchema?.properties?.posts).toBeUndefined();
+    expect(names).not.toContain("commit_manifest_autonomous_runway");
     const startup = await mcpTool<{
       runtime?: { execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean } };
     }>("getOperatorStartupContext");
@@ -2602,7 +2603,7 @@ describe("operator mode MCP endpoint", () => {
       success: boolean;
       cycle: { id: string; target_slots: Array<{ key: string; date: string; time: string }>; missing_slots: Array<{ key: string }> };
       strategy_contract: { fixed_percentages: boolean; winner_preservation: string };
-      commit_contract: { max_posts_per_call: number; complete_lineage_required: boolean };
+            persistence_contract: { tool: string; posts_per_call: number; model_orchestrated: boolean; internal_gate_fanout: boolean; internal_runway_scan: boolean; threads_api_during_persistence: boolean; complete_lineage_required: boolean };
     }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
@@ -2615,10 +2616,18 @@ describe("operator mode MCP endpoint", () => {
     expect(prepared.cycle.missing_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
     expect(prepared.strategy_contract.winner_preservation).toContain("Frequency alone");
-        expect(prepared.commit_contract).toMatchObject({ max_posts_per_call: 4, complete_lineage_required: true });
+            expect(prepared.persistence_contract).toMatchObject({
+      tool: "persist_manifest_autonomous_post",
+      posts_per_call: 1,
+      model_orchestrated: true,
+      internal_gate_fanout: false,
+      internal_runway_scan: false,
+      threads_api_during_persistence: false,
+      complete_lineage_required: true,
+    });
   }, 30000);
 
-  it("commits an autonomous post with full lineage into one exact missing slot", async () => {
+    it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       success: boolean;
@@ -2627,12 +2636,12 @@ describe("operator mode MCP endpoint", () => {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
       horizon_hours: 48,
-      operation_id: `test-autonomous-commit-prepare-${crypto.randomUUID()}`,
+      operation_id: `test-autonomous-persist-prepare-${crypto.randomUUID()}`,
       proceed_confirmed: true,
     });
     const slot = prepared.cycle.missing_slots[0];
     expect(slot).toBeTruthy();
-    const commitOperationId = `test-autonomous-commit-${crypto.randomUUID()}`;
+    const persistOperationId = `test-autonomous-persist-${crypto.randomUUID()}`;
     const payload = {
       brand_key: "manifest_mental",
       cycle_id: prepared.cycle.id,
@@ -2640,7 +2649,7 @@ describe("operator mode MCP endpoint", () => {
         position: "Protect the engagement floor while testing one original micro-length mechanism.",
         invalidator: "Comparable mature performance falls materially below the account floor.",
       },
-      posts: [{
+      post: {
         date: slot.date,
         time: slot.time,
         text: `Autonomous original discovery ${crypto.randomUUID().slice(0, 8)}: your next clear decision can change the pace of everything.`,
@@ -2658,30 +2667,44 @@ describe("operator mode MCP endpoint", () => {
           experiment: "autonomous_original_discovery",
           novelty_level: "original_discovery",
         },
-      }],
-      operation_id: commitOperationId,
+      },
+      model_evaluation: {
+        generation_passed: true,
+        scheduling_passed: true,
+        novelty_assessment: "The wording and payoff are distinct from current scheduled inventory.",
+        winner_preservation_assessment: "The post preserves the proven concise direct-statement mechanism without forcing fatigue rotation.",
+      },
+      operation_id: persistOperationId,
       proceed_confirmed: true,
     };
-    const committed = await mcpTool<{
+    const persisted = await mcpTool<{
       success: boolean;
-      scheduled_count: number;
-      results: Array<{ success: boolean; scheduled_post_id?: number }>;
+      scheduled_post_id: number;
+      lineage: { source_card_id: string; generation_run_id: string; draft_id: string; inventory_id: string };
+      server_checks: { no_internal_gate_fanout: boolean; no_internal_runway_scan: boolean; no_threads_api_call: boolean };
       remaining_missing_count: number;
-    }>("commit_manifest_autonomous_runway", payload);
-    expect(committed.success).toBe(true);
-    expect(committed.scheduled_count).toBe(1);
-    expect(committed.results[0]).toMatchObject({ success: true });
-    expect(committed.results[0].scheduled_post_id).toBeGreaterThan(0);
+    }>("persist_manifest_autonomous_post", payload);
+    expect(persisted.success).toBe(true);
+    expect(persisted.scheduled_post_id).toBeGreaterThan(0);
+    expect(persisted.lineage.source_card_id).toBeTruthy();
+    expect(persisted.lineage.generation_run_id).toBeTruthy();
+    expect(persisted.lineage.draft_id).toBeTruthy();
+    expect(persisted.lineage.inventory_id).toBeTruthy();
+    expect(persisted.server_checks).toMatchObject({
+      no_internal_gate_fanout: true,
+      no_internal_runway_scan: true,
+      no_threads_api_call: true,
+    });
 
-    const replayed = await mcpTool<typeof committed>("commit_manifest_autonomous_runway", payload);
-    expect(replayed.scheduled_count).toBe(1);
+    const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
+    expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
     const scheduled = await mcpTool<{ items: Array<{ id: number }> }>("list_scheduled_posts", {
       brand_key: "manifest_mental",
       date: slot.date,
       timezone: "America/New_York",
       limit: 100,
     });
-    expect(scheduled.items.filter((item) => item.id === committed.results[0].scheduled_post_id)).toHaveLength(1);
+    expect(scheduled.items.filter((item) => item.id === persisted.scheduled_post_id)).toHaveLength(1);
   }, 30000);
 
   it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
@@ -2695,13 +2718,13 @@ describe("operator mode MCP endpoint", () => {
       proceed_confirmed: true,
     });
     const slot = prepared.cycle.missing_slots[0];
-    const committed = await mcpTool<{
-      results: Array<{ scheduled_post_id: number }>;
-    }>("commit_manifest_autonomous_runway", {
+        const persisted = await mcpTool<{
+      scheduled_post_id: number;
+    }>("persist_manifest_autonomous_post", {
       brand_key: "manifest_mental",
       cycle_id: prepared.cycle.id,
       strategic_thesis: { position: "Test one reviewable autonomous post." },
-      posts: [{
+      post: {
         date: slot.date,
         time: slot.time,
         text: `Optional owner review ${crypto.randomUUID().slice(0, 8)}: a good day can begin with one honest decision.`,
@@ -2711,11 +2734,17 @@ describe("operator mode MCP endpoint", () => {
         audience_reward: "A grounded sense of agency.",
         strategic_purpose: "Verify optional criticism after autonomous scheduling.",
         strategy: { pillar: "agency", hook_style: "direct_statement", novelty_level: "original_discovery" },
-      }],
-      operation_id: `test-autonomous-review-commit-${crypto.randomUUID()}`,
+      },
+      model_evaluation: {
+        generation_passed: true,
+        scheduling_passed: true,
+        novelty_assessment: "The wording is distinct from current scheduled inventory.",
+        winner_preservation_assessment: "The post preserves a proven direct-statement mechanism.",
+      },
+      operation_id: `test-autonomous-review-persist-${crypto.randomUUID()}`,
       proceed_confirmed: true,
     });
-    const scheduledPostId = committed.results[0].scheduled_post_id;
+    const scheduledPostId = persisted.scheduled_post_id;
     const reviewed = await mcpTool<{
       success: boolean;
       action: string;

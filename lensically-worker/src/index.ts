@@ -387,7 +387,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_VERSION = "operator-engineering-authority-v
 const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2";
 const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1";
 const MANIFEST_AUTONOMOUS_RUNWAY_HOURS = 48;
-const MANIFEST_AUTONOMOUS_COMMIT_LIMIT = 4;
+const MANIFEST_AUTONOMOUS_COMMIT_LIMIT = 1;
 const MANIFEST_AUTONOMY_OBJECTIVE = "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.";
 const MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE = "ai_led_owner_ratified";
 const MANIFEST_AUTONOMY_MODE = "autonomous_operator";
@@ -10854,13 +10854,18 @@ async function prepareManifestAutonomousCycle(
       generation_modes: Array.from(MANIFEST_AUTONOMOUS_GENERATION_MODES),
       strategy_change_rule: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because another day began.",
     },
-    commit_contract: {
-      max_posts_per_call: MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
+        persistence_contract: {
+      tool: "persist_manifest_autonomous_post",
+      posts_per_call: MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
+      model_orchestrated: true,
       preserve_existing_schedule: true,
       exact_missing_slots_only: true,
       required_post_fields: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
-      optional_post_fields: ["strategy", "preserved_functions", "transformed_elements"],
-      self_reject_and_replace_before_schedule: true,
+      required_model_evaluation_fields: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment"],
+      server_enforcement: ["slot_open", "exact_duplicate", "explicit_banned_phrase", "idempotency", "lineage_persistence"],
+      internal_gate_fanout: false,
+      internal_runway_scan: false,
+      threads_api_during_persistence: false,
       complete_lineage_required: true,
     },
   };
@@ -11203,6 +11208,388 @@ async function commitManifestAutonomousRunway(
   };
 }
 
+async function persistManifestAutonomousPost(
+  env: Env,
+  brand: GptResolvedBrand,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
+  const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
+  if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
+    return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
+  }
+  const operationId = normalizeOperatorText(payload.operation_id, 240, true);
+  if (!operationId) return { success: false, error: "stable_operation_id_required" };
+  const cycleId = normalizeOperatorText(payload.cycle_id, 120);
+  if (!cycleId) return { success: false, error: "autonomous_cycle_id_required" };
+  const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
+  if (!cycle) return { success: false, error: "autonomous_cycle_not_found" };
+  const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
+    ? payload.post as Record<string, unknown>
+    : {};
+  const modelEvaluation = payload.model_evaluation && typeof payload.model_evaluation === "object" && !Array.isArray(payload.model_evaluation)
+    ? payload.model_evaluation as Record<string, unknown>
+    : {};
+  if (modelEvaluation.generation_passed !== true || modelEvaluation.scheduling_passed !== true) {
+    return { success: false, error: "model_evaluation_not_passed" };
+  }
+  const noveltyAssessment = normalizeOperatorText(modelEvaluation.novelty_assessment, 4000);
+  const winnerPreservationAssessment = normalizeOperatorText(modelEvaluation.winner_preservation_assessment, 4000);
+  if (!noveltyAssessment || !winnerPreservationAssessment) {
+    return { success: false, error: "model_evaluation_incomplete" };
+  }
+  const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
+    ? payload.strategic_thesis as Record<string, unknown>
+    : {};
+  const date = normalizeOperatorText(post.date, 20);
+  const time = normalizeOperatorText(post.time, 20);
+  const text = normalizeOperatorText(post.text, 20000);
+  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "");
+  const familyKey = normalizeOperatorMachineKey(post.family_key, "");
+  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000);
+  const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
+  const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
+  const slotKey = date && time ? `${date}T${time}` : "";
+  if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
+    || !MANIFEST_AUTONOMOUS_GENERATION_MODES.has(generationMode)) {
+    return { success: false, error: "invalid_autonomous_post" };
+  }
+  const targetSlots = Array.isArray(cycle.target_slots)
+    ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
+    : [];
+  const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
+  if (!targetSlot) return { success: false, error: "slot_outside_prepared_cycle", slot_key: slotKey };
+  const existingLineup = await env.DB.prepare(
+    `SELECT source_card_id, generation_run_id, draft_id, scheduled_post_id, status
+     FROM operator_autonomous_lineup_items
+     WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?
+     ORDER BY datetime(updated_at) DESC LIMIT 1`,
+  ).bind(cycleId, brand.brand_key, slotKey).first<Record<string, unknown>>();
+  if (existingLineup?.scheduled_post_id && String(existingLineup.status ?? "") === "scheduled") {
+    return {
+      success: true,
+      reused: true,
+      slot_key: slotKey,
+      scheduled_post_id: Number(existingLineup.scheduled_post_id),
+      lineage: {
+        source_card_id: existingLineup.source_card_id ?? null,
+        generation_run_id: existingLineup.generation_run_id ?? null,
+        draft_id: existingLineup.draft_id ?? null,
+      },
+      coverage_reconciliation_required: true,
+    };
+  }
+  const timezone = String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
+  const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
+  if (!scheduledUtc) return { success: false, error: "invalid_date_time" };
+  if (isPastUtcTimestamp(scheduledUtc)) return { success: false, error: "scheduled_time_in_past" };
+  await ensureScheduledPostsTable(env);
+  const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
+    WORKSPACE_APP_USER_ID,
+    brand.profile.threads_user_id,
+    scheduledUtc,
+    text,
+    buildSpoilerFingerprint(false, []),
+  );
+  const exactScheduled = await env.DB.prepare(
+    `SELECT id, scheduled_time FROM scheduled_posts WHERE idempotency_key = ? LIMIT 1`,
+  ).bind(scheduleIdempotencyKey).first<{ id: number | string; scheduled_time: string }>();
+  if (!exactScheduled) {
+    const occupied = await manifestAutonomousOccupiedSlots(env, brand, [targetSlot], timezone);
+    if (occupied.has(slotKey)) {
+      return { success: false, error: "slot_already_occupied", slot_key: slotKey, preserved_existing: true };
+    }
+  }
+  const normalizedText = normalizeCreativeComparisonText(text);
+  const bannedMemories = await listGptStrategyMemory(env, brand.account_id, ["banned_phrase"], 100, 0);
+  const bannedPhraseHits = bannedMemories.flatMap((memory) => {
+    const candidates = [memory.title, memory.body]
+      .map((value) => normalizeCreativeComparisonText(value))
+      .filter((value) => value.length >= 3);
+    return candidates
+      .filter((phrase, index, all) => all.indexOf(phrase) === index && normalizedText.includes(phrase))
+      .map((phrase) => ({ memory_id: memory.id, phrase, title: memory.title }));
+  });
+  if (bannedPhraseHits.length) {
+    return { success: false, error: "explicit_banned_phrase", slot_key: slotKey, banned_phrase_hits: bannedPhraseHits };
+  }
+  const duplicate = await env.DB.prepare(
+    `SELECT id, status, scheduled_time FROM scheduled_posts
+     WHERE threads_user_id = ? AND lower(trim(post_text)) = lower(trim(?))
+       AND idempotency_key <> ?
+     ORDER BY id DESC LIMIT 1`,
+  ).bind(brand.profile.threads_user_id, text, scheduleIdempotencyKey).first<Record<string, unknown>>();
+  if (duplicate) {
+    return {
+      success: false,
+      error: "exact_duplicate_post",
+      slot_key: slotKey,
+      duplicate_scheduled_post_id: Number(duplicate.id),
+      duplicate_status: duplicate.status ?? null,
+    };
+  }
+  const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
+  const sourceCardId = String(sourceCard.id ?? "");
+  const familyId = normalizeOperatorText(sourceCard.family_id, 120, true);
+  const identityHash = await sha256OperatorText(`${brand.brand_key}|${cycleId}|${slotKey}|${operationId}`);
+  const runId = `autonomous-run-${identityHash.slice(0, 32)}`;
+  const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
+  const lineupId = `autonomous-lineup-${identityHash.slice(0, 32)}`;
+  const inventoryId = `autonomous-inventory-${identityHash.slice(0, 32)}`;
+  const strategy: Record<string, unknown> = {
+    ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy)
+      ? post.strategy as Record<string, unknown>
+      : {}),
+    autonomous_engine_version: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+    autonomous_cycle_id: cycleId,
+    generation_mode: generationMode,
+    family_key: familyKey,
+    source_mechanism: sourceMechanism,
+    audience_reward: audienceReward,
+    strategic_purpose: strategicPurpose,
+    strategic_thesis: strategicThesis,
+    model_evaluation: modelEvaluation,
+  };
+  const scheduled = exactScheduled
+    ? {
+        success: true,
+        scheduledPostId: Number(exactScheduled.id),
+        scheduledTimeUtc: exactScheduled.scheduled_time,
+        reused: true,
+      }
+    : await createScheduledPostForAppUser(
+        env,
+        WORKSPACE_APP_USER_ID,
+        brand.profile.threads_user_id,
+        text,
+        date,
+        time,
+        timezone,
+      );
+  if (!scheduled.success || !scheduled.scheduledPostId) {
+    return { success: false, error: scheduled.error ?? "autonomous_schedule_failed", slot_key: slotKey };
+  }
+  await ensureGptPostStrategyTagsTable(env);
+  await ensureOperatorWorkflowTables(env);
+  const draftAnalysis = {
+    opening_phrase: extractOpeningPhrase(text),
+    hook_style: normalizeOperatorText(strategy.hook_style, 120, true),
+    lane_key: normalizeOperatorMachineKey(strategy.pillar, ""),
+    preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
+    transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
+    audience_reward_delivered: true,
+  };
+  const gateSummary = {
+    model_orchestrated: true,
+    model_evaluation: modelEvaluation,
+    server_checks: {
+      slot_open: true,
+      exact_duplicate: false,
+      explicit_banned_phrase: false,
+      no_internal_gate_fanout: true,
+      no_internal_runway_scan: true,
+      no_threads_api_call: true,
+    },
+  };
+  const normalizedStrategy = normalizeGptPostStrategyInput(strategy);
+  const firstLine = text.split(/\n/)[0]?.trim().slice(0, 500) ?? "";
+  const openingPhrase = extractOpeningPhrase(text);
+  const realmEntranceKey = inferRealmEntranceKey(openingPhrase);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO gpt_generation_runs (
+        id, account_id, threads_user_id, objective, prompt_summary, status,
+        metadata_json, source_card_id, source_card_family_id,
+        source_card_version_number, adaptation_plan_json
+      ) VALUES (?, ?, ?, ?, ?, 'drafted', ?, ?, ?, ?, ?)`,
+    ).bind(
+      runId,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      strategicPurpose,
+      `Model-orchestrated autonomous ${generationMode} for ${slotKey}`,
+      normalizeOperatorJson({ cycle_id: cycleId, strategic_thesis: strategicThesis, strategy, model_evaluation: modelEvaluation }, {}),
+      sourceCardId,
+      familyId,
+      Number(sourceCard.version_number ?? 1),
+      normalizeOperatorJson({
+        adaptation_goal: strategicPurpose,
+        payoff_choice: audienceReward,
+        experiment_notes: generationMode,
+        intentionally_different_from_prior: normalizeOperatorText(post.intentionally_different_from_prior, 2000, true),
+      }, {}),
+    ),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO gpt_generation_drafts (
+        id, run_id, account_id, threads_user_id, draft_index, text, status,
+        score_json, strategy_json, source_card_id, showable, metadata_json,
+        gate_summary_json, scheduled_post_id
+      ) VALUES (?, ?, ?, ?, 0, ?, 'scheduled', ?, ?, ?, 1, ?, ?, ?)`,
+    ).bind(
+      draftId,
+      runId,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      text,
+      normalizeOperatorJson(post.score, {}),
+      normalizeOperatorJson(strategy, {}),
+      sourceCardId,
+      normalizeOperatorJson({ cycle_id: cycleId, slot_key: slotKey, generation_mode: generationMode }, {}),
+      normalizeOperatorJson(gateSummary, {}),
+      scheduled.scheduledPostId,
+    ),
+    env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'scheduled', text = ?, score_json = ?, strategy_json = ?, source_card_id = ?,
+           showable = 1, metadata_json = ?, gate_summary_json = ?, scheduled_post_id = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND account_id = ?`,
+    ).bind(
+      text,
+      normalizeOperatorJson(post.score, {}),
+      normalizeOperatorJson(strategy, {}),
+      sourceCardId,
+      normalizeOperatorJson({ cycle_id: cycleId, slot_key: slotKey, generation_mode: generationMode }, {}),
+      normalizeOperatorJson(gateSummary, {}),
+      scheduled.scheduledPostId,
+      draftId,
+      brand.account_id,
+    ),
+    env.DB.prepare(
+      `INSERT INTO operator_autonomous_lineup_items (
+        id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+        generation_mode, family_key, strategic_purpose, strategy_json,
+        source_card_id, generation_run_id, draft_id, scheduled_post_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+      ON CONFLICT(id) DO UPDATE SET
+        text = excluded.text,
+        strategy_json = excluded.strategy_json,
+        source_card_id = excluded.source_card_id,
+        generation_run_id = excluded.generation_run_id,
+        draft_id = excluded.draft_id,
+        scheduled_post_id = excluded.scheduled_post_id,
+        status = 'scheduled',
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      lineupId,
+      cycleId,
+      brand.brand_key,
+      slotKey,
+      date,
+      time,
+      text,
+      generationMode,
+      familyKey,
+      strategicPurpose,
+      normalizeOperatorJson(strategy, {}),
+      sourceCardId,
+      runId,
+      draftId,
+      scheduled.scheduledPostId,
+    ),
+    env.DB.prepare(
+      `INSERT INTO gpt_post_strategy_tags (
+        scheduled_post_id, account_id, threads_user_id, pillar, hook_style, format,
+        intent, experiment, novelty_level, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(scheduled_post_id) DO UPDATE SET
+        account_id = excluded.account_id,
+        threads_user_id = excluded.threads_user_id,
+        pillar = excluded.pillar,
+        hook_style = excluded.hook_style,
+        format = excluded.format,
+        intent = excluded.intent,
+        experiment = excluded.experiment,
+        novelty_level = excluded.novelty_level,
+        metadata_json = excluded.metadata_json`,
+    ).bind(
+      scheduled.scheduledPostId,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      normalizedStrategy?.pillar ?? null,
+      normalizedStrategy?.hook_style ?? null,
+      normalizedStrategy?.format ?? null,
+      normalizedStrategy?.intent ?? null,
+      normalizedStrategy?.experiment ?? null,
+      normalizedStrategy?.novelty_level ?? null,
+      normalizedStrategy?.metadata_json ?? normalizeOperatorJson({}, {}),
+    ),
+    env.DB.prepare(
+      `INSERT INTO operator_content_inventory (
+        id, brand_key, source_type, source_id, text, first_line, opening_phrase,
+        realm_entrance_key, hook_style, lane_key, source_card_id, status, used_at, metadata_json
+      ) VALUES (?, ?, 'scheduled_post', ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        source_id = excluded.source_id,
+        text = excluded.text,
+        first_line = excluded.first_line,
+        opening_phrase = excluded.opening_phrase,
+        realm_entrance_key = excluded.realm_entrance_key,
+        hook_style = excluded.hook_style,
+        lane_key = excluded.lane_key,
+        source_card_id = excluded.source_card_id,
+        status = 'scheduled',
+        used_at = excluded.used_at,
+        metadata_json = excluded.metadata_json`,
+    ).bind(
+      inventoryId,
+      brand.brand_key,
+      String(scheduled.scheduledPostId),
+      text,
+      firstLine,
+      openingPhrase,
+      realmEntranceKey,
+      normalizeOperatorText(strategy.hook_style, 120, true),
+      normalizeOperatorMachineKey(strategy.pillar, "") || null,
+      sourceCardId,
+      new Date().toISOString(),
+      normalizeOperatorJson({ strategy, analysis: draftAnalysis, model_evaluation: modelEvaluation }, {}),
+    ),
+  ]);
+  const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
+  const remainingMissing = (Array.isArray(currentCycle.missing_slots)
+    ? currentCycle.missing_slots as Array<{ key: string; date: string; time: string }>
+    : []).filter((slot) => slot.key !== slotKey);
+  const scheduledIds = new Set<number>((Array.isArray(currentCycle.scheduled_post_ids)
+    ? currentCycle.scheduled_post_ids
+    : []).map(Number));
+  scheduledIds.add(scheduled.scheduledPostId);
+  await env.DB.prepare(
+    `UPDATE operator_autonomous_growth_cycles
+     SET status = ?, strategic_thesis_json = ?, missing_slots_json = ?,
+         scheduled_post_ids_json = ?, error_json = '[]', updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND brand_key = ?`,
+  ).bind(
+    remainingMissing.length ? "partially_committed" : "completed",
+    normalizeOperatorJson(strategicThesis, {}),
+    normalizeOperatorJson(remainingMissing, []),
+    normalizeOperatorJson(Array.from(scheduledIds), []),
+    cycleId,
+    brand.brand_key,
+  ).run();
+  return {
+    success: true,
+    reused: scheduled.reused === true,
+    slot_key: slotKey,
+    scheduled_post_id: scheduled.scheduledPostId,
+    scheduled_time_utc: scheduled.scheduledTimeUtc ?? scheduledUtc,
+    lineage: {
+      source_card_id: sourceCardId,
+      source_card_family_id: familyId,
+      generation_run_id: runId,
+      draft_id: draftId,
+      inventory_id: inventoryId,
+    },
+    model_evaluation: {
+      novelty_assessment: noveltyAssessment,
+      winner_preservation_assessment: winnerPreservationAssessment,
+    },
+    server_checks: gateSummary.server_checks,
+    remaining_missing_count: remainingMissing.length,
+    coverage_reconciliation_required: true,
+    next_action: "Re-read live hourly coverage before persisting another bounded group of posts.",
+  };
+}
+
 async function reviewManifestScheduledPost(
   env: Env,
   brand: GptResolvedBrand,
@@ -11358,8 +11745,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(await prepareManifestAutonomousCycle(env, brand, payload));
   }
 
-  if (toolName === "commit_manifest_autonomous_runway") {
-    return operatorJsonResponse(await commitManifestAutonomousRunway(env, brand, payload));
+    if (toolName === "commit_manifest_autonomous_runway") {
+    return operatorJsonResponse({
+      success: false,
+      error: "retired_monolithic_autonomous_commit",
+      replacement_tool: "persist_manifest_autonomous_post",
+      retryable: false,
+    }, 410);
+  }
+
+  if (toolName === "persist_manifest_autonomous_post") {
+    return operatorJsonResponse(await persistManifestAutonomousPost(env, brand, payload));
   }
 
   if (toolName === "review_manifest_scheduled_post") {
@@ -15099,48 +15495,56 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
-    name: "commit_manifest_autonomous_runway",
-    title: "Commit Manifest autonomous runway",
-        description: "Persist a strategic thesis and schedule up to 4 generated Manifest posts into exact missing slots from one prepared autonomous cycle. Every accepted post receives hypothesis-or-source lineage, generation and draft records, gates, strategy tags, inventory tracking, and idempotent scheduling. Reconcile coverage between batches and reuse an operation ID only for an identical batch retry.",
+    {
+    name: "persist_manifest_autonomous_post",
+    title: "Persist Manifest autonomous post",
+    description: "Persist exactly one completed, model-evaluated Manifest post into one exact missing slot. The model performs strategy, generation, novelty, winner-preservation, and semantic evaluation before this call. The server enforces slot availability, exact duplicates, explicit banned phrases, idempotency, lineage, and scheduling without internal gate fanout, runway scans, multi-post loops, or Threads API calls.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         cycle_id: { type: "string" },
         strategic_thesis: { type: "object", additionalProperties: true },
-        posts: {
-          type: "array",
-          minItems: 1,
-                    maxItems: MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
-          items: {
-            type: "object",
-            properties: {
-              date: { type: "string" },
-              time: { type: "string" },
-              text: { type: "string" },
-              generation_mode: {
-                type: "string",
-                enum: ["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment", "original_discovery", "market_response"],
-              },
-              family_key: { type: "string" },
-              family_title: { type: "string" },
-              source_mechanism: { type: "string" },
-              audience_reward: { type: "string" },
-              strategic_purpose: { type: "string" },
-              recommended_direction: { type: "string" },
-              intentionally_different_from_prior: { type: "string" },
-              preserved_functions: { type: "array", items: { type: "string" } },
-              transformed_elements: { type: "array", items: { type: "string" } },
-              strategy: { type: "object", additionalProperties: true },
-              score: { type: "object", additionalProperties: true },
+        post: {
+          type: "object",
+          properties: {
+            date: { type: "string" },
+            time: { type: "string" },
+            text: { type: "string" },
+            generation_mode: {
+              type: "string",
+              enum: ["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment", "original_discovery", "market_response"],
             },
-            required: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
-            additionalProperties: false,
+            family_key: { type: "string" },
+            family_title: { type: "string" },
+            source_mechanism: { type: "string" },
+            audience_reward: { type: "string" },
+            strategic_purpose: { type: "string" },
+            recommended_direction: { type: "string" },
+            intentionally_different_from_prior: { type: "string" },
+            preserved_functions: { type: "array", items: { type: "string" } },
+            transformed_elements: { type: "array", items: { type: "string" } },
+            strategy: { type: "object", additionalProperties: true },
+            score: { type: "object", additionalProperties: true },
           },
+          required: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
+          additionalProperties: false,
         },
+        model_evaluation: {
+          type: "object",
+          properties: {
+            generation_passed: { type: "boolean" },
+            scheduling_passed: { type: "boolean" },
+            novelty_assessment: { type: "string" },
+            winner_preservation_assessment: { type: "string" },
+            gate_summary: { type: "object", additionalProperties: true },
+          },
+          required: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment"],
+          additionalProperties: true,
+        },
+        operation_id: { type: "string" },
       },
-      required: ["brand_key", "cycle_id", "strategic_thesis", "posts"],
+      required: ["brand_key", "cycle_id", "strategic_thesis", "post", "model_evaluation", "operation_id"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -15300,8 +15704,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "get_monthly_growth_review",
     "get_performance_learning",
   "get_content_focus",
-  "prepare_manifest_autonomous_cycle",
-  "commit_manifest_autonomous_runway",
+    "prepare_manifest_autonomous_cycle",
+  "persist_manifest_autonomous_post",
   "review_manifest_scheduled_post",
   "claim_manifest_review_batch",
   "get_manifest_review_batch",
@@ -15389,8 +15793,8 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["attach_manifest_review_draft", 11],
     ["schedule_manifest_review_batch", 12],
         ["get_performance_learning", 13],
-    ["prepare_manifest_autonomous_cycle", 14],
-    ["commit_manifest_autonomous_runway", 15],
+        ["prepare_manifest_autonomous_cycle", 14],
+    ["persist_manifest_autonomous_post", 15],
     ["review_manifest_scheduled_post", 16],
     ["markOperatorDecisionExecuted", 17],
     ["edit_scheduled_post", 15],
@@ -21486,22 +21890,22 @@ async function handleOperatorMcpEngineeringTool(
       : [];
     const startup = await callDirectLiveTool("getOperatorStartupContext", {});
     const startupContent = structured(startup.payload);
-    const autonomousCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;
-    const autonomousCommitSchema = autonomousCommitTool?.inputSchema && typeof autonomousCommitTool.inputSchema === "object" && !Array.isArray(autonomousCommitTool.inputSchema)
-      ? autonomousCommitTool.inputSchema as Record<string, unknown>
+        const autonomousPersistTool = listedToolRows.find((tool) => tool.name === "persist_manifest_autonomous_post") ?? null;
+    const retiredCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;
+    const autonomousPersistSchema = autonomousPersistTool?.inputSchema && typeof autonomousPersistTool.inputSchema === "object" && !Array.isArray(autonomousPersistTool.inputSchema)
+      ? autonomousPersistTool.inputSchema as Record<string, unknown>
       : {};
-    const autonomousCommitProperties = autonomousCommitSchema.properties && typeof autonomousCommitSchema.properties === "object" && !Array.isArray(autonomousCommitSchema.properties)
-      ? autonomousCommitSchema.properties as Record<string, unknown>
+    const autonomousPersistProperties = autonomousPersistSchema.properties && typeof autonomousPersistSchema.properties === "object" && !Array.isArray(autonomousPersistSchema.properties)
+      ? autonomousPersistSchema.properties as Record<string, unknown>
       : {};
-    const autonomousPostsSchema = autonomousCommitProperties.posts && typeof autonomousCommitProperties.posts === "object" && !Array.isArray(autonomousCommitProperties.posts)
-      ? autonomousCommitProperties.posts as Record<string, unknown>
-      : {};
-    const advertisedCommitBatchMax = Math.trunc(Number(autonomousPostsSchema.maxItems ?? 0));
     const boundaryTest = {
       startup_direct: startupContent.ok === true && startupContent.bootstrap_version !== undefined,
-      commit_tool_advertised: autonomousCommitTool !== null,
-      commit_batch_max: advertisedCommitBatchMax,
-      worker_safe_commit_batch: advertisedCommitBatchMax === MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
+      persist_tool_advertised: autonomousPersistTool !== null,
+      retired_commit_hidden: retiredCommitTool === null,
+      one_post_per_call: Boolean(autonomousPersistProperties.post) && !autonomousPersistProperties.posts,
+      model_evaluation_required: Array.isArray(autonomousPersistSchema.required)
+        && (autonomousPersistSchema.required as unknown[]).includes("model_evaluation"),
+      no_internal_multi_post_contract: MANIFEST_AUTONOMOUS_COMMIT_LIMIT === 1,
       account_state_mutated: false,
     };
     return {
@@ -21509,9 +21913,12 @@ async function handleOperatorMcpEngineeringTool(
         && Boolean(liveSessionId)
         && listed.status < 400
         && startup.status < 400
-        && boundaryTest.startup_direct
-        && boundaryTest.commit_tool_advertised
-        && boundaryTest.worker_safe_commit_batch,
+                && boundaryTest.startup_direct
+        && boundaryTest.persist_tool_advertised
+        && boundaryTest.retired_commit_hidden
+        && boundaryTest.one_post_per_call
+        && boundaryTest.model_evaluation_required
+        && boundaryTest.no_internal_multi_post_contract,
       status: response.status,
       initialize: payload?.result ?? null,
       transport_mode: "direct_typed_main_tools",
