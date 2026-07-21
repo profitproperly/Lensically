@@ -2597,6 +2597,46 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions.length).toBeLessThan(5000);
   }, 30000);
 
+        it("keeps a missing guided review batch non-blocking and routes an active autonomous cycle back to persistence", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: `test-autonomous-review-route-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const result = await mcpTool<{
+      success: boolean;
+      active: boolean;
+      state: string;
+      normal_work_blocked: boolean;
+      autonomous_cycle_active: boolean;
+      autonomous_cycle: { cycle_id: string } | null;
+      required_tool: string | null;
+    }>("get_manifest_review_batch", {
+      brand_key: "manifest_mental",
+      production_date: "2099-01-01",
+      proceed_confirmed: true,
+    });
+    expect(result).toMatchObject({
+      success: true,
+      active: false,
+      state: "no_active_review_batch",
+      normal_work_blocked: false,
+      autonomous_cycle_active: true,
+      required_tool: "persist_manifest_autonomous_post",
+    });
+    expect(result.autonomous_cycle?.cycle_id).toBe(prepared.cycle.id);
+    const falseIncidents = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_hardening_incidents
+       WHERE blocked_tool_name = 'get_manifest_review_batch'
+         AND observed_json LIKE '%active_review_batch_not_found%'
+         AND state <> 'closed'`,
+    ).first<{ total: number }>();
+    expect(Number(falseIncidents?.total ?? 0)).toBe(0);
+  }, 30000);
+
     it("prepares the autonomous rolling runway without requiring owner review", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{

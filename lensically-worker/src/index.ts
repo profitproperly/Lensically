@@ -7188,13 +7188,30 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_operator_observations_capability_created
      ON operator_operational_observations (capability, created_at DESC)`,
   ).run();
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE TRIGGER IF NOT EXISTS trg_operator_hardening_touch_updated_at
      AFTER UPDATE ON operator_hardening_incidents
      FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
      BEGIN
        UPDATE operator_hardening_incidents SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
      END`,
+  ).run();
+  await env.DB.prepare(
+    `UPDATE operator_hardening_incidents
+     SET state = 'closed',
+         root_cause = COALESCE(root_cause, 'A legitimate empty guided-review state was misclassified as an unexpected production failure.'),
+         generalized_cause = COALESCE(generalized_cause, 'Expected empty read states must never create blocking hardening incidents.'),
+         prevention_rule_id = COALESCE(prevention_rule_id, 'expected-control-active-review-batch-not-found'),
+         live_verification_json = ?,
+         resume_result_json = ?,
+         closed_at = COALESCE(closed_at, CURRENT_TIMESTAMP),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE state <> 'closed'
+       AND blocked_tool_name = 'get_manifest_review_batch'
+       AND observed_json LIKE '%active_review_batch_not_found%'`,
+  ).bind(
+    normalizeOperatorJson({ resolution: 'reclassified_expected_empty_state', normal_work_blocked: false }, {}),
+    normalizeOperatorJson({ resume: 'continue_autonomous_cycle_without_review_batch_tools' }, {}),
   ).run();
 
   await env.DB.prepare(
@@ -12311,7 +12328,34 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         ).bind(brand.brand_key).first<{ id: string }>();
       reviewBatchId = row?.id ?? null;
     }
-    if (!reviewBatchId) return operatorJsonResponse({ success: false, error: "active_review_batch_not_found" }, 404);
+        if (!reviewBatchId) {
+      const activeAutonomousCycle = await env.DB.prepare(
+        `SELECT id, status, timezone, horizon_hours, updated_at
+         FROM operator_autonomous_growth_cycles
+         WHERE brand_key = ? AND status IN ('prepared', 'partially_committed')
+         ORDER BY datetime(updated_at) DESC LIMIT 1`,
+      ).bind(brand.brand_key).first<Record<string, unknown>>();
+      return operatorJsonResponse({
+        success: true,
+        active: false,
+        state: "no_active_review_batch",
+        normal_work_blocked: false,
+        autonomous_cycle_active: Boolean(activeAutonomousCycle),
+        autonomous_cycle: activeAutonomousCycle
+          ? {
+              cycle_id: activeAutonomousCycle.id,
+              status: activeAutonomousCycle.status,
+              timezone: activeAutonomousCycle.timezone,
+              horizon_hours: activeAutonomousCycle.horizon_hours,
+              updated_at: activeAutonomousCycle.updated_at,
+            }
+          : null,
+        required_tool: activeAutonomousCycle ? "persist_manifest_autonomous_post" : null,
+        required_route: activeAutonomousCycle
+          ? "Continue the prepared autonomous cycle with exactly one model-evaluated post per persistence call. Do not create, claim, read, attach, or schedule a guided review batch."
+          : null,
+      });
+    }
     const serialized = await serializeManifestReviewBatch(env, brand, reviewBatchId);
     return serialized ? operatorJsonResponse(serialized) : operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
   }
@@ -15226,7 +15270,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "get_manifest_review_batch",
     title: "Get Manifest review batch",
-    description: "Restore the active canonical four-post review batch with stable item numbers, source text, generated drafts, and decision state. IDs remain backend-only in owner-facing presentation.",
+        description: "Restore the active canonical four-post guided-review batch with stable item numbers, source text, generated drafts, and decision state. Do not call this during an autonomous Manifest cycle; autonomous execution proceeds from prepare_manifest_autonomous_cycle directly to persist_manifest_autonomous_post. A missing guided-review batch is a normal non-blocking state.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, review_batch_id: { type: "string" }, production_date: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
@@ -18067,7 +18111,8 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
   "patch_set_file_limit_exceeded", "path_mode_message_required", "path_message_required", "path_message_owner_approval_required",
       "file_not_found", "query_and_known_file_prefix_required", "known_file_path_required", "run_id_required", "validation_task_required", "workflow_stage_blocked",
     "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
-    "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
+      "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
+  "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
 ]);
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
