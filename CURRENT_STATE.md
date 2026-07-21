@@ -31,16 +31,20 @@
 - The runtime role is the **Lensically Autonomous Business Operator** under `agent-native-operating-contract-v1`, not a chat-dependent assistant. Each activation restores durable state, reconciles, diagnoses, selects a priority, executes, verifies, records, declares one next action, and checkpoints.
 - `single-active-outcome-v1` persists one frozen active implementation outcome in `operator_work_state`. Proposed work is explicitly activated, deferred, merged, or rejected in `operator_work_ledger`; only P0/P1 incidents, required prerequisites, or material irreversible rework may interrupt the active outcome.
 - Every gateway result includes an action-closure receipt containing current live state, target agent-native state, active outcome, selected next action, priority reason, completion evidence, owner-action requirement, and a retirement condition whenever a temporary dependency exists.
-- The current active outcome is to complete, validate, release, and live-verify the Continuous Hardening Loop and Autonomous Business Operator foundation. Content lineage, scheduled autonomous runs, human-gate retirement, and posting continuity remain durably ordered without silently expanding the release scope.
+- The current active outcome is to validate, release, and live-verify `manifest-autonomous-growth-engine-v1`, then prove the first one-time 48-hour autonomous cycle before installing the daily 6:15 AM task.
 
-## Guided Growth Mission
+## Manifest Autonomous Growth Engine
 
 - Manifest's permanent mission is to reach 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.
-- `guided-growth-mission-v1` is persisted in `operator_growth_missions`; every prior approved or active version is retained in `operator_growth_mission_revisions`.
-- After the key handshake and explicit Proceed, Lensically restores canonical account state, calculates a bounded evidence diagnostic, identifies the current bottleneck, proposes a primary objective and supporting plan, and presents the Growth Mission Brief for owner-model discussion.
-- Proceed does not authorize account mutation. Content creation, draft decisions, source deletion or exclusion, scheduling, publishing, and other account mutations remain locked while the mission is in `discussion` or `paused`.
-- The owner may revise or approve the proposed plan at any time. An approved or active guided plan unlocks account execution while preserving established owner checkpoints.
-- Routine engineering remains autonomous. Full autonomous account execution is a separate explicit owner-authorized mode change and is never inferred from normal plan approval.
+- `autonomous-growth-mission-v2` and `operator-autonomy-governance-v4` make the Lensically Autonomous Business Operator responsible for routine strategy, generation, scheduling, evaluation, recovery, and evidence-triggered engineering. Owner participation is optional criticism, taste, market intelligence, and override—not a production dependency.
+- After the fixed key handshake and explicit Proceed, continuity reconciles live schedule and delivery state before selecting the next autonomous action. Stale calendar summaries never override live state, and fresh sessions do not open a mandatory Growth Mission discussion or resume a four-post approval batch.
+- `prepare_manifest_autonomous_cycle` persists an exact rolling horizon, preserves existing scheduled posts, identifies missing hourly slots, and returns current follower trajectory, performance learning, Content Focus, recent audience exposure, adaptive strategy policy, and generation contract.
+- `commit_manifest_autonomous_runway` accepts up to 24 exact missing slots per bounded call. Each accepted post receives an operator hypothesis or source-card family, generation run, draft, mandatory gates, strategy tags, inventory tracking, scheduled-post lineage, and an idempotent cycle receipt.
+- The rolling runway target is 48 hours. The bootstrap may require two bounded commit calls; after stabilization, a daily run ordinarily replenishes approximately 24 consumed hours rather than creating another 48-post backlog.
+- Content selection uses adaptive expected marginal value rather than fixed ratios. Families are evaluated as franchise, core, emerging, prospect, cooling, or dormant. Strong winners keep earning opportunities while comparable performance remains strong; frequency alone is never treated as fatigue. Mechanism repetition and weak execution repetition are evaluated separately.
+- The four-post review workflow remains available only as an optional display surface. It no longer blocks generation or scheduling.
+- `review_manifest_scheduled_post` records optional owner feedback and can gate and replace one unpublished post in the same slot. Temporary repetition, family strategy, hypotheses, post-specific taste, and explicit permanent rules remain distinct.
+- Protected owner boundaries are limited to spending, credential or ownership changes, irreversible deletion, fundamental mission changes, disabling critical infrastructure, or material account/project danger.
 
 ## Retired Execution Infrastructure
 
