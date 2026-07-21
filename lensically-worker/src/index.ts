@@ -10990,6 +10990,7 @@ async function buildManifestAutonomousAccountPosition(
   },
 ): Promise<Record<string, unknown>> {
   await ensureThreadsFollowerSnapshotsTable(env);
+  await ensureGptPostStrategyTagsTable(env);
   const followerRows = await env.DB.prepare(
     `SELECT snapshot_date, followers_count, captured_at
      FROM threads_follower_snapshots
