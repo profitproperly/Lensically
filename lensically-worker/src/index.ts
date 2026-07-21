@@ -11754,10 +11754,21 @@ async function persistManifestAutonomousPost(
   if (modelEvaluation.generation_passed !== true || modelEvaluation.scheduling_passed !== true) {
     return { success: false, error: "model_evaluation_not_passed" };
   }
-  const noveltyAssessment = normalizeOperatorText(modelEvaluation.novelty_assessment, 4000);
+    const noveltyAssessment = normalizeOperatorText(modelEvaluation.novelty_assessment, 4000);
   const winnerPreservationAssessment = normalizeOperatorText(modelEvaluation.winner_preservation_assessment, 4000);
-  if (!noveltyAssessment || !winnerPreservationAssessment) {
-    return { success: false, error: "model_evaluation_incomplete" };
+  const slotPlacementAssessment = normalizeOperatorText(modelEvaluation.slot_placement_assessment, 4000);
+  const recentExposureAssessment = normalizeOperatorText(modelEvaluation.recent_exposure_assessment, 4000);
+  if (!noveltyAssessment || !winnerPreservationAssessment || !slotPlacementAssessment || !recentExposureAssessment) {
+    return {
+      success: false,
+      error: "model_evaluation_incomplete",
+      required_fields: [
+        "novelty_assessment",
+        "winner_preservation_assessment",
+        "slot_placement_assessment",
+        "recent_exposure_assessment",
+      ],
+    };
   }
   const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
     ? payload.strategic_thesis as Record<string, unknown>
@@ -11778,8 +11789,60 @@ async function persistManifestAutonomousPost(
   const targetSlots = Array.isArray(cycle.target_slots)
     ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
     : [];
-  const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
+    const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
   if (!targetSlot) return { success: false, error: "slot_outside_prepared_cycle", slot_key: slotKey };
+  const timezone = String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
+  const cycleAccountPosition = cycle.account_position && typeof cycle.account_position === "object" && !Array.isArray(cycle.account_position)
+    ? cycle.account_position as Record<string, unknown>
+    : {};
+  const cycleClock = cycleAccountPosition.clock && typeof cycleAccountPosition.clock === "object" && !Array.isArray(cycleAccountPosition.clock)
+    ? cycleAccountPosition.clock as Record<string, unknown>
+    : {};
+  const preparedClockMs = parseOperatorTimestampMs(cycleClock.effective_now_iso);
+  const reconciliationNowMs = Math.max(Date.now(), preparedClockMs ?? 0);
+  const reconcileNonfatalSlot = async (
+    outcome: "slot_already_covered" | "slot_elapsed",
+    evidence: Record<string, unknown> | null,
+  ): Promise<Record<string, unknown>> => {
+    const liveCoverage = await buildManifestAutonomousCoverageLedger(
+      env,
+      brand,
+      targetSlots,
+      timezone,
+      reconciliationNowMs,
+    );
+    const liveMissing = targetSlots.filter((slot) => {
+      const slotUtc = convertLocalDateTimeToUtcIso(slot.date, slot.time, timezone);
+      const slotMs = parseOperatorTimestampMs(slotUtc);
+      return slotMs !== null && slotMs > reconciliationNowMs && !liveCoverage.occupied.has(slot.key);
+    });
+    await env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles
+       SET status = ?, missing_slots_json = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(
+      liveMissing.length > 0 ? "partially_committed" : "completed",
+      normalizeOperatorJson(liveMissing, []),
+      cycleId,
+      brand.brand_key,
+    ).run();
+    return {
+      success: true,
+      persisted: false,
+      outcome,
+      slot_key: slotKey,
+      preserved_existing: outcome === "slot_already_covered",
+      occupied_evidence: evidence,
+      collision_reconciled: true,
+      candidate_requires_reslot: liveMissing.length > 0,
+      next_missing_slot: liveMissing[0] ?? null,
+      authoritative_missing_slots: liveMissing.slice(0, 12),
+      remaining_missing_count: liveMissing.length,
+      next_action: liveMissing.length > 0
+        ? "Re-evaluate the candidate for the returned next_missing_slot, use that slot's deterministic operation id, and continue without stopping."
+        : "The prepared horizon is covered; verify lineage, scheduler health, and delivery incidents.",
+    };
+  };
   const existingLineup = await env.DB.prepare(
     `SELECT source_card_id, generation_run_id, draft_id, scheduled_post_id, status
      FROM operator_autonomous_lineup_items
@@ -11811,11 +11874,10 @@ async function persistManifestAutonomousPost(
       };
     }
   }
-  const timezone = String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
-  const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
+    const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
   if (!scheduledUtc) return { success: false, error: "invalid_date_time" };
-  if (isPastUtcTimestamp(scheduledUtc) && !existingScheduledPostId) {
-    return { success: false, error: "scheduled_time_in_past" };
+  if ((parseOperatorTimestampMs(scheduledUtc) ?? 0) <= reconciliationNowMs && !existingScheduledPostId) {
+    return reconcileNonfatalSlot("slot_elapsed", null);
   }
   await ensureScheduledPostsTable(env);
   const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
@@ -11834,10 +11896,19 @@ async function persistManifestAutonomousPost(
       ).bind(existingScheduledPostId, brand.profile.threads_user_id).first<{ id: number | string; scheduled_time: string }>()
     : null;
   const exactScheduled = exactScheduledByKey ?? exactScheduledByLineup;
-  if (!exactScheduled) {
-    const occupied = await manifestAutonomousOccupiedSlots(env, brand, [targetSlot], timezone);
-    if (occupied.has(slotKey)) {
-      return { success: false, error: "slot_already_occupied", slot_key: slotKey, preserved_existing: true };
+    if (!exactScheduled) {
+    const liveCoverage = await buildManifestAutonomousCoverageLedger(
+      env,
+      brand,
+      targetSlots,
+      timezone,
+      reconciliationNowMs,
+    );
+    if (liveCoverage.occupied.has(slotKey)) {
+      return reconcileNonfatalSlot(
+        "slot_already_covered",
+        liveCoverage.occupied.get(slotKey) ?? null,
+      );
     }
   }
   const normalizedText = normalizeCreativeComparisonText(text);
@@ -12161,14 +12232,17 @@ async function persistManifestAutonomousPost(
       inventory_id: inventoryId,
     },
     publish_lineage_complete: true,
-    model_evaluation: {
+        model_evaluation: {
       novelty_assessment: noveltyAssessment,
       winner_preservation_assessment: winnerPreservationAssessment,
+      slot_placement_assessment: slotPlacementAssessment,
+      recent_exposure_assessment: recentExposureAssessment,
     },
     server_checks: gateSummary.server_checks,
     remaining_missing_count: remainingMissing.length,
-    coverage_reconciliation_required: true,
-    next_action: "Re-read live hourly coverage before persisting another bounded group of posts.",
+        coverage_reconciliation_required: true,
+    reconciliation_tool: "get_hourly_coverage",
+    next_action: "After four successfully persisted posts, call get_hourly_coverage once. Do not call prepare_manifest_autonomous_cycle again inside the same run.",
   };
 }
 
