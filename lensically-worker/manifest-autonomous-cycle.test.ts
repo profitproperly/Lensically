@@ -5,7 +5,7 @@ import {
 } from "./src/index";
 
 describe("Manifest autonomous clock and horizon", () => {
-  it("uses Threads server time when the runtime clock is behind", () => {
+    it("uses Threads server time when the runtime clock is behind", () => {
     const clock = resolveManifestAutonomousClock(
       "2026-07-21T15:16:39.000Z",
       "2026-07-21T17:16:39.000Z",
@@ -17,6 +17,35 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(clock.effective_now_iso).toBe("2026-07-21T17:16:39.000Z");
     expect(clock.runtime_skew_seconds).toBe(-7200);
   });
+
+  it("uses trusted UTC when runtime and database clocks expose New York wall time as UTC", () => {
+    const clock = resolveManifestAutonomousClock(
+      "2026-07-21T15:16:39.000Z",
+      null,
+      "2026-07-21T15:16:40.000Z",
+      null,
+      "2026-07-21T19:16:41.000Z",
+    );
+    const local = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(clock.effective_now_iso));
+    const parts = new Map(local.map((part) => [part.type, part.value]));
+    const slots = buildManifestRollingHourlySlots(
+      `${parts.get("year")}-${parts.get("month")}-${parts.get("day")}`,
+      Number(parts.get("hour")),
+      4,
+    );
+
+    expect(clock.source).toBe("trusted_edge");
+    expect(clock.effective_now_iso).toBe("2026-07-21T19:16:41.000Z");
+    expect(slots[0]?.key).toBe("2026-07-21T16:00");
+  });
+
 
     it("uses the newest verified publication as a hard lower bound", () => {
     const clock = resolveManifestAutonomousClock(
