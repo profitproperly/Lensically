@@ -2548,7 +2548,7 @@ describe("operator mode MCP endpoint", () => {
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-    const listed = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { additionalProperties?: boolean; properties?: Record<string, unknown> } }> }>("tools/list");
+        const listed = await mcpRequest<{ tools: Array<{ name: string; description?: string; inputSchema?: { additionalProperties?: boolean; properties?: Record<string, unknown> } }> }>("tools/list");
     const names = listed.tools.map((tool) => tool.name);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(expect.arrayContaining([
@@ -2588,7 +2588,10 @@ describe("operator mode MCP endpoint", () => {
     const saveStrategyMemoryKind = saveStrategyMemoryTool?.inputSchema?.properties?.kind as { enum?: string[] } | undefined;
     expect(saveStrategyMemoryKind?.enum).toEqual(expect.arrayContaining(["approved_rule", "voice_rule", "rejection_feedback"]));
     expect(saveStrategyMemoryKind?.enum).not.toContain("generation_rule");
-        const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
+                const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
+    const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
+    expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");
+    expect(autonomousPrepareTool?.description).toContain("no failure may be reported without this tool's returned result");
     expect(autonomousPersistTool?.inputSchema?.properties?.post).toBeTruthy();
     expect(autonomousPersistTool?.inputSchema?.properties?.posts).toBeUndefined();
     expect(names).not.toContain("commit_manifest_autonomous_runway");
@@ -2601,7 +2604,9 @@ describe("operator mode MCP endpoint", () => {
       public_contract: "direct_typed_tools_v1",
       deployment_fresh_sessions: true,
     });
-    expect(initialized.instructions).toContain("advertised direct typed tool");
+        expect(initialized.instructions).toContain("advertised direct typed tool");
+    expect(initialized.instructions).toContain("Tool discovery, schema loading, and tools/list are preparation only and never count as execution.");
+    expect(initialized.instructions).toContain("Without a tool result, the only valid status is not invoked");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
     expect(initialized.instructions.length).toBeLessThan(5000);
   }, 30000);

@@ -16202,7 +16202,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       {
     name: "prepare_manifest_autonomous_cycle",
     title: "Prepare Manifest autonomous cycle",
-        description: "Refresh live Threads publications, use Threads and database clock evidence, reconcile scheduled, posting, posted, failed, stalled, retry-required, and manually published records, ignore every elapsed hour, and return the authoritative rolling runway. The model must inspect recent published posts, future scheduled exposure, repetition pressure, performance, Content Focus, and follower trajectory; build and sequence the full horizon before persisting the first post; preserve franchise winners while spacing clustered execution; and justify why each family belongs in each exact slot. Reusing the same daily operation id refreshes live state instead of replaying a stale cycle. Existing valid posts are always preserved. After each four successful persistence calls, use get_hourly_coverage rather than calling this tool again.",
+                description: "Invocation integrity: when a request explicitly names prepare_manifest_autonomous_cycle, call this tool immediately after it is available; tool discovery or schema loading is not execution, and no failure may be reported without this tool's returned result. Refresh live Threads publications, use Threads and database clock evidence, reconcile scheduled, posting, posted, failed, stalled, retry-required, and manually published records, ignore every elapsed hour, and return the authoritative rolling runway. The model must inspect recent published posts, future scheduled exposure, repetition pressure, performance, Content Focus, and follower trajectory; build and sequence the full horizon before persisting the first post; preserve franchise winners while spacing clustered execution; and justify why each family belongs in each exact slot. Reusing the same daily operation id refreshes live state instead of replaying a stale cycle. Existing valid posts are always preserved. After each four successful persistence calls, use get_hourly_coverage rather than calling this tool again.",
     inputSchema: {
       type: "object",
       properties: {
@@ -17276,7 +17276,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.37.1";
+export const OPERATOR_MCP_VERSION = "1.37.2";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -19917,7 +19917,10 @@ async function handleOperatorMcpOAuthToken(request: Request, env: Env): Promise<
 function operatorMcpInstructions(toolCount: number): string {
   return [
     "Use Lensically Operator Mode as the source of truth.",
-    "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
+        "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
+    "Tool discovery, schema loading, and tools/list are preparation only and never count as execution.",
+    "When an owner or scheduled task explicitly names a direct typed tool, invoke that exact tool immediately once it is available; do not answer in prose between discovery and invocation.",
+    "Never report a safety block, timeout, connector error, backend failure, attempted execution, or completed execution unless the exact tool invocation returned evidence for that status. Without a tool result, the only valid status is not invoked, and the next action is to invoke it.",
     "Select one canonical brand key and wait for explicit Proceed before account data loads.",
         "After Proceed, reconcile live schedule, delivery, metrics, strategy, incidents, and durable cycle state, then resume the active autonomous outcome. Stale continuity summaries never override live state.",
     "Routine engineering uses bounded known-file inspection, one coherent change set, focused validation, one exact-head release, and compact receipts.",
