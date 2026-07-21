@@ -10577,6 +10577,664 @@ async function listSourceCandidatesForBrand(
   return { candidates, total_count: totalCount || candidates.length };
 }
 
+const MANIFEST_AUTONOMOUS_GENERATION_MODES = new Set([
+  "franchise_deployment",
+  "controlled_variation",
+  "mechanism_expansion",
+  "adjacent_experiment",
+  "original_discovery",
+  "market_response",
+]);
+
+async function readManifestAutonomousCycle(
+  env: Env,
+  brandKey: GptBrandKey,
+  cycleId: string,
+): Promise<Record<string, unknown> | null> {
+  const row = await env.DB.prepare(
+    `SELECT * FROM operator_autonomous_growth_cycles WHERE id = ? AND brand_key = ? LIMIT 1`,
+  ).bind(cycleId, brandKey).first<Record<string, unknown>>();
+  if (!row) return null;
+  return {
+    ...row,
+    horizon_hours: Number(row.horizon_hours ?? 0),
+    target_slots: safeParseJsonString(String(row.target_slots_json ?? "[]")) ?? [],
+    missing_slots: safeParseJsonString(String(row.missing_slots_json ?? "[]")) ?? [],
+    account_position: safeParseJsonString(String(row.account_position_json ?? "{}")) ?? {},
+    strategic_thesis: safeParseJsonString(String(row.strategic_thesis_json ?? "null")) ?? null,
+    scheduled_post_ids: safeParseJsonString(String(row.scheduled_post_ids_json ?? "[]")) ?? [],
+    error: safeParseJsonString(String(row.error_json ?? "null")) ?? null,
+  };
+}
+
+async function manifestAutonomousOccupiedSlots(
+  env: Env,
+  brand: GptResolvedBrand,
+  slots: Array<{ key: string; date: string; time: string }>,
+  timezone: string,
+): Promise<Map<string, Record<string, unknown>>> {
+  const dates = Array.from(new Set(slots.map((slot) => slot.date)));
+  const occupied = new Map<string, Record<string, unknown>>();
+  for (const date of dates) {
+    const scheduled = await listScheduledPostsForThreadsAccountOnLocalDate(
+      env,
+      brand.profile.threads_user_id,
+      date,
+      timezone,
+    );
+    for (const post of scheduled) {
+      const time = String(post.local_time ?? "");
+      if (!time) continue;
+      occupied.set(`${date}T${time}`, post as unknown as Record<string, unknown>);
+    }
+  }
+  return occupied;
+}
+
+async function buildManifestAutonomousAccountPosition(
+  env: Env,
+  brand: GptResolvedBrand,
+  targetSlots: Array<{ key: string; date: string; time: string }>,
+  occupied: Map<string, Record<string, unknown>>,
+): Promise<Record<string, unknown>> {
+  await ensureThreadsFollowerSnapshotsTable(env);
+  const followerRows = await env.DB.prepare(
+    `SELECT snapshot_date, followers_count, captured_at
+     FROM threads_follower_snapshots
+     WHERE threads_user_id = ?
+     ORDER BY snapshot_date DESC LIMIT 2`,
+  ).bind(brand.profile.threads_user_id).all<Record<string, unknown>>();
+  const followers = followerRows.results ?? [];
+  const latestFollowers = followers[0] ? Number(followers[0].followers_count ?? 0) : null;
+  const priorFollowers = followers[1] ? Number(followers[1].followers_count ?? 0) : null;
+  const learning = await getLatestOperatorPerformanceLearning(env, brand.brand_key, false);
+  const contentFocus = await getLatestOperatorContentFocus(env, brand.brand_key);
+  const recentInventory = await env.DB.prepare(
+    `SELECT source_type, text, opening_phrase, hook_style, lane_key, source_card_id, used_at, metadata_json
+     FROM operator_content_inventory
+     WHERE brand_key = ?
+     ORDER BY datetime(used_at) DESC LIMIT 48`,
+  ).bind(brand.brand_key).all<Record<string, unknown>>();
+  const brief = learning.brief && typeof learning.brief === "object" && !Array.isArray(learning.brief)
+    ? learning.brief as Record<string, unknown>
+    : {};
+  const hypotheses = Array.isArray(learning.hypotheses) ? learning.hypotheses.slice(0, 12) : [];
+  return {
+    captured_at: new Date().toISOString(),
+    followers: {
+      latest: latestFollowers,
+      previous: priorFollowers,
+      daily_change: latestFollowers !== null && priorFollowers !== null ? latestFollowers - priorFollowers : null,
+      latest_snapshot_date: followers[0]?.snapshot_date ?? null,
+    },
+    runway: {
+      target_slot_count: targetSlots.length,
+      occupied_slot_count: targetSlots.filter((slot) => occupied.has(slot.key)).length,
+      missing_slot_count: targetSlots.filter((slot) => !occupied.has(slot.key)).length,
+    },
+    performance: {
+      evaluator_version: learning.evaluator_version ?? null,
+      generated_at: learning.generated_at ?? null,
+      brief: {
+        checkpoint_hours: brief.checkpoint_hours ?? learning.checkpoint_hours ?? null,
+        mature_sample_size: brief.mature_sample_size ?? learning.sample_size ?? null,
+        proven_features: Array.isArray(brief.proven_features) ? brief.proven_features.slice(0, 8) : [],
+        directional_features: Array.isArray(brief.directional_features) ? brief.directional_features.slice(0, 8) : [],
+        weak_features: Array.isArray(brief.weak_features) ? brief.weak_features.slice(0, 8) : [],
+        recent_exposure_signals: Array.isArray(brief.recent_exposure_signals) ? brief.recent_exposure_signals.slice(0, 10) : [],
+        portfolio_policy: brief.portfolio_policy ?? OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION,
+        generation_guidance: Array.isArray(brief.generation_guidance) ? brief.generation_guidance : [],
+      },
+      hypotheses,
+    },
+    content_focus: contentFocus,
+    recent_audience_exposure: (recentInventory.results ?? []).map((row) => ({
+      source_type: row.source_type,
+      text: row.text,
+      opening_phrase: row.opening_phrase,
+      hook_style: row.hook_style,
+      lane_key: row.lane_key,
+      source_card_id: row.source_card_id,
+      used_at: row.used_at,
+      strategy: safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {},
+    })),
+  };
+}
+
+async function prepareManifestAutonomousCycle(
+  env: Env,
+  brand: GptResolvedBrand,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
+  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
+  if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
+    return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
+  }
+  const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+  const horizonHours = Math.min(Math.max(Math.trunc(Number(payload.horizon_hours ?? MANIFEST_AUTONOMOUS_RUNWAY_HOURS)), 1), 72);
+  const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
+  const local = operatorLocalDateTimeParts(new Date(), timezone);
+  const operationId = explicitOperationId ?? `${brand.brand_key}:autonomous-runway:${local.date}:${String(local.hour).padStart(2, "0")}`;
+  const existing = await env.DB.prepare(
+    `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
+  ).bind(brand.brand_key, operationId).first<{ id: string }>();
+  if (existing?.id) {
+    return {
+      success: true,
+      reused_existing: true,
+      cycle: await readManifestAutonomousCycle(env, brand.brand_key, existing.id),
+    };
+  }
+  const targetSlots = buildManifestRollingHourlySlots(local.date, local.hour, horizonHours);
+  const occupied = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, timezone);
+  const missingSlots = targetSlots.filter((slot) => !occupied.has(slot.key));
+  await refreshOperatorContentFocus(env, brand.brand_key);
+  const accountPosition = await buildManifestAutonomousAccountPosition(env, brand, targetSlots, occupied);
+  const cycleId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_autonomous_growth_cycles (
+      id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
+      horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+      account_position_json, scheduled_post_ids_json
+    ) VALUES (?, ?, ?, ?, 'prepared', ?, ?, ?, ?, ?, ?, ?, '[]')`,
+  ).bind(
+    cycleId,
+    brand.brand_key,
+    operationId,
+    MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+    timezone,
+    horizonHours,
+    targetSlots[0]?.key ?? `${local.date}T${operatorHourlySlot(local.hour)}`,
+    targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour)}`,
+    normalizeOperatorJson(targetSlots, []),
+    normalizeOperatorJson(missingSlots, []),
+    normalizeOperatorJson(accountPosition, {}),
+  ).run();
+  return {
+    success: true,
+    reused_existing: false,
+    cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+    strategy_contract: {
+      objective: "Choose the highest-value strategic lineup for account growth; posts are moves, not the mission.",
+      fixed_percentages: false,
+      winner_preservation: "Continue using winners while comparable performance remains strong. Frequency alone never establishes fatigue.",
+      repetition_distinction: "Mechanism repetition can be productive; weak execution repetition must be rejected or varied.",
+      family_roles: ["franchise", "core", "emerging", "prospect", "cooling", "dormant"],
+      generation_modes: Array.from(MANIFEST_AUTONOMOUS_GENERATION_MODES),
+      strategy_change_rule: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because another day began.",
+    },
+    commit_contract: {
+      max_posts_per_call: MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
+      preserve_existing_schedule: true,
+      exact_missing_slots_only: true,
+      required_post_fields: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
+      optional_post_fields: ["strategy", "preserved_functions", "transformed_elements"],
+      self_reject_and_replace_before_schedule: true,
+      complete_lineage_required: true,
+    },
+  };
+}
+
+async function ensureManifestAutonomousSourceCard(
+  env: Env,
+  brand: GptResolvedBrand,
+  cycleId: string,
+  post: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const familyKey = normalizeOperatorMachineKey(post.family_key, "autonomous_prospect");
+  const sourceIdentityKey = `operator_hypothesis:${familyKey}`;
+  let family = await env.DB.prepare(
+    `SELECT * FROM operator_source_card_families
+     WHERE brand_key = ? AND source_identity_key = ? LIMIT 1`,
+  ).bind(brand.brand_key, sourceIdentityKey).first<Record<string, unknown>>();
+  if (!family) {
+    const familyId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_source_card_families (
+        id, brand_key, source_identity_key, source_type, internal_source_id, status
+      ) VALUES (?, ?, ?, 'operator_hypothesis', ?, 'active')`,
+    ).bind(familyId, brand.brand_key, sourceIdentityKey, familyKey).run();
+    family = { id: familyId, current_source_card_id: null };
+  }
+  const currentCardId = normalizeOperatorText(family.current_source_card_id, 120, true);
+  if (currentCardId) {
+    const current = await getOperatorSourceCard(env, brand.brand_key, currentCardId);
+    if (current?.status === "locked") return current;
+  }
+  const sourceCardId = crypto.randomUUID();
+  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000)
+    ?? normalizeOperatorText(post.strategic_purpose, 4000)
+    ?? familyKey;
+  const audienceReward = normalizeOperatorText(post.audience_reward, 4000, true)
+    ?? normalizeOperatorText(post.strategic_purpose, 4000, true)
+    ?? "Deliver a strong Manifest Mental audience reward.";
+  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "original_discovery");
+  const transformationContract = {
+    must_preserve_exact: [],
+    must_preserve_function: [],
+    may_reuse: [],
+    should_transform: [],
+    must_transform: [],
+    forbidden_complete_combinations: [],
+    audience_reward: audienceReward,
+    time_or_context_requirements: [],
+    notes: `Operator-originated ${generationMode} hypothesis. Preserve the strategic mechanism and audience reward while allowing a materially new execution.`,
+  };
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO operator_source_cards (
+        id, brand_key, sequence_label, title, status, primary_source_json,
+        secondary_sources_json, anti_sources_json, metrics_snapshot_json,
+        source_mechanism, required_product, forbidden_surfaces_json,
+        danger_surfaces_json, current_inventory_constraints_json,
+        pass_conditions_json, fail_conditions_json, recommended_direction,
+        created_by, family_id, version_number, is_current,
+        transformation_contract_json, locked_at
+      ) VALUES (?, ?, ?, ?, 'locked', ?, '[]', '[]', NULL, ?, ?, '[]', '[]', '[]', ?, ?, ?,
+        'autonomous_operator', ?, 1, 1, ?, CURRENT_TIMESTAMP)`,
+    ).bind(
+      sourceCardId,
+      brand.brand_key,
+      `autonomous_${familyKey}`,
+      normalizeOperatorText(post.family_title, 500, true) ?? familyKey.replace(/_/g, " "),
+      normalizeOperatorJson({
+        source_type: "operator_hypothesis",
+        cycle_id: cycleId,
+        family_key: familyKey,
+        strategic_purpose: post.strategic_purpose ?? null,
+      }, {}),
+      sourceMechanism,
+      audienceReward,
+      normalizeOperatorJson(["Deliver the strategic purpose and audience reward without duplicating current inventory."], []),
+      normalizeOperatorJson(["Exact inventory duplicate", "Explicit owner hard-ban violation", "Missing strategic audience reward"], []),
+      normalizeOperatorText(post.recommended_direction, 4000, true) ?? `Use ${generationMode} in service of the active strategic thesis.`,
+      String(family.id),
+      normalizeOperatorJson(transformationContract, {}),
+    ),
+    env.DB.prepare(
+      `UPDATE operator_source_card_families
+       SET current_source_card_id = ?, status = 'active', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(sourceCardId, String(family.id), brand.brand_key),
+  ]);
+  return (await getOperatorSourceCard(env, brand.brand_key, sourceCardId)) ?? {
+    id: sourceCardId,
+    family_id: family.id,
+    version_number: 1,
+    status: "locked",
+  };
+}
+
+async function commitManifestAutonomousRunway(
+  env: Env,
+  brand: GptResolvedBrand,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
+  const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
+  if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
+    return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
+  }
+  const cycleId = normalizeOperatorText(payload.cycle_id, 120);
+  const cycle = cycleId ? await readManifestAutonomousCycle(env, brand.brand_key, cycleId) : null;
+  if (!cycle) return { success: false, error: "autonomous_cycle_not_found" };
+  const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
+    ? payload.strategic_thesis as Record<string, unknown>
+    : {};
+  const rawPosts = Array.isArray(payload.posts) ? payload.posts.slice(0, MANIFEST_AUTONOMOUS_COMMIT_LIMIT) : [];
+  if (!rawPosts.length) return { success: false, error: "autonomous_posts_required" };
+  const targetSlots = Array.isArray(cycle.target_slots) ? cycle.target_slots as Array<{ key: string; date: string; time: string }> : [];
+  const targetKeys = new Set(targetSlots.map((slot) => slot.key));
+  const occupiedBefore = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE));
+  const requestedKeys = new Set<string>();
+  const results: Record<string, unknown>[] = [];
+  const scheduledIds = new Set<number>((Array.isArray(cycle.scheduled_post_ids) ? cycle.scheduled_post_ids : []).map(Number));
+
+  for (let index = 0; index < rawPosts.length; index += 1) {
+    const post = rawPosts[index] && typeof rawPosts[index] === "object" && !Array.isArray(rawPosts[index])
+      ? rawPosts[index] as Record<string, unknown>
+      : {};
+    const date = normalizeOperatorText(post.date, 20);
+    const time = normalizeOperatorText(post.time, 20);
+    const text = normalizeOperatorText(post.text, 20000);
+    const generationMode = normalizeOperatorMachineKey(post.generation_mode, "");
+    const familyKey = normalizeOperatorMachineKey(post.family_key, "");
+    const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000);
+    const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
+    const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
+    const slotKey = date && time ? `${date}T${time}` : "";
+    if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
+      || !MANIFEST_AUTONOMOUS_GENERATION_MODES.has(generationMode)
+      || !targetKeys.has(slotKey)
+      || requestedKeys.has(slotKey)) {
+      results.push({ index, success: false, error: "invalid_or_duplicate_autonomous_post", slot_key: slotKey || null });
+      continue;
+    }
+    requestedKeys.add(slotKey);
+    if (occupiedBefore.has(slotKey)) {
+      results.push({ index, success: false, error: "slot_already_occupied", slot_key: slotKey, preserved_existing: true });
+      continue;
+    }
+    const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
+    const sourceCardId = String(sourceCard.id ?? "");
+    const familyId = normalizeOperatorText(sourceCard.family_id, 120, true);
+    const runId = crypto.randomUUID();
+    const draftId = crypto.randomUUID();
+    const strategy = {
+      ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy)
+        ? post.strategy as Record<string, unknown>
+        : {}),
+      autonomous_engine_version: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+      autonomous_cycle_id: cycleId,
+      generation_mode: generationMode,
+      family_key: familyKey,
+      source_mechanism: sourceMechanism,
+      audience_reward: audienceReward,
+      strategic_purpose: strategicPurpose,
+      strategic_thesis: strategicThesis,
+    };
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO gpt_generation_runs (
+          id, account_id, threads_user_id, objective, prompt_summary, status,
+          metadata_json, source_card_id, source_card_family_id,
+          source_card_version_number, adaptation_plan_json
+        ) VALUES (?, ?, ?, ?, ?, 'drafted', ?, ?, ?, ?, ?)`,
+      ).bind(
+        runId,
+        brand.account_id,
+        brand.profile.threads_user_id,
+        strategicPurpose,
+        `Autonomous ${generationMode} for ${slotKey}`,
+        normalizeOperatorJson({ cycle_id: cycleId, strategic_thesis: strategicThesis, strategy }, {}),
+        sourceCardId,
+        familyId,
+        Number(sourceCard.version_number ?? 1),
+        normalizeOperatorJson({
+          adaptation_goal: strategicPurpose,
+          payoff_choice: audienceReward,
+          experiment_notes: generationMode,
+          intentionally_different_from_prior: normalizeOperatorText(post.intentionally_different_from_prior, 2000, true),
+        }, {}),
+      ),
+      env.DB.prepare(
+        `INSERT INTO gpt_generation_drafts (
+          id, run_id, account_id, threads_user_id, draft_index, text, status,
+          score_json, strategy_json, source_card_id, showable, metadata_json
+        ) VALUES (?, ?, ?, ?, 0, ?, 'candidate', ?, ?, ?, 0, ?)`,
+      ).bind(
+        draftId,
+        runId,
+        brand.account_id,
+        brand.profile.threads_user_id,
+        text,
+        normalizeOperatorJson(post.score, {}),
+        normalizeOperatorJson(strategy, {}),
+        sourceCardId,
+        normalizeOperatorJson({ cycle_id: cycleId, slot_key: slotKey, generation_mode: generationMode }, {}),
+      ),
+    ]);
+    const draftAnalysis = {
+      opening_phrase: extractOpeningPhrase(text),
+      hook_style: normalizeOperatorText(strategy.hook_style, 120, true),
+      lane_key: normalizeOperatorMachineKey(strategy.pillar, ""),
+      preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
+      transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
+      satisfied_time_or_context_requirements: [],
+      audience_reward_delivered: true,
+    };
+    const generationGates = await runOperatorGates(env, {
+      brand,
+      draftId,
+      sourceCardId,
+      draftText: text,
+      stageScope: "gate_evaluation",
+      draftAnalysis,
+    });
+    if (!generationGates.showable) {
+      const reason = generationGates.blocking_failures.map((failure) => String(failure.gate_key ?? "gate")).join(", ") || "autonomous_generation_gates_failed";
+      await env.DB.prepare(
+        `UPDATE gpt_generation_drafts
+         SET status = 'self_rejected', rejection_reason = ?, gate_summary_json = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND account_id = ?`,
+      ).bind(reason, normalizeOperatorJson(generationGates, {}), draftId, brand.account_id).run();
+      await env.DB.prepare(
+        `INSERT OR REPLACE INTO operator_autonomous_lineup_items (
+          id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+          generation_mode, family_key, strategic_purpose, strategy_json,
+          source_card_id, generation_run_id, draft_id, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gate_rejected')`,
+      ).bind(
+        crypto.randomUUID(), cycleId, brand.brand_key, slotKey, date, time, text,
+        generationMode, familyKey, strategicPurpose, normalizeOperatorJson(strategy, {}),
+        sourceCardId, runId, draftId,
+      ).run();
+      results.push({ index, success: false, error: "autonomous_generation_gates_failed", slot_key: slotKey, blocking_failures: generationGates.blocking_failures });
+      continue;
+    }
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'approved', showable = 1, gate_summary_json = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND account_id = ?`,
+    ).bind(normalizeOperatorJson(generationGates, {}), draftId, brand.account_id).run();
+    const schedulingGates = await runOperatorGates(env, {
+      brand,
+      draftId,
+      sourceCardId,
+      draftText: text,
+      stageScope: "scheduling",
+      scheduling: { date, time, timezone: String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE) },
+    });
+    if (!schedulingGates.showable) {
+      results.push({ index, success: false, error: "autonomous_scheduling_gates_failed", slot_key: slotKey, blocking_failures: schedulingGates.blocking_failures });
+      continue;
+    }
+    const scheduled = await createScheduledPostForAppUser(
+      env,
+      WORKSPACE_APP_USER_ID,
+      brand.profile.threads_user_id,
+      text,
+      date,
+      time,
+      String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE),
+    );
+    if (!scheduled.success || !scheduled.scheduledPostId) {
+      results.push({ index, success: false, error: scheduled.error ?? "autonomous_schedule_failed", slot_key: slotKey });
+      continue;
+    }
+    scheduledIds.add(scheduled.scheduledPostId);
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE gpt_generation_drafts
+         SET status = 'scheduled', scheduled_post_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND account_id = ?`,
+      ).bind(scheduled.scheduledPostId, draftId, brand.account_id),
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO operator_autonomous_lineup_items (
+          id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+          generation_mode, family_key, strategic_purpose, strategy_json,
+          source_card_id, generation_run_id, draft_id, scheduled_post_id, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')`,
+      ).bind(
+        crypto.randomUUID(), cycleId, brand.brand_key, slotKey, date, time, text,
+        generationMode, familyKey, strategicPurpose, normalizeOperatorJson(strategy, {}),
+        sourceCardId, runId, draftId, scheduled.scheduledPostId,
+      ),
+    ]);
+    await upsertGptPostStrategyTag(env, {
+      scheduledPostId: scheduled.scheduledPostId,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      strategy: normalizeGptPostStrategyInput(strategy),
+    });
+    await insertOperatorInventory(env, {
+      brandKey: brand.brand_key,
+      sourceType: "scheduled_post",
+      sourceId: String(scheduled.scheduledPostId),
+      text,
+      sourceCardId,
+      status: "scheduled",
+      strategy,
+      analysis: draftAnalysis,
+    });
+    results.push({ index, success: true, slot_key: slotKey, scheduled_post_id: scheduled.scheduledPostId, reused: scheduled.reused === true });
+  }
+
+  const occupiedAfter = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE));
+  const remainingMissing = targetSlots.filter((slot) => !occupiedAfter.has(slot.key));
+  const completed = remainingMissing.length === 0;
+  await env.DB.prepare(
+    `UPDATE operator_autonomous_growth_cycles
+     SET status = ?, strategic_thesis_json = ?, missing_slots_json = ?,
+         scheduled_post_ids_json = ?, error_json = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND brand_key = ?`,
+  ).bind(
+    completed ? "completed" : "partially_committed",
+    normalizeOperatorJson(strategicThesis, {}),
+    normalizeOperatorJson(remainingMissing, []),
+    normalizeOperatorJson(Array.from(scheduledIds), []),
+    normalizeOperatorJson(results.filter((result) => result.success !== true), []),
+    cycleId,
+    brand.brand_key,
+  ).run();
+  return {
+    success: results.some((result) => result.success === true) || completed,
+    cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+    results,
+    scheduled_count: results.filter((result) => result.success === true).length,
+    failure_count: results.filter((result) => result.success !== true).length,
+    remaining_missing_count: remainingMissing.length,
+    continuation_required: remainingMissing.length > 0,
+    next_action: remainingMissing.length > 0
+      ? "Generate and commit the next bounded set of missing slots using the same cycle_id."
+      : "Verify the completed live runway, then continue with optional owner review and the next strategic checkpoint.",
+  };
+}
+
+async function reviewManifestScheduledPost(
+  env: Env,
+  brand: GptResolvedBrand,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
+  const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id));
+  const action = normalizeOperatorMachineKey(payload.action, "");
+  const feedback = normalizeOperatorText(payload.feedback, 8000);
+  const lessonScope = normalizeOperatorMachineKey(payload.lesson_scope, "post_specific");
+  if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !["keep", "rewrite", "reject_replace"].includes(action) || !feedback) {
+    return { success: false, error: "scheduled_post_action_feedback_required" };
+  }
+  const scheduled = await env.DB.prepare(
+    `SELECT * FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+  ).bind(scheduledPostId, brand.profile.threads_user_id).first<Record<string, unknown>>();
+  if (!scheduled) return { success: false, error: "scheduled_post_not_found" };
+  if (String(scheduled.status ?? "") !== SCHEDULED_POST_STATUS_APPROVED) {
+    return { success: false, error: "only_unpublished_approved_post_reviewable", status: scheduled.status ?? null };
+  }
+  const linkedDraft = await env.DB.prepare(
+    `SELECT * FROM gpt_generation_drafts
+     WHERE scheduled_post_id = ? AND account_id = ?
+     ORDER BY datetime(updated_at) DESC LIMIT 1`,
+  ).bind(scheduledPostId, brand.account_id).first<Record<string, unknown>>();
+  const replacementText = normalizeOperatorText(payload.replacement_text, 20000, true);
+  if (["rewrite", "reject_replace"].includes(action) && !replacementText) {
+    return { success: false, error: "replacement_text_required" };
+  }
+  let updatedPost: Record<string, unknown> | null = null;
+  if (replacementText) {
+    const sourceCardId = normalizeOperatorText(linkedDraft?.source_card_id, 120, true);
+    const generationGates = await runOperatorGates(env, {
+      brand,
+      draftId: normalizeOperatorText(linkedDraft?.id, 120, true),
+      sourceCardId,
+      draftText: replacementText,
+      stageScope: "gate_evaluation",
+      draftAnalysis: {
+        opening_phrase: extractOpeningPhrase(replacementText),
+        preserved_functions: [],
+        transformed_elements: ["owner_directed_revision"],
+        satisfied_time_or_context_requirements: [],
+        audience_reward_delivered: true,
+      },
+    });
+    if (!generationGates.showable) {
+      return { success: false, error: "replacement_generation_gates_failed", blocking_failures: generationGates.blocking_failures };
+    }
+    const scheduledTimeMs = Date.parse(String(scheduled.scheduled_time ?? ""));
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    const parts = Number.isFinite(scheduledTimeMs) ? getPartsInTimeZone(scheduledTimeMs, timezone) : null;
+    if (!parts) return { success: false, error: "scheduled_time_unreadable" };
+    const date = formatIsoDateParts(parts.year, parts.month, parts.day);
+    const time = `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+    const schedulingGates = await runOperatorGates(env, {
+      brand,
+      draftId: normalizeOperatorText(linkedDraft?.id, 120, true),
+      sourceCardId,
+      draftText: replacementText,
+      stageScope: "scheduling",
+      scheduling: { date, time, timezone },
+    });
+    if (!schedulingGates.showable) {
+      return { success: false, error: "replacement_scheduling_gates_failed", blocking_failures: schedulingGates.blocking_failures };
+    }
+    const updated = await updateScheduledPostForAppUser(env, {
+      appUserId: WORKSPACE_APP_USER_ID,
+      scheduledPostId,
+      expectedThreadsUserId: brand.profile.threads_user_id,
+      text: replacementText,
+      timeZone: timezone,
+    });
+    if (!updated.success || !updated.scheduledPost) {
+      return { success: false, error: updated.error ?? "scheduled_post_update_failed" };
+    }
+    updatedPost = updated.scheduledPost as unknown as Record<string, unknown>;
+  }
+  await env.DB.prepare(
+    `UPDATE operator_autonomous_lineup_items
+     SET text = COALESCE(?, text), status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE brand_key = ? AND scheduled_post_id = ?`,
+  ).bind(
+    replacementText ?? null,
+    action === "keep" ? "owner_kept" : "owner_revised",
+    feedback,
+    brand.brand_key,
+    scheduledPostId,
+  ).run();
+  const memoryKind = lessonScope === "permanent_rule"
+    ? "rule"
+    : lessonScope === "temporary_repetition"
+      ? "cooldown"
+      : lessonScope === "performance_hypothesis"
+        ? "experiment"
+        : lessonScope === "family_strategy"
+          ? "strategy"
+          : "owner_feedback";
+  await saveGptStrategyMemory(env, {
+    accountId: brand.account_id,
+    threadsUserId: brand.profile.threads_user_id,
+    kind: memoryKind,
+    title: `Scheduled post ${scheduledPostId} owner review`,
+    body: feedback,
+    metadataJson: normalizeOperatorJson({
+      source: "review_manifest_scheduled_post",
+      scheduled_post_id: scheduledPostId,
+      action,
+      lesson_scope: lessonScope,
+      permanent: lessonScope === "permanent_rule",
+      replacement_text: replacementText ?? null,
+    }, {}),
+  });
+  return {
+    success: true,
+    scheduled_post_id: scheduledPostId,
+    action,
+    lesson_scope: lessonScope,
+    updated_post: updatedPost,
+    operational_effect: action === "keep" ? "No production change; feedback recorded." : "The same scheduled slot was updated and remains covered.",
+  };
+}
+
 async function handleOperatorTool(request: Request, env: Env, toolName: string): Promise<Response> {
   if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
