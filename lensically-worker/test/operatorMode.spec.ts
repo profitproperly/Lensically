@@ -2674,7 +2674,7 @@ describe("operator mode MCP endpoint", () => {
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
         expect(prepared.strategy_contract.winner_preservation).toContain("Continue using winners");
     expect(prepared.strategy_contract.winner_preservation).toContain("spacing");
-            expect(prepared.persistence_contract).toMatchObject({
+                expect(prepared.persistence_contract).toMatchObject({
       tool: "persist_manifest_autonomous_post",
       posts_per_call: 1,
       model_orchestrated: true,
@@ -2685,7 +2685,42 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
+  it("reconciles prepare_manifest_autonomous_cycle again with the same durable operation id", async () => {
+    await activateManifestAutonomyForTest();
+    const operationId = `test-autonomous-reconcile-${crypto.randomUUID()}`;
+    const first = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: operationId,
+      proceed_confirmed: true,
+    });
+    await env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles SET horizon_start_local = '2000-01-01T00:00' WHERE id = ?`,
+    ).bind(first.cycle.id).run();
+
+    const second = await mcpTool<{ cycle: { id: string; horizon_start_local: string }; idempotency?: unknown }>(
+      "prepare_manifest_autonomous_cycle",
+      {
+        brand_key: "manifest_mental",
+        timezone: "America/New_York",
+        horizon_hours: 48,
+        operation_id: operationId,
+        proceed_confirmed: true,
+      },
+    );
+
+    expect(second.cycle.id).toBe(first.cycle.id);
+    expect(second.cycle.horizon_start_local).not.toBe("2000-01-01T00:00");
+    expect(second.idempotency).toBeUndefined();
+    const stored = await env.DB.prepare(
+      `SELECT horizon_start_local FROM operator_autonomous_growth_cycles WHERE id = ?`,
+    ).bind(first.cycle.id).first<{ horizon_start_local: string }>();
+    expect(stored?.horizon_start_local).toBe(second.cycle.horizon_start_local);
+  }, 30000);
+
     it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
+
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       success: boolean;
