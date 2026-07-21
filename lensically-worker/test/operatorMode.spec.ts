@@ -2318,6 +2318,22 @@ describe("operator mode MCP endpoint", () => {
     await resetTables();
   }, 30000);
 
+  it("keeps the retired local execution HTTP plane unreachable", async () => {
+    for (const path of [
+      "/api/operator/local-node/enroll",
+      "/api/operator/local-node/heartbeat",
+      "/api/operator/local-node/poll",
+      "/api/operator/local-node/result",
+    ]) {
+      const response = await fetchFromWorker(path, {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: "{}",
+      });
+      expect(response.status).toBe(404);
+    }
+  });
+
   it("supports ChatGPT app OAuth code exchange for the MCP token", async () => {
     const metadataResponse = await fetchFromWorker("/.well-known/oauth-authorization-server", { method: "GET" });
     const metadata = await metadataResponse.json() as { authorization_endpoint?: string; token_endpoint?: string; token_endpoint_auth_methods_supported?: string[] };
