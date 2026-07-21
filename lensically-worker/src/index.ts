@@ -30239,11 +30239,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     if (normalizedPath.startsWith("/api/operator/local-node/")) {
-      try {
-        return await handleLocalExecutionNodeEndpoint(request, env, normalizedPath);
-      } catch (error) {
-        return operatorTransportFailure(env, request.headers.get("cf-ray") || crypto.randomUUID(), "local_execution_node", error);
-      }
+      logWorkerEvent("RETIRED_ROUTE_BLOCKED", {
+        path: normalizedPath,
+        method: request.method,
+        reason_code: "local_execution_plane_retired",
+      });
+      return notFoundJsonResponse(requestCorsHeaders);
     }
 
     if (normalizedPath.startsWith("/api/operator/tools/")) {
