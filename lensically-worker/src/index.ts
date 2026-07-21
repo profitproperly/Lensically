@@ -10293,33 +10293,43 @@ function parseOperatorTimestampMs(value: unknown): number | null {
 export function resolveManifestAutonomousClock(
   runtimeNowIso: string,
   threadsServerTimeIso: string | null,
+  databaseTimeIso: string | null,
   latestPublishedAt: string | null,
 ): {
   effective_now_iso: string;
-  source: "threads_server" | "runtime";
+  source: "threads_server" | "database" | "runtime";
   runtime_now_iso: string;
   threads_server_time_iso: string | null;
+  database_time_iso: string | null;
   latest_published_at: string | null;
   runtime_skew_seconds: number | null;
   latest_publication_floor_applied: boolean;
 } {
   const runtimeMs = parseOperatorTimestampMs(runtimeNowIso) ?? Date.now();
-  const serverMs = parseOperatorTimestampMs(threadsServerTimeIso);
+  const threadsServerMs = parseOperatorTimestampMs(threadsServerTimeIso);
+  const databaseMs = parseOperatorTimestampMs(databaseTimeIso);
   const latestPublishedMs = parseOperatorTimestampMs(latestPublishedAt);
-  const authoritativeMs = serverMs ?? runtimeMs;
+  const authoritativeMs = threadsServerMs ?? databaseMs ?? runtimeMs;
   const effectiveMs = latestPublishedMs !== null && latestPublishedMs > authoritativeMs
     ? latestPublishedMs
     : authoritativeMs;
+  const source = threadsServerMs !== null
+    ? "threads_server"
+    : databaseMs !== null
+      ? "database"
+      : "runtime";
   return {
     effective_now_iso: new Date(effectiveMs).toISOString(),
-    source: serverMs !== null ? "threads_server" : "runtime",
+    source,
     runtime_now_iso: new Date(runtimeMs).toISOString(),
-    threads_server_time_iso: serverMs === null ? null : new Date(serverMs).toISOString(),
+    threads_server_time_iso: threadsServerMs === null ? null : new Date(threadsServerMs).toISOString(),
+    database_time_iso: databaseMs === null ? null : new Date(databaseMs).toISOString(),
     latest_published_at: latestPublishedMs === null ? null : new Date(latestPublishedMs).toISOString(),
-    runtime_skew_seconds: serverMs === null ? null : Math.round((runtimeMs - serverMs) / 1000),
+    runtime_skew_seconds: Math.round((runtimeMs - authoritativeMs) / 1000),
     latest_publication_floor_applied: latestPublishedMs !== null && latestPublishedMs > authoritativeMs,
   };
 }
+
 
 async function refreshManifestAutonomousThreadsSnapshot(
   env: Env,
@@ -11160,64 +11170,135 @@ async function prepareManifestAutonomousCycle(
   const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
   const horizonHours = Math.min(Math.max(Math.trunc(Number(payload.horizon_hours ?? MANIFEST_AUTONOMOUS_RUNWAY_HOURS)), 1), 72);
   const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
-  const local = operatorLocalDateTimeParts(new Date(), timezone);
+  const runtimeNowIso = new Date().toISOString();
+  const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+  const databaseClockRow = await env.DB.prepare(
+    `SELECT CURRENT_TIMESTAMP AS current_time`,
+  ).first<{ current_time: string }>();
+  const databaseClockRaw = normalizeOperatorText(databaseClockRow?.current_time, 100, true);
+  const databaseTimeIso = databaseClockRaw
+    ? `${databaseClockRaw.replace(" ", "T").replace(/Z$/, "")}Z`
+    : null;
+  const clock = resolveManifestAutonomousClock(
+    runtimeNowIso,
+    threadsSnapshot.threads_server_time_iso,
+    databaseTimeIso,
+    threadsSnapshot.latest_published_at,
+  );
+  const effectiveNowMs = parseOperatorTimestampMs(clock.effective_now_iso) ?? Date.now();
+  const local = operatorLocalDateTimeParts(new Date(effectiveNowMs), timezone);
   const operationId = explicitOperationId ?? `${brand.brand_key}:autonomous-runway:${local.date}:${String(local.hour).padStart(2, "0")}`;
+  const targetSlots = buildManifestRollingHourlySlots(local.date, local.hour, horizonHours);
+  const coverage = await buildManifestAutonomousCoverageLedger(
+    env,
+    brand,
+    targetSlots,
+    timezone,
+    effectiveNowMs,
+  );
+  const missingSlots = targetSlots.filter((slot) => !coverage.occupied.has(slot.key));
+  const deliveryReconciliation = await reconcileOperatorDeliveryIncidents(
+    env,
+    brand,
+    timezone,
+    effectiveNowMs,
+  );
+  await refreshOperatorContentFocus(env, brand.brand_key);
+  const accountPosition = await buildManifestAutonomousAccountPosition(
+    env,
+    brand,
+    targetSlots,
+    coverage,
+    clock,
+    threadsSnapshot as unknown as Record<string, unknown>,
+    deliveryReconciliation,
+  );
   const existing = await env.DB.prepare(
     `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
   ).bind(brand.brand_key, operationId).first<{ id: string }>();
+  const cycleId = existing?.id ?? crypto.randomUUID();
+  const cycleStatus = missingSlots.length > 0 ? "prepared" : "completed";
   if (existing?.id) {
-    return {
-      success: true,
-      reused_existing: true,
-      cycle: await readManifestAutonomousCycle(env, brand.brand_key, existing.id),
-    };
+    await env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles
+       SET engine_version = ?, status = ?, timezone = ?, horizon_hours = ?,
+           horizon_start_local = ?, horizon_end_local = ?, target_slots_json = ?,
+           missing_slots_json = ?, account_position_json = ?, error_json = '[]',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(
+      MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+      cycleStatus,
+      timezone,
+      horizonHours,
+      targetSlots[0]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
+      targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
+      normalizeOperatorJson(targetSlots, []),
+      normalizeOperatorJson(missingSlots, []),
+      normalizeOperatorJson(accountPosition, {}),
+      cycleId,
+      brand.brand_key,
+    ).run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO operator_autonomous_growth_cycles (
+        id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
+        horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+        account_position_json, scheduled_post_ids_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')`,
+    ).bind(
+      cycleId,
+      brand.brand_key,
+      operationId,
+      MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+      cycleStatus,
+      timezone,
+      horizonHours,
+      targetSlots[0]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
+      targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
+      normalizeOperatorJson(targetSlots, []),
+      normalizeOperatorJson(missingSlots, []),
+      normalizeOperatorJson(accountPosition, {}),
+    ).run();
   }
-  const targetSlots = buildManifestRollingHourlySlots(local.date, local.hour, horizonHours);
-  const occupied = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, timezone);
-  const missingSlots = targetSlots.filter((slot) => !occupied.has(slot.key));
-  await refreshOperatorContentFocus(env, brand.brand_key);
-  const accountPosition = await buildManifestAutonomousAccountPosition(env, brand, targetSlots, occupied);
-  const cycleId = crypto.randomUUID();
-  await env.DB.prepare(
-    `INSERT INTO operator_autonomous_growth_cycles (
-      id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
-      horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
-      account_position_json, scheduled_post_ids_json
-    ) VALUES (?, ?, ?, ?, 'prepared', ?, ?, ?, ?, ?, ?, ?, '[]')`,
-  ).bind(
-    cycleId,
-    brand.brand_key,
-    operationId,
-    MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
-    timezone,
-    horizonHours,
-    targetSlots[0]?.key ?? `${local.date}T${operatorHourlySlot(local.hour)}`,
-    targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour)}`,
-    normalizeOperatorJson(targetSlots, []),
-    normalizeOperatorJson(missingSlots, []),
-    normalizeOperatorJson(accountPosition, {}),
-  ).run();
   return {
     success: true,
-    reused_existing: false,
+    reused_existing: Boolean(existing?.id),
+    refreshed_live_state: true,
     cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
     strategy_contract: {
-      objective: "Choose the highest-value strategic lineup for account growth; posts are moves, not the mission.",
+      objective: "Build and sequence the highest-value 48-hour growth portfolio before persisting the first post. Posts are strategic moves, not interchangeable slot filler.",
       fixed_percentages: false,
-      winner_preservation: "Continue using winners while comparable performance remains strong. Frequency alone never establishes fatigue.",
-      repetition_distinction: "Mechanism repetition can be productive; weak execution repetition must be rejected or varied.",
+      winner_preservation: "Continue using winners while comparable performance remains strong, while spacing them when recent published or scheduled exposure is dense.",
+      repetition_distinction: "Mechanism repetition can be productive; clustered execution sameness must be rejected, rewritten, or moved to a later slot.",
+      full_horizon_sequence_required: true,
+      slot_placement_reasoning_required: true,
+      recent_published_posts_required: true,
+      future_schedule_required: true,
+      delivery_incident_awareness_required: true,
       family_roles: ["franchise", "core", "emerging", "prospect", "cooling", "dormant"],
       generation_modes: Array.from(MANIFEST_AUTONOMOUS_GENERATION_MODES),
-      strategy_change_rule: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because another day began.",
+      strategy_change_rule: "Change strategy when evidence, audience response, account position, recent exposure, or opportunity changes—not merely because another day began.",
+      sequencing_rule: "A franchise may stay in the portfolio and still move later in the day. The earliest slot is reserved for the strongest contextually appropriate move after exposure and novelty review.",
     },
-        persistence_contract: {
+    reconciliation_contract: {
+      authoritative_clock_source: clock.source,
+      effective_now_iso: clock.effective_now_iso,
+      past_slots_ignored: true,
+      occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
+      delivery_states_included: ["scheduled", "publishing", "published", "failed", "retry_required", "not_attempted", "publishing_stalled"],
+      stale_operation_refresh: true,
+      after_four_posts_tool: "get_hourly_coverage",
+      collision_behavior: "Treat an occupied slot as nonfatal, preserve it, refresh coverage, move the candidate to the next authoritative missing slot with a new slot operation id, and continue.",
+    },
+    persistence_contract: {
       tool: "persist_manifest_autonomous_post",
-      posts_per_call: MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
+      posts_per_call: 1,
       model_orchestrated: true,
       preserve_existing_schedule: true,
       exact_missing_slots_only: true,
       required_post_fields: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
-      required_model_evaluation_fields: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment"],
+      required_model_evaluation_fields: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment"],
       server_enforcement: ["slot_open", "exact_duplicate", "explicit_banned_phrase", "idempotency", "lineage_persistence"],
       internal_gate_fanout: false,
       internal_runway_scan: false,
@@ -11226,6 +11307,7 @@ async function prepareManifestAutonomousCycle(
     },
   };
 }
+
 
 async function ensureManifestAutonomousSourceCard(
   env: Env,
