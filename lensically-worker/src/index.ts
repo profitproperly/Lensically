@@ -6763,6 +6763,8 @@ const OPERATOR_ACTIVE_OUTCOME_SCOPE = [
   "live verification and repository-production reconciliation",
 ];
 
+let operatorExpectedControlIncidentCleanupApplied = false;
+
 const DEFAULT_OPERATOR_WORK_LEDGER: ReadonlyArray<{
   work_key: string;
   title: string;
@@ -7196,23 +7198,26 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
        UPDATE operator_hardening_incidents SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
      END`,
   ).run();
-  await env.DB.prepare(
-    `UPDATE operator_hardening_incidents
-     SET state = 'closed',
-         root_cause = COALESCE(root_cause, 'A legitimate empty guided-review state was misclassified as an unexpected production failure.'),
-         generalized_cause = COALESCE(generalized_cause, 'Expected empty read states must never create blocking hardening incidents.'),
-         prevention_rule_id = COALESCE(prevention_rule_id, 'expected-control-active-review-batch-not-found'),
-         live_verification_json = ?,
-         resume_result_json = ?,
-         closed_at = COALESCE(closed_at, CURRENT_TIMESTAMP),
-         updated_at = CURRENT_TIMESTAMP
-     WHERE state <> 'closed'
-       AND blocked_tool_name = 'get_manifest_review_batch'
-       AND observed_json LIKE '%active_review_batch_not_found%'`,
-  ).bind(
-    normalizeOperatorJson({ resolution: 'reclassified_expected_empty_state', normal_work_blocked: false }, {}),
-    normalizeOperatorJson({ resume: 'continue_autonomous_cycle_without_review_batch_tools' }, {}),
-  ).run();
+    if (!operatorExpectedControlIncidentCleanupApplied) {
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents
+       SET state = 'closed',
+           root_cause = COALESCE(root_cause, 'A legitimate empty guided-review state was misclassified as an unexpected production failure.'),
+           generalized_cause = COALESCE(generalized_cause, 'Expected empty read states must never create blocking hardening incidents.'),
+           prevention_rule_id = COALESCE(prevention_rule_id, 'expected-control-active-review-batch-not-found'),
+           live_verification_json = ?,
+           resume_result_json = ?,
+           closed_at = COALESCE(closed_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE state <> 'closed'
+         AND blocked_tool_name = 'get_manifest_review_batch'
+         AND observed_json LIKE '%active_review_batch_not_found%'`,
+    ).bind(
+      normalizeOperatorJson({ resolution: 'reclassified_expected_empty_state', normal_work_blocked: false }, {}),
+      normalizeOperatorJson({ resume: 'continue_autonomous_cycle_without_review_batch_tools' }, {}),
+    ).run();
+    operatorExpectedControlIncidentCleanupApplied = true;
+  }
 
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_work_state (
