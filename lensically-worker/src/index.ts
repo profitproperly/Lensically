@@ -16165,7 +16165,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       {
     name: "prepare_manifest_autonomous_cycle",
     title: "Prepare Manifest autonomous cycle",
-    description: "Reconcile live Manifest schedule, metrics, recent audience exposure, Content Focus, and follower trajectory; persist the exact rolling runway and return the missing hourly slots plus the strategic decision contract. Existing scheduled posts are preserved.",
+        description: "Refresh live Threads publications, use Threads and database clock evidence, reconcile scheduled, posting, posted, failed, stalled, retry-required, and manually published records, ignore every elapsed hour, and return the authoritative rolling runway. The model must inspect recent published posts, future scheduled exposure, repetition pressure, performance, Content Focus, and follower trajectory; build and sequence the full horizon before persisting the first post; preserve franchise winners while spacing clustered execution; and justify why each family belongs in each exact slot. Reusing the same daily operation id refreshes live state instead of replaying a stale cycle. Existing valid posts are always preserved. After each four successful persistence calls, use get_hourly_coverage rather than calling this tool again.",
     inputSchema: {
       type: "object",
       properties: {
@@ -16181,7 +16181,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "persist_manifest_autonomous_post",
     title: "Persist Manifest autonomous post",
-    description: "Persist exactly one completed, model-evaluated Manifest post into one exact missing slot. The model performs strategy, generation, novelty, winner-preservation, and semantic evaluation before this call. The server enforces slot availability, exact duplicates, explicit banned phrases, idempotency, lineage, and scheduling without internal gate fanout, runway scans, multi-post loops, or Threads API calls.",
+        description: "Persist exactly one completed, model-evaluated Manifest post into one exact authoritative missing slot. Before this call, the model must complete generation, scheduling, novelty, winner-preservation, recent-published-exposure, and slot-placement evaluation. The server enforces slot availability, exact duplicates, explicit banned phrases, idempotency, lineage, and scheduling without internal gate fanout, multi-post loops, or Threads publication calls. An elapsed or newly occupied slot is a nonfatal reconciled outcome: preserve the existing post, use the returned next missing slot with that slot's deterministic operation id, re-evaluate placement, and continue without stopping. After four actual persisted posts, call get_hourly_coverage once; do not call prepare_manifest_autonomous_cycle again inside the same run.",
     inputSchema: {
       type: "object",
       properties: {
