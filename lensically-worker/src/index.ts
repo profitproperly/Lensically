@@ -382,9 +382,12 @@ const OPERATOR_REJECTION_CONTEXT_LIMIT = 200;
 const OPERATOR_CONTINUITY_CONTRACT_VERSION = "operator-continuity-v2";
 const OPERATOR_EXECUTION_POLICY_VERSION = "operator-execution-policy-v2";
 const OPERATOR_IDEMPOTENCY_VERSION = "operator-idempotency-v1";
-const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v3";
+const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v4";
 const OPERATOR_ENGINEERING_AUTHORITY_VERSION = "operator-engineering-authority-v1";
-const OPERATOR_GROWTH_MISSION_VERSION = "guided-growth-mission-v1";
+const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2";
+const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1";
+const MANIFEST_AUTONOMOUS_RUNWAY_HOURS = 48;
+const MANIFEST_AUTONOMOUS_COMMIT_LIMIT = 24;
 const MANIFEST_AUTONOMY_OBJECTIVE = "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.";
 const MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE = "ai_led_owner_ratified";
 const MANIFEST_AUTONOMY_MODE = "autonomous_operator";
@@ -762,13 +765,13 @@ const OPERATOR_SYSTEM_LAYER_GLOSSARY = [
 
 const OPERATOR_COLLABORATION_CONTRACT = {
   version: OPERATOR_COLLABORATION_CONTRACT_VERSION,
-  working_relationship: "Jarvis-style guided autonomy for Manifest with persistent full-discretion engineering authority: the model proactively diagnoses, plans, prepares, and recommends; the owner discusses and approves consequential account execution.",
+    working_relationship: "Manifest operates through a full Autonomous Business Operator with optional owner criticism and override. The model owns strategy, production, scheduling, evaluation, recovery, and routine engineering; the owner supplies taste, market intelligence, and narrow protected-operation decisions without becoming an operational dependency.",
   principles: [
     "Load canonical startup context first, then route every later Lensically action through the source-defined gateway and static router.",
     "Inspect existing architecture, history, account state, and evidence before proposing or changing behavior.",
-    "After explicit Proceed, originate a Growth Mission Brief and proposed plan instead of asking the owner to invent the next routine action.",
+        "After explicit Proceed, reconcile live state and resume the active autonomous outcome instead of opening a mandatory owner planning ceremony.",
     "Give independent judgment, risks, edge cases, and better alternatives instead of agreeing automatically.",
-    "Routine engineering proceeds autonomously. Manifest account mutations wait for the current Growth Mission Brief and the relevant owner checkpoint to be approved.",
+    "Manifest strategy, production, scheduling, evaluation, recovery, and routine engineering proceed autonomously. Only narrow protected operations require owner ratification.",
     "Prefer backend, workflow, schema, gate, data-model, and test enforcement over memory-only instructions.",
     "Reuse and extend completed work instead of rebuilding or silently overwriting it.",
     "Separate verified facts, recommendations, assumptions, unresolved decisions, and completed implementation.",
@@ -792,15 +795,15 @@ const OPERATOR_AUTONOMY_CONTRACT = {
   version: OPERATOR_AUTONOMY_CONTRACT_VERSION,
   infrastructure_scope: "universal",
   active_account_scope: "manifest_mental",
-  active_mode: MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE,
+  active_mode: MANIFEST_AUTONOMY_MODE,
   objective: MANIFEST_AUTONOMY_OBJECTIVE,
-  model_role: "The model proactively owns diagnosis, prioritization, planning, research, preparation, experimentation design, workflow navigation, and routine engineering. It arrives with a recommendation and a prepared next step.",
-  owner_role: "The owner discusses, revises, and approves the active growth plan and consequential account execution while the model carries the operational and engineering burden.",
-  approval_policy: "Proceed authorizes account-state restoration and a Growth Mission Brief only. Account mutations require an approved current mission plan and the established owner checkpoint. Routine engineering remains autonomous.",
-  proposal_policy: "The model creates the Growth Mission Brief, identifies the current bottleneck, recommends objectives and experiments, and asks the owner to discuss, revise, or approve. It never asks the owner to invent the next routine action.",
-  fresh_chat_rule: "After startup and Manifest continuity restoration, open a new guided growth discussion cycle. Present the diagnostic and proposed plan before content creation, approval, scheduling, publishing, deletion, or exclusion.",
+  model_role: "The Autonomous Business Operator owns strategic diagnosis, prioritization, research, content production, scheduling, evaluation, routine recovery, and evidence-triggered engineering. Every turn closes with completed action, a persisted next checkpoint, or a narrow protected boundary.",
+  owner_role: "The owner is an optional critic, taste partner, market-intelligence source, and unrestricted override—not a required step in routine operation.",
+  approval_policy: "Routine Manifest strategy, generation, scheduling, publication, analytics, recovery, and engineering are autonomous. Owner ratification remains required only for spending, credentials or ownership, irreversible deletion, fundamental mission changes, disabling critical infrastructure, or material account/project danger.",
+  proposal_policy: "When a protected decision appears, the operator prepares one bounded implementation for ratification while continuing all unrelated routine work. It never asks the owner to invent the next routine action.",
+  fresh_chat_rule: "After startup and Manifest continuity restoration, reconcile live schedule, metrics, incidents, and active strategy; then resume the autonomous outcome. Stale continuity summaries never override live state.",
   decision_categories: ["strategy", "content", "scheduling", "analytics", "experiment", "workflow", "engineering", "risk"],
-  training_exit_rule: "Full autonomous account execution remains a future explicit mode change. Guided owner approval is the active training and collaboration mode.",
+  training_exit_rule: "Owner review is optional and non-blocking. Criticism becomes durable learning while the account continues operating.",
 } as const;
 
 const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
@@ -808,13 +811,13 @@ const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
   scope: "universal_engineering",
   mode: "full_discretion_recursive",
   authority: "Investigate, patch, test, retry with changed inputs, deploy, verify, repair, and improve Lensically engineering without routine owner approval.",
-  authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize destructive account data changes, credential ownership changes, account ownership changes, irreversible business decisions, repository file deletion, runtime rollback, tool disabling, or content publication controls.",
+    authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize spending, credential or ownership changes, irreversible deletion, fundamental mission changes, repository file deletion, runtime rollback, tool disabling, or actions presenting material account/project danger. Routine content production and publication are autonomous under an owner-authorized autonomous account profile.",
   numerical_tool_budgets: false,
   owner_ratification_required: false,
         known_path_rule: "After startup, the model can call only executeLensicallyIntent for operational work. Direct operational names are absent from discovery and rejected before lookup. The Mandatory Execution Map selects the active verified procedure from the action intent, permits discovery only for signed unknown or stale incidents, and promotes the verified replacement before the interrupted objective resumes.",
   recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
   owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
-    protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "account_data_mutation", "content_publication_control", "credential_or_account_ownership_change"],
+        protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "credential_or_account_ownership_change", "spending_or_fund_commitment", "fundamental_mission_change", "material_account_or_project_danger"],
 } as const;
 
 const SOURCE_CARD_OWNER_PRESENTATION_CONTRACT = {
@@ -26034,16 +26037,98 @@ export function evaluateThreadsPostMetricsForLearning(post: CachedThreadsPost): 
   };
 }
 
-const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v2";
+const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v3";
 const OPERATOR_POST_FINGERPRINT_VERSION = "post-fingerprint-v1";
 export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 18, 24] as const;
-const OPERATOR_CONTENT_FOCUS_VERSION = "content-focus-v1";
+const OPERATOR_CONTENT_FOCUS_VERSION = "content-focus-v2";
 const OPERATOR_CONTENT_FOCUS_STRONG_SCORE = 65;
 const OPERATOR_CONTENT_FOCUS_WEAK_SCORE = 35;
-const OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION = { repeat: 50, expand: 25, test: 20, exploration: 5 } as const;
+const OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION = {
+  strategy: "adaptive_expected_marginal_value",
+  fixed_percentages: false,
+  winner_preservation: "Performance earns continued opportunity; frequency alone never benches a winner.",
+  exploration_rule: "Develop additional winners without arbitrarily removing current stars.",
+} as const;
 
 export type OperatorContentFocusStatus = "repeat" | "expand" | "test" | "hold" | "retire" | "blocked";
 export type OperatorContentFocusCadence = "daily" | "weekly" | "monthly" | "quarterly";
+export type ManifestAutonomousFamilyRole = "franchise" | "core" | "emerging" | "prospect" | "cooling" | "dormant";
+
+export function buildManifestRollingHourlySlots(
+  currentDate: string,
+  currentHour: number,
+  horizonHours = MANIFEST_AUTONOMOUS_RUNWAY_HOURS,
+): Array<{ key: string; date: string; time: string }> {
+  if (!isValidIsoDate(currentDate) || !Number.isInteger(currentHour) || currentHour < 0 || currentHour > 23) return [];
+  const normalizedHorizon = Math.min(Math.max(Math.trunc(horizonHours), 1), 72);
+  return Array.from({ length: normalizedHorizon }, (_, index) => {
+    const absoluteHour = currentHour + index + 1;
+    const dayOffset = Math.floor(absoluteHour / 24);
+    const hour = absoluteHour % 24;
+    const date = addOperatorIsoDateDays(currentDate, dayOffset);
+    const time = operatorHourlySlot(hour);
+    return { key: `${date}T${time}`, date, time };
+  });
+}
+
+export function classifyManifestAutonomousFamilyRole(input: {
+  baseline_mature_count?: number;
+  baseline_median_overall?: number | null;
+  operating_mature_count?: number;
+  operating_median_overall?: number | null;
+  strong_count?: number;
+  weak_count?: number;
+  recent_use_count?: number;
+  execution_similarity_ratio?: number;
+}): { role: ManifestAutonomousFamilyRole; actual_decay: boolean; reason: string } {
+  const baselineMature = Math.max(0, Number(input.baseline_mature_count ?? 0));
+  const operatingMature = Math.max(0, Number(input.operating_mature_count ?? 0));
+  const baselineRaw = input.baseline_median_overall;
+  const operatingRaw = input.operating_median_overall;
+  const baselineMedian = baselineRaw === null || baselineRaw === undefined ? Number.NaN : Number(baselineRaw);
+  const operatingMedian = operatingRaw === null || operatingRaw === undefined ? Number.NaN : Number(operatingRaw);
+  const baselineKnown = Number.isFinite(baselineMedian);
+  const operatingKnown = Number.isFinite(operatingMedian);
+  const decline = baselineKnown && operatingKnown ? baselineMedian - operatingMedian : 0;
+  const similarity = Math.max(0, Number(input.execution_similarity_ratio ?? 0));
+  const actualDecay = baselineMature >= 3 && operatingMature >= 2 && decline >= 12;
+  const degradedExecution = similarity >= 0.6 && actualDecay;
+  if (actualDecay || degradedExecution) {
+    return { role: "cooling", actual_decay: true, reason: "Comparable mature results show real performance decay; frequency alone was not used as evidence." };
+  }
+  if (baselineMature >= 3 && baselineKnown && baselineMedian >= 65 && Number(input.strong_count ?? 0) >= 2) {
+    return { role: "franchise", actual_decay: false, reason: "Repeated mature strength earns continued deployment while the operator develops additional winners." };
+  }
+  if (baselineMature >= 3 && baselineKnown && baselineMedian >= 52) {
+    return { role: "core", actual_decay: false, reason: "Mature evidence supports reliable engagement-floor duty." };
+  }
+  if (Number(input.strong_count ?? 0) >= 1 || (operatingMature >= 2 && operatingKnown && operatingMedian >= 56)) {
+    return { role: "emerging", actual_decay: false, reason: "Promising evidence warrants deliberate follow-up development." };
+  }
+  if (baselineMature >= 3 && baselineKnown && baselineMedian <= 38 && Number(input.weak_count ?? 0) >= 3) {
+    return { role: "dormant", actual_decay: false, reason: "Repeated mature weakness removes the family from current duty without permanent deletion." };
+  }
+  return { role: "prospect", actual_decay: false, reason: "Evidence is insufficient; treat the family as a strategic prospect rather than forcing a quota." };
+}
+
+export function rankManifestAutonomousPortfolioCandidates<T extends Record<string, unknown>>(
+  candidates: T[],
+  random: () => number = operatorContentFocusRandomUnit,
+): T[] {
+  const roleValue: Record<string, number> = { franchise: 40, core: 28, emerging: 20, prospect: 12, cooling: -20, dormant: -35 };
+  return [...candidates].map((candidate) => {
+    const role = String(candidate.autonomous_role ?? candidate.family_role ?? "prospect");
+    const performance = Number(candidate.expected_value ?? candidate.focus_score ?? 0);
+    const confidence = Number(candidate.confidence_score ?? 0) / 10;
+    const sourceQuality = Math.log10(Math.max(1, Number((candidate.metrics as Record<string, unknown> | undefined)?.likes ?? 1))) * 4;
+    const similarity = Math.max(0, Number(candidate.execution_similarity_ratio ?? 0));
+    const actualDecay = candidate.actual_decay === true;
+    const repetitionPenalty = actualDecay ? 24 : similarity >= 0.75 ? 12 : 0;
+    const jitter = Math.max(0, Math.min(1, random())) * 4;
+    return { candidate, score: Number(roleValue[role] ?? 10) + performance + confidence + sourceQuality - repetitionPenalty + jitter };
+  }).sort((left, right) => right.score - left.score).map((entry) => entry.candidate);
+}
+
 
 type OperatorContentFocusHorizonSummary = {
   post_count: number;
