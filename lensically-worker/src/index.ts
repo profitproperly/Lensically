@@ -9295,12 +9295,13 @@ async function reconcileOperatorDeliveryIncidents(
   env: Env,
   brand: GptResolvedBrand,
   timezone: string,
+  nowMs = Date.now(),
 ): Promise<{
   unresolved_incidents: Record<string, unknown>[];
   required_recovery_actions: Record<string, unknown>[];
 }> {
   await ensureScheduledPostsTable(env);
-  const nowIso = new Date().toISOString();
+  const nowIso = new Date(nowMs).toISOString();
   const overdueRows = await env.DB.prepare(
     `SELECT id, status, scheduled_time, published_post_id, publish_error_message,
             last_attempted_at, processing_started_at
@@ -9318,8 +9319,8 @@ async function reconcileOperatorDeliveryIncidents(
     SCHEDULED_POST_STATUS_POSTING,
   ).all<OperatorScheduledDeliveryRow>();
 
-  for (const row of overdueRows.results ?? []) {
-    const classification = classifyOperatorScheduledDelivery(row);
+    for (const row of overdueRows.results ?? []) {
+    const classification = classifyOperatorScheduledDelivery(row, nowMs);
     const scheduledMs = Date.parse(row.scheduled_time);
     const productionDate = Number.isFinite(scheduledMs)
       ? operatorLocalDateTimeParts(new Date(scheduledMs), timezone).date
