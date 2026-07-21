@@ -10966,7 +10966,13 @@ async function buildManifestAutonomousAccountPosition(
   env: Env,
   brand: GptResolvedBrand,
   targetSlots: Array<{ key: string; date: string; time: string }>,
-  occupied: Map<string, Record<string, unknown>>,
+  coverage: ManifestAutonomousCoverageLedger,
+  clock: ReturnType<typeof resolveManifestAutonomousClock>,
+  threadsSnapshot: Record<string, unknown>,
+  deliveryReconciliation: {
+    unresolved_incidents: Record<string, unknown>[];
+    required_recovery_actions: Record<string, unknown>[];
+  },
 ): Promise<Record<string, unknown>> {
   await ensureThreadsFollowerSnapshotsTable(env);
   const followerRows = await env.DB.prepare(
@@ -10984,14 +10990,83 @@ async function buildManifestAutonomousAccountPosition(
     `SELECT source_type, text, opening_phrase, hook_style, lane_key, source_card_id, used_at, metadata_json
      FROM operator_content_inventory
      WHERE brand_key = ?
-     ORDER BY datetime(used_at) DESC LIMIT 48`,
+     ORDER BY datetime(used_at) DESC LIMIT 32`,
   ).bind(brand.brand_key).all<Record<string, unknown>>();
+  const recentPublishedRows = await env.DB.prepare(
+    `SELECT archive.post_id, archive.post_text, archive.post_timestamp,
+            archive.views, archive.likes, archive.replies, archive.reposts,
+            archive.quotes, archive.shares, archive.engagement_total,
+            scheduled.id AS scheduled_post_id, tags.hook_style, tags.pillar,
+            tags.intent, tags.metadata_json
+     FROM threads_posts_archive archive
+     LEFT JOIN scheduled_posts scheduled
+       ON scheduled.threads_user_id = archive.threads_user_id
+      AND scheduled.published_post_id = archive.post_id
+     LEFT JOIN gpt_post_strategy_tags tags ON tags.scheduled_post_id = scheduled.id
+     WHERE archive.threads_user_id = ?
+     ORDER BY datetime(archive.post_timestamp) DESC, archive.post_id DESC
+     LIMIT 40`,
+  ).bind(brand.profile.threads_user_id).all<Record<string, unknown>>();
+  const recentPublishedPosts = (recentPublishedRows.results ?? []).map((row) => ({
+    source_type: "published_post",
+    published_post_id: row.post_id,
+    scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined
+      ? null
+      : Number(row.scheduled_post_id),
+    publication_origin: row.scheduled_post_id ? "lensically_scheduler" : "manual_or_external",
+    text: row.post_text,
+    opening_phrase: extractOpeningPhrase(String(row.post_text ?? "")),
+    hook_style: row.hook_style ?? null,
+    lane_key: row.pillar ?? null,
+    intent: row.intent ?? null,
+    published_at: row.post_timestamp,
+    metrics: {
+      views: Number(row.views ?? 0),
+      likes: Number(row.likes ?? 0),
+      replies: Number(row.replies ?? 0),
+      reposts: Number(row.reposts ?? 0),
+      quotes: Number(row.quotes ?? 0),
+      shares: Number(row.shares ?? 0),
+      engagement_total: Number(row.engagement_total ?? 0),
+    },
+    strategy: safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {},
+  }));
+  const openingCounts = new Map<string, { opening_phrase: string; count: number }>();
+  const hookCounts = new Map<string, number>();
+  for (const post of recentPublishedPosts) {
+    const opening = String(post.opening_phrase ?? "").trim();
+    const openingKey = normalizeCreativeComparisonText(opening);
+    if (openingKey) {
+      const current = openingCounts.get(openingKey);
+      openingCounts.set(openingKey, {
+        opening_phrase: opening,
+        count: Number(current?.count ?? 0) + 1,
+      });
+    }
+    const hook = normalizeOperatorMachineKey(post.hook_style, "");
+    if (hook) hookCounts.set(hook, (hookCounts.get(hook) ?? 0) + 1);
+  }
   const brief = learning.brief && typeof learning.brief === "object" && !Array.isArray(learning.brief)
     ? learning.brief as Record<string, unknown>
     : {};
   const hypotheses = Array.isArray(learning.hypotheses) ? learning.hypotheses.slice(0, 12) : [];
+  const inventoryExposure = (recentInventory.results ?? []).map((row) => ({
+    source_type: row.source_type,
+    text: row.text,
+    opening_phrase: row.opening_phrase,
+    hook_style: row.hook_style,
+    lane_key: row.lane_key,
+    source_card_id: row.source_card_id,
+    used_at: row.used_at,
+    strategy: safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {},
+  }));
   return {
-    captured_at: new Date().toISOString(),
+    captured_at: clock.effective_now_iso,
+    clock: {
+      ...clock,
+      threads_snapshot: threadsSnapshot,
+      rule: "Threads response time is authoritative when available; the newest verified publication is a hard lower bound. Past hourly slots are never generated.",
+    },
     followers: {
       latest: latestFollowers,
       previous: priorFollowers,
@@ -11000,8 +11075,20 @@ async function buildManifestAutonomousAccountPosition(
     },
     runway: {
       target_slot_count: targetSlots.length,
-      occupied_slot_count: targetSlots.filter((slot) => occupied.has(slot.key)).length,
-      missing_slot_count: targetSlots.filter((slot) => !occupied.has(slot.key)).length,
+      occupied_slot_count: targetSlots.filter((slot) => coverage.occupied.has(slot.key)).length,
+      missing_slot_count: targetSlots.filter((slot) => !coverage.occupied.has(slot.key)).length,
+      occupied_slots: targetSlots.filter((slot) => coverage.occupied.has(slot.key)).map((slot) => ({
+        ...slot,
+        evidence: coverage.occupied.get(slot.key),
+      })),
+    },
+    delivery_reconciliation: {
+      status_counts: coverage.status_counts,
+      scheduled_records: coverage.scheduled_records,
+      published_records_in_horizon: coverage.published_records,
+      unresolved_incidents: deliveryReconciliation.unresolved_incidents,
+      required_recovery_actions: deliveryReconciliation.required_recovery_actions,
+      authoritative_sources: ["live Threads publication refresh", "threads_posts_archive", "scheduled_posts all statuses"],
     },
     performance: {
       evaluator_version: learning.evaluator_version ?? null,
@@ -11019,18 +11106,46 @@ async function buildManifestAutonomousAccountPosition(
       hypotheses,
     },
     content_focus: contentFocus,
-    recent_audience_exposure: (recentInventory.results ?? []).map((row) => ({
-      source_type: row.source_type,
-      text: row.text,
-      opening_phrase: row.opening_phrase,
-      hook_style: row.hook_style,
-      lane_key: row.lane_key,
-      source_card_id: row.source_card_id,
-      used_at: row.used_at,
-      strategy: safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {},
-    })),
+    recent_published_posts: recentPublishedPosts,
+    repetition_pressure: {
+      repeated_openings: Array.from(openingCounts.values())
+        .filter((entry) => entry.count > 1)
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 12),
+      hook_style_counts: Array.from(hookCounts.entries())
+        .map(([hook_style, count]) => ({ hook_style, count }))
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 12),
+      evaluation_rule: "High frequency is not automatic fatigue. The model must distinguish proven mechanism reuse from clustered execution sameness and space repeated franchises when recent exposure is dense.",
+    },
+    portfolio_sequence_policy: {
+      full_horizon_lineup_required_before_first_persist: true,
+      required_passes: [
+        "growth opportunity and account position",
+        "recent published-post exposure",
+        "future scheduled-post exposure",
+        "franchise winner preservation",
+        "execution novelty and semantic similarity",
+        "48-hour family and hook spacing",
+        "slot-specific placement rationale",
+      ],
+      franchise_rule: "Preserve proven winners, but do not automatically place a recently exposed franchise in the earliest slot. Move it later when spacing improves the portfolio without sacrificing expected value.",
+      clustering_rule: "Reject avoidable clusters of the same hook, opening, emotional payoff, question structure, or generation family even when each individual post passes.",
+      slot_order_rule: "The earliest open slot belongs to the strongest contextually appropriate move, not the easiest template to generate.",
+      required_model_evidence: [
+        "why this family belongs in this cycle",
+        "why this exact slot is appropriate",
+        "what recent published and scheduled posts were considered",
+        "how winner preservation and novelty were balanced",
+      ],
+    },
+    recent_audience_exposure: [
+      ...recentPublishedPosts.slice(0, 32),
+      ...inventoryExposure.slice(0, 24),
+    ].slice(0, 48),
   };
 }
+
 
 async function prepareManifestAutonomousCycle(
   env: Env,
