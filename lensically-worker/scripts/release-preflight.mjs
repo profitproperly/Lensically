@@ -14,6 +14,7 @@ const systemDirectoryTests = read("test/systemDirectory.spec.ts");
 const gptMemoryTests = read("test/gptMemoryRoutes.spec.ts");
 const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifecycle.json"));
 const tests = read("test/operatorMode.spec.ts");
+const manifestAutonomousTests = read("manifest-autonomous-cycle.test.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 
@@ -362,8 +363,21 @@ if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth
     || !source.includes('no_threads_api_call: true')
     || !source.includes('name: "review_manifest_scheduled_post"')
     || !source.includes('active_mode: MANIFEST_AUTONOMY_MODE')
-    || !source.includes('fixed_percentages: false')
-    || !source.includes('Frequency alone never establishes fatigue')
+        || !source.includes('fixed_percentages: false')
+    || !source.includes('full_horizon_sequence_required: true')
+    || !source.includes('slot_placement_reasoning_required: true')
+    || !source.includes('recent_published_posts_required: true')
+    || !source.includes('delivery_incident_awareness_required: true')
+    || !source.includes('stale_operation_refresh: true')
+    || !source.includes('collision_reconciled: true')
+    || !source.includes('slot_placement_assessment')
+    || !source.includes('recent_exposure_assessment')
+    || !source.includes('refreshManifestAutonomousThreadsSnapshot')
+    || !source.includes('buildManifestAutonomousCoverageLedger')
+    || !workflow.includes('manifest-autonomous-cycle.test.ts')
+    || !manifestAutonomousTests.includes("uses Threads server time when the runtime clock is behind")
+    || !manifestAutonomousTests.includes("uses the newest verified publication as a hard lower bound")
+    || !manifestAutonomousTests.includes("starts the rolling horizon at the next future hour")
     || !tests.includes("prepares the autonomous rolling runway without requiring owner review")
         || !tests.includes("persists one model-orchestrated autonomous post with full lineage into one exact missing slot")
     || !tests.includes("reviews a scheduled autonomous post without making the owner an operational dependency")
