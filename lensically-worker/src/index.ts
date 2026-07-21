@@ -18503,13 +18503,13 @@ async function handleOperatorMcpAdminTool(
         "readMcpToolDefinition",
         "runMcpTests",
         "getWorkflowStatus",
-      ]),
-      account_reads_a: new Set([
         "list_accounts",
         "get_account_state",
-        "read_lensically_ui_surface",
         "get_hourly_coverage",
         "get_manifest_review_batch",
+      ]),
+      account_reads_a: new Set([
+        "read_lensically_ui_surface",
         "get_production_board",
         "list_source_candidates",
         "audit_published_post_lineage",
