@@ -350,15 +350,15 @@
       "live_verification": "After autonomous mode activation, the exact deployed Main tool reconciles live schedule coverage and returns one persisted 48-hour target with existing slots preserved, exact missing slots, account position, adaptive strategy policy, and no owner approval checkpoint.",
       "compatibility_bridge": false
     },
-    {
-      "capability_id": "content.commit_manifest_autonomous_runway",
-      "directory_entry_id": "content.manifest_autonomous_runway",
-      "canonical_handler": "commit_manifest_autonomous_runway",
-      "route_intent": "commit manifest autonomous runway",
+        {
+      "capability_id": "content.persist_manifest_autonomous_post",
+      "directory_entry_id": "content.manifest_autonomous_post_persistence",
+      "canonical_handler": "persist_manifest_autonomous_post",
+      "route_intent": "persist manifest autonomous post",
       "implementation_mode": "new_handler",
-      "focused_regression": "commits an autonomous post with full lineage into one exact missing slot",
+      "focused_regression": "persists one model-orchestrated autonomous post with full lineage into one exact missing slot",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool accepts a bounded autonomous lineup, creates hypothesis-or-source lineage, passes every required gate, schedules only exact missing slots, returns remaining work, and replays without duplicate posts.",
+      "live_verification": "The exact deployed Main tool accepts exactly one completed model-evaluated post, enforces the prepared slot, exact duplicates, explicit banned phrases, idempotency, and complete lineage, persists without internal gate fanout or runway scans, performs no Threads API call, and replays without duplicate posts.",
       "compatibility_bridge": false
     },
     {
