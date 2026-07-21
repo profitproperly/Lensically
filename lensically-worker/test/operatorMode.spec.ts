@@ -3221,7 +3221,8 @@ describe("operator mode MCP endpoint", () => {
 
     const readSegments = [
       ["s1", "engineering_reads"],
-      ["s2", "admin_reads"],
+      ["s2", "admin_reads_a"],
+      ["admin_reads", "admin_reads_b"],
       ["s3", "account_reads_a"],
       ["s4", "account_reads_b"],
     ] as const;
