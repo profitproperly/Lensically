@@ -11262,6 +11262,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ success: false, error: "brand_key is required or unavailable" }, 400);
   }
 
+    if (toolName === "prepare_manifest_autonomous_cycle") {
+    return operatorJsonResponse(await prepareManifestAutonomousCycle(env, brand, payload));
+  }
+
+  if (toolName === "commit_manifest_autonomous_runway") {
+    return operatorJsonResponse(await commitManifestAutonomousRunway(env, brand, payload));
+  }
+
+  if (toolName === "review_manifest_scheduled_post") {
+    return operatorJsonResponse(await reviewManifestScheduledPost(env, brand, payload));
+  }
+
   if (toolName === "get_account_state") {
     const activeSession = await getActiveOperatorSession(env, brand.brand_key);
     const activeSourceCard = activeSession?.active_source_card_id
