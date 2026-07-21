@@ -11,9 +11,12 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Initialize issues a signed deployment-scoped MCP session. Reject a session from an older Worker deployment or Execution Kernel version before routing and require reinitialization.
 - Direct internal tool calls are rejected. Recovery remains independent break-glass infrastructure; the extensive post-consolidation call campaign must identify and remove any remaining normal-path dependency before cleanup.
 - Preserve account protections after routing: selected brand, explicit Proceed, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety.
-- Manifest uses `guided-growth-mission-v1`. After Proceed, restore account state and produce the persistent Growth Mission Brief: mission, follower target, diagnostic, current bottleneck, primary objective, supporting objectives, experiments, evidence, risks, and recommended next action.
-- Proceed authorizes diagnosis and discussion only. Keep account mutations locked while the mission is `discussion` or `paused`; unlock guided execution only when the owner explicitly approves or activates the plan.
-- Routine engineering remains autonomous. `autonomous_operator` is a separate explicit owner-authorized execution mode and must survive fresh chats once deliberately enabled.
+- Manifest uses `manifest-autonomous-growth-engine-v1` under `autonomous-growth-mission-v2`. After Proceed, reconcile live schedule, delivery state, metrics, Content Focus, recent audience exposure, and durable cycle state; then resume routine operation without opening a mandatory discussion or review gate.
+- The Operator owns routine strategy, generation, scheduling, evaluation, recovery, and evidence-triggered engineering. The owner is an optional critic, taste partner, market-intelligence source, and unrestricted override.
+- Maintain an exact rolling 48-hour runway. Preserve valid existing posts, generate only missing hourly slots, commit no more than 24 posts per bounded call, verify live coverage afterward, and replay interruptions through the same stable operation identity.
+- Use adaptive expected marginal value rather than fixed ratios. Frequency alone is not fatigue. Keep proven winners active while comparable performance remains strong, distinguish mechanism repetition from weak execution repetition, and continuously develop additional winner families.
+- The four-post batch is an optional presentation surface only. It must never block autonomous generation or scheduling.
+- Only spending, credential or ownership changes, irreversible deletion, fundamental mission changes, disabling critical infrastructure, or material account/project danger require owner ratification.
 
 ## Autonomous Business Operator
 
@@ -97,14 +100,14 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Store only changed metric snapshots and quarantine structurally impossible metrics rather than deleting history.
 - Evaluate posts at age-matched 6, 12, 18, and 24-hour checkpoints; 24 hours is final.
 - Post evidence uses the post's own metrics. Account follower totals are trajectory data only and must never be attributed to a post, day, batch, or posting period.
-- Source selection and generation may use supported performance mechanisms, confidence, and fatigue, while retaining exploration when evidence is weak.
+- Source selection and generation use adaptive expected marginal value. Treat recent frequency as audience-exposure context, not fatigue proof. Cooling requires comparable performance decay or degraded execution quality; strong winners continue playing while the Operator develops emerging, adjacent, and original mechanisms.
 
 ## Recovery and Client Boundaries
 
 - Recovery remains independently deployed and source-defined. It must not depend on the main gateway, main D1 preparation, account data, or Operator routing.
 - Main `repository_status` is the normal source for the current repository SHA, bounded GitHub checks, commit statuses, and Cloudflare validation state. Use Recovery only for break-glass classes that Main or its deployment plane cannot receive or complete: free-text discovery when the location is unknown, terminal failure diagnostics, exact repair of a blocked Main contract, health inspection, rollback, and smoke verification. Return normal engineering state, work intake, validation, and release to Main immediately after repair.
 - ChatGPT may cache a public MCP schema after a deployment. Server smoke proves the live schema; the installed app may still require an explicit Refresh when the public tool schema itself changes.
-- The public main schema is frozen at one tool. Internal handler additions and implementation changes should not require a ChatGPT app schema refresh.
+- Main advertises a curated direct typed public surface. A real public tool addition or schema change requires an explicit ChatGPT app refresh after the exact deployed head is live; internal implementation-only changes do not.
 - Keep client payloads narrow enough to pass preflight: compact intent and typed variable inputs only.
 
 ## Scope and Maintenance
