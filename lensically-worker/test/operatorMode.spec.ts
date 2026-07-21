@@ -2677,24 +2677,34 @@ describe("operator mode MCP endpoint", () => {
       operation_id: persistOperationId,
       proceed_confirmed: true,
     };
-    const persisted = await mcpTool<{
+        const persisted = await mcpTool<{
       success: boolean;
       scheduled_post_id: number;
-      lineage: { source_card_id: string; generation_run_id: string; draft_id: string; inventory_id: string };
+      lineage: { source_batch_id: string; source_selection_id: string; source_card_id: string; generation_run_id: string; draft_id: string; inventory_id: string };
+      publish_lineage_complete: boolean;
       server_checks: { no_internal_gate_fanout: boolean; no_internal_runway_scan: boolean; no_threads_api_call: boolean };
       remaining_missing_count: number;
     }>("persist_manifest_autonomous_post", payload);
     expect(persisted.success).toBe(true);
     expect(persisted.scheduled_post_id).toBeGreaterThan(0);
+        expect(persisted.lineage.source_batch_id).toBeTruthy();
+    expect(persisted.lineage.source_selection_id).toBeTruthy();
     expect(persisted.lineage.source_card_id).toBeTruthy();
     expect(persisted.lineage.generation_run_id).toBeTruthy();
     expect(persisted.lineage.draft_id).toBeTruthy();
     expect(persisted.lineage.inventory_id).toBeTruthy();
+    expect(persisted.publish_lineage_complete).toBe(true);
     expect(persisted.server_checks).toMatchObject({
       no_internal_gate_fanout: true,
       no_internal_runway_scan: true,
       no_threads_api_call: true,
     });
+    const publishLineage = await getScheduledPostPublishLineageStatus(
+      env,
+      persisted.scheduled_post_id,
+      "35758578720393972",
+    );
+    expect(publishLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
@@ -2704,7 +2714,30 @@ describe("operator mode MCP endpoint", () => {
       timezone: "America/New_York",
       limit: 100,
     });
-    expect(scheduled.items.filter((item) => item.id === persisted.scheduled_post_id)).toHaveLength(1);
+        expect(scheduled.items.filter((item) => item.id === persisted.scheduled_post_id)).toHaveLength(1);
+
+    await env.DB.prepare(
+      `UPDATE operator_source_cards SET source_selection_id = NULL WHERE id = ? AND brand_key = 'manifest_mental'`,
+    ).bind(persisted.lineage.source_card_id).run();
+    await env.DB.prepare(
+      `UPDATE scheduled_posts SET publish_error_message = 'manifest_lineage_incomplete:source' WHERE id = ?`,
+    ).bind(persisted.scheduled_post_id).run();
+    const repaired = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", {
+      ...payload,
+      operation_id: `test-autonomous-persist-repair-${crypto.randomUUID()}`,
+    });
+    expect(repaired.scheduled_post_id).toBe(persisted.scheduled_post_id);
+    expect(repaired.publish_lineage_complete).toBe(true);
+    const repairedLineage = await getScheduledPostPublishLineageStatus(
+      env,
+      repaired.scheduled_post_id,
+      "35758578720393972",
+    );
+    expect(repairedLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
+    const repairedScheduled = await env.DB.prepare(
+      `SELECT publish_error_message FROM scheduled_posts WHERE id = ?`,
+    ).bind(repaired.scheduled_post_id).first<{ publish_error_message: string | null }>();
+    expect(repairedScheduled?.publish_error_message).toBeNull();
   }, 30000);
 
   it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {

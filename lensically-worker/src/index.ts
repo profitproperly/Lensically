@@ -10879,6 +10879,13 @@ async function ensureManifestAutonomousSourceCard(
 ): Promise<Record<string, unknown>> {
   const familyKey = normalizeOperatorMachineKey(post.family_key, "autonomous_prospect");
   const sourceIdentityKey = `operator_hypothesis:${familyKey}`;
+  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000)
+    ?? normalizeOperatorText(post.strategic_purpose, 4000)
+    ?? familyKey;
+  const audienceReward = normalizeOperatorText(post.audience_reward, 4000, true)
+    ?? normalizeOperatorText(post.strategic_purpose, 4000, true)
+    ?? "Deliver a strong Manifest Mental audience reward.";
+  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "original_discovery");
   let family = await env.DB.prepare(
     `SELECT * FROM operator_source_card_families
      WHERE brand_key = ? AND source_identity_key = ? LIMIT 1`,
@@ -10893,18 +10900,87 @@ async function ensureManifestAutonomousSourceCard(
     family = { id: familyId, current_source_card_id: null };
   }
   const currentCardId = normalizeOperatorText(family.current_source_card_id, 120, true);
-  if (currentCardId) {
-    const current = await getOperatorSourceCard(env, brand.brand_key, currentCardId);
-    if (current?.status === "locked") return current;
+  const current = currentCardId
+    ? await getOperatorSourceCard(env, brand.brand_key, currentCardId)
+    : null;
+  const currentSelectionId = normalizeOperatorText(current?.source_selection_id, 120, true);
+  if (current?.status === "locked" && currentSelectionId) {
+    const completeSelection = await env.DB.prepare(
+      `SELECT s.id AS source_selection_id, b.id AS source_batch_id
+       FROM operator_source_selections s
+       JOIN operator_source_selection_batches b ON b.id = s.batch_id AND b.brand_key = s.brand_key
+       WHERE s.id = ? AND s.brand_key = ? LIMIT 1`,
+    ).bind(currentSelectionId, brand.brand_key).first<Record<string, unknown>>();
+    if (completeSelection?.source_selection_id && completeSelection?.source_batch_id) return current;
+  }
+  const workflowSession = await getActiveOperatorSession(env, brand.brand_key);
+  const workflowSessionId = normalizeOperatorText(workflowSession?.id, 120, true) ?? cycleId;
+  const lineageHash = await sha256OperatorText(`${brand.brand_key}|${cycleId}|${sourceIdentityKey}`);
+  const sourceBatchId = `autonomous-source-batch-${lineageHash.slice(0, 32)}`;
+  const sourceSelectionId = `autonomous-source-selection-${lineageHash.slice(0, 32)}`;
+  const selectedAt = new Date().toISOString();
+  const productionDate = normalizeOperatorText(post.date, 20, true);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO operator_source_selection_batches (
+        id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+        qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+        production_date, status
+      ) VALUES (?, ?, ?, 'model_orchestrated_operator_hypothesis', 0, 1, 1, 1, ?, ?, ?, 'active')`,
+    ).bind(
+      sourceBatchId,
+      brand.brand_key,
+      workflowSessionId,
+      selectedAt,
+      normalizeOperatorJson({
+        cycle_id: cycleId,
+        family_key: familyKey,
+        source_identity_key: sourceIdentityKey,
+        model_orchestrated: true,
+      }, {}),
+      productionDate,
+    ),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO operator_source_selections (
+        id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+        source_type, internal_source_id, threads_post_id, canonical_source_url,
+        post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+      ) VALUES (?, ?, ?, ?, 1, ?, 'operator_hypothesis', ?, NULL, NULL, ?, NULL, ?, ?, ?)`,
+    ).bind(
+      sourceSelectionId,
+      sourceBatchId,
+      brand.brand_key,
+      workflowSessionId,
+      sourceIdentityKey,
+      familyKey,
+      sourceMechanism,
+      normalizeOperatorJson({ source_type: "operator_hypothesis", measured: false, captured_at: selectedAt }, {}),
+      normalizeOperatorJson({
+        source_type: "operator_hypothesis",
+        cycle_id: cycleId,
+        family_key: familyKey,
+        source_mechanism: sourceMechanism,
+        audience_reward: audienceReward,
+        strategic_purpose: post.strategic_purpose ?? null,
+        generation_mode: generationMode,
+      }, {}),
+      selectedAt,
+    ),
+  ]);
+  if (current?.status === "locked" && currentCardId) {
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE operator_source_cards
+         SET source_selection_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND brand_key = ?`,
+      ).bind(sourceSelectionId, currentCardId, brand.brand_key),
+      env.DB.prepare(
+        `UPDATE operator_source_selections SET source_card_id = ? WHERE id = ? AND brand_key = ?`,
+      ).bind(currentCardId, sourceSelectionId, brand.brand_key),
+    ]);
+    return (await getOperatorSourceCard(env, brand.brand_key, currentCardId)) ?? current;
   }
   const sourceCardId = crypto.randomUUID();
-  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000)
-    ?? normalizeOperatorText(post.strategic_purpose, 4000)
-    ?? familyKey;
-  const audienceReward = normalizeOperatorText(post.audience_reward, 4000, true)
-    ?? normalizeOperatorText(post.strategic_purpose, 4000, true)
-    ?? "Deliver a strong Manifest Mental audience reward.";
-  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "original_discovery");
   const transformationContract = {
     must_preserve_exact: [],
     must_preserve_function: [],
@@ -10924,10 +11000,10 @@ async function ensureManifestAutonomousSourceCard(
         source_mechanism, required_product, forbidden_surfaces_json,
         danger_surfaces_json, current_inventory_constraints_json,
         pass_conditions_json, fail_conditions_json, recommended_direction,
-        created_by, family_id, version_number, is_current,
+        created_by, family_id, source_selection_id, version_number, is_current,
         transformation_contract_json, locked_at
       ) VALUES (?, ?, ?, ?, 'locked', ?, '[]', '[]', NULL, ?, ?, '[]', '[]', '[]', ?, ?, ?,
-        'autonomous_operator', ?, 1, 1, ?, CURRENT_TIMESTAMP)`,
+        'autonomous_operator', ?, ?, 1, 1, ?, CURRENT_TIMESTAMP)`,
     ).bind(
       sourceCardId,
       brand.brand_key,
@@ -10937,6 +11013,8 @@ async function ensureManifestAutonomousSourceCard(
         source_type: "operator_hypothesis",
         cycle_id: cycleId,
         family_key: familyKey,
+        source_selection_id: sourceSelectionId,
+        source_batch_id: sourceBatchId,
         strategic_purpose: post.strategic_purpose ?? null,
       }, {}),
       sourceMechanism,
@@ -10945,6 +11023,7 @@ async function ensureManifestAutonomousSourceCard(
       normalizeOperatorJson(["Exact inventory duplicate", "Explicit owner hard-ban violation", "Missing strategic audience reward"], []),
       normalizeOperatorText(post.recommended_direction, 4000, true) ?? `Use ${generationMode} in service of the active strategic thesis.`,
       String(family.id),
+      sourceSelectionId,
       normalizeOperatorJson(transformationContract, {}),
     ),
     env.DB.prepare(
@@ -10952,10 +11031,14 @@ async function ensureManifestAutonomousSourceCard(
        SET current_source_card_id = ?, status = 'active', updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND brand_key = ?`,
     ).bind(sourceCardId, String(family.id), brand.brand_key),
+    env.DB.prepare(
+      `UPDATE operator_source_selections SET source_card_id = ? WHERE id = ? AND brand_key = ?`,
+    ).bind(sourceCardId, sourceSelectionId, brand.brand_key),
   ]);
   return (await getOperatorSourceCard(env, brand.brand_key, sourceCardId)) ?? {
     id: sourceCardId,
     family_id: family.id,
+    source_selection_id: sourceSelectionId,
     version_number: 1,
     status: "locked",
   };
@@ -11265,24 +11348,37 @@ async function persistManifestAutonomousPost(
      WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?
      ORDER BY datetime(updated_at) DESC LIMIT 1`,
   ).bind(cycleId, brand.brand_key, slotKey).first<Record<string, unknown>>();
-  if (existingLineup?.scheduled_post_id && String(existingLineup.status ?? "") === "scheduled") {
-    return {
-      success: true,
-      reused: true,
-      slot_key: slotKey,
-      scheduled_post_id: Number(existingLineup.scheduled_post_id),
-      lineage: {
-        source_card_id: existingLineup.source_card_id ?? null,
-        generation_run_id: existingLineup.generation_run_id ?? null,
-        draft_id: existingLineup.draft_id ?? null,
-      },
-      coverage_reconciliation_required: true,
-    };
+    const existingScheduledPostId = existingLineup?.scheduled_post_id
+    ? Number(existingLineup.scheduled_post_id)
+    : null;
+  if (existingScheduledPostId && String(existingLineup?.status ?? "") === "scheduled") {
+    const existingLineage = await getScheduledPostPublishLineageStatus(
+      env,
+      existingScheduledPostId,
+      brand.profile.threads_user_id,
+    );
+    if (existingLineage.complete === true) {
+      return {
+        success: true,
+        reused: true,
+        slot_key: slotKey,
+        scheduled_post_id: existingScheduledPostId,
+        lineage: existingLineage.lineage ?? {
+          source_card_id: existingLineup?.source_card_id ?? null,
+          generation_run_id: existingLineup?.generation_run_id ?? null,
+          draft_id: existingLineup?.draft_id ?? null,
+        },
+        publish_lineage_complete: true,
+        coverage_reconciliation_required: true,
+      };
+    }
   }
   const timezone = String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
   const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
   if (!scheduledUtc) return { success: false, error: "invalid_date_time" };
-  if (isPastUtcTimestamp(scheduledUtc)) return { success: false, error: "scheduled_time_in_past" };
+  if (isPastUtcTimestamp(scheduledUtc) && !existingScheduledPostId) {
+    return { success: false, error: "scheduled_time_in_past" };
+  }
   await ensureScheduledPostsTable(env);
   const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
     WORKSPACE_APP_USER_ID,
@@ -11291,9 +11387,15 @@ async function persistManifestAutonomousPost(
     text,
     buildSpoilerFingerprint(false, []),
   );
-  const exactScheduled = await env.DB.prepare(
+  const exactScheduledByKey = await env.DB.prepare(
     `SELECT id, scheduled_time FROM scheduled_posts WHERE idempotency_key = ? LIMIT 1`,
   ).bind(scheduleIdempotencyKey).first<{ id: number | string; scheduled_time: string }>();
+  const exactScheduledByLineup = !exactScheduledByKey && existingScheduledPostId
+    ? await env.DB.prepare(
+        `SELECT id, scheduled_time FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+      ).bind(existingScheduledPostId, brand.profile.threads_user_id).first<{ id: number | string; scheduled_time: string }>()
+    : null;
+  const exactScheduled = exactScheduledByKey ?? exactScheduledByLineup;
   if (!exactScheduled) {
     const occupied = await manifestAutonomousOccupiedSlots(env, brand, [targetSlot], timezone);
     if (occupied.has(slotKey)) {
@@ -11313,12 +11415,17 @@ async function persistManifestAutonomousPost(
   if (bannedPhraseHits.length) {
     return { success: false, error: "explicit_banned_phrase", slot_key: slotKey, banned_phrase_hits: bannedPhraseHits };
   }
-  const duplicate = await env.DB.prepare(
+    const duplicate = await env.DB.prepare(
     `SELECT id, status, scheduled_time FROM scheduled_posts
      WHERE threads_user_id = ? AND lower(trim(post_text)) = lower(trim(?))
-       AND idempotency_key <> ?
+       AND COALESCE(idempotency_key, '') <> ? AND id <> ?
      ORDER BY id DESC LIMIT 1`,
-  ).bind(brand.profile.threads_user_id, text, scheduleIdempotencyKey).first<Record<string, unknown>>();
+  ).bind(
+    brand.profile.threads_user_id,
+    text,
+    scheduleIdempotencyKey,
+    Number(exactScheduled?.id ?? 0),
+  ).first<Record<string, unknown>>();
   if (duplicate) {
     return {
       success: false,
@@ -11328,9 +11435,13 @@ async function persistManifestAutonomousPost(
       duplicate_status: duplicate.status ?? null,
     };
   }
-  const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
+    const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
   const sourceCardId = String(sourceCard.id ?? "");
   const familyId = normalizeOperatorText(sourceCard.family_id, 120, true);
+  const sourceSelectionId = normalizeOperatorText(sourceCard.source_selection_id, 120, true);
+  if (!sourceSelectionId) {
+    return { success: false, error: "autonomous_source_lineage_missing", slot_key: slotKey };
+  }
   const identityHash = await sha256OperatorText(`${brand.brand_key}|${cycleId}|${slotKey}|${operationId}`);
   const runId = `autonomous-run-${identityHash.slice(0, 32)}`;
   const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
@@ -11513,7 +11624,7 @@ async function persistManifestAutonomousPost(
       normalizedStrategy?.novelty_level ?? null,
       normalizedStrategy?.metadata_json ?? normalizeOperatorJson({}, {}),
     ),
-    env.DB.prepare(
+        env.DB.prepare(
       `INSERT INTO operator_content_inventory (
         id, brand_key, source_type, source_id, text, first_line, opening_phrase,
         realm_entrance_key, hook_style, lane_key, source_card_id, status, used_at, metadata_json
@@ -11544,7 +11655,37 @@ async function persistManifestAutonomousPost(
       new Date().toISOString(),
       normalizeOperatorJson({ strategy, analysis: draftAnalysis, model_evaluation: modelEvaluation }, {}),
     ),
+    env.DB.prepare(
+      `UPDATE scheduled_posts SET publish_error_message = NULL WHERE id = ? AND threads_user_id = ?`,
+    ).bind(scheduled.scheduledPostId, brand.profile.threads_user_id),
   ]);
+  const publishLineage = await getScheduledPostPublishLineageStatus(
+    env,
+    scheduled.scheduledPostId,
+    brand.profile.threads_user_id,
+  );
+  if (publishLineage.complete !== true) {
+    const missingStages = Array.isArray(publishLineage.missing_stages)
+      ? publishLineage.missing_stages.map(String)
+      : ["unknown"];
+    await env.DB.prepare(
+      `UPDATE scheduled_posts SET publish_error_message = ? WHERE id = ? AND threads_user_id = ?`,
+    ).bind(
+      `manifest_lineage_incomplete:${missingStages.join(",")}`,
+      scheduled.scheduledPostId,
+      brand.profile.threads_user_id,
+    ).run();
+    return {
+      success: false,
+      error: "autonomous_lineage_incomplete_after_persist",
+      slot_key: slotKey,
+      scheduled_post_id: scheduled.scheduledPostId,
+      missing_stages: missingStages,
+    };
+  }
+  const publishLineageRow = publishLineage.lineage && typeof publishLineage.lineage === "object"
+    ? publishLineage.lineage as Record<string, unknown>
+    : {};
   const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
   const remainingMissing = (Array.isArray(currentCycle.missing_slots)
     ? currentCycle.missing_slots as Array<{ key: string; date: string; time: string }>
@@ -11572,13 +11713,16 @@ async function persistManifestAutonomousPost(
     slot_key: slotKey,
     scheduled_post_id: scheduled.scheduledPostId,
     scheduled_time_utc: scheduled.scheduledTimeUtc ?? scheduledUtc,
-    lineage: {
+        lineage: {
+      source_batch_id: publishLineageRow.source_batch_id ?? null,
+      source_selection_id: publishLineageRow.source_selection_id ?? sourceSelectionId,
       source_card_id: sourceCardId,
       source_card_family_id: familyId,
       generation_run_id: runId,
       draft_id: draftId,
       inventory_id: inventoryId,
     },
+    publish_lineage_complete: true,
     model_evaluation: {
       novelty_assessment: noveltyAssessment,
       winner_preservation_assessment: winnerPreservationAssessment,
