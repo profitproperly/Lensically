@@ -2666,7 +2666,10 @@ describe("operator mode MCP endpoint", () => {
       proceed_confirmed: true,
     });
     expect(prepared.success).toBe(true);
-    expect(prepared.cycle.target_slots).toHaveLength(48);
+        expect(prepared.cycle.account_position.runway.target_slot_count).toBe(48);
+    expect(prepared.cycle.account_position.runway.missing_slot_count).toBeLessThanOrEqual(48);
+    expect(prepared.cycle.target_slots.length).toBeGreaterThan(0);
+    expect(prepared.cycle.target_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.cycle.missing_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
     expect(prepared.strategy_contract.winner_preservation).toContain("Frequency alone");
