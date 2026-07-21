@@ -11080,7 +11080,7 @@ async function buildManifestAutonomousAccountPosition(
     clock: {
       ...clock,
       threads_snapshot: threadsSnapshot,
-      rule: "Threads response time is authoritative when available; the newest verified publication is a hard lower bound. Past hourly slots are never generated.",
+            rule: "Use the newest valid live clock across runtime, database, and Threads; the newest verified publication is a hard lower bound. Convert that instant through the requested IANA timezone and generate only future hourly slots.",
     },
     followers: {
       latest: latestFollowers,
