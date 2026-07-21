@@ -11202,9 +11202,11 @@ async function prepareManifestAutonomousCycle(
   }
   const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
   const horizonHours = Math.min(Math.max(Math.trunc(Number(payload.horizon_hours ?? MANIFEST_AUTONOMOUS_RUNWAY_HOURS)), 1), 72);
-  const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
+    const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
   const runtimeNowIso = new Date().toISOString();
+  const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
   const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+
   const databaseClockRow = await env.DB.prepare(
     `SELECT CURRENT_TIMESTAMP AS current_time`,
   ).first<{ current_time: string }>();
