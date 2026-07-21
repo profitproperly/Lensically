@@ -2234,11 +2234,20 @@ describe("operator mode backend spine", () => {
     });
     await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });
 
-    const second = await createLockedSourceCard();
+        const second = await operatorTool<{ run_id: string }>("create_generation_run", {
+      brand_key: BRAND_KEY,
+      source_card_id: first.sourceCardId,
+      adaptation_plan: {
+        adaptation_goal: "Generate a second candidate to verify account-inventory entrance repetition blocking.",
+        transformed_elements: ["calendar payoff"],
+        intentionally_different_from_prior: "The payoff changes while the repeated realm entrance remains intentional for this gate regression.",
+      },
+      prompt_summary: "Reuse the locked source card for the repeated-realm gate regression.",
+    });
     const blocked = await operatorTool<{ draft_id: string; showable: boolean; blocking_failures: Array<{ gate_key: string }> }>("submit_candidate_draft", {
       brand_key: BRAND_KEY,
-      run_id: second.runId,
-      source_card_id: second.sourceCardId,
+      run_id: second.run_id,
+      source_card_id: first.sourceCardId,
       text: "Imagine your calendar finally respecting your attention.",
       draft_analysis: { opening_phrase: "Imagine your calendar", realm_entrance_key: "imagine", lane_key: "systems" },
     });
