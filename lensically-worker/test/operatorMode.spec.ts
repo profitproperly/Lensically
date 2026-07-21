@@ -126,6 +126,31 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
   }
 }
 
+async function activateManifestAutonomyForTest(): Promise<void> {
+  await ensureMcpAccountOpen("manifest_mental");
+  const activated = await mcpToolRaw<{
+    growth_mission?: { execution_mode?: string; status?: string };
+    full_auto_enabled?: boolean;
+  }>("updateGrowthMission", {
+    brand_key: "manifest_mental",
+    status: "active",
+    execution_mode: "autonomous_operator",
+    mission_patch: {
+      permanent_mission: "Grow Manifest Mental to 1,000,000 followers through the Autonomous Growth Engine.",
+      target_followers: 1000000,
+      growth_phase: "autonomous_growth_engine_v1",
+      current_bottleneck: "maintain rolling runway",
+      primary_objective: "Maintain a strategic rolling 48-hour runway without owner dependency.",
+      recommended_next_action: "Prepare and execute the next autonomous growth cycle.",
+    },
+    owner_response: "I explicitly approve full autonomous Manifest operation for this isolated regression.",
+    change_summary: "Activate autonomous growth engine in isolated test state.",
+    proceed_confirmed: true,
+  });
+  expect(activated.isError).not.toBe(true);
+  expect(activated.structuredContent.full_auto_enabled).toBe(true);
+}
+
 
 async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
   const requestedBrand = testRequestedBrandKey(toolName, args);
@@ -2566,6 +2591,144 @@ describe("operator mode MCP endpoint", () => {
     expect(initialized.instructions).toContain("advertised direct typed tool");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
     expect(initialized.instructions.length).toBeLessThan(5000);
+  }, 30000);
+
+    it("prepares the autonomous rolling runway without requiring owner review", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{
+      success: boolean;
+      cycle: { id: string; target_slots: Array<{ key: string; date: string; time: string }>; missing_slots: Array<{ key: string }> };
+      strategy_contract: { fixed_percentages: boolean; winner_preservation: string };
+      commit_contract: { max_posts_per_call: number; complete_lineage_required: boolean };
+    }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: `test-autonomous-prepare-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    expect(prepared.success).toBe(true);
+    expect(prepared.cycle.target_slots).toHaveLength(48);
+    expect(prepared.cycle.missing_slots.length).toBeLessThanOrEqual(48);
+    expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
+    expect(prepared.strategy_contract.winner_preservation).toContain("Frequency alone");
+    expect(prepared.commit_contract).toMatchObject({ max_posts_per_call: 24, complete_lineage_required: true });
+  }, 30000);
+
+  it("commits an autonomous post with full lineage into one exact missing slot", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{
+      success: boolean;
+      cycle: { id: string; missing_slots: Array<{ key: string; date: string; time: string }> };
+    }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: `test-autonomous-commit-prepare-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const slot = prepared.cycle.missing_slots[0];
+    expect(slot).toBeTruthy();
+    const commitOperationId = `test-autonomous-commit-${crypto.randomUUID()}`;
+    const payload = {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      strategic_thesis: {
+        position: "Protect the engagement floor while testing one original micro-length mechanism.",
+        invalidator: "Comparable mature performance falls materially below the account floor.",
+      },
+      posts: [{
+        date: slot.date,
+        time: slot.time,
+        text: `Autonomous original discovery ${crypto.randomUUID().slice(0, 8)}: your next clear decision can change the pace of everything.`,
+        generation_mode: "original_discovery",
+        family_key: `test_original_discovery_${crypto.randomUUID().slice(0, 8)}`,
+        source_mechanism: "A concise direct statement links clarity to forward momentum.",
+        audience_reward: "A sense of clarity and forward motion.",
+        strategic_purpose: "Test a distinct operator-originated micro-length mechanism.",
+        transformed_elements: ["operator_originated_premise"],
+        strategy: {
+          pillar: "clarity",
+          hook_style: "direct_statement",
+          format: "single_sentence",
+          intent: "resonance",
+          experiment: "autonomous_original_discovery",
+          novelty_level: "original_discovery",
+        },
+      }],
+      operation_id: commitOperationId,
+      proceed_confirmed: true,
+    };
+    const committed = await mcpTool<{
+      success: boolean;
+      scheduled_count: number;
+      results: Array<{ success: boolean; scheduled_post_id?: number }>;
+      remaining_missing_count: number;
+    }>("commit_manifest_autonomous_runway", payload);
+    expect(committed.success).toBe(true);
+    expect(committed.scheduled_count).toBe(1);
+    expect(committed.results[0]).toMatchObject({ success: true });
+    expect(committed.results[0].scheduled_post_id).toBeGreaterThan(0);
+
+    const replayed = await mcpTool<typeof committed>("commit_manifest_autonomous_runway", payload);
+    expect(replayed.scheduled_count).toBe(1);
+    const scheduled = await mcpTool<{ items: Array<{ id: number }> }>("list_scheduled_posts", {
+      brand_key: "manifest_mental",
+      date: slot.date,
+      timezone: "America/New_York",
+      limit: 100,
+    });
+    expect(scheduled.items.filter((item) => item.id === committed.results[0].scheduled_post_id)).toHaveLength(1);
+  }, 30000);
+
+  it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{
+      cycle: { id: string; missing_slots: Array<{ date: string; time: string }> };
+    }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      horizon_hours: 48,
+      operation_id: `test-autonomous-review-prepare-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const slot = prepared.cycle.missing_slots[0];
+    const committed = await mcpTool<{
+      results: Array<{ scheduled_post_id: number }>;
+    }>("commit_manifest_autonomous_runway", {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      strategic_thesis: { position: "Test one reviewable autonomous post." },
+      posts: [{
+        date: slot.date,
+        time: slot.time,
+        text: `Optional owner review ${crypto.randomUUID().slice(0, 8)}: a good day can begin with one honest decision.`,
+        generation_mode: "original_discovery",
+        family_key: `test_owner_review_${crypto.randomUUID().slice(0, 8)}`,
+        source_mechanism: "A concise decision-oriented reflection.",
+        audience_reward: "A grounded sense of agency.",
+        strategic_purpose: "Verify optional criticism after autonomous scheduling.",
+        strategy: { pillar: "agency", hook_style: "direct_statement", novelty_level: "original_discovery" },
+      }],
+      operation_id: `test-autonomous-review-commit-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const scheduledPostId = committed.results[0].scheduled_post_id;
+    const reviewed = await mcpTool<{
+      success: boolean;
+      action: string;
+      lesson_scope: string;
+      operational_effect: string;
+    }>("review_manifest_scheduled_post", {
+      brand_key: "manifest_mental",
+      scheduled_post_id: scheduledPostId,
+      action: "keep",
+      feedback: "Keep this post. This is post-specific approval, not a permanent rule.",
+      lesson_scope: "post_specific",
+      operation_id: `test-autonomous-review-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    expect(reviewed).toMatchObject({ success: true, action: "keep", lesson_scope: "post_specific" });
+    expect(reviewed.operational_effect).toContain("No production change");
   }, 30000);
 
   it.skip("retired: bloated internal registry contract", async () => {
