@@ -11886,9 +11886,26 @@ async function persistManifestAutonomousPost(
      WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?
      ORDER BY datetime(updated_at) DESC LIMIT 1`,
   ).bind(cycleId, brand.brand_key, slotKey).first<Record<string, unknown>>();
-    const existingScheduledPostId = existingLineup?.scheduled_post_id
+      const existingLineupScheduledPostId = existingLineup?.scheduled_post_id
     ? Number(existingLineup.scheduled_post_id)
     : null;
+  const existingScheduledPost = existingLineupScheduledPostId
+    ? await env.DB.prepare(
+        `SELECT id, scheduled_time FROM scheduled_posts
+         WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+      ).bind(existingLineupScheduledPostId, brand.profile.threads_user_id)
+        .first<{ id: number | string; scheduled_time: string }>()
+    : null;
+  const existingScheduledPostId = existingScheduledPost
+    ? Number(existingScheduledPost.id)
+    : null;
+  if (existingLineupScheduledPostId && !existingScheduledPost) {
+    await env.DB.prepare(
+      `UPDATE operator_autonomous_lineup_items
+       SET scheduled_post_id = NULL, status = 'stale', updated_at = CURRENT_TIMESTAMP
+       WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND scheduled_post_id = ?`,
+    ).bind(cycleId, brand.brand_key, slotKey, existingLineupScheduledPostId).run();
+  }
   if (existingScheduledPostId && String(existingLineup?.status ?? "") === "scheduled") {
     const existingLineage = await getScheduledPostPublishLineageStatus(
       env,
