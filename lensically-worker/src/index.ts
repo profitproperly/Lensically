@@ -10290,43 +10290,69 @@ function parseOperatorTimestampMs(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+async function refreshManifestTrustedUtcClock(): Promise<string | null> {
+  try {
+    const response = await fetch("https://www.cloudflare.com/cdn-cgi/trace", {
+      headers: { "cache-control": "no-cache" },
+    });
+    const body = response.ok ? await response.text() : "";
+    const epochSeconds = Number(body.match(/(?:^|\n)ts=([0-9]+(?:\.[0-9]+)?)(?:\n|$)/)?.[1] ?? Number.NaN);
+    if (Number.isFinite(epochSeconds) && epochSeconds > 0) {
+      return new Date(Math.trunc(epochSeconds * 1000)).toISOString();
+    }
+    const responseDateMs = parseOperatorTimestampMs(response.headers.get("date"));
+    return responseDateMs === null ? null : new Date(responseDateMs).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 export function resolveManifestAutonomousClock(
   runtimeNowIso: string,
   threadsServerTimeIso: string | null,
   databaseTimeIso: string | null,
   latestPublishedAt: string | null,
+  trustedUtcTimeIso: string | null = null,
 ): {
   effective_now_iso: string;
-  source: "threads_server" | "database" | "runtime";
+  source: "trusted_edge" | "threads_server" | "database" | "runtime";
   runtime_now_iso: string;
+  trusted_utc_time_iso: string | null;
   threads_server_time_iso: string | null;
   database_time_iso: string | null;
   latest_published_at: string | null;
   runtime_skew_seconds: number | null;
   latest_publication_floor_applied: boolean;
 } {
-    const runtimeMs = parseOperatorTimestampMs(runtimeNowIso) ?? Date.now();
+  const runtimeMs = parseOperatorTimestampMs(runtimeNowIso) ?? Date.now();
+  const trustedUtcMs = parseOperatorTimestampMs(trustedUtcTimeIso);
   const threadsServerMs = parseOperatorTimestampMs(threadsServerTimeIso);
   const databaseMs = parseOperatorTimestampMs(databaseTimeIso);
   const latestPublishedMs = parseOperatorTimestampMs(latestPublishedAt);
-  const clockCandidates: Array<{
+  const fallbackCandidates: Array<{
     source: "threads_server" | "database" | "runtime";
     ms: number;
   }> = [{ source: "runtime", ms: runtimeMs }];
-  if (threadsServerMs !== null) clockCandidates.push({ source: "threads_server", ms: threadsServerMs });
-  if (databaseMs !== null) clockCandidates.push({ source: "database", ms: databaseMs });
-  const authoritativeClock = clockCandidates.reduce((latest, candidate) =>
+  if (threadsServerMs !== null) fallbackCandidates.push({ source: "threads_server", ms: threadsServerMs });
+  if (databaseMs !== null) fallbackCandidates.push({ source: "database", ms: databaseMs });
+  const fallbackClock = fallbackCandidates.reduce((latest, candidate) =>
     candidate.ms > latest.ms ? candidate : latest,
   );
+  const authoritativeClock: {
+    source: "trusted_edge" | "threads_server" | "database" | "runtime";
+    ms: number;
+  } = trustedUtcMs === null
+    ? fallbackClock
+    : { source: "trusted_edge", ms: trustedUtcMs };
   const authoritativeMs = authoritativeClock.ms;
   const effectiveMs = latestPublishedMs !== null && latestPublishedMs > authoritativeMs
     ? latestPublishedMs
     : authoritativeMs;
-  const source = authoritativeClock.source;
   return {
     effective_now_iso: new Date(effectiveMs).toISOString(),
-    source,
+    source: authoritativeClock.source,
     runtime_now_iso: new Date(runtimeMs).toISOString(),
+    trusted_utc_time_iso: trustedUtcMs === null ? null : new Date(trustedUtcMs).toISOString(),
     threads_server_time_iso: threadsServerMs === null ? null : new Date(threadsServerMs).toISOString(),
     database_time_iso: databaseMs === null ? null : new Date(databaseMs).toISOString(),
     latest_published_at: latestPublishedMs === null ? null : new Date(latestPublishedMs).toISOString(),
@@ -10334,6 +10360,7 @@ export function resolveManifestAutonomousClock(
     latest_publication_floor_applied: latestPublishedMs !== null && latestPublishedMs > authoritativeMs,
   };
 }
+
 
 
 async function refreshManifestAutonomousThreadsSnapshot(
