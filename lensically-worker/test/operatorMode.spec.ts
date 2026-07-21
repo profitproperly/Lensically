@@ -2496,8 +2496,12 @@ describe("operator mode MCP endpoint", () => {
       "recordOpsMemory",
       "listOpsMemory",
     ]));
-    expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
+        expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
+    const saveStrategyMemoryTool = listed.tools.find((tool) => tool.name === "save_strategy_memory");
+    const saveStrategyMemoryKind = saveStrategyMemoryTool?.inputSchema?.properties?.kind as { enum?: string[] } | undefined;
+    expect(saveStrategyMemoryKind?.enum).toEqual(expect.arrayContaining(["approved_rule", "voice_rule", "rejection_feedback"]));
+    expect(saveStrategyMemoryKind?.enum).not.toContain("generation_rule");
     const startup = await mcpTool<{
       runtime?: { execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean } };
     }>("getOperatorStartupContext");
@@ -4429,11 +4433,28 @@ describe("operator mode MCP endpoint", () => {
       proceed_confirmed: true,
     });
     expect(approvedMission.isError).not.toBe(true);
-    expect(approvedMission.structuredContent).toMatchObject({
+        expect(approvedMission.structuredContent).toMatchObject({
       account_execution_unlocked: true,
       full_auto_enabled: false,
       growth_mission: { status: "approved", execution_mode: "guided_owner_approval" },
     });
+
+    const invalidKind = await mcpToolRaw<{
+      error: string;
+      allowed_kinds: string[];
+      hardening_incident?: Record<string, unknown>;
+      normal_work_blocked?: boolean;
+    }>("save_strategy_memory", {
+      brand_key: "manifest_mental",
+      kind: "generation_rule",
+      body: "Invalid finite-kind regression fixture.",
+      proceed_confirmed: true,
+    });
+    expect(invalidKind.isError).toBe(true);
+    expect(invalidKind.structuredContent.error).toBe("invalid_strategy_memory_kind");
+    expect(invalidKind.structuredContent.allowed_kinds).toContain("approved_rule");
+    expect(invalidKind.structuredContent.hardening_incident).toBeUndefined();
+    expect(invalidKind.structuredContent.normal_work_blocked).toBeUndefined();
 
     const first = await mcpToolRaw<{
       ok: boolean;

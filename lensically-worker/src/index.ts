@@ -12646,11 +12646,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ items, returned_count: items.length, total_count: total, has_more: offset + items.length < total });
   }
 
-  if (toolName === "save_strategy_memory") {
+    if (toolName === "save_strategy_memory") {
     const kind = normalizeGptStrategyMemoryKind(payload.kind);
     const body = normalizeOperatorText(payload.body, 20000);
-    if (!kind || !body) {
-      return operatorJsonResponse({ success: false, error: "valid kind and body are required" }, 400);
+    if (!kind) {
+      return operatorJsonResponse({ success: false, error: "invalid_strategy_memory_kind", allowed_kinds: Array.from(GPT_STRATEGY_MEMORY_KINDS) }, 400);
+    }
+    if (!body) {
+      return operatorJsonResponse({ success: false, error: "strategy_memory_body_required" }, 400);
     }
     const memory = await saveGptStrategyMemory(env, {
       accountId: brand.account_id,
@@ -14190,7 +14193,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     name: "save_strategy_memory",
     title: "Save strategy memory",
     description: "Use this to save account-scoped approval, rejection, voice, rule, cooldown, or experiment memory in Lensically.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, source: { type: "string" }, metadata: { type: "object", additionalProperties: true } }, required: ["brand_key", "kind", "body"], additionalProperties: false },
+        inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, kind: { type: "string", enum: Array.from(GPT_STRATEGY_MEMORY_KINDS) }, title: { type: "string" }, body: { type: "string" }, source: { type: "string" }, metadata: { type: "object", additionalProperties: true } }, required: ["brand_key", "kind", "body"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
     {
@@ -16608,7 +16611,7 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
   "patch_set_file_limit_exceeded", "path_mode_message_required", "path_message_required", "path_message_owner_approval_required",
       "file_not_found", "query_and_known_file_prefix_required", "known_file_path_required", "run_id_required", "validation_task_required", "workflow_stage_blocked",
     "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
-  "owner_response_required_for_growth_plan_approval",
+    "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
 ]);
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
