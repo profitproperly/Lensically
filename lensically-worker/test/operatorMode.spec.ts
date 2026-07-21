@@ -2650,7 +2650,12 @@ describe("operator mode MCP endpoint", () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       success: boolean;
-      cycle: { id: string; target_slots: Array<{ key: string; date: string; time: string }>; missing_slots: Array<{ key: string }> };
+            cycle: {
+        id: string;
+        target_slots: Array<{ key: string; date: string; time: string }>;
+        missing_slots: Array<{ key: string }>;
+        account_position: { runway: { target_slot_count: number; missing_slot_count: number } };
+      };
       strategy_contract: { fixed_percentages: boolean; winner_preservation: string };
             persistence_contract: { tool: string; posts_per_call: number; model_orchestrated: boolean; internal_gate_fanout: boolean; internal_runway_scan: boolean; threads_api_during_persistence: boolean; complete_lineage_required: boolean };
     }>("prepare_manifest_autonomous_cycle", {
