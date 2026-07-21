@@ -6909,6 +6909,61 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     )`,
   ).run();
 
+    await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      operation_id TEXT NOT NULL,
+      engine_version TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'prepared',
+      timezone TEXT NOT NULL,
+      horizon_hours INTEGER NOT NULL,
+      horizon_start_local TEXT NOT NULL,
+      horizon_end_local TEXT NOT NULL,
+      target_slots_json TEXT NOT NULL,
+      missing_slots_json TEXT NOT NULL,
+      account_position_json TEXT NOT NULL,
+      strategic_thesis_json TEXT,
+      scheduled_post_ids_json TEXT NOT NULL DEFAULT '[]',
+      error_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, operation_id)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_autonomous_cycles_brand_status
+     ON operator_autonomous_growth_cycles (brand_key, status, updated_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items (
+      id TEXT PRIMARY KEY,
+      cycle_id TEXT NOT NULL,
+      brand_key TEXT NOT NULL,
+      slot_key TEXT NOT NULL,
+      slot_date TEXT NOT NULL,
+      slot_time TEXT NOT NULL,
+      text TEXT NOT NULL,
+      generation_mode TEXT NOT NULL,
+      family_key TEXT NOT NULL,
+      strategic_purpose TEXT NOT NULL,
+      strategy_json TEXT NOT NULL,
+      source_card_id TEXT,
+      generation_run_id TEXT,
+      draft_id TEXT,
+      scheduled_post_id INTEGER,
+      status TEXT NOT NULL DEFAULT 'planned',
+      owner_feedback TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(cycle_id, slot_key)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_operator_autonomous_lineup_schedule
+     ON operator_autonomous_lineup_items (brand_key, scheduled_post_id, updated_at DESC)`,
+  ).run();
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_decision_proposals (
       id TEXT PRIMARY KEY,
