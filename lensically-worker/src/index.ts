@@ -10305,19 +10305,24 @@ export function resolveManifestAutonomousClock(
   runtime_skew_seconds: number | null;
   latest_publication_floor_applied: boolean;
 } {
-  const runtimeMs = parseOperatorTimestampMs(runtimeNowIso) ?? Date.now();
+    const runtimeMs = parseOperatorTimestampMs(runtimeNowIso) ?? Date.now();
   const threadsServerMs = parseOperatorTimestampMs(threadsServerTimeIso);
   const databaseMs = parseOperatorTimestampMs(databaseTimeIso);
   const latestPublishedMs = parseOperatorTimestampMs(latestPublishedAt);
-  const authoritativeMs = threadsServerMs ?? databaseMs ?? runtimeMs;
+  const clockCandidates: Array<{
+    source: "threads_server" | "database" | "runtime";
+    ms: number;
+  }> = [{ source: "runtime", ms: runtimeMs }];
+  if (threadsServerMs !== null) clockCandidates.push({ source: "threads_server", ms: threadsServerMs });
+  if (databaseMs !== null) clockCandidates.push({ source: "database", ms: databaseMs });
+  const authoritativeClock = clockCandidates.reduce((latest, candidate) =>
+    candidate.ms > latest.ms ? candidate : latest,
+  );
+  const authoritativeMs = authoritativeClock.ms;
   const effectiveMs = latestPublishedMs !== null && latestPublishedMs > authoritativeMs
     ? latestPublishedMs
     : authoritativeMs;
-  const source = threadsServerMs !== null
-    ? "threads_server"
-    : databaseMs !== null
-      ? "database"
-      : "runtime";
+  const source = authoritativeClock.source;
   return {
     effective_now_iso: new Date(effectiveMs).toISOString(),
     source,
