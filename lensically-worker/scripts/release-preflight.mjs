@@ -347,20 +347,24 @@ if (!source.includes('name: "get_monthly_growth_review"')
   errors.push("bounded_monthly_growth_contract_missing");
 }
 
-if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "guided-growth-mission-v1"')
+if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2"')
+    || !source.includes('const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1"')
+    || !source.includes('const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v4"')
     || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_missions")
     || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")
-    || !source.includes('name: "getGrowthMission"')
-    || !source.includes('name: "updateGrowthMission"')
-    || !source.includes('error: "approved_growth_mission_required"')
-    || !source.includes("account_mutation_requires_approved_plan: true")
-    || !source.includes("full_auto_requires_explicit_owner_mode_change: true")
-    || !router.includes('return "getGrowthMission"')
-    || !router.includes('return "updateGrowthMission"')
-    || !systemDirectoryTests.includes("routes the persisted Growth Mission Brief for guided owner discussion")
-    || !systemDirectoryTests.includes("routes owner-approved Growth Mission updates without enabling full auto implicitly")
-    || !tests.includes("opens a guided Growth Mission discussion after Proceed and blocks account mutations until approval")) {
-  errors.push("guided_growth_mission_contract_missing");
+    || !source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles")
+    || !source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items")
+    || !source.includes('name: "prepare_manifest_autonomous_cycle"')
+    || !source.includes('name: "commit_manifest_autonomous_runway"')
+    || !source.includes('name: "review_manifest_scheduled_post"')
+    || !source.includes('active_mode: MANIFEST_AUTONOMY_MODE')
+    || !source.includes('fixed_percentages: false')
+    || !source.includes('Frequency alone never establishes fatigue')
+    || !tests.includes("prepares the autonomous rolling runway without requiring owner review")
+    || !tests.includes("commits an autonomous post with full lineage into one exact missing slot")
+    || !tests.includes("reviews a scheduled autonomous post without making the owner an operational dependency")
+    || !tests.includes("preserves a frequent winner until comparable mature performance actually decays")) {
+  errors.push("manifest_autonomous_growth_contract_missing");
 }
 
 if (!tests.includes("routes operational status and engineering intents deterministically away from content procedures")) {
