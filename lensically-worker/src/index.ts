@@ -9502,7 +9502,97 @@ async function buildOperatorManifestProceedCapsule(
   const pendingDecisions = autonomyProfile
     ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
     : [];
-  const tools = await buildOperatorMcpTools(env, false, false);
+    const tools = await buildOperatorMcpTools(env, false, false);
+  if (String(autonomyProfile?.mode ?? "") === MANIFEST_AUTONOMY_MODE) {
+    const latestCycleRow = await env.DB.prepare(
+      `SELECT id FROM operator_autonomous_growth_cycles
+       WHERE brand_key = ?
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).bind(brand.brand_key).first<{ id: string }>();
+    const latestCycle = latestCycleRow?.id
+      ? await readManifestAutonomousCycle(env, brand.brand_key, latestCycleRow.id)
+      : null;
+    const next = blockingIncident
+      ? {
+        action: "resolve_delivery_incident",
+        canonical_tool: "list_scheduled_posts",
+        last_completed_action: "live_delivery_state_reconciled",
+      }
+      : {
+        action: "prepare_autonomous_growth_cycle",
+        canonical_tool: "prepare_manifest_autonomous_cycle",
+        last_completed_action: "live_schedule_state_reconciled",
+      };
+    const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${calendarCoverage.current_local_date ?? "current"}`;
+    return {
+      version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+      choice,
+      brand_key: brand.brand_key,
+      account_data_loaded: true,
+      canonical_state_source: "database_plus_live_reconciliation",
+      continuity_mode: "autonomous_growth_operator",
+      continuity_diagnostics: {
+        live_schedule_inspected: true,
+        live_delivery_state_inspected: true,
+        stale_calendar_summary_authoritative: false,
+        mandatory_owner_discussion_opened: false,
+        four_post_review_dependency: false,
+        calendar_horizon_days: 3,
+      },
+      autonomy_governance: {
+        contract: OPERATOR_AUTONOMY_CONTRACT,
+        profile: autonomyProfile,
+        pending_protected_decisions: pendingDecisions,
+        engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
+        next_behavior: "Resume autonomous Manifest operation. Act on routine strategy, production, scheduling, evaluation, recovery, and engineering without waiting for owner input.",
+      },
+      growth_mission: await readOperatorGrowthMission(env, brand.brand_key),
+      account_execution: {
+        unlocked: true,
+        discussion_required: false,
+        routine_account_operations_autonomous: true,
+        owner_review_optional: true,
+        protected_boundaries_only: true,
+      },
+      calendar_coverage: {
+        ...calendarCoverage,
+        unresolved_delivery_count: deliveryReconciliation.unresolved_incidents.length,
+        unresolved_delivery_slots: deliveryReconciliation.unresolved_incidents.map((incident) => ({
+          incident_id: incident.id,
+          scheduled_post_id: incident.scheduled_post_id,
+          production_date: incident.production_date,
+          scheduled_time: incident.scheduled_time,
+          delivery_state: incident.delivery_state,
+        })),
+      },
+      latest_autonomous_cycle: latestCycle,
+      legacy_review_batch: activeReviewBatch,
+      unresolved_incidents: deliveryReconciliation.unresolved_incidents,
+      required_recovery_actions: deliveryReconciliation.required_recovery_actions,
+      new_scheduling_blocked: Boolean(blockingIncident),
+      scheduling_block_reason: blockingIncident ? "unresolved_delivery_incident" : null,
+      workflow_checkpoint: {
+        workflow_session_id: sessionId,
+        workflow_status: session?.status ?? null,
+        current_stage: session?.current_stage ?? null,
+        last_completed_action: next.last_completed_action,
+        next_pending_action: next.action,
+        next_owner_checkpoint: null,
+        canonical_next_tool: next.canonical_tool,
+        next_operation_id: operationId,
+      },
+      idempotency: {
+        version: OPERATOR_IDEMPOTENCY_VERSION,
+        next_operation_id: operationId,
+        replay_same_operation_id_after_interruption: true,
+      },
+      runtime_identity: {
+        ...operatorRuntimeMetadata(env),
+        live_tool_count: tools.length,
+        request_origin: new URL(request.url).origin,
+      },
+    };
+  }
   const reviewItems = activeReviewBatch && Array.isArray(activeReviewBatch.items)
     ? activeReviewBatch.items as Array<Record<string, unknown>>
     : [];
