@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker, {
     ScheduledPostScheduler,
   activateNextApprovedScheduledPostCanary,
+        buildManifestRollingHourlySlots,
     buildOperatorContentFocusDailyDecisions,
   buildOperatorMaturityObservation,
   buildOperatorPostFingerprint,
+    classifyManifestAutonomousFamilyRole,
   classifyOperatorContentFocusFamily,
   evaluateThreadsPostMetricsForLearning,
     finalizeScheduledPostPublished,
@@ -16,6 +18,7 @@ import worker, {
   quarantineScheduledPostPublishAttempt,
   recoverStalePostingScheduledPosts,
     OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS,
+    rankManifestAutonomousPortfolioCandidates,
   selectOperatorContentFocusSources,
   shouldAutoArmScheduledPostAlarm,
 
@@ -791,7 +794,7 @@ describe("operator mode backend spine", () => {
     expect(result.structuredContent).toMatchObject({
       success: true,
       brand_key: "manifest_mental",
-      content_focus: { version: "content-focus-v1" },
+            content_focus: { version: "content-focus-v2" },
     });
     expect(result.structuredContent.content_focus.reviews).toBeTruthy();
     expect(Array.isArray(result.structuredContent.content_focus.family_states)).toBe(true);
@@ -841,13 +844,13 @@ describe("operator mode backend spine", () => {
     expect(new Set(decisions.map((decision) => decision.source_card_family_id)).size).toBe(3);
   });
 
-  it("enforces focus allocation and excludes zero-allocation source families", () => {
+    it("selects an adaptive portfolio without fixed ratios and excludes inactive families", () => {
     const result = selectOperatorContentFocusSources([
-      { source_identity_key: "repeat-1", focus_status: "repeat", focus_weight: 1.5, focus_observed: true },
-      { source_identity_key: "repeat-2", focus_status: "repeat", focus_weight: 1.5, focus_observed: true },
-      { source_identity_key: "expand-1", focus_status: "expand", focus_weight: 1.25, focus_observed: true },
-      { source_identity_key: "test-1", focus_status: "test", focus_weight: 1, focus_observed: true },
-      { source_identity_key: "new-1", focus_status: "test", focus_weight: 1, focus_observed: false },
+      { source_identity_key: "repeat-1", focus_status: "repeat", focus_weight: 1.5, focus_observed: true, confidence_score: 90 },
+      { source_identity_key: "repeat-2", focus_status: "repeat", focus_weight: 1.5, focus_observed: true, confidence_score: 85 },
+      { source_identity_key: "expand-1", focus_status: "expand", focus_weight: 1.25, focus_observed: true, confidence_score: 75 },
+      { source_identity_key: "test-1", focus_status: "test", focus_weight: 1, focus_observed: true, confidence_score: 70 },
+      { source_identity_key: "new-1", focus_status: "test", focus_weight: 1, focus_observed: false, confidence_score: 10 },
       { source_identity_key: "hold-1", focus_status: "hold", focus_weight: 0, focus_observed: true },
       { source_identity_key: "retire-1", focus_status: "retire", focus_weight: 0, focus_observed: true },
       { source_identity_key: "blocked-1", focus_status: "blocked", focus_weight: 0, focus_observed: true },
@@ -857,9 +860,55 @@ describe("operator mode backend spine", () => {
     expect(selected).toEqual(expect.arrayContaining(["repeat-1", "repeat-2", "expand-1", "test-1"]));
     expect(selected).not.toEqual(expect.arrayContaining(["hold-1", "retire-1", "blocked-1"]));
     expect(result.allocation).toMatchObject({
-      percentages: { repeat: 50, expand: 25, test: 20, exploration: 5 },
+      strategy: "adaptive_expected_marginal_value",
+      fixed_percentages: false,
       excluded_zero_allocation_count: 3,
     });
+  });
+
+  it("builds the exact 48-hour rolling runway from the next viable hour", () => {
+    const slots = buildManifestRollingHourlySlots("2026-07-21", 6, 48);
+    expect(slots).toHaveLength(48);
+    expect(slots[0]).toEqual({ key: "2026-07-21T07:00", date: "2026-07-21", time: "07:00" });
+    expect(slots[16]).toEqual({ key: "2026-07-21T23:00", date: "2026-07-21", time: "23:00" });
+    expect(slots[17]).toEqual({ key: "2026-07-22T00:00", date: "2026-07-22", time: "00:00" });
+    expect(slots[40]).toEqual({ key: "2026-07-22T23:00", date: "2026-07-22", time: "23:00" });
+    expect(slots[47]).toEqual({ key: "2026-07-23T06:00", date: "2026-07-23", time: "06:00" });
+  });
+
+  it("preserves a frequent winner until comparable mature performance actually decays", () => {
+    const frequentWinner = classifyManifestAutonomousFamilyRole({
+      baseline_mature_count: 6,
+      baseline_median_overall: 74,
+      operating_mature_count: 4,
+      operating_median_overall: 72,
+      strong_count: 5,
+      recent_use_count: 7,
+      execution_similarity_ratio: 0.3,
+    });
+    expect(frequentWinner).toMatchObject({ role: "franchise", actual_decay: false });
+
+    const decayingWinner = classifyManifestAutonomousFamilyRole({
+      baseline_mature_count: 8,
+      baseline_median_overall: 76,
+      operating_mature_count: 3,
+      operating_median_overall: 57,
+      strong_count: 5,
+      recent_use_count: 3,
+      execution_similarity_ratio: 0.7,
+    });
+    expect(decayingWinner).toMatchObject({ role: "cooling", actual_decay: true });
+  });
+
+  it("ranks franchise and emerging opportunities above prospects without rigid quotas", () => {
+    const ranked = rankManifestAutonomousPortfolioCandidates([
+      { source_identity_key: "prospect", autonomous_role: "prospect", expected_value: 10 },
+      { source_identity_key: "franchise", autonomous_role: "franchise", expected_value: 5 },
+      { source_identity_key: "emerging", autonomous_role: "emerging", expected_value: 8 },
+      { source_identity_key: "cooling", autonomous_role: "cooling", expected_value: 30, actual_decay: true },
+    ], () => 0.5);
+    expect(ranked.map((item) => item.source_identity_key).slice(0, 2)).toEqual(["franchise", "emerging"]);
+    expect(ranked.at(-1)?.source_identity_key).toBe("cooling");
   });
 
     it("arms, executes, and re-arms the independent scheduled-post alarm with shared cron health", async () => {
