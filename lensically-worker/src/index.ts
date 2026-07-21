@@ -10286,10 +10286,10 @@ async function ensureManifestSourceBatchForDate(
   const statements = [
     env.DB.prepare(
       `INSERT INTO operator_source_selection_batches (
-        id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+        id, brand_key, workflow_session_id,         selection_method, eligibility_min_likes,
         qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
         production_date, status
-            ) VALUES (?, ?, ?, 'content_focus_weighted_without_replacement', ?, ?, ?, ?, ?, ?, ?, 'active')`,
+            ) VALUES (?, ?, ?, 'adaptive_expected_marginal_value_without_replacement', ?, ?, ?, ?, ?, ?, ?, 'active')`,
     ).bind(
       batchId,
       brand.brand_key,
@@ -26185,14 +26185,12 @@ export function classifyOperatorContentFocusFamily(input: OperatorContentFocusFa
   ) {
     recommended = "retire";
     reason = "Repeated mature weakness across the 90-day strategic window supports retirement.";
-  } else if (
-    (Number(operating?.mature_count ?? 0) >= 3 && Number(operating?.median_overall ?? 100) <= 40)
-    || (fatigueRatio >= 0.5 && Number(operating?.post_count ?? 0) >= 4)
+    } else if (
+    Number(operating?.mature_count ?? 0) >= 3
+    && Number(operating?.median_overall ?? 100) <= 40
   ) {
     recommended = "hold";
-    reason = fatigueRatio >= 0.5
-      ? "Recent use is concentrated enough to create fatigue risk, so the family should pause."
-      : "Several mature seven-day results are weak, so the family should pause before more allocation.";
+    reason = "Several comparable mature seven-day results are weak. Usage frequency alone never triggers a pause.";
   } else if (
     Number(baseline?.mature_count ?? 0) >= 3
     && Number(baseline?.median_overall ?? 0) >= OPERATOR_CONTENT_FOCUS_STRONG_SCORE
@@ -26268,7 +26266,7 @@ export function buildOperatorContentFocusDailyDecisions(families: Array<{
 
   const useLess = families
     .filter((family) => !used.has(family.source_card_family_id) && !["retire", "blocked"].includes(family.status))
-    .filter((family) => family.status === "hold" || family.fatigue_ratio >= 0.5 || (family.mature_count >= 3 && Number(family.operating_score ?? 100) <= 40))
+        .filter((family) => family.status === "hold" || (family.mature_count >= 3 && Number(family.operating_score ?? 100) <= 40))
     .sort((left, right) =>
       Number(left.operating_score ?? 100) - Number(right.operating_score ?? 100)
       || right.fatigue_ratio - left.fatigue_ratio
@@ -26319,52 +26317,32 @@ export function selectOperatorContentFocusSources<T extends Record<string, unkno
   const active = candidates.filter((candidate) => {
     const status = String(candidate.focus_status ?? "test") as OperatorContentFocusStatus;
     return !["hold", "retire", "blocked"].includes(status) && Number(candidate.focus_weight ?? 1) > 0;
+  }).map((candidate) => {
+    const mappedRole: ManifestAutonomousFamilyRole = candidate.focus_status === "repeat"
+      ? "franchise"
+      : candidate.focus_status === "expand"
+        ? "emerging"
+        : candidate.focus_observed === true ? "core" : "prospect";
+    return { ...candidate, autonomous_role: candidate.autonomous_role ?? mappedRole } as T;
   });
-  const rawTargets = Object.entries(OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION).map(([key, percent]) => ({ key, raw: count * Number(percent) / 100 }));
-  const targets = Object.fromEntries(rawTargets.map((item) => [item.key, Math.floor(item.raw)])) as Record<string, number>;
-  let remaining = count - Object.values(targets).reduce((sum, value) => sum + value, 0);
-  for (const item of [...rawTargets].sort((left, right) => (right.raw % 1) - (left.raw % 1))) {
-    if (remaining <= 0) break;
-    targets[item.key] += 1;
-    remaining -= 1;
-  }
-  const weighted = (items: T[]) => [...items].map((item) => ({
-    item,
-    key: -Math.log(Math.max(random(), Number.EPSILON)) / Math.max(Number(item.focus_weight ?? 1), 0.05),
-  })).sort((left, right) => left.key - right.key).map((entry) => entry.item);
-  const buckets: Record<string, T[]> = {
-    repeat: active.filter((item) => item.focus_observed === true && item.focus_status === "repeat"),
-    expand: active.filter((item) => item.focus_observed === true && item.focus_status === "expand"),
-    test: active.filter((item) => item.focus_observed === true && item.focus_status === "test"),
-    exploration: active.filter((item) => item.focus_observed !== true),
-  };
   const selected: T[] = [];
   const selectedIds = new Set<string>();
-  const selectedCounts: Record<string, number> = {};
-  for (const key of ["repeat", "expand", "test", "exploration"]) {
-    for (const pick of weighted(buckets[key]).slice(0, targets[key] ?? 0)) {
-      const id = String(pick.source_identity_key ?? pick.source_candidate_id ?? "");
-      if (!id || selectedIds.has(id)) continue;
-      selected.push(pick);
-      selectedIds.add(id);
-      selectedCounts[key] = Number(selectedCounts[key] ?? 0) + 1;
-    }
-  }
-  for (const pick of weighted(active.filter((item) => {
-    const id = String(item.source_identity_key ?? item.source_candidate_id ?? "");
-    return id && !selectedIds.has(id);
-  }))) {
+  for (const pick of rankManifestAutonomousPortfolioCandidates(active, random)) {
     if (selected.length >= count) break;
     const id = String(pick.source_identity_key ?? pick.source_candidate_id ?? "");
     if (!id || selectedIds.has(id)) continue;
     selected.push(pick);
     selectedIds.add(id);
   }
+  const selectedCounts = selected.reduce<Record<string, number>>((counts, item) => {
+    const role = String(item.autonomous_role ?? "prospect");
+    counts[role] = Number(counts[role] ?? 0) + 1;
+    return counts;
+  }, {});
   return {
-    selected: selected.slice(0, count),
+    selected,
     allocation: {
-      percentages: OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION,
-      targets,
+      ...OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION,
       selected_counts: selectedCounts,
       excluded_zero_allocation_count: candidates.length - active.length,
     },
@@ -27340,12 +27318,14 @@ async function refreshOperatorPerformanceEvaluator(
     .sort((left, right) => right.used - left.used)
     .slice(0, 10)
     .map((item) => ({ ...item, recent_sample_size: recentSampleSize, fatigue_risk: item.used >= 10 ? "high" : "medium" }));
-  const matureSampleSize = selectedCheckpoint?.sample_size ?? 0;
-  const allocation = matureSampleSize < 8
-    ? { exploitation_percent: 35, improvement_percent: 25, exploration_percent: 40 }
-    : matureSampleSize < 20
-      ? { exploitation_percent: 50, improvement_percent: 30, exploration_percent: 20 }
-      : { exploitation_percent: 60, improvement_percent: 30, exploration_percent: 10 };
+    const matureSampleSize = selectedCheckpoint?.sample_size ?? 0;
+  const portfolioPolicy = {
+    strategy: "adaptive_expected_marginal_value",
+    fixed_allocation: false,
+    winner_preservation: "Continue deploying winners while comparable performance remains strong. Frequency alone is not fatigue.",
+    discovery_requirement: "Use available schedule capacity to develop additional winner families without arbitrarily benching current stars.",
+    change_trigger: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because a day passed.",
+  };
   const generatedAt = new Date().toISOString();
   const brief = {
     version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
@@ -27368,12 +27348,13 @@ async function refreshOperatorPerformanceEvaluator(
     proven_features: positive.filter((row) => row.confidence_label === "reliable").slice(0, 8),
     directional_features: positive.filter((row) => row.confidence_label === "directional").slice(0, 8),
     weak_features: negative.slice(0, 8),
-    fatigue_risks: fatigueRisks,
-    experiment_allocation: allocation,
+        fatigue_risks: [],
+    recent_exposure_signals: fatigueRisks.map((signal) => ({ ...signal, interpretation: "Exposure signal only; do not infer fatigue without comparable performance decay or degraded execution quality." })),
+    portfolio_policy: portfolioPolicy,
     generation_guidance: [
-                  "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result.",
-      "Exploit reliable positive mechanisms, improve one variable at a time, and preserve controlled exploration.",
-      "Avoid overused recent features when an equally supported alternative exists.",
+      "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result.",
+      "Preserve strong winners while developing additional winners through deliberate variations, adjacent experiments, and original discovery.",
+      "Distinguish productive mechanism repetition from weak execution repetition; frequency alone never forces cooling.",
       "Do not infer follower conversion from any post, day, batch, or surrounding time period.",
     ],
     source_selection_guidance: {
