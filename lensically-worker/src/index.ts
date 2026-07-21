@@ -18493,7 +18493,7 @@ async function handleOperatorMcpAdminTool(
         "verifyDeployedMcpVersion",
         "listEngineeringAudit",
       ]),
-      admin_reads: new Set([
+      admin_reads_a: new Set([
         "selectOperatorKey",
         "getGrowthMission",
         "getOperatorDecisionState",
@@ -18501,6 +18501,8 @@ async function handleOperatorMcpAdminTool(
         "auditScheduledPost",
         "inspectMcpFailure",
         "listMcpTools",
+      ]),
+      admin_reads_b: new Set([
         "readMcpToolDefinition",
         "runMcpTests",
         "getWorkflowStatus",
