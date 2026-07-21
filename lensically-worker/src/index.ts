@@ -11570,8 +11570,8 @@ async function persistManifestAutonomousPost(
         id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
         generation_mode, family_key, strategic_purpose, strategy_json,
         source_card_id, generation_run_id, draft_id, scheduled_post_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
-      ON CONFLICT(id) DO UPDATE SET
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+      ON CONFLICT(cycle_id, slot_key) DO UPDATE SET
         text = excluded.text,
         strategy_json = excluded.strategy_json,
         source_card_id = excluded.source_card_id,
