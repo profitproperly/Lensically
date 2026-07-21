@@ -10284,6 +10284,128 @@ function operatorLocalDateTimeParts(value: Date, timezone: string): { date: stri
   };
 }
 
+function parseOperatorTimestampMs(value: unknown): number | null {
+  const parsed = Date.parse(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function resolveManifestAutonomousClock(
+  runtimeNowIso: string,
+  threadsServerTimeIso: string | null,
+  latestPublishedAt: string | null,
+): {
+  effective_now_iso: string;
+  source: "threads_server" | "runtime";
+  runtime_now_iso: string;
+  threads_server_time_iso: string | null;
+  latest_published_at: string | null;
+  runtime_skew_seconds: number | null;
+  latest_publication_floor_applied: boolean;
+} {
+  const runtimeMs = parseOperatorTimestampMs(runtimeNowIso) ?? Date.now();
+  const serverMs = parseOperatorTimestampMs(threadsServerTimeIso);
+  const latestPublishedMs = parseOperatorTimestampMs(latestPublishedAt);
+  const authoritativeMs = serverMs ?? runtimeMs;
+  const effectiveMs = latestPublishedMs !== null && latestPublishedMs > authoritativeMs
+    ? latestPublishedMs
+    : authoritativeMs;
+  return {
+    effective_now_iso: new Date(effectiveMs).toISOString(),
+    source: serverMs !== null ? "threads_server" : "runtime",
+    runtime_now_iso: new Date(runtimeMs).toISOString(),
+    threads_server_time_iso: serverMs === null ? null : new Date(serverMs).toISOString(),
+    latest_published_at: latestPublishedMs === null ? null : new Date(latestPublishedMs).toISOString(),
+    runtime_skew_seconds: serverMs === null ? null : Math.round((runtimeMs - serverMs) / 1000),
+    latest_publication_floor_applied: latestPublishedMs !== null && latestPublishedMs > authoritativeMs,
+  };
+}
+
+async function refreshManifestAutonomousThreadsSnapshot(
+  env: Env,
+  brand: GptResolvedBrand,
+): Promise<{
+  refreshed: boolean;
+  threads_server_time_iso: string | null;
+  latest_published_at: string | null;
+  published_count: number;
+  error: string | null;
+}> {
+  const account = await getThreadsAccountForAppUser(
+    env,
+    WORKSPACE_APP_USER_ID,
+    brand.profile.threads_user_id,
+  );
+  if (!account?.access_token) {
+    return {
+      refreshed: false,
+      threads_server_time_iso: null,
+      latest_published_at: null,
+      published_count: 0,
+      error: "threads_access_token_missing",
+    };
+  }
+  try {
+    const params = new URLSearchParams({
+      fields: "id,text,permalink,timestamp,username",
+      limit: "40",
+    });
+    const response = await fetch(
+      `https://graph.threads.net/v1.0/${brand.profile.threads_user_id}/threads?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${account.access_token}` } },
+    );
+    const responseDateMs = parseOperatorTimestampMs(response.headers.get("date"));
+    const threadsServerTimeIso = responseDateMs === null ? null : new Date(responseDateMs).toISOString();
+    if (!response.ok) {
+      return {
+        refreshed: false,
+        threads_server_time_iso: threadsServerTimeIso,
+        latest_published_at: null,
+        published_count: 0,
+        error: `threads_reconciliation_http_${response.status}`,
+      };
+    }
+    const payload = await readJsonSafe(response) as { data?: Array<Record<string, unknown>> } | null;
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const posts: CachedThreadsPost[] = rows.map((row) => ({
+      id: typeof row.id === "string" ? row.id : "",
+      text: typeof row.text === "string" ? row.text : null,
+      timestamp: typeof row.timestamp === "string" ? row.timestamp : null,
+      permalink: typeof row.permalink === "string" ? row.permalink : null,
+      username: typeof row.username === "string" ? row.username : null,
+      profile_picture_url: null,
+      views: 0,
+      likes: 0,
+      replies: 0,
+      reposts: 0,
+      quotes: 0,
+      shares: 0,
+      engagement_total: 0,
+    })).filter((post) => Boolean(post.id));
+    await upsertThreadsPostsArchive(env, brand.profile.threads_user_id, posts);
+    const latestPublishedMs = posts.reduce<number | null>((latest, post) => {
+      const timestampMs = parseOperatorTimestampMs(post.timestamp);
+      if (timestampMs === null) return latest;
+      return latest === null || timestampMs > latest ? timestampMs : latest;
+    }, null);
+    return {
+      refreshed: true,
+      threads_server_time_iso: threadsServerTimeIso,
+      latest_published_at: latestPublishedMs === null ? null : new Date(latestPublishedMs).toISOString(),
+      published_count: posts.length,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      refreshed: false,
+      threads_server_time_iso: null,
+      latest_published_at: null,
+      published_count: 0,
+      error: error instanceof Error ? error.message.slice(0, 500) : "threads_reconciliation_failed",
+    };
+  }
+}
+
+
 function addOperatorIsoDateDays(date: string, days: number): string {
   const parsed = new Date(`${date}T12:00:00.000Z`);
   parsed.setUTCDate(parsed.getUTCDate() + days);
@@ -10719,29 +10841,125 @@ async function readManifestAutonomousCycle(
   };
 }
 
+type ManifestAutonomousCoverageLedger = {
+  occupied: Map<string, Record<string, unknown>>;
+  scheduled_records: Record<string, unknown>[];
+  published_records: Record<string, unknown>[];
+  status_counts: Record<string, number>;
+};
+
+async function buildManifestAutonomousCoverageLedger(
+  env: Env,
+  brand: GptResolvedBrand,
+  slots: Array<{ key: string; date: string; time: string }>,
+  timezone: string,
+  nowMs = Date.now(),
+): Promise<ManifestAutonomousCoverageLedger> {
+  await ensureScheduledPostsTable(env);
+  await ensureThreadsPostsArchiveTable(env);
+  const slotKeys = new Set(slots.map((slot) => slot.key));
+  const dates = Array.from(new Set(slots.map((slot) => slot.date)));
+  const occupied = new Map<string, Record<string, unknown>>();
+  const scheduledRecords: Record<string, unknown>[] = [];
+  const publishedRecords: Record<string, unknown>[] = [];
+  const statusCounts: Record<string, number> = {};
+  for (const date of dates) {
+    const startUtc = convertLocalDateTimeToUtcIso(date, "00:00", timezone);
+    const nextDate = addDaysToIsoDate(date, 1);
+    const endUtcExclusive = nextDate ? convertLocalDateTimeToUtcIso(nextDate, "00:00", timezone) : null;
+    if (!startUtc || !endUtcExclusive) continue;
+    const scheduledRows = await env.DB.prepare(
+      `SELECT id, post_text, status, scheduled_time, published_post_id,
+              publish_error_message, last_attempted_at, processing_started_at
+       FROM scheduled_posts
+       WHERE threads_user_id = ? AND scheduled_time >= ? AND scheduled_time < ?
+       ORDER BY scheduled_time ASC, id ASC`,
+    ).bind(
+      brand.profile.threads_user_id,
+      startUtc,
+      endUtcExclusive,
+    ).all<OperatorScheduledDeliveryRow & { post_text: string }>();
+    for (const row of scheduledRows.results ?? []) {
+      const scheduledMs = parseOperatorTimestampMs(row.scheduled_time);
+      if (scheduledMs === null) continue;
+      const local = operatorLocalDateTimeParts(new Date(scheduledMs), timezone);
+      const key = `${local.date}T${operatorHourlySlot(local.hour)}`;
+      const published = row.status === SCHEDULED_POST_STATUS_POSTED || Boolean(row.published_post_id);
+      const delivery = published
+        ? { delivery_state: "published", required_recovery_action: "none" }
+        : classifyOperatorScheduledDelivery(row, nowMs);
+      const record = {
+        source_type: "scheduled_post",
+        slot_key: key,
+        scheduled_post_id: Number(row.id),
+        text: row.post_text,
+        status: row.status,
+        delivery_state: delivery.delivery_state,
+        required_recovery_action: delivery.required_recovery_action,
+        scheduled_time_utc: row.scheduled_time,
+        published_post_id: row.published_post_id,
+        publish_error_message: row.publish_error_message,
+        last_attempted_at: row.last_attempted_at,
+        processing_started_at: row.processing_started_at,
+      };
+      scheduledRecords.push(record);
+      statusCounts[delivery.delivery_state] = (statusCounts[delivery.delivery_state] ?? 0) + 1;
+      if (slotKeys.has(key) && [SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING, SCHEDULED_POST_STATUS_POSTED].includes(String(row.status))) {
+        occupied.set(key, record);
+      }
+    }
+    const archiveRows = await env.DB.prepare(
+      `SELECT post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total
+       FROM threads_posts_archive
+       WHERE threads_user_id = ? AND post_timestamp >= ? AND post_timestamp < ?
+       ORDER BY datetime(post_timestamp) ASC, post_id ASC`,
+    ).bind(
+      brand.profile.threads_user_id,
+      startUtc,
+      endUtcExclusive,
+    ).all<Record<string, unknown>>();
+    for (const row of archiveRows.results ?? []) {
+      const publishedMs = parseOperatorTimestampMs(row.post_timestamp);
+      if (publishedMs === null) continue;
+      const local = operatorLocalDateTimeParts(new Date(publishedMs), timezone);
+      const key = `${local.date}T${operatorHourlySlot(local.hour)}`;
+      const record = {
+        source_type: "published_post",
+        slot_key: key,
+        published_post_id: row.post_id,
+        text: row.post_text,
+        published_at: row.post_timestamp,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes: Number(row.likes ?? 0),
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          quotes: Number(row.quotes ?? 0),
+          shares: Number(row.shares ?? 0),
+          engagement_total: Number(row.engagement_total ?? 0),
+        },
+      };
+      publishedRecords.push(record);
+      if (slotKeys.has(key)) occupied.set(key, record);
+    }
+  }
+  return {
+    occupied,
+    scheduled_records: scheduledRecords,
+    published_records: publishedRecords,
+    status_counts: statusCounts,
+  };
+}
+
 async function manifestAutonomousOccupiedSlots(
   env: Env,
   brand: GptResolvedBrand,
   slots: Array<{ key: string; date: string; time: string }>,
   timezone: string,
 ): Promise<Map<string, Record<string, unknown>>> {
-  const dates = Array.from(new Set(slots.map((slot) => slot.date)));
-  const occupied = new Map<string, Record<string, unknown>>();
-  for (const date of dates) {
-    const scheduled = await listScheduledPostsForThreadsAccountOnLocalDate(
-      env,
-      brand.profile.threads_user_id,
-      date,
-      timezone,
-    );
-    for (const post of scheduled) {
-      const time = String(post.local_time ?? "");
-      if (!time) continue;
-      occupied.set(`${date}T${time}`, post as unknown as Record<string, unknown>);
-    }
-  }
-  return occupied;
+  return (await buildManifestAutonomousCoverageLedger(env, brand, slots, timezone)).occupied;
 }
+
 
 async function buildManifestAutonomousAccountPosition(
   env: Env,
