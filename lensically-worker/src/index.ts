@@ -387,7 +387,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_VERSION = "operator-engineering-authority-v
 const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2";
 const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1";
 const MANIFEST_AUTONOMOUS_RUNWAY_HOURS = 48;
-const MANIFEST_AUTONOMOUS_COMMIT_LIMIT = 24;
+const MANIFEST_AUTONOMOUS_COMMIT_LIMIT = 4;
 const MANIFEST_AUTONOMY_OBJECTIVE = "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.";
 const MANIFEST_OWNER_RATIFIED_AUTONOMY_MODE = "ai_led_owner_ratified";
 const MANIFEST_AUTONOMY_MODE = "autonomous_operator";
@@ -15102,7 +15102,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "commit_manifest_autonomous_runway",
     title: "Commit Manifest autonomous runway",
-    description: "Persist a strategic thesis and schedule up to 24 generated Manifest posts into exact missing slots from one prepared autonomous cycle. Every accepted post receives hypothesis-or-source lineage, generation and draft records, gates, strategy tags, inventory tracking, and idempotent scheduling.",
+        description: "Persist a strategic thesis and schedule up to 4 generated Manifest posts into exact missing slots from one prepared autonomous cycle. Every accepted post receives hypothesis-or-source lineage, generation and draft records, gates, strategy tags, inventory tracking, and idempotent scheduling. Reconcile coverage between batches and reuse an operation ID only for an identical batch retry.",
     inputSchema: {
       type: "object",
       properties: {
@@ -15112,7 +15112,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         posts: {
           type: "array",
           minItems: 1,
-          maxItems: 24,
+                    maxItems: MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
           items: {
             type: "object",
             properties: {
@@ -18491,7 +18491,15 @@ function operatorSemanticOperationIdentity(toolName: string, args: Record<string
   if (toolName === "start_workflow_session") return `${brand}:active:${String(args.workflow_template_key ?? OPERATOR_WORKFLOW_TEMPLATE_KEY)}`;
     if (toolName === "draw_source_candidate_batch") return `${brand}:${session}:daily-source-batch`;
   if (toolName === "prepare_manifest_autonomous_cycle") return `${brand}:autonomous-cycle:${String(args.operation_id ?? "current")}`;
-  if (toolName === "commit_manifest_autonomous_runway") return `${brand}:autonomous-commit:${String(args.cycle_id ?? "missing")}`;
+    if (toolName === "commit_manifest_autonomous_runway") {
+    const slotKeys = (Array.isArray(args.posts) ? args.posts : [])
+      .slice(0, MANIFEST_AUTONOMOUS_COMMIT_LIMIT)
+      .map((post) => {
+        const row = post && typeof post === "object" && !Array.isArray(post) ? post as Record<string, unknown> : {};
+        return `${String(row.date ?? "missing-date")}T${String(row.time ?? "missing-time")}`;
+      });
+    return `${brand}:autonomous-commit:${String(args.cycle_id ?? "missing")}:${slotKeys.join(",") || "empty"}`;
+  }
   if (toolName === "review_manifest_scheduled_post") return `${brand}:autonomous-review:${String(args.scheduled_post_id ?? "missing")}:${String(args.action ?? "review")}`;
   if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? `${session}:${String(args.sequence_label ?? "unlabeled")}`)}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
   if (toolName === "lock_source_card") return `${brand}:lock:${String(args.source_card_id ?? "")}`;
@@ -18523,9 +18531,27 @@ async function beginOperatorOperationReceipt(
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<{ existing: Record<string, unknown> | null; fingerprint: string; created: boolean }> {
-  const fingerprint = await sha256OperatorText(JSON.stringify(args));
+    const fingerprint = await sha256OperatorText(JSON.stringify(args));
   const existing = await readOperatorOperationReceipt(env, key);
-  if (existing) return { existing, fingerprint, created: false };
+  if (existing) {
+    const status = String(existing.status ?? "");
+    const sameFingerprint = String(existing.request_fingerprint ?? "") === fingerprint;
+    const leaseTimestamp = Date.parse(String(existing.updated_at ?? existing.created_at ?? ""));
+    const staleStarted = status === "started"
+      && Number.isFinite(leaseTimestamp)
+      && Date.now() - leaseTimestamp >= 120000;
+    if (sameFingerprint && (status === "failed" || staleStarted)) {
+      const reclaimed = await env.DB.prepare(
+        `UPDATE operator_operation_receipts
+         SET status = 'started', result_json = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE idempotency_key = ? AND request_fingerprint = ? AND status = ? AND updated_at = ?`,
+      ).bind(key, fingerprint, status, String(existing.updated_at ?? "")).run();
+      if (Number(reclaimed.meta?.changes ?? 0) > 0) {
+        return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created: true };
+      }
+    }
+    return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created: false };
+  }
   const insert = await env.DB.prepare(
     `INSERT OR IGNORE INTO operator_operation_receipts (
       idempotency_key, brand_key, workflow_session_id, operation_type, tool_name, request_fingerprint, status
@@ -18549,6 +18575,20 @@ async function completeOperatorOperationReceipt(env: Env, key: string, result: R
      WHERE idempotency_key = ?`,
   ).bind(JSON.stringify(result).slice(0, 120000), key).run();
 }
+
+async function failOperatorOperationReceipt(env: Env, key: string, error: unknown): Promise<void> {
+  const result = {
+    ok: false,
+    error: error instanceof Error ? error.message : String(error),
+    retryable: true,
+  };
+  await env.DB.prepare(
+    `UPDATE operator_operation_receipts
+     SET status = 'failed', result_json = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE idempotency_key = ?`,
+  ).bind(JSON.stringify(result).slice(0, 120000), key).run();
+}
+
 
 function operatorMcpOAuthJson(payload: Record<string, unknown>, status = 200): Response {
 
@@ -21925,13 +21965,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             },
           });
         }
-        if (!receipt.created && receipt.existing?.status === "started") {
-          const startedAt = Date.parse(String(receipt.existing.created_at ?? ""));
-          if (Number.isFinite(startedAt) && Date.now() - startedAt < 120000) {
+                if (!receipt.created && receipt.existing?.status === "started") {
+          const startedAt = Date.parse(String(receipt.existing.updated_at ?? receipt.existing.created_at ?? ""));
+          const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
+          if (ageMs < 120000) {
             const resultPayload = {
               ok: false,
               error: "operation_already_in_progress",
-              retryable_after_seconds: 120,
+              retryable_after_seconds: Math.max(1, Math.ceil((120000 - ageMs) / 1000)),
               idempotency: {
                 version: OPERATOR_IDEMPOTENCY_VERSION,
                 key: idempotencyKey,
@@ -21980,11 +22021,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           : isOperatorMcpAdminToolName(toolName)
             ? await handleOperatorMcpAdminTool(request, env, toolName, args, routedGatewayMetadata !== null)
             : await callOperatorToolForMcp(request, env, toolName, args);
-      } catch (error) {
+            } catch (error) {
         await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, {
           ok: false,
           error: error instanceof Error ? error.message : String(error),
         });
+        if (idempotencyKey) {
+          await failOperatorOperationReceipt(env, idempotencyKey, error);
+        }
         throw error;
       }
       await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, resultPayload);

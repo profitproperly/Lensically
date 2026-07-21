@@ -2575,10 +2575,13 @@ describe("operator mode MCP endpoint", () => {
     ]));
         expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
-    const saveStrategyMemoryTool = listed.tools.find((tool) => tool.name === "save_strategy_memory");
+        const saveStrategyMemoryTool = listed.tools.find((tool) => tool.name === "save_strategy_memory");
     const saveStrategyMemoryKind = saveStrategyMemoryTool?.inputSchema?.properties?.kind as { enum?: string[] } | undefined;
     expect(saveStrategyMemoryKind?.enum).toEqual(expect.arrayContaining(["approved_rule", "voice_rule", "rejection_feedback"]));
     expect(saveStrategyMemoryKind?.enum).not.toContain("generation_rule");
+    const autonomousCommitTool = listed.tools.find((tool) => tool.name === "commit_manifest_autonomous_runway");
+    const autonomousPostsSchema = autonomousCommitTool?.inputSchema?.properties?.posts as { maxItems?: number } | undefined;
+    expect(autonomousPostsSchema?.maxItems).toBe(4);
     const startup = await mcpTool<{
       runtime?: { execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean } };
     }>("getOperatorStartupContext");
@@ -2612,7 +2615,7 @@ describe("operator mode MCP endpoint", () => {
     expect(prepared.cycle.missing_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
     expect(prepared.strategy_contract.winner_preservation).toContain("Frequency alone");
-    expect(prepared.commit_contract).toMatchObject({ max_posts_per_call: 24, complete_lineage_required: true });
+        expect(prepared.commit_contract).toMatchObject({ max_posts_per_call: 4, complete_lineage_required: true });
   }, 30000);
 
   it("commits an autonomous post with full lineage into one exact missing slot", async () => {
