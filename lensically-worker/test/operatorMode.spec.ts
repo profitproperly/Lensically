@@ -2672,7 +2672,8 @@ describe("operator mode MCP endpoint", () => {
     expect(prepared.cycle.target_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.cycle.missing_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
-    expect(prepared.strategy_contract.winner_preservation).toContain("Frequency alone");
+        expect(prepared.strategy_contract.winner_preservation).toContain("Continue using winners");
+    expect(prepared.strategy_contract.winner_preservation).toContain("spacing");
             expect(prepared.persistence_contract).toMatchObject({
       tool: "persist_manifest_autonomous_post",
       posts_per_call: 1,
