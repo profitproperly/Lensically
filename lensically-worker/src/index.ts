@@ -18481,7 +18481,10 @@ function operatorSemanticOperationIdentity(toolName: string, args: Record<string
   const session = normalizeOperatorText(args.workflow_session_id, 120, true) ?? "no-session";
       if (toolName === "resolveContinuationContext") return `${brand}:${String(args.continuation_choice ?? "")}:${String(args.workflow_session_id ?? "latest")}`;
   if (toolName === "start_workflow_session") return `${brand}:active:${String(args.workflow_template_key ?? OPERATOR_WORKFLOW_TEMPLATE_KEY)}`;
-  if (toolName === "draw_source_candidate_batch") return `${brand}:${session}:daily-source-batch`;
+    if (toolName === "draw_source_candidate_batch") return `${brand}:${session}:daily-source-batch`;
+  if (toolName === "prepare_manifest_autonomous_cycle") return `${brand}:autonomous-cycle:${String(args.operation_id ?? "current")}`;
+  if (toolName === "commit_manifest_autonomous_runway") return `${brand}:autonomous-commit:${String(args.cycle_id ?? "missing")}`;
+  if (toolName === "review_manifest_scheduled_post") return `${brand}:autonomous-review:${String(args.scheduled_post_id ?? "missing")}:${String(args.action ?? "review")}`;
   if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? `${session}:${String(args.sequence_label ?? "unlabeled")}`)}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
   if (toolName === "lock_source_card") return `${brand}:lock:${String(args.source_card_id ?? "")}`;
   if (toolName === "submit_candidate_draft" || toolName === "submitAndGateDraft") return `${brand}:${String(args.run_id ?? "")}:${String(args.source_card_id ?? "")}:${String(args.text ?? args.draft_text ?? "")}`;
@@ -19031,10 +19034,15 @@ async function handleOperatorMcpAdminTool(
     const growthMissionBrief = capsule.growth_mission_brief && typeof capsule.growth_mission_brief === "object"
       ? capsule.growth_mission_brief as Record<string, unknown>
       : null;
-    const discussionContract = growthMissionBrief?.discussion_contract && typeof growthMissionBrief.discussion_contract === "object"
+        const discussionContract = growthMissionBrief?.discussion_contract && typeof growthMissionBrief.discussion_contract === "object"
       ? growthMissionBrief.discussion_contract as Record<string, unknown>
       : null;
-    const accountExecutionLocked = brandKey === "manifest_mental" && discussionContract?.execution_locked !== false;
+    const capsuleAccountExecution = capsule.account_execution && typeof capsule.account_execution === "object" && !Array.isArray(capsule.account_execution)
+      ? capsule.account_execution as Record<string, unknown>
+      : null;
+    const accountExecutionLocked = brandKey === "manifest_mental"
+      && capsuleAccountExecution?.unlocked !== true
+      && discussionContract?.execution_locked !== false;
     return {
       ok: true,
       selected_key: brandKey,
@@ -19093,12 +19101,12 @@ async function handleOperatorMcpAdminTool(
       growth_mission: growthMission,
       decisions,
       execution_counts: eventRows.results ?? [],
-      next_behavior: ["discussion", "paused"].includes(String(growthMission?.status ?? "discussion"))
-        ? "Present the current Growth Mission Brief, brainstorm with the owner, and persist revisions. Account mutations remain locked until the owner approves or activates the guided plan."
-        : decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
-          ? "Present the pending protected or irreversible decision while keeping routine work inside the approved Growth Mission."
-          : String(profile?.mode ?? "") === MANIFEST_AUTONOMY_MODE
-            ? "Resume owner-authorized full autonomous Manifest operation through mandatory known paths."
+            next_behavior: String(profile?.mode ?? "") === MANIFEST_AUTONOMY_MODE
+        ? "Resume owner-authorized full autonomous Manifest operation through mandatory known paths. Pending protected decisions do not pause unrelated routine work."
+        : ["discussion", "paused"].includes(String(growthMission?.status ?? "discussion"))
+          ? "Present the current Growth Mission Brief, brainstorm with the owner, and persist revisions. Account mutations remain locked until the owner approves or activates the guided plan."
+          : decisions.some((decision) => ["proposed", "revision_required"].includes(String(decision.status)))
+            ? "Present the pending protected or irreversible decision while keeping routine work inside the approved Growth Mission."
             : "Execute proactively within the approved Guided Growth Mission and retain owner checkpoints for consequential account actions; routine engineering remains autonomous.",
     };
   }
