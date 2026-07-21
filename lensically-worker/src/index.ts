@@ -16150,7 +16150,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.37.0";
+export const OPERATOR_MCP_VERSION = "1.37.1";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -18751,7 +18751,7 @@ function operatorMcpInstructions(toolCount: number): string {
     "Use Lensically Operator Mode as the source of truth.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
     "Select one canonical brand key and wait for explicit Proceed before account data loads.",
-    "After Proceed, restore account continuity and present the guided Growth Mission Brief. Brainstorm, revise, and obtain explicit plan approval before account mutation; routine engineering remains autonomous.",
+        "After Proceed, reconcile live schedule, delivery, metrics, strategy, incidents, and durable cycle state, then resume the active autonomous outcome. Stale continuity summaries never override live state.",
     "Routine engineering uses bounded known-file inspection, one coherent change set, focused validation, one exact-head release, and compact receipts.",
     "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
     "Canonical brand keys are manifest_mental, opmg_deadman, and vectrix.",
@@ -18760,9 +18760,9 @@ function operatorMcpInstructions(toolCount: number): string {
     "Selected key: <selected_key>",
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
     "Proceed to the next step?",
-    "After explicit Proceed, account calls include only their advertised typed fields. Lensically verifies Proceed from server-side continuity; an approved Growth Mission unlocks account mutation.",
-    "Content generation preserves source lineage, requires passing backend gates, and schedules only approved drafts.",
-    "Protected destructive, ownership, credential, scheduler-safety, and irreversible operations retain owner-ratified controls.",
+        "After explicit Proceed, account calls include only their advertised typed fields. Routine Manifest strategy, generation, scheduling, evaluation, recovery, and engineering proceed autonomously under the active autonomous profile.",
+    "Content generation preserves source lineage, passes every mandatory backend gate, and schedules only internally approved autonomous drafts into exact missing runway slots.",
+    "Owner review is optional and non-blocking. Spending, credential or ownership changes, irreversible deletion, fundamental mission changes, disabling critical infrastructure, and material account or project danger remain owner-ratified.",
     "Scheduler safety and overdue recovery remain backend-enforced.",
     "Follower totals are account-level trajectory data and are never attributed to a post or posting period.",
   ].join("\n");
