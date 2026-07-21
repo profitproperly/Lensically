@@ -21477,62 +21477,46 @@ async function handleOperatorMcpEngineeringTool(
         arguments: args,
       });
 
-    const listed = await callLiveMcp(2, "tools/list", {});
+        const listed = await callLiveMcp(2, "tools/list", {});
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
+    const listedToolRows = Array.isArray(listedTools)
+      ? listedTools.filter((tool): tool is Record<string, unknown> => Boolean(tool) && typeof tool === "object" && !Array.isArray(tool))
+      : [];
     const startup = await callDirectLiveTool("getOperatorStartupContext", {});
-    const select = await callDirectLiveTool("selectOperatorKey", { brand_key: "manifest_mental" });
-    const proceed = await callDirectLiveTool("confirmOperatorProceed", { brand_key: "manifest_mental", proceed_confirmed: true });
-    const proceedContent = structured(proceed.payload);
-    const allowed = await callDirectLiveTool("getWorkflowStatus", {
-      brand_key: "manifest_mental",
-      proceed_confirmed: true,
-    });
-    const coverage = await callDirectLiveTool("get_hourly_coverage", {
-      brand_key: "manifest_mental",
-      proceed_confirmed: true,
-      timezone: "America/New_York",
-    });
-
     const startupContent = structured(startup.payload);
-    const selectContent = structured(select.payload);
-    const allowedContent = structured(allowed.payload);
-    const coverageContent = structured(coverage.payload);
-    const continuityCapsule = proceedContent.continuity_capsule && typeof proceedContent.continuity_capsule === "object" && !Array.isArray(proceedContent.continuity_capsule)
-      ? proceedContent.continuity_capsule as Record<string, unknown>
-      : null;
+    const autonomousCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;
+    const autonomousCommitSchema = autonomousCommitTool?.inputSchema && typeof autonomousCommitTool.inputSchema === "object" && !Array.isArray(autonomousCommitTool.inputSchema)
+      ? autonomousCommitTool.inputSchema as Record<string, unknown>
+      : {};
+    const autonomousCommitProperties = autonomousCommitSchema.properties && typeof autonomousCommitSchema.properties === "object" && !Array.isArray(autonomousCommitSchema.properties)
+      ? autonomousCommitSchema.properties as Record<string, unknown>
+      : {};
+    const autonomousPostsSchema = autonomousCommitProperties.posts && typeof autonomousCommitProperties.posts === "object" && !Array.isArray(autonomousCommitProperties.posts)
+      ? autonomousCommitProperties.posts as Record<string, unknown>
+      : {};
+    const advertisedCommitBatchMax = Math.trunc(Number(autonomousPostsSchema.maxItems ?? 0));
     const boundaryTest = {
-      selected_key: selectContent.selected_key ?? null,
       startup_direct: startupContent.ok === true && startupContent.bootstrap_version !== undefined,
-      handshake: selectContent.handshake ?? null,
-      key_selection_requires_proceed: selectContent.proceed_required === true
-        && selectContent.account_data_loaded === false
-        && selectContent.next_tool === "confirmOperatorProceed",
-      proceed_accepted: proceed.status < 400 && proceedContent.ok === true && continuityCapsule?.brand_key === "manifest_mental",
-      continuity_capsule_version: continuityCapsule?.version ?? null,
-      calendar_coverage_loaded: Array.isArray(coverageContent.open_slots),
-      allowed_after_proceed: allowedContent.ok === true,
+      commit_tool_advertised: autonomousCommitTool !== null,
+      commit_batch_max: advertisedCommitBatchMax,
+      worker_safe_commit_batch: advertisedCommitBatchMax === MANIFEST_AUTONOMOUS_COMMIT_LIMIT,
+      account_state_mutated: false,
     };
     return {
       ok: response.ok
         && Boolean(liveSessionId)
         && listed.status < 400
         && startup.status < 400
-        && select.status < 400
-        && proceed.status < 400
-        && allowed.status < 400
-        && coverage.status < 400
         && boundaryTest.startup_direct
-        && boundaryTest.key_selection_requires_proceed
-        && boundaryTest.proceed_accepted
-        && boundaryTest.calendar_coverage_loaded
-        && boundaryTest.allowed_after_proceed,
+        && boundaryTest.commit_tool_advertised
+        && boundaryTest.worker_safe_commit_batch,
       status: response.status,
       initialize: payload?.result ?? null,
-                  transport_mode: "direct_typed_main_tools",
-            live_tool_count: await operatorPublicMcpToolCount(env),
-      advertised_tool_count: Array.isArray(listedTools) ? listedTools.length : 0,
+      transport_mode: "direct_typed_main_tools",
+      live_tool_count: await operatorPublicMcpToolCount(env),
+      advertised_tool_count: listedToolRows.length,
       boundary_test: boundaryTest,
     };
   }
