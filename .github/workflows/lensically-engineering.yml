@@ -85,7 +85,10 @@ jobs:
           set -euo pipefail
           case "${TASK}" in
             typecheck) ;;
-            operator-smoke) node scripts/run-operator-validation.mjs smoke ;;
+                        operator-smoke)
+              node scripts/run-operator-validation.mjs smoke
+              npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
+              ;;
             system-directory-tests) npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1 ;;
             threads-publish-tests) npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1 ;;
             gpt-memory-tests) npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1 ;;
@@ -171,7 +174,8 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/release-preflight.mjs
-          npx tsc --noEmit
+                    npx tsc --noEmit
+          npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
           npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
           npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1
