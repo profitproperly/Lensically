@@ -111,8 +111,8 @@ function serializeStrategy(strategy: JsonRecord | null): JsonRecord | null {
     id: strategy.id ?? null,
     version: strategy.version ?? null,
     parent_version_id: strategy.parent_version_id ?? null,
-    strategy: compact(strategy.strategy ?? {}, 12),
-    evidence: compact(strategy.evidence ?? {}, 12),
+        strategy: compact(strategy.strategy ?? {}, 6),
+    evidence: compact(strategy.evidence ?? {}, 6),
     change_summary: strategy.change_summary ?? null,
     reversal_conditions: compact(strategy.reversal_conditions ?? [], 12),
     source_cycle_id: strategy.source_cycle_id ?? null,
@@ -130,8 +130,8 @@ function serializeLearningBrief(row: JsonRecord | null): JsonRecord | null {
     authoritative_post_count: number(row.authoritative_post_count),
     evidence_window_start: row.evidence_window_start ?? null,
     evidence_window_end: row.evidence_window_end ?? null,
-    brief: compact(brief, 16),
-    strategy_change: compact(strategyChange, 16),
+        brief: compact(brief, 8),
+    strategy_change: compact(strategyChange, 8),
     strategy_version_id: row.strategy_version_id ?? null,
     updated_at: row.updated_at ?? null,
   };
@@ -176,19 +176,19 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     db.prepare(`SELECT family_key, role, recommended_role, previous_role, confidence_score,
         confidence_label, allocation_weight, actual_decay, reason, evidence_json, updated_at
       FROM operator_manifest_portfolio_states WHERE brand_key = ?
-      ORDER BY allocation_weight DESC, confidence_score DESC LIMIT 30`).bind(brandKey).all<JsonRecord>(),
+            ORDER BY allocation_weight DESC, confidence_score DESC LIMIT 10`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT id, experiment_key, family_key, status, follow_up_decision,
         hypothesis_json, comparison_group_json, latest_result_json, updated_at
       FROM operator_manifest_experiments WHERE brand_key = ?
-      ORDER BY datetime(updated_at) DESC LIMIT 20`).bind(brandKey).all<JsonRecord>(),
+            ORDER BY datetime(updated_at) DESC LIMIT 8`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT pattern_identity_key, source_identity_key, mechanism_json,
         adaptation_options_json, confidence_json, reuse_state, results_json, updated_at
       FROM operator_manifest_saved_pattern_intelligence WHERE brand_key = ?
         AND exclusion_state = 'active'
       ORDER BY CASE reuse_state WHEN 'proven' THEN 1 WHEN 'ready' THEN 2 WHEN 'monitor' THEN 3 ELSE 4 END,
-        datetime(updated_at) DESC LIMIT 20`).bind(brandKey).all<JsonRecord>(),
+                datetime(updated_at) DESC LIMIT 8`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT signature_json, observed_at FROM operator_manifest_semantic_signatures
-      WHERE brand_key = ? ORDER BY datetime(observed_at) DESC LIMIT 40`).bind(brandKey).all<JsonRecord>(),
+            WHERE brand_key = ? ORDER BY datetime(observed_at) DESC LIMIT 24`).bind(brandKey).all<JsonRecord>(),
   ]);
   const learningBrief = serializeLearningBrief(briefRow);
   const benchmark = serializeBenchmark(benchmarkRow);
@@ -208,8 +208,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     confidence_label: row.confidence_label,
     allocation_weight: number(row.allocation_weight, 1),
     actual_decay: number(row.actual_decay) === 1,
-    reason: row.reason ?? null,
-    evidence: compact(parseJson(row.evidence_json, {}), 10),
+        reason: row.reason ?? null,
     updated_at: row.updated_at ?? null,
   }));
   const experiments = (experimentRows.results ?? []).map((row) => ({
@@ -218,19 +217,19 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     family_key: row.family_key ?? null,
     status: row.status,
     follow_up_decision: row.follow_up_decision ?? null,
-    hypothesis: compact(parseJson(row.hypothesis_json, {}), 10),
-    comparison_group: compact(parseJson(row.comparison_group_json, {}), 10),
-    latest_result: compact(parseJson(row.latest_result_json, {}), 10),
+        hypothesis: compact(parseJson(row.hypothesis_json, {}), 4),
+    comparison_group: compact(parseJson(row.comparison_group_json, {}), 4),
+    latest_result: compact(parseJson(row.latest_result_json, {}), 4),
     updated_at: row.updated_at ?? null,
   }));
   const savedPatterns = (savedRows.results ?? []).map((row) => ({
     pattern_identity_key: row.pattern_identity_key,
     source_identity_key: row.source_identity_key,
-    mechanism: compact(parseJson(row.mechanism_json, {}), 10),
-    adaptation_options: compact(parseJson(row.adaptation_options_json, {}), 10),
-    confidence: compact(parseJson(row.confidence_json, {}), 10),
+        mechanism: compact(parseJson(row.mechanism_json, {}), 4),
+    adaptation_options: compact(parseJson(row.adaptation_options_json, {}), 4),
+    confidence: compact(parseJson(row.confidence_json, {}), 4),
     reuse_state: row.reuse_state,
-    results: compact(parseJson(row.results_json, {}), 10),
+    results: compact(parseJson(row.results_json, {}), 4),
     updated_at: row.updated_at ?? null,
   }));
   const premiseCounts = new Map<string, number>();

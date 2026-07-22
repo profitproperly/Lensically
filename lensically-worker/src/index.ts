@@ -11359,8 +11359,7 @@ async function prepareManifestAutonomousCycle(
     threadsSnapshot as unknown as Record<string, unknown>,
     deliveryReconciliation,
   );
-    accountPosition.decision_intelligence = decisionIntelligence;
-  const existing = await env.DB.prepare(
+      const existing = await env.DB.prepare(
     `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
   ).bind(brand.brand_key, operationId).first<{ id: string }>();
   const cycleId = existing?.id ?? crypto.randomUUID();

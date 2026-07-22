@@ -3203,8 +3203,7 @@ describe("operator mode MCP endpoint", () => {
       success: boolean;
       cycle: {
         id: string;
-        missing_slots: Array<{ key: string; date: string; time: string }>;
-        account_position: { decision_intelligence: Record<string, unknown> };
+                missing_slots: Array<{ key: string; date: string; time: string }>;
       };
       decision_intelligence: {
         version: string;
@@ -3226,7 +3225,7 @@ describe("operator mode MCP endpoint", () => {
       "slot placement",
       "strategy change or explicit evidence-based preservation",
     ]));
-    expect(prepared.cycle.account_position.decision_intelligence).toMatchObject({ version: "manifest-decision-intelligence-v1" });
+        expect(new TextEncoder().encode(JSON.stringify(prepared.decision_intelligence)).byteLength).toBeLessThan(12000);
     const slot = prepared.cycle.missing_slots[0];
     expect(slot).toBeTruthy();
     const persistOperationId = `test-autonomous-persist-${crypto.randomUUID()}`;
