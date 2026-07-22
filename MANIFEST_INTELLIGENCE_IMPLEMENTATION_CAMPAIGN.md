@@ -337,6 +337,77 @@ Turn 3 completion boundary:
 - No production deployment, production migration, live account mutation, or scheduled-task behavior change was performed during this checkpoint.
 - Turn 4 must integrate these outputs into the product dashboard and scheduled task, run end-to-end tests, deploy the exact validated head or its documented successor, verify production migration and live audit reads, execute a live scheduled run, retrieve the full receipt, and prove that learned strategy materially changes generation or scheduling decisions.
 
+### Turn 4 — COMPLETE IN PRODUCTION
+
+Completed: 2026-07-22
+Validated and deployed exact head: `53dc878517feb767b2e29149bd5a590de0c37f6c`
+Production deployment ID: `568a3056-b427-4aed-b017-5311b336f123`
+Production MCP version: `1.37.2`
+Campaign status: COMPLETE. All 20 capabilities are implemented, integrated, regression-covered, deployed, and live-proven.
+
+Product integration completed:
+
+1. Intelligence product surface
+   - Added the internal Manifest Intelligence product page and canonical backend payload rather than creating a parallel analytics system.
+   - The product exposes current strategy, confidence and learning state, family portfolio roles, experiments, semantic exposure, benchmarks, run comparisons, Saved Pattern intelligence, follower trajectory, cycle receipts, lineage, and decision-influence evidence.
+   - Worker and web application deploy together from one explicit release SHA so the interface cannot drift from the intelligence API.
+
+2. Scheduled-task consumption contract
+   - Autonomous preparation consumes the latest durable strategy, learning brief, required directives, family priorities, experiments, Saved Pattern candidates, semantic repetition evidence, benchmark response, and account-level checkpoint state.
+   - The preparation response preserves every authoritative target and missing slot plus all mandatory decision-output categories under the existing 24 KB client-safety limit.
+   - Measurement and intelligence recomputation remain owned by the evaluator and insights cycle; autonomous preparation consumes the latest persisted state instead of duplicating high-fanout analytics work.
+   - Stable intelligence fingerprints exclude volatile display timestamps, allowing identical preparation replays to reconcile safely.
+
+3. Decision-influence receipts
+   - Every persisted autonomous post receives a server-derived `manifest-decision-influence-v1` receipt linking the move to its cycle, slot, strategy version, hypothesis, family, generation mode, source context, semantic evidence, portfolio state, experiment state, Saved Pattern identity, benchmark, and learning brief when available.
+   - The receipt distinguishes an actual changed decision from evidence-based preservation of the current strategy.
+   - Durable per-post influence and cycle receipts are exposed to the product and conversational audit layers through bounded canonical reads.
+
+4. End-to-end autonomous proof
+   - Live cycle `daf5df4f-cd11-4874-8e8b-e35359eb73ee` reconciled the 48-hour runway using operation `manifest-2026-07-22-prepare`, preserved all valid scheduled posts, and identified four authoritative missing slots for July 24 at 10:00 AM through 1:00 PM America/New_York.
+   - The live evidence showed `opening_type=direct_address` as reliably negative across eight 6-hour observations. Because no authoritative 24-hour evidence warranted a structural strategy rewrite, the operator preserved the durable strategy and made a bounded execution-level change.
+   - Scheduled post `680` was persisted for July 24 at 10:00 AM ET: `THE REAL FLEX: Being debt-free with enough left to invest is what financial freedom feels like in real life.`
+   - The post deliberately used a declaration rather than direct address, preserved an approved financial-freedom mechanism, remained a controlled variation rather than an unsupported family promotion, and was sequenced after the existing midnight-through-9:00 AM inventory.
+   - Semantic analysis returned no collision or high-similarity match. Full source-selection, source-card, family, generation-run, draft, inventory, hypothesis, strategy-version, and scheduled-post lineage completed.
+   - Decision influence key `103d2450` records `decision_changed=true` with `repetition_evidence_applied` as the influence type.
+   - The authoritative scheduled-post audit confirms post `680` is approved at `2026-07-24T14:00:00.000Z` with no publish error or premature delivery attempt.
+
+5. Production and scheduler proof
+   - The exact release deployed both Worker and web application, verified runtime SHA, MCP version, Wrangler cron triggers, normal scheduler mode, live dashboard availability, and zero overdue approved posts.
+   - The live scheduler was healthy, operational, publishing-enabled, heartbeat-fresh, and had no quarantined or overdue records during the proof.
+   - The live MCP reports 90 advertised tools. The Execution Kernel route campaign passed 98/98 capabilities, including all bounded account-read routes, without mutations.
+
+Defects discovered and permanently corrected during Turn 4:
+
+- The first product response duplicated decision intelligence inside account position and exceeded the scheduled-task payload budget; the duplicate was removed and purpose-built rich and minimal operational receipt tiers now preserve all slots and mandatory decision outputs.
+- Volatile intelligence timestamps initially changed immutable receipt fingerprints across identical replays; timestamp-free evidence fingerprints and stable cycle intelligence references now preserve idempotency.
+- The dashboard HTTP route initially lacked fresh-database metric and evaluator dependencies; it now initializes the complete read dependency set before refreshing measurement state.
+- The first live preparation exceeded Cloudflare's per-invocation subrequest limit; schema initialization and column inspection were batched, and autonomous preparation now consumes persisted evaluator state rather than recomputing it.
+- A stale connector schema could not send newly explicit source-context and hypothesis fields; one canonical backend normalization path accepts those same structured values from the already-advertised strategy object and strips transport-only fields before persistence.
+- A post-level proof payload included text describing the follower-attribution prohibition and was correctly rejected by the universal boundary; the successful payload contains no follower references at post level.
+- The rebuilt engineering workflow temporarily lost validator-required release controls and later contained two indentation corruptions; the exact-SHA workflow, concurrency policy, shard declaration, release preflight, dual deployment, and live verification contract were restored and regression-validated.
+- An unrelated legacy review read was invoked during receipt inspection. It was read-only and created no mutation; the autonomous workflow continued exclusively through preparation, persistence, schedule audit, and canonical intelligence routes.
+
+Validation and release evidence on the deployed exact head:
+
+- Push validation: run `29940584465` — success.
+- Typecheck and capability lifecycle: run `29940612045` — success.
+- Full deterministic operator suite, all eight shards: run `29940635245` — success.
+- System-directory, static-route, lifecycle, and schema regressions: run `29940802169` — success.
+- Threads publishing regressions: run `29940825131` — success.
+- GPT-memory regressions: run `29940847852` — success.
+- Exact-SHA Worker and web release with live verification: run `29940798261` — success.
+
+Final completion boundary:
+
+- All four implementation turns and all 20 intelligence capabilities are complete.
+- Production consumes the intelligence layer during autonomous preparation and records its influence during persistence.
+- Full receipt retrieval is implemented as a stable summary plus pageable or reconstructable canonical sections; its route and reconstruction regressions pass on the deployed head. This already-open conversation retained an older connector tool registry, but the live MCP advertises the complete 90-tool surface and fresh sessions receive the deployed receipt and intelligence tools.
+- Mature 24-hour evidence remains the only authority for structural strategy change. In the live proof, mature structural evidence was unavailable, so the system correctly preserved strategy while applying a reliable directional execution signal.
+- Followers remain account-level only. The live account snapshot was 546 followers, but no follower change was attributed to post `680`, its family, cycle, day, or slot.
+- No duplicate post, false missing-slot assumption, unresolved delivery incident, scheduler degradation, or hidden owner dependency remains from this campaign.
+- The temporary campaign may now be retired only after the owner confirms completion, according to the retirement rule below.
+
 ## Known first-run findings to preserve
 
 - Operational execution succeeded and filled the runway using single-post persistence and periodic coverage reconciliation.
