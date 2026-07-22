@@ -3232,10 +3232,16 @@ describe("operator mode MCP endpoint", () => {
       operation_id: `test-autonomous-persist-prepare-${crypto.randomUUID()}`,
       proceed_confirmed: true,
     });
-    expect(prepared.decision_intelligence).toMatchObject({
+        expect(prepared.decision_intelligence).toMatchObject({
       version: "manifest-decision-intelligence-v1",
       consumption_contract: { required: true },
     });
+    expect(prepared.measurement_audit_refresh).toMatchObject({
+      mode: "latest_persisted_measurement_state",
+      recomputed: false,
+      refresh_owner: "performance_evaluator_and_insights_cycle",
+    });
+
         expect(prepared.decision_intelligence.consumption_contract.inputs_that_must_be_considered).toMatchObject({
       latest_strategy: true,
       learning_brief: true,
