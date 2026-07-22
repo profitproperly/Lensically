@@ -912,7 +912,7 @@ async function refreshManifestSavedPatternIntelligence(db: D1Database, input: {
     FROM external_patterns
     WHERE app_user_id = ? AND account_id = ? AND likes >= 1000
     ORDER BY likes DESC, views DESC, updated_at DESC LIMIT 250`).bind(input.app_user_id, input.account_id).all<JsonRecord>();
-  const patternRows = (patterns.results ?? []).map((item) => {
+    const patternRows: Array<JsonRecord & { source_identity_key: string; signature: ManifestSemanticSignature }> = (patterns.results ?? []).map((item) => {
     const postId = text(item.post_id, 255);
     const sourceUrl = text(item.source_url, 2000);
     const sourceIdentityKey = postId ? `threads:${postId}` : sourceUrl ? `url:${sourceUrl}` : `saved_pattern:${number(item.id)}`;
