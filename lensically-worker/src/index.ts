@@ -11745,12 +11745,12 @@ async function prepareManifestAutonomousCycle(
     brand_key: brand.brand_key,
     threads_user_id: brand.profile.threads_user_id,
   });
-    const measurementAuditRefresh = await refreshManifestMeasurementAudit(env.DB, {
-    brand_key: brand.brand_key,
-    threads_user_id: brand.profile.threads_user_id,
-    account_id: brand.account_id,
-    saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
-  });
+        const measurementAuditRefresh = {
+    mode: "latest_persisted_measurement_state",
+    recomputed: false,
+    refresh_owner: "performance_evaluator_and_insights_cycle",
+    reason: "Autonomous preparation consumes the latest durable learning, benchmark, Saved Pattern, and follower records without recomputing the full measurement layer inside one Worker invocation.",
+  };
     const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, brand.brand_key);
   const decisionIntelligenceReceiptReference = {
     version: decisionIntelligence.version ?? null,
