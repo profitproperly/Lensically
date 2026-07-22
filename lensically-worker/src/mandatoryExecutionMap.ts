@@ -479,8 +479,10 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "appendRepoFileChunk",
     "commitRepoFileWrite",
     "createRepoFile",
-  "createGitHubRepository",
+    "createGitHubRepository",
+  "upsertGitHubRepositoryFile",
   "createCloudflarePagesProject",
+  "deployCloudflarePagesProject",
   "deleteRepoFile",
   "runMcpTests",
   "runGitHubWorkflow",
@@ -715,7 +717,9 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
     || has(/\bstatus\s+(request|check|verification)\b/)
     || has(/\bcheck\s+(mcp|operator|runtime|gateway)\b/)
   ) return "engineeringPrecheck";
-    if (has(/\b(create|add|provision)\b/) && has(/\bcloudflare\b/) && has(/\bpages?\b/) && has(/\bproject\b/)) return "createCloudflarePagesProject";
+      if (has(/\b(deploy|publish|release)\b/) && has(/\bcloudflare\b/) && has(/\bpages?\b/)) return "deployCloudflarePagesProject";
+  if (has(/\b(create|add|provision)\b/) && has(/\bcloudflare\b/) && has(/\bpages?\b/) && has(/\bproject\b/)) return "createCloudflarePagesProject";
+  if (has(/\b(create|update|write|upsert|replace)\b/) && has(/\bgithub\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "upsertGitHubRepositoryFile";
   if (has(/\b(search|find)\b/) && has(/\b(repo|repository|source|code|file|files)\b/)) return "searchRepoFiles";
   if (has(/\b(list|show)\b/) && has(/\b(repo|repository)\b/) && has(/\b(files|tree)\b/)) return "listRepoFiles";
   if (has(/\b(start|begin|open)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "startRepoFileWrite";
@@ -923,7 +927,11 @@ function prepareStaticCall(
         || machineKey(actionIntent, "") === machineKey("create github repository", "")
     || machineKey(actionIntent, "") === machineKey("createGitHubRepository", "")
     || machineKey(actionIntent, "") === machineKey("create cloudflare pages project", "")
-    || machineKey(actionIntent, "") === machineKey("createCloudflarePagesProject", "");
+        || machineKey(actionIntent, "") === machineKey("createCloudflarePagesProject", "")
+    || machineKey(actionIntent, "") === machineKey("upsert github repository file", "")
+    || machineKey(actionIntent, "") === machineKey("upsertGitHubRepositoryFile", "")
+    || machineKey(actionIntent, "") === machineKey("deploy cloudflare pages project", "")
+    || machineKey(actionIntent, "") === machineKey("deployCloudflarePagesProject", "");
   const promotedWinningPath = directFileCreation ? null : resolvePromotedWinningPath(actionIntent, objective, inputs);
   if (promotedWinningPath?.winning_path.surface === "recovery_plane") {
     return {

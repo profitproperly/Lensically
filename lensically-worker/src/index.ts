@@ -16455,8 +16455,10 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "appendRepoFileChunk",
   "commitRepoFileWrite",
     "createRepoFile",
-    "createGitHubRepository",
+        "createGitHubRepository",
+  "upsertGitHubRepositoryFile",
   "createCloudflarePagesProject",
+  "deployCloudflarePagesProject",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
   "runGitHubWorkflow",
@@ -16537,7 +16539,9 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "commitRepoFileWrite", title: "Commit repo file write", description: "Commit a pending chunked file write to GitHub.", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "createGitHubRepository", title: "Create GitHub repository", description: "Create or idempotently reconcile one repository under the configured GitHub owner. Returns only compact repository metadata and never returns credentials.", inputSchema: { type: "object", properties: { name: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" }, description: { type: "string", maxLength: 350 }, visibility: { type: "string", enum: ["private", "public"], default: "private" }, initialize_with_readme: { type: "boolean", default: true }, operation_id: { type: "string", minLength: 1, maxLength: 120 } }, required: ["name", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    { name: "upsertGitHubRepositoryFile", title: "Upsert GitHub repository file", description: "Create or replace one bounded text file in a named repository under the configured GitHub owner, with idempotent content reconciliation and compact audit output.", inputSchema: { type: "object", properties: { repository: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" }, path: REPO_PATH_SCHEMA, content: { type: "string", maxLength: 100000 }, message: { type: "string", minLength: 1, maxLength: 200 }, branch: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._/-]+$", default: "main" }, operation_id: { type: "string", minLength: 1, maxLength: 120 } }, required: ["repository", "path", "content", "message", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "createCloudflarePagesProject", title: "Create Cloudflare Pages project", description: "Dispatch an idempotent protected workflow to create or reconcile one Cloudflare Pages project without exposing Cloudflare credentials.", inputSchema: { type: "object", properties: { project_name: { type: "string", minLength: 1, maxLength: 58, pattern: "^[a-z0-9](?:[a-z0-9-]{0,56}[a-z0-9])?$" }, production_branch: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._/-]+$", default: "main" }, operation_id: { type: "string", minLength: 1, maxLength: 80 } }, required: ["project_name", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "deployCloudflarePagesProject", title: "Deploy Cloudflare Pages project", description: "Dispatch a protected workflow that checks out one named public repository and deploys a bounded directory to an existing Cloudflare Pages project.", inputSchema: { type: "object", properties: { project_name: { type: "string", minLength: 1, maxLength: 58, pattern: "^[a-z0-9](?:[a-z0-9-]{0,56}[a-z0-9])?$" }, repository: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" }, branch: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._/-]+$", default: "main" }, directory: { type: "string", minLength: 1, maxLength: 200, default: "site" }, operation_id: { type: "string", minLength: 1, maxLength: 80 } }, required: ["project_name", "repository", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner. Include owner_response with the owner's exact approval so authorization is persisted before execution.", inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
   { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
         { name: "runGitHubWorkflow", title: "Run GitHub validation or release workflow", description: "Dispatch one configured Main validation task or one explicit exact-SHA Worker release.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "gpt-memory-tests", "worker-deploy"] }, release_id: { type: "string", maxLength: 80 }, release_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -17719,8 +17723,10 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "appendRepoFileChunk",
     "commitRepoFileWrite",
   "createRepoFile",
-    "createGitHubRepository",
+        "createGitHubRepository",
+  "upsertGitHubRepositoryFile",
   "createCloudflarePagesProject",
+  "deployCloudflarePagesProject",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
   "getGitHubWorkflowRun",
@@ -19559,8 +19565,8 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 ] as const;
 
 function operatorPreCallProvider(toolName: string): string {
-    if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
-        if (["createCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
+        if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
+        if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
   if (["schedule_approved_draft", "schedule_manifest_review_batch", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
 }
@@ -19903,7 +19909,7 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
-      "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "createCloudflarePagesProject", "deleteRepoFile",
+            "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "createCloudflarePagesProject", "deployCloudflarePagesProject", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
 ]);
 
@@ -21882,8 +21888,10 @@ async function handleOperatorMcpAdminTool(
         "appendRepoFileChunk",
                 "commitRepoFileWrite",
                 "createRepoFile",
-        "createGitHubRepository",
+                "createGitHubRepository",
+        "upsertGitHubRepositoryFile",
         "createCloudflarePagesProject",
+        "deployCloudflarePagesProject",
         "deleteRepoFile",
         "runGitHubWorkflow",
       ]),
@@ -23655,6 +23663,59 @@ async function handleOperatorMcpEngineeringTool(
     await env.DB.prepare(`UPDATE operator_repo_write_sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(put.ok ? "committed" : "failed", sessionId).run();
     await recordEngineeringAudit(env, { action: "commitRepoFileWrite", filesChanged: [path], diffSummary: normalizeOperatorText(session.summary, 1000, true), result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
     return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: session.summary ?? null };
+  }
+
+        if (toolName === "upsertGitHubRepositoryFile") {
+    const repository = normalizeOperatorText(args.repository, 100, true);
+    const path = sanitizeRepoPath(args.path);
+    const content = typeof args.content === "string" ? args.content : "";
+    const message = normalizeOperatorText(args.message, 200);
+    const branch = normalizeOperatorText(args.branch, 120, true) ?? "main";
+    const operationId = normalizeOperatorText(args.operation_id, 120, true);
+    if (!repository || !path || !message || !operationId) return { ok: false, error: "repository_path_message_operation_id_required" };
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(repository) || repository.endsWith(".git")) return { ok: false, error: "invalid_repository_name" };
+    if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.includes("..") || branch.startsWith("/") || branch.endsWith("/")) return { ok: false, error: "invalid_repository_branch" };
+    if (new TextEncoder().encode(content).length > 100000) return { ok: false, error: "repository_file_content_too_large" };
+    const encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
+    const endpoint = `/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(repository)}/contents/${encodedPath}`;
+    const existing = await githubApi(env, `${endpoint}?ref=${encodeURIComponent(branch)}`);
+    let existingSha: string | undefined;
+    if (existing.ok) {
+      const record = existing.data && typeof existing.data === "object" && !Array.isArray(existing.data) ? existing.data as Record<string, unknown> : {};
+      existingSha = normalizeOperatorText(record.sha, 80, true) ?? undefined;
+      const encoded = typeof record.content === "string" ? record.content : "";
+      if (encoded) {
+        try {
+          if (base64ToTextUtf8(encoded) === content) return { ok: true, no_change: true, created: false, operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path, commit_sha: existingSha ?? null };
+        } catch {
+          return { ok: false, error: "existing_repository_file_decode_failed", operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path };
+        }
+      }
+    } else if (existing.status !== 404) {
+      return { ok: false, error: "github_repository_file_lookup_failed", status: existing.status, operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path };
+    }
+    const put = await githubApi(env, endpoint, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, content: textToBase64Utf8(content), branch, ...(existingSha ? { sha: existingSha } : {}) }) });
+    const putRecord = put.data && typeof put.data === "object" && !Array.isArray(put.data) ? put.data as Record<string, unknown> : {};
+    const commitRecord = putRecord.commit && typeof putRecord.commit === "object" && !Array.isArray(putRecord.commit) ? putRecord.commit as Record<string, unknown> : {};
+    const commitSha = normalizeOperatorText(commitRecord.sha, 80, true);
+    await recordEngineeringAudit(env, { action: "upsertGitHubRepositoryFile", filesChanged: [`${repository}:${path}`], diffSummary: put.ok ? `Upserted ${config.owner}/${repository}:${path}.` : `Failed to upsert ${config.owner}/${repository}:${path}.`, result: put.ok ? "ok" : "failed", metadata: { operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path, status: put.status, commit_sha: commitSha } });
+    return { ok: put.ok, status: put.status, created: !existing.ok, operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path, commit_sha: commitSha };
+  }
+
+  if (toolName === "deployCloudflarePagesProject") {
+    const projectName = normalizeOperatorText(args.project_name, 58, true);
+    const repository = normalizeOperatorText(args.repository, 100, true);
+    const branch = normalizeOperatorText(args.branch, 120, true) ?? "main";
+    const directory = sanitizeRepoPath(args.directory ?? "site");
+    const operationId = normalizeOperatorText(args.operation_id, 80, true);
+    if (!projectName || !repository || !directory || !operationId) return { ok: false, error: "pages_project_repository_directory_operation_id_required" };
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,56}[a-z0-9])?$/.test(projectName)) return { ok: false, error: "invalid_pages_project_name" };
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(repository) || repository.endsWith(".git")) return { ok: false, error: "invalid_repository_name" };
+    if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.includes("..") || branch.startsWith("/") || branch.endsWith("/")) return { ok: false, error: "invalid_repository_branch" };
+    const workflowId = "lensically-cloudflare-pages-deploy.yml";
+    const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: config.branch, inputs: { operation_id: operationId, project_name: projectName, repository, branch, directory } }) });
+    await recordEngineeringAudit(env, { action: "deployCloudflarePagesProject", filesChanged: [], diffSummary: result.ok ? `Dispatched Pages deployment for ${config.owner}/${repository}:${directory}.` : `Failed to dispatch Pages deployment for ${config.owner}/${repository}:${directory}.`, result: result.ok ? "ok" : "failed", metadata: { operation_id: operationId, project_name: projectName, repository: `${config.owner}/${repository}`, branch, directory, workflow_id: workflowId, status: result.status } });
+    return { ok: result.ok, status: result.status, dispatched: result.ok, workflow_id: workflowId, operation_id: operationId, project_name: projectName, repository: `${config.owner}/${repository}`, branch, directory, expected_url: `https://${projectName}.pages.dev` };
   }
 
       if (toolName === "createCloudflarePagesProject") {
