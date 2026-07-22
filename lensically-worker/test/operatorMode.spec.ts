@@ -2700,8 +2700,11 @@ describe("operator mode MCP endpoint", () => {
       operation_id: operationId,
       proceed_confirmed: true,
     });
-    await env.DB.prepare(
+        await env.DB.prepare(
       `UPDATE operator_autonomous_growth_cycles SET horizon_start_local = '2000-01-01T00:00' WHERE id = ?`,
+    ).bind(first.cycle.id).run();
+    await env.DB.prepare(
+      `UPDATE operator_manifest_exposure_snapshots SET source_hash = 'stale-test-hash' WHERE cycle_id = ?`,
     ).bind(first.cycle.id).run();
 
     const second = await mcpTool<{ cycle: { id: string; horizon_start_local: string }; idempotency?: unknown }>(
@@ -2718,10 +2721,20 @@ describe("operator mode MCP endpoint", () => {
     expect(second.cycle.id).toBe(first.cycle.id);
     expect(second.cycle.horizon_start_local).not.toBe("2000-01-01T00:00");
     expect(second.idempotency).toBeUndefined();
-    const stored = await env.DB.prepare(
+        const stored = await env.DB.prepare(
       `SELECT horizon_start_local FROM operator_autonomous_growth_cycles WHERE id = ?`,
     ).bind(first.cycle.id).first<{ horizon_start_local: string }>();
     expect(stored?.horizon_start_local).toBe(second.cycle.horizon_start_local);
+    const exposure = await env.DB.prepare(
+      `SELECT revision, source_hash FROM operator_manifest_exposure_snapshots WHERE cycle_id = ?`,
+    ).bind(first.cycle.id).first<{ revision: number; source_hash: string }>();
+    expect(Number(exposure?.revision ?? 0)).toBeGreaterThan(1);
+    expect(exposure?.source_hash).not.toBe("stale-test-hash");
+    const preparationEvents = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_manifest_cycle_receipt_events
+       WHERE cycle_id = ? AND event_type = 'cycle_prepared'`,
+    ).bind(first.cycle.id).first<{ total: number }>();
+    expect(Number(preparationEvents?.total ?? 0)).toBeGreaterThanOrEqual(2);
   }, 30000);
 
     it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
@@ -2755,7 +2768,25 @@ describe("operator mode MCP endpoint", () => {
         family_key: `test_original_discovery_${crypto.randomUUID().slice(0, 8)}`,
         source_mechanism: "A concise direct statement links clarity to forward momentum.",
         audience_reward: "A sense of clarity and forward motion.",
-        strategic_purpose: "Test a distinct operator-originated micro-length mechanism.",
+                strategic_purpose: "Test a distinct operator-originated micro-length mechanism.",
+        source_context: {
+          kind: "operator_hypothesis",
+          source_type: "operator_hypothesis",
+        },
+        hypothesis: {
+          expected_response_type: "balanced_engagement",
+          expected_audience_reward: "A sense of clarity and forward motion.",
+          hook_rationale: "The concise direct statement creates immediate relevance.",
+          premise_rationale: "The premise connects one clear decision to tangible momentum.",
+          exploration_mode: "explore",
+          comparable_post_ids: [],
+          expected_performance_range: {
+            views: { min: 100, max: 10_000 },
+            likes: { min: 5, max: 1_000 },
+          },
+          uncertainty: "A new operator-originated family may need several mature observations.",
+          falsification_conditions: ["Comparable mature posts consistently underperform the engagement floor."],
+        },
         transformed_elements: ["operator_originated_premise"],
         strategy: {
           pillar: "clarity",
@@ -2780,8 +2811,11 @@ describe("operator mode MCP endpoint", () => {
         const persisted = await mcpTool<{
       success: boolean;
       scheduled_post_id: number;
-      lineage: { source_batch_id: string; source_selection_id: string; source_card_id: string; generation_run_id: string; draft_id: string; inventory_id: string };
+            lineage: { source_batch_id: string; source_selection_id: string; source_card_id: string; generation_run_id: string; draft_id: string; inventory_id: string; hypothesis_id: string; strategy_version_id: string };
+      hypothesis_id: string;
+      strategy_version_id: string;
       publish_lineage_complete: boolean;
+      intelligence_lineage_complete: boolean;
       server_checks: { no_internal_gate_fanout: boolean; no_internal_runway_scan: boolean; no_threads_api_call: boolean };
       remaining_missing_count: number;
     }>("persist_manifest_autonomous_post", payload);
@@ -2792,8 +2826,13 @@ describe("operator mode MCP endpoint", () => {
     expect(persisted.lineage.source_card_id).toBeTruthy();
     expect(persisted.lineage.generation_run_id).toBeTruthy();
     expect(persisted.lineage.draft_id).toBeTruthy();
-    expect(persisted.lineage.inventory_id).toBeTruthy();
+        expect(persisted.lineage.inventory_id).toBeTruthy();
+    expect(persisted.lineage.hypothesis_id).toBeTruthy();
+    expect(persisted.lineage.strategy_version_id).toBeTruthy();
+    expect(persisted.hypothesis_id).toBe(persisted.lineage.hypothesis_id);
+    expect(persisted.strategy_version_id).toBe(persisted.lineage.strategy_version_id);
     expect(persisted.publish_lineage_complete).toBe(true);
+    expect(persisted.intelligence_lineage_complete).toBe(true);
     expect(persisted.server_checks).toMatchObject({
       no_internal_gate_fanout: true,
       no_internal_runway_scan: true,
@@ -2804,7 +2843,47 @@ describe("operator mode MCP endpoint", () => {
       persisted.scheduled_post_id,
       "35758578720393972",
     );
-    expect(publishLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
+        expect(publishLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
+    const intelligenceLineage = await env.DB.prepare(
+      `SELECT l.hypothesis_id, l.source_selection_id,
+              h.status AS hypothesis_status, h.locked_at, h.scheduled_post_id, h.revision
+       FROM operator_autonomous_lineup_items l
+       JOIN operator_manifest_post_hypotheses h ON h.id = l.hypothesis_id
+       WHERE l.cycle_id = ? AND l.slot_key = ? AND l.scheduled_post_id = ? LIMIT 1`,
+    ).bind(prepared.cycle.id, slot.key, persisted.scheduled_post_id).first<{
+      hypothesis_id: string; source_selection_id: string; hypothesis_status: string;
+      locked_at: string | null; scheduled_post_id: number; revision: number;
+    }>();
+    expect(intelligenceLineage?.hypothesis_id).toBe(persisted.hypothesis_id);
+    expect(intelligenceLineage?.source_selection_id).toBe(persisted.lineage.source_selection_id);
+    expect(intelligenceLineage?.hypothesis_status).toBe("scheduled");
+    expect(intelligenceLineage?.locked_at).toBeTruthy();
+    expect(Number(intelligenceLineage?.scheduled_post_id)).toBe(persisted.scheduled_post_id);
+    expect(Number(intelligenceLineage?.revision ?? 0)).toBeGreaterThanOrEqual(1);
+    const receipt = await mcpTool<{
+      available: boolean;
+      cycle_receipt: {
+        input_strategy_version: { id: string } | null;
+        output_strategy_version: { id: string } | null;
+        exposure_snapshot: { id: string; revision: number } | null;
+        hypotheses: Array<{ id: string; scheduled_post_id: number; status: string; locked_at: string | null }>;
+        events: Array<{ event_type: string }>;
+      } | null;
+    }>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      proceed_confirmed: true,
+    });
+    expect(receipt.available).toBe(true);
+    expect(receipt.cycle_receipt?.input_strategy_version?.id).toBeTruthy();
+    expect(receipt.cycle_receipt?.output_strategy_version?.id).toBe(persisted.strategy_version_id);
+    expect(receipt.cycle_receipt?.exposure_snapshot?.id).toBeTruthy();
+    expect(receipt.cycle_receipt?.hypotheses).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: persisted.hypothesis_id, scheduled_post_id: persisted.scheduled_post_id, status: "scheduled" }),
+    ]));
+    expect(receipt.cycle_receipt?.events.map((event) => event.event_type)).toEqual(expect.arrayContaining([
+      "cycle_prepared", "candidate_evaluated", "post_persisted", "coverage_reconciled",
+    ]));
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
@@ -2865,7 +2944,19 @@ describe("operator mode MCP endpoint", () => {
         family_key: `test_owner_review_${crypto.randomUUID().slice(0, 8)}`,
         source_mechanism: "A concise decision-oriented reflection.",
         audience_reward: "A grounded sense of agency.",
-        strategic_purpose: "Verify optional criticism after autonomous scheduling.",
+                strategic_purpose: "Verify optional criticism after autonomous scheduling.",
+        source_context: { kind: "operator_hypothesis", source_type: "operator_hypothesis" },
+        hypothesis: {
+          expected_response_type: "likes",
+          expected_audience_reward: "A grounded sense of agency.",
+          hook_rationale: "The direct opening makes the reflection immediately accessible.",
+          premise_rationale: "One honest decision is a concrete, low-friction action.",
+          exploration_mode: "explore",
+          comparable_post_ids: [],
+          expected_performance_range: { views: { min: 100, max: 10_000 }, likes: { min: 5, max: 1_000 } },
+          uncertainty: "The reflective premise may produce quiet resonance rather than replies.",
+          falsification_conditions: ["Comparable mature posts consistently fail the engagement floor."],
+        },
         strategy: { pillar: "agency", hook_style: "direct_statement", novelty_level: "original_discovery" },
       },
       model_evaluation: {
