@@ -212,15 +212,15 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     db.prepare(`SELECT id, experiment_key, family_key, status, follow_up_decision,
         hypothesis_json, comparison_group_json, latest_result_json, updated_at
       FROM operator_manifest_experiments WHERE brand_key = ?
-            ORDER BY datetime(updated_at) DESC LIMIT 8`).bind(brandKey).all<JsonRecord>(),
+                        ORDER BY datetime(updated_at) DESC LIMIT 4`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT pattern_identity_key, source_identity_key, mechanism_json,
         adaptation_options_json, confidence_json, reuse_state, results_json, updated_at
       FROM operator_manifest_saved_pattern_intelligence WHERE brand_key = ?
         AND exclusion_state = 'active'
       ORDER BY CASE reuse_state WHEN 'proven' THEN 1 WHEN 'ready' THEN 2 WHEN 'monitor' THEN 3 ELSE 4 END,
-                datetime(updated_at) DESC LIMIT 8`).bind(brandKey).all<JsonRecord>(),
+                                datetime(updated_at) DESC LIMIT 4`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT signature_json, observed_at FROM operator_manifest_semantic_signatures
-            WHERE brand_key = ? ORDER BY datetime(observed_at) DESC LIMIT 24`).bind(brandKey).all<JsonRecord>(),
+                        WHERE brand_key = ? ORDER BY datetime(observed_at) DESC LIMIT 18`).bind(brandKey).all<JsonRecord>(),
   ]);
   const learningBrief = serializeLearningBrief(briefRow);
   const benchmark = serializeBenchmark(benchmarkRow);
@@ -230,7 +230,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
   const directives = uniqueStrings([
     ...array(strategyChange.directives),
     ...array(briefPayload.next_run_tests),
-  ], 24);
+    ], 8);
   const familyPriorities = (portfolioRows.results ?? []).map((row) => ({
     family_key: row.family_key,
     role: row.role,
@@ -239,9 +239,8 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     confidence_score: number(row.confidence_score),
     confidence_label: row.confidence_label,
     allocation_weight: number(row.allocation_weight, 1),
-    actual_decay: number(row.actual_decay) === 1,
-        reason: row.reason ?? null,
-    updated_at: row.updated_at ?? null,
+        actual_decay: number(row.actual_decay) === 1,
+    reason: row.reason ?? null,
   }));
   const experiments = (experimentRows.results ?? []).map((row) => ({
     id: row.id,
@@ -251,8 +250,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     follow_up_decision: row.follow_up_decision ?? null,
         hypothesis: compact(parseJson(row.hypothesis_json, {}), 4),
     comparison_group: compact(parseJson(row.comparison_group_json, {}), 4),
-    latest_result: compact(parseJson(row.latest_result_json, {}), 4),
-    updated_at: row.updated_at ?? null,
+        latest_result: compact(parseJson(row.latest_result_json, {}), 4),
   }));
   const savedPatterns = (savedRows.results ?? []).map((row) => ({
     pattern_identity_key: row.pattern_identity_key,
@@ -261,8 +259,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     adaptation_options: compact(parseJson(row.adaptation_options_json, {}), 4),
     confidence: compact(parseJson(row.confidence_json, {}), 4),
     reuse_state: row.reuse_state,
-    results: compact(parseJson(row.results_json, {}), 4),
-    updated_at: row.updated_at ?? null,
+        results: compact(parseJson(row.results_json, {}), 4),
   }));
   const premiseCounts = new Map<string, number>();
   const architectureCounts = new Map<string, number>();
@@ -278,9 +275,9 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     }
   }
   const repetition = {
-    premise_clusters: Array.from(premiseCounts.entries()).map(([key, count]) => ({ key, count })).sort((left, right) => right.count - left.count).slice(0, 12),
-    architecture_clusters: Array.from(architectureCounts.entries()).map(([key, count]) => ({ key, count })).sort((left, right) => right.count - left.count).slice(0, 12),
-    scenario_clusters: Array.from(scenarioCounts.entries()).map(([key, count]) => ({ key, count })).sort((left, right) => right.count - left.count).slice(0, 12),
+        premise_clusters: Array.from(premiseCounts.entries()).map(([key, count]) => ({ key, count })).sort((left, right) => right.count - left.count).slice(0, 6),
+    architecture_clusters: Array.from(architectureCounts.entries()).map(([key, count]) => ({ key, count })).sort((left, right) => right.count - left.count).slice(0, 6),
+    scenario_clusters: Array.from(scenarioCounts.entries()).map(([key, count]) => ({ key, count })).sort((left, right) => right.count - left.count).slice(0, 6),
     recent_signature_count: (semanticRows.results ?? []).length,
   };
   const follower = followerRow ? {
@@ -288,7 +285,17 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     followers_count: number(followerRow.followers_count),
     follower_goal: number(followerRow.follower_goal, 1_000_000),
     distance_to_goal: number(followerRow.distance_to_goal),
-    trajectory: compact(parseJson(followerRow.trajectory_json, {}), 30),
+        trajectory: (() => {
+      const trajectory = record(parseJson(followerRow.trajectory_json, {}));
+      return {
+        snapshot_count: trajectory.snapshot_count ?? 0,
+        average_daily_change_7d: trajectory.average_daily_change_7d ?? null,
+        average_daily_change_30d: trajectory.average_daily_change_30d ?? null,
+        trend: trajectory.trend ?? "uncertain",
+        estimated_days_to_goal_at_observed_velocity: trajectory.estimated_days_to_goal_at_observed_velocity ?? null,
+        projection_is_attribution: false,
+      };
+    })(),
     account_level_only: true,
     attribution_policy: followerRow.attribution_policy,
   } : null;
@@ -310,7 +317,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     benchmark_response: {
       latest: benchmark,
       latest_run_comparison: runComparison,
-      repeated_mistakes: array(comparisonPayload.repeated_mistakes).slice(0, 20),
+            repeated_mistakes: array(comparisonPayload.repeated_mistakes).slice(0, 8),
       actual_strategy_influence: comparisonPayload.actual_strategy_influence === true,
       prediction_accuracy: record(benchmarkPayload.prediction_accuracy),
       engagement_floor: record(benchmarkPayload.engagement_floor),
