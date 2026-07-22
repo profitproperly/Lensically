@@ -2885,38 +2885,46 @@ describe("operator mode MCP endpoint", () => {
       post: {
         date: slot.date,
         time: slot.time,
-        text: `Autonomous original discovery ${crypto.randomUUID().slice(0, 8)}: your next clear decision can change the pace of everything.`,
-        generation_mode: "original_discovery",
-        family_key: `test_original_discovery_${crypto.randomUUID().slice(0, 8)}`,
-        source_mechanism: "A concise direct statement links clarity to forward momentum.",
-        audience_reward: "A sense of clarity and forward motion.",
-                strategic_purpose: "Test a distinct operator-originated micro-length mechanism.",
+                text: "If $25,123 reached you today, what expense disappears first?",
+        generation_mode: "adjacent_experiment",
+        family_key: "test_specific_money_priority",
+        source_mechanism: "A specific-dollar question invites one concrete financial priority.",
+        audience_reward: "A specific financial choice worth discussing.",
+                strategic_purpose: "Test a controlled specific-money question while proving semantic collision prevention.",
         source_context: {
           kind: "operator_hypothesis",
           source_type: "operator_hypothesis",
         },
         hypothesis: {
           expected_response_type: "balanced_engagement",
-          expected_audience_reward: "A sense of clarity and forward motion.",
-          hook_rationale: "The concise direct statement creates immediate relevance.",
-          premise_rationale: "The premise connects one clear decision to tangible momentum.",
+                    expected_audience_reward: "A specific financial choice worth discussing.",
+          hook_rationale: "The concrete amount creates immediate imagination.",
+          premise_rationale: "The question exposes a real spending-priority tradeoff.",
           exploration_mode: "explore",
           comparable_post_ids: [],
           expected_performance_range: {
             views: { min: 100, max: 10_000 },
             likes: { min: 5, max: 1_000 },
           },
-          uncertainty: "A new operator-originated family may need several mature observations.",
+                    uncertainty: "The premise may already be overexposed even when the amount changes.",
           falsification_conditions: ["Comparable mature posts consistently underperform the engagement floor."],
+          experiment: {
+            experiment_key: "test-money-question-payoff-v1",
+            hypothesis: { variable: "payoff", expected_effect: "higher conversation rate" },
+            comparison_group: { family_key: "test_specific_money_priority", variant_excluded: true },
+            maturity_windows: [6, 12, 18, 24],
+            result_criteria: { minimum_variant: 3, minimum_control: 3, win_delta: 8, loss_delta: -8 },
+            variant_key: "direct-relief-payoff",
+          },
         },
         transformed_elements: ["operator_originated_premise"],
         strategy: {
-          pillar: "clarity",
-          hook_style: "direct_statement",
-          format: "single_sentence",
-          intent: "resonance",
-          experiment: "autonomous_original_discovery",
-          novelty_level: "original_discovery",
+                    pillar: "money",
+          hook_style: "specific_money_question",
+          format: "direct_question",
+          intent: "conversation",
+          experiment: "test-money-question-payoff-v1",
+          novelty_level: "adjacent_experiment",
         },
       },
       model_evaluation: {
@@ -2938,7 +2946,9 @@ describe("operator mode MCP endpoint", () => {
       strategy_version_id: string;
       publish_lineage_complete: boolean;
       intelligence_lineage_complete: boolean;
-      server_checks: { no_internal_gate_fanout: boolean; no_internal_runway_scan: boolean; no_threads_api_call: boolean };
+            experiment_assignment: { id: string; experiment_key: string; variant_key: string; status: string } | null;
+      semantic_repetition: { semantic_repetition_blocked: boolean; highest_score: number };
+      server_checks: { semantic_repetition_collision: boolean; no_internal_gate_fanout: boolean; no_internal_runway_scan: boolean; no_threads_api_call: boolean };
       remaining_missing_count: number;
     }>("persist_manifest_autonomous_post", payload);
     expect(persisted.success).toBe(true);
@@ -2954,8 +2964,15 @@ describe("operator mode MCP endpoint", () => {
     expect(persisted.hypothesis_id).toBe(persisted.lineage.hypothesis_id);
     expect(persisted.strategy_version_id).toBe(persisted.lineage.strategy_version_id);
     expect(persisted.publish_lineage_complete).toBe(true);
-    expect(persisted.intelligence_lineage_complete).toBe(true);
+        expect(persisted.intelligence_lineage_complete).toBe(true);
+    expect(persisted.experiment_assignment).toMatchObject({
+      experiment_key: "test_money_question_payoff_v1",
+      variant_key: "direct_relief_payoff",
+      status: "running",
+    });
+    expect(persisted.semantic_repetition.semantic_repetition_blocked).toBe(false);
     expect(persisted.server_checks).toMatchObject({
+      semantic_repetition_collision: false,
       no_internal_gate_fanout: true,
       no_internal_runway_scan: true,
       no_threads_api_call: true,
@@ -2980,8 +2997,31 @@ describe("operator mode MCP endpoint", () => {
     expect(intelligenceLineage?.source_selection_id).toBe(persisted.lineage.source_selection_id);
     expect(intelligenceLineage?.hypothesis_status).toBe("scheduled");
     expect(intelligenceLineage?.locked_at).toBeTruthy();
-    expect(Number(intelligenceLineage?.scheduled_post_id)).toBe(persisted.scheduled_post_id);
+        expect(Number(intelligenceLineage?.scheduled_post_id)).toBe(persisted.scheduled_post_id);
     expect(Number(intelligenceLineage?.revision ?? 0)).toBeGreaterThanOrEqual(1);
+    const semanticSignature = await env.DB.prepare(
+      `SELECT signature_json FROM operator_manifest_semantic_signatures
+       WHERE brand_key = 'manifest_mental' AND content_type = 'scheduled' AND scheduled_post_id = ? LIMIT 1`,
+    ).bind(persisted.scheduled_post_id).first<{ signature_json: string }>();
+    expect(JSON.parse(String(semanticSignature?.signature_json ?? "{}"))).toMatchObject({
+      question_type: "choice_priority",
+      financial_scenario_key: "spending_priority",
+      sentence_architecture: "specific_amount_question",
+    });
+    const experimentLineage = await env.DB.prepare(
+      `SELECT e.experiment_key, a.hypothesis_id, a.scheduled_post_id, a.variant_key
+       FROM operator_manifest_experiment_assignments a
+       JOIN operator_manifest_experiments e ON e.id = a.experiment_id
+       WHERE a.scheduled_post_id = ? LIMIT 1`,
+    ).bind(persisted.scheduled_post_id).first<{
+      experiment_key: string; hypothesis_id: string; scheduled_post_id: number; variant_key: string;
+    }>();
+    expect(experimentLineage).toMatchObject({
+      experiment_key: "test_money_question_payoff_v1",
+      hypothesis_id: persisted.hypothesis_id,
+      scheduled_post_id: persisted.scheduled_post_id,
+      variant_key: "direct_relief_payoff",
+    });
         const directEvents = await env.DB.prepare(
       `SELECT event_type FROM operator_manifest_cycle_receipt_events
        WHERE cycle_id = ? ORDER BY datetime(created_at) ASC, event_key ASC`,
@@ -3065,8 +3105,41 @@ describe("operator mode MCP endpoint", () => {
         status: "scheduled",
       }),
     ]));
-    expect(hypothesisPage.receipt_section.pagination.total).toBeGreaterThanOrEqual(1);
+        expect(hypothesisPage.receipt_section.pagination.total).toBeGreaterThanOrEqual(1);
     expect(hypothesisPage.receipt_section.pagination.has_more).toBe(false);
+
+    const collisionSlot = prepared.cycle.missing_slots[1];
+    expect(collisionSlot).toBeTruthy();
+    const collision = await mcpTool<{
+      success: boolean;
+      error: string;
+      semantic_repetition: {
+        semantic_repetition_blocked: boolean;
+        collision: { severity: string; premise_similarity: number; blocking: boolean };
+      };
+    }>("persist_manifest_autonomous_post", {
+      ...payload,
+      post: {
+        ...payload.post,
+        date: collisionSlot.date,
+        time: collisionSlot.time,
+        text: "$50,456 arrives today. What gets handled first?",
+      },
+      operation_id: `test-autonomous-semantic-collision-${crypto.randomUUID()}`,
+    });
+    expect(collision).toMatchObject({
+      success: false,
+      error: "semantic_repetition_collision",
+      semantic_repetition: {
+        semantic_repetition_blocked: true,
+        collision: { severity: "collision", premise_similarity: 1, blocking: true },
+      },
+    });
+    const collisionScheduled = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM scheduled_posts
+       WHERE threads_user_id = '35758578720393972' AND scheduled_time = ?`,
+    ).bind(convertLocalDateTimeToUtcIso(collisionSlot.date, collisionSlot.time, "America/New_York")).first<{ count: number }>();
+    expect(Number(collisionScheduled?.count ?? 0)).toBe(0);
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
