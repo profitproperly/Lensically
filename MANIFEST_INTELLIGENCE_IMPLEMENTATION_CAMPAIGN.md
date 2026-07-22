@@ -258,6 +258,85 @@ Turn 2 completion boundary:
 - No production deployment or live account mutation was performed during this checkpoint.
 - Turn 3 must consume these canonical maturity, comparable, semantic, learning, experiment, portfolio, and transition records rather than recomputing parallel analytics.
 
+### Turn 3 — COMPLETE IN SOURCE
+
+Completed: 2026-07-22
+Validated implementation head: `f546e25bff65718122645048b5b152be3066275c`
+Production status: NOT DEPLOYED. Production migration, scheduled-task consumption, dashboard integration, live account verification, and proof that learned strategy changes live decisions remain reserved for Turn 4.
+Next authorized implementation step: Turn 4 — Product integration and proof.
+
+Implemented and hardened:
+
+1. Automatic learning briefs
+   - Turn 2 maturity, comparable, multi-level learning, portfolio, experiment, and transition records are synthesized into one durable brief instead of recomputed through a parallel analytics path.
+   - The brief identifies improvements, weakening, uncertainty, family opportunities, verified fatigue or decay, disproven assumptions, experiment decisions, recent state transitions, and next-run tests.
+   - Early evidence may be summarized, but a structural strategy version is created only when authoritative 24-hour evidence supports a reliable improvement, reliable weakening, verified decay, disproven assumption, or terminal experiment decision.
+   - Every warranted change preserves parent strategy, source evidence, change summary, reversal conditions, and source-cycle lineage. Replaying unchanged evidence remains idempotent.
+
+2. Operator benchmarks
+   - Every available autonomous cycle receives one durable benchmark snapshot with a stable source fingerprint.
+   - Benchmarks cover slot completion, candidate efficiency, duplicate and semantic-collision prevention, gate quality, semantic diversity, complete lineage, prediction calibration, learning confidence, mature performance, family development, experiment progress, and whether strategy changed.
+   - Prediction accuracy uses machine-readable expected ranges against authoritative mature results. Missing calibration evidence is reported as insufficient rather than guessed.
+   - Benchmark refreshes update the same cycle snapshot instead of creating duplicate run records.
+
+3. Run-to-run comparison
+   - Each cycle is compared with the immediately prior benchmark across execution quality, content quality, learning quality, growth of viable families, repeated mistakes, and strategy influence.
+   - Every metric carries direction-aware improved, weakened, mixed-or-unchanged, or insufficient-comparable-evidence status.
+   - Repeated mistakes are surfaced explicitly, and the audit records whether strategy actually influenced the cycle rather than merely existing in storage.
+   - First-run absence of a prior benchmark is a normal evidence gap, not a false failure.
+
+4. Conversational audit layer
+   - New direct typed read-only tool `get_manifest_intelligence_audit` exposes summary, learning brief, benchmarks, run comparisons, Saved Patterns, follower checkpoint, strategy transitions, portfolio, experiments, and capability gaps.
+   - Every variable-size section is bounded and pageable with explicit total, offset, limit, returned count, continuation state, and next offset.
+   - The tool is available after Proceed without requiring Growth Mission approval because it cannot mutate content, schedules, account state, or strategy.
+   - The same bounded audit summary is included in the existing performance-learning surface, so autonomous planning and conversational inspection use the same canonical evidence.
+
+5. Saved Pattern intelligence expansion
+   - Every qualified Saved Pattern receives stable identity, verified source metrics, semantic signature, hook, mechanism, audience reward, structure, topic, tension, and source-card transformation context.
+   - Adaptation guidance separates what to preserve, what to vary, and what nearby semantic executions to avoid.
+   - Usage history, last-use timing, mature adapted-post results, confidence, similarity risk, exclusion state, and reuse state are persisted.
+   - Reuse states include ready, proven, monitor, cooling, and excluded. Original source popularity alone cannot prove that Lensically adaptations work.
+
+6. Account-level follower checkpoint
+   - Up to 365 daily account snapshots produce current followers, distance to the 1,000,000-follower goal, progress ratio, recent daily changes, 7-day and 30-day average velocity, trend, and a velocity-based projection.
+   - Projection is explicitly labeled as non-attribution.
+   - Post, day, family, experiment, cycle, source, schedule, and posting-period follower attribution remain forbidden.
+   - Fewer than two checkpoints are surfaced as uncertainty rather than converted into a fabricated growth conclusion.
+
+Operational integration:
+
+- Performance evaluation now refreshes the learning brief, benchmark snapshot, run comparison, Saved Pattern intelligence, and account-level follower checkpoint after updating Turn 2 evidence.
+- Autonomous preparation refreshes the same measurement layer before constructing account position, then consumes the latest brief and any warranted strategy version before planning the runway.
+- The audit layer initializes all Turn 1, Turn 2, strategy-tag, workflow-lineage, Saved Pattern, and follower dependencies explicitly on fresh databases.
+- The direct tool is registered in the public surface, static intent map, system directory, capability lifecycle, read-only authorization classification, and bounded live-read campaign.
+- The deterministic capability campaign now proves 98 routes, executes all 43 read-only capabilities, and preflights 55 mutations with zero side effects.
+
+Defects discovered and permanently corrected during Turn 3:
+
+- Saved Pattern enrichment initially lost external row fields through TypeScript inference; the row contract now preserves both stable source fields and semantic signatures.
+- One combined integration patch exceeded the client payload safety boundary; implementation was split into smaller atomic commits, preserving the same result without weakening the safety gate.
+- The lifecycle gate correctly rejected the new tool until its Directory entry, static route, and named regression were registered; all three are now mandatory.
+- Fresh databases could query post hypotheses before Turn 1 tables existed; the shared Turn 3 initializer now creates every prerequisite first.
+- The new audit was initially treated as account execution and blocked before Growth Mission approval; it is now classified with canonical read-only analytics tools.
+- Route totals increased from 97/42/55 to 98/43/55, and the new audit was added to the live-read segment so coverage did not become nominal-only.
+- A stream interruption occurred after a completed repository write; exact-head and workflow receipts were recovered before continuing, with no duplicate write or validation dispatch.
+
+Validation evidence on the exact implementation head:
+
+- Push validation: run `29930051303` — success.
+- Typecheck and capability lifecycle: run `29930072965` — success.
+- Focused operator smoke plus Manifest measurement tests: run `29930089935` — success.
+- System-directory, static-route, lifecycle, and schema regressions: run `29930107444` — success.
+- Full deterministic operator suite, all eight shards: run `29930125369` — success.
+
+Turn 3 completion boundary:
+
+- All six Measurement and audit capabilities are source-complete, operationally integrated, and regression-covered.
+- Mature evidence can now produce an automatic brief and a new durable strategy version when the evidence gate warrants it.
+- Operator quality is persistently measurable and comparable across runs, Saved Patterns contain reusable business intelligence, followers remain account-level only, and a new chat can inspect the complete intelligence state through one bounded audit tool.
+- No production deployment, production migration, live account mutation, or scheduled-task behavior change was performed during this checkpoint.
+- Turn 4 must integrate these outputs into the product dashboard and scheduled task, run end-to-end tests, deploy the exact validated head or its documented successor, verify production migration and live audit reads, execute a live scheduled run, retrieve the full receipt, and prove that learned strategy materially changes generation or scheduling decisions.
+
 ## Known first-run findings to preserve
 
 - Operational execution succeeded and filled the runway using single-post persistence and periodic coverage reconciliation.
