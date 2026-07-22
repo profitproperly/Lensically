@@ -3135,10 +3135,10 @@ describe("operator mode MCP endpoint", () => {
         collision: { severity: "collision", premise_similarity: 1, blocking: true },
       },
     });
-    const collisionScheduled = await env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM scheduled_posts
-       WHERE threads_user_id = '35758578720393972' AND scheduled_time = ?`,
-    ).bind(convertLocalDateTimeToUtcIso(collisionSlot.date, collisionSlot.time, "America/New_York")).first<{ count: number }>();
+        const collisionScheduled = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM operator_autonomous_lineup_items
+       WHERE cycle_id = ? AND slot_key = ? AND scheduled_post_id IS NOT NULL`,
+    ).bind(prepared.cycle.id, collisionSlot.key).first<{ count: number }>();
     expect(Number(collisionScheduled?.count ?? 0)).toBe(0);
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
