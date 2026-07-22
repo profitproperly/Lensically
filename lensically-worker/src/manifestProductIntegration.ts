@@ -324,9 +324,12 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
       mature_performance: record(benchmarkPayload.mature_performance),
     },
     follower_checkpoint: follower,
-    consumption_contract: {
+        consumption_contract: {
       required: true,
-            inputs_that_must_be_considered: {
+      measurement_state_mode: "latest_persisted_measurement_state",
+      measurement_recomputed: false,
+      measurement_refresh_owner: "performance_evaluator_and_insights_cycle",
+      inputs_that_must_be_considered: {
         latest_strategy: true,
         learning_brief: true,
         required_directives: true,
