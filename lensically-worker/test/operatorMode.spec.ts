@@ -3198,10 +3198,18 @@ describe("operator mode MCP endpoint", () => {
 
     it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
 
-    await activateManifestAutonomyForTest();
+        await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       success: boolean;
-      cycle: { id: string; missing_slots: Array<{ key: string; date: string; time: string }> };
+      cycle: {
+        id: string;
+        missing_slots: Array<{ key: string; date: string; time: string }>;
+        account_position: { decision_intelligence: Record<string, unknown> };
+      };
+      decision_intelligence: {
+        version: string;
+        consumption_contract: { required: boolean; required_decision_outputs: string[] };
+      };
     }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
@@ -3209,6 +3217,16 @@ describe("operator mode MCP endpoint", () => {
       operation_id: `test-autonomous-persist-prepare-${crypto.randomUUID()}`,
       proceed_confirmed: true,
     });
+    expect(prepared.decision_intelligence).toMatchObject({
+      version: "manifest-decision-intelligence-v1",
+      consumption_contract: { required: true },
+    });
+    expect(prepared.decision_intelligence.consumption_contract.required_decision_outputs).toEqual(expect.arrayContaining([
+      "family selection",
+      "slot placement",
+      "strategy change or explicit evidence-based preservation",
+    ]));
+    expect(prepared.cycle.account_position.decision_intelligence).toMatchObject({ version: "manifest-decision-intelligence-v1" });
     const slot = prepared.cycle.missing_slots[0];
     expect(slot).toBeTruthy();
     const persistOperationId = `test-autonomous-persist-${crypto.randomUUID()}`;
@@ -3304,10 +3322,45 @@ describe("operator mode MCP endpoint", () => {
     expect(persisted.strategy_version_id).toBe(persisted.lineage.strategy_version_id);
     expect(persisted.publish_lineage_complete).toBe(true);
         expect(persisted.intelligence_lineage_complete).toBe(true);
-    expect(persisted.experiment_assignment).toMatchObject({
+        expect(persisted.experiment_assignment).toMatchObject({
       experiment_key: "test_money_question_payoff_v1",
       variant_key: "direct_relief_payoff",
       status: "running",
+    });
+    expect(persisted.decision_influence).toMatchObject({
+      decision_changed: true,
+      scheduled_post_id: persisted.scheduled_post_id,
+      decision_change_types: expect.arrayContaining([
+        "strategy_version_changed",
+        "controlled_experiment_applied",
+        "repetition_evidence_applied",
+      ]),
+    });
+    expect(persisted.decision_influence.decision_summary).toContain("Learned intelligence changed or constrained");
+    const storedDecisionInfluence = await env.DB.prepare(
+      `SELECT scheduled_post_id, hypothesis_id, strategy_version_id, decision_changed,
+              decision_change_types_json, evidence_json
+       FROM operator_manifest_decision_influences
+       WHERE brand_key = 'manifest_mental' AND cycle_id = ? AND slot_key = ? LIMIT 1`,
+    ).bind(prepared.cycle.id, slot.key).first<{
+      scheduled_post_id: number; hypothesis_id: string; strategy_version_id: string;
+      decision_changed: number; decision_change_types_json: string; evidence_json: string;
+    }>();
+    expect(storedDecisionInfluence).toMatchObject({
+      scheduled_post_id: persisted.scheduled_post_id,
+      hypothesis_id: persisted.hypothesis_id,
+      strategy_version_id: persisted.strategy_version_id,
+      decision_changed: 1,
+    });
+    expect(JSON.parse(String(storedDecisionInfluence?.decision_change_types_json ?? "[]"))).toEqual(expect.arrayContaining([
+      "strategy_version_changed",
+      "controlled_experiment_applied",
+      "repetition_evidence_applied",
+    ]));
+    expect(JSON.parse(String(storedDecisionInfluence?.evidence_json ?? "{}"))).toMatchObject({
+      selected_family: "test_specific_money_priority",
+      selected_generation_mode: "adjacent_experiment",
+      intelligence_application_assessment: expect.stringContaining("controlled experiment"),
     });
     expect(persisted.semantic_repetition.semantic_repetition_blocked).toBe(false);
     expect(persisted.server_checks).toMatchObject({
