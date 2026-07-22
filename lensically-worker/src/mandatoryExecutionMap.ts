@@ -665,7 +665,15 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
     "top posts this month",
     "monthly follower growth and top posts",
   ],
-  get_performance_learning: ["get performance learning", "performance learning", "account learning"],
+    get_performance_learning: ["get performance learning", "performance learning", "account learning"],
+  get_manifest_intelligence_audit: [
+    "get manifest intelligence audit",
+    "manifest intelligence audit",
+    "operator benchmarks",
+    "run comparison",
+    "saved pattern intelligence",
+    "follower checkpoint",
+  ],
 };
 
 function aliasesForTool(tool: MandatoryExecutionToolDefinition): string[] {
