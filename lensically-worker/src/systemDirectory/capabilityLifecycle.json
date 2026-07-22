@@ -19,8 +19,8 @@
       "appendRepoFileChunk",
             "commitRepoFileWrite",
       "createRepoFile",
-      "createGitHubRepository",
-      "deleteRepoFile,"
+            "createGitHubRepository",
+      "deleteRepoFile",
       "listGitHubWorkflowRuns",
       "runGitHubWorkflow",
       "getGitHubWorkflowRun",
