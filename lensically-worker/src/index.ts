@@ -12983,11 +12983,24 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-    if (toolName === "get_hourly_coverage") {
+        if (toolName === "get_hourly_coverage") {
     const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
     const startDate = normalizeOperatorText(payload.start_date, 20, true);
     const horizonDays = Math.min(Math.max(Math.trunc(Number(payload.horizon_days ?? 14)), 1), 60);
-    return operatorJsonResponse(await getOperatorHourlyCoverage(env, brand, timezone, horizonDays, startDate));
+    const coverageResult = await getOperatorHourlyCoverage(env, brand, timezone, horizonDays, startDate);
+    const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
+    if (brand.brand_key === "manifest_mental" && cycleId) {
+      const coverageOperationId = normalizeOperatorText(payload.operation_id, 240, true)
+        ?? `${coverageResult.current_local_date ?? "current"}-${coverageResult.current_local_time ?? "coverage"}`;
+      await appendManifestCycleEvent(env.DB, {
+        cycleId,
+        brandKey: brand.brand_key,
+        eventKey: `coverage:${coverageOperationId}`,
+        eventType: "coverage_reconciled",
+        payload: coverageResult,
+      });
+    }
+    return operatorJsonResponse(coverageResult);
   }
 
   if (toolName === "claim_manifest_review_batch") {
@@ -15188,6 +15201,30 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
   }
 
+                if (toolName === "get_manifest_cycle_receipt") {
+    const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
+    const operationId = normalizeOperatorText(payload.cycle_operation_id, 240, true);
+    const receipt = await getManifestCycleReceipt(env.DB, {
+      brandKey: brand.brand_key,
+      cycleId,
+      operationId,
+    });
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      available: Boolean(receipt),
+      cycle_receipt: receipt,
+    });
+  }
+
+  if (toolName === "get_manifest_intelligence_foundation") {
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      intelligence_foundation: await getManifestIntelligenceFoundation(env.DB, brand.brand_key),
+    });
+  }
+
               if (toolName === "get_performance_learning") {
     return operatorJsonResponse({
       success: true,
@@ -16113,7 +16150,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     name: "get_hourly_coverage",
     title: "Get hourly publishing coverage",
     description: "Inspect the selected account schedule from the next viable hour forward and return the earliest incomplete publishing day, its open hourly slots, and the next open slot. Past missed hours are never backfilled.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, start_date: { type: "string" }, timezone: { type: "string" }, horizon_days: { type: "integer", minimum: 1, maximum: 60, default: 14 } }, required: ["brand_key"], additionalProperties: false },
+        inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, start_date: { type: "string" }, timezone: { type: "string" }, horizon_days: { type: "integer", minimum: 1, maximum: 60, default: 14 }, cycle_id: { type: "string", description: "Optional autonomous cycle ID. When present, append this coverage reconciliation to that cycle's immutable receipt." }, operation_id: { type: "string", description: "Stable identity for this coverage checkpoint." } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
@@ -16523,6 +16560,20 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, draft_id: { type: "string" }, date: { type: "string" }, time: { type: "string" }, timezone: { type: "string" }, strategy: { type: "object", additionalProperties: true } }, required: ["brand_key", "draft_id", "date", "time"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
+        {
+    name: "get_manifest_intelligence_foundation",
+    title: "Get Manifest intelligence foundation",
+    description: "Read the active noninterference and follower-attribution policies, latest durable strategy version, and latest autonomous cycle receipt. This is read-only and returns unavailable states without treating them as failures.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "get_manifest_cycle_receipt",
+    title: "Get Manifest autonomous cycle receipt",
+    description: "Read one complete autonomous-cycle receipt with trigger, startup state, exposure snapshot, input and output strategy versions, candidate and persistence events, post hypotheses, lineage evidence, completion, and unresolved issues. Defaults to the latest receipt.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
       {
     name: "prepare_manifest_autonomous_cycle",
     title: "Prepare Manifest autonomous cycle",
@@ -16567,11 +16618,43 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
             recommended_direction: { type: "string" },
             intentionally_different_from_prior: { type: "string" },
             preserved_functions: { type: "array", items: { type: "string" } },
-            transformed_elements: { type: "array", items: { type: "string" } },
+                        transformed_elements: { type: "array", items: { type: "string" } },
+            source_context: {
+              type: "object",
+              description: "Identify whether the post comes from a Saved Pattern/source card or an operator hypothesis. Existing sources must provide source_card_id or source_selection_id.",
+              properties: {
+                kind: { type: "string", enum: ["saved_pattern", "source_card", "operator_hypothesis", "market_signal"] },
+                source_type: { type: "string" },
+                source_identity_key: { type: "string" },
+                source_card_id: { type: "string" },
+                source_selection_id: { type: "string" },
+                internal_source_id: { type: "string" },
+                source_url: { type: "string" },
+              },
+              required: ["kind"],
+              additionalProperties: false,
+            },
+            hypothesis: {
+              type: "object",
+              description: "Pre-publication engagement hypothesis. Follower attribution is forbidden.",
+              properties: {
+                expected_response_type: { type: "string", enum: ["reach", "likes", "replies", "reposts", "shares", "engagement_rate", "balanced_engagement"] },
+                expected_audience_reward: { type: "string" },
+                hook_rationale: { type: "string" },
+                premise_rationale: { type: "string" },
+                exploration_mode: { type: "string", enum: ["exploit", "explore", "hybrid"] },
+                comparable_post_ids: { type: "array", items: { type: "string" } },
+                expected_performance_range: { type: "object", additionalProperties: true },
+                uncertainty: { type: "string" },
+                falsification_conditions: { type: "array", items: { type: "string" } },
+              },
+              required: ["expected_response_type", "expected_audience_reward", "hook_rationale", "premise_rationale", "exploration_mode", "expected_performance_range", "uncertainty"],
+              additionalProperties: false,
+            },
             strategy: { type: "object", additionalProperties: true },
             score: { type: "object", additionalProperties: true },
           },
-          required: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
+                    required: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose", "source_context", "hypothesis"],
           additionalProperties: false,
         },
         model_evaluation: {
@@ -16582,7 +16665,13 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
                         novelty_assessment: { type: "string" },
             winner_preservation_assessment: { type: "string" },
             slot_placement_assessment: { type: "string", description: "Explain why this exact family and execution belong in this exact hourly slot after sequencing the full horizon." },
-            recent_exposure_assessment: { type: "string", description: "Explain which recent published and future scheduled posts were considered and how clustering was avoided or justified." },
+                        recent_exposure_assessment: { type: "string", description: "Explain which recent published and future scheduled posts were considered and how clustering was avoided or justified." },
+            candidate_trace: {
+              type: "array",
+              maxItems: 12,
+              description: "Record considered candidates, including internally rejected candidates and why they were rejected, before the final selection.",
+              items: { type: "object", additionalProperties: true },
+            },
             gate_summary: { type: "object", additionalProperties: true },
           },
           required: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment"],
@@ -16749,7 +16838,9 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "submitAndGateDraft",
   "get_monthly_growth_review",
     "get_performance_learning",
-  "get_content_focus",
+    "get_content_focus",
+  "get_manifest_intelligence_foundation",
+  "get_manifest_cycle_receipt",
     "prepare_manifest_autonomous_cycle",
   "persist_manifest_autonomous_post",
   "review_manifest_scheduled_post",
@@ -16838,7 +16929,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["get_manifest_review_batch", 10],
     ["attach_manifest_review_draft", 11],
     ["schedule_manifest_review_batch", 12],
-        ["get_performance_learning", 13],
+                ["get_performance_learning", 13],
+    ["get_manifest_intelligence_foundation", 13],
+    ["get_manifest_cycle_receipt", 13],
         ["prepare_manifest_autonomous_cycle", 14],
     ["persist_manifest_autonomous_post", 15],
     ["review_manifest_scheduled_post", 16],
@@ -19648,7 +19741,7 @@ function operatorToolMutatesState(toolName: string): boolean {
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
     "list_accounts", "get_account_state", "read_lensically_ui_surface", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
-    "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results", "get_monthly_growth_review", "get_performance_learning", "get_content_focus", "audit_published_post_lineage",
+        "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results", "get_monthly_growth_review", "get_performance_learning", "get_content_focus", "get_manifest_intelligence_foundation", "get_manifest_cycle_receipt", "audit_published_post_lineage",
   ]);
   return !readOnly.has(toolName);
 }
@@ -20939,8 +21032,10 @@ async function handleOperatorMcpAdminTool(
         "list_scheduled_posts",
         "get_post_results",
         "get_monthly_growth_review",
-        "get_performance_learning",
+                "get_performance_learning",
         "get_content_focus",
+        "get_manifest_intelligence_foundation",
+        "get_manifest_cycle_receipt",
       ]),
     };
     const mutationSegments: Record<string, Set<string>> = {
@@ -21302,8 +21397,10 @@ async function handleOperatorMcpAdminTool(
         ? { ...accountBase, published_post_id: latestPublished.published_post_id, compact: true }
         : null,
       get_monthly_growth_review: { ...accountBase, date_from: weekAgo, date_to: today, timezone: WORKSPACE_DEFAULT_TIMEZONE, top_limit: 1 },
-      get_performance_learning: { ...accountBase, include_posts: false },
+            get_performance_learning: { ...accountBase, include_posts: false },
       get_content_focus: { ...accountBase },
+      get_manifest_intelligence_foundation: { ...accountBase },
+      get_manifest_cycle_receipt: { ...accountBase },
     };
     const liveReadRows: Array<Record<string, unknown>> = [];
     const canonicalLiveHost = new URL(request.url).hostname === new URL(DEFAULT_WORKER_ORIGIN).hostname;
