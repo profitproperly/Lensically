@@ -11917,9 +11917,25 @@ async function persistManifestAutonomousPost(
   const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
     ? payload.post as Record<string, unknown>
     : {};
-  const modelEvaluation = payload.model_evaluation && typeof payload.model_evaluation === "object" && !Array.isArray(payload.model_evaluation)
+    const modelEvaluation = payload.model_evaluation && typeof payload.model_evaluation === "object" && !Array.isArray(payload.model_evaluation)
     ? payload.model_evaluation as Record<string, unknown>
     : {};
+  const hypothesisValidation = validateManifestPostHypothesis(post.hypothesis);
+  if (!hypothesisValidation.ok) {
+    return { success: false, error: "post_hypothesis_invalid", details: hypothesisValidation.errors };
+  }
+  const sourceContextValidation = normalizeManifestSourceContext(post.source_context);
+  if (!sourceContextValidation.ok) {
+    return { success: false, error: "source_context_invalid", details: sourceContextValidation.errors };
+  }
+  if (["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)
+    && !sourceContextValidation.value.source_card_id
+    && !sourceContextValidation.value.source_selection_id) {
+    return { success: false, error: "existing_source_card_lineage_required" };
+  }
+  const candidateTrace = Array.isArray(modelEvaluation.candidate_trace)
+    ? modelEvaluation.candidate_trace.filter((item) => item && typeof item === "object" && !Array.isArray(item)).slice(0, 12) as Record<string, unknown>[]
+    : [];
   if (modelEvaluation.generation_passed !== true || modelEvaluation.scheduling_passed !== true) {
     return { success: false, error: "model_evaluation_not_passed" };
   }
@@ -11939,9 +11955,30 @@ async function persistManifestAutonomousPost(
       ],
     };
   }
-  const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
+    const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
     ? payload.strategic_thesis as Record<string, unknown>
     : {};
+  if (!Object.keys(strategicThesis).length) {
+    return { success: false, error: "strategic_thesis_required" };
+  }
+  const outputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
+    brandKey: brand.brand_key,
+    strategy: strategicThesis,
+    evidence: {
+      cycle_id: cycleId,
+      input_strategy_version_id: cycle.strategy_version_id ?? null,
+      account_position_captured_at: (cycle.account_position as Record<string, unknown> | undefined)?.captured_at ?? null,
+      follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+    },
+    changeSummary: normalizeOperatorText(strategicThesis.change_summary, 4000, true)
+      ?? `Autonomous strategy thesis selected for cycle ${cycleId}.`,
+    reversalConditions: Array.isArray(strategicThesis.reversal_conditions)
+      ? strategicThesis.reversal_conditions.map(String).slice(0, 20)
+      : ["Revise only when observable engagement evidence contradicts the thesis or account conditions materially change."],
+    sourceCycleId: cycleId,
+    parentVersionId: normalizeOperatorText(cycle.strategy_version_id, 160, true),
+  });
+  await linkManifestCycleStrategy(env.DB, cycleId, String(outputStrategyVersion.id));
   const date = normalizeOperatorText(post.date, 20);
   const time = normalizeOperatorText(post.time, 20);
   const text = normalizeOperatorText(post.text, 20000);
@@ -11958,8 +11995,35 @@ async function persistManifestAutonomousPost(
   const targetSlots = Array.isArray(cycle.target_slots)
     ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
     : [];
-    const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
+        const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
   if (!targetSlot) return { success: false, error: "slot_outside_prepared_cycle", slot_key: slotKey };
+  let postHypothesis = await recordManifestPostHypothesis(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    slotKey,
+    strategyVersionId: normalizeOperatorText(outputStrategyVersion.id, 160, true),
+    source: sourceContextValidation.value,
+    hypothesis: hypothesisValidation.value,
+    candidateTrace,
+    modelEvaluation,
+  });
+  await appendManifestCycleEvent(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    eventKey: `candidate:${operationId}`,
+    eventType: "candidate_evaluated",
+    slotKey,
+    payload: {
+      operation_id: operationId,
+      text,
+      generation_mode: generationMode,
+      family_key: familyKey,
+      source_context: sourceContextValidation.value,
+      hypothesis_id: postHypothesis.id ?? null,
+      candidate_trace: candidateTrace,
+      model_evaluation: modelEvaluation,
+    },
+  });
   const timezone = String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
   const cycleAccountPosition = cycle.account_position && typeof cycle.account_position === "object" && !Array.isArray(cycle.account_position)
     ? cycle.account_position as Record<string, unknown>
@@ -12013,7 +12077,7 @@ async function persistManifestAutonomousPost(
     };
   };
   const existingLineup = await env.DB.prepare(
-    `SELECT source_card_id, generation_run_id, draft_id, scheduled_post_id, status
+        `SELECT source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
      FROM operator_autonomous_lineup_items
      WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?
      ORDER BY datetime(updated_at) DESC LIMIT 1`,
@@ -12044,7 +12108,24 @@ async function persistManifestAutonomousPost(
       existingScheduledPostId,
       brand.profile.threads_user_id,
     );
-    if (existingLineage.complete === true) {
+        if (existingLineage.complete === true) {
+      await linkManifestHypothesisResult(env.DB, {
+        cycleId,
+        slotKey,
+        scheduledPostId: existingScheduledPostId,
+        status: "reused",
+        hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
+        sourceSelectionId: normalizeOperatorText(existingLineup?.source_selection_id, 160, true)
+          ?? sourceContextValidation.value.source_selection_id,
+      });
+      await appendManifestCycleEvent(env.DB, {
+        cycleId,
+        brandKey: brand.brand_key,
+        eventKey: `persist:${operationId}`,
+        eventType: "post_reused",
+        slotKey,
+        payload: { scheduled_post_id: existingScheduledPostId, publish_lineage_complete: true },
+      });
       return {
         success: true,
         reused: true,
@@ -12055,7 +12136,9 @@ async function persistManifestAutonomousPost(
           generation_run_id: existingLineup?.generation_run_id ?? null,
           draft_id: existingLineup?.draft_id ?? null,
         },
-        publish_lineage_complete: true,
+                publish_lineage_complete: true,
+        hypothesis_id: postHypothesis.id ?? null,
+        strategy_version_id: outputStrategyVersion.id ?? null,
         coverage_reconciliation_required: true,
       };
     }
@@ -12130,13 +12213,30 @@ async function persistManifestAutonomousPost(
       duplicate_status: duplicate.status ?? null,
     };
   }
-    const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
+        const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
   const sourceCardId = String(sourceCard.id ?? "");
   const familyId = normalizeOperatorText(sourceCard.family_id, 120, true);
   const sourceSelectionId = normalizeOperatorText(sourceCard.source_selection_id, 120, true);
   if (!sourceSelectionId) {
+    await linkManifestHypothesisResult(env.DB, {
+      cycleId, slotKey, status: "source_lineage_failed", hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
+    });
     return { success: false, error: "autonomous_source_lineage_missing", slot_key: slotKey };
   }
+  postHypothesis = await recordManifestPostHypothesis(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    slotKey,
+    strategyVersionId: normalizeOperatorText(outputStrategyVersion.id, 160, true),
+    source: {
+      ...sourceContextValidation.value,
+      source_card_id: sourceCardId,
+      source_selection_id: sourceSelectionId,
+    },
+    hypothesis: hypothesisValidation.value,
+    candidateTrace,
+    modelEvaluation,
+  });
   const identityHash = await sha256OperatorText(`${brand.brand_key}|${cycleId}|${slotKey}|${operationId}`);
   const runId = `autonomous-run-${identityHash.slice(0, 32)}`;
   const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
@@ -12152,8 +12252,15 @@ async function persistManifestAutonomousPost(
     family_key: familyKey,
     source_mechanism: sourceMechanism,
     audience_reward: audienceReward,
-    strategic_purpose: strategicPurpose,
+        strategic_purpose: strategicPurpose,
     strategic_thesis: strategicThesis,
+    strategy_version_id: outputStrategyVersion.id ?? null,
+    post_hypothesis: hypothesisValidation.value,
+    source_context: {
+      ...sourceContextValidation.value,
+      source_card_id: sourceCardId,
+      source_selection_id: sourceSelectionId,
+    },
     model_evaluation: modelEvaluation,
   };
   const scheduled = exactScheduled
@@ -12359,7 +12466,23 @@ async function persistManifestAutonomousPost(
     scheduled.scheduledPostId,
     brand.profile.threads_user_id,
   );
-  if (publishLineage.complete !== true) {
+    if (publishLineage.complete !== true) {
+    await linkManifestHypothesisResult(env.DB, {
+      cycleId,
+      slotKey,
+      scheduledPostId: scheduled.scheduledPostId,
+      status: "lineage_failed",
+      hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
+      sourceSelectionId,
+    });
+    await appendManifestCycleEvent(env.DB, {
+      cycleId,
+      brandKey: brand.brand_key,
+      eventKey: `persist:${operationId}`,
+      eventType: "lineage_failed",
+      slotKey,
+      payload: { scheduled_post_id: scheduled.scheduledPostId, missing_stages: publishLineage.missing_stages ?? [] },
+    });
     const missingStages = Array.isArray(publishLineage.missing_stages)
       ? publishLineage.missing_stages.map(String)
       : ["unknown"];
@@ -12378,9 +12501,34 @@ async function persistManifestAutonomousPost(
       missing_stages: missingStages,
     };
   }
-  const publishLineageRow = publishLineage.lineage && typeof publishLineage.lineage === "object"
+    const publishLineageRow = publishLineage.lineage && typeof publishLineage.lineage === "object"
     ? publishLineage.lineage as Record<string, unknown>
     : {};
+  await linkManifestHypothesisResult(env.DB, {
+    cycleId,
+    slotKey,
+    scheduledPostId: scheduled.scheduledPostId,
+    status: "scheduled",
+    hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
+    sourceSelectionId,
+  });
+  await appendManifestCycleEvent(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    eventKey: `persist:${operationId}`,
+    eventType: "post_persisted",
+    slotKey,
+    payload: {
+      scheduled_post_id: scheduled.scheduledPostId,
+      source_card_id: sourceCardId,
+      source_selection_id: sourceSelectionId,
+      generation_run_id: runId,
+      draft_id: draftId,
+      hypothesis_id: postHypothesis.id ?? null,
+      strategy_version_id: outputStrategyVersion.id ?? null,
+      publish_lineage_complete: true,
+    },
+  });
   const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
   const remainingMissing = (Array.isArray(currentCycle.missing_slots)
     ? currentCycle.missing_slots as Array<{ key: string; date: string; time: string }>
@@ -12399,9 +12547,34 @@ async function persistManifestAutonomousPost(
     normalizeOperatorJson(strategicThesis, {}),
     normalizeOperatorJson(remainingMissing, []),
     normalizeOperatorJson(Array.from(scheduledIds), []),
-    cycleId,
+        cycleId,
     brand.brand_key,
   ).run();
+  if (!remainingMissing.length) {
+    const completion = {
+      completed_slot_key: slotKey,
+      scheduled_post_ids: Array.from(scheduledIds),
+      scheduled_count: scheduledIds.size,
+      remaining_missing_count: 0,
+      final_post_lineage_complete: true,
+      output_strategy_version_id: outputStrategyVersion.id ?? null,
+      completed_at: new Date().toISOString(),
+    };
+    await appendManifestCycleEvent(env.DB, {
+      cycleId,
+      brandKey: brand.brand_key,
+      eventKey: "cycle-completed",
+      eventType: "cycle_completed",
+      payload: completion,
+    });
+    await finalizeManifestCycleReceipt(env.DB, {
+      cycleId,
+      status: "completed",
+      completion,
+      unresolvedIssues: [],
+      completedAt: String(completion.completed_at),
+    });
+  }
   return {
     success: true,
     reused: scheduled.reused === true,
@@ -12417,7 +12590,9 @@ async function persistManifestAutonomousPost(
       draft_id: draftId,
       inventory_id: inventoryId,
     },
-    publish_lineage_complete: true,
+        publish_lineage_complete: true,
+    hypothesis_id: postHypothesis.id ?? null,
+    strategy_version_id: outputStrategyVersion.id ?? null,
         model_evaluation: {
       novelty_assessment: noveltyAssessment,
       winner_preservation_assessment: winnerPreservationAssessment,
