@@ -478,8 +478,9 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "startRepoFileWrite",
   "appendRepoFileChunk",
     "commitRepoFileWrite",
-  "createRepoFile",
+    "createRepoFile",
   "createGitHubRepository",
+  "createCloudflarePagesProject",
   "deleteRepoFile",
   "runMcpTests",
   "runGitHubWorkflow",
@@ -714,6 +715,7 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
     || has(/\bstatus\s+(request|check|verification)\b/)
     || has(/\bcheck\s+(mcp|operator|runtime|gateway)\b/)
   ) return "engineeringPrecheck";
+    if (has(/\b(create|add|provision)\b/) && has(/\bcloudflare\b/) && has(/\bpages?\b/) && has(/\bproject\b/)) return "createCloudflarePagesProject";
   if (has(/\b(search|find)\b/) && has(/\b(repo|repository|source|code|file|files)\b/)) return "searchRepoFiles";
   if (has(/\b(list|show)\b/) && has(/\b(repo|repository)\b/) && has(/\b(files|tree)\b/)) return "listRepoFiles";
   if (has(/\b(start|begin|open)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "startRepoFileWrite";
@@ -918,8 +920,10 @@ function prepareStaticCall(
   }
         const directFileCreation = machineKey(actionIntent, "") === machineKey("create repo file", "")
     || machineKey(actionIntent, "") === machineKey("createRepoFile", "")
-    || machineKey(actionIntent, "") === machineKey("create github repository", "")
-    || machineKey(actionIntent, "") === machineKey("createGitHubRepository", "");
+        || machineKey(actionIntent, "") === machineKey("create github repository", "")
+    || machineKey(actionIntent, "") === machineKey("createGitHubRepository", "")
+    || machineKey(actionIntent, "") === machineKey("create cloudflare pages project", "")
+    || machineKey(actionIntent, "") === machineKey("createCloudflarePagesProject", "");
   const promotedWinningPath = directFileCreation ? null : resolvePromotedWinningPath(actionIntent, objective, inputs);
   if (promotedWinningPath?.winning_path.surface === "recovery_plane") {
     return {

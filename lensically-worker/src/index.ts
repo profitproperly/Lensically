@@ -16455,7 +16455,8 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "appendRepoFileChunk",
   "commitRepoFileWrite",
     "createRepoFile",
-  "createGitHubRepository",
+    "createGitHubRepository",
+  "createCloudflarePagesProject",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
   "runGitHubWorkflow",
@@ -16535,7 +16536,8 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "appendRepoFileChunk", title: "Append repo file chunk", description: "Append a compact text chunk to a pending repo file write session.", inputSchema: { type: "object", properties: { session_id: { type: "string" }, chunk: { type: "string" } }, required: ["session_id", "chunk"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "commitRepoFileWrite", title: "Commit repo file write", description: "Commit a pending chunked file write to GitHub.", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "createGitHubRepository", title: "Create GitHub repository", description: "Create or idempotently reconcile one repository under the configured GitHub owner. Returns only compact repository metadata and never returns credentials.", inputSchema: { type: "object", properties: { name: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" }, description: { type: "string", maxLength: 350 }, visibility: { type: "string", enum: ["private", "public"], default: "private" }, initialize_with_readme: { type: "boolean", default: true }, operation_id: { type: "string", minLength: 1, maxLength: 120 } }, required: ["name", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    { name: "createGitHubRepository", title: "Create GitHub repository", description: "Create or idempotently reconcile one repository under the configured GitHub owner. Returns only compact repository metadata and never returns credentials.", inputSchema: { type: "object", properties: { name: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" }, description: { type: "string", maxLength: 350 }, visibility: { type: "string", enum: ["private", "public"], default: "private" }, initialize_with_readme: { type: "boolean", default: true }, operation_id: { type: "string", minLength: 1, maxLength: 120 } }, required: ["name", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "createCloudflarePagesProject", title: "Create Cloudflare Pages project", description: "Dispatch an idempotent protected workflow to create or reconcile one Cloudflare Pages project without exposing Cloudflare credentials.", inputSchema: { type: "object", properties: { project_name: { type: "string", minLength: 1, maxLength: 58, pattern: "^[a-z0-9](?:[a-z0-9-]{0,56}[a-z0-9])?$" }, production_branch: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._/-]+$", default: "main" }, operation_id: { type: "string", minLength: 1, maxLength: 80 } }, required: ["project_name", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner. Include owner_response with the owner's exact approval so authorization is persisted before execution.", inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
   { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
         { name: "runGitHubWorkflow", title: "Run GitHub validation or release workflow", description: "Dispatch one configured Main validation task or one explicit exact-SHA Worker release.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "gpt-memory-tests", "worker-deploy"] }, release_id: { type: "string", maxLength: 80 }, release_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -17717,7 +17719,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "appendRepoFileChunk",
     "commitRepoFileWrite",
   "createRepoFile",
-  "createGitHubRepository",
+    "createGitHubRepository",
+  "createCloudflarePagesProject",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
   "getGitHubWorkflowRun",
@@ -19557,7 +19560,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 
 function operatorPreCallProvider(toolName: string): string {
     if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
-    if (["verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
+        if (["createCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
   if (["schedule_approved_draft", "schedule_manifest_review_batch", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
 }
@@ -19900,7 +19903,7 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
-    "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "deleteRepoFile",
+      "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "createCloudflarePagesProject", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
 ]);
 
@@ -21878,8 +21881,9 @@ async function handleOperatorMcpAdminTool(
         "startRepoFileWrite",
         "appendRepoFileChunk",
                 "commitRepoFileWrite",
-        "createRepoFile",
+                "createRepoFile",
         "createGitHubRepository",
+        "createCloudflarePagesProject",
         "deleteRepoFile",
         "runGitHubWorkflow",
       ]),
@@ -23653,7 +23657,54 @@ async function handleOperatorMcpEngineeringTool(
     return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: session.summary ?? null };
   }
 
-    if (toolName === "createGitHubRepository") {
+      if (toolName === "createCloudflarePagesProject") {
+    const projectName = normalizeOperatorText(args.project_name, 58, true);
+    const productionBranch = normalizeOperatorText(args.production_branch, 120, true) ?? "main";
+    const operationId = normalizeOperatorText(args.operation_id, 80, true);
+    if (!projectName || !operationId) {
+      return { ok: false, error: "pages_project_name_operation_id_required" };
+    }
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,56}[a-z0-9])?$/.test(projectName)) {
+      return { ok: false, error: "invalid_pages_project_name" };
+    }
+    if (!/^[A-Za-z0-9._/-]+$/.test(productionBranch) || productionBranch.includes("..") || productionBranch.startsWith("/") || productionBranch.endsWith("/")) {
+      return { ok: false, error: "invalid_pages_production_branch" };
+    }
+    const workflowId = "lensically-engineering.yml";
+    const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ref: config.branch,
+        inputs: {
+          task: "cloudflare-pages-project-create",
+          release_id: operationId,
+          project_name: projectName,
+          production_branch: productionBranch,
+        },
+      }),
+    });
+    await recordEngineeringAudit(env, {
+      action: "createCloudflarePagesProject",
+      filesChanged: [],
+      diffSummary: result.ok ? `Dispatched Cloudflare Pages project reconciliation for ${projectName}.` : `Failed to dispatch Cloudflare Pages project reconciliation for ${projectName}.`,
+      result: result.ok ? "ok" : "failed",
+      metadata: { operation_id: operationId, project_name: projectName, production_branch: productionBranch, workflow_id: workflowId, status: result.status },
+    });
+    return {
+      ok: result.ok,
+      status: result.status,
+      dispatched: result.ok,
+      workflow_id: workflowId,
+      task: "cloudflare-pages-project-create",
+      operation_id: operationId,
+      project_name: projectName,
+      production_branch: productionBranch,
+      expected_url: `https://${projectName}.pages.dev`,
+    };
+  }
+
+  if (toolName === "createGitHubRepository") {
     const name = normalizeOperatorText(args.name, 100, true);
     const operationId = normalizeOperatorText(args.operation_id, 120, true);
     const description = normalizeOperatorText(args.description, 350, true) ?? "";
