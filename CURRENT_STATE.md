@@ -35,6 +35,7 @@
 
 ## Manifest Autonomous Growth Engine
 
+- Canonical temporary implementation campaign: `MANIFEST_INTELLIGENCE_IMPLEMENTATION_CAMPAIGN.md`. Fresh chats must read this complete 20-part, four-turn record before continuing Manifest Intelligence work; do not reconstruct its scope from chat memory.
 - Manifest's permanent mission is to reach 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.
 - `autonomous-growth-mission-v2` and `operator-autonomy-governance-v4` make the Lensically Autonomous Business Operator responsible for routine strategy, generation, scheduling, evaluation, recovery, and evidence-triggered engineering. Owner participation is optional criticism, taste, market intelligence, and override—not a production dependency.
 - After the fixed key handshake and explicit Proceed, continuity reconciles live schedule and delivery state before selecting the next autonomous action. Stale calendar summaries never override live state, and fresh sessions do not open a mandatory Growth Mission discussion or resume a four-post approval batch.
