@@ -28,6 +28,11 @@ import {
   upsertManifestLearningObservation,
   upsertManifestSemanticSignature,
 } from "../src/manifestIntelligenceEngine";
+import {
+  buildManifestDecisionIntelligence,
+  buildManifestIntelligenceDashboard,
+  recordManifestDecisionInfluence,
+} from "../src/manifestProductIntegration";
 
 const AUTH_HEADERS = {
   Authorization: "Bearer test-gpt-key",
@@ -1045,6 +1050,93 @@ describe("operator mode backend spine", () => {
       records: [{ reuse_state: "proven", confidence: { label: "reliable_adaptation_evidence" } }],
     });
     expect(new TextEncoder().encode(JSON.stringify(patterns.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
+
+        const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, "manifest_mental");
+    expect(decisionIntelligence).toMatchObject({
+      version: "manifest-decision-intelligence-v1",
+      brand_key: "manifest_mental",
+      consumption_contract: {
+        required: true,
+        proof_requirement: expect.stringContaining("decision-influence receipt"),
+      },
+    });
+    expect(decisionIntelligence.family_priorities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ family_key: `family-${suffix}`, role: "franchise", allocation_weight: 1.6 }),
+    ]));
+    expect(decisionIntelligence.experiments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ experiment_key: `experiment-${suffix}`, follow_up_decision: "expand" }),
+    ]));
+    expect(decisionIntelligence.saved_pattern_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ pattern_identity_key: `threads:pattern-${suffix}`, reuse_state: "proven" }),
+    ]));
+
+    const influence = await recordManifestDecisionInfluence(env.DB, {
+      brand_key: "manifest_mental",
+      cycle_id: `cycle-${suffix}`,
+      slot_key: "2026-07-23T09:00",
+      scheduled_post_id: 900001,
+      hypothesis_id: `hypothesis-${suffix}`,
+      input_strategy_version_id: `strategy-before-${suffix}`,
+      output_strategy_version_id: `strategy-after-${suffix}`,
+      family_key: `family-${suffix}`,
+      generation_mode: "adjacent_experiment",
+      source_context: { kind: "saved_pattern", pattern_identity_key: `threads:pattern-${suffix}` },
+      strategic_thesis: { change_summary: "Apply reliable portfolio and experiment evidence." },
+      model_evaluation: { intelligence_application_assessment: "The reliable franchise weight and expand decision changed family selection and experiment assignment." },
+      semantic_repetition: { highest_score: 0.58 },
+      experiment_assignment: { experiment_key: `experiment-${suffix}` },
+    });
+    expect(influence).toMatchObject({
+      version: "manifest-decision-influence-v1",
+      decision_changed: true,
+      family_key: `family_${suffix}`,
+      decision_change_types: expect.arrayContaining([
+        "strategy_version_changed",
+        "portfolio_allocation_applied",
+        "controlled_experiment_applied",
+        "saved_pattern_intelligence_applied",
+        "repetition_evidence_applied",
+      ]),
+    });
+    const storedInfluence = await env.DB.prepare(
+      `SELECT decision_changed, decision_change_types_json FROM operator_manifest_decision_influences
+       WHERE brand_key = 'manifest_mental' AND cycle_id = ? AND slot_key = ? LIMIT 1`,
+    ).bind(`cycle-${suffix}`, "2026-07-23T09:00").first<{ decision_changed: number; decision_change_types_json: string }>();
+    expect(Number(storedInfluence?.decision_changed)).toBe(1);
+    expect(JSON.parse(String(storedInfluence?.decision_change_types_json ?? "[]"))).toContain("strategy_version_changed");
+
+    const productDashboard = await buildManifestIntelligenceDashboard(env.DB, { brand_key: "manifest_mental", limit: 10 });
+    expect(productDashboard).toMatchObject({
+      version: "manifest-intelligence-dashboard-v1",
+      brand_key: "manifest_mental",
+      product_proof: {
+        dashboard_complete: true,
+        scheduled_task_contract_available: true,
+        automatic_operator_decision_change_proven: true,
+        noninterference_preserved: true,
+        owner_dependency: false,
+      },
+      decision_influence: {
+        learned_strategy_changed_decisions: true,
+        changed_decision_count: 1,
+      },
+    });
+    expect(Array.isArray(productDashboard.family_states)).toBe(true);
+    expect(Array.isArray(productDashboard.run_receipts)).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(productDashboard)).byteLength).toBeLessThan(24000);
+
+    const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
+    expect(productResponse.status).toBe(200);
+    expect(productResponse.headers.get("Cache-Control")).toBe("no-store");
+    const productPayload = await productResponse.json() as Record<string, unknown>;
+    expect(productPayload).toMatchObject({
+      version: "manifest-intelligence-dashboard-v1",
+      product_proof: {
+        dashboard_complete: true,
+        scheduled_task_contract_available: true,
+        automatic_operator_decision_change_proven: true,
+      },
+    });
 
     const afterScheduled = await env.DB.prepare(`SELECT COUNT(*) AS total FROM scheduled_posts`).first<{ total: number }>();
     expect(Number(afterScheduled?.total ?? 0)).toBe(Number(beforeScheduled?.total ?? 0));
@@ -3178,7 +3270,8 @@ describe("operator mode MCP endpoint", () => {
         novelty_assessment: "The wording and payoff are distinct from current scheduled inventory.",
                 winner_preservation_assessment: "The post preserves the proven concise direct-statement mechanism without forcing fatigue rotation.",
         slot_placement_assessment: "The selected slot is the first authoritative future opening in the prepared ET runway.",
-        recent_exposure_assessment: "The candidate was checked against recent published and scheduled exposure and does not create an avoidable cluster.",
+                recent_exposure_assessment: "The candidate was checked against recent published and scheduled exposure and does not create an avoidable cluster.",
+        intelligence_application_assessment: "The controlled experiment, specific-money portfolio evidence, and repetition exposure changed the chosen family, premise, and exact slot decision.",
       },
       operation_id: persistOperationId,
       proceed_confirmed: true,
@@ -3192,7 +3285,8 @@ describe("operator mode MCP endpoint", () => {
       publish_lineage_complete: boolean;
       intelligence_lineage_complete: boolean;
             experiment_assignment: { id: string; experiment_key: string; variant_key: string; status: string } | null;
-      semantic_repetition: { semantic_repetition_blocked: boolean; highest_score: number };
+            semantic_repetition: { semantic_repetition_blocked: boolean; highest_score: number };
+      decision_influence: { decision_changed: boolean; decision_change_types: string[]; decision_summary: string; scheduled_post_id: number };
       server_checks: { semantic_repetition_collision: boolean; no_internal_gate_fanout: boolean; no_internal_runway_scan: boolean; no_threads_api_call: boolean };
       remaining_missing_count: number;
     }>("persist_manifest_autonomous_post", payload);
