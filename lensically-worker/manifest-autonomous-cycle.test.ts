@@ -14,6 +14,15 @@ import {
   validateManifestFollowerAttributionBoundary,
   validateManifestPostHypothesis,
 } from "./src/manifestIntelligence";
+import {
+  buildManifestComparableAnalysis,
+  buildManifestMaturityEvaluation,
+  buildManifestSemanticSignature,
+  compareManifestSemanticSignatures,
+  deriveManifestConfidenceTransition,
+  deriveManifestPortfolioState,
+  evaluateManifestExperiment,
+} from "./src/manifestIntelligenceEngine";
 
 describe("Manifest autonomous clock and horizon", () => {
     it("uses Threads server time when the runtime clock is behind", () => {
@@ -251,7 +260,7 @@ describe("Manifest intelligence foundation", () => {
     expect(JSON.parse(reconstructedStrategy)).toEqual(receipt.output_strategy_version);
   });
 
-  it("accepts operator hypotheses and preserves permanent policy boundaries", () => {
+    it("accepts operator hypotheses and preserves permanent policy boundaries", () => {
     const source = normalizeManifestSourceContext({ kind: "operator_hypothesis", source_type: "operator_hypothesis" });
     expect(source.ok).toBe(true);
     expect(MANIFEST_INTELLIGENCE_FOUNDATION_VERSION).toBe("manifest-intelligence-foundation-v2");
@@ -260,4 +269,187 @@ describe("Manifest intelligence foundation", () => {
     expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.account_level_only).toBe(true);
   });
 });
+
+describe("Manifest intelligence engine", () => {
+  it("detects the same spending-priority premise when only the dollar amount and wording change", () => {
+    const first = buildManifestSemanticSignature({
+      text: "If $25,000 reached you today, what expense disappears first?",
+    });
+    const second = buildManifestSemanticSignature({
+      text: "$50,000 arrives today. What gets handled first?",
+    });
+    const comparison = compareManifestSemanticSignatures(first, second);
+
+    expect(first.premise_key).toBe(second.premise_key);
+    expect(first.dollar_amounts).not.toEqual(second.dollar_amounts);
+    expect(comparison).toMatchObject({
+      semantic_repetition: true,
+      severity: "collision",
+      premise_similarity: 1,
+    });
+    expect(comparison.repeated_dimensions).toEqual(expect.arrayContaining([
+      "question_type", "financial_scenario_key", "tension_key", "audience_reward_key", "sentence_architecture",
+    ]));
+  });
+
+  it("keeps materially different premises outside the semantic collision class", () => {
+    const money = buildManifestSemanticSignature({
+      text: "If $25,000 reached you today, what expense disappears first?",
+    });
+    const intuition = buildManifestSemanticSignature({
+      text: "Trust what your intuition keeps telling you. BELIEVE IT.",
+    });
+    const comparison = compareManifestSemanticSignatures(money, intuition);
+
+    expect(comparison.semantic_repetition).toBe(false);
+    expect(comparison.severity).toBe("none");
+  });
+
+  it("uses 6, 12, and 18 hours directionally while reserving structural changes for 24 hours", () => {
+    const evaluations = [6, 12, 18, 24].map((checkpoint_hours) => buildManifestMaturityEvaluation({
+      checkpoint_hours,
+      metrics: { views: 1000, likes: 100 },
+      rates: { like_rate: 0.1 },
+      velocity: { cumulative_views_per_hour: 50 },
+      scores: { overall: 75 },
+      distribution_state: "accelerating",
+    }));
+
+    expect(evaluations.map((item) => item.maturity_state)).toEqual([
+      "initial_signal", "directional", "strong_directional", "authoritative",
+    ]);
+    expect(evaluations.map((item) => item.structural_change_allowed)).toEqual([false, false, false, true]);
+    expect(evaluations.map((item) => item.learning_weight)).toEqual([0.25, 0.5, 0.75, 1]);
+  });
+
+  it("selects age-matched comparable posts across family, hook, structure, reward, format, topic, and time", () => {
+    const targetSignature = buildManifestSemanticSignature({
+      text: "If $25,000 reached you today, what expense disappears first?",
+    });
+    const closeSignature = buildManifestSemanticSignature({
+      text: "$50,000 arrives today. What gets handled first?",
+    });
+    const analysis = buildManifestComparableAnalysis({
+      published_post_id: "target",
+      checkpoint_hours: 24,
+      overall_score: 70,
+      family_key: "specific_money_question",
+      hook_style: "money_question",
+      structure: "specific_amount_question",
+      audience_reward: "financial_choice",
+      format: "short_text",
+      topic: "money",
+      time_bucket: "morning",
+      semantic_signature: targetSignature,
+    }, [
+      {
+        published_post_id: "close",
+        checkpoint_hours: 24,
+        overall_score: 60,
+        family_key: "specific_money_question",
+        hook_style: "money_question",
+        structure: "specific_amount_question",
+        audience_reward: "financial_choice",
+        format: "short_text",
+        topic: "money",
+        time_bucket: "morning",
+        semantic_signature: closeSignature,
+      },
+      {
+        published_post_id: "unrelated",
+        checkpoint_hours: 24,
+        overall_score: 80,
+        family_key: "intuition",
+        hook_style: "direct_validation",
+        structure: "two_step_claim",
+        audience_reward: "self_trust",
+        format: "short_text",
+        topic: "intuition",
+        time_bucket: "evening",
+        semantic_signature: buildManifestSemanticSignature({ text: "Trust what your intuition keeps telling you. BELIEVE IT." }),
+      },
+    ]);
+
+    expect(analysis.comparable_post_ids).toEqual(["close"]);
+    expect(analysis.comparable_count).toBe(1);
+    expect(analysis.delta_from_comparable_median).toBe(10);
+  });
+
+  it("permits strategy transitions only when mature evidence reaches a supported confidence state", () => {
+    const reliable = deriveManifestConfidenceTransition({
+      sample_size: 8,
+      authoritative_sample_size: 8,
+      supporting_count: 7,
+      contradicting_count: 1,
+      effect_size: 14,
+    });
+    const insufficient = deriveManifestConfidenceTransition({
+      sample_size: 2,
+      authoritative_sample_size: 1,
+      supporting_count: 1,
+      contradicting_count: 0,
+      effect_size: 18,
+    });
+
+    expect(reliable).toMatchObject({ label: "reliable", transition_allowed: true });
+    expect(insufficient).toMatchObject({ label: "insufficient", transition_allowed: false });
+  });
+
+  it("classifies adaptive portfolio roles without fixed quotas and evaluates controlled experiments", () => {
+    const portfolio = deriveManifestPortfolioState({
+      current_role: "prospect",
+      mature_count: 8,
+      median_overall: 70,
+      recent_median_overall: 72,
+      baseline_median_overall: 68,
+      strong_count: 5,
+      weak_count: 0,
+      confidence_label: "reliable",
+    });
+    const experiment = evaluateManifestExperiment({
+      variant_scores: [70, 72, 74],
+      control_scores: [55, 58, 60],
+    });
+
+    expect(portfolio).toMatchObject({
+      role: "franchise",
+      recommended_role: "franchise",
+      allocation_weight: 1.6,
+      transition_allowed: true,
+      actual_decay: false,
+    });
+    expect(experiment).toMatchObject({ decision: "expand", variant_median: 72, control_median: 58, delta: 14 });
+  });
+
+  it("validates a controlled experiment inside the immutable pre-publication hypothesis", () => {
+    const result = validateManifestPostHypothesis({
+      expected_response_type: "replies",
+      expected_audience_reward: "A specific financial choice worth discussing.",
+      hook_rationale: "The concrete amount creates immediate imagination.",
+      premise_rationale: "The question exposes a real priority tradeoff.",
+      exploration_mode: "explore",
+      expected_performance_range: { replies: { min: 10, max: 100 } },
+      uncertainty: "The premise may be overexposed.",
+      experiment: {
+        experiment_key: "money-question-payoff-v1",
+        hypothesis: { variable: "payoff", expected_effect: "higher conversation rate" },
+        comparison_group: { family_key: "specific_money_question", variant_excluded: true },
+        maturity_windows: [6, 12, 18, 24],
+        result_criteria: { minimum_variant: 3, minimum_control: 3, win_delta: 8, loss_delta: -8 },
+        variant_key: "direct-relief-payoff",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.experiment).toMatchObject({
+        experiment_key: "money-question-payoff-v1",
+        maturity_windows: [6, 12, 18, 24],
+        variant_key: "direct-relief-payoff",
+      });
+    }
+  });
+});
+
+
 
