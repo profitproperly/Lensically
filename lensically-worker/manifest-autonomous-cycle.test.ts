@@ -3,6 +3,13 @@ import {
   buildManifestRollingHourlySlots,
   resolveManifestAutonomousClock,
 } from "./src/index";
+import {
+  MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+  MANIFEST_NONINTERFERENCE_POLICY,
+  buildManifestExposureDimensions,
+  normalizeManifestSourceContext,
+  validateManifestPostHypothesis,
+} from "./src/manifestIntelligence";
 
 describe("Manifest autonomous clock and horizon", () => {
     it("uses Threads server time when the runtime clock is behind", () => {
@@ -94,5 +101,70 @@ describe("Manifest autonomous clock and horizon", () => {
       "2026-07-21T16:00",
       "2026-07-21T17:00",
     ]);
+    });
+});
+
+describe("Manifest intelligence foundation", () => {
+  it("rejects any post hypothesis that attempts follower attribution", () => {
+    const result = validateManifestPostHypothesis({
+      expected_response_type: "replies",
+      expected_audience_reward: "A specific financial choice worth discussing.",
+      hook_rationale: "The concrete amount creates immediate imagination.",
+      premise_rationale: "The question exposes a real priority tradeoff.",
+      exploration_mode: "explore",
+      expected_performance_range: { replies: { min: 10, max: 100 } },
+      uncertainty: "The premise may be overexposed.",
+      expected_followers: 25,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join("|")).toContain("follower_attribution_forbidden");
+  });
+
+  it("normalizes a complete engagement-only post hypothesis", () => {
+    const result = validateManifestPostHypothesis({
+      expected_response_type: "balanced_engagement",
+      expected_audience_reward: "A vivid financial-freedom scenario.",
+      hook_rationale: "The opener directly selects the reader.",
+      premise_rationale: "The payoff is concrete without repeating a spending-priority question.",
+      exploration_mode: "hybrid",
+      comparable_post_ids: ["post-1", "post-2"],
+      expected_performance_range: { views: { min: 500, max: 5000 }, likes: { min: 25, max: 500 } },
+      uncertainty: "Distribution can vary even when engagement quality is strong.",
+      falsification_conditions: ["Comparable mature posts consistently outperform this premise."],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.expected_response_type).toBe("balanced_engagement");
+      expect(result.value.comparable_post_ids).toEqual(["post-1", "post-2"]);
+    }
+  });
+
+  it("builds structured exposure counts across semantic dimensions", () => {
+    const dimensions = buildManifestExposureDimensions([
+      {
+        text: "If $25,000 reached you today, what expense disappears first?",
+        strategy: { family_key: "specific_money_question", hook_style: "money_question", premise_key: "spending_priority", audience_reward: "financial_choice", generation_mode: "controlled_variation" },
+      },
+      {
+        text: "$50,000 arrives today. What gets handled first?",
+        strategy: { family_key: "specific_money_question", hook_style: "money_question", premise_key: "spending_priority", audience_reward: "financial_choice", generation_mode: "controlled_variation" },
+      },
+    ]);
+
+    expect(dimensions.record_count).toBe(2);
+    expect((dimensions.premise_counts as Record<string, number>).spending_priority).toBe(2);
+    expect(dimensions.question_count).toBe(2);
+    expect(Object.keys(dimensions.dollar_amount_counts as Record<string, number>)).toEqual(["25,000", "50,000"]);
+  });
+
+  it("accepts operator hypotheses and preserves permanent policy boundaries", () => {
+    const source = normalizeManifestSourceContext({ kind: "operator_hypothesis", source_type: "operator_hypothesis" });
+    expect(source.ok).toBe(true);
+    expect(MANIFEST_NONINTERFERENCE_POLICY.learning_source).toBe("observable_post_engagement");
+    expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.post_level_attribution).toBe("forbidden");
+    expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.account_level_only).toBe(true);
   });
 });
+
