@@ -3211,15 +3211,20 @@ describe("operator mode MCP endpoint", () => {
         id: string;
                 missing_slots: Array<{ key: string; date: string; time: string }>;
       };
-      decision_intelligence: {
+            decision_intelligence: {
         version: string;
-                consumption_contract: {
+        consumption_contract: {
           required: boolean;
           required_decision_outputs: Record<string, boolean>;
           inputs_that_must_be_considered: Record<string, boolean>;
         };
-
       };
+      measurement_audit_refresh: {
+        mode: string;
+        recomputed: boolean;
+        refresh_owner: string;
+      };
+
     }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
