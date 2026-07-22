@@ -3074,24 +3074,27 @@ describe("operator mode MCP endpoint", () => {
     expect(countsAfter).toEqual(countsBefore);
   }, 30000);
 
-  it("reconciles prepare_manifest_autonomous_cycle again with the same durable operation id", async () => {
+    it("reconciles prepare_manifest_autonomous_cycle again with the same durable operation id", async () => {
     await activateManifestAutonomyForTest();
     const operationId = `test-autonomous-reconcile-${crypto.randomUUID()}`;
-    const first = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
+    const first = await mcpTool<{ success?: boolean; error?: string; cycle?: { id: string } }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
       horizon_hours: 48,
       operation_id: operationId,
       proceed_confirmed: true,
     });
-        await env.DB.prepare(
+    expect(first.success, JSON.stringify(first)).toBe(true);
+    expect(first.cycle, JSON.stringify(first)).toBeTruthy();
+    const cycleId = first.cycle!.id;
+    await env.DB.prepare(
       `UPDATE operator_autonomous_growth_cycles SET horizon_start_local = '2000-01-01T00:00' WHERE id = ?`,
-    ).bind(first.cycle.id).run();
+    ).bind(cycleId).run();
     await env.DB.prepare(
       `UPDATE operator_manifest_exposure_snapshots SET source_hash = 'stale-test-hash' WHERE cycle_id = ?`,
-    ).bind(first.cycle.id).run();
+    ).bind(cycleId).run();
 
-    const second = await mcpTool<{ cycle: { id: string; horizon_start_local: string }; idempotency?: unknown }>(
+    const second = await mcpTool<{ success?: boolean; error?: string; cycle?: { id: string; horizon_start_local: string }; idempotency?: unknown }>(
       "prepare_manifest_autonomous_cycle",
       {
         brand_key: "manifest_mental",
@@ -3102,24 +3105,26 @@ describe("operator mode MCP endpoint", () => {
       },
     );
 
-    expect(second.cycle.id).toBe(first.cycle.id);
-    expect(second.cycle.horizon_start_local).not.toBe("2000-01-01T00:00");
+    expect(second.success, JSON.stringify(second)).toBe(true);
+    expect(second.cycle, JSON.stringify(second)).toBeTruthy();
+    expect(second.cycle!.id).toBe(cycleId);
+    expect(second.cycle!.horizon_start_local).not.toBe("2000-01-01T00:00");
     expect(second.idempotency).toBeUndefined();
-        const stored = await env.DB.prepare(
+    const stored = await env.DB.prepare(
       `SELECT horizon_start_local FROM operator_autonomous_growth_cycles WHERE id = ?`,
-    ).bind(first.cycle.id).first<{ horizon_start_local: string }>();
-    expect(stored?.horizon_start_local).toBe(second.cycle.horizon_start_local);
+    ).bind(cycleId).first<{ horizon_start_local: string }>();
+    expect(stored?.horizon_start_local).toBe(second.cycle!.horizon_start_local);
     const exposure = await env.DB.prepare(
       `SELECT revision, source_hash FROM operator_manifest_exposure_snapshots WHERE cycle_id = ?`,
-    ).bind(first.cycle.id).first<{ revision: number; source_hash: string }>();
+    ).bind(cycleId).first<{ revision: number; source_hash: string }>();
     expect(Number(exposure?.revision ?? 0)).toBeGreaterThan(1);
     expect(exposure?.source_hash).not.toBe("stale-test-hash");
     const preparationEvents = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM operator_manifest_cycle_receipt_events
        WHERE cycle_id = ? AND event_type = 'cycle_prepared'`,
-    ).bind(first.cycle.id).first<{ total: number }>();
+    ).bind(cycleId).first<{ total: number }>();
     expect(Number(preparationEvents?.total ?? 0)).toBeGreaterThanOrEqual(2);
-    }, 30000);
+  }, 30000);
 
   it("rejects follower attribution before strategy or scheduling state is created", async () => {
     await activateManifestAutonomyForTest();
