@@ -11329,11 +11329,19 @@ async function prepareManifestAutonomousCycle(
     effectiveNowMs,
   );
       await refreshOperatorContentFocus(env, brand.brand_key);
-  await ensureGptPostStrategyTagsTable(env);
+    await ensureGptPostStrategyTagsTable(env);
   await ensureOperatorWorkflowTables(env);
+  await ensureExternalPatternsTable(env);
+  await ensureThreadsFollowerSnapshotsTable(env);
   const intelligenceEngineRefresh = await refreshManifestIntelligenceEngine(env.DB, {
     brand_key: brand.brand_key,
     threads_user_id: brand.profile.threads_user_id,
+  });
+  const measurementAuditRefresh = await refreshManifestMeasurementAudit(env.DB, {
+    brand_key: brand.brand_key,
+    threads_user_id: brand.profile.threads_user_id,
+    account_id: brand.account_id,
+    saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
   });
   const accountPosition = await buildManifestAutonomousAccountPosition(
     env,
@@ -11480,8 +11488,9 @@ async function prepareManifestAutonomousCycle(
     success: true,
     reused_existing: Boolean(existing?.id),
     refreshed_live_state: true,
-        cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+                cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
         intelligence_engine_refresh: intelligenceEngineRefresh,
+        measurement_audit_refresh: measurementAuditRefresh,
     intelligence_foundation: {
       policy: intelligencePolicy,
       input_strategy_version: inputStrategyVersion,
