@@ -840,8 +840,225 @@ function compactManifestAutonomousPreparationPayload(
     if (Number((bounded.payload_contract as Record<string, unknown>).returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
       return bounded;
     }
-  }
-  return null;
+    }
+
+  const accountClock = accountPosition.clock && typeof accountPosition.clock === "object" && !Array.isArray(accountPosition.clock)
+    ? accountPosition.clock as Record<string, unknown>
+    : {};
+  const latestStrategy = decision.latest_strategy && typeof decision.latest_strategy === "object" && !Array.isArray(decision.latest_strategy)
+    ? decision.latest_strategy as Record<string, unknown>
+    : {};
+  const learningBrief = decision.learning_brief && typeof decision.learning_brief === "object" && !Array.isArray(decision.learning_brief)
+    ? decision.learning_brief as Record<string, unknown>
+    : {};
+  const benchmarkResponse = decision.benchmark_response && typeof decision.benchmark_response === "object" && !Array.isArray(decision.benchmark_response)
+    ? decision.benchmark_response as Record<string, unknown>
+    : {};
+  const recentPublished = (Array.isArray(accountPosition.recent_published_posts) ? accountPosition.recent_published_posts : [])
+    .slice(0, 8)
+    .map((post) => compactOperatorPayloadValue(post, "cycle.account_position.recent_published_posts", {
+      arrayItems: 3, stringChars: 260, objectKeys: 18, maxDepth: 4,
+    }, []));
+  const futureScheduled = (Array.isArray(delivery.scheduled_records) ? delivery.scheduled_records : [])
+    .slice(0, 16)
+    .map((post) => compactOperatorPayloadValue(post, "cycle.account_position.future_scheduled_exposure", {
+      arrayItems: 2, stringChars: 260, objectKeys: 16, maxDepth: 3,
+    }, []));
+  const minimalOccupied = occupiedSlots.map((slot) => {
+    const evidence = slot.evidence && typeof slot.evidence === "object" && !Array.isArray(slot.evidence)
+      ? slot.evidence as Record<string, unknown>
+      : {};
+    return {
+      key: slot.key,
+      date: slot.date,
+      time: slot.time,
+      evidence: {
+        source_type: evidence.source_type ?? null,
+        scheduled_post_id: evidence.scheduled_post_id ?? null,
+        published_post_id: evidence.published_post_id ?? null,
+        status: evidence.status ?? null,
+        delivery_state: evidence.delivery_state ?? null,
+      },
+    };
+  });
+  const minimalDecision = {
+    version: decision.version ?? null,
+    source_fingerprint: decision.source_fingerprint ?? null,
+    generated_at: decision.generated_at ?? null,
+    latest_strategy: {
+      id: latestStrategy.id ?? null,
+      version: latestStrategy.version ?? null,
+      parent_version_id: latestStrategy.parent_version_id ?? null,
+      change_summary: latestStrategy.change_summary ?? null,
+      reversal_conditions: compactOperatorPayloadValue(latestStrategy.reversal_conditions ?? [], "decision_intelligence.latest_strategy.reversal_conditions", {
+        arrayItems: 12, stringChars: 260, objectKeys: 16, maxDepth: 3,
+      }, []),
+    },
+    learning_brief: {
+      brief_key: learningBrief.brief_key ?? null,
+      authoritative_post_count: learningBrief.authoritative_post_count ?? 0,
+      strategy_change: compactOperatorPayloadValue(learningBrief.strategy_change ?? {}, "decision_intelligence.learning_brief.strategy_change", {
+        arrayItems: 8, stringChars: 260, objectKeys: 24, maxDepth: 4,
+      }, []),
+      brief: compactOperatorPayloadValue(learningBrief.brief ?? {}, "decision_intelligence.learning_brief.brief", {
+        arrayItems: 6, stringChars: 260, objectKeys: 24, maxDepth: 4,
+      }, []),
+    },
+    required_directives: Array.isArray(decision.required_directives) ? decision.required_directives.slice(0, 24) : [],
+    strategy_change_warranted: decision.strategy_change_warranted === true,
+    family_priorities: compactOperatorPayloadValue(decision.family_priorities ?? [], "decision_intelligence.family_priorities", {
+      arrayItems: 10, stringChars: 240, objectKeys: 16, maxDepth: 3,
+    }, []),
+    experiments: (Array.isArray(decision.experiments) ? decision.experiments : []).slice(0, 8).map((value) => {
+      const experiment = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+      return {
+        experiment_key: experiment.experiment_key ?? null,
+        family_key: experiment.family_key ?? null,
+        status: experiment.status ?? null,
+        follow_up_decision: experiment.follow_up_decision ?? null,
+      };
+    }),
+    saved_pattern_candidates: (Array.isArray(decision.saved_pattern_candidates) ? decision.saved_pattern_candidates : []).slice(0, 8).map((value) => {
+      const pattern = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+      return {
+        pattern_identity_key: pattern.pattern_identity_key ?? null,
+        source_identity_key: pattern.source_identity_key ?? null,
+        reuse_state: pattern.reuse_state ?? null,
+        mechanism: compactOperatorPayloadValue(pattern.mechanism ?? {}, "decision_intelligence.saved_pattern_candidates.mechanism", {
+          arrayItems: 3, stringChars: 220, objectKeys: 12, maxDepth: 3,
+        }, []),
+        confidence: compactOperatorPayloadValue(pattern.confidence ?? {}, "decision_intelligence.saved_pattern_candidates.confidence", {
+          arrayItems: 3, stringChars: 160, objectKeys: 10, maxDepth: 3,
+        }, []),
+      };
+    }),
+    repetition: compactOperatorPayloadValue(decision.repetition ?? {}, "decision_intelligence.repetition", {
+      arrayItems: 12, stringChars: 220, objectKeys: 20, maxDepth: 3,
+    }, []),
+    benchmark_response: {
+      latest: compactOperatorPayloadValue(benchmarkResponse.latest ?? null, "decision_intelligence.benchmark_response.latest", {
+        arrayItems: 3, stringChars: 220, objectKeys: 18, maxDepth: 3,
+      }, []),
+      latest_run_comparison: compactOperatorPayloadValue(benchmarkResponse.latest_run_comparison ?? null, "decision_intelligence.benchmark_response.latest_run_comparison", {
+        arrayItems: 3, stringChars: 220, objectKeys: 18, maxDepth: 3,
+      }, []),
+      repeated_mistakes: Array.isArray(benchmarkResponse.repeated_mistakes) ? benchmarkResponse.repeated_mistakes.slice(0, 20) : [],
+      actual_strategy_influence: benchmarkResponse.actual_strategy_influence === true,
+      prediction_accuracy: benchmarkResponse.prediction_accuracy ?? {},
+      engagement_floor: benchmarkResponse.engagement_floor ?? {},
+      mature_performance: benchmarkResponse.mature_performance ?? {},
+    },
+    follower_checkpoint: compactOperatorPayloadValue(decision.follower_checkpoint ?? null, "decision_intelligence.follower_checkpoint", {
+      arrayItems: 30, stringChars: 220, objectKeys: 20, maxDepth: 4,
+    }, []),
+    consumption_contract: decision.consumption_contract ?? {},
+  };
+  const minimal: Record<string, unknown> = {
+    success: true,
+    reused_existing: payload.reused_existing === true,
+    refreshed_live_state: payload.refreshed_live_state === true,
+    cycle: {
+      id: cycle.id ?? null,
+      brand_key: cycle.brand_key ?? null,
+      operation_id: cycle.operation_id ?? null,
+      status: cycle.status ?? null,
+      timezone: cycle.timezone ?? null,
+      horizon_hours: cycle.horizon_hours ?? null,
+      horizon_start_local: cycle.horizon_start_local ?? null,
+      horizon_end_local: cycle.horizon_end_local ?? null,
+      receipt_id: cycle.receipt_id ?? null,
+      strategy_version_id: cycle.strategy_version_id ?? null,
+      exposure_snapshot_id: cycle.exposure_snapshot_id ?? null,
+      target_slots: targetSlots,
+      missing_slots: missingSlots,
+      scheduled_post_ids: Array.isArray(cycle.scheduled_post_ids) ? cycle.scheduled_post_ids.slice(0, 72) : [],
+      account_position: {
+        captured_at: accountPosition.captured_at ?? null,
+        clock: {
+          effective_now_iso: accountClock.effective_now_iso ?? null,
+          source: accountClock.source ?? null,
+          runtime_time_iso: accountClock.runtime_time_iso ?? null,
+          threads_server_time_iso: accountClock.threads_server_time_iso ?? null,
+          database_time_iso: accountClock.database_time_iso ?? null,
+          latest_published_at: accountClock.latest_published_at ?? null,
+        },
+        followers: accountPosition.followers ?? {},
+        runway: {
+          target_slot_count: runway.target_slot_count ?? targetSlots.length,
+          occupied_slot_count: runway.occupied_slot_count ?? minimalOccupied.length,
+          missing_slot_count: runway.missing_slot_count ?? missingSlots.length,
+          occupied_slots: minimalOccupied,
+        },
+        delivery_reconciliation: {
+          status_counts: delivery.status_counts ?? {},
+          unresolved_incidents: compactOperatorPayloadValue(delivery.unresolved_incidents ?? [], "cycle.account_position.delivery_reconciliation.unresolved_incidents", {
+            arrayItems: 8, stringChars: 220, objectKeys: 14, maxDepth: 3,
+          }, []),
+          required_recovery_actions: compactOperatorPayloadValue(delivery.required_recovery_actions ?? [], "cycle.account_position.delivery_reconciliation.required_recovery_actions", {
+            arrayItems: 8, stringChars: 220, objectKeys: 14, maxDepth: 3,
+          }, []),
+        },
+        recent_published_posts: recentPublished,
+        future_scheduled_exposure: futureScheduled,
+        repetition_pressure: compactOperatorPayloadValue(accountPosition.repetition_pressure ?? {}, "cycle.account_position.repetition_pressure", {
+          arrayItems: 12, stringChars: 220, objectKeys: 24, maxDepth: 3,
+        }, []),
+        portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? {},
+      },
+    },
+    decision_intelligence: minimalDecision,
+    intelligence_foundation: {
+      input_strategy_version: compactOperatorPayloadValue(
+        payload.intelligence_foundation && typeof payload.intelligence_foundation === "object" && !Array.isArray(payload.intelligence_foundation)
+          ? (payload.intelligence_foundation as Record<string, unknown>).input_strategy_version ?? null
+          : null,
+        "intelligence_foundation.input_strategy_version",
+        { arrayItems: 4, stringChars: 220, objectKeys: 18, maxDepth: 3 },
+        [],
+      ),
+      exposure_snapshot: payload.intelligence_foundation && typeof payload.intelligence_foundation === "object" && !Array.isArray(payload.intelligence_foundation)
+        ? (payload.intelligence_foundation as Record<string, unknown>).exposure_snapshot ?? null
+        : null,
+      cycle_receipt: payload.intelligence_foundation && typeof payload.intelligence_foundation === "object" && !Array.isArray(payload.intelligence_foundation)
+        ? (payload.intelligence_foundation as Record<string, unknown>).cycle_receipt ?? null
+        : null,
+      follower_attribution_policy: payload.intelligence_foundation && typeof payload.intelligence_foundation === "object" && !Array.isArray(payload.intelligence_foundation)
+        ? (payload.intelligence_foundation as Record<string, unknown>).follower_attribution_policy ?? null
+        : null,
+      noninterference_policy: payload.intelligence_foundation && typeof payload.intelligence_foundation === "object" && !Array.isArray(payload.intelligence_foundation)
+        ? (payload.intelligence_foundation as Record<string, unknown>).noninterference_policy ?? null
+        : null,
+    },
+    strategy_contract: compactOperatorPayloadValue(payload.strategy_contract ?? {}, "strategy_contract", {
+      arrayItems: 20, stringChars: 320, objectKeys: 32, maxDepth: 4,
+    }, []),
+    reconciliation_contract: compactOperatorPayloadValue(payload.reconciliation_contract ?? {}, "reconciliation_contract", {
+      arrayItems: 20, stringChars: 320, objectKeys: 32, maxDepth: 4,
+    }, []),
+    persistence_contract: compactOperatorPayloadValue(payload.persistence_contract ?? {}, "persistence_contract", {
+      arrayItems: 20, stringChars: 320, objectKeys: 32, maxDepth: 4,
+    }, []),
+    operator_action_closure: compactOperatorPayloadValue(payload.operator_action_closure ?? {}, "operator_action_closure", {
+      arrayItems: 8, stringChars: 260, objectKeys: 28, maxDepth: 4,
+    }, []),
+    payload_contract: {
+      server_bounded: true,
+      model_payload_sizing: false,
+      byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+      original_bytes: originalBytes,
+      returned_bytes: 0,
+      truncated: true,
+      actionable_autonomous_cycle_preserved: true,
+      all_target_slots_preserved: true,
+      all_missing_slots_preserved: true,
+      decision_intelligence_categories_preserved: true,
+      minimal_operational_tier: true,
+    },
+  };
+  (minimal.payload_contract as Record<string, unknown>).returned_bytes = operatorPayloadBytes(minimal);
+  return Number((minimal.payload_contract as Record<string, unknown>).returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES
+    ? minimal
+    : null;
 }
 
 function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<string, unknown> {
