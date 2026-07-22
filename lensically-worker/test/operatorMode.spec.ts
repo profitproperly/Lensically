@@ -4504,7 +4504,7 @@ describe("operator mode MCP endpoint", () => {
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-    expect(eligibleMutations).toBe(55);
+        expect(eligibleMutations).toBe(56);
     expect(failedMutationPreflights).toBe(0);
   }, 90000);
 
