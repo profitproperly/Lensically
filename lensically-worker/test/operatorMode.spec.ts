@@ -2735,6 +2735,82 @@ describe("operator mode MCP endpoint", () => {
        WHERE cycle_id = ? AND event_type = 'cycle_prepared'`,
     ).bind(first.cycle.id).first<{ total: number }>();
     expect(Number(preparationEvents?.total ?? 0)).toBeGreaterThanOrEqual(2);
+    }, 30000);
+
+  it("rejects follower attribution before strategy or scheduling state is created", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{
+      cycle: { id: string; missing_slots: Array<{ key: string; date: string; time: string }> };
+    }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: `test-follower-boundary-prepare-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const slot = prepared.cycle.missing_slots[0];
+    expect(slot).toBeTruthy();
+    const strategyBefore = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_manifest_strategy_versions WHERE brand_key = 'manifest_mental'`,
+    ).first<{ total: number }>();
+    const operationId = `test-follower-boundary-${crypto.randomUUID()}`;
+    const rejected = await mcpTool<{ success: boolean; error: string; details: string[] }>("persist_manifest_autonomous_post", {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      strategic_thesis: {
+        position: "Test a direct-statement candidate.",
+        expected_followers_from_post: 25,
+      },
+      post: {
+        date: slot.date,
+        time: slot.time,
+        text: `Follower boundary candidate ${crypto.randomUUID().slice(0, 8)}.`,
+        generation_mode: "original_discovery",
+        family_key: `test_follower_boundary_${crypto.randomUUID().slice(0, 8)}`,
+        source_mechanism: "A concise direct statement.",
+        audience_reward: "A grounded moment of clarity.",
+        strategic_purpose: "Verify the follower attribution boundary.",
+        source_context: { kind: "operator_hypothesis", source_type: "operator_hypothesis" },
+        hypothesis: {
+          expected_response_type: "likes",
+          expected_audience_reward: "A grounded moment of clarity.",
+          hook_rationale: "The direct statement is immediately accessible.",
+          premise_rationale: "The premise offers a concrete emotional reward.",
+          exploration_mode: "explore",
+          comparable_post_ids: [],
+          expected_performance_range: { views: { min: 100, max: 10_000 }, likes: { min: 5, max: 1_000 } },
+          uncertainty: "Distribution remains uncertain before maturity.",
+          falsification_conditions: ["Comparable mature posts consistently underperform."],
+        },
+        strategy: { pillar: "clarity", hook_style: "direct_statement", novelty_level: "original_discovery" },
+      },
+      model_evaluation: {
+        generation_passed: true,
+        scheduling_passed: true,
+        novelty_assessment: "Distinct from current inventory.",
+        winner_preservation_assessment: "Does not displace a proven winner.",
+        slot_placement_assessment: "Uses an authoritative missing slot.",
+        recent_exposure_assessment: "No avoidable recent cluster was found.",
+      },
+      operation_id: operationId,
+      proceed_confirmed: true,
+    });
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toBe("follower_attribution_forbidden");
+    const strategyAfter = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_manifest_strategy_versions WHERE brand_key = 'manifest_mental'`,
+    ).first<{ total: number }>();
+    expect(Number(strategyAfter?.total ?? 0)).toBe(Number(strategyBefore?.total ?? 0));
+    const scheduled = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_autonomous_lineup_items WHERE cycle_id = ? AND slot_key = ?`,
+    ).bind(prepared.cycle.id, slot.key).first<{ total: number }>();
+    expect(Number(scheduled?.total ?? 0)).toBe(0);
+    const rejectionEvent = await env.DB.prepare(
+      `SELECT event_type, payload_json FROM operator_manifest_cycle_receipt_events
+       WHERE cycle_id = ? AND event_key = ? LIMIT 1`,
+    ).bind(prepared.cycle.id, `rejected:${operationId}`).first<{ event_type: string; payload_json: string }>();
+    expect(rejectionEvent?.event_type).toBe("candidate_rejected");
+    expect(rejectionEvent?.payload_json).toContain("follower_attribution_forbidden");
   }, 30000);
 
     it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
