@@ -84,6 +84,14 @@ import {
   validateManifestFollowerAttributionBoundary,
   validateManifestPostHypothesis,
 } from "./manifestIntelligence";
+import {
+  analyzeManifestCandidateRepetition,
+  ensureManifestIntelligenceEngineTables,
+  getManifestIntelligenceEngineState,
+  refreshManifestIntelligenceEngine,
+  registerManifestExperimentAssignment,
+  upsertManifestSemanticSignature,
+} from "./manifestIntelligenceEngine";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -29168,6 +29176,7 @@ function operatorFingerprintDimensions(fingerprint: Record<string, unknown>): Ar
 }
 
 async function ensureOperatorPerformanceEvaluatorTables(env: Env): Promise<void> {
+  await ensureManifestIntelligenceEngineTables(env.DB);
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_post_fingerprints (
       id TEXT PRIMARY KEY,
@@ -29916,9 +29925,13 @@ async function refreshOperatorPerformanceEvaluator(
     discovery_requirement: "Use available schedule capacity to develop additional winner families without arbitrarily benching current stars.",
     change_trigger: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because a day passed.",
   };
+    const intelligenceEngine = brandKey === "manifest_mental"
+    ? await refreshManifestIntelligenceEngine(env.DB, { brand_key: brandKey, threads_user_id: threadsUserId })
+    : null;
   const generatedAt = new Date().toISOString();
   const brief = {
     version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    intelligence_engine: intelligenceEngine,
     generated_at: generatedAt,
         checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
     mature_sample_size: matureSampleSize,
@@ -29970,7 +29983,8 @@ async function refreshOperatorPerformanceEvaluator(
   return {
     ok: true,
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-    content_focus: contentFocus,
+        content_focus: contentFocus,
+    intelligence_engine: intelligenceEngine,
     fingerprinted_posts: fingerprintedPosts,
     maturity_scores_upserted: maturityScores,
     evidence_records: evidenceRows.length,
@@ -30238,11 +30252,15 @@ async function getLatestOperatorPerformanceLearning(
        ORDER BY s.checkpoint_hours DESC, datetime(s.updated_at) DESC LIMIT 100`,
     ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
-  const contentFocus = await getLatestOperatorContentFocus(env, brandKey);
+    const contentFocus = await getLatestOperatorContentFocus(env, brandKey);
+  const intelligenceEngine = brandKey === "manifest_mental"
+    ? await getManifestIntelligenceEngineState(env.DB, brandKey)
+    : null;
   return {
     available: Boolean(briefRow),
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
     content_focus: contentFocus,
+    intelligence_engine: intelligenceEngine,
     brief_id: briefRow?.id ?? null,
     checkpoint_hours: briefRow?.checkpoint_hours ?? null,
     sample_size: Number(briefRow?.sample_size ?? 0),
