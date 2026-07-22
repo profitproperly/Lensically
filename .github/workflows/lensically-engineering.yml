@@ -191,7 +191,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-                shard:
+        shard:
           - 1
           - 2
           - 3
