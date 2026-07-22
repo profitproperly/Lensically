@@ -3759,12 +3759,15 @@ describe("operator mode MCP endpoint", () => {
     const releaseTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { force?: { type?: string } } } } }>("readMcpToolDefinition", { tool_name: "runEngineeringRelease" });
         const releaseStatusTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getEngineeringRelease" });
     const workflowWatchTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getGitHubWorkflowRun" });
-    const hardeningTransitionTool = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", { tool_name: "advanceHardeningIncident" });
+        const hardeningTransitionTool = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", { tool_name: "advanceHardeningIncident" });
+    const createRepositoryTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { visibility?: { enum?: string[] }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "createGitHubRepository" });
     expect(patchSetTool.tool?.inputSchema?.properties?.patches?.maxItems).toBe(20);
     expect(releaseTool.tool?.inputSchema?.properties?.force?.type).toBe("boolean");
         expect(releaseStatusTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(55);
     expect(workflowWatchTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(60);
-    expect(hardeningTransitionTool.tool?.inputSchema?.properties).toHaveProperty("resume_result");
+        expect(hardeningTransitionTool.tool?.inputSchema?.properties).toHaveProperty("resume_result");
+    expect(createRepositoryTool.tool?.inputSchema?.properties?.visibility?.enum).toEqual(["private", "public"]);
+    expect(createRepositoryTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(120);
 
         expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
@@ -3776,10 +3779,11 @@ describe("operator mode MCP endpoint", () => {
       "getRepoStatus",
       "applyRepoTextPatch",
       "applyRepoPatchSet",
-      "startRepoFileWrite",
+            "startRepoFileWrite",
       "appendRepoFileChunk",
       "commitRepoFileWrite",
       "createRepoFile",
+      "createGitHubRepository",
       "deleteRepoFile",
       "listGitHubWorkflowRuns",
       "runGitHubWorkflow",
@@ -3831,7 +3835,7 @@ describe("operator mode MCP endpoint", () => {
       "listImplementationBacklogItems",
             "markImplementationBacklogItemResolved",
     ]));
-    for (const name of [
+        for (const name of [
       "getOperatorStartupContext",
       "engineeringPrecheck",
       "getEngineeringAccessState",
@@ -3845,6 +3849,7 @@ describe("operator mode MCP endpoint", () => {
       "appendRepoFileChunk",
       "commitRepoFileWrite",
       "createRepoFile",
+      "createGitHubRepository",
       "deleteRepoFile",
       "listGitHubWorkflowRuns",
             "runGitHubWorkflow",
