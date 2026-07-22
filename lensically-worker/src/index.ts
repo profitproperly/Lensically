@@ -29747,9 +29747,12 @@ async function refreshOperatorPerformanceEvaluator(
   threadsUserId: string,
 ): Promise<Record<string, unknown>> {
         await ensureOperatorPostMetricSnapshotsTable(env);
-  await ensureGptPostStrategyTagsTable(env);
+    await ensureGptPostStrategyTagsTable(env);
   await ensureOperatorWorkflowTables(env);
+  await ensureExternalPatternsTable(env);
+  await ensureThreadsFollowerSnapshotsTable(env);
   await ensureOperatorPerformanceEvaluatorTables(env);
+  await ensureManifestMeasurementAuditTables(env.DB);
   const checkpointPlaceholders = OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS.map(() => "?").join(", ");
   await env.DB.prepare(
     `UPDATE operator_post_performance_scores
@@ -30119,13 +30122,22 @@ async function refreshOperatorPerformanceEvaluator(
     discovery_requirement: "Use available schedule capacity to develop additional winner families without arbitrarily benching current stars.",
     change_trigger: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because a day passed.",
   };
-    const intelligenceEngine = brandKey === "manifest_mental"
+        const intelligenceEngine = brandKey === "manifest_mental"
     ? await refreshManifestIntelligenceEngine(env.DB, { brand_key: brandKey, threads_user_id: threadsUserId })
+    : null;
+  const measurementAudit = brandKey === "manifest_mental"
+    ? await refreshManifestMeasurementAudit(env.DB, {
+      brand_key: brandKey,
+      threads_user_id: threadsUserId,
+      account_id: accountId,
+      saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
+    })
     : null;
   const generatedAt = new Date().toISOString();
   const brief = {
     version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-    intelligence_engine: intelligenceEngine,
+        intelligence_engine: intelligenceEngine,
+    measurement_audit: measurementAudit,
     generated_at: generatedAt,
         checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
     mature_sample_size: matureSampleSize,
@@ -30177,8 +30189,9 @@ async function refreshOperatorPerformanceEvaluator(
   return {
     ok: true,
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-        content_focus: contentFocus,
+                content_focus: contentFocus,
     intelligence_engine: intelligenceEngine,
+    measurement_audit: measurementAudit,
     fingerprinted_posts: fingerprintedPosts,
     maturity_scores_upserted: maturityScores,
     evidence_records: evidenceRows.length,
