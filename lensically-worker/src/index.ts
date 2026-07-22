@@ -12507,17 +12507,25 @@ async function persistManifestAutonomousPost(
     });
     return { success: false, error, ...details };
   };
-  const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
+    const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
     ? payload.post as Record<string, unknown>
     : {};
-    const modelEvaluation = payload.model_evaluation && typeof payload.model_evaluation === "object" && !Array.isArray(payload.model_evaluation)
+  const rawPostStrategy = post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy)
+    ? post.strategy as Record<string, unknown>
+    : {};
+  const {
+    hypothesis: embeddedHypothesis,
+    source_context: embeddedSourceContext,
+    ...postStrategy
+  } = rawPostStrategy;
+  const modelEvaluation = payload.model_evaluation && typeof payload.model_evaluation === "object" && !Array.isArray(payload.model_evaluation)
     ? payload.model_evaluation as Record<string, unknown>
     : {};
-  const hypothesisValidation = validateManifestPostHypothesis(post.hypothesis);
-    if (!hypothesisValidation.ok) {
+  const hypothesisValidation = validateManifestPostHypothesis(post.hypothesis ?? embeddedHypothesis);
+  if (!hypothesisValidation.ok) {
     return rejectPersist("post_hypothesis_invalid", { details: hypothesisValidation.errors });
   }
-  const sourceContextValidation = normalizeManifestSourceContext(post.source_context);
+  const sourceContextValidation = normalizeManifestSourceContext(post.source_context ?? embeddedSourceContext);
     if (!sourceContextValidation.ok) {
     return rejectPersist("source_context_invalid", { details: sourceContextValidation.errors });
   }
@@ -12555,7 +12563,7 @@ async function persistManifestAutonomousPost(
   }
   const followerBoundary = validateManifestFollowerAttributionBoundary({
     strategic_thesis: strategicThesis,
-    post_strategy: post.strategy ?? {},
+        post_strategy: postStrategy,
     model_evaluation: modelEvaluation,
   });
     if (!followerBoundary.ok) {
@@ -12724,7 +12732,7 @@ async function persistManifestAutonomousPost(
         content_id: String(existingScheduledPostId),
         text,
         metadata: {
-          ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy) ? post.strategy as Record<string, unknown> : {}),
+                    ...postStrategy,
           family_key: familyKey,
           source_mechanism: sourceMechanism,
           audience_reward: audienceReward,
@@ -12862,7 +12870,7 @@ async function persistManifestAutonomousPost(
     brand_key: brand.brand_key,
     text,
     metadata: {
-      ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy) ? post.strategy as Record<string, unknown> : {}),
+            ...postStrategy,
       family_key: familyKey,
       source_mechanism: sourceMechanism,
       audience_reward: audienceReward,
@@ -12910,10 +12918,8 @@ async function persistManifestAutonomousPost(
   const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
   const lineupId = `autonomous-lineup-${identityHash.slice(0, 32)}`;
   const inventoryId = `autonomous-inventory-${identityHash.slice(0, 32)}`;
-  const strategy: Record<string, unknown> = {
-    ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy)
-      ? post.strategy as Record<string, unknown>
-      : {}),
+    const strategy: Record<string, unknown> = {
+    ...postStrategy,
     autonomous_engine_version: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
     autonomous_cycle_id: cycleId,
     generation_mode: generationMode,

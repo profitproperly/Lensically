@@ -3356,10 +3356,19 @@ describe("operator mode MCP endpoint", () => {
                 recent_exposure_assessment: "The candidate was checked against recent published and scheduled exposure and does not create an avoidable cluster.",
         intelligence_application_assessment: "The controlled experiment, specific-money portfolio evidence, and repetition exposure changed the chosen family, premise, and exact slot decision.",
       },
-      operation_id: persistOperationId,
+            operation_id: persistOperationId,
       proceed_confirmed: true,
     };
-        const persisted = await mcpTool<{
+    const staleSchemaPost = payload.post as typeof payload.post & {
+      source_context?: Record<string, unknown>;
+      hypothesis?: Record<string, unknown>;
+      strategy: Record<string, unknown>;
+    };
+    staleSchemaPost.strategy.source_context = staleSchemaPost.source_context;
+    staleSchemaPost.strategy.hypothesis = staleSchemaPost.hypothesis;
+    delete staleSchemaPost.source_context;
+    delete staleSchemaPost.hypothesis;
+    const persisted = await mcpTool<{
       success: boolean;
       scheduled_post_id: number;
             lineage: { source_batch_id: string; source_selection_id: string; source_card_id: string; generation_run_id: string; draft_id: string; inventory_id: string; hypothesis_id: string; strategy_version_id: string };
