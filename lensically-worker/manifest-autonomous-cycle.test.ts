@@ -556,8 +556,62 @@ describe("Manifest measurement and audit", () => {
     expect(current.coverage_accuracy.value).toBe(1);
     expect(current.lineage_completeness.value).toBe(1);
     expect(current.strategy_influence.value).toBe(1);
-    expect((comparison.dimensions as Record<string, unknown>).repeated_mistakes).toMatchObject({ status: "improved" });
+        expect((comparison.dimensions as Record<string, unknown>).repeated_mistakes).toMatchObject({ status: "improved" });
     expect(comparison.actual_strategy_influence).toBe(true);
+  });
+
+  it("enriches Saved Patterns and keeps followers account-level only", () => {
+    const signature = buildManifestSemanticSignature({ text: "If $100,000 arrived today, what would you handle first?" });
+    const pattern = buildManifestSavedPatternIntelligence({
+      pattern: {
+        id: 42,
+        post_id: "threads-42",
+        source_url: "https://threads.net/t/42",
+        source_identity_key: "threads:threads-42",
+        likes: 12000,
+        replies: 120,
+        reposts: 90,
+        shares: 40,
+        views: 200000,
+      },
+      signature,
+      source_card: {
+        source_mechanism: "A specific amount creates an immediate priority decision.",
+        required_product: "Concrete financial possibility.",
+        recommended_direction: "Preserve the decision tension while changing the scenario.",
+        transformation_contract_json: "{\"copy_surface_wording\":false}",
+      },
+      usage_rows: [
+        { id: "selection-1", selected_at: "2026-07-01T00:00:00.000Z" },
+        { id: "selection-2", selected_at: "2026-07-10T00:00:00.000Z" },
+      ],
+      result_rows: [
+        { published_post_id: "p1", scores_json: "{\"overall\":72}" },
+        { published_post_id: "p2", scores_json: "{\"overall\":68}" },
+        { published_post_id: "p3", scores_json: "{\"overall\":75}" },
+      ],
+      similarities: [{ pattern_identity_key: "threads:other", semantic_score: 0.82, repeated_dimensions: ["premise_key"] }],
+      excluded: false,
+    });
+    const follower = buildManifestFollowerCheckpoint({
+      snapshots: [
+        { snapshot_date: "2026-07-20", followers_count: 500, captured_at: "2026-07-20T04:00:00.000Z" },
+        { snapshot_date: "2026-07-21", followers_count: 525, captured_at: "2026-07-21T04:00:00.000Z" },
+        { snapshot_date: "2026-07-22", followers_count: 560, captured_at: "2026-07-22T04:00:00.000Z" },
+      ],
+    });
+
+    expect(pattern).toMatchObject({ reuse_state: "proven", exclusion_state: "active" });
+    expect(pattern.confidence).toMatchObject({ label: "reliable_adaptation_evidence", adaptation_result_sample_size: 3 });
+    expect(pattern.results).toMatchObject({ mature_result_count: 3, median_overall: 72 });
+    expect(follower).toMatchObject({
+      account_level_only: true,
+      followers_count: 560,
+      follower_goal: 1000000,
+      distance_to_goal: 999440,
+    });
+    expect((follower.trajectory as Record<string, unknown>).projection_is_attribution).toBe(false);
+    expect(JSON.stringify(follower)).not.toContain("published_post_id");
   });
 });
 
