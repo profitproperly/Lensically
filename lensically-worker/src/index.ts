@@ -11916,8 +11916,23 @@ async function persistManifestAutonomousPost(
   if (!operationId) return { success: false, error: "stable_operation_id_required" };
   const cycleId = normalizeOperatorText(payload.cycle_id, 120);
   if (!cycleId) return { success: false, error: "autonomous_cycle_id_required" };
-  const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
+    const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
   if (!cycle) return { success: false, error: "autonomous_cycle_not_found" };
+  const rejectPersist = async (
+    error: string,
+    details: Record<string, unknown> = {},
+    slotKey: string | null = null,
+  ): Promise<Record<string, unknown>> => {
+    await appendManifestCycleEvent(env.DB, {
+      cycleId,
+      brandKey: brand.brand_key,
+      eventKey: `rejected:${operationId}`,
+      eventType: "candidate_rejected",
+      slotKey,
+      payload: { operation_id: operationId, error, ...details },
+    });
+    return { success: false, error, ...details };
+  };
   const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
     ? payload.post as Record<string, unknown>
     : {};
@@ -11925,54 +11940,70 @@ async function persistManifestAutonomousPost(
     ? payload.model_evaluation as Record<string, unknown>
     : {};
   const hypothesisValidation = validateManifestPostHypothesis(post.hypothesis);
-  if (!hypothesisValidation.ok) {
-    return { success: false, error: "post_hypothesis_invalid", details: hypothesisValidation.errors };
+    if (!hypothesisValidation.ok) {
+    return rejectPersist("post_hypothesis_invalid", { details: hypothesisValidation.errors });
   }
   const sourceContextValidation = normalizeManifestSourceContext(post.source_context);
-  if (!sourceContextValidation.ok) {
-    return { success: false, error: "source_context_invalid", details: sourceContextValidation.errors };
+    if (!sourceContextValidation.ok) {
+    return rejectPersist("source_context_invalid", { details: sourceContextValidation.errors });
   }
   if (["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)
     && !sourceContextValidation.value.source_card_id
     && !sourceContextValidation.value.source_selection_id) {
-    return { success: false, error: "existing_source_card_lineage_required" };
+        return rejectPersist("existing_source_card_lineage_required");
   }
   const candidateTrace = Array.isArray(modelEvaluation.candidate_trace)
     ? modelEvaluation.candidate_trace.filter((item) => item && typeof item === "object" && !Array.isArray(item)).slice(0, 12) as Record<string, unknown>[]
     : [];
-  if (modelEvaluation.generation_passed !== true || modelEvaluation.scheduling_passed !== true) {
-    return { success: false, error: "model_evaluation_not_passed" };
+    if (modelEvaluation.generation_passed !== true || modelEvaluation.scheduling_passed !== true) {
+    return rejectPersist("model_evaluation_not_passed");
   }
     const noveltyAssessment = normalizeOperatorText(modelEvaluation.novelty_assessment, 4000);
   const winnerPreservationAssessment = normalizeOperatorText(modelEvaluation.winner_preservation_assessment, 4000);
   const slotPlacementAssessment = normalizeOperatorText(modelEvaluation.slot_placement_assessment, 4000);
   const recentExposureAssessment = normalizeOperatorText(modelEvaluation.recent_exposure_assessment, 4000);
   if (!noveltyAssessment || !winnerPreservationAssessment || !slotPlacementAssessment || !recentExposureAssessment) {
-    return {
-      success: false,
-      error: "model_evaluation_incomplete",
+        return rejectPersist("model_evaluation_incomplete", {
       required_fields: [
         "novelty_assessment",
         "winner_preservation_assessment",
         "slot_placement_assessment",
         "recent_exposure_assessment",
       ],
-    };
+    });
   }
     const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
     ? payload.strategic_thesis as Record<string, unknown>
     : {};
-    if (!Object.keys(strategicThesis).length) {
-    return { success: false, error: "strategic_thesis_required" };
+        if (!Object.keys(strategicThesis).length) {
+    return rejectPersist("strategic_thesis_required");
   }
   const followerBoundary = validateManifestFollowerAttributionBoundary({
     strategic_thesis: strategicThesis,
     post_strategy: post.strategy ?? {},
     model_evaluation: modelEvaluation,
   });
-  if (!followerBoundary.ok) {
-    return { success: false, error: "follower_attribution_forbidden", details: followerBoundary.errors };
+    if (!followerBoundary.ok) {
+    return rejectPersist("follower_attribution_forbidden", { details: followerBoundary.errors });
   }
+  const date = normalizeOperatorText(post.date, 20);
+  const time = normalizeOperatorText(post.time, 20);
+  const text = normalizeOperatorText(post.text, 20000);
+  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "");
+  const familyKey = normalizeOperatorMachineKey(post.family_key, "");
+  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000);
+  const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
+  const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
+  const slotKey = date && time ? `${date}T${time}` : "";
+    if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
+    || !MANIFEST_AUTONOMOUS_GENERATION_MODES.has(generationMode)) {
+    return rejectPersist("invalid_autonomous_post", {}, slotKey || null);
+  }
+  const targetSlots = Array.isArray(cycle.target_slots)
+    ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
+    : [];
+                const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
+  if (!targetSlot) return rejectPersist("slot_outside_prepared_cycle", { slot_key: slotKey }, slotKey);
   const outputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
     brandKey: brand.brand_key,
     strategy: strategicThesis,
@@ -11991,24 +12022,6 @@ async function persistManifestAutonomousPost(
     parentVersionId: normalizeOperatorText(cycle.strategy_version_id, 160, true),
   });
   await linkManifestCycleStrategy(env.DB, cycleId, String(outputStrategyVersion.id));
-  const date = normalizeOperatorText(post.date, 20);
-  const time = normalizeOperatorText(post.time, 20);
-  const text = normalizeOperatorText(post.text, 20000);
-  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "");
-  const familyKey = normalizeOperatorMachineKey(post.family_key, "");
-  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000);
-  const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
-  const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
-  const slotKey = date && time ? `${date}T${time}` : "";
-  if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
-    || !MANIFEST_AUTONOMOUS_GENERATION_MODES.has(generationMode)) {
-    return { success: false, error: "invalid_autonomous_post" };
-  }
-  const targetSlots = Array.isArray(cycle.target_slots)
-    ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
-    : [];
-        const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
-  if (!targetSlot) return { success: false, error: "slot_outside_prepared_cycle", slot_key: slotKey };
   let postHypothesis = await recordManifestPostHypothesis(env.DB, {
     cycleId,
     brandKey: brand.brand_key,
@@ -12156,7 +12169,7 @@ async function persistManifestAutonomousPost(
     }
   }
     const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
-  if (!scheduledUtc) return { success: false, error: "invalid_date_time" };
+    if (!scheduledUtc) return rejectPersist("invalid_date_time", { slot_key: slotKey }, slotKey);
   if ((parseOperatorTimestampMs(scheduledUtc) ?? 0) <= reconciliationNowMs && !existingScheduledPostId) {
     return reconcileNonfatalSlot("slot_elapsed", null);
   }
@@ -12202,8 +12215,8 @@ async function persistManifestAutonomousPost(
       .filter((phrase, index, all) => all.indexOf(phrase) === index && normalizedText.includes(phrase))
       .map((phrase) => ({ memory_id: memory.id, phrase, title: memory.title }));
   });
-  if (bannedPhraseHits.length) {
-    return { success: false, error: "explicit_banned_phrase", slot_key: slotKey, banned_phrase_hits: bannedPhraseHits };
+    if (bannedPhraseHits.length) {
+    return rejectPersist("explicit_banned_phrase", { slot_key: slotKey, banned_phrase_hits: bannedPhraseHits }, slotKey);
   }
     const duplicate = await env.DB.prepare(
     `SELECT id, status, scheduled_time FROM scheduled_posts
@@ -12216,14 +12229,12 @@ async function persistManifestAutonomousPost(
     scheduleIdempotencyKey,
     Number(exactScheduled?.id ?? 0),
   ).first<Record<string, unknown>>();
-  if (duplicate) {
-    return {
-      success: false,
-      error: "exact_duplicate_post",
+    if (duplicate) {
+    return rejectPersist("exact_duplicate_post", {
       slot_key: slotKey,
       duplicate_scheduled_post_id: Number(duplicate.id),
       duplicate_status: duplicate.status ?? null,
-    };
+    }, slotKey);
   }
         const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
   const sourceCardId = String(sourceCard.id ?? "");
