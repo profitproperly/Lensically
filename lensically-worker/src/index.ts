@@ -12210,13 +12210,41 @@ async function persistManifestAutonomousPost(
         sourceSelectionId: normalizeOperatorText(existingLineup?.source_selection_id, 160, true)
           ?? sourceContextValidation.value.source_selection_id,
       });
+            await upsertManifestSemanticSignature(env.DB, {
+        brand_key: brand.brand_key,
+        content_type: "scheduled",
+        content_id: String(existingScheduledPostId),
+        text,
+        metadata: {
+          ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy) ? post.strategy as Record<string, unknown> : {}),
+          family_key: familyKey,
+          source_mechanism: sourceMechanism,
+          audience_reward: audienceReward,
+          strategic_purpose: strategicPurpose,
+        },
+        scheduled_post_id: existingScheduledPostId,
+        observed_at: existingScheduledPost?.scheduled_time ?? null,
+      });
+      const reusedExperimentAssignment = await registerManifestExperimentAssignment(env.DB, {
+        brand_key: brand.brand_key,
+        cycle_id: cycleId,
+        slot_key: slotKey,
+        family_key: familyKey,
+        hypothesis_id: String(postHypothesis.id ?? ""),
+        scheduled_post_id: existingScheduledPostId,
+        experiment: hypothesisValidation.value.experiment,
+      });
       await appendManifestCycleEvent(env.DB, {
         cycleId,
         brandKey: brand.brand_key,
         eventKey: `persist:${operationId}`,
         eventType: "post_reused",
         slotKey,
-        payload: { scheduled_post_id: existingScheduledPostId, publish_lineage_complete: true },
+        payload: {
+          scheduled_post_id: existingScheduledPostId,
+          publish_lineage_complete: true,
+          experiment_assignment: reusedExperimentAssignment,
+        },
       });
       return {
         success: true,
@@ -12230,7 +12258,8 @@ async function persistManifestAutonomousPost(
         },
                 publish_lineage_complete: true,
         hypothesis_id: postHypothesis.id ?? null,
-        strategy_version_id: outputStrategyVersion.id ?? null,
+                strategy_version_id: outputStrategyVersion.id ?? null,
+        experiment_assignment: reusedExperimentAssignment,
         coverage_reconciliation_required: true,
       };
     }
@@ -12296,11 +12325,34 @@ async function persistManifestAutonomousPost(
     scheduleIdempotencyKey,
     Number(exactScheduled?.id ?? 0),
   ).first<Record<string, unknown>>();
-    if (duplicate) {
+        if (duplicate) {
     return rejectPersist("exact_duplicate_post", {
       slot_key: slotKey,
       duplicate_scheduled_post_id: Number(duplicate.id),
       duplicate_status: duplicate.status ?? null,
+    }, slotKey);
+  }
+  const semanticRepetition = await analyzeManifestCandidateRepetition(env.DB, {
+    brand_key: brand.brand_key,
+    text,
+    metadata: {
+      ...(post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy) ? post.strategy as Record<string, unknown> : {}),
+      family_key: familyKey,
+      source_mechanism: sourceMechanism,
+      audience_reward: audienceReward,
+      strategic_purpose: strategicPurpose,
+      expected_audience_reward: hypothesisValidation.value.expected_audience_reward,
+    },
+    candidate_slot_utc: scheduledUtc,
+    exclude_scheduled_post_id: exactScheduled ? Number(exactScheduled.id) : null,
+    recent_hours: 48,
+    future_hours: 48,
+  });
+  if (semanticRepetition.semantic_repetition_blocked === true) {
+    return rejectPersist("semantic_repetition_collision", {
+      slot_key: slotKey,
+      semantic_repetition: semanticRepetition,
+      required_action: "Rewrite the premise, scenario, reward, or sentence architecture, or move the execution outside the collision window while preserving any proven family mechanism.",
     }, slotKey);
   }
         const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
@@ -12387,8 +12439,14 @@ async function persistManifestAutonomousPost(
     model_evaluation: modelEvaluation,
     server_checks: {
       slot_open: true,
-      exact_duplicate: false,
+            exact_duplicate: false,
       explicit_banned_phrase: false,
+      semantic_repetition_collision: false,
+      semantic_repetition_summary: {
+        highest_score: semanticRepetition.highest_score ?? 0,
+        high_similarity: semanticRepetition.high_similarity ?? null,
+        candidate_signature: semanticRepetition.signature ?? null,
+      },
       no_internal_gate_fanout: true,
       no_internal_runway_scan: true,
       no_threads_api_call: true,
@@ -12560,7 +12618,16 @@ async function persistManifestAutonomousPost(
     env.DB.prepare(
       `UPDATE scheduled_posts SET publish_error_message = NULL WHERE id = ? AND threads_user_id = ?`,
     ).bind(scheduled.scheduledPostId, brand.profile.threads_user_id),
-  ]);
+    ]);
+  await upsertManifestSemanticSignature(env.DB, {
+    brand_key: brand.brand_key,
+    content_type: "scheduled",
+    content_id: String(scheduled.scheduledPostId),
+    text,
+    metadata: strategy,
+    scheduled_post_id: scheduled.scheduledPostId,
+    observed_at: scheduled.scheduledTimeUtc ?? scheduledUtc,
+  });
     const publishLineage = await getScheduledPostPublishLineageStatus(
     env,
     scheduled.scheduledPostId,
@@ -12626,13 +12693,22 @@ async function persistManifestAutonomousPost(
     const publishLineageRow = publishLineage.lineage && typeof publishLineage.lineage === "object"
     ? publishLineage.lineage as Record<string, unknown>
     : {};
-  await linkManifestHypothesisResult(env.DB, {
+    await linkManifestHypothesisResult(env.DB, {
     cycleId,
     slotKey,
     scheduledPostId: scheduled.scheduledPostId,
     status: "scheduled",
     hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
     sourceSelectionId,
+  });
+  const experimentAssignment = await registerManifestExperimentAssignment(env.DB, {
+    brand_key: brand.brand_key,
+    cycle_id: cycleId,
+    slot_key: slotKey,
+    family_key: familyKey,
+    hypothesis_id: String(postHypothesis.id ?? ""),
+    scheduled_post_id: scheduled.scheduledPostId,
+    experiment: hypothesisValidation.value.experiment,
   });
   await appendManifestCycleEvent(env.DB, {
     cycleId,
@@ -12648,7 +12724,9 @@ async function persistManifestAutonomousPost(
       draft_id: draftId,
       hypothesis_id: postHypothesis.id ?? null,
             strategy_version_id: outputStrategyVersion.id ?? null,
-      gate_summary: gateSummary,
+            gate_summary: gateSummary,
+      semantic_repetition: semanticRepetition,
+      experiment_assignment: experimentAssignment,
       publish_lineage_complete: true,
       intelligence_lineage_complete: true,
     },
@@ -12732,7 +12810,9 @@ async function persistManifestAutonomousPost(
         publish_lineage_complete: true,
     intelligence_lineage_complete: true,
     hypothesis_id: postHypothesis.id ?? null,
-    strategy_version_id: outputStrategyVersion.id ?? null,
+        strategy_version_id: outputStrategyVersion.id ?? null,
+    experiment_assignment: experimentAssignment,
+    semantic_repetition: semanticRepetition,
         model_evaluation: {
       novelty_assessment: noveltyAssessment,
       winner_preservation_assessment: winnerPreservationAssessment,
