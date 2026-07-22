@@ -4,9 +4,11 @@ import {
   resolveManifestAutonomousClock,
 } from "./src/index";
 import {
-    MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+      MANIFEST_CYCLE_RECEIPT_READ_VERSION,
+  MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
   MANIFEST_INTELLIGENCE_FOUNDATION_VERSION,
   MANIFEST_NONINTERFERENCE_POLICY,
+  buildManifestCycleReceiptRead,
   buildManifestExposureDimensions,
   normalizeManifestSourceContext,
   validateManifestFollowerAttributionBoundary,
@@ -182,6 +184,58 @@ describe("Manifest intelligence foundation", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.join("|")).toContain("follower_attribution_forbidden");
+  });
+
+    it("returns complete pageable receipt evidence without payload truncation", () => {
+    const events = Array.from({ length: 7 }, (_, index) => ({
+      event_key: `event-${index + 1}`,
+      event_type: index === 0 ? "cycle_prepared" : `event_type_${index + 1}`,
+      payload: { index: index + 1 },
+    }));
+    const receipt = {
+      id: "receipt-1",
+      cycle_id: "cycle-1",
+      brand_key: "manifest_mental",
+      receipt_version: "manifest-cycle-receipt-v2",
+      foundation_version: "manifest-intelligence-foundation-v2",
+      status: "running",
+      input_strategy_version: { id: "strategy-in", version: 1, strategy: { thesis: "input" } },
+      output_strategy_version: { id: "strategy-out", version: 2, strategy: { thesis: "output" } },
+      exposure_snapshot: {
+        id: "exposure-1",
+        revision: 2,
+        published: [{ id: "published-1" }, { id: "published-2" }],
+        scheduled: [{ id: "scheduled-1" }],
+        dimensions: { record_count: 3 },
+      },
+      startup_state: { captured_at: "2026-07-21T00:00:00.000Z", consulted: ["performance", "schedule"] },
+      events,
+      hypotheses: [
+        { id: "hypothesis-1", slot_key: "2026-07-21T12:00", status: "scheduled" },
+        { id: "hypothesis-2", slot_key: "2026-07-21T13:00", status: "scheduled" },
+      ],
+    };
+
+    const summary = buildManifestCycleReceiptRead(receipt, "summary");
+    expect(summary.receipt_read_version).toBe(MANIFEST_CYCLE_RECEIPT_READ_VERSION);
+    expect((summary.summary as Record<string, unknown>).event_count).toBe(7);
+    expect((summary.summary as Record<string, unknown>).hypothesis_count).toBe(2);
+    expect(summary.items).toEqual([]);
+
+    const firstPage = buildManifestCycleReceiptRead(receipt, "events", 0, 3);
+    expect(firstPage.items).toEqual(events.slice(0, 3));
+    expect(firstPage.pagination).toMatchObject({
+      offset: 0,
+      limit: 3,
+      returned: 3,
+      total: 7,
+      has_more: true,
+      next_offset: 3,
+    });
+
+    const finalPage = buildManifestCycleReceiptRead(receipt, "events", 3, 20);
+    expect(finalPage.items).toEqual(events.slice(3));
+    expect(finalPage.pagination).toMatchObject({ returned: 4, total: 7, has_more: false, next_offset: null });
   });
 
   it("accepts operator hypotheses and preserves permanent policy boundaries", () => {

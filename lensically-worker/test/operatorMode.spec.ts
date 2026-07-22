@@ -2990,28 +2990,83 @@ describe("operator mode MCP endpoint", () => {
     expect(directEventTypes).toEqual(expect.arrayContaining([
       "cycle_prepared", "candidate_evaluated", "post_persisted", "coverage_reconciled",
     ]));
-    const receipt = await mcpTool<{
+        const receipt = await mcpTool<{
       available: boolean;
       cycle_receipt: {
         input_strategy_version: { id: string } | null;
         output_strategy_version: { id: string } | null;
         exposure_snapshot: { id: string; revision: number } | null;
-        hypotheses: Array<{ id: string; scheduled_post_id: number; status: string; locked_at: string | null }>;
-        events: Array<{ event_type: string }>;
+        event_count: number;
+        hypothesis_count: number;
+        read_contract: { version: string; canonical_receipt_preserved: boolean; payload_budget_truncation_forbidden: boolean };
       } | null;
+      receipt_section: { section: string; items: unknown[]; pagination: Record<string, unknown> | null } | null;
     }>("get_manifest_cycle_receipt", {
       brand_key: "manifest_mental",
       cycle_id: prepared.cycle.id,
+      receipt_section: "summary",
       proceed_confirmed: true,
     });
     expect(receipt.available).toBe(true);
     expect(receipt.cycle_receipt?.input_strategy_version?.id).toBeTruthy();
     expect(receipt.cycle_receipt?.output_strategy_version?.id).toBe(persisted.strategy_version_id);
     expect(receipt.cycle_receipt?.exposure_snapshot?.id).toBeTruthy();
-    expect(receipt.cycle_receipt?.hypotheses).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: persisted.hypothesis_id, scheduled_post_id: persisted.scheduled_post_id, status: "scheduled" }),
+    expect(receipt.cycle_receipt?.event_count).toBe(directEventTypes.length);
+    expect(receipt.cycle_receipt?.hypothesis_count).toBeGreaterThanOrEqual(1);
+    expect(receipt.cycle_receipt?.read_contract).toMatchObject({
+      version: "manifest-cycle-receipt-read-v1",
+      canonical_receipt_preserved: true,
+      payload_budget_truncation_forbidden: true,
+    });
+    expect(receipt.receipt_section).toMatchObject({ section: "summary", items: [], pagination: null });
+
+    const eventPage = await mcpTool<{
+      receipt_section: {
+        section: string;
+        items: Array<{ event_type: string }>;
+        pagination: { returned: number; total: number; has_more: boolean; next_offset: number | null };
+      };
+    }>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      receipt_section: "events",
+      offset: 0,
+      limit: 20,
+      proceed_confirmed: true,
+    });
+    expect(eventPage.receipt_section.section).toBe("events");
+    expect(eventPage.receipt_section.items.map((event) => event.event_type)).toEqual(directEventTypes);
+    expect(eventPage.receipt_section.pagination).toMatchObject({
+      returned: directEventTypes.length,
+      total: directEventTypes.length,
+      has_more: false,
+      next_offset: null,
+    });
+
+    const hypothesisPage = await mcpTool<{
+      receipt_section: {
+        section: string;
+        items: Array<{ id: string; scheduled_post_id: number; status: string; locked_at: string | null }>;
+        pagination: { total: number; has_more: boolean };
+      };
+    }>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      receipt_section: "hypotheses",
+      offset: 0,
+      limit: 20,
+      proceed_confirmed: true,
+    });
+    expect(hypothesisPage.receipt_section.section).toBe("hypotheses");
+    expect(hypothesisPage.receipt_section.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: persisted.hypothesis_id,
+        scheduled_post_id: persisted.scheduled_post_id,
+        status: "scheduled",
+      }),
     ]));
-        expect(receipt.cycle_receipt?.events.map((event) => event.event_type)).toEqual(directEventTypes);
+    expect(hypothesisPage.receipt_section.pagination.total).toBeGreaterThanOrEqual(1);
+    expect(hypothesisPage.receipt_section.pagination.has_more).toBe(false);
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
