@@ -92,6 +92,12 @@ import {
   registerManifestExperimentAssignment,
   upsertManifestSemanticSignature,
 } from "./manifestIntelligenceEngine";
+import {
+  buildManifestMeasurementAuditRead,
+  ensureManifestMeasurementAuditTables,
+  refreshManifestMeasurementAudit,
+  type ManifestAuditSection,
+} from "./manifestMeasurementAudit";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
