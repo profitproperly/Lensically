@@ -98,6 +98,12 @@ import {
   refreshManifestMeasurementAudit,
   type ManifestAuditSection,
 } from "./manifestMeasurementAudit";
+import {
+  buildManifestDecisionIntelligence,
+  buildManifestIntelligenceDashboard,
+  ensureManifestProductIntegrationTables,
+  recordManifestDecisionInfluence,
+} from "./manifestProductIntegration";
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -11337,12 +11343,13 @@ async function prepareManifestAutonomousCycle(
     brand_key: brand.brand_key,
     threads_user_id: brand.profile.threads_user_id,
   });
-  const measurementAuditRefresh = await refreshManifestMeasurementAudit(env.DB, {
+    const measurementAuditRefresh = await refreshManifestMeasurementAudit(env.DB, {
     brand_key: brand.brand_key,
     threads_user_id: brand.profile.threads_user_id,
     account_id: brand.account_id,
     saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
   });
+  const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, brand.brand_key);
   const accountPosition = await buildManifestAutonomousAccountPosition(
     env,
     brand,
@@ -11352,6 +11359,7 @@ async function prepareManifestAutonomousCycle(
     threadsSnapshot as unknown as Record<string, unknown>,
     deliveryReconciliation,
   );
+    accountPosition.decision_intelligence = decisionIntelligence;
   const existing = await env.DB.prepare(
     `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
   ).bind(brand.brand_key, operationId).first<{ id: string }>();
@@ -11454,8 +11462,9 @@ async function prepareManifestAutonomousCycle(
     startupState: {
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-      data_consulted: ["growth mission", "strategy memory", "performance learning", "Content Focus", "recent published exposure", "future scheduled exposure", "active gates"],
+            data_consulted: ["growth mission", "strategy memory", "performance learning", "Content Focus", "learning brief", "operator benchmarks", "run comparison", "portfolio states", "controlled experiments", "Saved Pattern intelligence", "semantic repetition exposure", "account-level follower checkpoint", "recent published exposure", "future scheduled exposure", "active gates"],
       intelligence_policy: intelligencePolicy,
+      decision_intelligence: decisionIntelligence,
     },
     inputStrategyVersionId: normalizeOperatorText(inputStrategyVersion.id, 160, true),
     exposureSnapshotId: normalizeOperatorText(exposureSnapshot.id, 160, true),
@@ -11490,7 +11499,8 @@ async function prepareManifestAutonomousCycle(
     refreshed_live_state: true,
                 cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
         intelligence_engine_refresh: intelligenceEngineRefresh,
-        measurement_audit_refresh: measurementAuditRefresh,
+                measurement_audit_refresh: measurementAuditRefresh,
+        decision_intelligence: decisionIntelligence,
     intelligence_foundation: {
       policy: intelligencePolicy,
       input_strategy_version: inputStrategyVersion,
@@ -11519,8 +11529,10 @@ async function prepareManifestAutonomousCycle(
       delivery_incident_awareness_required: true,
       family_roles: ["franchise", "core", "emerging", "prospect", "cooling", "dormant"],
       generation_modes: Array.from(MANIFEST_AUTONOMOUS_GENERATION_MODES),
-      strategy_change_rule: "Change strategy when evidence, audience response, account position, recent exposure, or opportunity changes—not merely because another day began.",
+            strategy_change_rule: "Change strategy when authoritative learning, benchmark movement, portfolio evidence, experiment results, audience response, account position, recent exposure, or opportunity changes—not merely because another day began.",
       sequencing_rule: "A franchise may stay in the portfolio and still move later in the day. The earliest slot is reserved for the strongest contextually appropriate move after exposure and novelty review.",
+      scheduled_task_consumption_rule: "Before generating or placing any post, consume every field in decision_intelligence. Persist an intelligence_application_assessment explaining which learned directive changed the move or why evidence required preserving the current strategy.",
+      decision_influence_receipt_required: true,
     },
     reconciliation_contract: {
       authoritative_clock_source: clock.source,
@@ -11539,7 +11551,7 @@ async function prepareManifestAutonomousCycle(
       preserve_existing_schedule: true,
       exact_missing_slots_only: true,
       required_post_fields: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
-      required_model_evaluation_fields: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment"],
+            required_model_evaluation_fields: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment", "intelligence_application_assessment"],
       server_enforcement: ["slot_open", "exact_duplicate", "explicit_banned_phrase", "idempotency", "lineage_persistence"],
       internal_gate_fanout: false,
       internal_runway_scan: false,
@@ -29752,8 +29764,9 @@ async function refreshOperatorPerformanceEvaluator(
   await ensureOperatorWorkflowTables(env);
   await ensureExternalPatternsTable(env);
   await ensureThreadsFollowerSnapshotsTable(env);
-  await ensureOperatorPerformanceEvaluatorTables(env);
+    await ensureOperatorPerformanceEvaluatorTables(env);
   await ensureManifestMeasurementAuditTables(env.DB);
+  await ensureManifestProductIntegrationTables(env.DB);
   const checkpointPlaceholders = OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS.map(() => "?").join(", ");
   await env.DB.prepare(
     `UPDATE operator_post_performance_scores
