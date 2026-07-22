@@ -37186,14 +37186,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       await ensureExternalPatternsTable(env);
       await ensureThreadsFollowerSnapshotsTable(env);
       await ensureOperatorPerformanceEvaluatorTables(env);
-      await ensureManifestMeasurementAuditTables(env.DB);
+            await ensureManifestMeasurementAuditTables(env.DB);
       await ensureManifestProductIntegrationTables(env.DB);
-      await refreshManifestMeasurementAudit(env.DB, {
-        brand_key: brand.brand_key,
-        threads_user_id: brand.profile.threads_user_id,
-        account_id: brand.account_id,
-        saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
-      });
       const rawLimit = Number(url.searchParams.get("limit") ?? "20");
       const dashboard = await buildManifestIntelligenceDashboard(env.DB, {
         brand_key: brand.brand_key,
