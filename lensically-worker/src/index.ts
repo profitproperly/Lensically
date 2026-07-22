@@ -30460,14 +30460,18 @@ async function getLatestOperatorPerformanceLearning(
     ).bind(brandKey, OPERATOR_PERFORMANCE_EVALUATOR_VERSION).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
     const contentFocus = await getLatestOperatorContentFocus(env, brandKey);
-  const intelligenceEngine = brandKey === "manifest_mental"
+    const intelligenceEngine = brandKey === "manifest_mental"
     ? await getManifestIntelligenceEngineState(env.DB, brandKey)
+    : null;
+  const measurementAudit = brandKey === "manifest_mental"
+    ? await buildManifestMeasurementAuditRead(env.DB, { brand_key: brandKey, section: "summary", limit: 1 })
     : null;
   return {
     available: Boolean(briefRow),
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-    content_focus: contentFocus,
+        content_focus: contentFocus,
     intelligence_engine: intelligenceEngine,
+    measurement_audit: measurementAudit?.summary ?? null,
     brief_id: briefRow?.id ?? null,
     checkpoint_hours: briefRow?.checkpoint_hours ?? null,
     sample_size: Number(briefRow?.sample_size ?? 0),
