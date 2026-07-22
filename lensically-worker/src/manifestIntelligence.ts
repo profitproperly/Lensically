@@ -37,6 +37,15 @@ export const MANIFEST_FOLLOWER_ATTRIBUTION_POLICY = {
 
 type JsonRecord = Record<string, unknown>;
 
+export type ManifestControlledExperimentSpec = {
+  experiment_key: string;
+  hypothesis: JsonRecord;
+  comparison_group: JsonRecord;
+  maturity_windows: number[];
+  result_criteria: JsonRecord;
+  variant_key: string;
+};
+
 export type ManifestPostHypothesis = {
   expected_response_type: "reach" | "likes" | "replies" | "reposts" | "shares" | "engagement_rate" | "balanced_engagement";
   expected_audience_reward: string;
@@ -47,6 +56,7 @@ export type ManifestPostHypothesis = {
   expected_performance_range: JsonRecord;
   uncertainty: string;
   falsification_conditions: string[];
+  experiment: ManifestControlledExperimentSpec | null;
 };
 
 export type ManifestSourceContext = {
@@ -162,9 +172,38 @@ export function validateManifestPostHypothesis(input: unknown): { ok: true; valu
   if (!premiseRationale) errors.push("premise_rationale_required");
   const uncertainty = text(source.uncertainty);
   if (!uncertainty) errors.push("uncertainty_required");
-  const expectedRange = source.expected_performance_range && typeof source.expected_performance_range === "object" && !Array.isArray(source.expected_performance_range)
+    const expectedRange = source.expected_performance_range && typeof source.expected_performance_range === "object" && !Array.isArray(source.expected_performance_range)
     ? source.expected_performance_range as JsonRecord : {};
   if (!Object.keys(expectedRange).length) errors.push("expected_performance_range_required");
+  const experimentSource = source.experiment && typeof source.experiment === "object" && !Array.isArray(source.experiment)
+    ? source.experiment as JsonRecord : null;
+  let experiment: ManifestControlledExperimentSpec | null = null;
+  if (experimentSource) {
+    const experimentKey = text(experimentSource.experiment_key, 160);
+    const experimentHypothesis = experimentSource.hypothesis && typeof experimentSource.hypothesis === "object" && !Array.isArray(experimentSource.hypothesis)
+      ? experimentSource.hypothesis as JsonRecord : {};
+    const comparisonGroup = experimentSource.comparison_group && typeof experimentSource.comparison_group === "object" && !Array.isArray(experimentSource.comparison_group)
+      ? experimentSource.comparison_group as JsonRecord : {};
+    const maturityWindows = Array.isArray(experimentSource.maturity_windows)
+      ? experimentSource.maturity_windows.map(Number).filter((value) => [6, 12, 18, 24].includes(value))
+      : [6, 12, 18, 24];
+    const resultCriteria = experimentSource.result_criteria && typeof experimentSource.result_criteria === "object" && !Array.isArray(experimentSource.result_criteria)
+      ? experimentSource.result_criteria as JsonRecord : {};
+    const variantKey = text(experimentSource.variant_key, 120) || "variant";
+    if (!experimentKey) errors.push("experiment_key_required");
+    if (!Object.keys(experimentHypothesis).length) errors.push("experiment_hypothesis_required");
+    if (!Object.keys(comparisonGroup).length) errors.push("experiment_comparison_group_required");
+    if (!maturityWindows.includes(24)) errors.push("experiment_24_hour_maturity_required");
+    if (!Object.keys(resultCriteria).length) errors.push("experiment_result_criteria_required");
+    experiment = {
+      experiment_key: experimentKey,
+      hypothesis: experimentHypothesis,
+      comparison_group: comparisonGroup,
+      maturity_windows: Array.from(new Set(maturityWindows)).sort((left, right) => left - right),
+      result_criteria: resultCriteria,
+      variant_key: variantKey,
+    };
+  }
   if (errors.length) return { ok: false, errors };
   return { ok: true, value: {
     expected_response_type: response,
@@ -176,6 +215,7 @@ export function validateManifestPostHypothesis(input: unknown): { ok: true; valu
     expected_performance_range: expectedRange,
     uncertainty,
     falsification_conditions: strings(source.falsification_conditions, 20, 1000),
+    experiment,
   } };
 }
 
