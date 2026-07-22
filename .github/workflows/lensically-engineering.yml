@@ -37,7 +37,7 @@ on:
 
 concurrency:
   group: "lensically-engineering-${{ github.event_name }}-${{ inputs.task }}-${{ github.ref }}"
-    cancel-in-progress: "${{ inputs.task != 'worker-deploy' }}"
+    cancel-in-progress: false
 
 permissions:
   contents: read
