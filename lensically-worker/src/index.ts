@@ -10575,7 +10575,7 @@ async function applyManifestContentFocusToPool(
     return candidates.map((candidate) => {
     const focus = byIdentity.get(String(candidate.source_identity_key ?? ""));
     const focusFamilyId = focus?.source_card_family_id ? String(focus.source_card_family_id) : "";
-    const portfolio = focusFamilyId ? portfolioByFamily.get(focusFamilyId) : null;
+        const portfolio = focusFamilyId ? portfolioByFamily.get(normalizeOperatorMachineKey(focusFamilyId, "")) : null;
     return {
       ...candidate,
       focus_observed: Boolean(focus),

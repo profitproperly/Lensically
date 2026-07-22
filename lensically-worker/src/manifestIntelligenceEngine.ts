@@ -598,6 +598,60 @@ export async function ensureManifestIntelligenceEngineTables(db: D1Database): Pr
   )`).run();
 }
 
+export async function upsertManifestLearningObservation(db: D1Database, input: {
+  brand_key: string;
+  level: string;
+  feature_key: string;
+  sample_size: number;
+  supporting_count: number;
+  contradicting_count: number;
+  median_overall: number;
+  effect_size: number;
+  confidence_score: number;
+  confidence_label: ManifestConfidenceLabel;
+  state: string;
+  evidence: JsonRecord;
+  reason: string;
+}): Promise<{ transitioned: boolean; from_state: string | null; to_state: string }> {
+  await ensureManifestIntelligenceEngineTables(db);
+  const previous = await db.prepare(`SELECT confidence_label, state
+    FROM operator_manifest_learning_observations
+    WHERE brand_key = ? AND level = ? AND feature_key = ? AND checkpoint_hours = 24 LIMIT 1`)
+    .bind(input.brand_key, input.level, input.feature_key).first<JsonRecord>();
+  const evidenceJson = stableJson(input.evidence);
+  await db.prepare(`INSERT INTO operator_manifest_learning_observations (
+    id, brand_key, level, feature_key, checkpoint_hours, sample_size, supporting_count,
+    contradicting_count, median_overall, effect_size, confidence_score, confidence_label,
+    state, evidence_json, active, learning_version
+  ) VALUES (?, ?, ?, ?, 24, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+  ON CONFLICT(brand_key, level, feature_key, checkpoint_hours) DO UPDATE SET
+    sample_size = excluded.sample_size, supporting_count = excluded.supporting_count,
+    contradicting_count = excluded.contradicting_count, median_overall = excluded.median_overall,
+    effect_size = excluded.effect_size, confidence_score = excluded.confidence_score,
+    confidence_label = excluded.confidence_label, state = excluded.state,
+    evidence_json = excluded.evidence_json, active = 1, learning_version = excluded.learning_version,
+    updated_at = CURRENT_TIMESTAMP`).bind(
+    crypto.randomUUID(), input.brand_key, input.level, input.feature_key, input.sample_size,
+    input.supporting_count, input.contradicting_count, input.median_overall, input.effect_size,
+    input.confidence_score, input.confidence_label, input.state, evidenceJson,
+    MANIFEST_MULTI_LEVEL_LEARNING_VERSION,
+  ).run();
+  const previousLabel = previous?.confidence_label ? machine(previous.confidence_label, "insufficient") : null;
+  const transitioned = previousLabel !== input.confidence_label;
+  if (transitioned) {
+    const entityId = `${input.level}:${input.feature_key}`;
+    const transitionKey = fnv1a(`${input.brand_key}|confidence|${entityId}|${previousLabel ?? "none"}|${input.confidence_label}|${evidenceJson}`);
+    await db.prepare(`INSERT OR IGNORE INTO operator_manifest_state_transitions (
+      id, transition_key, brand_key, entity_type, entity_id, from_state, to_state,
+      reason, evidence_json, transitioned_at
+    ) VALUES (?, ?, ?, 'confidence', ?, ?, ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(), transitionKey, input.brand_key, entityId, previousLabel,
+      input.confidence_label, input.reason, evidenceJson, new Date().toISOString(),
+    ).run();
+  }
+  return { transitioned, from_state: previousLabel, to_state: input.confidence_label };
+}
+
 export async function upsertManifestSemanticSignature(db: D1Database, input: {
   brand_key: string;
   content_type: "published" | "scheduled" | "candidate";
@@ -911,22 +965,21 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       global_median_overall: globalMedian,
       structural_change_allowed: confidence.transition_allowed,
     };
-    await db.prepare(`INSERT INTO operator_manifest_learning_observations (
-      id, brand_key, level, feature_key, checkpoint_hours, sample_size, supporting_count,
-      contradicting_count, median_overall, effect_size, confidence_score, confidence_label,
-      state, evidence_json, active, learning_version
-    ) VALUES (?, ?, ?, ?, 24, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-    ON CONFLICT(brand_key, level, feature_key, checkpoint_hours) DO UPDATE SET
-      sample_size = excluded.sample_size, supporting_count = excluded.supporting_count,
-      contradicting_count = excluded.contradicting_count, median_overall = excluded.median_overall,
-      effect_size = excluded.effect_size, confidence_score = excluded.confidence_score,
-      confidence_label = excluded.confidence_label, state = excluded.state,
-      evidence_json = excluded.evidence_json, active = 1, learning_version = excluded.learning_version,
-      updated_at = CURRENT_TIMESTAMP`).bind(
-      crypto.randomUUID(), input.brand_key, group.level, group.feature_key, scores.length,
-      supporting, contradicting, groupMedian, effect, confidence.score, confidence.label,
-      state, stableJson(evidence), MANIFEST_MULTI_LEVEL_LEARNING_VERSION,
-    ).run();
+        await upsertManifestLearningObservation(db, {
+      brand_key: input.brand_key,
+      level: group.level,
+      feature_key: group.feature_key,
+      sample_size: scores.length,
+      supporting_count: supporting,
+      contradicting_count: contradicting,
+      median_overall: groupMedian,
+      effect_size: effect,
+      confidence_score: confidence.score,
+      confidence_label: confidence.label,
+      state,
+      evidence,
+      reason: confidence.reason,
+    });
     if (group.level === "family") familyObservations.set(group.feature_key, {
       sample_size: scores.length, median_overall: groupMedian, supporting_count: supporting,
       contradicting_count: contradicting, confidence,
@@ -1024,30 +1077,70 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
   };
 }
 
+function compactManifestEngineEvidence(value: unknown): JsonRecord {
+  const source = record(parseJson(value, {}));
+  const publishedPostIds = array(source.published_post_ids).map(String);
+  const overallScores = array(source.overall_scores).map(Number).filter(Number.isFinite);
+  return {
+    ...source,
+    published_post_ids: publishedPostIds.slice(0, 12),
+    overall_scores: overallScores.slice(0, 12),
+    evidence_truncated: publishedPostIds.length > 12 || overallScores.length > 12,
+    published_post_id_count: publishedPostIds.length,
+    overall_score_count: overallScores.length,
+  };
+}
+
+function compactManifestSemanticSignature(value: unknown): JsonRecord {
+  const signature = record(parseJson(value, {}));
+  const meaningTokens = array(signature.meaning_tokens).map(String);
+  return {
+    ...signature,
+    meaning_tokens: meaningTokens.slice(0, 10),
+    meaning_token_count: meaningTokens.length,
+    meaning_tokens_truncated: meaningTokens.length > 10,
+  };
+}
+
 export async function getManifestIntelligenceEngineState(db: D1Database, brandKey: string): Promise<JsonRecord> {
   await ensureManifestIntelligenceEngineTables(db);
   const portfolio = await db.prepare(`SELECT family_key, role, recommended_role, previous_role,
       confidence_score, confidence_label, allocation_weight, actual_decay, reason, evidence_json, updated_at
     FROM operator_manifest_portfolio_states WHERE brand_key = ?
-    ORDER BY allocation_weight DESC, confidence_score DESC, updated_at DESC`).bind(brandKey).all<JsonRecord>();
+    ORDER BY allocation_weight DESC, confidence_score DESC, updated_at DESC LIMIT 30`).bind(brandKey).all<JsonRecord>();
   const learning = await db.prepare(`SELECT level, feature_key, sample_size, supporting_count,
       contradicting_count, median_overall, effect_size, confidence_score, confidence_label,
       state, evidence_json, updated_at
     FROM operator_manifest_learning_observations WHERE brand_key = ? AND active = 1
-    ORDER BY confidence_score DESC, sample_size DESC LIMIT 100`).bind(brandKey).all<JsonRecord>();
+    ORDER BY confidence_score DESC, sample_size DESC LIMIT 40`).bind(brandKey).all<JsonRecord>();
   const experiments = await db.prepare(`SELECT id, experiment_key, family_key, hypothesis_json,
       comparison_group_json, maturity_windows_json, result_criteria_json, status,
       latest_result_json, follow_up_decision, updated_at
     FROM operator_manifest_experiments WHERE brand_key = ?
-    ORDER BY datetime(updated_at) DESC LIMIT 50`).bind(brandKey).all<JsonRecord>();
+    ORDER BY datetime(updated_at) DESC LIMIT 20`).bind(brandKey).all<JsonRecord>();
   const repetition = await db.prepare(`SELECT content_type, content_id, scheduled_post_id,
       published_post_id, observed_at, signature_json
     FROM operator_manifest_semantic_signatures WHERE brand_key = ?
-    ORDER BY datetime(observed_at) DESC, datetime(updated_at) DESC LIMIT 80`).bind(brandKey).all<JsonRecord>();
+    ORDER BY datetime(observed_at) DESC, datetime(updated_at) DESC LIMIT 40`).bind(brandKey).all<JsonRecord>();
   return {
     engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
-    portfolio_states: (portfolio.results ?? []).map((row) => ({ ...row, actual_decay: number(row.actual_decay) === 1, evidence: parseJson(row.evidence_json, {}) })),
-    learning_observations: (learning.results ?? []).map((row) => ({ ...row, evidence: parseJson(row.evidence_json, {}) })),
+    bounded_read_contract: {
+      portfolio_limit: 30,
+      learning_limit: 40,
+      experiment_limit: 20,
+      semantic_exposure_limit: 40,
+      evidence_post_limit: 12,
+      semantic_token_limit: 10,
+    },
+    portfolio_states: (portfolio.results ?? []).map((row) => ({
+      ...row,
+      actual_decay: number(row.actual_decay) === 1,
+      evidence: compactManifestEngineEvidence(row.evidence_json),
+    })),
+    learning_observations: (learning.results ?? []).map((row) => ({
+      ...row,
+      evidence: compactManifestEngineEvidence(row.evidence_json),
+    })),
     experiments: (experiments.results ?? []).map((row) => ({
       ...row,
       hypothesis: parseJson(row.hypothesis_json, {}),
@@ -1056,6 +1149,9 @@ export async function getManifestIntelligenceEngineState(db: D1Database, brandKe
       result_criteria: parseJson(row.result_criteria_json, {}),
       latest_result: parseJson(row.latest_result_json, {}),
     })),
-    semantic_exposure: (repetition.results ?? []).map((row) => ({ ...row, signature: parseJson(row.signature_json, {}) })),
+    semantic_exposure: (repetition.results ?? []).map((row) => ({
+      ...row,
+      signature: compactManifestSemanticSignature(row.signature_json),
+    })),
   };
 }
