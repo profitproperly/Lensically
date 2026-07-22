@@ -3,6 +3,7 @@ export const MANIFEST_CYCLE_RECEIPT_VERSION = "manifest-cycle-receipt-v2";
 export const MANIFEST_STRATEGY_VERSION_CONTRACT = "manifest-strategy-version-v1";
 export const MANIFEST_EXPOSURE_LEDGER_VERSION = "manifest-exposure-ledger-v2";
 export const MANIFEST_POST_HYPOTHESIS_VERSION = "manifest-post-hypothesis-v2";
+export const MANIFEST_CYCLE_RECEIPT_READ_VERSION = "manifest-cycle-receipt-read-v1";
 
 export const MANIFEST_NONINTERFERENCE_POLICY = {
   version: "manifest-owner-noninterference-v1",
@@ -20,7 +21,7 @@ export const MANIFEST_NONINTERFERENCE_POLICY = {
 } as const;
 
 export const MANIFEST_FOLLOWER_ATTRIBUTION_POLICY = {
-  version: "manifest-follower-attribution-boundary-v1",
+    version: "manifest-follower-attribution-boundary-v2",
   account_level_only: true,
   post_level_attribution: "forbidden",
   day_level_attribution: "forbidden",
@@ -651,14 +652,147 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
   };
 }
 
+type ManifestCycleReceiptReadSection = "summary" | "events" | "hypotheses" | "exposure_published" | "exposure_scheduled" | "startup_state";
+
+function compactManifestStrategyForReceipt(value: unknown): JsonRecord | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as JsonRecord;
+  return {
+    id: row.id ?? null,
+    brand_key: row.brand_key ?? null,
+    version: row.version ?? null,
+    contract_version: row.contract_version ?? null,
+    parent_version_id: row.parent_version_id ?? null,
+    status: row.status ?? null,
+    strategy_hash: row.strategy_hash ?? null,
+    strategy: row.strategy ?? {},
+    evidence: row.evidence ?? {},
+    change_summary: row.change_summary ?? null,
+    reversal_conditions: row.reversal_conditions ?? [],
+    source_cycle_id: row.source_cycle_id ?? null,
+    created_at: row.created_at ?? null,
+  };
+}
+
+export function buildManifestCycleReceiptRead(
+  receipt: unknown,
+  requestedSection: unknown = "summary",
+  requestedOffset: unknown = 0,
+  requestedLimit: unknown = 20,
+): JsonRecord {
+  const source = receipt && typeof receipt === "object" && !Array.isArray(receipt) ? receipt as JsonRecord : {};
+  const allowedSections = new Set<ManifestCycleReceiptReadSection>([
+    "summary", "events", "hypotheses", "exposure_published", "exposure_scheduled", "startup_state",
+  ]);
+  const normalizedSection = text(requestedSection, 80) as ManifestCycleReceiptReadSection;
+  const section: ManifestCycleReceiptReadSection = allowedSections.has(normalizedSection) ? normalizedSection : "summary";
+  const offsetNumber = Number(requestedOffset);
+  const limitNumber = Number(requestedLimit);
+  const offset = Number.isFinite(offsetNumber) ? Math.max(0, Math.trunc(offsetNumber)) : 0;
+  const limit = Number.isFinite(limitNumber) ? Math.min(20, Math.max(1, Math.trunc(limitNumber))) : 20;
+  const events = Array.isArray(source.events) ? source.events : [];
+  const hypotheses = Array.isArray(source.hypotheses) ? source.hypotheses : [];
+  const startupState = source.startup_state && typeof source.startup_state === "object" && !Array.isArray(source.startup_state)
+    ? source.startup_state as JsonRecord : {};
+  const exposure = source.exposure_snapshot && typeof source.exposure_snapshot === "object" && !Array.isArray(source.exposure_snapshot)
+    ? source.exposure_snapshot as JsonRecord : null;
+  const published = exposure && Array.isArray(exposure.published) ? exposure.published : [];
+  const scheduled = exposure && Array.isArray(exposure.scheduled) ? exposure.scheduled : [];
+  const exposureSummary = exposure ? {
+    id: exposure.id ?? null,
+    cycle_id: exposure.cycle_id ?? null,
+    brand_key: exposure.brand_key ?? null,
+    ledger_version: exposure.ledger_version ?? null,
+    as_of: exposure.as_of ?? null,
+    timezone: exposure.timezone ?? null,
+    horizon_start_local: exposure.horizon_start_local ?? null,
+    horizon_end_local: exposure.horizon_end_local ?? null,
+    dimensions: exposure.dimensions ?? {},
+    source_hash: exposure.source_hash ?? null,
+    revision: exposure.revision ?? 1,
+    published_count: published.length,
+    scheduled_count: scheduled.length,
+    created_at: exposure.created_at ?? null,
+    updated_at: exposure.updated_at ?? null,
+  } : null;
+  const summary = {
+    id: source.id ?? null,
+    cycle_id: source.cycle_id ?? null,
+    brand_key: source.brand_key ?? null,
+    operation_id: source.operation_id ?? null,
+    receipt_version: source.receipt_version ?? null,
+    foundation_version: source.foundation_version ?? null,
+    trigger_type: source.trigger_type ?? null,
+    status: source.status ?? null,
+    timezone: source.timezone ?? null,
+    horizon_hours: source.horizon_hours ?? null,
+    horizon_start_local: source.horizon_start_local ?? null,
+    horizon_end_local: source.horizon_end_local ?? null,
+    input_strategy_version_id: source.input_strategy_version_id ?? null,
+    output_strategy_version_id: source.output_strategy_version_id ?? null,
+    exposure_snapshot_id: source.exposure_snapshot_id ?? null,
+    input_strategy_version: compactManifestStrategyForReceipt(source.input_strategy_version),
+    output_strategy_version: compactManifestStrategyForReceipt(source.output_strategy_version),
+    exposure_snapshot: exposureSummary,
+    startup_state_summary: {
+      top_level_keys: Object.keys(startupState).sort(),
+      captured_at: startupState.captured_at ?? null,
+      account_position_captured_at: (startupState.account_position && typeof startupState.account_position === "object" && !Array.isArray(startupState.account_position)
+        ? (startupState.account_position as JsonRecord).captured_at : null) ?? null,
+    },
+    completion: source.completion ?? null,
+    unresolved_issues: source.unresolved_issues ?? [],
+    event_count: events.length,
+    hypothesis_count: hypotheses.length,
+    started_at: source.started_at ?? null,
+    completed_at: source.completed_at ?? null,
+    created_at: source.created_at ?? null,
+    updated_at: source.updated_at ?? null,
+    follower_attribution_policy: source.follower_attribution_policy ?? MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+    noninterference_policy: source.noninterference_policy ?? MANIFEST_NONINTERFERENCE_POLICY,
+    read_contract: {
+      version: MANIFEST_CYCLE_RECEIPT_READ_VERSION,
+      canonical_receipt_preserved: true,
+      payload_budget_truncation_forbidden: true,
+      available_sections: Array.from(allowedSections),
+      page_limit_max: 20,
+    },
+  };
+  let items: unknown[] | null = null;
+  let sectionData: unknown = null;
+  if (section === "events") items = events;
+  if (section === "hypotheses") items = hypotheses;
+  if (section === "exposure_published") items = published;
+  if (section === "exposure_scheduled") items = scheduled;
+  if (section === "startup_state") sectionData = startupState;
+  const total = items?.length ?? (section === "startup_state" ? Object.keys(startupState).length : 0);
+  const pageItems = items ? items.slice(offset, offset + limit) : [];
+  return {
+    receipt_read_version: MANIFEST_CYCLE_RECEIPT_READ_VERSION,
+    section,
+    summary,
+    section_data: sectionData,
+    items: pageItems,
+    pagination: items ? {
+      offset,
+      limit,
+      returned: pageItems.length,
+      total,
+      has_more: offset + pageItems.length < total,
+      next_offset: offset + pageItems.length < total ? offset + pageItems.length : null,
+    } : null,
+  };
+}
+
 export async function getManifestIntelligenceFoundation(db: D1Database, brandKey: string): Promise<JsonRecord> {
   const policy = await ensureManifestIntelligencePolicy(db, brandKey);
   const strategy = await getLatestManifestStrategyVersion(db, brandKey);
   const receipt = await getManifestCycleReceipt(db, { brandKey });
+  const receiptRead = receipt ? buildManifestCycleReceiptRead(receipt, "summary") : null;
   return {
     foundation_version: MANIFEST_INTELLIGENCE_FOUNDATION_VERSION,
     policy,
     latest_strategy_version: strategy,
-    latest_cycle_receipt: receipt,
+    latest_cycle_receipt: receiptRead?.summary ?? null,
   };
 }

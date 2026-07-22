@@ -67,8 +67,9 @@ import {
 import {
   MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
   MANIFEST_NONINTERFERENCE_POLICY,
-  appendManifestCycleEvent,
+    appendManifestCycleEvent,
   beginManifestCycleReceipt,
+  buildManifestCycleReceiptRead,
   createManifestExposureSnapshot,
   ensureManifestIntelligencePolicy,
   ensureManifestStrategyVersion,
@@ -15274,7 +15275,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
   }
 
-                if (toolName === "get_manifest_cycle_receipt") {
+                                if (toolName === "get_manifest_cycle_receipt") {
     const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
     const operationId = normalizeOperatorText(payload.cycle_operation_id, 240, true);
     const receipt = await getManifestCycleReceipt(env.DB, {
@@ -15282,11 +15283,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       cycleId,
       operationId,
     });
+    const receiptRead = receipt
+      ? buildManifestCycleReceiptRead(receipt, payload.receipt_section, payload.offset, payload.limit)
+      : null;
+    const receiptSection = receiptRead ? { ...receiptRead } : null;
+    if (receiptSection) delete receiptSection.summary;
     return operatorJsonResponse({
       success: true,
       brand_key: brand.brand_key,
       available: Boolean(receipt),
-      cycle_receipt: receipt,
+      cycle_receipt: receiptRead?.summary ?? null,
+      receipt_section: receiptSection,
     });
   }
 
@@ -16643,8 +16650,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "get_manifest_cycle_receipt",
     title: "Get Manifest autonomous cycle receipt",
-    description: "Read one complete autonomous-cycle receipt with trigger, startup state, exposure snapshot, input and output strategy versions, candidate and persistence events, post hypotheses, lineage evidence, completion, and unresolved issues. Defaults to the latest receipt.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
+        description: "Read one canonical autonomous-cycle receipt without payload-budget truncation. The response always includes a stable summary and supports pageable sections for events, hypotheses, published exposure, scheduled exposure, and startup state. Defaults to the latest receipt summary.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" }, receipt_section: { type: "string", enum: ["summary", "events", "hypotheses", "exposure_published", "exposure_scheduled", "startup_state"], default: "summary" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 20, default: 20 } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
       {
