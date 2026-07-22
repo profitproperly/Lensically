@@ -904,8 +904,152 @@ describe("operator mode backend spine", () => {
     const signature = semantic?.signature as Record<string, unknown>;
     expect((signature.meaning_tokens as unknown[]).length).toBeLessThanOrEqual(10);
     expect(Number(signature.meaning_token_count)).toBeGreaterThan(10);
-    expect(signature.meaning_tokens_truncated).toBe(true);
+        expect(signature.meaning_tokens_truncated).toBe(true);
   });
+
+  it("reads the complete bounded Manifest measurement and audit surface without mutation", async () => {
+    await ensureMcpAccountOpen("manifest_mental");
+    const beforeScheduled = await env.DB.prepare(`SELECT COUNT(*) AS total FROM scheduled_posts`).first<{ total: number }>();
+    const bootstrap = await mcpToolRaw<{
+      success: boolean;
+      intelligence_audit: { summary: Record<string, unknown>; section: string; records: unknown[] };
+    }>("get_manifest_intelligence_audit", {
+      brand_key: "manifest_mental",
+      audit_section: "summary",
+      proceed_confirmed: true,
+    });
+    expect(bootstrap.isError, JSON.stringify(bootstrap.structuredContent)).not.toBe(true);
+
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const now = new Date().toISOString();
+    await env.DB.prepare(`INSERT INTO operator_manifest_learning_briefs (
+      id, brand_key, brief_key, brief_version, source_fingerprint, evidence_window_start,
+      evidence_window_end, authoritative_post_count, brief_json, strategy_change_json, strategy_version_id
+    ) VALUES (?, 'manifest_mental', ?, 'manifest-learning-brief-v1', ?, ?, ?, 8, ?, ?, NULL)`).bind(
+      crypto.randomUUID(), `brief-${suffix}`, `fingerprint-${suffix}`,
+      "2026-07-01T00:00:00.000Z", now,
+      JSON.stringify({ improvements: [{ level: "hook", feature_key: "universe_opener" }], next_run_tests: [] }),
+      JSON.stringify({ warranted: false, reason: "No new structural change." }),
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_benchmark_snapshots (
+      id, brand_key, snapshot_key, cycle_id, benchmark_version, window_start, window_end,
+      metrics_json, source_fingerprint
+    ) VALUES (?, 'manifest_mental', ?, ?, 'manifest-operator-benchmark-v1', ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(), `snapshot-${suffix}`, `cycle-${suffix}`, "2026-07-21T00:00:00.000Z", now,
+      JSON.stringify({ coverage_accuracy: { value: 1, sample_size: 24, direction: "higher_is_better", unit: "ratio" } }),
+      `benchmark-${suffix}`,
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_run_comparisons (
+      id, brand_key, cycle_id, previous_cycle_id, comparison_version, comparison_json, source_fingerprint
+    ) VALUES (?, 'manifest_mental', ?, ?, 'manifest-run-comparison-v1', ?, ?)`).bind(
+      crypto.randomUUID(), `cycle-${suffix}`, `cycle-before-${suffix}`,
+      JSON.stringify({ comparable: true, dimensions: { diversity: { status: "improved" } } }),
+      `comparison-${suffix}`,
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_saved_pattern_intelligence (
+      id, brand_key, pattern_identity_key, external_pattern_id, source_identity_key,
+      verified_metrics_json, semantic_json, mechanism_json, adaptation_options_json,
+      similarity_json, usage_json, results_json, confidence_json, reuse_state,
+      exclusion_state, source_updated_at, intelligence_version
+    ) VALUES (?, 'manifest_mental', ?, 42, ?, ?, ?, ?, ?, '[]', ?, ?, ?, 'proven', 'active', ?, 'manifest-saved-pattern-intelligence-v1')`).bind(
+      crypto.randomUUID(), `threads:pattern-${suffix}`, `threads:pattern-${suffix}`,
+      JSON.stringify({ likes: 12000, verified_like_floor_passed: true }),
+      JSON.stringify({ premise_key: "choice_priority:spending_priority:choice_priority" }),
+      JSON.stringify({ mechanism: "specific_amount_priority", reward: "financial_choice" }),
+      JSON.stringify({ preserve: ["specific_amount_priority"], vary: ["scenario"] }),
+      JSON.stringify({ count: 3, last_used_at: now }),
+      JSON.stringify({ mature_result_count: 3, median_overall: 72 }),
+      JSON.stringify({ label: "reliable_adaptation_evidence", score: 82 }),
+      now,
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_follower_checkpoints (
+      id, brand_key, checkpoint_key, threads_user_id, checkpoint_version, snapshot_date,
+      followers_count, follower_goal, distance_to_goal, trajectory_json, attribution_policy
+    ) VALUES (?, 'manifest_mental', ?, '35758578720393972', 'manifest-follower-checkpoint-v1',
+      '2026-07-22', 560, 1000000, 999440, ?, ?)`).bind(
+      crypto.randomUUID(), `checkpoint-${suffix}`,
+      JSON.stringify({ snapshot_count: 3, trend: "growing", projection_is_attribution: false }),
+      "Account-level checkpoint only. No post attribution.",
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_state_transitions (
+      id, transition_key, brand_key, entity_type, entity_id, from_state, to_state,
+      reason, evidence_json, transitioned_at
+    ) VALUES (?, ?, 'manifest_mental', 'family', ?, 'core', 'franchise', 'Mature evidence strengthened.', '{}', ?)`).bind(
+      crypto.randomUUID(), `transition-${suffix}`, `family-${suffix}`, now,
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_portfolio_states (
+      id, brand_key, family_key, role, recommended_role, previous_role, confidence_score,
+      confidence_label, allocation_weight, actual_decay, reason, evidence_json, portfolio_version
+    ) VALUES (?, 'manifest_mental', ?, 'franchise', 'franchise', 'core', 82, 'reliable', 1.6, 0,
+      'Repeated mature strength.', '{}', 'manifest-adaptive-portfolio-v1')`).bind(
+      crypto.randomUUID(), `family-${suffix}`,
+    ).run();
+    await env.DB.prepare(`INSERT INTO operator_manifest_experiments (
+      id, brand_key, experiment_key, family_key, hypothesis_json, comparison_group_json,
+      maturity_windows_json, result_criteria_json, status, latest_result_json,
+      follow_up_decision, experiment_version
+    ) VALUES (?, 'manifest_mental', ?, ?, '{}', '{}', '[6,12,18,24]', '{}', 'completed',
+      '{"delta":12}', 'expand', 'manifest-controlled-experiment-v1')`).bind(
+      crypto.randomUUID(), `experiment-${suffix}`, `family-${suffix}`,
+    ).run();
+
+    const summary = await mcpToolRaw<{
+      success: boolean;
+      intelligence_audit: {
+        summary: {
+          capability_status: Record<string, boolean>;
+          saved_pattern_inventory: { total: number; proven: number };
+          follower_checkpoint: { account_level_only: boolean; followers_count: number; distance_to_goal: number };
+          latest_benchmark: { metrics: Record<string, unknown> };
+          latest_run_comparison: { comparison: Record<string, unknown> };
+        };
+        section: string;
+        records: unknown[];
+      };
+    }>("get_manifest_intelligence_audit", {
+      brand_key: "manifest_mental",
+      audit_section: "summary",
+      proceed_confirmed: true,
+    });
+    expect(summary.isError, JSON.stringify(summary.structuredContent)).not.toBe(true);
+    expect(summary.structuredContent.intelligence_audit.summary).toMatchObject({
+      capability_status: {
+        automatic_learning_brief: true,
+        operator_benchmarks: true,
+        run_to_run_comparison: true,
+        conversational_audit: true,
+        saved_pattern_intelligence: true,
+        account_level_follower_checkpoint: true,
+      },
+      saved_pattern_inventory: { proven: 1 },
+      follower_checkpoint: { account_level_only: true, followers_count: 560, distance_to_goal: 999440 },
+    });
+
+    const patterns = await mcpToolRaw<{
+      intelligence_audit: {
+        section: string;
+        pagination: { total: number; returned: number; has_more: boolean };
+        records: Array<{ pattern_identity_key: string; reuse_state: string; confidence: { label: string } }>;
+      };
+    }>("get_manifest_intelligence_audit", {
+      brand_key: "manifest_mental",
+      audit_section: "saved_patterns",
+      offset: 0,
+      limit: 1,
+      proceed_confirmed: true,
+    });
+    expect(patterns.isError, JSON.stringify(patterns.structuredContent)).not.toBe(true);
+    expect(patterns.structuredContent.intelligence_audit).toMatchObject({
+      section: "saved_patterns",
+      pagination: { returned: 1 },
+      records: [{ reuse_state: "proven", confidence: { label: "reliable_adaptation_evidence" } }],
+    });
+    expect(new TextEncoder().encode(JSON.stringify(patterns.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
+
+    const afterScheduled = await env.DB.prepare(`SELECT COUNT(*) AS total FROM scheduled_posts`).first<{ total: number }>();
+    expect(Number(afterScheduled?.total ?? 0)).toBe(Number(beforeScheduled?.total ?? 0));
+    expect(JSON.stringify(summary.structuredContent.intelligence_audit.summary.follower_checkpoint)).not.toContain("published_post_id");
+  }, 30000);
 
   it("reads Content Focus through a direct typed Main tool after Proceed", async () => {
     await ensureMcpAccountOpen("manifest_mental");
