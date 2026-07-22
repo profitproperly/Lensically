@@ -23,6 +23,11 @@ import worker, {
   shouldAutoArmScheduledPostAlarm,
 
 } from "../src";
+import {
+  getManifestIntelligenceEngineState,
+  upsertManifestLearningObservation,
+  upsertManifestSemanticSignature,
+} from "../src/manifestIntelligenceEngine";
 
 const AUTH_HEADERS = {
   Authorization: "Bearer test-gpt-key",
@@ -803,8 +808,104 @@ describe("operator mode backend spine", () => {
     expect(observation.rates.like_rate).toBeCloseTo(30 / 260, 6);
     expect(observation.rates.propagation_rate).toBeCloseTo(6 / 260, 6);
     expect(observation.velocity.interval_views_per_hour).toBeCloseTo(160 / 6, 3);
-    expect(JSON.stringify(observation)).not.toContain("follower");
+        expect(JSON.stringify(observation)).not.toContain("follower");
     });
+
+  it("persists confidence transitions and bounds Manifest intelligence reads", async () => {
+    const evidenceIds = Array.from({ length: 20 }, (_, index) => `post-${index + 1}`);
+    const evidenceScores = Array.from({ length: 20 }, (_, index) => 40 + index);
+    const initial = await upsertManifestLearningObservation(env.DB, {
+      brand_key: "manifest_mental",
+      level: "hook",
+      feature_key: "test_direct_question",
+      sample_size: 2,
+      supporting_count: 1,
+      contradicting_count: 0,
+      median_overall: 48,
+      effect_size: 2,
+      confidence_score: 24,
+      confidence_label: "insufficient",
+      state: "uncertain",
+      evidence: { published_post_ids: evidenceIds, overall_scores: evidenceScores },
+      reason: "Initial evidence is insufficient.",
+    });
+    const promoted = await upsertManifestLearningObservation(env.DB, {
+      brand_key: "manifest_mental",
+      level: "hook",
+      feature_key: "test_direct_question",
+      sample_size: 8,
+      supporting_count: 7,
+      contradicting_count: 1,
+      median_overall: 68,
+      effect_size: 14,
+      confidence_score: 82,
+      confidence_label: "reliable",
+      state: "supporting",
+      evidence: { published_post_ids: evidenceIds, overall_scores: evidenceScores },
+      reason: "Eight authoritative observations support a reliable transition.",
+    });
+    const replay = await upsertManifestLearningObservation(env.DB, {
+      brand_key: "manifest_mental",
+      level: "hook",
+      feature_key: "test_direct_question",
+      sample_size: 8,
+      supporting_count: 7,
+      contradicting_count: 1,
+      median_overall: 68,
+      effect_size: 14,
+      confidence_score: 82,
+      confidence_label: "reliable",
+      state: "supporting",
+      evidence: { published_post_ids: evidenceIds, overall_scores: evidenceScores },
+      reason: "Eight authoritative observations support a reliable transition.",
+    });
+    expect(initial).toMatchObject({ transitioned: true, from_state: null, to_state: "insufficient" });
+    expect(promoted).toMatchObject({ transitioned: true, from_state: "insufficient", to_state: "reliable" });
+    expect(replay).toMatchObject({ transitioned: false, from_state: "reliable", to_state: "reliable" });
+
+    const transitions = await env.DB.prepare(
+      `SELECT from_state, to_state FROM operator_manifest_state_transitions
+       WHERE brand_key = 'manifest_mental' AND entity_type = 'confidence'
+         AND entity_id = 'hook:test_direct_question'
+       ORDER BY datetime(transitioned_at) ASC, created_at ASC`,
+    ).all<{ from_state: string | null; to_state: string }>();
+    expect(transitions.results).toEqual([
+      { from_state: null, to_state: "insufficient" },
+      { from_state: "insufficient", to_state: "reliable" },
+    ]);
+
+    await upsertManifestSemanticSignature(env.DB, {
+      brand_key: "manifest_mental",
+      content_type: "candidate",
+      content_id: "bounded-read-test",
+      text: "Money freedom security abundance momentum possibility confidence clarity growth future peace wealth purpose choice action focus trust belief direction progress.",
+      observed_at: new Date().toISOString(),
+    });
+    const state = await getManifestIntelligenceEngineState(env.DB, "manifest_mental");
+    expect(state.bounded_read_contract).toMatchObject({
+      portfolio_limit: 30,
+      learning_limit: 40,
+      experiment_limit: 20,
+      semantic_exposure_limit: 40,
+      evidence_post_limit: 12,
+      semantic_token_limit: 10,
+    });
+    const learning = (state.learning_observations as Array<Record<string, unknown>>)
+      .find((item) => item.feature_key === "test_direct_question");
+    expect(learning?.confidence_label).toBe("reliable");
+    expect(learning?.evidence).toMatchObject({
+      evidence_truncated: true,
+      published_post_id_count: 20,
+      overall_score_count: 20,
+    });
+    expect(((learning?.evidence as Record<string, unknown>).published_post_ids as unknown[])).toHaveLength(12);
+    const semantic = (state.semantic_exposure as Array<Record<string, unknown>>)
+      .find((item) => item.content_id === "bounded-read-test");
+    const signature = semantic?.signature as Record<string, unknown>;
+    expect((signature.meaning_tokens as unknown[]).length).toBeLessThanOrEqual(10);
+    expect(Number(signature.meaning_token_count)).toBeGreaterThan(10);
+    expect(signature.meaning_tokens_truncated).toBe(true);
+  });
 
   it("reads Content Focus through a direct typed Main tool after Proceed", async () => {
     await ensureMcpAccountOpen("manifest_mental");
