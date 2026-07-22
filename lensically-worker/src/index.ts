@@ -11501,12 +11501,48 @@ async function prepareManifestAutonomousCycle(
       receipt_id: cycleReceipt.id ?? null,
       effective_now_iso: clock.effective_now_iso,
     },
-  });
+    });
+  const preparedCycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
+  if (existing?.id) {
+    const compactCycle = preparedCycle ? {
+      id: preparedCycle.id,
+      brand_key: preparedCycle.brand_key,
+      operation_id: preparedCycle.operation_id,
+      engine_version: preparedCycle.engine_version,
+      status: preparedCycle.status,
+      timezone: preparedCycle.timezone,
+      horizon_hours: preparedCycle.horizon_hours,
+      horizon_start_local: preparedCycle.horizon_start_local,
+      horizon_end_local: preparedCycle.horizon_end_local,
+      target_slots: preparedCycle.target_slots,
+      missing_slots: preparedCycle.missing_slots,
+      scheduled_post_ids: preparedCycle.scheduled_post_ids,
+      error: preparedCycle.error,
+      updated_at: preparedCycle.updated_at,
+    } : null;
+    return {
+      success: true,
+      reused_existing: true,
+      refreshed_live_state: true,
+      cycle: compactCycle,
+      intelligence_engine_refresh: intelligenceEngineRefresh,
+      measurement_audit_refresh: measurementAuditRefresh,
+      decision_intelligence: decisionIntelligenceReceiptReference,
+      reconciliation_contract: {
+        authoritative_clock_source: clock.source,
+        effective_now_iso: clock.effective_now_iso,
+        past_slots_ignored: true,
+        occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
+        stale_operation_refresh: true,
+        coverage_reconciled: true,
+      },
+    };
+  }
   return {
     success: true,
-    reused_existing: Boolean(existing?.id),
+    reused_existing: false,
     refreshed_live_state: true,
-                cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+                cycle: preparedCycle,
         intelligence_engine_refresh: intelligenceEngineRefresh,
                 measurement_audit_refresh: measurementAuditRefresh,
         decision_intelligence: decisionIntelligence,
