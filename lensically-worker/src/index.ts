@@ -64,6 +64,25 @@ import {
   type LocalValidationReceipt,
 } from "./localExecution";
 
+import {
+  MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+  MANIFEST_NONINTERFERENCE_POLICY,
+  appendManifestCycleEvent,
+  beginManifestCycleReceipt,
+  createManifestExposureSnapshot,
+  ensureManifestIntelligencePolicy,
+  ensureManifestStrategyVersion,
+  finalizeManifestCycleReceipt,
+  getLatestManifestStrategyVersion,
+  getManifestCycleReceipt,
+  getManifestIntelligenceFoundation,
+  linkManifestCycleStrategy,
+  linkManifestHypothesisResult,
+  normalizeManifestSourceContext,
+  recordManifestPostHypothesis,
+  validateManifestPostHypothesis,
+} from "./manifestIntelligence";
+
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
 const DEFAULT_WORKER_ORIGIN = "https://api.lensically.com";
@@ -11295,14 +11314,111 @@ async function prepareManifestAutonomousCycle(
       targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
       normalizeOperatorJson(targetSlots, []),
       normalizeOperatorJson(missingSlots, []),
-      normalizeOperatorJson(accountPosition, {}),
+            normalizeOperatorJson(accountPosition, {}),
     ).run();
   }
+
+  const intelligencePolicy = await ensureManifestIntelligencePolicy(env.DB, brand.brand_key);
+  let inputStrategyVersion = await getLatestManifestStrategyVersion(env.DB, brand.brand_key);
+  if (!inputStrategyVersion) {
+    const performancePosition = accountPosition.performance && typeof accountPosition.performance === "object" && !Array.isArray(accountPosition.performance)
+      ? accountPosition.performance as Record<string, unknown>
+      : {};
+    inputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
+      brandKey: brand.brand_key,
+      strategy: {
+        contract_version: "manifest-cycle-input-strategy-v1",
+        mission_objective: profile?.objective ?? null,
+        content_focus: accountPosition.content_focus ?? null,
+        performance_brief: performancePosition.brief ?? null,
+        portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? null,
+        intelligence_policy: intelligencePolicy,
+      },
+      evidence: {
+        captured_at: clock.effective_now_iso,
+        sources: ["growth mission", "Content Focus", "performance learning", "recent exposure", "owner policy"],
+      },
+      changeSummary: "Seed the first durable strategy version from the live autonomous account position.",
+      reversalConditions: ["Replace or revise only when observable engagement evidence or account conditions materially change."],
+      sourceCycleId: cycleId,
+    });
+  }
+  const publishedExposure = Array.isArray(accountPosition.recent_published_posts)
+    ? accountPosition.recent_published_posts as Record<string, unknown>[]
+    : [];
+  const scheduledExposure = coverage.scheduled_records.map((record) => ({ ...record }));
+  const exposureSnapshot = await createManifestExposureSnapshot(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    asOf: clock.effective_now_iso,
+    timezone,
+    horizonStartLocal: targetSlots[0]?.key ?? null,
+    horizonEndLocal: targetSlots[targetSlots.length - 1]?.key ?? null,
+    published: publishedExposure,
+    scheduled: scheduledExposure,
+  });
+  const cycleReceipt = await beginManifestCycleReceipt(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    operationId,
+    trigger: {
+      operation_id: operationId,
+      requested_horizon_hours: horizonHours,
+      timezone,
+      clock,
+      invocation_mode: "model_orchestrated_autonomous_cycle",
+    },
+    startupState: {
+      account_position: accountPosition,
+      occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
+      data_consulted: ["growth mission", "strategy memory", "performance learning", "Content Focus", "recent published exposure", "future scheduled exposure", "active gates"],
+      intelligence_policy: intelligencePolicy,
+    },
+    inputStrategyVersionId: normalizeOperatorText(inputStrategyVersion.id, 160, true),
+    exposureSnapshotId: normalizeOperatorText(exposureSnapshot.id, 160, true),
+    horizonPlan: {
+      target_slots: targetSlots,
+      authoritative_missing_slots: missingSlots,
+      occupied_slots: targetSlots.filter((slot) => coverage.occupied.has(slot.key)).map((slot) => ({ ...slot, evidence: coverage.occupied.get(slot.key) })),
+      full_horizon_lineup_required_before_first_persist: true,
+    },
+    startedAt: clock.effective_now_iso,
+  });
+  await appendManifestCycleEvent(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    eventKey: "cycle-prepared",
+    eventType: "cycle_prepared",
+    payload: {
+      operation_id: operationId,
+      target_slot_count: targetSlots.length,
+      missing_slot_count: missingSlots.length,
+      input_strategy_version_id: inputStrategyVersion.id ?? null,
+      exposure_snapshot_id: exposureSnapshot.id ?? null,
+      receipt_id: cycleReceipt.id ?? null,
+    },
+  });
   return {
     success: true,
     reused_existing: Boolean(existing?.id),
     refreshed_live_state: true,
-    cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+        cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+    intelligence_foundation: {
+      policy: intelligencePolicy,
+      input_strategy_version: inputStrategyVersion,
+      exposure_snapshot: {
+        id: exposureSnapshot.id ?? null,
+        ledger_version: exposureSnapshot.ledger_version ?? null,
+        dimensions: exposureSnapshot.dimensions ?? {},
+      },
+      cycle_receipt: {
+        id: cycleReceipt.id ?? null,
+        receipt_version: cycleReceipt.receipt_version ?? null,
+        status: cycleReceipt.status ?? null,
+      },
+      follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+      noninterference_policy: MANIFEST_NONINTERFERENCE_POLICY,
+    },
     strategy_contract: {
       objective: "Build and sequence the highest-value 48-hour growth portfolio before persisting the first post. Posts are strategic moves, not interchangeable slot filler.",
       fixed_percentages: false,
@@ -11352,6 +11468,22 @@ async function ensureManifestAutonomousSourceCard(
   cycleId: string,
   post: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  const sourceContextResult = normalizeManifestSourceContext(post.source_context);
+  const sourceContext = sourceContextResult.ok ? sourceContextResult.value : null;
+  if (sourceContext?.source_card_id) {
+    const providedCard = await getOperatorSourceCard(env, brand.brand_key, sourceContext.source_card_id);
+    if (providedCard?.status === "locked" && providedCard.source_selection_id) return providedCard;
+  }
+  if (sourceContext?.source_selection_id) {
+    const selected = await env.DB.prepare(
+      `SELECT source_card_id FROM operator_source_selections
+       WHERE id = ? AND brand_key = ? LIMIT 1`,
+    ).bind(sourceContext.source_selection_id, brand.brand_key).first<{ source_card_id: string | null }>();
+    if (selected?.source_card_id) {
+      const providedCard = await getOperatorSourceCard(env, brand.brand_key, selected.source_card_id);
+      if (providedCard?.status === "locked" && providedCard.source_selection_id) return providedCard;
+    }
+  }
   const familyKey = normalizeOperatorMachineKey(post.family_key, "autonomous_prospect");
   const sourceIdentityKey = `operator_hypothesis:${familyKey}`;
   const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000)
