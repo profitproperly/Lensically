@@ -11478,7 +11478,7 @@ async function prepareManifestAutonomousCycle(
     await appendManifestCycleEvent(env.DB, {
     cycleId,
     brandKey: brand.brand_key,
-    eventKey: `cycle-prepared:${clock.effective_now_iso}`,
+        eventKey: `cycle-prepared:${exposureSnapshot.revision ?? 1}:${runtimeNowIso}`,
     eventType: "cycle_prepared",
     payload: {
       operation_id: operationId,
