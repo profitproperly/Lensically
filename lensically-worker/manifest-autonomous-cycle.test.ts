@@ -23,6 +23,13 @@ import {
   deriveManifestPortfolioState,
   evaluateManifestExperiment,
 } from "./src/manifestIntelligenceEngine";
+import {
+  buildManifestFollowerCheckpoint,
+  buildManifestLearningBrief,
+  buildManifestOperatorBenchmarks,
+  buildManifestRunComparison,
+  buildManifestSavedPatternIntelligence,
+} from "./src/manifestMeasurementAudit";
 
 describe("Manifest autonomous clock and horizon", () => {
     it("uses Threads server time when the runtime clock is behind", () => {
