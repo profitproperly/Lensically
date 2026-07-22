@@ -3232,6 +3232,11 @@ describe("operator mode MCP endpoint", () => {
 
         };
       };
+            intelligence_engine_refresh: {
+        mode: string;
+        recomputed: boolean;
+        refresh_owner: string;
+      };
       measurement_audit_refresh: {
         mode: string;
         recomputed: boolean;
@@ -3245,7 +3250,17 @@ describe("operator mode MCP endpoint", () => {
       operation_id: `test-autonomous-persist-prepare-${crypto.randomUUID()}`,
       proceed_confirmed: true,
     });
-        expect(prepared.decision_intelligence).toMatchObject({
+            expect(prepared.intelligence_engine_refresh).toMatchObject({
+      mode: "latest_persisted_intelligence_state",
+      recomputed: false,
+      refresh_owner: "performance_evaluator_and_insights_cycle",
+    });
+    expect(prepared.measurement_audit_refresh).toMatchObject({
+      mode: "latest_persisted_measurement_state",
+      recomputed: false,
+      refresh_owner: "performance_evaluator_and_insights_cycle",
+    });
+    expect(prepared.decision_intelligence).toMatchObject({
       version: "manifest-decision-intelligence-v1",
       consumption_contract: { required: true },
     });

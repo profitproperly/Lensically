@@ -812,7 +812,14 @@ function compactManifestAutonomousPreparationPayload(
           }, []),
           portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? {},
         },
-            },
+                  },
+      intelligence_engine_refresh: payload.intelligence_engine_refresh && typeof payload.intelligence_engine_refresh === "object" && !Array.isArray(payload.intelligence_engine_refresh)
+        ? {
+            mode: (payload.intelligence_engine_refresh as Record<string, unknown>).mode ?? null,
+            recomputed: (payload.intelligence_engine_refresh as Record<string, unknown>).recomputed === true,
+            refresh_owner: (payload.intelligence_engine_refresh as Record<string, unknown>).refresh_owner ?? null,
+          }
+        : null,
       measurement_audit_refresh: payload.measurement_audit_refresh && typeof payload.measurement_audit_refresh === "object" && !Array.isArray(payload.measurement_audit_refresh)
         ? {
             mode: (payload.measurement_audit_refresh as Record<string, unknown>).mode ?? null,
@@ -1013,7 +1020,14 @@ function compactManifestAutonomousPreparationPayload(
         }, []),
         portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? {},
       },
-    },
+        },
+    intelligence_engine_refresh: payload.intelligence_engine_refresh && typeof payload.intelligence_engine_refresh === "object" && !Array.isArray(payload.intelligence_engine_refresh)
+      ? {
+          mode: (payload.intelligence_engine_refresh as Record<string, unknown>).mode ?? null,
+          recomputed: (payload.intelligence_engine_refresh as Record<string, unknown>).recomputed === true,
+          refresh_owner: (payload.intelligence_engine_refresh as Record<string, unknown>).refresh_owner ?? null,
+        }
+      : null,
     measurement_audit_refresh: payload.measurement_audit_refresh && typeof payload.measurement_audit_refresh === "object" && !Array.isArray(payload.measurement_audit_refresh)
       ? {
           mode: (payload.measurement_audit_refresh as Record<string, unknown>).mode ?? null,
@@ -11752,16 +11766,17 @@ async function prepareManifestAutonomousCycle(
     timezone,
     effectiveNowMs,
   );
-      await refreshOperatorContentFocus(env, brand.brand_key);
-    await ensureGptPostStrategyTagsTable(env);
+        await ensureGptPostStrategyTagsTable(env);
   await ensureOperatorWorkflowTables(env);
   await ensureExternalPatternsTable(env);
   await ensureThreadsFollowerSnapshotsTable(env);
-  const intelligenceEngineRefresh = await refreshManifestIntelligenceEngine(env.DB, {
-    brand_key: brand.brand_key,
-    threads_user_id: brand.profile.threads_user_id,
-  });
-        const measurementAuditRefresh = {
+  const intelligenceEngineRefresh = {
+    mode: "latest_persisted_intelligence_state",
+    recomputed: false,
+    refresh_owner: "performance_evaluator_and_insights_cycle",
+    reason: "Autonomous preparation consumes durable Content Focus, maturity, comparable, semantic, portfolio, experiment, and confidence state without recomputing the intelligence engine inside one scheduled-task invocation.",
+  };
+  const measurementAuditRefresh = {
     mode: "latest_persisted_measurement_state",
     recomputed: false,
     refresh_owner: "performance_evaluator_and_insights_cycle",
