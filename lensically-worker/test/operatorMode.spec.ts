@@ -3223,9 +3223,13 @@ describe("operator mode MCP endpoint", () => {
             decision_intelligence: {
         version: string;
         consumption_contract: {
-          required: boolean;
+                    required: boolean;
+          measurement_state_mode: string;
+          measurement_recomputed: boolean;
+          measurement_refresh_owner: string;
           required_decision_outputs: Record<string, boolean>;
           inputs_that_must_be_considered: Record<string, boolean>;
+
         };
       };
       measurement_audit_refresh: {
