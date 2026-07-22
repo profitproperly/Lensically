@@ -12057,7 +12057,8 @@ async function persistManifestAutonomousPost(
     const noveltyAssessment = normalizeOperatorText(modelEvaluation.novelty_assessment, 4000);
   const winnerPreservationAssessment = normalizeOperatorText(modelEvaluation.winner_preservation_assessment, 4000);
   const slotPlacementAssessment = normalizeOperatorText(modelEvaluation.slot_placement_assessment, 4000);
-  const recentExposureAssessment = normalizeOperatorText(modelEvaluation.recent_exposure_assessment, 4000);
+    const recentExposureAssessment = normalizeOperatorText(modelEvaluation.recent_exposure_assessment, 4000);
+  const intelligenceApplicationAssessment = normalizeOperatorText(modelEvaluation.intelligence_application_assessment, 4000, true);
   if (!noveltyAssessment || !winnerPreservationAssessment || !slotPlacementAssessment || !recentExposureAssessment) {
         return rejectPersist("model_evaluation_incomplete", {
       required_fields: [
@@ -12254,7 +12255,7 @@ async function persistManifestAutonomousPost(
         scheduled_post_id: existingScheduledPostId,
         observed_at: existingScheduledPost?.scheduled_time ?? null,
       });
-      const reusedExperimentAssignment = await registerManifestExperimentAssignment(env.DB, {
+            const reusedExperimentAssignment = await registerManifestExperimentAssignment(env.DB, {
         brand_key: brand.brand_key,
         cycle_id: cycleId,
         slot_key: slotKey,
@@ -12262,6 +12263,22 @@ async function persistManifestAutonomousPost(
         hypothesis_id: String(postHypothesis.id ?? ""),
         scheduled_post_id: existingScheduledPostId,
         experiment: hypothesisValidation.value.experiment,
+      });
+      const reusedDecisionInfluence = await recordManifestDecisionInfluence(env.DB, {
+        brand_key: brand.brand_key,
+        cycle_id: cycleId,
+        slot_key: slotKey,
+        scheduled_post_id: existingScheduledPostId,
+        hypothesis_id: String(postHypothesis.id ?? ""),
+        input_strategy_version_id: normalizeOperatorText(cycle.strategy_version_id, 160, true),
+        output_strategy_version_id: normalizeOperatorText(outputStrategyVersion.id, 160, true),
+        family_key: familyKey,
+        generation_mode: generationMode,
+        source_context: sourceContextValidation.value as unknown as Record<string, unknown>,
+        strategic_thesis: strategicThesis,
+        model_evaluation: { ...modelEvaluation, intelligence_application_assessment: intelligenceApplicationAssessment },
+        semantic_repetition: {},
+        experiment_assignment: reusedExperimentAssignment,
       });
       await appendManifestCycleEvent(env.DB, {
         cycleId,
@@ -12271,8 +12288,9 @@ async function persistManifestAutonomousPost(
         slotKey,
         payload: {
           scheduled_post_id: existingScheduledPostId,
-          publish_lineage_complete: true,
+                    publish_lineage_complete: true,
           experiment_assignment: reusedExperimentAssignment,
+          decision_influence: reusedDecisionInfluence,
         },
       });
       return {
@@ -12288,7 +12306,8 @@ async function persistManifestAutonomousPost(
                 publish_lineage_complete: true,
         hypothesis_id: postHypothesis.id ?? null,
                 strategy_version_id: outputStrategyVersion.id ?? null,
-        experiment_assignment: reusedExperimentAssignment,
+                experiment_assignment: reusedExperimentAssignment,
+        decision_influence: reusedDecisionInfluence,
         coverage_reconciliation_required: true,
       };
     }
@@ -12730,7 +12749,7 @@ async function persistManifestAutonomousPost(
     hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
     sourceSelectionId,
   });
-  const experimentAssignment = await registerManifestExperimentAssignment(env.DB, {
+    const experimentAssignment = await registerManifestExperimentAssignment(env.DB, {
     brand_key: brand.brand_key,
     cycle_id: cycleId,
     slot_key: slotKey,
@@ -12738,6 +12757,22 @@ async function persistManifestAutonomousPost(
     hypothesis_id: String(postHypothesis.id ?? ""),
     scheduled_post_id: scheduled.scheduledPostId,
     experiment: hypothesisValidation.value.experiment,
+  });
+  const decisionInfluence = await recordManifestDecisionInfluence(env.DB, {
+    brand_key: brand.brand_key,
+    cycle_id: cycleId,
+    slot_key: slotKey,
+    scheduled_post_id: scheduled.scheduledPostId,
+    hypothesis_id: String(postHypothesis.id ?? ""),
+    input_strategy_version_id: normalizeOperatorText(cycle.strategy_version_id, 160, true),
+    output_strategy_version_id: normalizeOperatorText(outputStrategyVersion.id, 160, true),
+    family_key: familyKey,
+    generation_mode: generationMode,
+    source_context: sourceContextValidation.value as unknown as Record<string, unknown>,
+    strategic_thesis: strategicThesis,
+    model_evaluation: { ...modelEvaluation, intelligence_application_assessment: intelligenceApplicationAssessment },
+    semantic_repetition: semanticRepetition,
+    experiment_assignment: experimentAssignment,
   });
   await appendManifestCycleEvent(env.DB, {
     cycleId,
@@ -12754,8 +12789,9 @@ async function persistManifestAutonomousPost(
       hypothesis_id: postHypothesis.id ?? null,
             strategy_version_id: outputStrategyVersion.id ?? null,
             gate_summary: gateSummary,
-      semantic_repetition: semanticRepetition,
+            semantic_repetition: semanticRepetition,
       experiment_assignment: experimentAssignment,
+      decision_influence: decisionInfluence,
       publish_lineage_complete: true,
       intelligence_lineage_complete: true,
     },
@@ -12840,13 +12876,15 @@ async function persistManifestAutonomousPost(
     intelligence_lineage_complete: true,
     hypothesis_id: postHypothesis.id ?? null,
         strategy_version_id: outputStrategyVersion.id ?? null,
-    experiment_assignment: experimentAssignment,
+        experiment_assignment: experimentAssignment,
     semantic_repetition: semanticRepetition,
+    decision_influence: decisionInfluence,
         model_evaluation: {
       novelty_assessment: noveltyAssessment,
       winner_preservation_assessment: winnerPreservationAssessment,
       slot_placement_assessment: slotPlacementAssessment,
       recent_exposure_assessment: recentExposureAssessment,
+      intelligence_application_assessment: intelligenceApplicationAssessment,
     },
     server_checks: gateSummary.server_checks,
     remaining_missing_count: remainingMissing.length,
@@ -16948,7 +16986,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
                         novelty_assessment: { type: "string" },
             winner_preservation_assessment: { type: "string" },
             slot_placement_assessment: { type: "string", description: "Explain why this exact family and execution belong in this exact hourly slot after sequencing the full horizon." },
-                        recent_exposure_assessment: { type: "string", description: "Explain which recent published and future scheduled posts were considered and how clustering was avoided or justified." },
+                                    recent_exposure_assessment: { type: "string", description: "Explain which recent published and future scheduled posts were considered and how clustering was avoided or justified." },
+            intelligence_application_assessment: { type: "string", description: "Explain which learning brief directive, benchmark movement, portfolio state, experiment, Saved Pattern intelligence, repetition evidence, or account-level checkpoint changed the move, or why mature evidence required preserving the current strategy." },
             candidate_trace: {
               type: "array",
               maxItems: 12,
@@ -36683,6 +36722,36 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         },
       );
+    }
+
+        if (url.pathname === "/api/threads/intelligence-dashboard" && request.method === "GET") {
+      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
+      const brand = await resolveGptBrandForThreadsUserId(env, selectedThreadsUserId);
+      if (!brand) {
+        return new Response(JSON.stringify({ error: "Manifest account not connected" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...requestCorsHeaders },
+        });
+      }
+      await refreshManifestMeasurementAudit(env.DB, {
+        brand_key: brand.brand_key,
+        threads_user_id: brand.profile.threads_user_id,
+        account_id: brand.account_id,
+        saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
+      });
+      const rawLimit = Number(url.searchParams.get("limit") ?? "20");
+      const dashboard = await buildManifestIntelligenceDashboard(env.DB, {
+        brand_key: brand.brand_key,
+        limit: Number.isFinite(rawLimit) ? rawLimit : 20,
+      });
+      return new Response(JSON.stringify(dashboard), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
     }
 
     if (url.pathname === "/api/threads/dashboard" && request.method === "GET") {
