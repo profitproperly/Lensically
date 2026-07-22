@@ -36726,12 +36726,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (url.pathname === "/api/threads/intelligence-dashboard" && request.method === "GET") {
       const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
       const brand = await resolveGptBrandForThreadsUserId(env, selectedThreadsUserId);
-      if (!brand) {
+            if (!brand) {
         return new Response(JSON.stringify({ error: "Manifest account not connected" }), {
           status: 404,
           headers: { "Content-Type": "application/json", ...requestCorsHeaders },
         });
       }
+      await ensureGptPostStrategyTagsTable(env);
+      await ensureOperatorWorkflowTables(env);
+      await ensureExternalPatternsTable(env);
+      await ensureThreadsFollowerSnapshotsTable(env);
       await refreshManifestMeasurementAudit(env.DB, {
         brand_key: brand.brand_key,
         threads_user_id: brand.profile.threads_user_id,
