@@ -122,12 +122,10 @@ function serializeStrategy(strategy: JsonRecord | null): JsonRecord | null {
     id: strategy.id ?? null,
     version: strategy.version ?? null,
     parent_version_id: strategy.parent_version_id ?? null,
-        strategy: compact(strategy.strategy ?? {}, 6),
-    evidence: compact(strategy.evidence ?? {}, 6),
+    strategy: compact(strategy.strategy ?? {}, 3),
     change_summary: strategy.change_summary ?? null,
-    reversal_conditions: compact(strategy.reversal_conditions ?? [], 12),
+    reversal_conditions: array(strategy.reversal_conditions).slice(0, 4),
     source_cycle_id: strategy.source_cycle_id ?? null,
-    created_at: strategy.created_at ?? null,
   };
 }
 
@@ -139,38 +137,61 @@ function serializeLearningBrief(row: JsonRecord | null): JsonRecord | null {
     brief_key: row.brief_key,
     brief_version: row.brief_version,
     authoritative_post_count: number(row.authoritative_post_count),
-    evidence_window_start: row.evidence_window_start ?? null,
-    evidence_window_end: row.evidence_window_end ?? null,
-        brief: compact(brief, 8),
-    strategy_change: compact(strategyChange, 8),
+    brief: {
+      improvements: array(brief.improvements).slice(0, 4),
+      weakening: array(brief.weakening).slice(0, 4),
+      uncertainty: array(brief.uncertainty).slice(0, 4),
+      family_opportunities: array(brief.family_opportunities).slice(0, 4),
+      fatigue: array(brief.fatigue).slice(0, 4),
+      disproven_assumptions: array(brief.disproven_assumptions).slice(0, 4),
+      experiment_decisions: array(brief.experiment_decisions).slice(0, 4),
+      next_run_tests: array(brief.next_run_tests).slice(0, 6),
+    },
+    strategy_change: {
+      warranted: strategyChange.warranted === true,
+      reason: strategyChange.reason ?? null,
+      directives: array(strategyChange.directives).slice(0, 8),
+    },
     strategy_version_id: row.strategy_version_id ?? null,
-    updated_at: row.updated_at ?? null,
   };
 }
 
 function serializeBenchmark(row: JsonRecord | null): JsonRecord | null {
   if (!row) return null;
+  const metrics = record(parseJson(row.metrics_json, {}));
   return {
     snapshot_key: row.snapshot_key,
     cycle_id: row.cycle_id ?? null,
-    metrics: compact(parseJson(row.metrics_json, {}), 16),
+    metrics: {
+      completion: metrics.completion ?? {},
+      candidate_efficiency: metrics.candidate_efficiency ?? {},
+      repeated_mistakes: metrics.repeated_mistakes ?? {},
+      prediction_accuracy: metrics.prediction_accuracy ?? {},
+      engagement_floor: metrics.engagement_floor ?? {},
+      mature_performance: metrics.mature_performance ?? {},
+      strategy_influence: metrics.strategy_influence ?? {},
+    },
     source_fingerprint: row.source_fingerprint,
-    window_start: row.window_start ?? null,
-    window_end: row.window_end ?? null,
-    updated_at: row.updated_at ?? null,
   };
 }
 
 function serializeRunComparison(row: JsonRecord | null): JsonRecord | null {
   if (!row) return null;
+  const comparison = record(parseJson(row.comparison_json, {}));
+  const dimensions = record(comparison.dimensions);
   return {
     cycle_id: row.cycle_id,
     previous_cycle_id: row.previous_cycle_id ?? null,
-    comparison: compact(parseJson(row.comparison_json, {}), 16),
+    comparison: {
+      comparable: comparison.comparable === true,
+      repeated_mistakes: array(comparison.repeated_mistakes).slice(0, 8),
+      actual_strategy_influence: comparison.actual_strategy_influence === true,
+      dimension_status: Object.fromEntries(Object.entries(dimensions).map(([key, value]) => [key, record(value).status ?? null])),
+    },
     source_fingerprint: row.source_fingerprint,
-    updated_at: row.updated_at ?? null,
   };
 }
+
 
 export async function buildManifestDecisionIntelligence(db: D1Database, brandKey: string): Promise<JsonRecord> {
   await ensureManifestProductIntegrationTables(db);
