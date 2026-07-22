@@ -3856,7 +3856,7 @@ describe("operator mode MCP endpoint", () => {
         JSON.stringify(result.structuredContent.campaign.live_reads.failures),
       ).toBe(0);
     }
-        expect(eligibleReads).toBe(40);
+                expect(eligibleReads).toBe(42);
     expect(failedReads).toBe(0);
 
     const mutationSegments = [
