@@ -17,7 +17,8 @@ import {
 } from "../lib/threadsProfileCache";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard" },
+    { href: "/dashboard", label: "Dashboard" },
+  { href: "/intelligence", label: "Intelligence" },
   { href: "/agent", label: "Agent Control" },
   { href: "/insights", label: "Insights" },
   { href: "/saved-patterns", label: "Saved Patterns" },

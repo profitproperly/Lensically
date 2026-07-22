@@ -37,7 +37,8 @@ type ThreadsPostsResponse = {
 const THREADS_ME_URL = buildWorkerUrl("/api/threads/me");
 const THREADS_POSTS_URL = buildWorkerUrl("/api/threads/posts");
 const PROFILE_REQUIRED_ROUTES = new Set([
-  "/dashboard",
+    "/dashboard",
+  "/intelligence",
   "/insights",
   "/saved-patterns",
   "/followers",

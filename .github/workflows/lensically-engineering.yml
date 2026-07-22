@@ -4,8 +4,9 @@ run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.relea
 on:
   push:
     branches: [main]
-    paths:
+        paths:
       - "lensically-worker/**"
+      - "lensically-web/**"
       - ".github/workflows/lensically-engineering.yml"
   workflow_dispatch:
     inputs:
@@ -68,9 +69,38 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: ${{ steps.worker-cache.outputs.cache-hit != 'true' }}
         run: npm ci
+
+      - name: Detect web changes
+        id: web-changes
+        working-directory: .
+        shell: bash
+        run: |
+          if git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^lensically-web/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore web dependencies
+        if: ${{ steps.web-changes.outputs.changed == 'true' }}
+        id: web-cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-web/node_modules
+          key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
+
+      - name: Install web dependencies
+        if: ${{ steps.web-changes.outputs.changed == 'true' && steps.web-cache.outputs.cache-hit != 'true' }}
+        working-directory: lensically-web
+        run: npm ci
+
+      - name: Build changed web product surface
+        if: ${{ steps.web-changes.outputs.changed == 'true' }}
+        working-directory: lensically-web
+        run: npm run build
 
       - name: Typecheck and lifecycle gate
         run: |
@@ -166,9 +196,25 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: ${{ steps.release-cache.outputs.cache-hit != 'true' }}
         run: npm ci
+
+      - name: Restore web dependencies
+        id: release-web-cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-web/node_modules
+          key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
+
+      - name: Install web dependencies
+        if: ${{ steps.release-web-cache.outputs.cache-hit != 'true' }}
+        working-directory: lensically-web
+        run: npm ci
+
+      - name: Build exact-head web product
+        working-directory: lensically-web
+        run: npm run build:cf
 
       - name: Run exact-head release gates
         run: |
@@ -189,6 +235,13 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
+
+            - name: Deploy exact validated web head
+        working-directory: lensically-web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --config wrangler.toml
 
       - name: Verify Wrangler-managed cron triggers
         env:
@@ -218,8 +271,10 @@ jobs:
             fi
             sleep 5
           done
-          if [ "${verified}" != "true" ]; then
+                    if [ "${verified}" != "true" ]; then
             cat /tmp/lensically-runtime-health.json || true
             cat /tmp/lensically-scheduler-health.json || true
             exit 1
           fi
+          curl --fail-with-body --silent --show-error "https://lensically.com/intelligence" > /tmp/lensically-intelligence.html
+          grep -q "Manifest Intelligence" /tmp/lensically-intelligence.html
