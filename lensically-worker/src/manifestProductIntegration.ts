@@ -69,6 +69,17 @@ function compact(value: unknown, maxArray = 12): unknown {
   return Object.fromEntries(Object.entries(value as JsonRecord).map(([key, item]) => [key, compact(item, maxArray)]));
 }
 
+function stableEvidence(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableEvidence);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as JsonRecord)
+      .filter(([key]) => key !== "generated_at" && key !== "created_at" && key !== "updated_at")
+      .map(([key, item]) => [key, stableEvidence(item)]),
+  );
+}
+
+
 function uniqueStrings(values: unknown[], limit = 20): string[] {
   return Array.from(new Set(values.map((value) => text(value, 1000)).filter(Boolean))).slice(0, limit);
 }
