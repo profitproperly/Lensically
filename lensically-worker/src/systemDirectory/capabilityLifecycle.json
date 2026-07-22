@@ -383,6 +383,17 @@
       "live_verification": "The exact deployed Main tool returns the noninterference policy, account-level-only follower boundary, latest immutable strategy version, and latest available cycle receipt without changing content or schedule state.",
       "compatibility_bridge": false
     },
+        {
+      "capability_id": "strategy.read_manifest_intelligence_audit",
+      "directory_entry_id": "strategy.manifest_intelligence_audit",
+      "canonical_handler": "get_manifest_intelligence_audit",
+      "route_intent": "get manifest intelligence audit",
+      "implementation_mode": "new_handler",
+      "focused_regression": "reads the complete bounded Manifest measurement and audit surface without mutation",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool returns the latest automatic learning brief, benchmark and run comparison, Saved Pattern intelligence, account-level follower checkpoint, strategy transitions, portfolio state, experiments, and explicit evidence gaps through bounded pageable sections without changing content or schedule state.",
+      "compatibility_bridge": false
+    },
     {
       "capability_id": "strategy.read_manifest_cycle_receipt",
       "directory_entry_id": "strategy.manifest_cycle_receipt",
