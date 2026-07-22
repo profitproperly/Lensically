@@ -449,12 +449,115 @@ describe("Manifest intelligence engine", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.experiment).toMatchObject({
+            expect(result.value.experiment).toMatchObject({
         experiment_key: "money-question-payoff-v1",
         maturity_windows: [6, 12, 18, 24],
         variant_key: "direct-relief-payoff",
       });
     }
+  });
+});
+
+describe("Manifest measurement and audit", () => {
+  it("synthesizes authoritative learning into a strategy change only when evidence warrants it", () => {
+    const brief = buildManifestLearningBrief({
+      authoritative_post_count: 8,
+      evidence_window_start: "2026-07-01T00:00:00.000Z",
+      evidence_window_end: "2026-07-22T00:00:00.000Z",
+      observations: [
+        { level: "hook", feature_key: "universe_opener", effect_size: 14, sample_size: 8, confidence_label: "reliable", state: "supporting" },
+        { level: "premise", feature_key: "spending_priority", effect_size: -12, sample_size: 7, confidence_label: "reliable", state: "contradicting" },
+        { level: "structure", feature_key: "specific_amount_question", effect_size: 2, sample_size: 3, confidence_label: "emerging", state: "uncertain" },
+      ],
+      portfolio_states: [
+        { family_key: "universe_directive", role: "franchise", allocation_weight: 1.6, confidence_label: "reliable", actual_decay: 0, reason: "Repeated mature strength." },
+        { family_key: "money_question", role: "cooling", allocation_weight: 0.25, confidence_label: "reliable", actual_decay: 1, reason: "Comparable recent decay." },
+      ],
+      experiments: [
+        { experiment_key: "payoff-v1", family_key: "money_question", status: "completed", follow_up_decision: "stop", latest_result_json: "{\"delta\":-11}" },
+      ],
+      transitions: [
+        { entity_type: "family", entity_id: "money_question", from_state: "core", to_state: "cooling", reason: "Verified decay.", transitioned_at: "2026-07-22T00:00:00.000Z" },
+      ],
+    });
+
+    expect(brief.strategy_change).toMatchObject({ warranted: true });
+    expect((brief.strategy_change as Record<string, unknown>).directives).toMatchObject({
+      emphasize: ["hook:universe_opener"],
+      reduce: ["premise:spending_priority"],
+      cool_verified_decay_only: ["money_question"],
+      preserve_winners: ["universe_directive"],
+    });
+    expect(brief.disproven_assumptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "experiment_stopped", experiment_key: "payoff_v1" }),
+    ]));
+  });
+
+  it("persists business-quality benchmarks and compares run movement by direction", () => {
+    const current = buildManifestOperatorBenchmarks({
+      target_slot_count: 24,
+      scheduled_slot_count: 24,
+      candidate_attempt_count: 28,
+      duplicate_rejection_count: 0,
+      semantic_collision_count: 2,
+      gate_failure_count: 2,
+      semantic_signatures: [
+        { premise_key: "choice:restart:security", audience_reward_key: "possibility_expansion", question_type: "life_restart", financial_scenario_key: "life_restart", tension_key: "scarcity_to_security" },
+        { premise_key: "choice:debt:relief", audience_reward_key: "financial_relief", question_type: "choice_priority", financial_scenario_key: "spending_priority", tension_key: "burden_to_relief" },
+      ],
+      lineage_complete_count: 24,
+      lineage_total_count: 24,
+      prediction_calibrations: [1, 1, 0.5],
+      confidence_labels: ["reliable", "directional", "contested"],
+      authoritative_scores: [70, 68, 55, 80],
+      recent_scores: [70, 68],
+      previous_scores: [55, 50],
+      portfolio_states: [
+        { role: "franchise", actual_decay: 0 },
+        { role: "core", actual_decay: 0 },
+        { role: "emerging", previous_role: "prospect" },
+      ],
+      experiments: [
+        { follow_up_decision: "expand" },
+        { follow_up_decision: "insufficient_evidence" },
+      ],
+      new_family_count: 1,
+      strategy_changed: true,
+    });
+    const previous = buildManifestOperatorBenchmarks({
+      target_slot_count: 24,
+      scheduled_slot_count: 22,
+      candidate_attempt_count: 30,
+      duplicate_rejection_count: 2,
+      semantic_collision_count: 4,
+      gate_failure_count: 5,
+      semantic_signatures: [
+        { premise_key: "choice:debt:relief", audience_reward_key: "general_encouragement", question_type: "none", financial_scenario_key: "none", tension_key: "none" },
+      ],
+      lineage_complete_count: 20,
+      lineage_total_count: 22,
+      prediction_calibrations: [0.5, 0],
+      confidence_labels: ["contested", "contested"],
+      authoritative_scores: [45, 50, 55],
+      recent_scores: [50],
+      previous_scores: [55],
+      portfolio_states: [{ role: "core", actual_decay: 1 }],
+      experiments: [{ follow_up_decision: "insufficient_evidence" }],
+      new_family_count: 0,
+      strategy_changed: false,
+    });
+    const comparison = buildManifestRunComparison({
+      cycle_id: "cycle-new",
+      previous_cycle_id: "cycle-old",
+      current_metrics: current,
+      previous_metrics: previous,
+    });
+
+    expect(current.coverage_accuracy.value).toBe(1);
+    expect(current.lineage_completeness.value).toBe(1);
+    expect(current.strategy_influence.value).toBe(1);
+    expect((comparison.dimensions as Record<string, unknown>).repeated_mistakes).toMatchObject({ status: "improved" });
+    expect(comparison.actual_strategy_influence).toBe(true);
   });
 });
 
