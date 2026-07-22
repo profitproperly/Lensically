@@ -2982,6 +2982,14 @@ describe("operator mode MCP endpoint", () => {
     expect(intelligenceLineage?.locked_at).toBeTruthy();
     expect(Number(intelligenceLineage?.scheduled_post_id)).toBe(persisted.scheduled_post_id);
     expect(Number(intelligenceLineage?.revision ?? 0)).toBeGreaterThanOrEqual(1);
+        const directEvents = await env.DB.prepare(
+      `SELECT event_type FROM operator_manifest_cycle_receipt_events
+       WHERE cycle_id = ? ORDER BY datetime(created_at) ASC, event_key ASC`,
+    ).bind(prepared.cycle.id).all<{ event_type: string }>();
+    const directEventTypes = (directEvents.results ?? []).map((event) => event.event_type);
+    expect(directEventTypes).toEqual(expect.arrayContaining([
+      "cycle_prepared", "candidate_evaluated", "post_persisted", "coverage_reconciled",
+    ]));
     const receipt = await mcpTool<{
       available: boolean;
       cycle_receipt: {
@@ -3003,9 +3011,7 @@ describe("operator mode MCP endpoint", () => {
     expect(receipt.cycle_receipt?.hypotheses).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: persisted.hypothesis_id, scheduled_post_id: persisted.scheduled_post_id, status: "scheduled" }),
     ]));
-    expect(receipt.cycle_receipt?.events.map((event) => event.event_type)).toEqual(expect.arrayContaining([
-      "cycle_prepared", "candidate_evaluated", "post_persisted", "coverage_reconciled",
-    ]));
+        expect(receipt.cycle_receipt?.events.map((event) => event.event_type)).toEqual(directEventTypes);
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
