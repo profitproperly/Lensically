@@ -2688,6 +2688,52 @@ describe("operator mode MCP endpoint", () => {
       threads_api_during_persistence: false,
       complete_lineage_required: true,
     });
+    }, 30000);
+
+  it("reads the active intelligence policies, latest strategy version, exposure ledger, and latest cycle receipt without mutation", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: `test-intelligence-foundation-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const countsBefore = await env.DB.prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM operator_manifest_strategy_versions WHERE brand_key = 'manifest_mental') AS strategies,
+        (SELECT COUNT(*) FROM operator_manifest_exposure_snapshots WHERE brand_key = 'manifest_mental') AS exposures,
+        (SELECT COUNT(*) FROM operator_manifest_cycle_receipts WHERE brand_key = 'manifest_mental') AS receipts`,
+    ).first<{ strategies: number; exposures: number; receipts: number }>();
+    const first = await mcpTool<{
+      intelligence_foundation: {
+        foundation_version: string;
+        policy: { noninterference: { learning_source: string }; follower_attribution: { account_level_only: boolean } };
+        latest_strategy_version: { id: string } | null;
+        latest_cycle_receipt: { cycle_id: string; exposure_snapshot: { id: string } | null } | null;
+      };
+    }>("get_manifest_intelligence_foundation", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+    });
+    const second = await mcpTool<typeof first>("get_manifest_intelligence_foundation", {
+      brand_key: "manifest_mental",
+      proceed_confirmed: true,
+    });
+    expect(first.intelligence_foundation.foundation_version).toBe("manifest-intelligence-foundation-v2");
+    expect(first.intelligence_foundation.policy.noninterference.learning_source).toBe("observable_post_engagement");
+    expect(first.intelligence_foundation.policy.follower_attribution.account_level_only).toBe(true);
+    expect(first.intelligence_foundation.latest_strategy_version?.id).toBeTruthy();
+    expect(first.intelligence_foundation.latest_cycle_receipt?.cycle_id).toBe(prepared.cycle.id);
+    expect(first.intelligence_foundation.latest_cycle_receipt?.exposure_snapshot?.id).toBeTruthy();
+    expect(second).toEqual(first);
+    const countsAfter = await env.DB.prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM operator_manifest_strategy_versions WHERE brand_key = 'manifest_mental') AS strategies,
+        (SELECT COUNT(*) FROM operator_manifest_exposure_snapshots WHERE brand_key = 'manifest_mental') AS exposures,
+        (SELECT COUNT(*) FROM operator_manifest_cycle_receipts WHERE brand_key = 'manifest_mental') AS receipts`,
+    ).first<{ strategies: number; exposures: number; receipts: number }>();
+    expect(countsAfter).toEqual(countsBefore);
   }, 30000);
 
   it("reconciles prepare_manifest_autonomous_cycle again with the same durable operation id", async () => {

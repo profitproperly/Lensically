@@ -389,7 +389,7 @@
       "canonical_handler": "get_manifest_cycle_receipt",
       "route_intent": "get manifest cycle receipt",
       "implementation_mode": "new_handler",
-      "focused_regression": "reads one complete autonomous run receipt with strategy, exposure, hypothesis, event, and lineage evidence",
+            "focused_regression": "persists one model-orchestrated autonomous post with full lineage into one exact missing slot",
       "release_scope": "operator-content",
       "live_verification": "The exact deployed Main tool returns available=false before the first new-format run and a complete immutable receipt after a new-format autonomous cycle, without opening a hardening incident for normal absence.",
       "compatibility_bridge": false
