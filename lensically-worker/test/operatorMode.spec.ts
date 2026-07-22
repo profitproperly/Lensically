@@ -4415,7 +4415,7 @@ describe("operator mode MCP endpoint", () => {
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                total_internal_capabilities: 98,
+                                                                                                total_internal_capabilities: 99,
             total_read_only_capabilities: 43,
       route_only: true,
       mutations_executed: 0,
