@@ -113,6 +113,66 @@ Purpose: Preserve complete cross-chat continuity while implementing the schedule
 - Live verification
 - Evidence that the automatic operator actually changes decisions from learned strategy
 
+## Implementation checkpoints
+
+### Turn 1 — COMPLETE IN SOURCE
+
+Completed: 2026-07-22
+Validated implementation head: `e7b35e385679d3e444fe4aea4d76f1207c0d44dc`
+Production status: NOT DEPLOYED. Exact-SHA deployment, production migration, live receipt verification, and scheduled-task proof remain reserved for Turn 4.
+Next authorized implementation step: Turn 2 — Intelligence engine.
+
+Implemented and hardened:
+
+1. Autonomous cycle receipts
+   - Versioned immutable receipt identity and completion.
+   - Immutable event ledger with exact replay acceptance and conflicting replay rejection.
+   - Durable preparation, rejection, candidate evaluation, gate, persistence, lineage, and coverage-reconciliation evidence.
+   - Stable summary plus authoritative pageable sections.
+   - Variable-size startup state, input/output strategies, exposure dimensions, completion evidence, and unresolved issues are reconstructable from bounded canonical stable-JSON chunks rather than being silently truncated by the MCP payload budget.
+
+2. Strategy versioning
+   - Durable hashed versions with parent version, evidence, change summary, reversal conditions, and source-cycle linkage.
+   - Invalid or rejected candidates cannot create strategy versions.
+   - Accepted cycle strategy is linked to the cycle receipt and every persisted post hypothesis.
+
+3. Post hypothesis records
+   - Required pre-publication engagement hypothesis, audience reward, hook and premise rationale, exploration mode, comparables, expected range, uncertainty, and falsification conditions.
+   - Revision tracking while proposed.
+   - Immutable lock once scheduled, reused, published, or evaluated.
+   - Atomic linkage to the exact scheduled post and lineup item.
+
+4. Exposure ledger
+   - Versioned recent-published and future-scheduled exposure snapshot with semantic dimensions and source hash.
+   - Repeated preparation reconciles live exposure and increments the revision when authoritative state changes instead of replaying stale exposure.
+
+5. Complete lineage
+   - Persisted chain from source selection or operator hypothesis through strategy version, source card, generation run, draft, hypothesis, lineup, scheduled post, inventory, and publish-lineage receipt.
+   - Persistence fails when either publish lineage or intelligence lineage is incomplete.
+
+6. Noninterference policy
+   - Durable active policy preserves observable engagement as the learning source and keeps owner involvement optional except for protected boundaries.
+
+7. Follower-attribution boundary
+   - Account-level follower checkpoints remain permitted.
+   - Post, slot, hour, day, family, experiment, campaign, cycle, schedule, source, candidate, draft, and posting-period attribution is rejected across hypotheses, strategic theses, post strategy, model evaluations, and narrative claims.
+   - Rejected attribution attempts create receipt evidence without creating strategy or scheduling state.
+
+Validation evidence on the exact implementation head:
+
+- Push validation: run `29891120406` — success.
+- Typecheck and capability lifecycle: run `29891125172` — success.
+- Focused operator smoke plus Manifest intelligence unit tests: run `29891131102` — success.
+- System-directory and public-schema regression tests: run `29891136126` — success.
+- Full deterministic operator suite, all eight shards: run `29891147406` — success.
+
+Turn 1 completion boundary:
+
+- The seven Turn 1 foundations are source-complete and regression-covered.
+- No production deployment or live account mutation was performed during this checkpoint.
+- The first-run finding that no complete receipt could be retrieved is resolved in source through the sectioned canonical receipt read contract; live production proof remains a Turn 4 criterion.
+- Turn 2 must build on these records rather than introducing parallel strategy, hypothesis, exposure, or receipt stores.
+
 ## Known first-run findings to preserve
 
 - Operational execution succeeded and filled the runway using single-post persistence and periodic coverage reconciliation.
