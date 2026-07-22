@@ -22,7 +22,7 @@ on:
           - operator-tests
           - system-directory-tests
           - threads-publish-tests
-                    - gpt-memory-tests
+                              - gpt-memory-tests
           - worker-deploy
           - cloudflare-pages-project-create
       release_id:
@@ -30,7 +30,7 @@ on:
         required: false
         default: ""
         type: string
-            release_sha:
+                  release_sha:
         description: Exact commit SHA to validate or deploy
         required: false
         default: ""
