@@ -208,7 +208,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     db.prepare(`SELECT family_key, role, recommended_role, previous_role, confidence_score,
         confidence_label, allocation_weight, actual_decay, reason, evidence_json, updated_at
       FROM operator_manifest_portfolio_states WHERE brand_key = ?
-            ORDER BY allocation_weight DESC, confidence_score DESC LIMIT 10`).bind(brandKey).all<JsonRecord>(),
+                        ORDER BY allocation_weight DESC, confidence_score DESC LIMIT 6`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT id, experiment_key, family_key, status, follow_up_decision,
         hypothesis_json, comparison_group_json, latest_result_json, updated_at
       FROM operator_manifest_experiments WHERE brand_key = ?
