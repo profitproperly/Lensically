@@ -1125,10 +1125,11 @@ describe("operator mode backend spine", () => {
     expect(Array.isArray(productDashboard.run_receipts)).toBe(true);
     expect(new TextEncoder().encode(JSON.stringify(productDashboard)).byteLength).toBeLessThan(24000);
 
-    const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
-    expect(productResponse.status).toBe(200);
+        const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
+    const productBody = await productResponse.text();
+    expect(productResponse.status, productBody).toBe(200);
     expect(productResponse.headers.get("Cache-Control")).toBe("no-store");
-    const productPayload = await productResponse.json() as Record<string, unknown>;
+    const productPayload = JSON.parse(productBody) as Record<string, unknown>;
     expect(productPayload).toMatchObject({
       version: "manifest-intelligence-dashboard-v1",
       product_proof: {
