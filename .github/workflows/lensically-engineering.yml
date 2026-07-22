@@ -237,7 +237,7 @@ jobs:
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
-    cloudflare-pages-project-create:
+      cloudflare-pages-project-create:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'cloudflare-pages-project-create'
     runs-on: ubuntu-latest
     environment: production
