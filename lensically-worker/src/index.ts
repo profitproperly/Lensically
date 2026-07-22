@@ -10556,24 +10556,40 @@ async function applyManifestContentFocusToPool(
   brandKey: GptBrandKey,
   candidates: Record<string, unknown>[],
 ): Promise<Record<string, unknown>[]> {
-  await ensureOperatorPerformanceEvaluatorTables(env);
+    await ensureOperatorPerformanceEvaluatorTables(env);
+  await ensureManifestIntelligenceEngineTables(env.DB);
   const rows = await env.DB.prepare(
     `SELECT source_card_family_id, source_identity_key, status, allocation_weight,
             reuse_directives_json, stop_directives_json
      FROM operator_content_focus_family_states
      WHERE brand_key = ?`,
   ).bind(brandKey).all<Record<string, unknown>>();
+  const portfolioRows = await env.DB.prepare(
+    `SELECT family_key, role, recommended_role, confidence_score, confidence_label,
+            allocation_weight, actual_decay, reason
+     FROM operator_manifest_portfolio_states
+     WHERE brand_key = ?`,
+  ).bind(brandKey).all<Record<string, unknown>>();
   const byIdentity = new Map((rows.results ?? []).map((row) => [String(row.source_identity_key), row]));
-  return candidates.map((candidate) => {
+  const portfolioByFamily = new Map((portfolioRows.results ?? []).map((row) => [String(row.family_key), row]));
+    return candidates.map((candidate) => {
     const focus = byIdentity.get(String(candidate.source_identity_key ?? ""));
+    const focusFamilyId = focus?.source_card_family_id ? String(focus.source_card_family_id) : "";
+    const portfolio = focusFamilyId ? portfolioByFamily.get(focusFamilyId) : null;
     return {
       ...candidate,
       focus_observed: Boolean(focus),
       focus_family_id: focus?.source_card_family_id ?? null,
       focus_status: focus?.status ?? "test",
-      focus_weight: focus ? Number(focus.allocation_weight ?? 1) : 1,
+      focus_weight: portfolio ? Number(portfolio.allocation_weight ?? 1) : focus ? Number(focus.allocation_weight ?? 1) : 1,
       focus_reuse_directives: focus ? safeParseJsonString(String(focus.reuse_directives_json ?? "{}")) ?? {} : {},
       focus_stop_directives: focus ? safeParseJsonString(String(focus.stop_directives_json ?? "{}")) ?? {} : {},
+      autonomous_role: portfolio?.role ?? null,
+      autonomous_recommended_role: portfolio?.recommended_role ?? null,
+      confidence_score: portfolio ? Number(portfolio.confidence_score ?? 0) : Number(candidate.confidence_score ?? 0),
+      confidence_label: portfolio?.confidence_label ?? null,
+      actual_decay: Number(portfolio?.actual_decay ?? 0) === 1,
+      portfolio_reason: portfolio?.reason ?? null,
     };
   });
 }
@@ -11056,8 +11072,27 @@ async function buildManifestAutonomousAccountPosition(
   const followers = followerRows.results ?? [];
   const latestFollowers = followers[0] ? Number(followers[0].followers_count ?? 0) : null;
   const priorFollowers = followers[1] ? Number(followers[1].followers_count ?? 0) : null;
-  const learning = await getLatestOperatorPerformanceLearning(env, brand.brand_key, false);
+    const learning = await getLatestOperatorPerformanceLearning(env, brand.brand_key, false);
   const contentFocus = await getLatestOperatorContentFocus(env, brand.brand_key);
+  const intelligenceEngine = await getManifestIntelligenceEngineState(env.DB, brand.brand_key);
+  const semanticExposure = Array.isArray(intelligenceEngine.semantic_exposure)
+    ? intelligenceEngine.semantic_exposure as Record<string, unknown>[]
+    : [];
+  const semanticPremiseCounts = new Map<string, number>();
+  const semanticArchitectureCounts = new Map<string, number>();
+  const semanticScenarioCounts = new Map<string, number>();
+  for (const exposure of semanticExposure) {
+    const signature = exposure.signature && typeof exposure.signature === "object" && !Array.isArray(exposure.signature)
+      ? exposure.signature as Record<string, unknown>
+      : {};
+    const addSemanticCount = (target: Map<string, number>, value: unknown): void => {
+      const key = normalizeOperatorMachineKey(value, "");
+      if (key && key !== "none" && key !== "unknown") target.set(key, (target.get(key) ?? 0) + 1);
+    };
+    addSemanticCount(semanticPremiseCounts, signature.premise_key);
+    addSemanticCount(semanticArchitectureCounts, signature.sentence_architecture);
+    addSemanticCount(semanticScenarioCounts, signature.financial_scenario_key);
+  }
   const recentInventory = await env.DB.prepare(
     `SELECT source_type, text, opening_phrase, hook_style, lane_key, source_card_id, used_at, metadata_json
      FROM operator_content_inventory
@@ -11175,7 +11210,13 @@ async function buildManifestAutonomousAccountPosition(
         portfolio_policy: brief.portfolio_policy ?? OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION,
         generation_guidance: Array.isArray(brief.generation_guidance) ? brief.generation_guidance : [],
       },
-      hypotheses,
+            hypotheses,
+      intelligence_engine: {
+        engine_version: intelligenceEngine.engine_version ?? null,
+        portfolio_states: Array.isArray(intelligenceEngine.portfolio_states) ? intelligenceEngine.portfolio_states.slice(0, 24) : [],
+        learning_observations: Array.isArray(intelligenceEngine.learning_observations) ? intelligenceEngine.learning_observations.slice(0, 32) : [],
+        experiments: Array.isArray(intelligenceEngine.experiments) ? intelligenceEngine.experiments.slice(0, 20) : [],
+      },
     },
     content_focus: contentFocus,
     recent_published_posts: recentPublishedPosts,
@@ -11184,11 +11225,23 @@ async function buildManifestAutonomousAccountPosition(
         .filter((entry) => entry.count > 1)
         .sort((left, right) => right.count - left.count)
         .slice(0, 12),
-      hook_style_counts: Array.from(hookCounts.entries())
+            hook_style_counts: Array.from(hookCounts.entries())
         .map(([hook_style, count]) => ({ hook_style, count }))
         .sort((left, right) => right.count - left.count)
         .slice(0, 12),
-      evaluation_rule: "High frequency is not automatic fatigue. The model must distinguish proven mechanism reuse from clustered execution sameness and space repeated franchises when recent exposure is dense.",
+      semantic_premise_counts: Array.from(semanticPremiseCounts.entries())
+        .map(([premise_key, count]) => ({ premise_key, count }))
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 16),
+      sentence_architecture_counts: Array.from(semanticArchitectureCounts.entries())
+        .map(([sentence_architecture, count]) => ({ sentence_architecture, count }))
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 12),
+      financial_scenario_counts: Array.from(semanticScenarioCounts.entries())
+        .map(([financial_scenario_key, count]) => ({ financial_scenario_key, count }))
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 12),
+      evaluation_rule: "High frequency is not automatic fatigue. The model must distinguish proven mechanism reuse from repeated premise, scenario, reward, opening, closing, sentence architecture, and meaning, and space franchises when execution similarity is dense.",
     },
     portfolio_sequence_policy: {
       full_horizon_lineup_required_before_first_persist: true,
@@ -11269,7 +11322,11 @@ async function prepareManifestAutonomousCycle(
     timezone,
     effectiveNowMs,
   );
-  await refreshOperatorContentFocus(env, brand.brand_key);
+    await refreshOperatorContentFocus(env, brand.brand_key);
+  const intelligenceEngineRefresh = await refreshManifestIntelligenceEngine(env.DB, {
+    brand_key: brand.brand_key,
+    threads_user_id: brand.profile.threads_user_id,
+  });
   const accountPosition = await buildManifestAutonomousAccountPosition(
     env,
     brand,
@@ -11416,6 +11473,7 @@ async function prepareManifestAutonomousCycle(
     reused_existing: Boolean(existing?.id),
     refreshed_live_state: true,
         cycle: await readManifestAutonomousCycle(env, brand.brand_key, cycleId),
+        intelligence_engine_refresh: intelligenceEngineRefresh,
     intelligence_foundation: {
       policy: intelligencePolicy,
       input_strategy_version: inputStrategyVersion,
