@@ -36732,10 +36732,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { "Content-Type": "application/json", ...requestCorsHeaders },
         });
       }
+            await ensureOperatorPostMetricSnapshotsTable(env);
       await ensureGptPostStrategyTagsTable(env);
       await ensureOperatorWorkflowTables(env);
       await ensureExternalPatternsTable(env);
       await ensureThreadsFollowerSnapshotsTable(env);
+      await ensureOperatorPerformanceEvaluatorTables(env);
+      await ensureManifestMeasurementAuditTables(env.DB);
+      await ensureManifestProductIntegrationTables(env.DB);
       await refreshManifestMeasurementAudit(env.DB, {
         brand_key: brand.brand_key,
         threads_user_id: brand.profile.threads_user_id,
