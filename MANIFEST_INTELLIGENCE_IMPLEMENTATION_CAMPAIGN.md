@@ -173,6 +173,91 @@ Turn 1 completion boundary:
 - The first-run finding that no complete receipt could be retrieved is resolved in source through the sectioned canonical receipt read contract; live production proof remains a Turn 4 criterion.
 - Turn 2 must build on these records rather than introducing parallel strategy, hypothesis, exposure, or receipt stores.
 
+### Turn 2 — COMPLETE IN SOURCE
+
+Completed: 2026-07-22
+Validated implementation head: `8cc7a91be8ef8e43513fb9c31a0e8344d218e9d1`
+Production status: NOT DEPLOYED. Production migration, scheduled-task consumption, live account verification, and proof that learned strategy changes live decisions remain reserved for Turn 4.
+Next authorized implementation step: Turn 3 — Measurement and audit.
+
+Implemented and hardened:
+
+1. Maturity evaluation
+   - Every valid post checkpoint is evaluated at exactly 6, 12, 18, and 24 hours using observable views, likes, replies, reposts, quotes, shares, engagement rates, propagation rates, velocity, and distribution state.
+   - Six-hour evidence is initial signal, 12-hour evidence is directional, 18-hour evidence is strong directional, and 24-hour evidence is authoritative.
+   - Structural strategy changes are blocked until authoritative 24-hour evidence exists; earlier checkpoints remain useful for observation and execution monitoring.
+   - Follower attribution is absent from every maturity record.
+
+2. Comparable-post analysis
+   - Each maturity evaluation receives an age-matched cohort selected by maturity, family, hook, structure, audience reward, format, topic, time range, and semantic premise.
+   - Durable comparable analyses preserve matched post IDs, match dimensions, match scores, cohort median, target delta, and comparable percentile.
+   - A post is no longer judged against every historical post indiscriminately.
+
+3. Multi-level learning
+   - Authoritative observations aggregate independently at exact-post, hook, premise, payoff, emotional reward, structure, topic, family, source, generation mode, placement, and sequence levels.
+   - Every observation persists sample size, supporting and contradicting counts, mature median, baseline-relative effect size, confidence score, confidence label, state, evidence, and whether structural change is permitted.
+   - Exact-post observations remain available without being mistaken for sufficient family-level evidence.
+
+4. Semantic repetition detection
+   - Versioned semantic signatures capture question type, financial scenario, tension, audience reward, sentence architecture, opening, closing, premise, payoff, meaning tokens, dollar amounts, and stable semantic identity.
+   - Recent published and future scheduled signatures form an operational exposure ledger for generation and slot placement.
+   - Autonomous persistence blocks close semantic collisions before scheduling while preserving the option to reuse a proven family mechanism with a materially different premise, scenario, reward, or execution.
+   - The original failure case is directly covered: changing `$25,000` to `$50,000` and lightly rewording the sentence cannot disguise the same spending-priority question.
+   - Different premises remain outside the collision class, so semantic protection does not become a generic novelty veto.
+
+5. Adaptive portfolio allocation
+   - Durable family states support franchise, core, emerging, prospect, cooling, and dormant roles with evidence-derived allocation weights.
+   - Strong repeated mature performance earns franchise or core opportunity; promising evidence earns emerging status; repeated mature weakness can move a family dormant.
+   - Cooling requires actual comparable recent decay. Posting frequency alone never creates a fatigue finding.
+   - Confidence gates preserve the current role when evidence is insufficient, and normalized family identities ensure portfolio weighting reaches source allocation correctly.
+   - No fixed family quotas were introduced.
+
+6. Controlled exploration
+   - Optional experiments are embedded in immutable pre-publication hypotheses with stable experiment keys, explicit hypotheses, comparison groups, 6/12/18/24-hour windows, result criteria, and variant keys.
+   - Exact experiment assignments link cycle, slot, hypothesis, scheduled post, and eventual published result.
+   - Mature matched results produce one explicit follow-up decision: insufficient evidence, continue, expand, revise, or stop.
+   - Experiment replay is idempotent and cannot create duplicate assignments.
+
+7. Confidence state transitions
+   - Confidence states are insufficient, emerging, directional, reliable, or contested.
+   - Confidence changes are persisted as immutable transition events with previous state, new state, reason, authoritative evidence, and transition timestamp.
+   - Replaying unchanged evidence does not create another transition.
+   - Family role transitions are separately persisted, preserving the distinction between belief confidence and portfolio allocation.
+
+Operational integration:
+
+- The existing performance evaluator refreshes the intelligence engine rather than creating a parallel evaluator.
+- `get_performance_learning` returns the current bounded intelligence state alongside legacy learning evidence.
+- Autonomous preparation refreshes intelligence before constructing account position and exposes portfolio states, learning observations, experiments, and semantic exposure counts to the model.
+- Source allocation consumes portfolio roles, confidence, weights, and verified decay.
+- Autonomous persistence records semantic signatures, blocks semantic collisions, and attaches experiment lineage before completing a scheduled post.
+- Large intelligence reads use explicit bounded limits and compact evidence summaries instead of relying on accidental MCP payload truncation.
+- The 97-capability validation campaign is split into native bounded route, read, and mutation segments, preserving 97 route checks, 42 live reads, and 55 no-side-effect mutation preflights without one serial timeout bottleneck.
+
+Defects discovered and permanently corrected during Turn 2:
+
+- Fresh databases could invoke intelligence before optional strategy and workflow tables existed; dependency initialization is now explicit.
+- Initial semantic inference treated two amount-swapped spending-priority questions as different scenarios; scenario and reward inference now follows the underlying premise.
+- Portfolio family IDs were normalized in storage but initially looked up raw during source allocation; lookup now uses the same canonical identity.
+- Intelligence reads could grow with accumulated evidence; the public operational state now has explicit row, evidence, and semantic-token limits.
+- One monolithic capability-campaign test serialized every bounded segment and exceeded its runtime budget; each native segment now has an independent proof.
+
+Validation evidence on the exact implementation head:
+
+- Push validation: run `29894120770` — success.
+- Typecheck and capability lifecycle: run `29894128848` — success.
+- Focused operator smoke plus Manifest intelligence unit tests: run `29894137893` — success.
+- System-directory and public-schema regression tests: run `29894221118` — success.
+- Full deterministic operator suite, all eight shards: run `29894147320` — success.
+
+Turn 2 completion boundary:
+
+- All seven Turn 2 intelligence capabilities are source-complete, operationally integrated, and regression-covered.
+- The first-run semantic repetition finding is resolved in source through pre-schedule semantic collision detection and model-visible semantic exposure evidence; live production proof remains a Turn 4 criterion.
+- Mature evidence can now create durable learning, confidence changes, portfolio changes, and experiment decisions, but the automatic synthesized learning brief, operator benchmarks, run-to-run comparison, expanded Saved Pattern intelligence, conversational audit layer, and account-level follower checkpoint belong to Turn 3.
+- No production deployment or live account mutation was performed during this checkpoint.
+- Turn 3 must consume these canonical maturity, comparable, semantic, learning, experiment, portfolio, and transition records rather than recomputing parallel analytics.
+
 ## Known first-run findings to preserve
 
 - Operational execution succeeded and filled the runway using single-post persistence and periodic coverage reconciliation.
