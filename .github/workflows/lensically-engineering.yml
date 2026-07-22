@@ -104,10 +104,9 @@ jobs:
 
   fast-validation:
     if: >-
-            github.event_name == 'workflow_dispatch' &&
+      github.event_name == 'workflow_dispatch' &&
       inputs.task != 'operator-tests' &&
-      inputs.task != 'worker-deploy' &&
-      inputs.task != 'cloudflare-pages-project-create'
+      inputs.task != 'worker-deploy'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact head
@@ -225,8 +224,6 @@ jobs:
           set -euo pipefail
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
-
-      
 
   worker-release:
     if: >-
