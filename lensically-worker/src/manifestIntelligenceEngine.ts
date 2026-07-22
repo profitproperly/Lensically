@@ -177,10 +177,10 @@ function inferQuestionType(normalized: string): string {
 
 function inferFinancialScenario(normalized: string, amounts: string[]): string {
   if (/\b(restart|start over|begin again)\b/.test(normalized)) return "life_restart";
+  if (amounts.length && /\b(first|handle|pay|spend|do with|buy|expense)\b/.test(normalized)) return "spending_priority";
   if (/\b(debt|mortgage|rent|bill|expense|loan|credit card)\b/.test(normalized)) return "debt_or_expense_relief";
   if (/\b(invest|portfolio|asset|stock|crypto|business)\b/.test(normalized)) return "investment_choice";
   if (/\b(income|salary|per month|a month|per year|a year)\b/.test(normalized)) return "income_target";
-  if (amounts.length && /\b(first|handle|pay|spend|do with|buy)\b/.test(normalized)) return "spending_priority";
   if (amounts.length && /\b(arrive|reach|receive|received|win|won|touch|land|show up|deposit)\b/.test(normalized)) return "sudden_money";
   if (/\b(money|wealth|financial|dollar|cash|rich|millionaire)\b/.test(normalized)) return "general_financial_possibility";
   if (/\b(universe|manifest|blessing|abundance)\b/.test(normalized)) return "abundance_signal";
@@ -200,6 +200,7 @@ function inferTension(normalized: string): string {
 function inferReward(normalized: string, metadata: JsonRecord): string {
   const explicit = machine(metadata.audience_reward ?? metadata.required_product ?? metadata.expected_audience_reward, "");
   if (explicit) return explicit;
+  if (machine(metadata.inferred_question_type, "none") !== "none" && array(metadata.dollar_amounts).length > 0) return "financial_choice";
   if (/\b(debt|bill|expense|mortgage|rent)\b/.test(normalized)) return "financial_relief";
   if (/\b(imagine|possible|possibility|what if|restart|new life)\b/.test(normalized)) return "possibility_expansion";
   if (/\b(trust|intuition|believe yourself|believe it)\b/.test(normalized)) return "self_trust";
@@ -235,7 +236,7 @@ export function buildManifestSemanticSignature(input: {
   const questionType = inferQuestionType(`${normalized}${raw.includes("?") ? "?" : ""}`);
   const scenario = inferFinancialScenario(normalized, amounts);
   const tension = inferTension(normalized);
-  const reward = inferReward(normalized, metadata);
+    const reward = inferReward(normalized, { ...metadata, inferred_question_type: questionType, dollar_amounts: amounts });
   const architecture = inferArchitecture(raw, `${normalized}${raw.includes("?") ? "?" : ""}`, amounts);
   const meaningTokens = tokens(raw);
   const significant = normalizeText(raw).split(" ").filter((token) => token.length >= 3 && !STOP_WORDS.has(token));
@@ -286,7 +287,10 @@ export function compareManifestSemanticSignatures(
   );
   const score = clamp(premise * 0.68 + execution * 0.32);
   const semanticRepetition = premise >= 0.65 && (score >= 0.7 || (left.premise_key === right.premise_key && execution >= 0.25));
-  const severity: ManifestSemanticComparison["severity"] = score >= 0.86 || (premise >= 0.85 && execution >= 0.55)
+    const samePremiseArchitecture = left.premise_key === right.premise_key
+    && left.sentence_architecture === right.sentence_architecture
+    && left.premise_key !== "none:none:none";
+  const severity: ManifestSemanticComparison["severity"] = score >= 0.86 || (premise >= 0.85 && execution >= 0.55) || samePremiseArchitecture
     ? "collision"
     : semanticRepetition && score >= 0.76
       ? "high"
