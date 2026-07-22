@@ -11349,7 +11349,17 @@ async function prepareManifestAutonomousCycle(
     account_id: brand.account_id,
     saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
   });
-  const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, brand.brand_key);
+    const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, brand.brand_key);
+  const decisionIntelligenceReceiptReference = {
+    version: decisionIntelligence.version ?? null,
+    source_fingerprint: decisionIntelligence.source_fingerprint ?? null,
+    latest_strategy_version_id: (decisionIntelligence.latest_strategy as Record<string, unknown> | null)?.id ?? null,
+    learning_brief_key: (decisionIntelligence.learning_brief as Record<string, unknown> | null)?.brief_key ?? null,
+    benchmark_snapshot_key: ((decisionIntelligence.benchmark_response as Record<string, unknown> | null)?.latest as Record<string, unknown> | null)?.snapshot_key ?? null,
+    required_directives: Array.isArray(decisionIntelligence.required_directives) ? decisionIntelligence.required_directives : [],
+    strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
+    consumption_contract: decisionIntelligence.consumption_contract ?? {},
+  };
   const accountPosition = await buildManifestAutonomousAccountPosition(
     env,
     brand,
