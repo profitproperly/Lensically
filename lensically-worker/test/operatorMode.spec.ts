@@ -3761,7 +3761,9 @@ describe("operator mode MCP endpoint", () => {
     const workflowWatchTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getGitHubWorkflowRun" });
         const hardeningTransitionTool = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", { tool_name: "advanceHardeningIncident" });
         const createRepositoryTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { visibility?: { enum?: string[] }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "createGitHubRepository" });
-    const createPagesProjectTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { project_name?: { maxLength?: number }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "createCloudflarePagesProject" });
+        const createPagesProjectTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { project_name?: { maxLength?: number }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "createCloudflarePagesProject" });
+    const upsertRepositoryFileTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { content?: { maxLength?: number }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "upsertGitHubRepositoryFile" });
+    const deployPagesProjectTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { directory?: { default?: string }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "deployCloudflarePagesProject" });
     expect(patchSetTool.tool?.inputSchema?.properties?.patches?.maxItems).toBe(20);
     expect(releaseTool.tool?.inputSchema?.properties?.force?.type).toBe("boolean");
         expect(releaseStatusTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(55);
@@ -3770,7 +3772,11 @@ describe("operator mode MCP endpoint", () => {
     expect(createRepositoryTool.tool?.inputSchema?.properties?.visibility?.enum).toEqual(["private", "public"]);
         expect(createRepositoryTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(120);
     expect(createPagesProjectTool.tool?.inputSchema?.properties?.project_name?.maxLength).toBe(58);
-    expect(createPagesProjectTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(80);
+        expect(createPagesProjectTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(80);
+    expect(upsertRepositoryFileTool.tool?.inputSchema?.properties?.content?.maxLength).toBe(100000);
+    expect(upsertRepositoryFileTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(120);
+    expect(deployPagesProjectTool.tool?.inputSchema?.properties?.directory?.default).toBe("site");
+    expect(deployPagesProjectTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(80);
 
         expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
@@ -3786,8 +3792,10 @@ describe("operator mode MCP endpoint", () => {
       "appendRepoFileChunk",
       "commitRepoFileWrite",
             "createRepoFile",
-      "createGitHubRepository",
+            "createGitHubRepository",
+      "upsertGitHubRepositoryFile",
       "createCloudflarePagesProject",
+      "deployCloudflarePagesProject",
       "deleteRepoFile",
       "listGitHubWorkflowRuns",
       "runGitHubWorkflow",
@@ -3853,8 +3861,10 @@ describe("operator mode MCP endpoint", () => {
       "appendRepoFileChunk",
       "commitRepoFileWrite",
             "createRepoFile",
-      "createGitHubRepository",
+            "createGitHubRepository",
+      "upsertGitHubRepositoryFile",
       "createCloudflarePagesProject",
+      "deployCloudflarePagesProject",
       "deleteRepoFile",
       "listGitHubWorkflowRuns",
             "runGitHubWorkflow",
@@ -4420,7 +4430,7 @@ describe("operator mode MCP endpoint", () => {
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                                                                                                                                                                total_internal_capabilities: 100,
+                                                                                                                                                                                                total_internal_capabilities: 102,
             total_read_only_capabilities: 43,
       route_only: true,
       mutations_executed: 0,
@@ -4430,10 +4440,10 @@ describe("operator mode MCP endpoint", () => {
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
-                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(100);
+                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(102);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
             read_only: 43,
-                                                mutation: 57,
+                                                mutation: 59,
       mutation_without_required_inputs: 0,
     });
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
@@ -4509,7 +4519,7 @@ describe("operator mode MCP endpoint", () => {
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-                expect(eligibleMutations).toBe(57);
+                expect(eligibleMutations).toBe(59);
     expect(failedMutationPreflights).toBe(0);
   }, 90000);
 
