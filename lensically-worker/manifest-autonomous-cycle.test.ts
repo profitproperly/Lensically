@@ -4,10 +4,12 @@ import {
   resolveManifestAutonomousClock,
 } from "./src/index";
 import {
-  MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+    MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+  MANIFEST_INTELLIGENCE_FOUNDATION_VERSION,
   MANIFEST_NONINTERFERENCE_POLICY,
   buildManifestExposureDimensions,
   normalizeManifestSourceContext,
+  validateManifestFollowerAttributionBoundary,
   validateManifestPostHypothesis,
 } from "./src/manifestIntelligence";
 
@@ -159,9 +161,33 @@ describe("Manifest intelligence foundation", () => {
     expect(Object.keys(dimensions.dollar_amount_counts as Record<string, number>)).toEqual(["25,000", "50,000"]);
   });
 
+    it("allows only account-level follower checkpoints", () => {
+    const result = validateManifestFollowerAttributionBoundary({
+      follower_checkpoint: {
+        current_followers: 505,
+        target_followers: 1_000_000,
+        followers_remaining: 999_495,
+        long_horizon_follower_trajectory: "Account-level checkpoint only.",
+      },
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("rejects scoped follower attribution in fields and narrative claims", () => {
+    const result = validateManifestFollowerAttributionBoundary({
+      post_strategy: { expected_followers_from_post: 25 },
+      rationale: "This post generated followers from the morning schedule.",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join("|")).toContain("follower_attribution_forbidden");
+  });
+
   it("accepts operator hypotheses and preserves permanent policy boundaries", () => {
     const source = normalizeManifestSourceContext({ kind: "operator_hypothesis", source_type: "operator_hypothesis" });
     expect(source.ok).toBe(true);
+    expect(MANIFEST_INTELLIGENCE_FOUNDATION_VERSION).toBe("manifest-intelligence-foundation-v2");
     expect(MANIFEST_NONINTERFERENCE_POLICY.learning_source).toBe("observable_post_engagement");
     expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.post_level_attribution).toBe("forbidden");
     expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.account_level_only).toBe(true);
