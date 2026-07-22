@@ -244,7 +244,7 @@ jobs:
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
           test "${actual_crons}" = "${expected_crons}"
 
-      - name: Verify production runtime, scheduler, and intelligence product
+            - name: Verify production runtime and scheduler plus intelligence product
         run: |
           set -euo pipefail
           expected_sha="$(git rev-parse HEAD)"
