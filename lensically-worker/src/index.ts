@@ -11322,7 +11322,9 @@ async function prepareManifestAutonomousCycle(
     timezone,
     effectiveNowMs,
   );
-    await refreshOperatorContentFocus(env, brand.brand_key);
+      await refreshOperatorContentFocus(env, brand.brand_key);
+  await ensureGptPostStrategyTagsTable(env);
+  await ensureOperatorWorkflowTables(env);
   const intelligenceEngineRefresh = await refreshManifestIntelligenceEngine(env.DB, {
     brand_key: brand.brand_key,
     threads_user_id: brand.profile.threads_user_id,
@@ -29692,7 +29694,9 @@ async function refreshOperatorPerformanceEvaluator(
   accountId: string,
   threadsUserId: string,
 ): Promise<Record<string, unknown>> {
-    await ensureOperatorPostMetricSnapshotsTable(env);
+        await ensureOperatorPostMetricSnapshotsTable(env);
+  await ensureGptPostStrategyTagsTable(env);
+  await ensureOperatorWorkflowTables(env);
   await ensureOperatorPerformanceEvaluatorTables(env);
   const checkpointPlaceholders = OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS.map(() => "?").join(", ");
   await env.DB.prepare(
