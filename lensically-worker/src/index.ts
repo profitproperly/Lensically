@@ -15459,11 +15459,25 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-              if (toolName === "get_performance_learning") {
+                            if (toolName === "get_performance_learning") {
     return operatorJsonResponse({
       success: true,
       brand_key: brand.brand_key,
       performance_learning: await getLatestOperatorPerformanceLearning(env, brand.brand_key, payload.include_posts === true),
+    });
+  }
+
+  if (toolName === "get_manifest_intelligence_audit") {
+    const requestedSection = normalizeOperatorMachineKey(payload.audit_section, "summary") as ManifestAuditSection;
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      intelligence_audit: await buildManifestMeasurementAuditRead(env.DB, {
+        brand_key: brand.brand_key,
+        section: requestedSection,
+        offset: Number(payload.offset ?? 0),
+        limit: Number(payload.limit ?? 20),
+      }),
     });
   }
 
@@ -16982,6 +16996,27 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     title: "Get performance learning",
     description: "Read the latest maturity-normalized post evidence, hypotheses, fatigue signals, generation learning brief, and current Content Focus state. Follower totals remain account-level only and are never attributed to posts or posting periods.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, include_posts: { type: "boolean" } }, required: ["brand_key"], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+    {
+    name: "get_manifest_intelligence_audit",
+    title: "Get Manifest intelligence audit",
+    description: "Read the bounded Manifest learning brief, benchmark history, run comparisons, Saved Pattern intelligence, account-level follower checkpoint, strategy transitions, portfolio state, experiments, or remaining evidence gaps. This tool never changes content or schedule state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        audit_section: {
+          type: "string",
+          enum: ["summary", "learning_brief", "benchmarks", "run_comparisons", "saved_patterns", "follower_checkpoint", "strategy_transitions", "portfolio", "experiments", "capability_gaps"],
+          default: "summary",
+        },
+        offset: { type: "integer", minimum: 0, default: 0 },
+        limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+      },
+      required: ["brand_key"],
+      additionalProperties: false,
+    },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
