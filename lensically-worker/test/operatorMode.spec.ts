@@ -1134,7 +1134,7 @@ describe("operator mode backend spine", () => {
     expect(productResponse.status, productBody).toBe(200);
     expect(productResponse.headers.get("Cache-Control")).toBe("no-store");
     const productPayload = JSON.parse(productBody) as Record<string, unknown>;
-    expect(productPayload).toMatchObject({
+        expect(productPayload).toMatchObject({
       version: "manifest-intelligence-dashboard-v1",
       product_proof: {
         dashboard_complete: true,
@@ -1142,6 +1142,11 @@ describe("operator mode backend spine", () => {
         automatic_operator_decision_change_proven: true,
       },
     });
+    const measurementAfterDashboardRead = await env.DB.prepare(
+      `SELECT updated_at, source_fingerprint FROM operator_manifest_benchmark_snapshots
+       WHERE brand_key = 'manifest_mental' ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).first<{ updated_at: string; source_fingerprint: string }>();
+    expect(measurementAfterDashboardRead).toEqual(measurementBeforeDashboardRead);
 
     const afterScheduled = await env.DB.prepare(`SELECT COUNT(*) AS total FROM scheduled_posts`).first<{ total: number }>();
     expect(Number(afterScheduled?.total ?? 0)).toBe(Number(beforeScheduled?.total ?? 0));
