@@ -1,4 +1,5 @@
 import {
+  ensureManifestIntelligenceTables,
   ensureManifestStrategyVersion,
   getLatestManifestStrategyVersion,
 } from "./manifestIntelligence";
@@ -162,6 +163,7 @@ function compactEvidence(value: unknown, itemLimit = 12): JsonRecord {
 }
 
 export async function ensureManifestMeasurementAuditTables(db: D1Database): Promise<void> {
+  await ensureManifestIntelligenceTables(db);
   await ensureManifestIntelligenceEngineTables(db);
   const statements = [
     `CREATE TABLE IF NOT EXISTS operator_manifest_learning_briefs (
