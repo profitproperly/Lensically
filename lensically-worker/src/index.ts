@@ -21328,7 +21328,8 @@ async function handleOperatorMcpAdminTool(
         "get_monthly_growth_review",
                 "get_performance_learning",
         "get_content_focus",
-        "get_manifest_intelligence_foundation",
+                "get_manifest_intelligence_foundation",
+        "get_manifest_intelligence_audit",
         "get_manifest_cycle_receipt",
       ]),
     };
