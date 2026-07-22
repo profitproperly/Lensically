@@ -4026,7 +4026,7 @@ describe("operator mode MCP endpoint", () => {
     expect(directoryPath.structuredContent.normal_work_blocked).not.toBe(true);
   }, 30000);
 
-  it("builds one complete non-mutating Execution Kernel capability campaign", async () => {
+    it("validates complete Execution Kernel routes without mutations", async () => {
     const campaign = await mcpToolCallRaw<{
       campaign: {
         segment: string;
@@ -4069,6 +4069,9 @@ describe("operator mode MCP endpoint", () => {
       "zero_input_mutation",
     ]);
 
+      }, 30000);
+
+  it("executes all bounded Execution Kernel read segments without failures", async () => {
     const readSegments = [
       ["s1", "engineering_reads"],
       ["s2", "admin_reads_a"],
@@ -4079,9 +4082,13 @@ describe("operator mode MCP endpoint", () => {
     let eligibleReads = 0;
     let failedReads = 0;
     for (const [transportSegment, canonicalSegment] of readSegments) {
-      const result = await mcpToolCallRaw<typeof campaign.structuredContent>("runMcpTests", {
-        segment: transportSegment,
-      });
+      const result = await mcpToolCallRaw<{
+        campaign: {
+          segment: string;
+          route_only: boolean;
+          live_reads: { eligible: number; failed: number; failures: Array<Record<string, unknown>> };
+        };
+      }>("runMcpTests", { segment: transportSegment });
       expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
       expect(result.structuredContent.campaign.route_only).toBe(false);
       eligibleReads += result.structuredContent.campaign.live_reads.eligible;
@@ -4091,9 +4098,11 @@ describe("operator mode MCP endpoint", () => {
         JSON.stringify(result.structuredContent.campaign.live_reads.failures),
       ).toBe(0);
     }
-                expect(eligibleReads).toBe(42);
+    expect(eligibleReads).toBe(42);
     expect(failedReads).toBe(0);
+  }, 90000);
 
+  it("preflights all bounded Execution Kernel mutations without side effects", async () => {
     const mutationSegments = [
       ["s5", "engineering_mutations"],
       ["s6", "admin_mutations"],
@@ -4103,9 +4112,18 @@ describe("operator mode MCP endpoint", () => {
     let eligibleMutations = 0;
     let failedMutationPreflights = 0;
     for (const [transportSegment, canonicalSegment] of mutationSegments) {
-      const result = await mcpToolCallRaw<typeof campaign.structuredContent>("runMcpTests", {
-        segment: transportSegment,
-      });
+      const result = await mcpToolCallRaw<{
+        campaign: {
+          segment: string;
+          mutations_executed: number;
+          mutation_preflights: {
+            eligible: number;
+            failed: number;
+            failures: Array<Record<string, unknown>>;
+            side_effects_executed: number;
+          };
+        };
+      }>("runMcpTests", { segment: transportSegment });
       expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
       expect(result.structuredContent.campaign.mutations_executed).toBe(0);
       eligibleMutations += result.structuredContent.campaign.mutation_preflights.eligible;
@@ -4116,9 +4134,9 @@ describe("operator mode MCP endpoint", () => {
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-                expect(eligibleMutations).toBe(55);
+    expect(eligibleMutations).toBe(55);
     expect(failedMutationPreflights).toBe(0);
-  }, 120000);
+  }, 90000);
 
   it.skip("retired: static router as the only public action path", async () => {
     const direct = await mcpToolCallRaw<{ error: string; required_tool: string }>("getEngineeringAccessState", {});
