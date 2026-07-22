@@ -1006,6 +1006,14 @@ function compactManifestAutonomousPreparationPayload(
         portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? {},
       },
     },
+    measurement_audit_refresh: payload.measurement_audit_refresh && typeof payload.measurement_audit_refresh === "object" && !Array.isArray(payload.measurement_audit_refresh)
+      ? {
+          mode: (payload.measurement_audit_refresh as Record<string, unknown>).mode ?? null,
+          recomputed: (payload.measurement_audit_refresh as Record<string, unknown>).recomputed === true,
+          refresh_owner: (payload.measurement_audit_refresh as Record<string, unknown>).refresh_owner ?? null,
+          authoritative_post_count: (payload.measurement_audit_refresh as Record<string, unknown>).authoritative_post_count ?? null,
+        }
+      : null,
     decision_intelligence: minimalDecision,
     intelligence_foundation: {
       input_strategy_version: compactOperatorPayloadValue(
