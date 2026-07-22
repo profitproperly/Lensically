@@ -1,5 +1,5 @@
 name: Lensically Engineering
-run-name: "Lensically ${{ inputs.task }} · ${{ inputs.release_id }}"
+run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}
 
 on:
   push:
@@ -37,7 +37,7 @@ on:
 
 concurrency:
   group: "lensically-engineering-${{ github.event_name }}-${{ inputs.task }}-${{ github.ref }}"
-  cancel-in-progress: false
+    cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}
 
 permissions:
   contents: read
@@ -191,15 +191,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        shard:
-          - 1
-          - 2
-          - 3
-          - 4
-          - 5
-          - 6
-          - 7
-          - 8
+                shard: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact head
