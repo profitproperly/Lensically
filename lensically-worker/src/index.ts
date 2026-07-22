@@ -79,7 +79,8 @@ import {
   linkManifestCycleStrategy,
   linkManifestHypothesisResult,
   normalizeManifestSourceContext,
-  recordManifestPostHypothesis,
+    recordManifestPostHypothesis,
+  validateManifestFollowerAttributionBoundary,
   validateManifestPostHypothesis,
 } from "./manifestIntelligence";
 
@@ -11384,10 +11385,10 @@ async function prepareManifestAutonomousCycle(
     },
     startedAt: clock.effective_now_iso,
   });
-  await appendManifestCycleEvent(env.DB, {
+    await appendManifestCycleEvent(env.DB, {
     cycleId,
     brandKey: brand.brand_key,
-    eventKey: "cycle-prepared",
+    eventKey: `cycle-prepared:${clock.effective_now_iso}`,
     eventType: "cycle_prepared",
     payload: {
       operation_id: operationId,
@@ -11395,7 +11396,10 @@ async function prepareManifestAutonomousCycle(
       missing_slot_count: missingSlots.length,
       input_strategy_version_id: inputStrategyVersion.id ?? null,
       exposure_snapshot_id: exposureSnapshot.id ?? null,
+      exposure_revision: exposureSnapshot.revision ?? 1,
+      exposure_refreshed: exposureSnapshot.refreshed === true,
       receipt_id: cycleReceipt.id ?? null,
+      effective_now_iso: clock.effective_now_iso,
     },
   });
   return {
@@ -11958,8 +11962,16 @@ async function persistManifestAutonomousPost(
     const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
     ? payload.strategic_thesis as Record<string, unknown>
     : {};
-  if (!Object.keys(strategicThesis).length) {
+    if (!Object.keys(strategicThesis).length) {
     return { success: false, error: "strategic_thesis_required" };
+  }
+  const followerBoundary = validateManifestFollowerAttributionBoundary({
+    strategic_thesis: strategicThesis,
+    post_strategy: post.strategy ?? {},
+    model_evaluation: modelEvaluation,
+  });
+  if (!followerBoundary.ok) {
+    return { success: false, error: "follower_attribution_forbidden", details: followerBoundary.errors };
   }
   const outputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
     brandKey: brand.brand_key,
@@ -12368,15 +12380,17 @@ async function persistManifestAutonomousPost(
       brand.account_id,
     ),
     env.DB.prepare(
-      `INSERT INTO operator_autonomous_lineup_items (
+            `INSERT INTO operator_autonomous_lineup_items (
         id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
         generation_mode, family_key, strategic_purpose, strategy_json,
-        source_card_id, generation_run_id, draft_id, scheduled_post_id, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+        source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
       ON CONFLICT(cycle_id, slot_key) DO UPDATE SET
         text = excluded.text,
         strategy_json = excluded.strategy_json,
         source_card_id = excluded.source_card_id,
+        source_selection_id = excluded.source_selection_id,
+        hypothesis_id = excluded.hypothesis_id,
         generation_run_id = excluded.generation_run_id,
         draft_id = excluded.draft_id,
         scheduled_post_id = excluded.scheduled_post_id,
@@ -12393,8 +12407,10 @@ async function persistManifestAutonomousPost(
       generationMode,
       familyKey,
       strategicPurpose,
-      normalizeOperatorJson(strategy, {}),
+            normalizeOperatorJson(strategy, {}),
       sourceCardId,
+      sourceSelectionId,
+      normalizeOperatorText(postHypothesis.id, 160, true),
       runId,
       draftId,
       scheduled.scheduledPostId,
@@ -12457,16 +12473,37 @@ async function persistManifestAutonomousPost(
       new Date().toISOString(),
       normalizeOperatorJson({ strategy, analysis: draftAnalysis, model_evaluation: modelEvaluation }, {}),
     ),
+        env.DB.prepare(
+      `UPDATE operator_manifest_post_hypotheses
+       SET scheduled_post_id = ?, status = 'scheduled', locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND cycle_id = ? AND slot_key = ?`,
+    ).bind(scheduled.scheduledPostId, postHypothesis.id, cycleId, slotKey),
     env.DB.prepare(
       `UPDATE scheduled_posts SET publish_error_message = NULL WHERE id = ? AND threads_user_id = ?`,
     ).bind(scheduled.scheduledPostId, brand.profile.threads_user_id),
   ]);
-  const publishLineage = await getScheduledPostPublishLineageStatus(
+    const publishLineage = await getScheduledPostPublishLineageStatus(
     env,
     scheduled.scheduledPostId,
     brand.profile.threads_user_id,
   );
-    if (publishLineage.complete !== true) {
+  const intelligenceLineage = await env.DB.prepare(
+    `SELECT l.hypothesis_id, l.source_selection_id, l.cycle_id, l.slot_key,
+            h.id AS stored_hypothesis_id, h.scheduled_post_id AS hypothesis_scheduled_post_id,
+            h.status AS hypothesis_status, h.locked_at AS hypothesis_locked_at
+     FROM operator_autonomous_lineup_items l
+     LEFT JOIN operator_manifest_post_hypotheses h
+       ON h.id = l.hypothesis_id AND h.cycle_id = l.cycle_id AND h.slot_key = l.slot_key
+     WHERE l.cycle_id = ? AND l.brand_key = ? AND l.slot_key = ? AND l.scheduled_post_id = ?
+     LIMIT 1`,
+  ).bind(cycleId, brand.brand_key, slotKey, scheduled.scheduledPostId).first<Record<string, unknown>>();
+  const intelligenceMissingStages: string[] = [];
+  if (!intelligenceLineage?.source_selection_id) intelligenceMissingStages.push("source_selection");
+  if (!intelligenceLineage?.hypothesis_id || !intelligenceLineage?.stored_hypothesis_id) intelligenceMissingStages.push("hypothesis");
+  if (Number(intelligenceLineage?.hypothesis_scheduled_post_id ?? 0) !== scheduled.scheduledPostId) intelligenceMissingStages.push("hypothesis_schedule_link");
+  if (!intelligenceLineage?.hypothesis_locked_at || String(intelligenceLineage?.hypothesis_status) !== "scheduled") intelligenceMissingStages.push("hypothesis_lock");
+  if (publishLineage.complete !== true || intelligenceMissingStages.length > 0) {
     await linkManifestHypothesisResult(env.DB, {
       cycleId,
       slotKey,
@@ -12481,11 +12518,18 @@ async function persistManifestAutonomousPost(
       eventKey: `persist:${operationId}`,
       eventType: "lineage_failed",
       slotKey,
-      payload: { scheduled_post_id: scheduled.scheduledPostId, missing_stages: publishLineage.missing_stages ?? [] },
+            payload: {
+        scheduled_post_id: scheduled.scheduledPostId,
+        missing_stages: [
+          ...(Array.isArray(publishLineage.missing_stages) ? publishLineage.missing_stages.map(String) : []),
+          ...intelligenceMissingStages,
+        ],
+      },
     });
-    const missingStages = Array.isArray(publishLineage.missing_stages)
-      ? publishLineage.missing_stages.map(String)
-      : ["unknown"];
+    const missingStages = [
+      ...(Array.isArray(publishLineage.missing_stages) ? publishLineage.missing_stages.map(String) : []),
+      ...intelligenceMissingStages,
+    ]; 
     await env.DB.prepare(
       `UPDATE scheduled_posts SET publish_error_message = ? WHERE id = ? AND threads_user_id = ?`,
     ).bind(
@@ -12525,8 +12569,10 @@ async function persistManifestAutonomousPost(
       generation_run_id: runId,
       draft_id: draftId,
       hypothesis_id: postHypothesis.id ?? null,
-      strategy_version_id: outputStrategyVersion.id ?? null,
+            strategy_version_id: outputStrategyVersion.id ?? null,
+      gate_summary: gateSummary,
       publish_lineage_complete: true,
+      intelligence_lineage_complete: true,
     },
   });
   const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
@@ -12549,7 +12595,20 @@ async function persistManifestAutonomousPost(
     normalizeOperatorJson(Array.from(scheduledIds), []),
         cycleId,
     brand.brand_key,
-  ).run();
+    ).run();
+  await appendManifestCycleEvent(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    eventKey: `coverage:${operationId}`,
+    eventType: "coverage_reconciled",
+    slotKey,
+    payload: {
+      persisted_scheduled_post_id: scheduled.scheduledPostId,
+      scheduled_post_ids: Array.from(scheduledIds),
+      remaining_missing_slots: remainingMissing,
+      remaining_missing_count: remainingMissing.length,
+    },
+  });
   if (!remainingMissing.length) {
     const completion = {
       completed_slot_key: slotKey,
@@ -12588,9 +12647,12 @@ async function persistManifestAutonomousPost(
       source_card_family_id: familyId,
       generation_run_id: runId,
       draft_id: draftId,
-      inventory_id: inventoryId,
+            inventory_id: inventoryId,
+      hypothesis_id: postHypothesis.id ?? null,
+      strategy_version_id: outputStrategyVersion.id ?? null,
     },
         publish_lineage_complete: true,
+    intelligence_lineage_complete: true,
     hypothesis_id: postHypothesis.id ?? null,
     strategy_version_id: outputStrategyVersion.id ?? null,
         model_evaluation: {
