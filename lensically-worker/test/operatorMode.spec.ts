@@ -3213,7 +3213,12 @@ describe("operator mode MCP endpoint", () => {
       };
       decision_intelligence: {
         version: string;
-        consumption_contract: { required: boolean; required_decision_outputs: string[] };
+                consumption_contract: {
+          required: boolean;
+          required_decision_outputs: Record<string, boolean>;
+          inputs_that_must_be_considered: Record<string, boolean>;
+        };
+
       };
     }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
@@ -3226,11 +3231,26 @@ describe("operator mode MCP endpoint", () => {
       version: "manifest-decision-intelligence-v1",
       consumption_contract: { required: true },
     });
-    expect(prepared.decision_intelligence.consumption_contract.required_decision_outputs).toEqual(expect.arrayContaining([
-      "family selection",
-      "slot placement",
-      "strategy change or explicit evidence-based preservation",
-    ]));
+        expect(prepared.decision_intelligence.consumption_contract.inputs_that_must_be_considered).toMatchObject({
+      latest_strategy: true,
+      learning_brief: true,
+      family_priorities: true,
+      experiments: true,
+      saved_pattern_candidates: true,
+      repetition: true,
+      benchmark_response: true,
+      follower_checkpoint: true,
+    });
+    expect(prepared.decision_intelligence.consumption_contract.required_decision_outputs).toMatchObject({
+      family_selection: true,
+      generation_mode: true,
+      source_or_hypothesis_selection: true,
+      premise_and_audience_reward: true,
+      slot_placement: true,
+      experiment_assignment_when_warranted: true,
+      novelty_and_repetition_response: true,
+      strategy_change_or_evidence_based_preservation: true,
+    });
         expect(new TextEncoder().encode(JSON.stringify(prepared.decision_intelligence)).byteLength).toBeLessThan(12000);
     const slot = prepared.cycle.missing_slots[0];
     expect(slot).toBeTruthy();
