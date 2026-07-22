@@ -3809,9 +3809,9 @@ describe("operator mode MCP endpoint", () => {
       };
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
-      segment: "routes",
-                        total_internal_capabilities: 95,
-      total_read_only_capabilities: 40,
+            segment: "routes",
+                        total_internal_capabilities: 97,
+      total_read_only_capabilities: 42,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
@@ -3820,9 +3820,9 @@ describe("operator mode MCP endpoint", () => {
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
-                expect(campaign.structuredContent.campaign.passed).toBe(95);
+                                expect(campaign.structuredContent.campaign.passed).toBe(97);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
-      read_only: 40,
+      read_only: 42,
             mutation: 55,
       mutation_without_required_inputs: 0,
     });
