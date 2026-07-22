@@ -16650,8 +16650,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "get_manifest_cycle_receipt",
     title: "Get Manifest autonomous cycle receipt",
-        description: "Read one canonical autonomous-cycle receipt without payload-budget truncation. The response always includes a stable summary and supports pageable sections for events, hypotheses, published exposure, scheduled exposure, and startup state. Defaults to the latest receipt summary.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" }, receipt_section: { type: "string", enum: ["summary", "events", "hypotheses", "exposure_published", "exposure_scheduled", "startup_state"], default: "summary" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 20, default: 20 } }, required: ["brand_key"], additionalProperties: false },
+            description: "Read one canonical autonomous-cycle receipt without payload-budget truncation. The response always includes a stable summary. Events, hypotheses, and exposure records are pageable; startup state, strategy versions, exposure dimensions, completion, and unresolved issues are reconstructable from canonical stable-JSON chunks.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" }, receipt_section: { type: "string", enum: ["summary", "events", "hypotheses", "exposure_published", "exposure_scheduled", "exposure_dimensions", "startup_state", "input_strategy", "output_strategy", "completion", "unresolved_issues"], default: "summary" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 10, default: 10 } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
       {

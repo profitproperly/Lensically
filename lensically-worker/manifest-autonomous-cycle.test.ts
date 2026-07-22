@@ -233,9 +233,22 @@ describe("Manifest intelligence foundation", () => {
       next_offset: 3,
     });
 
-    const finalPage = buildManifestCycleReceiptRead(receipt, "events", 3, 20);
+        const finalPage = buildManifestCycleReceiptRead(receipt, "events", 3, 10);
     expect(finalPage.items).toEqual(events.slice(3));
     expect(finalPage.pagination).toMatchObject({ returned: 4, total: 7, has_more: false, next_offset: null });
+
+    const startupChunks = buildManifestCycleReceiptRead(receipt, "startup_state", 0, 10);
+    const reconstructedStartup = (startupChunks.items as Array<{ text: string }>).map((item) => item.text).join("");
+    expect(JSON.parse(reconstructedStartup)).toEqual(receipt.startup_state);
+    expect(startupChunks.section_data).toMatchObject({
+      encoding: "stable-json-chunks",
+      character_count: reconstructedStartup.length,
+      chunk_count: 1,
+    });
+
+    const strategyChunks = buildManifestCycleReceiptRead(receipt, "output_strategy", 0, 10);
+    const reconstructedStrategy = (strategyChunks.items as Array<{ text: string }>).map((item) => item.text).join("");
+    expect(JSON.parse(reconstructedStrategy)).toEqual(receipt.output_strategy_version);
   });
 
   it("accepts operator hypotheses and preserves permanent policy boundaries", () => {

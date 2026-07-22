@@ -3031,7 +3031,7 @@ describe("operator mode MCP endpoint", () => {
       cycle_id: prepared.cycle.id,
       receipt_section: "events",
       offset: 0,
-      limit: 20,
+            limit: 10,
       proceed_confirmed: true,
     });
     expect(eventPage.receipt_section.section).toBe("events");
@@ -3054,7 +3054,7 @@ describe("operator mode MCP endpoint", () => {
       cycle_id: prepared.cycle.id,
       receipt_section: "hypotheses",
       offset: 0,
-      limit: 20,
+            limit: 10,
       proceed_confirmed: true,
     });
     expect(hypothesisPage.receipt_section.section).toBe("hypotheses");

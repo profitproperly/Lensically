@@ -652,11 +652,15 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
   };
 }
 
-type ManifestCycleReceiptReadSection = "summary" | "events" | "hypotheses" | "exposure_published" | "exposure_scheduled" | "startup_state";
+type ManifestCycleReceiptReadSection =
+  | "summary" | "events" | "hypotheses" | "exposure_published" | "exposure_scheduled"
+  | "exposure_dimensions" | "startup_state" | "input_strategy" | "output_strategy"
+  | "completion" | "unresolved_issues";
 
 function compactManifestStrategyForReceipt(value: unknown): JsonRecord | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as JsonRecord;
+  const reversalConditions = Array.isArray(row.reversal_conditions) ? row.reversal_conditions : [];
   return {
     id: row.id ?? null,
     brand_key: row.brand_key ?? null,
@@ -665,12 +669,30 @@ function compactManifestStrategyForReceipt(value: unknown): JsonRecord | null {
     parent_version_id: row.parent_version_id ?? null,
     status: row.status ?? null,
     strategy_hash: row.strategy_hash ?? null,
-    strategy: row.strategy ?? {},
-    evidence: row.evidence ?? {},
     change_summary: row.change_summary ?? null,
-    reversal_conditions: row.reversal_conditions ?? [],
+    reversal_condition_count: reversalConditions.length,
     source_cycle_id: row.source_cycle_id ?? null,
     created_at: row.created_at ?? null,
+  };
+}
+
+function manifestReceiptJsonChunks(value: unknown, chunkChars = 6000): { metadata: JsonRecord; items: JsonRecord[] } {
+  const json = stableManifestJson(value ?? null);
+  const items: JsonRecord[] = [];
+  for (let start = 0, index = 0; start < json.length; start += chunkChars, index += 1) {
+    const end = Math.min(json.length, start + chunkChars);
+    items.push({ chunk_index: index, start_char: start, end_char: end, text: json.slice(start, end) });
+  }
+  if (!items.length) items.push({ chunk_index: 0, start_char: 0, end_char: 0, text: "" });
+  return {
+    metadata: {
+      encoding: "stable-json-chunks",
+      chunk_chars: chunkChars,
+      character_count: json.length,
+      chunk_count: items.length,
+      reconstruction: "Concatenate item.text in chunk_index order, then parse as JSON.",
+    },
+    items,
   };
 }
 
@@ -678,26 +700,34 @@ export function buildManifestCycleReceiptRead(
   receipt: unknown,
   requestedSection: unknown = "summary",
   requestedOffset: unknown = 0,
-  requestedLimit: unknown = 20,
+  requestedLimit: unknown = 10,
 ): JsonRecord {
   const source = receipt && typeof receipt === "object" && !Array.isArray(receipt) ? receipt as JsonRecord : {};
   const allowedSections = new Set<ManifestCycleReceiptReadSection>([
-    "summary", "events", "hypotheses", "exposure_published", "exposure_scheduled", "startup_state",
+    "summary", "events", "hypotheses", "exposure_published", "exposure_scheduled",
+    "exposure_dimensions", "startup_state", "input_strategy", "output_strategy",
+    "completion", "unresolved_issues",
   ]);
   const normalizedSection = text(requestedSection, 80) as ManifestCycleReceiptReadSection;
   const section: ManifestCycleReceiptReadSection = allowedSections.has(normalizedSection) ? normalizedSection : "summary";
   const offsetNumber = Number(requestedOffset);
   const limitNumber = Number(requestedLimit);
   const offset = Number.isFinite(offsetNumber) ? Math.max(0, Math.trunc(offsetNumber)) : 0;
-  const limit = Number.isFinite(limitNumber) ? Math.min(20, Math.max(1, Math.trunc(limitNumber))) : 20;
+  const limit = Number.isFinite(limitNumber) ? Math.min(10, Math.max(1, Math.trunc(limitNumber))) : 10;
   const events = Array.isArray(source.events) ? source.events : [];
   const hypotheses = Array.isArray(source.hypotheses) ? source.hypotheses : [];
-  const startupState = source.startup_state && typeof source.startup_state === "object" && !Array.isArray(source.startup_state)
-    ? source.startup_state as JsonRecord : {};
+  const startupState = source.startup_state ?? {};
+  const inputStrategy = source.input_strategy_version ?? null;
+  const outputStrategy = source.output_strategy_version ?? null;
+  const completion = source.completion ?? null;
+  const unresolvedIssues = Array.isArray(source.unresolved_issues) ? source.unresolved_issues : [];
   const exposure = source.exposure_snapshot && typeof source.exposure_snapshot === "object" && !Array.isArray(source.exposure_snapshot)
     ? source.exposure_snapshot as JsonRecord : null;
   const published = exposure && Array.isArray(exposure.published) ? exposure.published : [];
   const scheduled = exposure && Array.isArray(exposure.scheduled) ? exposure.scheduled : [];
+  const exposureDimensions = exposure?.dimensions ?? {};
+  const startupRecord = startupState && typeof startupState === "object" && !Array.isArray(startupState)
+    ? startupState as JsonRecord : {};
   const exposureSummary = exposure ? {
     id: exposure.id ?? null,
     cycle_id: exposure.cycle_id ?? null,
@@ -707,11 +737,12 @@ export function buildManifestCycleReceiptRead(
     timezone: exposure.timezone ?? null,
     horizon_start_local: exposure.horizon_start_local ?? null,
     horizon_end_local: exposure.horizon_end_local ?? null,
-    dimensions: exposure.dimensions ?? {},
     source_hash: exposure.source_hash ?? null,
     revision: exposure.revision ?? 1,
     published_count: published.length,
     scheduled_count: scheduled.length,
+    dimension_keys: exposureDimensions && typeof exposureDimensions === "object" && !Array.isArray(exposureDimensions)
+      ? Object.keys(exposureDimensions as JsonRecord).sort() : [],
     created_at: exposure.created_at ?? null,
     updated_at: exposure.updated_at ?? null,
   } : null;
@@ -731,17 +762,17 @@ export function buildManifestCycleReceiptRead(
     input_strategy_version_id: source.input_strategy_version_id ?? null,
     output_strategy_version_id: source.output_strategy_version_id ?? null,
     exposure_snapshot_id: source.exposure_snapshot_id ?? null,
-    input_strategy_version: compactManifestStrategyForReceipt(source.input_strategy_version),
-    output_strategy_version: compactManifestStrategyForReceipt(source.output_strategy_version),
+    input_strategy_version: compactManifestStrategyForReceipt(inputStrategy),
+    output_strategy_version: compactManifestStrategyForReceipt(outputStrategy),
     exposure_snapshot: exposureSummary,
     startup_state_summary: {
-      top_level_keys: Object.keys(startupState).sort(),
-      captured_at: startupState.captured_at ?? null,
-      account_position_captured_at: (startupState.account_position && typeof startupState.account_position === "object" && !Array.isArray(startupState.account_position)
-        ? (startupState.account_position as JsonRecord).captured_at : null) ?? null,
+      top_level_keys: Object.keys(startupRecord).sort(),
+      captured_at: startupRecord.captured_at ?? null,
+      account_position_captured_at: (startupRecord.account_position && typeof startupRecord.account_position === "object" && !Array.isArray(startupRecord.account_position)
+        ? (startupRecord.account_position as JsonRecord).captured_at : null) ?? null,
     },
-    completion: source.completion ?? null,
-    unresolved_issues: source.unresolved_issues ?? [],
+    completion_present: completion !== null,
+    unresolved_issue_count: unresolvedIssues.length,
     event_count: events.length,
     hypothesis_count: hypotheses.length,
     started_at: source.started_at ?? null,
@@ -754,33 +785,46 @@ export function buildManifestCycleReceiptRead(
       version: MANIFEST_CYCLE_RECEIPT_READ_VERSION,
       canonical_receipt_preserved: true,
       payload_budget_truncation_forbidden: true,
+      variable_size_sections_use_canonical_json_chunks: true,
       available_sections: Array.from(allowedSections),
-      page_limit_max: 20,
+      page_limit_max: 10,
+      json_chunk_chars: 6000,
     },
   };
-  let items: unknown[] | null = null;
-  let sectionData: unknown = null;
+  let items: unknown[] = [];
+  let sectionData: JsonRecord | null = null;
   if (section === "events") items = events;
   if (section === "hypotheses") items = hypotheses;
   if (section === "exposure_published") items = published;
   if (section === "exposure_scheduled") items = scheduled;
-  if (section === "startup_state") sectionData = startupState;
-  const total = items?.length ?? (section === "startup_state" ? Object.keys(startupState).length : 0);
-  const pageItems = items ? items.slice(offset, offset + limit) : [];
+  const chunkSource = section === "exposure_dimensions" ? exposureDimensions
+    : section === "startup_state" ? startupState
+      : section === "input_strategy" ? inputStrategy
+        : section === "output_strategy" ? outputStrategy
+          : section === "completion" ? completion
+            : section === "unresolved_issues" ? unresolvedIssues
+              : undefined;
+  if (chunkSource !== undefined) {
+    const chunked = manifestReceiptJsonChunks(chunkSource);
+    items = chunked.items;
+    sectionData = chunked.metadata;
+  }
+  const total = items.length;
+  const pageItems = items.slice(offset, offset + limit);
   return {
     receipt_read_version: MANIFEST_CYCLE_RECEIPT_READ_VERSION,
     section,
     summary,
     section_data: sectionData,
     items: pageItems,
-    pagination: items ? {
+    pagination: section === "summary" ? null : {
       offset,
       limit,
       returned: pageItems.length,
       total,
       has_more: offset + pageItems.length < total,
       next_offset: offset + pageItems.length < total ? offset + pageItems.length : null,
-    } : null,
+    },
   };
 }
 
