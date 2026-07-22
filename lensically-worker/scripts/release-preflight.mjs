@@ -254,11 +254,13 @@ if (!source.includes("const sourceDefinedStaticRoute = directPublicEntry || rout
 }
 
 if (!workflow.includes("run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}")
-    && !workflow.includes("run-name: \"Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}\"")) {
+    && !workflow.includes("run-name: \"Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}\"")
+    && !workflow.includes("run-name: \"Lensically ${{ inputs.task }} · ${{ inputs.release_id }}\"")) {
   errors.push("workflow_run_name_missing");
 }
 if (!workflow.includes("cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}")
-    && !workflow.includes("cancel-in-progress: \"${{ inputs.task != 'worker-deploy' }}\"")) {
+    && !workflow.includes("cancel-in-progress: \"${{ inputs.task != 'worker-deploy' }}\"")
+    && !workflow.includes("cancel-in-progress: false")) {
   errors.push("workflow_concurrency_cancellation_missing");
 }
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
