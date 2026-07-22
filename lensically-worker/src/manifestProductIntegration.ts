@@ -325,7 +325,7 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
   };
   return {
     ...decisionIntelligence,
-    source_fingerprint: fnv1a(stable(decisionIntelligence)),
+        source_fingerprint: fnv1a(stable(stableEvidence(decisionIntelligence))),
   };
 }
 
