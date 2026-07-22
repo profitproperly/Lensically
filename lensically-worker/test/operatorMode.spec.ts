@@ -1125,7 +1125,11 @@ describe("operator mode backend spine", () => {
     expect(Array.isArray(productDashboard.run_receipts)).toBe(true);
     expect(new TextEncoder().encode(JSON.stringify(productDashboard)).byteLength).toBeLessThan(24000);
 
-        const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
+            const measurementBeforeDashboardRead = await env.DB.prepare(
+      `SELECT updated_at, source_fingerprint FROM operator_manifest_benchmark_snapshots
+       WHERE brand_key = 'manifest_mental' ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).first<{ updated_at: string; source_fingerprint: string }>();
+    const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
     const productBody = await productResponse.text();
     expect(productResponse.status, productBody).toBe(200);
     expect(productResponse.headers.get("Cache-Control")).toBe("no-store");
