@@ -16454,7 +16454,8 @@ const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "startRepoFileWrite",
   "appendRepoFileChunk",
   "commitRepoFileWrite",
-  "createRepoFile",
+    "createRepoFile",
+  "createGitHubRepository",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
   "runGitHubWorkflow",
@@ -16533,7 +16534,8 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "startRepoFileWrite", title: "Start repo file write", description: "Start a chunked file write session for a GitHub repo path.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, mode: { type: "string", enum: ["replace", "create"] }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "mode", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "appendRepoFileChunk", title: "Append repo file chunk", description: "Append a compact text chunk to a pending repo file write session.", inputSchema: { type: "object", properties: { session_id: { type: "string" }, chunk: { type: "string" } }, required: ["session_id", "chunk"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "commitRepoFileWrite", title: "Commit repo file write", description: "Commit a pending chunked file write to GitHub.", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-  { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    { name: "createRepoFile", title: "Create repo file", description: "Create a small GitHub repo file directly. Use chunked writes for larger files.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, content: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "content", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "createGitHubRepository", title: "Create GitHub repository", description: "Create or idempotently reconcile one repository under the configured GitHub owner. Returns only compact repository metadata and never returns credentials.", inputSchema: { type: "object", properties: { name: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" }, description: { type: "string", maxLength: 350 }, visibility: { type: "string", enum: ["private", "public"], default: "private" }, initialize_with_readme: { type: "boolean", default: true }, operation_id: { type: "string", minLength: 1, maxLength: 120 } }, required: ["name", "operation_id"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
     { name: "deleteRepoFile", title: "Delete repo file", description: "Delete one GitHub repo file when explicitly requested by the owner. Include owner_response with the owner's exact approval so authorization is persisted before execution.", inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, path: REPO_PATH_SCHEMA, message: { type: "string" }, owner_approval: { type: "string" }, owner_response: { type: "string", description: "Exact owner approval from the current conversation." } }, required: ["path", "message", "owner_approval"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
   { name: "listGitHubWorkflowRuns", title: "List GitHub workflow runs", description: "List recent GitHub Actions workflow runs compactly.", inputSchema: { type: "object", properties: { workflow_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
         { name: "runGitHubWorkflow", title: "Run GitHub validation or release workflow", description: "Dispatch one configured Main validation task or one explicit exact-SHA Worker release.", inputSchema: { type: "object", properties: { task: { type: "string", enum: ["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "gpt-memory-tests", "worker-deploy"] }, release_id: { type: "string", maxLength: 80 }, release_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" } }, required: ["task"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
@@ -17713,8 +17715,9 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "applyRepoPatchSet",
   "startRepoFileWrite",
   "appendRepoFileChunk",
-  "commitRepoFileWrite",
+    "commitRepoFileWrite",
   "createRepoFile",
+  "createGitHubRepository",
   "deleteRepoFile",
   "listGitHubWorkflowRuns",
   "getGitHubWorkflowRun",
@@ -19553,7 +19556,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 ] as const;
 
 function operatorPreCallProvider(toolName: string): string {
-  if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
+    if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
     if (["verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
   if (["schedule_approved_draft", "schedule_manifest_review_batch", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
@@ -19897,7 +19900,7 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
-  "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "deleteRepoFile",
+    "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
 ]);
 
@@ -21874,8 +21877,9 @@ async function handleOperatorMcpAdminTool(
         "applyRepoPatchSet",
         "startRepoFileWrite",
         "appendRepoFileChunk",
-        "commitRepoFileWrite",
+                "commitRepoFileWrite",
         "createRepoFile",
+        "createGitHubRepository",
         "deleteRepoFile",
         "runGitHubWorkflow",
       ]),
@@ -23647,6 +23651,83 @@ async function handleOperatorMcpEngineeringTool(
     await env.DB.prepare(`UPDATE operator_repo_write_sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(put.ok ? "committed" : "failed", sessionId).run();
     await recordEngineeringAudit(env, { action: "commitRepoFileWrite", filesChanged: [path], diffSummary: normalizeOperatorText(session.summary, 1000, true), result: put.ok ? "ok" : "failed", metadata: { status: put.status, commit_sha: put.commit_sha } });
     return { ok: put.ok, status: put.status, path, commit_sha: put.commit_sha, diff_summary: session.summary ?? null };
+  }
+
+    if (toolName === "createGitHubRepository") {
+    const name = normalizeOperatorText(args.name, 100, true);
+    const operationId = normalizeOperatorText(args.operation_id, 120, true);
+    const description = normalizeOperatorText(args.description, 350, true) ?? "";
+    const visibility = normalizeOperatorMachineKey(args.visibility, "private");
+    const initializeWithReadme = args.initialize_with_readme !== false;
+    if (!name || !operationId) {
+      return { ok: false, error: "repository_name_operation_id_required" };
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(name) || name.endsWith(".git")) {
+      return { ok: false, error: "invalid_repository_name" };
+    }
+    if (!["private", "public"].includes(visibility)) {
+      return { ok: false, error: "invalid_repository_visibility" };
+    }
+    const expectedPrivate = visibility === "private";
+    const repositoryPath = `/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(name)}`;
+    const summarizeRepository = (data: unknown): Record<string, unknown> => {
+      const repo = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
+      return {
+        id: typeof repo.id === "number" ? repo.id : null,
+        name: normalizeOperatorText(repo.name, 100, true),
+        full_name: normalizeOperatorText(repo.full_name, 220, true),
+        private: repo.private === true,
+        default_branch: normalizeOperatorText(repo.default_branch, 120, true),
+        html_url: normalizeOperatorText(repo.html_url, 500, true),
+      };
+    };
+    const existing = await githubApi(env, repositoryPath);
+    if (existing.ok) {
+      const existingRecord = existing.data && typeof existing.data === "object" && !Array.isArray(existing.data)
+        ? existing.data as Record<string, unknown>
+        : {};
+      if ((existingRecord.private === true) !== expectedPrivate) {
+        return {
+          ok: false,
+          error: "repository_exists_with_different_visibility",
+          operation_id: operationId,
+          requested_visibility: visibility,
+          repository: summarizeRepository(existing.data),
+        };
+      }
+      await recordEngineeringAudit(env, {
+        action: "createGitHubRepository",
+        filesChanged: [],
+        diffSummary: `Reconciled existing GitHub repository ${config.owner}/${name}.`,
+        result: "ok",
+        metadata: { operation_id: operationId, repository: `${config.owner}/${name}`, visibility, existed: true },
+      });
+      return { ok: true, created: false, existed: true, operation_id: operationId, repository: summarizeRepository(existing.data) };
+    }
+    if (existing.status !== 404) {
+      return { ok: false, error: "github_repository_lookup_failed", status: existing.status, operation_id: operationId };
+    }
+    const created = await githubApi(env, "/user/repos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, description, private: expectedPrivate, auto_init: initializeWithReadme }),
+    });
+    let resolved = created;
+    if (!created.ok && created.status === 422) {
+      resolved = await githubApi(env, repositoryPath);
+    }
+    const ok = resolved.ok;
+    await recordEngineeringAudit(env, {
+      action: "createGitHubRepository",
+      filesChanged: [],
+      diffSummary: ok ? `Created or reconciled GitHub repository ${config.owner}/${name}.` : `Failed to create GitHub repository ${config.owner}/${name}.`,
+      result: ok ? "ok" : "failed",
+      metadata: { operation_id: operationId, repository: `${config.owner}/${name}`, visibility, status: resolved.status, created: created.ok },
+    });
+    if (!ok) {
+      return { ok: false, error: "github_repository_creation_failed", status: resolved.status, operation_id: operationId };
+    }
+    return { ok: true, created: created.ok, existed: !created.ok, operation_id: operationId, repository: summarizeRepository(resolved.data) };
   }
 
   if (toolName === "createRepoFile") {

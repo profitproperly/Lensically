@@ -477,8 +477,9 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "applyRepoTextPatch",
   "startRepoFileWrite",
   "appendRepoFileChunk",
-  "commitRepoFileWrite",
+    "commitRepoFileWrite",
   "createRepoFile",
+  "createGitHubRepository",
   "deleteRepoFile",
   "runMcpTests",
   "runGitHubWorkflow",
@@ -718,7 +719,8 @@ function deterministicToolForOperationalIntent(actionIntent: string, inputs: Rec
   if (has(/\b(start|begin|open)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "startRepoFileWrite";
   if (has(/\b(append|add)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+chunk|write\s+chunk|chunk)\b/)) return "appendRepoFileChunk";
   if (has(/\b(commit|finish|complete)\b/) && has(/\b(repo|repository)\b/) && has(/\b(file\s+write|write\s+session|chunked\s+write)\b/)) return "commitRepoFileWrite";
-  if (has(/\b(delete|remove)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "deleteRepoFile";
+    if (has(/\b(delete|remove)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "deleteRepoFile";
+  if (has(/\b(create|add)\b/) && has(/\b(github\s+)?(repo|repository)\b/) && !has(/\bfile\b/)) return "createGitHubRepository";
     if (has(/\b(create|add)\b/) && has(/\b(repo|repository)\b/) && has(/\bfile\b/)) return "createRepoFile";
   if (has(/\b(read|inspect|show)\b/) && has(/\b(capability|schema|definition)\b/)) return "readMcpToolDefinition";
   if (has(/\b(list|show|inspect)\b/) && has(/\b(workflow|github)\b/) && has(/\b(runs|history|activity)\b/)) return "listGitHubWorkflowRuns";
@@ -914,8 +916,10 @@ function prepareStaticCall(
       candidates: winningPathValidation.errors.map((error) => ({ error })),
     };
   }
-    const directFileCreation = machineKey(actionIntent, "") === machineKey("create repo file", "")
-    || machineKey(actionIntent, "") === machineKey("createRepoFile", "");
+        const directFileCreation = machineKey(actionIntent, "") === machineKey("create repo file", "")
+    || machineKey(actionIntent, "") === machineKey("createRepoFile", "")
+    || machineKey(actionIntent, "") === machineKey("create github repository", "")
+    || machineKey(actionIntent, "") === machineKey("createGitHubRepository", "");
   const promotedWinningPath = directFileCreation ? null : resolvePromotedWinningPath(actionIntent, objective, inputs);
   if (promotedWinningPath?.winning_path.surface === "recovery_plane") {
     return {

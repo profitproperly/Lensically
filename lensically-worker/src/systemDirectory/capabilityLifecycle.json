@@ -17,9 +17,10 @@
       "applyRepoPatchSet",
       "startRepoFileWrite",
       "appendRepoFileChunk",
-      "commitRepoFileWrite",
+            "commitRepoFileWrite",
       "createRepoFile",
-      "deleteRepoFile",
+      "createGitHubRepository",
+      "deleteRepoFile,"
       "listGitHubWorkflowRuns",
       "runGitHubWorkflow",
       "getGitHubWorkflowRun",
