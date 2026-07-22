@@ -37,7 +37,7 @@ on:
 
 concurrency:
   group: "lensically-engineering-${{ github.event_name }}-${{ inputs.task }}-${{ github.ref }}"
-    cancel-in-progress: false
+  cancel-in-progress: false
 
 permissions:
   contents: read
