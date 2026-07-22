@@ -1,9 +1,10 @@
 name: Lensically Engineering
-run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}
+run-name: "Lensically ${{ inputs.task }} · ${{ inputs.release_id }}"
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "lensically-worker/**"
       - "lensically-web/**"
@@ -35,16 +36,77 @@ on:
         type: string
 
 concurrency:
-  group: lensically-engineering-${{ github.event_name }}-${{ inputs.task || 'push' }}
-  cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}
+  group: "lensically-engineering-${{ github.event_name }}-${{ inputs.task }}-${{ github.ref }}"
+  cancel-in-progress: false
 
 permissions:
   contents: read
   actions: write
 
 jobs:
+  push-validation:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pushed head
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            lensically-worker/package-lock.json
+            lensically-web/package-lock.json
+
+      - name: Restore worker dependencies
+        id: push_worker_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+      - name: Install worker dependencies
+        if: steps.push_worker_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-worker
+        run: npm ci
+
+      - name: Restore web dependencies
+        id: push_web_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-web/node_modules
+          key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
+
+      - name: Install web dependencies
+        if: steps.push_web_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-web
+        run: npm ci
+
+      - name: Build web product surface
+        working-directory: lensically-web
+        run: npm run build
+
+      - name: Typecheck and lifecycle gate
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit
+          node scripts/release-preflight.mjs --capability-lifecycle-only
+
+      - name: Run push smoke validation
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+          node scripts/run-operator-validation.mjs smoke
+          npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
+
   fast-validation:
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.task != 'operator-tests' && inputs.task != 'worker-deploy') }}
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.task != 'operator-tests' &&
+      inputs.task != 'worker-deploy'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact head
@@ -69,7 +131,7 @@ jobs:
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
       - name: Install worker dependencies
-        if: ${{ steps.worker_cache.outputs.cache-hit != 'true' }}
+        if: steps.worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
 
@@ -81,7 +143,7 @@ jobs:
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
       - name: Install web dependencies
-        if: ${{ steps.web_cache.outputs.cache-hit != 'true' }}
+        if: steps.web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
 
@@ -99,7 +161,7 @@ jobs:
       - name: Run selected fast validation
         working-directory: lensically-worker
         env:
-          TASK: ${{ inputs.task || 'operator-smoke' }}
+          TASK: ${{ inputs.task }}
         run: |
           set -euo pipefail
           case "${TASK}" in
@@ -108,19 +170,36 @@ jobs:
               node scripts/run-operator-validation.mjs smoke
               npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
               ;;
-            system-directory-tests) npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1 ;;
-            threads-publish-tests) npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1 ;;
-            gpt-memory-tests) npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1 ;;
-            *) echo "Unsupported fast-validation task: ${TASK}"; exit 2 ;;
+            system-directory-tests)
+              npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
+              ;;
+            threads-publish-tests)
+              npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
+              ;;
+            gpt-memory-tests)
+              npm run test -- --run test/gptMemoryRoutes.spec.ts --reporter=dot --bail=1
+              ;;
+            *)
+              echo "Unsupported fast-validation task: ${TASK}"
+              exit 2
+              ;;
           esac
 
   operator-test-shards:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests'
     name: Operator shard ${{ matrix.shard }}/8
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact head
@@ -143,7 +222,7 @@ jobs:
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
       - name: Install worker dependencies
-        if: ${{ steps.operator_cache.outputs.cache-hit != 'true' }}
+        if: steps.operator_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
 
@@ -155,7 +234,10 @@ jobs:
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
   worker-release:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.task == 'worker-deploy' && inputs.release_sha != '' }}
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.task == 'worker-deploy' &&
+      inputs.release_sha != ''
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -184,7 +266,7 @@ jobs:
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
       - name: Install worker dependencies
-        if: ${{ steps.release_worker_cache.outputs.cache-hit != 'true' }}
+        if: steps.release_worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
 
@@ -196,7 +278,7 @@ jobs:
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
       - name: Install web dependencies
-        if: ${{ steps.release_web_cache.outputs.cache-hit != 'true' }}
+        if: steps.release_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
 
@@ -244,15 +326,14 @@ jobs:
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
           test "${actual_crons}" = "${expected_crons}"
 
-            
-      - name: Verify production runtime and scheduler plus intelligence product
+      - name: Verify production runtime, scheduler, and intelligence product
         run: |
           set -euo pipefail
           expected_sha="$(git rev-parse HEAD)"
           verified=false
           for attempt in $(seq 1 12); do
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
-              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and .live_tool_count >= 87' /tmp/lensically-runtime-health.json > /dev/null \
+              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and .live_tool_count == 87' /tmp/lensically-runtime-health.json > /dev/null \
               && curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
               && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null \
               && curl --fail-with-body --silent --show-error "https://lensically.com/intelligence" > /tmp/lensically-intelligence.html \
