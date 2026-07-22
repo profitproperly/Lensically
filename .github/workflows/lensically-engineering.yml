@@ -22,33 +22,22 @@ on:
           - operator-tests
           - system-directory-tests
           - threads-publish-tests
-                              - gpt-memory-tests
+          - gpt-memory-tests
           - worker-deploy
-          - cloudflare-pages-project-create
       release_id:
         description: Compact exact-SHA release identity
         required: false
         default: ""
         type: string
-                  release_sha:
+      release_sha:
         description: Exact commit SHA to validate or deploy
         required: false
         default: ""
         type: string
-      project_name:
-        description: Cloudflare Pages project name
-        required: false
-        default: ""
-        type: string
-      production_branch:
-        description: Cloudflare Pages production branch
-        required: false
-        default: "main"
-        type: string
 
 concurrency:
-  group: lensically-engineering-${{ github.event_name }}-${{ inputs.task || 'push' }}-${{ inputs.release_id || github.sha }}
-  cancel-in-progress: ${{ inputs.task != 'worker-deploy' && inputs.task != 'cloudflare-pages-project-create' }}
+  group: lensically-engineering-${{ github.event_name }}-${{ inputs.task || 'push' }}
+  cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}
 
 permissions:
   contents: read
@@ -237,55 +226,7 @@ jobs:
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
-      cloudflare-pages-project-create:
-    if: github.event_name == 'workflow_dispatch' && inputs.task == 'cloudflare-pages-project-create'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Reconcile Cloudflare Pages project
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PROJECT_NAME: ${{ inputs.project_name }}
-          PRODUCTION_BRANCH: ${{ inputs.production_branch }}
-        run: |
-          set -euo pipefail
-          project="${PROJECT_NAME}"
-          branch="${PRODUCTION_BRANCH}"
-          if ! [[ "${project}" =~ ^[a-z0-9]([a-z0-9-]{0,56}[a-z0-9])?$ ]]; then
-            echo "Invalid Cloudflare Pages project name"
-            exit 2
-          fi
-          if ! [[ "${branch}" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "${branch}" == *".."* ]] || [[ "${branch}" == /* ]] || [[ "${branch}" == */ ]]; then
-            echo "Invalid Cloudflare Pages production branch"
-            exit 2
-          fi
-          base_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects"
-          get_status=$(curl --silent --show-error --output /tmp/pages-project.json --write-out "%{http_code}" \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            "${base_url}/${project}")
-          if [ "${get_status}" = "200" ]; then
-            jq -e --arg branch "${branch}" '.success == true and .result.production_branch == $branch' /tmp/pages-project.json > /dev/null
-            echo "Cloudflare Pages project already exists with the requested production branch."
-            exit 0
-          fi
-          if [ "${get_status}" != "404" ]; then
-            cat /tmp/pages-project.json
-            exit 1
-          fi
-          jq -n --arg name "${project}" --arg branch "${branch}" '{name: $name, production_branch: $branch}' > /tmp/pages-create-request.json
-          create_status=$(curl --silent --show-error --output /tmp/pages-create-response.json --write-out "%{http_code}" \
-            --request POST \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data @/tmp/pages-create-request.json \
-            "${base_url}")
-          if [ "${create_status}" != "200" ] && [ "${create_status}" != "201" ]; then
-            cat /tmp/pages-create-response.json
-            exit 1
-          fi
-          jq -e --arg name "${project}" --arg branch "${branch}" '.success == true and .result.name == $name and .result.production_branch == $branch' /tmp/pages-create-response.json > /dev/null
-          echo "Created Cloudflare Pages project ${project}."
+      
 
   worker-release:
     if: >-

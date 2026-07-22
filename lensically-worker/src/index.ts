@@ -23670,15 +23670,14 @@ async function handleOperatorMcpEngineeringTool(
     if (!/^[A-Za-z0-9._/-]+$/.test(productionBranch) || productionBranch.includes("..") || productionBranch.startsWith("/") || productionBranch.endsWith("/")) {
       return { ok: false, error: "invalid_pages_production_branch" };
     }
-    const workflowId = "lensically-engineering.yml";
+        const workflowId = "lensically-cloudflare-pages.yml";
     const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         ref: config.branch,
         inputs: {
-          task: "cloudflare-pages-project-create",
-          release_id: operationId,
+          operation_id: operationId,
           project_name: projectName,
           production_branch: productionBranch,
         },
