@@ -86,34 +86,36 @@ function uniqueStrings(values: unknown[], limit = 20): string[] {
 
 export async function ensureManifestProductIntegrationTables(db: D1Database): Promise<void> {
   await ensureManifestMeasurementAuditTables(db);
-  await db.prepare(`CREATE TABLE IF NOT EXISTS operator_manifest_decision_influences (
-    id TEXT PRIMARY KEY,
-    influence_key TEXT NOT NULL UNIQUE,
-    brand_key TEXT NOT NULL,
-    cycle_id TEXT,
-    slot_key TEXT,
-    scheduled_post_id INTEGER,
-    hypothesis_id TEXT,
-    strategy_version_id TEXT,
-    learning_brief_key TEXT,
-    benchmark_snapshot_key TEXT,
-    family_key TEXT,
-    portfolio_role TEXT,
-    experiment_key TEXT,
-    saved_pattern_identity_key TEXT,
-    decision_changed INTEGER NOT NULL DEFAULT 0,
-    decision_change_types_json TEXT NOT NULL DEFAULT '[]',
-    decision_summary TEXT NOT NULL,
-    evidence_json TEXT NOT NULL DEFAULT '{}',
-    influence_version TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(brand_key, cycle_id, slot_key)
-  )`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_manifest_decision_influences_brand_created
-    ON operator_manifest_decision_influences(brand_key, created_at DESC)`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_manifest_decision_influences_scheduled
-    ON operator_manifest_decision_influences(brand_key, scheduled_post_id)`).run();
+    await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS operator_manifest_decision_influences (
+      id TEXT PRIMARY KEY,
+      influence_key TEXT NOT NULL UNIQUE,
+      brand_key TEXT NOT NULL,
+      cycle_id TEXT,
+      slot_key TEXT,
+      scheduled_post_id INTEGER,
+      hypothesis_id TEXT,
+      strategy_version_id TEXT,
+      learning_brief_key TEXT,
+      benchmark_snapshot_key TEXT,
+      family_key TEXT,
+      portfolio_role TEXT,
+      experiment_key TEXT,
+      saved_pattern_identity_key TEXT,
+      decision_changed INTEGER NOT NULL DEFAULT 0,
+      decision_change_types_json TEXT NOT NULL DEFAULT '[]',
+      decision_summary TEXT NOT NULL,
+      evidence_json TEXT NOT NULL DEFAULT '{}',
+      influence_version TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, cycle_id, slot_key)
+    )`),
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_manifest_decision_influences_brand_created
+      ON operator_manifest_decision_influences(brand_key, created_at DESC)`),
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_manifest_decision_influences_scheduled
+      ON operator_manifest_decision_influences(brand_key, scheduled_post_id)`),
+  ]);
 }
 
 function serializeStrategy(strategy: JsonRecord | null): JsonRecord | null {

@@ -211,7 +211,7 @@ export async function ensureManifestMeasurementAuditTables(db: D1Database): Prom
     `CREATE INDEX IF NOT EXISTS idx_manifest_follower_checkpoints_brand_created
       ON operator_manifest_follower_checkpoints (brand_key, created_at DESC)`,
   ];
-  for (const statement of statements) await db.prepare(statement).run();
+    await db.batch(statements.map((statement) => db.prepare(statement)));
 }
 
 export function buildManifestLearningBrief(input: {

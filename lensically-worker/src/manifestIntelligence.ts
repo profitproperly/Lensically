@@ -280,10 +280,19 @@ export function buildManifestExposureDimensions(records: JsonRecord[]): JsonReco
   };
 }
 
-async function ensureColumn(db: D1Database, table: string, column: string, definition: string): Promise<void> {
-  const rows = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
-  if (!(rows.results ?? []).some((row) => row.name === column)) {
-    await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+async function ensureColumns(db: D1Database, columns: Array<{
+  table: string;
+  column: string;
+  definition: string;
+}>): Promise<void> {
+  const tableInfo = await db.batch(columns.map(({ table }) => db.prepare(`PRAGMA table_info(${table})`)));
+  const missing = columns.filter(({ column }, index) => {
+    const rows = (tableInfo[index]?.results ?? []) as Array<{ name?: string }>;
+    return !rows.some((row) => row.name === column);
+  });
+  if (missing.length > 0) {
+    await db.batch(missing.map(({ table, column, definition }) =>
+      db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)));
   }
 }
 
@@ -333,16 +342,18 @@ export async function ensureManifestIntelligenceTables(db: D1Database): Promise<
     `CREATE INDEX IF NOT EXISTS idx_manifest_receipt_events_cycle ON operator_manifest_cycle_receipt_events (cycle_id, created_at ASC)`,
     `CREATE INDEX IF NOT EXISTS idx_manifest_hypotheses_cycle ON operator_manifest_post_hypotheses (cycle_id, slot_key ASC)`,
   ];
-  for (const sql of statements) await db.prepare(sql).run();
-  await ensureColumn(db, "operator_autonomous_growth_cycles", "receipt_id", "TEXT");
-  await ensureColumn(db, "operator_autonomous_growth_cycles", "strategy_version_id", "TEXT");
-  await ensureColumn(db, "operator_autonomous_growth_cycles", "exposure_snapshot_id", "TEXT");
-    await ensureColumn(db, "operator_autonomous_lineup_items", "hypothesis_id", "TEXT");
-  await ensureColumn(db, "operator_autonomous_lineup_items", "source_selection_id", "TEXT");
-  await ensureColumn(db, "operator_manifest_exposure_snapshots", "revision", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(db, "operator_manifest_exposure_snapshots", "updated_at", "TEXT");
-  await ensureColumn(db, "operator_manifest_post_hypotheses", "revision", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(db, "operator_manifest_post_hypotheses", "locked_at", "TEXT");
+    await db.batch(statements.map((sql) => db.prepare(sql)));
+  await ensureColumns(db, [
+    { table: "operator_autonomous_growth_cycles", column: "receipt_id", definition: "TEXT" },
+    { table: "operator_autonomous_growth_cycles", column: "strategy_version_id", definition: "TEXT" },
+    { table: "operator_autonomous_growth_cycles", column: "exposure_snapshot_id", definition: "TEXT" },
+    { table: "operator_autonomous_lineup_items", column: "hypothesis_id", definition: "TEXT" },
+    { table: "operator_autonomous_lineup_items", column: "source_selection_id", definition: "TEXT" },
+    { table: "operator_manifest_exposure_snapshots", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
+    { table: "operator_manifest_exposure_snapshots", column: "updated_at", definition: "TEXT" },
+    { table: "operator_manifest_post_hypotheses", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
+    { table: "operator_manifest_post_hypotheses", column: "locked_at", definition: "TEXT" },
+  ]);
 }
 
 export async function ensureManifestIntelligencePolicy(db: D1Database, brandKey: string): Promise<JsonRecord> {
