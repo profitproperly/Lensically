@@ -662,9 +662,194 @@ function compactOperatorContinuityCapsule(value: unknown): Record<string, unknow
   };
 }
 
+function compactManifestAutonomousSlot(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const slot = value as Record<string, unknown>;
+  const key = typeof slot.key === "string" ? slot.key : null;
+  const date = typeof slot.date === "string" ? slot.date : null;
+  const time = typeof slot.time === "string" ? slot.time : null;
+  if (!key || !date || !time) return null;
+  return { key, date, time };
+}
+
+function compactManifestAutonomousPreparationPayload(
+  payload: Record<string, unknown>,
+  originalBytes: number,
+): Record<string, unknown> | null {
+  const cycle = payload.cycle && typeof payload.cycle === "object" && !Array.isArray(payload.cycle)
+    ? payload.cycle as Record<string, unknown>
+    : null;
+  const persistence = payload.persistence_contract && typeof payload.persistence_contract === "object" && !Array.isArray(payload.persistence_contract)
+    ? payload.persistence_contract as Record<string, unknown>
+    : null;
+  if (payload.success !== true || !cycle || persistence?.tool !== "persist_manifest_autonomous_post") return null;
+
+  const accountPosition = cycle.account_position && typeof cycle.account_position === "object" && !Array.isArray(cycle.account_position)
+    ? cycle.account_position as Record<string, unknown>
+    : {};
+  const runway = accountPosition.runway && typeof accountPosition.runway === "object" && !Array.isArray(accountPosition.runway)
+    ? accountPosition.runway as Record<string, unknown>
+    : {};
+  const delivery = accountPosition.delivery_reconciliation && typeof accountPosition.delivery_reconciliation === "object" && !Array.isArray(accountPosition.delivery_reconciliation)
+    ? accountPosition.delivery_reconciliation as Record<string, unknown>
+    : {};
+  const decision = payload.decision_intelligence && typeof payload.decision_intelligence === "object" && !Array.isArray(payload.decision_intelligence)
+    ? payload.decision_intelligence as Record<string, unknown>
+    : {};
+  const targetSlots = (Array.isArray(cycle.target_slots) ? cycle.target_slots : [])
+    .map(compactManifestAutonomousSlot)
+    .filter((slot): slot is Record<string, unknown> => Boolean(slot));
+  const missingSlots = (Array.isArray(cycle.missing_slots) ? cycle.missing_slots : [])
+    .map(compactManifestAutonomousSlot)
+    .filter((slot): slot is Record<string, unknown> => Boolean(slot));
+  const occupiedSlots = (Array.isArray(runway.occupied_slots) ? runway.occupied_slots : [])
+    .map((value) => {
+      const slot = compactManifestAutonomousSlot(value);
+      if (!slot || !value || typeof value !== "object" || Array.isArray(value)) return slot;
+      const evidence = (value as Record<string, unknown>).evidence;
+      const compactEvidence = evidence && typeof evidence === "object" && !Array.isArray(evidence)
+        ? compactOperatorPayloadValue(evidence, "cycle.account_position.runway.occupied_slots.evidence", {
+          arrayItems: 2, stringChars: 240, objectKeys: 16, maxDepth: 3,
+        }, [])
+        : null;
+      return compactEvidence ? { ...slot, evidence: compactEvidence } : slot;
+    })
+    .filter((slot): slot is Record<string, unknown> => Boolean(slot));
+
+  const attempts = [
+    { exposureItems: 16, intelligenceItems: 8, stringChars: 480 },
+    { exposureItems: 12, intelligenceItems: 6, stringChars: 360 },
+    { exposureItems: 8, intelligenceItems: 4, stringChars: 280 },
+    { exposureItems: 4, intelligenceItems: 3, stringChars: 200 },
+  ];
+  for (const attempt of attempts) {
+    const recentPublished = (Array.isArray(accountPosition.recent_published_posts) ? accountPosition.recent_published_posts : [])
+      .slice(0, attempt.exposureItems)
+      .map((post) => compactOperatorPayloadValue(post, "cycle.account_position.recent_published_posts", {
+        arrayItems: 4, stringChars: attempt.stringChars, objectKeys: 20, maxDepth: 4,
+      }, []));
+    const compactDecision = {
+      version: decision.version ?? null,
+      source_fingerprint: decision.source_fingerprint ?? null,
+      generated_at: decision.generated_at ?? null,
+      latest_strategy: compactOperatorPayloadValue(decision.latest_strategy ?? null, "decision_intelligence.latest_strategy", {
+        arrayItems: attempt.intelligenceItems, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+      }, []),
+      learning_brief: compactOperatorPayloadValue(decision.learning_brief ?? null, "decision_intelligence.learning_brief", {
+        arrayItems: attempt.intelligenceItems, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+      }, []),
+      required_directives: Array.isArray(decision.required_directives) ? decision.required_directives.slice(0, 24) : [],
+      strategy_change_warranted: decision.strategy_change_warranted === true,
+      family_priorities: compactOperatorPayloadValue(decision.family_priorities ?? [], "decision_intelligence.family_priorities", {
+        arrayItems: 10, stringChars: attempt.stringChars, objectKeys: 24, maxDepth: 4,
+      }, []),
+      experiments: compactOperatorPayloadValue(decision.experiments ?? [], "decision_intelligence.experiments", {
+        arrayItems: 8, stringChars: attempt.stringChars, objectKeys: 24, maxDepth: 5,
+      }, []),
+      saved_pattern_candidates: compactOperatorPayloadValue(decision.saved_pattern_candidates ?? [], "decision_intelligence.saved_pattern_candidates", {
+        arrayItems: 8, stringChars: attempt.stringChars, objectKeys: 24, maxDepth: 5,
+      }, []),
+      repetition: compactOperatorPayloadValue(decision.repetition ?? {}, "decision_intelligence.repetition", {
+        arrayItems: 12, stringChars: attempt.stringChars, objectKeys: 24, maxDepth: 4,
+      }, []),
+      benchmark_response: compactOperatorPayloadValue(decision.benchmark_response ?? {}, "decision_intelligence.benchmark_response", {
+        arrayItems: 12, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+      }, []),
+      follower_checkpoint: compactOperatorPayloadValue(decision.follower_checkpoint ?? null, "decision_intelligence.follower_checkpoint", {
+        arrayItems: 30, stringChars: attempt.stringChars, objectKeys: 24, maxDepth: 5,
+      }, []),
+      consumption_contract: decision.consumption_contract ?? {},
+    };
+    const bounded: Record<string, unknown> = {
+      success: true,
+      reused_existing: payload.reused_existing === true,
+      refreshed_live_state: payload.refreshed_live_state === true,
+      cycle: {
+        id: cycle.id ?? null,
+        brand_key: cycle.brand_key ?? null,
+        operation_id: cycle.operation_id ?? null,
+        status: cycle.status ?? null,
+        timezone: cycle.timezone ?? null,
+        horizon_hours: cycle.horizon_hours ?? null,
+        horizon_start_local: cycle.horizon_start_local ?? null,
+        horizon_end_local: cycle.horizon_end_local ?? null,
+        receipt_id: cycle.receipt_id ?? null,
+        strategy_version_id: cycle.strategy_version_id ?? null,
+        exposure_snapshot_id: cycle.exposure_snapshot_id ?? null,
+        target_slots: targetSlots,
+        missing_slots: missingSlots,
+        scheduled_post_ids: Array.isArray(cycle.scheduled_post_ids) ? cycle.scheduled_post_ids.slice(0, 72) : [],
+        account_position: {
+          captured_at: accountPosition.captured_at ?? null,
+          clock: compactOperatorPayloadValue(accountPosition.clock ?? {}, "cycle.account_position.clock", {
+            arrayItems: 2, stringChars: attempt.stringChars, objectKeys: 20, maxDepth: 4,
+          }, []),
+          followers: accountPosition.followers ?? {},
+          runway: {
+            target_slot_count: runway.target_slot_count ?? targetSlots.length,
+            occupied_slot_count: runway.occupied_slot_count ?? occupiedSlots.length,
+            missing_slot_count: runway.missing_slot_count ?? missingSlots.length,
+            occupied_slots: occupiedSlots,
+          },
+          delivery_reconciliation: {
+            status_counts: delivery.status_counts ?? {},
+            unresolved_incidents: compactOperatorPayloadValue(delivery.unresolved_incidents ?? [], "cycle.account_position.delivery_reconciliation.unresolved_incidents", {
+              arrayItems: 8, stringChars: attempt.stringChars, objectKeys: 20, maxDepth: 4,
+            }, []),
+            required_recovery_actions: compactOperatorPayloadValue(delivery.required_recovery_actions ?? [], "cycle.account_position.delivery_reconciliation.required_recovery_actions", {
+              arrayItems: 8, stringChars: attempt.stringChars, objectKeys: 20, maxDepth: 4,
+            }, []),
+          },
+          performance: compactOperatorPayloadValue(accountPosition.performance ?? {}, "cycle.account_position.performance", {
+            arrayItems: attempt.intelligenceItems, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+          }, []),
+          content_focus: compactOperatorPayloadValue(accountPosition.content_focus ?? {}, "cycle.account_position.content_focus", {
+            arrayItems: attempt.intelligenceItems, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+          }, []),
+          recent_published_posts: recentPublished,
+          repetition_pressure: compactOperatorPayloadValue(accountPosition.repetition_pressure ?? {}, "cycle.account_position.repetition_pressure", {
+            arrayItems: 16, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 4,
+          }, []),
+          portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? {},
+        },
+      },
+      decision_intelligence: compactDecision,
+      intelligence_foundation: compactOperatorPayloadValue(payload.intelligence_foundation ?? {}, "intelligence_foundation", {
+        arrayItems: attempt.intelligenceItems, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+      }, []),
+      strategy_contract: payload.strategy_contract ?? {},
+      reconciliation_contract: payload.reconciliation_contract ?? {},
+      persistence_contract: payload.persistence_contract ?? {},
+      operator_action_closure: compactOperatorPayloadValue(payload.operator_action_closure ?? {}, "operator_action_closure", {
+        arrayItems: 8, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
+      }, []),
+      payload_contract: {
+        server_bounded: true,
+        model_payload_sizing: false,
+        byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+        original_bytes: originalBytes,
+        returned_bytes: 0,
+        truncated: true,
+        actionable_autonomous_cycle_preserved: true,
+        all_target_slots_preserved: targetSlots.length === (Array.isArray(cycle.target_slots) ? cycle.target_slots.length : 0),
+        all_missing_slots_preserved: missingSlots.length === (Array.isArray(cycle.missing_slots) ? cycle.missing_slots.length : 0),
+        decision_intelligence_categories_preserved: true,
+      },
+    };
+    (bounded.payload_contract as Record<string, unknown>).returned_bytes = operatorPayloadBytes(bounded);
+    if (Number((bounded.payload_contract as Record<string, unknown>).returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
+      return bounded;
+    }
+  }
+  return null;
+}
+
 function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<string, unknown> {
   const originalBytes = operatorPayloadBytes(payload);
   if (originalBytes <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) return payload;
+  const compactAutonomousPreparation = compactManifestAutonomousPreparationPayload(payload, originalBytes);
+  if (compactAutonomousPreparation) return compactAutonomousPreparation;
+
 
   const continuityCapsule = payload.continuity_capsule;
   if (!continuityCapsule || typeof continuityCapsule !== "object" || Array.isArray(continuityCapsule)) {
