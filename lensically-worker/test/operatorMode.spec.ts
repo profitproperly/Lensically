@@ -4123,7 +4123,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(scheduled?.total ?? 0)).toBe(0);
   }, 30000);
 
-  it("persists one source-backed autonomous post through evidence, strategy, plan, gates, and complete lineage", async () => {
+    it("reads a complete cycle receipt after source-backed persistence without mutation", async () => {
     const fixture = await prepareManifestSourceBackedCycleForTest();
     const payload = buildManifestSourceBackedPersistPayload(fixture);
     const slot = fixture.prepared.cycle.missing_slots[0];
@@ -4207,10 +4207,58 @@ describe("operator mode MCP endpoint", () => {
 
     const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
-    const duplicateCount = await env.DB.prepare(
+        const duplicateCount = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM scheduled_posts WHERE id = ?`,
     ).bind(persisted.scheduled_post_id).first<{ total: number }>();
     expect(Number(duplicateCount?.total ?? 0)).toBe(1);
+
+    const receiptCountsBefore = await env.DB.prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM operator_manifest_cycle_receipts WHERE cycle_id = ?) AS receipts,
+        (SELECT COUNT(*) FROM operator_manifest_cycle_receipt_events WHERE cycle_id = ?) AS events,
+        (SELECT COUNT(*) FROM operator_manifest_post_hypotheses WHERE cycle_id = ?) AS hypotheses`,
+    ).bind(fixture.prepared.cycle.id, fixture.prepared.cycle.id, fixture.prepared.cycle.id)
+      .first<{ receipts: number; events: number; hypotheses: number }>();
+    const firstReceipt = await mcpTool<{
+      success: boolean;
+      available: boolean;
+      cycle_receipt: {
+        cycle_id: string;
+        output_strategy_version: { id: string; contract_version: string } | null;
+        event_count: number;
+        hypothesis_count: number;
+      };
+      receipt_section: { section: string; items: unknown[]; pagination: null };
+    }>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: fixture.prepared.cycle.id,
+      receipt_section: "summary",
+      proceed_confirmed: true,
+    });
+    const secondReceipt = await mcpTool<typeof firstReceipt>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: fixture.prepared.cycle.id,
+      receipt_section: "summary",
+      proceed_confirmed: true,
+    });
+    expect(firstReceipt).toEqual(secondReceipt);
+    expect(firstReceipt).toMatchObject({ success: true, available: true });
+    expect(firstReceipt.cycle_receipt.cycle_id).toBe(fixture.prepared.cycle.id);
+    expect(firstReceipt.cycle_receipt.output_strategy_version).toMatchObject({
+      id: fixture.cycleStrategyId,
+      contract_version: "manifest-cycle-strategy-v1",
+    });
+    expect(firstReceipt.cycle_receipt.event_count).toBeGreaterThan(0);
+    expect(firstReceipt.cycle_receipt.hypothesis_count).toBeGreaterThan(0);
+    expect(firstReceipt.receipt_section).toMatchObject({ section: "summary", items: [], pagination: null });
+    const receiptCountsAfter = await env.DB.prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM operator_manifest_cycle_receipts WHERE cycle_id = ?) AS receipts,
+        (SELECT COUNT(*) FROM operator_manifest_cycle_receipt_events WHERE cycle_id = ?) AS events,
+        (SELECT COUNT(*) FROM operator_manifest_post_hypotheses WHERE cycle_id = ?) AS hypotheses`,
+    ).bind(fixture.prepared.cycle.id, fixture.prepared.cycle.id, fixture.prepared.cycle.id)
+      .first<{ receipts: number; events: number; hypotheses: number }>();
+    expect(receiptCountsAfter).toEqual(receiptCountsBefore);
   }, 30000);
 
   it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {

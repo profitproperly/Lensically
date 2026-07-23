@@ -991,9 +991,15 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
         );
     }));
   }
-  await db.prepare(`UPDATE operator_autonomous_growth_cycles
-    SET cycle_strategy_id = ?, evidence_snapshot_id = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ? AND brand_key = ?`).bind(strategyId, input.snapshotId, input.cycleId, input.brandKey).run();
+    await db.batch([
+    db.prepare(`UPDATE operator_autonomous_growth_cycles
+      SET cycle_strategy_id = ?, evidence_snapshot_id = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND brand_key = ?`).bind(strategyId, input.snapshotId, input.cycleId, input.brandKey),
+    db.prepare(`UPDATE operator_manifest_cycle_receipts
+      SET output_strategy_version_id = ?
+      WHERE cycle_id = ? AND brand_key = ? AND output_strategy_version_id IS NULL`)
+      .bind(strategyId, input.cycleId, input.brandKey),
+  ]);
   const row = await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE id = ?`).bind(strategyId).first<JsonRecord>();
   return { ...serializeCycleStrategy(row ?? { id: strategyId }), replayed: false };
 }
@@ -1247,8 +1253,13 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
   const inputStrategy = row.input_strategy_version_id
     ? await db.prepare(`SELECT * FROM operator_manifest_strategy_versions WHERE id = ?`).bind(row.input_strategy_version_id).first<JsonRecord>()
     : null;
-  const outputStrategy = row.output_strategy_version_id
-    ? await db.prepare(`SELECT * FROM operator_manifest_strategy_versions WHERE id = ?`).bind(row.output_strategy_version_id).first<JsonRecord>()
+    const outputCycleStrategy = row.output_strategy_version_id
+    ? await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE id = ? AND brand_key = ? LIMIT 1`)
+      .bind(row.output_strategy_version_id, input.brandKey).first<JsonRecord>()
+    : null;
+  const outputLegacyStrategy = row.output_strategy_version_id && !outputCycleStrategy
+    ? await db.prepare(`SELECT * FROM operator_manifest_strategy_versions WHERE id = ? AND brand_key = ? LIMIT 1`)
+      .bind(row.output_strategy_version_id, input.brandKey).first<JsonRecord>()
     : null;
   const exposure = row.exposure_snapshot_id
     ? await db.prepare(`SELECT * FROM operator_manifest_exposure_snapshots WHERE id = ?`).bind(row.exposure_snapshot_id).first<JsonRecord>()
@@ -1256,7 +1267,11 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
   return {
     ...serializeReceipt(row),
     input_strategy_version: inputStrategy ? serializeStrategy(inputStrategy) : null,
-    output_strategy_version: outputStrategy ? serializeStrategy(outputStrategy) : null,
+        output_strategy_version: outputCycleStrategy
+      ? serializeCycleStrategy(outputCycleStrategy)
+      : outputLegacyStrategy
+        ? serializeStrategy(outputLegacyStrategy)
+        : null,
     exposure_snapshot: exposure ? serializeExposure(exposure) : null,
     events: (events.results ?? []).map((event) => ({ ...event, payload: parseJson(event.payload_json, {}) })),
     hypotheses: (hypotheses.results ?? []).map(serializeHypothesis),
