@@ -13490,10 +13490,15 @@ async function persistManifestAutonomousPost(
            updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND cycle_id = ? AND slot_key = ?`,
     ).bind(scheduled.scheduledPostId, postHypothesis.id, cycleId, slotKey),
-    env.DB.prepare(
+        env.DB.prepare(
       `UPDATE scheduled_posts SET publish_error_message = NULL WHERE id = ? AND threads_user_id = ?`,
     ).bind(scheduled.scheduledPostId, brand.profile.threads_user_id),
-    ]);
+    env.DB.prepare(
+      `UPDATE operator_manifest_cycle_plan_items
+       SET status = 'scheduled', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND strategy_id = ? AND cycle_id = ? AND slot_key = ?`,
+    ).bind(requestedCyclePlanItemId, requestedCycleStrategyId, cycleId, slotKey),
+  ]);
   await upsertManifestSemanticSignature(env.DB, {
     brand_key: brand.brand_key,
     content_type: "scheduled",
@@ -13509,17 +13514,26 @@ async function persistManifestAutonomousPost(
     brand.profile.threads_user_id,
   );
   const intelligenceLineage = await env.DB.prepare(
-    `SELECT l.hypothesis_id, l.source_selection_id, l.cycle_id, l.slot_key,
+        `SELECT l.hypothesis_id, l.source_selection_id, l.cycle_id, l.slot_key,
+            l.cycle_plan_item_id, l.gate_receipt_id,
             h.id AS stored_hypothesis_id, h.scheduled_post_id AS hypothesis_scheduled_post_id,
-            h.status AS hypothesis_status, h.locked_at AS hypothesis_locked_at
+            h.status AS hypothesis_status, h.locked_at AS hypothesis_locked_at,
+            plan.id AS stored_plan_item_id, plan.status AS plan_status,
+            gate.id AS stored_gate_receipt_id, gate.passed AS gate_passed
      FROM operator_autonomous_lineup_items l
      LEFT JOIN operator_manifest_post_hypotheses h
        ON h.id = l.hypothesis_id AND h.cycle_id = l.cycle_id AND h.slot_key = l.slot_key
+     LEFT JOIN operator_manifest_cycle_plan_items plan
+       ON plan.id = l.cycle_plan_item_id AND plan.cycle_id = l.cycle_id AND plan.slot_key = l.slot_key
+     LEFT JOIN operator_manifest_candidate_gate_receipts gate
+       ON gate.id = l.gate_receipt_id AND gate.cycle_id = l.cycle_id AND gate.slot_key = l.slot_key
      WHERE l.cycle_id = ? AND l.brand_key = ? AND l.slot_key = ? AND l.scheduled_post_id = ?
      LIMIT 1`,
   ).bind(cycleId, brand.brand_key, slotKey, scheduled.scheduledPostId).first<Record<string, unknown>>();
   const intelligenceMissingStages: string[] = [];
-  if (!intelligenceLineage?.source_selection_id) intelligenceMissingStages.push("source_selection");
+    if (!intelligenceLineage?.source_selection_id) intelligenceMissingStages.push("source_selection");
+  if (!intelligenceLineage?.cycle_plan_item_id || !intelligenceLineage?.stored_plan_item_id || String(intelligenceLineage.plan_status) !== "scheduled") intelligenceMissingStages.push("cycle_plan_item");
+  if (!intelligenceLineage?.gate_receipt_id || !intelligenceLineage?.stored_gate_receipt_id || Number(intelligenceLineage.gate_passed ?? 0) !== 1) intelligenceMissingStages.push("candidate_gate_receipt");
   if (!intelligenceLineage?.hypothesis_id || !intelligenceLineage?.stored_hypothesis_id) intelligenceMissingStages.push("hypothesis");
   if (Number(intelligenceLineage?.hypothesis_scheduled_post_id ?? 0) !== scheduled.scheduledPostId) intelligenceMissingStages.push("hypothesis_schedule_link");
   if (!intelligenceLineage?.hypothesis_locked_at || String(intelligenceLineage?.hypothesis_status) !== "scheduled") intelligenceMissingStages.push("hypothesis_lock");
@@ -31780,7 +31794,8 @@ async function getLatestOperatorContentFocus(
   env: Env,
   brandKey: GptBrandKey,
 ): Promise<Record<string, unknown>> {
-  await ensureOperatorPerformanceEvaluatorTables(env);
+    await ensureOperatorPerformanceEvaluatorTables(env);
+  await ensureManifestIntelligencePolicy(env.DB, brandKey);
   const reviewRows = await env.DB.prepare(
     `SELECT cadence, period_key, anchor_date, decisions_json, allocation_json, generated_at
      FROM operator_content_focus_reviews
