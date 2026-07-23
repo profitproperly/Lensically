@@ -350,9 +350,31 @@
       "canonical_handler": "prepare_manifest_autonomous_cycle",
       "route_intent": "prepare manifest autonomous cycle",
       "implementation_mode": "new_handler",
-      "focused_regression": "prepares the autonomous rolling runway without requiring owner review",
+            "focused_regression": "prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review",
       "release_scope": "operator-content",
-      "live_verification": "After autonomous mode activation, the exact deployed Main tool reconciles live schedule coverage and returns one persisted 48-hour target with existing slots preserved, exact missing slots, account position, adaptive strategy policy, and no owner approval checkpoint.",
+      "live_verification": "After autonomous mode activation, the exact deployed Main tool reconciles live schedule coverage, preserves existing slots, creates the complete rolling 28-day evidence snapshot, returns page 0 plus the page manifest, exposes 72-hour recent exposure and future 48-hour coverage, and requires one locked source-backed strategy before generation.",
+      "compatibility_bridge": false
+        },
+    {
+      "capability_id": "strategy.read_manifest_cycle_analysis_page",
+      "directory_entry_id": "strategy.manifest_cycle_analysis_page",
+      "canonical_handler": "get_manifest_cycle_analysis_page",
+      "route_intent": "get manifest cycle analysis page",
+      "implementation_mode": "new_handler",
+      "focused_regression": "reads and durably records one complete rolling evidence page without truncation",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool returns one requested canonical page from the cycle's rolling 28-day evidence snapshot, preserves full post text, maturity, 24-hour likes, supporting metrics, lineage, and classification, and reports whether every required page has been consumed.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "strategy.commit_manifest_cycle_strategy",
+      "directory_entry_id": "strategy.manifest_cycle_strategy",
+      "canonical_handler": "commit_manifest_cycle_strategy",
+      "route_intent": "commit manifest cycle strategy",
+      "implementation_mode": "new_handler",
+      "focused_regression": "locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool refuses incomplete evidence consumption, original model sources, missing source cards, incomplete lineups, follower attribution, and conflicting second strategies; it accepts one complete source-backed lineup covering every authoritative missing slot and replays the identical strategy safely.",
       "compatibility_bridge": false
     },
         {
@@ -361,9 +383,9 @@
       "canonical_handler": "persist_manifest_autonomous_post",
       "route_intent": "persist manifest autonomous post",
       "implementation_mode": "new_handler",
-      "focused_regression": "persists one model-orchestrated autonomous post with full lineage into one exact missing slot",
+            "focused_regression": "persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool accepts exactly one completed model-evaluated post, enforces the prepared slot, exact duplicates, explicit banned phrases, idempotency, and complete lineage, persists without internal gate fanout or runway scans, performs no Threads API call, and replays without duplicate posts.",
+      "live_verification": "The exact deployed Main tool rejects original model posts, missing or mismatched cycle strategies and plan items, incomplete analysis consumption, missing canonical source cards, empty or failed owner-rule evaluation, source-fidelity failures, exact duplicates, semantic collisions, slot conflicts, and incomplete lineage; a passing post stores evidence-to-strategy-to-plan-to-source-to-gate lineage and replays idempotently."
       "compatibility_bridge": false
     },
         {
