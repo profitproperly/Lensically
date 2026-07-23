@@ -20471,7 +20471,39 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
   const durableOutcome = workState?.status === "active"
     ? normalizeOperatorText(workState.active_outcome_title, 500, true)
     : null;
-  const durableNextAction = normalizeOperatorText(workState?.next_action, 1200, true);
+    const durableNextAction = normalizeOperatorText(workState?.next_action, 1200, true);
+  const manifestAutonomousCycleTool = new Set([
+    "prepare_manifest_autonomous_cycle",
+    "persist_manifest_autonomous_post",
+    "get_hourly_coverage",
+    "get_manifest_cycle_receipt",
+    "get_manifest_intelligence_audit",
+    "get_manifest_intelligence_foundation",
+  ]).has(toolName);
+  const cyclePayload = operatorRecord(result.cycle);
+  const cycleReceiptPayload = operatorRecord(result.cycle_receipt);
+  const cycleMissingSlots = Array.isArray(cyclePayload.missing_slots) ? cyclePayload.missing_slots : [];
+  const explicitRemainingMissing = Number(result.remaining_missing_count);
+  const remainingMissingCount = Number.isFinite(explicitRemainingMissing)
+    ? explicitRemainingMissing
+    : cycleMissingSlots.length;
+  const manifestCycleCompleted = cycleReceiptPayload.status === "completed"
+    && cycleReceiptPayload.completion_present === true;
+  const manifestAutonomousFallbackNextAction = !manifestAutonomousCycleTool
+    ? null
+    : toolName === "prepare_manifest_autonomous_cycle"
+      ? remainingMissingCount > 0
+        ? `Continue the same autonomous Manifest cycle immediately. Build the full remaining portfolio and persist the first exact missing slot. Do not end after preparation; ${remainingMissingCount} cycle-horizon slots remain.`
+        : "Verify the canonical cycle completion receipt, complete lineage, scheduler health, and zero unresolved delivery incidents before ending."
+      : toolName === "persist_manifest_autonomous_post"
+        ? remainingMissingCount > 0
+          ? `Continue the same autonomous Manifest cycle immediately; ${remainingMissingCount} exact cycle-horizon slots remain.`
+          : "Verify the canonical completion receipt and scheduler health before ending."
+        : toolName === "get_hourly_coverage"
+          ? "If this coverage read belongs to an active autonomous Manifest cycle, return to that cycle and persist its next exact missing slot. General calendar openings beyond the prepared horizon are not a stopping condition."
+          : toolName === "get_manifest_cycle_receipt" && manifestCycleCompleted
+            ? "The canonical cycle is complete; verify scheduler health and end only after all completion conditions pass."
+            : "Continue the active autonomous Manifest cycle from its canonical receipt and exact next incomplete operation.";
   const explicitNextAction = normalizeOperatorText(
     result.next_action ?? result.recommended_next_action ?? result.required_action,
     1200,
