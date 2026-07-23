@@ -6223,6 +6223,77 @@ describe("operator mode MCP endpoint", () => {
     expect(publishedRetry.structuredContent.error).toBe("scheduled_post_already_published");
   }, 40000);
 
+    it("requires and preserves scheduled-post deletion reasons without writing strategy memory", async () => {
+    await operatorTool("list_accounts");
+    const inserted = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'vectrix', 'Deletion audit fixture', 'approved', '2099-01-03T14:00:00.000Z')`,
+    ).run();
+    const scheduledPostId = Number(inserted.meta?.last_row_id ?? 0);
+
+    const missingReason = await mcpToolRaw<{ error?: string }>("delete_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduledPostId,
+      proceed_confirmed: true,
+    });
+    expect(missingReason.isError).toBe(true);
+    expect(missingReason.structuredContent.error).toBe("scheduled_post_deletion_reason_required");
+
+    const memoryBefore = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
+    ).first<{ total: number | string }>();
+    const deleted = await mcpTool<{
+      success: boolean;
+      deleted: boolean;
+      deletion: { scheduled_post_id: number; reason: string; deleted_by: string; deletion_source: string };
+      strategy_memory_written: boolean;
+    }>("delete_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduledPostId,
+      reason: "Generic filler did not meet the account quality floor.",
+      operation_id: "delete-audit-fixture",
+      proceed_confirmed: true,
+    });
+    expect(deleted.success).toBe(true);
+    expect(deleted.deleted).toBe(true);
+    expect(deleted.deletion).toMatchObject({
+      scheduled_post_id: scheduledPostId,
+      reason: "Generic filler did not meet the account quality floor.",
+      deleted_by: "model",
+      deletion_source: "mcp",
+    });
+    expect(deleted.strategy_memory_written).toBe(false);
+
+    const scheduledRow = await env.DB.prepare(
+      `SELECT id FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(scheduledPostId).first<{ id: number }>();
+    const deletionRow = await env.DB.prepare(
+      `SELECT scheduled_post_id, reason, deleted_by, deletion_source
+       FROM scheduled_post_deletions WHERE scheduled_post_id = ? LIMIT 1`,
+    ).bind(scheduledPostId).first<Record<string, unknown>>();
+    const memoryAfter = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
+    ).first<{ total: number | string }>();
+    expect(scheduledRow).toBeNull();
+    expect(deletionRow).toMatchObject({
+      scheduled_post_id: scheduledPostId,
+      reason: "Generic filler did not meet the account quality floor.",
+      deleted_by: "model",
+      deletion_source: "mcp",
+    });
+    expect(Number(memoryAfter?.total ?? 0)).toBe(Number(memoryBefore?.total ?? 0));
+
+    const listed = await mcpTool<{ deleted_items: Array<{ scheduled_post_id: number; reason: string }> }>("list_scheduled_posts", {
+      brand_key: BRAND_KEY,
+      date: "2099-01-03",
+      timezone: "America/New_York",
+    });
+    expect(listed.deleted_items).toContainEqual(expect.objectContaining({
+      scheduled_post_id: scheduledPostId,
+      reason: "Generic filler did not meet the account quality floor.",
+    }));
+  }, 30000);
+
   it("hides scheduled posts from other account scopes when editing", async () => {
     await operatorTool("list_accounts");
     const inserted = await env.DB.prepare(

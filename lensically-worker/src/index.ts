@@ -3906,7 +3906,7 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
      END`,
   ).run();
 
-  await env.DB.prepare(
+    await env.DB.prepare(
     `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_touch_updated_at
      AFTER UPDATE ON scheduled_posts
      FOR EACH ROW
@@ -3916,6 +3916,39 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
        SET updated_at = CURRENT_TIMESTAMP
        WHERE id = NEW.id;
      END`,
+  ).run();
+}
+
+async function ensureScheduledPostDeletionsTable(env: Env): Promise<void> {
+  await ensureScheduledPostsTable(env);
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS scheduled_post_deletions (
+      id TEXT PRIMARY KEY,
+      scheduled_post_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
+      threads_user_id TEXT NOT NULL,
+      post_text TEXT NOT NULL,
+      scheduled_time TEXT NOT NULL,
+      status_before TEXT NOT NULL,
+      reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+      deleted_by TEXT NOT NULL CHECK (deleted_by IN ('owner', 'model')),
+      deletion_source TEXT NOT NULL CHECK (deletion_source IN ('ui', 'mcp')),
+      operation_id TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_scheduled_post_deletions_account_time
+     ON scheduled_post_deletions (threads_user_id, scheduled_time DESC, created_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_scheduled_post_deletions_scheduled_post
+     ON scheduled_post_deletions (scheduled_post_id, created_at DESC)`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_post_deletions_operation
+     ON scheduled_post_deletions (operation_id)
+     WHERE operation_id IS NOT NULL`,
   ).run();
 }
 
@@ -11844,15 +11877,23 @@ async function prepareManifestAutonomousCycle(
     strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
     consumption_contract: decisionIntelligence.consumption_contract ?? {},
   };
-  const accountPosition = await buildManifestAutonomousAccountPosition(
+    const recentScheduledDeletions = await listScheduledPostDeletionsForThreadsAccount(
     env,
-    brand,
-    targetSlots,
-    coverage,
-    clock,
-    threadsSnapshot as unknown as Record<string, unknown>,
-    deliveryReconciliation,
+    brand.profile.threads_user_id,
+    { limit: 100 },
   );
+  const accountPosition = {
+    ...(await buildManifestAutonomousAccountPosition(
+      env,
+      brand,
+      targetSlots,
+      coverage,
+      clock,
+      threadsSnapshot as unknown as Record<string, unknown>,
+      deliveryReconciliation,
+    )),
+    recent_scheduled_deletions: recentScheduledDeletions,
+  };
       const existing = await env.DB.prepare(
     `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
   ).bind(brand.brand_key, operationId).first<{ id: string }>();
@@ -11955,7 +11996,7 @@ async function prepareManifestAutonomousCycle(
     startupState: {
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-            data_consulted: ["growth mission", "strategy memory", "performance learning", "Content Focus", "learning brief", "operator benchmarks", "run comparison", "portfolio states", "controlled experiments", "Saved Pattern intelligence", "semantic repetition exposure", "account-level follower checkpoint", "recent published exposure", "future scheduled exposure", "active gates"],
+                        data_consulted: ["growth mission", "strategy memory", "performance learning", "Content Focus", "learning brief", "operator benchmarks", "run comparison", "portfolio states", "controlled experiments", "Saved Pattern intelligence", "semantic repetition exposure", "account-level follower checkpoint", "recent published exposure", "future scheduled exposure", "scheduled deletion reasons", "active gates"],
             intelligence_policy: intelligencePolicy,
       decision_intelligence: decisionIntelligenceReceiptReference,
     },
@@ -12011,7 +12052,8 @@ async function prepareManifestAutonomousCycle(
       cycle: compactCycle,
       intelligence_engine_refresh: intelligenceEngineRefresh,
             measurement_audit_refresh: measurementAuditRefresh,
-      decision_intelligence: decisionIntelligenceReceiptReference,
+            decision_intelligence: decisionIntelligenceReceiptReference,
+      recent_scheduled_deletions: recentScheduledDeletions,
       remaining_missing_count: missingSlots.length,
       next_missing_slot: missingSlots[0] ?? null,
       next_action: missingSlots.length > 0
@@ -12034,7 +12076,8 @@ async function prepareManifestAutonomousCycle(
                 cycle: preparedCycle,
                 intelligence_engine_refresh: intelligenceEngineRefresh,
                 measurement_audit_refresh: measurementAuditRefresh,
-        decision_intelligence: decisionIntelligence,
+                decision_intelligence: decisionIntelligence,
+    recent_scheduled_deletions: recentScheduledDeletions,
     remaining_missing_count: missingSlots.length,
     next_missing_slot: missingSlots[0] ?? null,
     next_action: missingSlots.length > 0
@@ -15833,13 +15876,59 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ memory_id: memory?.id ?? null });
   }
 
-    if (toolName === "list_scheduled_posts") {
+        if (toolName === "list_scheduled_posts") {
     const date = normalizeOperatorText(payload.date, 20, true);
     const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
     const items = date && isValidIsoDate(date)
       ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, date, timezone)
       : [];
-    return operatorJsonResponse({ items, returned_count: items.length, total_count: items.length, has_more: false });
+    const deletedItems = await listScheduledPostDeletionsForThreadsAccount(env, brand.profile.threads_user_id, {
+      date: date && isValidIsoDate(date) ? date : null,
+      timezone,
+      limit: 100,
+    });
+    return operatorJsonResponse({
+      items,
+      deleted_items: deletedItems,
+      returned_count: items.length,
+      deleted_count: deletedItems.length,
+      total_count: items.length,
+      has_more: false,
+    });
+  }
+
+  if (toolName === "delete_scheduled_post") {
+    const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id ?? 0));
+    const reason = normalizeOperatorText(payload.reason, 8000);
+    if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
+      return operatorJsonResponse({ success: false, error: "scheduled_post_id is required" }, 400);
+    }
+    if (!reason) {
+      return operatorJsonResponse({ success: false, error: "scheduled_post_deletion_reason_required" }, 400);
+    }
+    const deletion = await deleteScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, scheduledPostId, {
+      expectedThreadsUserId: brand.profile.threads_user_id,
+      reason,
+      deletedBy: "model",
+      deletionSource: "mcp",
+      operationId: normalizeOperatorText(payload.operation_id, 240, true),
+    });
+    if (deletion.outcome === "not_found") {
+      return operatorJsonResponse({ success: false, error: "scheduled_post_not_found" }, 404);
+    }
+    if (deletion.outcome === "not_deletable") {
+      return operatorJsonResponse({ success: false, error: "only_approved_scheduled_posts_can_be_deleted" }, 409);
+    }
+    if (deletion.outcome === "reason_required") {
+      return operatorJsonResponse({ success: false, error: "scheduled_post_deletion_reason_required" }, 400);
+    }
+    return operatorJsonResponse({
+      success: true,
+      deleted: true,
+      deletion: deletion.record ?? null,
+      replayed: deletion.replayed === true,
+      strategy_memory_written: false,
+    });
   }
 
   if (toolName === "edit_scheduled_post") {
@@ -17422,6 +17511,22 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, date: { type: "string" }, timezone: { type: "string" }, limit: { type: "integer" }, offset: { type: "integer" } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+    {
+    name: "delete_scheduled_post",
+    title: "Delete scheduled post with reason",
+    description: "Delete one approved unpublished scheduled post only when a nonempty reason is supplied. The original text, slot, actor, source, timestamp, and reason are preserved in durable deletion history for UI and future model reads. This action does not write strategy memory.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        scheduled_post_id: { type: "integer", minimum: 1 },
+        reason: { type: "string", minLength: 1 },
+      },
+      required: ["brand_key", "scheduled_post_id", "reason"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  },
   {
         name: "edit_scheduled_post",
     title: "Edit scheduled post",
@@ -17827,7 +17932,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "promote_memory_to_gate",
   "list_strategy_memory",
   "save_strategy_memory",
-  "list_scheduled_posts",
+    "list_scheduled_posts",
+  "delete_scheduled_post",
   "edit_scheduled_post",
   "schedule_owner_approved_batch",
   "schedule_approved_draft",
@@ -17899,7 +18005,8 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
         ["prepare_manifest_autonomous_cycle", 14],
     ["persist_manifest_autonomous_post", 15],
     ["review_manifest_scheduled_post", 16],
-    ["markOperatorDecisionExecuted", 17],
+        ["markOperatorDecisionExecuted", 17],
+    ["delete_scheduled_post", 15],
     ["edit_scheduled_post", 15],
     ["skip_manifest_review_source", 16],
   ]);
@@ -18657,7 +18764,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.37.2";
+export const OPERATOR_MCP_VERSION = "1.38.0";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -19690,7 +19797,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 function operatorPreCallProvider(toolName: string): string {
         if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
         if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
-  if (["schedule_approved_draft", "schedule_manifest_review_batch", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
+    if (["schedule_approved_draft", "schedule_manifest_review_batch", "delete_scheduled_post", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
 }
 
@@ -21047,7 +21154,8 @@ function operatorSemanticOperationIdentity(toolName: string, args: Record<string
       });
     return `${brand}:autonomous-commit:${String(args.cycle_id ?? "missing")}:${slotKeys.join(",") || "empty"}`;
   }
-  if (toolName === "review_manifest_scheduled_post") return `${brand}:autonomous-review:${String(args.scheduled_post_id ?? "missing")}:${String(args.action ?? "review")}`;
+    if (toolName === "review_manifest_scheduled_post") return `${brand}:autonomous-review:${String(args.scheduled_post_id ?? "missing")}:${String(args.action ?? "review")}`;
+  if (toolName === "delete_scheduled_post") return `${brand}:delete-scheduled:${String(args.scheduled_post_id ?? "missing")}:${String(args.reason ?? "missing-reason")}`;
   if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? `${session}:${String(args.sequence_label ?? "unlabeled")}`)}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
   if (toolName === "lock_source_card") return `${brand}:lock:${String(args.source_card_id ?? "")}`;
   if (toolName === "submit_candidate_draft" || toolName === "submitAndGateDraft") return `${brand}:${String(args.run_id ?? "")}:${String(args.source_card_id ?? "")}:${String(args.text ?? args.draft_text ?? "")}`;
@@ -22109,7 +22217,8 @@ async function handleOperatorMcpAdminTool(
         "reject_draft",
         "create_or_update_gate",
         "promote_memory_to_gate",
-        "save_strategy_memory",
+                "save_strategy_memory",
+        "delete_scheduled_post",
         "edit_scheduled_post",
         "schedule_owner_approved_batch",
         "schedule_approved_draft",
@@ -32364,42 +32473,163 @@ async function getTopArchivedPostByLikes(
   };
 }
 
+type ScheduledPostDeletionRecord = {
+  id: string;
+  scheduled_post_id: number;
+  post_text: string;
+  scheduled_time_utc: string;
+  status_before: string;
+  reason: string;
+  deleted_by: "owner" | "model";
+  deletion_source: "ui" | "mcp";
+  operation_id: string | null;
+  deleted_at: string;
+};
+
+function mapScheduledPostDeletionRow(row: Record<string, unknown>): ScheduledPostDeletionRecord {
+  return {
+    id: String(row.id ?? ""),
+    scheduled_post_id: Number(row.scheduled_post_id ?? 0),
+    post_text: String(row.post_text ?? ""),
+    scheduled_time_utc: String(row.scheduled_time ?? ""),
+    status_before: String(row.status_before ?? ""),
+    reason: String(row.reason ?? ""),
+    deleted_by: String(row.deleted_by ?? "model") === "owner" ? "owner" : "model",
+    deletion_source: String(row.deletion_source ?? "mcp") === "ui" ? "ui" : "mcp",
+    operation_id: normalizeOperatorText(row.operation_id, 240, true),
+    deleted_at: String(row.created_at ?? ""),
+  };
+}
+
+async function listScheduledPostDeletionsForThreadsAccount(
+  env: Env,
+  threadsUserId: string,
+  input: { date?: string | null; timezone?: string; limit?: number } = {},
+): Promise<ScheduledPostDeletionRecord[]> {
+  await ensureScheduledPostDeletionsTable(env);
+  const limit = Math.min(Math.max(Math.trunc(Number(input.limit ?? 100)), 1), 200);
+  const date = normalizeOperatorText(input.date, 20, true);
+  const timezone = normalizeOperatorText(input.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+  let rows;
+  if (date && isValidIsoDate(date)) {
+    const startUtc = convertLocalDateTimeToUtcIso(date, "00:00", timezone);
+    const nextDate = addDaysToIsoDate(date, 1);
+    const endUtc = nextDate ? convertLocalDateTimeToUtcIso(nextDate, "00:00", timezone) : null;
+    if (!startUtc || !endUtc) return [];
+    rows = await env.DB.prepare(
+      `SELECT * FROM scheduled_post_deletions
+       WHERE threads_user_id = ? AND scheduled_time >= ? AND scheduled_time < ?
+       ORDER BY scheduled_time ASC, created_at ASC LIMIT ?`,
+    ).bind(threadsUserId, startUtc, endUtc, limit).all<Record<string, unknown>>();
+  } else {
+    rows = await env.DB.prepare(
+      `SELECT * FROM scheduled_post_deletions
+       WHERE threads_user_id = ?
+       ORDER BY datetime(created_at) DESC LIMIT ?`,
+    ).bind(threadsUserId, limit).all<Record<string, unknown>>();
+  }
+  return (rows.results ?? []).map((row) => mapScheduledPostDeletionRow(row));
+}
+
 async function deleteScheduledPostForAppUser(
   env: Env,
   appUserId: string,
   scheduledPostId: number,
-): Promise<"deleted" | "not_found" | "not_deletable"> {
-  await ensureScheduledPostsTable(env);
+  input: {
+    expectedThreadsUserId?: string | null;
+    reason: string;
+    deletedBy: "owner" | "model";
+    deletionSource: "ui" | "mcp";
+    operationId?: string | null;
+  },
+): Promise<{
+  outcome: "deleted" | "not_found" | "not_deletable" | "reason_required";
+  record?: ScheduledPostDeletionRecord;
+  replayed?: boolean;
+}> {
+  const reason = input.reason.trim();
+  if (!reason) return { outcome: "reason_required" };
+  await ensureScheduledPostDeletionsTable(env);
+  const operationId = normalizeOperatorText(input.operationId, 240, true);
+  if (operationId) {
+    const replay = await env.DB.prepare(
+      `SELECT * FROM scheduled_post_deletions WHERE operation_id = ? LIMIT 1`,
+    ).bind(operationId).first<Record<string, unknown>>();
+    if (replay) return { outcome: "deleted", record: mapScheduledPostDeletionRow(replay), replayed: true };
+  }
 
   const existing = await env.DB.prepare(
-    `SELECT id, status
+    `SELECT id, user_id, threads_user_id, post_text, status, scheduled_time
      FROM scheduled_posts
-     WHERE id = ?
-       AND user_id = ?
-     LIMIT 1`,
-  )
-    .bind(scheduledPostId, appUserId)
-    .first<{ id: number | string; status: string }>();
-
-  if (!existing) {
-    return "not_found";
+     WHERE id = ? AND user_id = ? LIMIT 1`,
+  ).bind(scheduledPostId, appUserId).first<Record<string, unknown>>();
+  if (!existing || (input.expectedThreadsUserId && String(existing.threads_user_id ?? "") !== input.expectedThreadsUserId)) {
+    return { outcome: "not_found" };
+  }
+  if (String(existing.status ?? "") !== SCHEDULED_POST_STATUS_APPROVED) {
+    return { outcome: "not_deletable" };
   }
 
-  if (existing.status !== SCHEDULED_POST_STATUS_APPROVED) {
-    return "not_deletable";
+  const deletionId = crypto.randomUUID();
+  const deletedAt = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO scheduled_post_deletions (
+        id, scheduled_post_id, user_id, threads_user_id, post_text, scheduled_time,
+        status_before, reason, deleted_by, deletion_source, operation_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      deletionId,
+      scheduledPostId,
+      appUserId,
+      String(existing.threads_user_id ?? ""),
+      String(existing.post_text ?? ""),
+      String(existing.scheduled_time ?? ""),
+      String(existing.status ?? ""),
+      reason,
+      input.deletedBy,
+      input.deletionSource,
+      operationId,
+      deletedAt,
+    ),
+    env.DB.prepare(
+      `DELETE FROM scheduled_posts WHERE id = ? AND user_id = ? AND status = ?`,
+    ).bind(scheduledPostId, appUserId, SCHEDULED_POST_STATUS_APPROVED),
+  ]);
+
+  if (await doesTableExist(env, "gpt_generation_drafts")) {
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'rejected', rejection_reason = ?, owner_feedback = ?, scheduled_post_id = NULL
+       WHERE scheduled_post_id = ?`,
+    ).bind(reason, reason, scheduledPostId).run();
+  }
+  if (await doesTableExist(env, "operator_autonomous_lineup_items")) {
+    await env.DB.prepare(
+      `UPDATE operator_autonomous_lineup_items
+       SET status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE scheduled_post_id = ?`,
+    ).bind(input.deletedBy === "owner" ? "owner_deleted" : "model_deleted", reason, scheduledPostId).run();
   }
 
-  await env.DB.prepare(
-    `DELETE FROM scheduled_posts
-     WHERE id = ?
-       AND user_id = ?
-       AND status = ?`,
-  )
-    .bind(scheduledPostId, appUserId, SCHEDULED_POST_STATUS_APPROVED)
-    .run();
-
-    return "deleted";
+  return {
+    outcome: "deleted",
+    record: {
+      id: deletionId,
+      scheduled_post_id: scheduledPostId,
+      post_text: String(existing.post_text ?? ""),
+      scheduled_time_utc: String(existing.scheduled_time ?? ""),
+      status_before: String(existing.status ?? ""),
+      reason,
+      deleted_by: input.deletedBy,
+      deletion_source: input.deletionSource,
+      operation_id: operationId,
+      deleted_at: deletedAt,
+    },
+    replayed: false,
+  };
 }
+
 
 async function updateScheduledPostForAppUser(
   env: Env,
@@ -38971,10 +39201,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    if (url.pathname === "/api/threads/schedule/delete" && request.method === "POST") {
+        if (url.pathname === "/api/threads/schedule/delete" && request.method === "POST") {
       let payload: {
         app_user_id?: string;
         scheduled_post_id?: number | string;
+        threads_user_id?: string;
+        reason?: string;
       };
       try {
         payload = await request.json();
@@ -38989,6 +39221,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
 
       const scheduledPostId = Number(payload.scheduled_post_id);
+      const reason = normalizeOperatorText(payload.reason, 8000);
       if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
         return new Response(
           JSON.stringify({ error: "scheduled_post_id is required" }),
@@ -38998,11 +39231,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
+      if (!reason) {
+        return new Response(
+          JSON.stringify({ error: "Deletion reason is required." }),
+          { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
+        );
+      }
 
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
-
-      const deleted = await deleteScheduledPostForAppUser(env, ownedAppUserId, scheduledPostId);
-      if (deleted === "not_found") {
+      const deleted = await deleteScheduledPostForAppUser(env, ownedAppUserId, scheduledPostId, {
+        expectedThreadsUserId: normalizeOperatorText(payload.threads_user_id, 200, true),
+        reason,
+        deletedBy: "owner",
+        deletionSource: "ui",
+      });
+      if (deleted.outcome === "not_found") {
         return new Response(
           JSON.stringify({ error: "Scheduled post not found" }),
           {
@@ -39012,7 +39255,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      if (deleted === "not_deletable") {
+      if (deleted.outcome === "not_deletable") {
         return new Response(
           JSON.stringify({ error: "Only approved scheduled posts can be deleted." }),
           {
@@ -39027,6 +39270,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           success: true,
           deleted: true,
           scheduled_post_id: scheduledPostId,
+          deletion: deleted.record ?? null,
+          strategy_memory_written: false,
         }),
         {
           status: 200,
@@ -39034,6 +39279,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         },
       );
     }
+
 
     if (url.pathname === "/api/threads/schedule/strategy" && request.method === "POST") {
       let payload: {
@@ -39334,7 +39580,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         last_attempted_at: row.last_attempted_at ?? null,
         processing_started_at: row.processing_started_at ?? null,
       }));
-      const strategyTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+            const strategyTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
+      const deletedPosts = selectedThreadsUserId
+        ? await listScheduledPostDeletionsForThreadsAccount(env, selectedThreadsUserId, { limit: 100 })
+        : [];
 
       return new Response(
         JSON.stringify({
@@ -39343,6 +39592,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             ...post,
             strategy: strategyTagMap.get(post.id) ?? null,
           })),
+          deleted_posts: deletedPosts,
         }),
         {
           status: 200,
