@@ -236,9 +236,10 @@ type ManifestSourceBackedCycleTestFixture = {
       missing_slots: Array<{ key: string; date: string; time: string }>;
     };
         rolling_evidence: {
-      snapshot: {
+            snapshot: {
         id: string;
         page_count: number;
+        page_byte_budget: number;
         benchmarks: Record<string, unknown>;
       };
       first_page: {
@@ -335,15 +336,33 @@ async function prepareManifestSourceBackedCycleForTest(
   });
     expect(prepared.cycle.missing_slots.length).toBeGreaterThan(0);
   expect(prepared.rolling_evidence.snapshot.id).toBeTruthy();
-  expect(prepared.rolling_evidence.snapshot.benchmarks).toMatchObject({ primary_metric: "24_hour_likes" });
-  expect(prepared.rolling_evidence.first_page).toMatchObject({ success: true, page_index: 0 });
+    expect(prepared.rolling_evidence.snapshot.benchmarks).toMatchObject({ primary_metric: "24_hour_likes" });
+  expect(prepared.rolling_evidence.snapshot.page_byte_budget).toBe(12000);
+  expect(prepared.rolling_evidence.first_page).toMatchObject({
+    success: true,
+    page_index: 0,
+    items: [],
+    consumption: { consumed_page_count: 0, complete: false },
+  });
 
   const maturePostIds: string[] = [];
-  const pageCount = Math.max(1, Number(prepared.rolling_evidence.snapshot.page_count ?? 0));
+  const pageCount = Number(prepared.rolling_evidence.snapshot.page_count ?? 0);
+  expect(pageCount).toBeGreaterThan(0);
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-    const page = await mcpTool<{
+        const page = await mcpTool<{
       success: boolean;
-      items: Array<{ published_post_id: string; maturity_state: string }>;
+      complete_page: boolean;
+      page_contract_version: string;
+      page_byte_count: number;
+      response_bytes: number;
+      evidence_types: string[];
+      items: Array<{
+        evidence_type: string;
+        section_key?: string;
+        item_index?: number;
+        data: Record<string, unknown>;
+      }>;
+      pagination: { page_count: number; returned: number; has_more: boolean; next_page_index: number | null };
       consumption: { complete: boolean; consumed_page_count: number; required_page_count: number };
     }>("get_manifest_cycle_analysis_page", {
             brand_key: "manifest_mental",
@@ -352,11 +371,32 @@ async function prepareManifestSourceBackedCycleForTest(
       page_index: pageIndex,
       proceed_confirmed: true,
     });
-    expect(page.success).toBe(true);
+        expect(page).toMatchObject({
+      success: true,
+      complete_page: true,
+      page_contract_version: "manifest-evidence-page-v1",
+      pagination: { page_count: pageCount },
+      consumption: { required_page_count: pageCount },
+    });
+    expect(page.page_byte_count).toBeGreaterThan(0);
+    expect(page.page_byte_count).toBeLessThanOrEqual(12000);
+    expect(page.response_bytes).toBeGreaterThan(page.page_byte_count);
+    expect(page.response_bytes).toBeLessThanOrEqual(20000);
+    expect(page.pagination.returned).toBe(page.items.length);
     maturePostIds.push(...page.items
-      .filter((item) => item.maturity_state === "mature")
-      .map((item) => item.published_post_id));
-    if (pageIndex === pageCount - 1) expect(page.consumption.complete).toBe(true);
+      .filter((item) => item.evidence_type === "published_post" && item.data.maturity_state === "mature")
+      .map((item) => String(item.data.published_post_id)));
+    if (pageIndex === pageCount - 1) {
+      expect(page.pagination.has_more).toBe(false);
+      expect(page.consumption).toMatchObject({
+        complete: true,
+        consumed_page_count: pageCount,
+        required_page_count: pageCount,
+      });
+    } else {
+      expect(page.pagination.next_page_index).toBe(pageIndex + 1);
+      expect(page.consumption.complete).toBe(false);
+    }
   }
 
   const lineup = prepared.cycle.missing_slots.map((slot, index) => ({
