@@ -65,22 +65,36 @@ import {
 } from "./localExecution";
 
 import {
+  MANIFEST_ANALYSIS_WINDOW_DAYS,
+  MANIFEST_EVIDENCE_PAGE_SIZE,
   MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
   MANIFEST_NONINTERFERENCE_POLICY,
-    appendManifestCycleEvent,
+  MANIFEST_RECENT_EXPOSURE_HOURS,
+  appendManifestCycleEvent,
   beginManifestCycleReceipt,
   buildManifestCycleReceiptRead,
+  buildManifestExposureDimensions,
+  buildManifestLikesBenchmarks,
+  commitManifestCycleStrategy,
+  createManifestEvidenceSnapshot,
   createManifestExposureSnapshot,
   ensureManifestIntelligencePolicy,
   ensureManifestStrategyVersion,
   finalizeManifestCycleReceipt,
   getLatestManifestStrategyVersion,
+  getManifestCyclePlanItem,
   getManifestCycleReceipt,
+  getManifestCycleStrategy,
+  getManifestEvidenceConsumptionState,
   getManifestIntelligenceFoundation,
   linkManifestCycleStrategy,
   linkManifestHypothesisResult,
+  listManifestHardBans,
   normalizeManifestSourceContext,
-    recordManifestPostHypothesis,
+  readManifestEvidencePage,
+  recordManifestCandidateGateReceipt,
+  recordManifestPostHypothesis,
+  syncManifestHardBans,
   validateManifestFollowerAttributionBoundary,
   validateManifestPostHypothesis,
 } from "./manifestIntelligence";
@@ -11758,6 +11772,268 @@ async function buildManifestAutonomousAccountPosition(
   };
 }
 
+async function buildManifestRollingEvidence(
+  env: Env,
+  brand: GptResolvedBrand,
+  input: {
+    cycle_id: string;
+    as_of: string;
+    effective_now_ms: number;
+    timezone: string;
+    future_schedule: Record<string, unknown>[];
+  },
+): Promise<Record<string, unknown>> {
+  await ensureManifestIntelligenceEngineTables(env.DB);
+  const windowEnd = input.as_of;
+  const windowStart = new Date(
+    input.effective_now_ms - MANIFEST_ANALYSIS_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const publishedRows = await env.DB.prepare(
+    `SELECT archive.post_id, archive.post_text, archive.post_timestamp,
+            archive.views, archive.likes, archive.replies, archive.reposts,
+            archive.quotes, archive.shares, archive.engagement_total,
+            scheduled.id AS scheduled_post_id,
+            tags.hook_style, tags.pillar, tags.format, tags.intent, tags.metadata_json,
+            lineup.family_key, lineup.generation_mode,
+            COALESCE(lineup.source_card_id, draft.source_card_id) AS source_card_id,
+            lineup.source_selection_id,
+            card.family_id AS source_family_id,
+            family.source_identity_key
+     FROM threads_posts_archive archive
+     LEFT JOIN scheduled_posts scheduled
+       ON scheduled.threads_user_id = archive.threads_user_id
+      AND scheduled.published_post_id = archive.post_id
+     LEFT JOIN gpt_post_strategy_tags tags ON tags.scheduled_post_id = scheduled.id
+     LEFT JOIN operator_autonomous_lineup_items lineup
+       ON lineup.scheduled_post_id = scheduled.id AND lineup.brand_key = ?
+     LEFT JOIN gpt_generation_drafts draft
+       ON draft.scheduled_post_id = scheduled.id AND draft.account_id = ?
+     LEFT JOIN operator_source_cards card
+       ON card.id = COALESCE(lineup.source_card_id, draft.source_card_id)
+      AND card.brand_key = ?
+     LEFT JOIN operator_source_card_families family
+       ON family.id = card.family_id AND family.brand_key = ?
+     WHERE archive.threads_user_id = ?
+       AND datetime(archive.post_timestamp) >= datetime(?)
+       AND datetime(archive.post_timestamp) <= datetime(?)
+     ORDER BY datetime(archive.post_timestamp) DESC, archive.post_id DESC`,
+  ).bind(
+    brand.brand_key,
+    brand.account_id,
+    brand.brand_key,
+    brand.brand_key,
+    brand.profile.threads_user_id,
+    windowStart,
+    windowEnd,
+  ).all<Record<string, unknown>>();
+  const maturityRows = await env.DB.prepare(
+    `SELECT maturity.published_post_id, maturity.checkpoint_hours,
+            maturity.evaluation_json, maturity.updated_at
+     FROM operator_manifest_maturity_evaluations maturity
+     JOIN threads_posts_archive archive ON archive.post_id = maturity.published_post_id
+     WHERE maturity.brand_key = ?
+       AND archive.threads_user_id = ?
+       AND datetime(archive.post_timestamp) >= datetime(?)
+       AND datetime(archive.post_timestamp) <= datetime(?)
+     ORDER BY maturity.published_post_id, maturity.checkpoint_hours ASC`,
+  ).bind(
+    brand.brand_key,
+    brand.profile.threads_user_id,
+    windowStart,
+    windowEnd,
+  ).all<Record<string, unknown>>();
+  const maturityByPost = new Map<string, Record<string, unknown>[]>();
+  for (const row of maturityRows.results ?? []) {
+    const key = String(row.published_post_id ?? "");
+    const evaluation = safeParseJsonString(String(row.evaluation_json ?? "{}")) ?? {};
+    const list = maturityByPost.get(key) ?? [];
+    list.push({
+      checkpoint_hours: Number(row.checkpoint_hours ?? 0),
+      updated_at: row.updated_at ?? null,
+      ...(evaluation && typeof evaluation === "object" && !Array.isArray(evaluation)
+        ? evaluation as Record<string, unknown>
+        : {}),
+    });
+    maturityByPost.set(key, list);
+  }
+  const evidencePosts = (publishedRows.results ?? []).map((row) => {
+    const publishedAt = String(row.post_timestamp ?? "");
+    const publishedMs = parseOperatorTimestampMs(publishedAt) ?? input.effective_now_ms;
+    const ageHours = Math.max(0, (input.effective_now_ms - publishedMs) / (60 * 60 * 1000));
+    const snapshots = maturityByPost.get(String(row.post_id ?? "")) ?? [];
+    const matureSnapshot = snapshots.find((snapshot) => Number(snapshot.checkpoint_hours ?? 0) === 24) ?? null;
+    const matureMetrics = matureSnapshot?.metrics && typeof matureSnapshot.metrics === "object" && !Array.isArray(matureSnapshot.metrics)
+      ? matureSnapshot.metrics as Record<string, unknown>
+      : null;
+    const matureRates = matureSnapshot?.rates && typeof matureSnapshot.rates === "object" && !Array.isArray(matureSnapshot.rates)
+      ? matureSnapshot.rates as Record<string, unknown>
+      : null;
+    const maturityState = ageHours < 24
+      ? "immature"
+      : matureSnapshot
+        ? "mature"
+        : "evidence_incomplete";
+    const strategy = safeParseJsonString(String(row.metadata_json ?? "{}")) ?? {};
+    const strategyRecord = strategy && typeof strategy === "object" && !Array.isArray(strategy)
+      ? strategy as Record<string, unknown>
+      : {};
+    return {
+      published_post_id: String(row.post_id ?? ""),
+      scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined
+        ? null
+        : Number(row.scheduled_post_id),
+      text: String(row.post_text ?? ""),
+      published_at: publishedAt,
+      age_hours: Number(ageHours.toFixed(4)),
+      maturity_state: maturityState,
+      primary_likes: matureMetrics ? Number(matureMetrics.likes ?? 0) : null,
+      like_rate: matureRates ? Number(matureRates.like_rate ?? 0) : null,
+      metrics: matureMetrics ?? {
+        current_only_not_strategy_proof: true,
+        views: Number(row.views ?? 0),
+        likes: Number(row.likes ?? 0),
+        replies: Number(row.replies ?? 0),
+        reposts: Number(row.reposts ?? 0),
+        quotes: Number(row.quotes ?? 0),
+        shares: Number(row.shares ?? 0),
+        engagement_total: Number(row.engagement_total ?? 0),
+      },
+      maturity_snapshots: snapshots,
+      lineage: {
+        scheduled_post_id: row.scheduled_post_id ?? null,
+        source_card_id: row.source_card_id ?? null,
+        source_selection_id: row.source_selection_id ?? null,
+        source_family_id: row.source_family_id ?? null,
+        source_identity_key: row.source_identity_key ?? null,
+      },
+      classification: {
+        family_key: row.family_key ?? strategyRecord.family_key ?? null,
+        generation_mode: row.generation_mode ?? strategyRecord.generation_mode ?? null,
+        hook_style: row.hook_style ?? strategyRecord.hook_style ?? null,
+        topic: row.pillar ?? strategyRecord.topic ?? strategyRecord.pillar ?? null,
+        format: row.format ?? strategyRecord.format ?? null,
+        intent: row.intent ?? strategyRecord.intent ?? null,
+        premise_key: strategyRecord.premise_key ?? null,
+        participation_mechanism: strategyRecord.participation_mechanism ?? strategyRecord.question_type ?? null,
+        audience_reward: strategyRecord.audience_reward ?? null,
+        emotional_product: strategyRecord.emotional_product ?? strategyRecord.required_product ?? null,
+        sentence_architecture: strategyRecord.sentence_architecture ?? null,
+      },
+      strategy: strategyRecord,
+    };
+  });
+  const benchmarks = buildManifestLikesBenchmarks(evidencePosts);
+  const previousSnapshot = await env.DB.prepare(
+    `SELECT benchmarks_json FROM operator_manifest_evidence_snapshots
+     WHERE brand_key = ? AND cycle_id <> ?
+     ORDER BY datetime(created_at) DESC LIMIT 1`,
+  ).bind(brand.brand_key, input.cycle_id).first<Record<string, unknown>>();
+  const recentPosts = evidencePosts.filter((post) => Number(post.age_hours) <= MANIFEST_RECENT_EXPOSURE_HOURS);
+  const recentExposure = {
+    window_hours: MANIFEST_RECENT_EXPOSURE_HOURS,
+    posts: recentPosts,
+    dimensions: buildManifestExposureDimensions(recentPosts),
+    rule: "Use this window for immediate audience saturation and clustering. It does not replace the complete 28-day performance review.",
+  };
+  const memories = await listGptStrategyMemory(
+    env,
+    brand.account_id,
+    ["banned_phrase", "approved_rule", "rejection_feedback", "voice_rule", "brand_voice_note"],
+    100,
+    0,
+  );
+  const memoryRules = memories.filter((memory) => {
+    const metadata = getGptMemoryMetadataRecord(memory);
+    const title = String(memory.title ?? "").trim().toLowerCase();
+    const body = String(memory.body ?? "").toLowerCase();
+    return memory.kind === "banned_phrase"
+      || metadata.permanent === true
+      || /^(ban|avoid|do not|never)\b/.test(title)
+      || body.includes("permanent ban")
+      || body.includes("permanently rejected");
+  }).map((memory) => ({
+    rule_key: `memory:${memory.id}`,
+    description: memory.title ?? `Owner rule ${memory.id}`,
+    rule_type: "semantic_rule",
+    pattern: memory.body,
+    scope: "manifest_generation",
+    source_authority: `${memory.kind}:${memory.id}`,
+    pass_examples: [],
+    fail_examples: [],
+  }));
+  const activeGates = await listOperatorGates(env, brand.brand_key, null, null, null);
+  const gateRules = activeGates.filter((gate) => {
+    const stage = String(gate.stage_scope ?? "").toLowerCase();
+    const severity = String(gate.severity ?? "").toLowerCase();
+    return gate.active !== false
+      && ["block", "blocking", "hard"].includes(severity)
+      && ["gate_evaluation", "generation_run_and_candidates"].includes(stage);
+  }).map((gate) => ({
+    rule_key: `gate:${String(gate.gate_key ?? gate.id)}`,
+    description: String(gate.display_name ?? gate.gate_key ?? "Active generation gate"),
+    rule_type: "semantic_rule",
+    pattern: String(gate.description ?? ""),
+    scope: "manifest_generation",
+    source_authority: `operator_gate:${String(gate.gate_key ?? gate.id)}`,
+    pass_examples: Array.isArray(gate.pass_examples) ? gate.pass_examples : [],
+    fail_examples: Array.isArray(gate.fail_examples) ? gate.fail_examples : [],
+  }));
+  const hardBans = await syncManifestHardBans(env.DB, brand.brand_key, [...memoryRules, ...gateRules]);
+  const experimentRows = await env.DB.prepare(
+    `SELECT experiment_key, family_key, hypothesis_json, comparison_group_json,
+            maturity_windows_json, result_criteria_json, status, latest_result_json,
+            follow_up_decision, updated_at
+     FROM operator_manifest_experiments
+     WHERE brand_key = ?
+       AND (status = 'running' OR datetime(updated_at) >= datetime(?, '-72 hours'))
+     ORDER BY CASE WHEN status = 'running' THEN 0 ELSE 1 END, datetime(updated_at) DESC
+     LIMIT 50`,
+  ).bind(brand.brand_key, input.as_of).all<Record<string, unknown>>();
+  const experiments = (experimentRows.results ?? []).map((row) => ({
+    experiment_key: row.experiment_key,
+    family_key: row.family_key ?? null,
+    hypothesis: safeParseJsonString(String(row.hypothesis_json ?? "{}")) ?? {},
+    comparison_group: safeParseJsonString(String(row.comparison_group_json ?? "{}")) ?? {},
+    maturity_windows: safeParseJsonString(String(row.maturity_windows_json ?? "[]")) ?? [],
+    result_criteria: safeParseJsonString(String(row.result_criteria_json ?? "{}")) ?? {},
+    status: row.status,
+    latest_result: safeParseJsonString(String(row.latest_result_json ?? "{}")) ?? {},
+    follow_up_decision: row.follow_up_decision ?? null,
+    updated_at: row.updated_at,
+  }));
+  const snapshot = await createManifestEvidenceSnapshot(env.DB, {
+    cycleId: input.cycle_id,
+    brandKey: brand.brand_key,
+    asOf: input.as_of,
+    timezone: input.timezone,
+    windowStart,
+    windowEnd,
+    posts: evidencePosts,
+    benchmarks,
+    previousBenchmarks: safeParseJsonString(String(previousSnapshot?.benchmarks_json ?? "{}")) as Record<string, unknown> ?? {},
+    recentExposure,
+    futureSchedule: input.future_schedule,
+    hardBans,
+    experiments,
+    pageSize: MANIFEST_EVIDENCE_PAGE_SIZE,
+  });
+  const firstPage = Number(snapshot.page_count ?? 0) > 0
+    ? await readManifestEvidencePage(env.DB, {
+      brandKey: brand.brand_key,
+      cycleId: input.cycle_id,
+      snapshotId: String(snapshot.id),
+      pageIndex: 0,
+    })
+    : {
+      success: true,
+      snapshot,
+      page_index: 0,
+      items: [],
+      pagination: { page_size: MANIFEST_EVIDENCE_PAGE_SIZE, page_count: 0, returned: 0, has_more: false, next_page_index: null },
+      consumption: { consumed_page_count: 0, required_page_count: 0, complete: true },
+    };
+  return { snapshot, first_page: firstPage };
+}
 
 async function prepareManifestAutonomousCycle(
   env: Env,
