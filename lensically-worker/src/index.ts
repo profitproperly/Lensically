@@ -20511,7 +20511,8 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
   );
   const failed = result.ok === false;
   const hasIncident = Boolean(result.hardening_incident);
-  const nextAction = explicitNextAction
+    const nextAction = explicitNextAction
+    ?? manifestAutonomousFallbackNextAction
     ?? durableNextAction
     ?? (hasIncident
       ? "Advance the blocking hardening incident through evidence-gated closure before resuming the interrupted objective."
