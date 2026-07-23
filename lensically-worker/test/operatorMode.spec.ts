@@ -5023,7 +5023,7 @@ describe("operator mode MCP endpoint", () => {
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
                                                                                                                                                                                                                                                                                                                                                                                                 total_internal_capabilities: 105,
-            total_read_only_capabilities: 44,
+                        total_read_only_capabilities: 43,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
@@ -5034,8 +5034,8 @@ describe("operator mode MCP endpoint", () => {
     ).toBe(0);
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(campaign.structuredContent.campaign.passed).toBe(105);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
-                        read_only: 44,
-                                                mutation: 61,
+                                    read_only: 43,
+                                                mutation: 62,
       mutation_without_required_inputs: 0,
     });
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
@@ -5111,7 +5111,7 @@ describe("operator mode MCP endpoint", () => {
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-                                expect(eligibleMutations).toBe(61);
+                                                expect(eligibleMutations).toBe(62);
     expect(failedMutationPreflights).toBe(0);
   }, 90000);
 

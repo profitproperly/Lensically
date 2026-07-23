@@ -682,7 +682,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     objects: ["canonical evidence page", "mature post", "immature post", "evidence-consumption receipt"],
     keywords: ["get manifest cycle analysis page", "read evidence page", "inspect 28-day posts", "consume complete evidence"],
     capabilities: ["read one complete canonical evidence page", "preserve full post text and lineage", "record page consumption", "report remaining pages"],
-    payload: { action_size: "bounded_read", max_results: 100, max_response_bytes: 24000, required_inputs: ["brand_key", "cycle_id", "snapshot_id", "page_number"] },
+        payload: { action_size: "bounded_mutation", max_results: 100, max_response_bytes: 24000, required_inputs: ["brand_key", "cycle_id", "snapshot_id", "page_index"] },
     route_intent: "get manifest cycle analysis page",
     related_entry_ids: ["strategy.manifest_autonomous_cycle", "strategy.manifest_cycle_strategy", "analytics.performance_learning"],
     recommended_next_planes: ["content_production"],

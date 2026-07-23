@@ -18022,8 +18022,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   },
         {
     name: "get_manifest_cycle_analysis_page",
-    title: "Read Manifest cycle analysis page",
-    description: "Read one canonical page from the complete rolling 28-day Manifest evidence snapshot. Preparation returns page 0; read every remaining page before committing the cycle strategy. Each read is durably recorded, and strategy commit remains blocked until every page has been consumed.",
+        title: "Consume Manifest cycle analysis page",
+    description: "Return one complete canonical page from the rolling 28-day Manifest evidence snapshot and durably record that the model consumed it. Preparation returns only the snapshot manifest; call this tool from page 0 through the final page before committing the cycle strategy.",
     inputSchema: {
       type: "object",
       properties: {
@@ -18035,7 +18035,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       required: ["brand_key", "cycle_id", "snapshot_id", "page_index"],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "commit_manifest_cycle_strategy",
