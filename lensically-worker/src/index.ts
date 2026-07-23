@@ -11611,10 +11611,10 @@ async function buildManifestAutonomousAccountPosition(
        ON scheduled.threads_user_id = archive.threads_user_id
       AND scheduled.published_post_id = archive.post_id
      LEFT JOIN gpt_post_strategy_tags tags ON tags.scheduled_post_id = scheduled.id
-     WHERE archive.threads_user_id = ?
-     ORDER BY datetime(archive.post_timestamp) DESC, archive.post_id DESC
-     LIMIT 40`,
-  ).bind(brand.profile.threads_user_id).all<Record<string, unknown>>();
+          WHERE archive.threads_user_id = ?
+       AND datetime(archive.post_timestamp) >= datetime(?, '-72 hours')
+     ORDER BY datetime(archive.post_timestamp) DESC, archive.post_id DESC`,
+  ).bind(brand.profile.threads_user_id, clock.effective_now_iso).all<Record<string, unknown>>();
   const recentPublishedPosts = (recentPublishedRows.results ?? []).map((row) => ({
     source_type: "published_post",
     published_post_id: row.post_id,
@@ -31812,9 +31812,22 @@ async function getLatestOperatorContentFocus(
       generated_at: row.generated_at,
     } : null;
   };
+    const latestCycleStrategy = await env.DB.prepare(
+    `SELECT id, cycle_id, content_focus_json, locked_at
+     FROM operator_manifest_cycle_strategies
+     WHERE brand_key = ? AND status = 'locked'
+     ORDER BY datetime(locked_at) DESC LIMIT 1`,
+  ).bind(brandKey).first<Record<string, unknown>>();
   return {
     available: familyRows.results !== undefined,
     version: OPERATOR_CONTENT_FOCUS_VERSION,
+    current_authority: latestCycleStrategy ? "locked_cycle_strategy" : "legacy_content_focus_reviews",
+    cycle_content_focus: latestCycleStrategy ? {
+      strategy_id: latestCycleStrategy.id,
+      cycle_id: latestCycleStrategy.cycle_id,
+      content_focus: safeParseJsonString(String(latestCycleStrategy.content_focus_json ?? "{}")) ?? {},
+      locked_at: latestCycleStrategy.locked_at,
+    } : null,
     reviews: {
       daily: review("daily"),
       weekly: review("weekly"),
