@@ -359,53 +359,42 @@ if (!source.includes('name: "get_monthly_growth_review"')
   errors.push("bounded_monthly_growth_contract_missing");
 }
 
-if (!source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2"')
-    || !source.includes('const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1"')
-    || !source.includes('const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v4"')
-    || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_missions")
-    || !source.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")
-    || !source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles")
-    || !source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items")
-    || !source.includes('name: "prepare_manifest_autonomous_cycle"')
-    || !source.includes('name: "get_manifest_cycle_analysis_page"')
-    || !source.includes('name: "commit_manifest_cycle_strategy"')
-    || !source.includes('name: "persist_manifest_autonomous_post"')
-    || !source.includes('error: "retired_monolithic_autonomous_commit"')
-    || !source.includes('source_backed_generation_only: true')
-    || !source.includes('manifest_cycle_strategy_required_before_persist')
-    || !source.includes('manifest_cycle_plan_item_required')
-    || !source.includes('canonical_source_card_required')
-    || !source.includes('canonical_hard_ban_evaluation_incomplete')
-    || !source.includes('required_candidate_gate_execution_empty')
-    || !source.includes('candidate_gate_receipt_failed')
-    || !source.includes('slot_placement_assessment: { type: "string"')
-    || !source.includes('recent_exposure_assessment: { type: "string"')
-    || !source.includes('refreshManifestAutonomousThreadsSnapshot')
-    || !source.includes('buildManifestAutonomousCoverageLedger')
-    || !manifestIntelligence.includes('MANIFEST_INTELLIGENCE_FOUNDATION_VERSION = "manifest-intelligence-foundation-v3"')
-    || !manifestIntelligence.includes('MANIFEST_ANALYSIS_WINDOW_DAYS = 28')
-    || !manifestIntelligence.includes('MANIFEST_RECENT_EXPOSURE_HOURS = 72')
-    || !manifestIntelligence.includes('MANIFEST_EVIDENCE_PAGE_SIZE = 80')
-    || !manifestIntelligence.includes('primary_metric: "24_hour_likes"')
-    || !manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_snapshots")
-    || !manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts")
-    || !manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies")
-    || !manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items")
-    || !manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_candidate_gate_receipts")
-    || !manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_hard_bans")
-    || !workflow.includes('manifest-autonomous-cycle.test.ts')
-    || !manifestAutonomousTests.includes("uses Threads server time when the runtime clock is behind")
-    || !manifestAutonomousTests.includes("uses the newest verified publication as a hard lower bound")
-    || !manifestAutonomousTests.includes("starts the rolling horizon at the next future hour")
-    || !manifestAutonomousTests.includes("rejects original model sources and preserves permanent policy boundaries")
-    || !manifestAutonomousTests.includes("uses likes as the primary mature performance benchmark")
-    || !systemDirectoryTests.includes("prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review")
-    || !systemDirectoryTests.includes("reads and durably records one complete rolling evidence page without truncation")
-    || !systemDirectoryTests.includes("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup")
-    || !systemDirectoryTests.includes("persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt")
-    || !tests.includes("reviews a scheduled autonomous post without making the owner an operational dependency")
-    || !tests.includes("preserves a frequent winner until comparable mature performance actually decays")) {
-  errors.push("manifest_autonomous_growth_contract_missing");
+const manifestAutonomousGrowthChecks = [
+  ["growth_mission_version", source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2"')],
+  ["growth_engine_version", source.includes('const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1"')],
+  ["autonomy_contract_version", source.includes('const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v4"')],
+  ["growth_mission_tables", source.includes("CREATE TABLE IF NOT EXISTS operator_growth_missions") && source.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")],
+  ["autonomous_cycle_tables", source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles") && source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items")],
+  ["prepare_tool", source.includes('name: "prepare_manifest_autonomous_cycle"')],
+  ["analysis_page_tool", source.includes('name: "get_manifest_cycle_analysis_page"')],
+  ["cycle_strategy_tool", source.includes('name: "commit_manifest_cycle_strategy"')],
+  ["persist_tool", source.includes('name: "persist_manifest_autonomous_post"')],
+  ["retired_monolithic_commit", source.includes('error: "retired_monolithic_autonomous_commit"')],
+  ["source_backed_only", source.includes('source_backed_generation_only: true') && source.includes('canonical_source_card_required')],
+  ["strategy_and_plan_required", source.includes('manifest_cycle_strategy_required_before_persist') && source.includes('manifest_cycle_plan_item_required')],
+  ["hard_ban_enforcement", source.includes('canonical_hard_ban_evaluation_incomplete')],
+  ["nonempty_gate_execution", source.includes('required_candidate_gate_execution_empty') && source.includes('candidate_gate_receipt_failed')],
+  ["placement_and_exposure_assessment", source.includes('slot_placement_assessment: { type: "string"') && source.includes('recent_exposure_assessment: { type: "string"')],
+  ["live_reconciliation", source.includes('refreshManifestAutonomousThreadsSnapshot') && source.includes('buildManifestAutonomousCoverageLedger')],
+  ["intelligence_v3", manifestIntelligence.includes('MANIFEST_INTELLIGENCE_FOUNDATION_VERSION = "manifest-intelligence-foundation-v3"')],
+  ["rolling_windows", manifestIntelligence.includes('MANIFEST_ANALYSIS_WINDOW_DAYS = 28') && manifestIntelligence.includes('MANIFEST_RECENT_EXPOSURE_HOURS = 72')],
+  ["paged_evidence", manifestIntelligence.includes('MANIFEST_EVIDENCE_PAGE_SIZE = 80') && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_snapshots") && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts") && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_pages")],
+  ["likes_first", manifestIntelligence.includes('primary_metric: "24_hour_likes"')],
+  ["one_cycle_strategy", manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies") && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items")],
+  ["gate_receipts_and_bans", manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_candidate_gate_receipts") && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_hard_bans")],
+  ["workflow_regression", workflow.includes('manifest-autonomous-cycle.test.ts')],
+  ["clock_regressions", manifestAutonomousTests.includes("uses Threads server time when the runtime clock is behind") && manifestAutonomousTests.includes("uses the newest verified publication as a hard lower bound") && manifestAutonomousTests.includes("starts the rolling horizon at the next future hour")],
+  ["source_only_regression", manifestAutonomousTests.includes("rejects original model sources and preserves permanent policy boundaries")],
+  ["likes_first_regression", manifestAutonomousTests.includes("uses likes as the primary mature performance benchmark")],
+  ["prepare_regression", systemDirectoryTests.includes("prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review")],
+  ["analysis_page_regression", systemDirectoryTests.includes("reads and durably records one complete rolling evidence page without truncation")],
+  ["strategy_regression", systemDirectoryTests.includes("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup")],
+  ["persist_regression", systemDirectoryTests.includes("persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt")],
+  ["scheduled_review_regression", tests.includes("reviews a scheduled autonomous post without making the owner an operational dependency")],
+  ["winner_decay_regression", tests.includes("preserves a frequent winner until comparable mature performance actually decays")],
+];
+for (const [name, passed] of manifestAutonomousGrowthChecks) {
+  if (!passed) errors.push(`manifest_autonomous_growth_contract_missing:${name}`);
 }
 
 if (!tests.includes("routes operational status and engineering intents deterministically away from content procedures")) {
