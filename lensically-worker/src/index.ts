@@ -20610,6 +20610,43 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
       "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
   "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
 ]);
+function isExpectedHardeningControlResult(
+  toolName: string,
+  error: string,
+  result: Record<string, unknown>,
+): boolean {
+  if (HARDENING_EXPECTED_CONTROL_ERRORS.has(error)) return true;
+  const status = Number(result.status ?? 0);
+  if (toolName === "get_manifest_cycle_analysis_page") {
+    return error.startsWith("manifest_evidence_")
+      || ["manifest_cycle_not_found", "manifest_analysis_page_invalid"].includes(error);
+  }
+  if (toolName === "commit_manifest_cycle_strategy") {
+    return error.startsWith("manifest_") || error === "follower_attribution_forbidden";
+  }
+  if (toolName === "persist_manifest_autonomous_post") {
+    const expectedExact = new Set([
+      "autonomous_operator_mode_required", "stable_operation_id_required", "autonomous_cycle_id_required",
+      "autonomous_cycle_not_found", "post_hypothesis_invalid", "source_context_invalid",
+      "existing_source_card_lineage_required", "model_evaluation_not_passed", "model_evaluation_incomplete",
+      "follower_attribution_forbidden", "invalid_autonomous_post", "source_grounding_required_for_generation_mode",
+      "slot_outside_prepared_cycle", "cycle_strategy_required", "cycle_strategy_mismatch",
+      "cycle_plan_item_required", "cycle_plan_item_mismatch", "cycle_plan_source_mismatch",
+      "exact_duplicate_post", "explicit_banned_phrase", "semantic_repetition_collision",
+      "canonical_hard_ban_evaluation_incomplete", "candidate_gate_execution_failed",
+      "autonomous_source_lineage_missing", "autonomous_lineage_incomplete_after_persist",
+      "invalid_date_time", "autonomous_schedule_failed",
+    ]);
+    return expectedExact.has(error)
+      || error.startsWith("manifest_")
+      || error.startsWith("slot_")
+      || error.startsWith("source_")
+      || error.startsWith("candidate_")
+      || error.startsWith("model_evaluation_");
+  }
+  return status === 410 && error.endsWith("_retired");
+}
+
 const HARDENING_REPAIR_TOOLS = new Set<string>([
   "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
@@ -25495,7 +25532,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
             const isError = resultPayload.ok === false;
       const resultError = normalizeOperatorMachineKey(resultPayload.error ?? resultPayload.error_code, "unexpected_result");
-      const expectedControl = isError && HARDENING_EXPECTED_CONTROL_ERRORS.has(resultError);
+            const expectedControl = isError && isExpectedHardeningControlResult(toolName, resultError, resultPayload);
       const unexplainedZero = !isError
         && toolName === "searchRepoFiles"
         && Number(resultPayload.returned_count ?? 0) === 0

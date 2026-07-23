@@ -4097,14 +4097,19 @@ describe("operator mode MCP endpoint", () => {
       source_kind: "operator_hypothesis",
       source_card_id: fixture.sourceCardId,
     }));
-    const rejected = await mcpTool<{ success: boolean; error: string }>(
-      "commit_manifest_cycle_strategy",
-      invalidStrategy,
-    );
-    expect(rejected).toMatchObject({
+        const rejected = await mcpToolRaw<{
+      success: boolean;
+      error: string;
+      hardening_incident?: unknown;
+      normal_work_blocked?: boolean;
+    }>("commit_manifest_cycle_strategy", invalidStrategy);
+    expect(rejected.isError).toBe(true);
+    expect(rejected.structuredContent).toMatchObject({
       success: false,
       error: "manifest_cycle_lineup_source_backed_only",
     });
+    expect(rejected.structuredContent.hardening_incident).toBeUndefined();
+    expect(rejected.structuredContent.normal_work_blocked).not.toBe(true);
     const stored = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM operator_manifest_cycle_strategies WHERE cycle_id = ?`,
     ).bind(fixture.prepared.cycle.id).first<{ total: number }>();
