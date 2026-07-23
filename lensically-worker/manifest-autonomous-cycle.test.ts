@@ -8,8 +8,9 @@ import {
   MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
   MANIFEST_INTELLIGENCE_FOUNDATION_VERSION,
   MANIFEST_NONINTERFERENCE_POLICY,
-  buildManifestCycleReceiptRead,
+    buildManifestCycleReceiptRead,
   buildManifestExposureDimensions,
+  buildManifestLikesBenchmarks,
   normalizeManifestSourceContext,
   validateManifestFollowerAttributionBoundary,
   validateManifestPostHypothesis,
@@ -175,8 +176,10 @@ describe("Manifest intelligence foundation", () => {
 
     expect(dimensions.record_count).toBe(2);
     expect((dimensions.premise_counts as Record<string, number>).spending_priority).toBe(2);
-    expect(dimensions.question_count).toBe(2);
-    expect(Object.keys(dimensions.dollar_amount_counts as Record<string, number>)).toEqual(["25,000", "50,000"]);
+        expect(dimensions.question_count).toBe(2);
+    expect(Object.keys(dimensions.repeated_entity_counts as Record<string, number>)).toEqual(["$25,000", "$50,000"]);
+    expect(dimensions).not.toHaveProperty("financial_scenario_counts");
+    expect(dimensions).not.toHaveProperty("dollar_amount_counts");
   });
 
     it("allows only account-level follower checkpoints", () => {
@@ -267,13 +270,39 @@ describe("Manifest intelligence foundation", () => {
     expect(JSON.parse(reconstructedStrategy)).toEqual(receipt.output_strategy_version);
   });
 
-    it("accepts operator hypotheses and preserves permanent policy boundaries", () => {
-    const source = normalizeManifestSourceContext({ kind: "operator_hypothesis", source_type: "operator_hypothesis" });
-    expect(source.ok).toBe(true);
-    expect(MANIFEST_INTELLIGENCE_FOUNDATION_VERSION).toBe("manifest-intelligence-foundation-v2");
+      it("rejects model-originated sources and accepts canonical source-card lineage", () => {
+    const original = normalizeManifestSourceContext({ kind: "operator_hypothesis", source_type: "operator_hypothesis" });
+    expect(original.ok).toBe(false);
+    if (!original.ok) expect(original.errors).toContain("source_context_kind_invalid_source_backed_only");
+    const sourceBacked = normalizeManifestSourceContext({
+      kind: "saved_pattern",
+      source_type: "saved_pattern",
+      source_card_id: "card-1",
+      source_selection_id: "selection-1",
+    });
+    expect(sourceBacked.ok).toBe(true);
+    expect(MANIFEST_INTELLIGENCE_FOUNDATION_VERSION).toBe("manifest-intelligence-foundation-v3");
     expect(MANIFEST_NONINTERFERENCE_POLICY.learning_source).toBe("observable_post_engagement");
     expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.post_level_attribution).toBe("forbidden");
     expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.account_level_only).toBe(true);
+  });
+
+  it("builds mature likes-first benchmarks and excludes immature evidence", () => {
+    const benchmarks = buildManifestLikesBenchmarks([
+      { maturity_state: "mature", primary_likes: 10 },
+      { maturity_state: "mature", primary_likes: 30 },
+      { maturity_state: "mature", primary_likes: 50 },
+      { maturity_state: "immature", primary_likes: null },
+      { maturity_state: "evidence_incomplete", primary_likes: null },
+    ]);
+    expect(benchmarks).toMatchObject({
+      primary_metric: "24_hour_likes",
+      mature_sample_size: 3,
+      total_post_count: 5,
+      median_likes: 30,
+      minimum_likes: 10,
+      maximum_likes: 50,
+    });
   });
 });
 
