@@ -17606,7 +17606,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
             candidate_trace: {
               type: "array",
               maxItems: 12,
-              description: "Record considered candidates, including internally rejected candidates and why they were rejected, before the final selection.",
+                            description: "Record considered candidates, including internally rejected candidates and why they were rejected, before the final selection. When source_context.kind is operator_hypothesis and qualified Saved Patterns exist, include at least one real candidate from decision_intelligence.saved_pattern_candidates with its source_identity_key, decision rejected/not_selected/deferred, and a specific reason.",
               items: { type: "object", additionalProperties: true },
             },
             gate_summary: { type: "object", additionalProperties: true },
