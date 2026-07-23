@@ -17976,13 +17976,14 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "persist_manifest_autonomous_post",
     title: "Persist Manifest autonomous post",
-        description: "Persist exactly one completed, model-evaluated Manifest post into one exact authoritative missing slot. Before this call, the model must complete generation, scheduling, novelty, winner-preservation, recent-published-exposure, and slot-placement evaluation. The server enforces slot availability, exact duplicates, explicit banned phrases, idempotency, lineage, and scheduling without internal gate fanout, multi-post loops, or Threads publication calls. An elapsed or newly occupied slot is a nonfatal reconciled outcome: preserve the existing post, use the returned next missing slot with that slot's deterministic operation id, re-evaluate placement, and continue without stopping. After four actual persisted posts, call get_hourly_coverage once; do not call prepare_manifest_autonomous_cycle again inside the same run.",
+            description: "Persist exactly one source-card-backed Manifest post into the exact slot defined by the single locked cycle strategy and plan item. Every rolling 28-day evidence page must already be consumed. Original model posts are forbidden. The server verifies strategy and plan identity, canonical source lineage, itemized owner hard-ban coverage, source fidelity, exact duplicates, semantic repetition, slot availability, a nonempty passing gate receipt, idempotency, and complete lineage before scheduling. After four actual persists, reconcile coverage with get_hourly_coverage without preparing a second strategy." ,
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
-        cycle_id: { type: "string" },
-        strategic_thesis: { type: "object", additionalProperties: true },
+                cycle_id: { type: "string" },
+        cycle_strategy_id: { type: "string" },
+        cycle_plan_item_id: { type: "string" },
         post: {
           type: "object",
           properties: {
@@ -17991,7 +17992,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
             text: { type: "string" },
             generation_mode: {
               type: "string",
-              enum: ["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment", "original_discovery", "market_response"],
+                            enum: ["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment"],
             },
             family_key: { type: "string" },
             family_title: { type: "string" },
@@ -18004,9 +18005,9 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
                         transformed_elements: { type: "array", items: { type: "string" } },
             source_context: {
               type: "object",
-              description: "Identify whether the post comes from a Saved Pattern/source card or an operator hypothesis. Existing sources must provide source_card_id or source_selection_id.",
+                            description: "Identify the real Saved Pattern or canonical source card used for this adaptation. source_card_id is mandatory; autonomous generation may not invent a source or premise.",
               properties: {
-                kind: { type: "string", enum: ["saved_pattern", "source_card", "operator_hypothesis", "market_signal"] },
+                kind: { type: "string", enum: ["saved_pattern", "source_card"] },
                 source_type: { type: "string" },
                 source_identity_key: { type: "string" },
                 source_card_id: { type: "string" },
@@ -18014,7 +18015,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
                 internal_source_id: { type: "string" },
                 source_url: { type: "string" },
               },
-              required: ["kind"],
+                            required: ["kind", "source_card_id"],
               additionalProperties: false,
             },
             hypothesis: {
@@ -18067,17 +18068,40 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
             candidate_trace: {
               type: "array",
               maxItems: 12,
-                            description: "Record considered candidates, including internally rejected candidates and why they were rejected, before the final selection. When source_context.kind is operator_hypothesis and qualified Saved Patterns exist, include at least one real candidate from decision_intelligence.saved_pattern_candidates with its source_identity_key, decision rejected/not_selected/deferred, and a specific reason.",
+                                          description: "Record source-backed candidate variations considered for this exact locked plan item, including rejected variations and their source-card-grounded reasons. Do not include original premises or source-independent candidates.",
               items: { type: "object", additionalProperties: true },
             },
-            gate_summary: { type: "object", additionalProperties: true },
+                        gate_summary: {
+              type: "object",
+              properties: {
+                results: {
+                  type: "array",
+                  minItems: 1,
+                  items: {
+                    type: "object",
+                    properties: {
+                      rule_key: { type: "string" },
+                      gate_key: { type: "string" },
+                      executed: { type: "boolean" },
+                      status: { type: "string", enum: ["pass", "fail", "block", "blocked"] },
+                      evidence: {},
+                      reason: { type: "string" },
+                    },
+                    required: ["executed", "status"],
+                    additionalProperties: true,
+                  },
+                },
+              },
+              required: ["results"],
+              additionalProperties: true,
+            },
           },
-          required: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment"],
+                    required: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment", "gate_summary"],
           additionalProperties: true,
         },
         operation_id: { type: "string" },
       },
-      required: ["brand_key", "cycle_id", "strategic_thesis", "post", "model_evaluation", "operation_id"],
+            required: ["brand_key", "cycle_id", "cycle_strategy_id", "cycle_plan_item_id", "post", "model_evaluation", "operation_id"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
