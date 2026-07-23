@@ -20647,12 +20647,19 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
       "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
   "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
 ]);
-function isExpectedHardeningControlResult(
+export function isExpectedHardeningControlResult(
   toolName: string,
   error: string,
   result: Record<string, unknown>,
 ): boolean {
-  if (HARDENING_EXPECTED_CONTROL_ERRORS.has(error)) return true;
+    if (HARDENING_EXPECTED_CONTROL_ERRORS.has(error)) return true;
+  const failure = result.failure && typeof result.failure === "object" && !Array.isArray(result.failure)
+    ? result.failure as Record<string, unknown>
+    : {};
+  if (["applyRepoPatchSet", "applyRepoTextPatch"].includes(toolName)
+    && String(failure.phase ?? "") === "head_changed") {
+    return true;
+  }
   const status = Number(result.status ?? 0);
   if (toolName === "get_manifest_cycle_analysis_page") {
     return error.startsWith("manifest_evidence_")

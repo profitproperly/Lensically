@@ -13,7 +13,8 @@ import worker, {
   classifyOperatorContentFocusFamily,
   evaluateThreadsPostMetricsForLearning,
     finalizeScheduledPostPublished,
-  getScheduledPostPublishLineageStatus,
+    getScheduledPostPublishLineageStatus,
+  isExpectedHardeningControlResult,
   isSixHourInsightsRefreshWindow,
   OPERATOR_MCP_VERSION,
   searchKnownRepositoryFileContent,
@@ -4302,6 +4303,19 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(reviewed.operational_effect).toContain("No production change");
   }, 30000);
+
+    it("treats exact-head patch conflicts as expected non-destructive engineering control flow", () => {
+    expect(isExpectedHardeningControlResult(
+      "applyRepoPatchSet",
+      "unexpected_result",
+      { ok: false, status: 409, failure: { phase: "head_changed" } },
+    )).toBe(true);
+    expect(isExpectedHardeningControlResult(
+      "applyRepoPatchSet",
+      "unexpected_result",
+      { ok: false, status: 500, failure: { phase: "commit_failed" } },
+    )).toBe(false);
+  });
 
   it.skip("retired: bloated internal registry contract", async () => {
     const initialized = await mcpRequest<{ serverInfo: { name: string }; capabilities: Record<string, unknown>; instructions: string }>("initialize", {
