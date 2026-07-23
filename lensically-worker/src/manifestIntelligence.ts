@@ -747,13 +747,41 @@ export async function createManifestEvidenceSnapshot(db: D1Database, input: {
   hardBans: JsonRecord[]; experiments: JsonRecord[]; pageSize?: number;
 }): Promise<JsonRecord> {
   await ensureManifestIntelligenceTables(db);
-  const pageSize = Math.max(25, Math.min(100, Math.trunc(input.pageSize ?? MANIFEST_EVIDENCE_PAGE_SIZE)));
+    const pageSize = Math.max(1, Math.min(25, Math.trunc(input.pageSize ?? MANIFEST_EVIDENCE_PAGE_SIZE)));
+  const pageByteBudget = MANIFEST_EVIDENCE_PAGE_MAX_BYTES;
   const postCount = input.posts.length;
   const matureCount = input.posts.filter((post) => post.maturity_state === "mature").length;
   const immatureCount = input.posts.filter((post) => post.maturity_state === "immature").length;
   const incompleteCount = input.posts.filter((post) => post.maturity_state === "evidence_incomplete").length;
-  const pageCount = postCount === 0 ? 0 : Math.ceil(postCount / pageSize);
+  const pagePlan = buildManifestEvidencePages({
+    summary: {
+      as_of: input.asOf,
+      timezone: input.timezone,
+      window_days: MANIFEST_ANALYSIS_WINDOW_DAYS,
+      window_start: input.windowStart,
+      window_end: input.windowEnd,
+      post_count: postCount,
+      mature_count: matureCount,
+      immature_count: immatureCount,
+      incomplete_count: incompleteCount,
+      primary_metric: "24_hour_likes",
+      source_backed_generation_only: true,
+    },
+    posts: input.posts,
+    benchmarks: input.benchmarks,
+    previousBenchmarks: input.previousBenchmarks,
+    recentExposure: input.recentExposure,
+    futureSchedule: input.futureSchedule,
+    hardBans: input.hardBans,
+    experiments: input.experiments,
+    maxItems: pageSize,
+    maxBytes: pageByteBudget,
+  });
+  const pageCount = pagePlan.length;
   const sourceHash = await hash({
+    page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION,
+    page_size: pageSize,
+    page_byte_budget: pageByteBudget,
     posts: input.posts,
     benchmarks: input.benchmarks,
     previous_benchmarks: input.previousBenchmarks ?? {},
@@ -768,32 +796,46 @@ export async function createManifestEvidenceSnapshot(db: D1Database, input: {
   if (existing && String(existing.brand_key) !== input.brandKey) throw new Error("manifest_evidence_cycle_brand_conflict");
   await db.prepare(`INSERT INTO operator_manifest_evidence_snapshots (
       id, cycle_id, brand_key, snapshot_version, as_of, timezone, window_days,
-      window_start, window_end, post_count, mature_count, immature_count, incomplete_count,
-      page_size, page_count, benchmarks_json, previous_benchmarks_json, recent_exposure_json,
+            window_start, window_end, post_count, mature_count, immature_count, incomplete_count,
+      page_size, page_count, page_byte_budget, benchmarks_json, previous_benchmarks_json, recent_exposure_json,
       future_schedule_json, hard_bans_json, experiments_json, source_hash, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(cycle_id) DO UPDATE SET
       snapshot_version = excluded.snapshot_version, as_of = excluded.as_of, timezone = excluded.timezone,
       window_days = excluded.window_days, window_start = excluded.window_start, window_end = excluded.window_end,
-      post_count = excluded.post_count, mature_count = excluded.mature_count,
+            post_count = excluded.post_count, mature_count = excluded.mature_count,
       immature_count = excluded.immature_count, incomplete_count = excluded.incomplete_count,
       page_size = excluded.page_size, page_count = excluded.page_count,
+      page_byte_budget = excluded.page_byte_budget,
       benchmarks_json = excluded.benchmarks_json, previous_benchmarks_json = excluded.previous_benchmarks_json,
       recent_exposure_json = excluded.recent_exposure_json, future_schedule_json = excluded.future_schedule_json,
       hard_bans_json = excluded.hard_bans_json, experiments_json = excluded.experiments_json,
       source_hash = excluded.source_hash, updated_at = CURRENT_TIMESTAMP`).bind(
       snapshotId, input.cycleId, input.brandKey, MANIFEST_EVIDENCE_SNAPSHOT_VERSION,
-      input.asOf, input.timezone, MANIFEST_ANALYSIS_WINDOW_DAYS, input.windowStart, input.windowEnd,
-      postCount, matureCount, immatureCount, incompleteCount, pageSize, pageCount,
+            input.asOf, input.timezone, MANIFEST_ANALYSIS_WINDOW_DAYS, input.windowStart, input.windowEnd,
+      postCount, matureCount, immatureCount, incompleteCount, pageSize, pageCount, pageByteBudget,
       stableManifestJson(input.benchmarks), stableManifestJson(input.previousBenchmarks ?? {}),
       stableManifestJson(input.recentExposure), stableManifestJson(input.futureSchedule),
       stableManifestJson(input.hardBans), stableManifestJson(input.experiments), sourceHash,
     ).run();
   if (!existing || String(existing.source_hash) !== sourceHash) {
-    await db.batch([
+        await db.batch([
       db.prepare(`DELETE FROM operator_manifest_evidence_posts WHERE snapshot_id = ?`).bind(snapshotId),
+      db.prepare(`DELETE FROM operator_manifest_evidence_pages WHERE snapshot_id = ?`).bind(snapshotId),
       db.prepare(`DELETE FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`).bind(snapshotId),
     ]);
+        for (let offset = 0; offset < pagePlan.length; offset += 50) {
+      const chunk = pagePlan.slice(offset, offset + 50);
+      await db.batch(chunk.map((page) => db.prepare(`INSERT INTO operator_manifest_evidence_pages (
+          id, snapshot_id, cycle_id, brand_key, page_index, page_contract_version,
+          item_count, byte_count, evidence_types_json, items_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          crypto.randomUUID(), snapshotId, input.cycleId, input.brandKey, numeric(page.page_index),
+          MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, numeric(page.item_count), numeric(page.byte_count),
+          stableManifestJson(page.evidence_types ?? []), stableManifestJson(page.items ?? []),
+        )));
+    }
     for (let offset = 0; offset < input.posts.length; offset += 75) {
       const chunk = input.posts.slice(offset, offset + 75);
       await db.batch(chunk.map((post) => db.prepare(`INSERT INTO operator_manifest_evidence_posts (
