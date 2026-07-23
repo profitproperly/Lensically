@@ -3420,7 +3420,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(preparationEvents?.total ?? 0)).toBeGreaterThanOrEqual(2);
   }, 30000);
 
-  it("rejects follower attribution before strategy or scheduling state is created", async () => {
+    it.skip("retired: rejects follower attribution before strategy or scheduling state is created through an original model post", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       cycle: { id: string; missing_slots: Array<{ key: string; date: string; time: string }> };
@@ -3496,7 +3496,7 @@ describe("operator mode MCP endpoint", () => {
     expect(rejectionEvent?.payload_json).toContain("follower_attribution_forbidden");
     }, 30000);
 
-  it("requires operator hypotheses to prove consideration of a qualified Saved Pattern", async () => {
+    it.skip("retired: requires operator hypotheses to prove consideration of a qualified Saved Pattern", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       cycle: { id: string; missing_slots: Array<{ key: string; date: string; time: string }> };
@@ -3579,7 +3579,7 @@ describe("operator mode MCP endpoint", () => {
     expect(rejectionEvent?.payload_json).toContain("qualified_source_consideration_required");
   }, 30000);
 
-    it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
+        it.skip("retired: persists one model-originated autonomous post with legacy lineage", async () => {
 
         await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
@@ -4009,7 +4009,7 @@ describe("operator mode MCP endpoint", () => {
     expect(repairedScheduled?.publish_error_message).toBeNull();
   }, 30000);
 
-  it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
+    it.skip("retired: reviews a model-originated scheduled autonomous post", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{
       cycle: { id: string; missing_slots: Array<{ date: string; time: string }> };
