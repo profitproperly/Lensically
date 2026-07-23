@@ -1386,14 +1386,23 @@ export function buildManifestCycleReceiptRead(
 }
 
 export async function getManifestIntelligenceFoundation(db: D1Database, brandKey: string): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
   const policy = await ensureManifestIntelligencePolicy(db, brandKey);
-  const strategy = await getLatestManifestStrategyVersion(db, brandKey);
+  const cycleStrategyRow = await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies
+    WHERE brand_key = ? AND status = 'locked'
+    ORDER BY datetime(locked_at) DESC, datetime(created_at) DESC LIMIT 1`)
+    .bind(brandKey).first<JsonRecord>();
+  const cycleStrategy = cycleStrategyRow ? serializeCycleStrategy(cycleStrategyRow) : null;
+  const legacyStrategy = await getLatestManifestStrategyVersion(db, brandKey);
   const receipt = await getManifestCycleReceipt(db, { brandKey });
   const receiptRead = receipt ? buildManifestCycleReceiptRead(receipt, "summary") : null;
   return {
     foundation_version: MANIFEST_INTELLIGENCE_FOUNDATION_VERSION,
     policy,
-    latest_strategy_version: strategy,
+    latest_strategy_version: cycleStrategy,
+    latest_cycle_strategy: cycleStrategy,
+    legacy_strategy_version: legacyStrategy,
+    strategy_authority: "one_locked_model_led_strategy_per_cycle",
     latest_cycle_receipt: receiptRead?.summary ?? null,
   };
 }
