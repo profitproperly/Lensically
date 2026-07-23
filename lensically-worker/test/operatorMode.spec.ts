@@ -234,10 +234,18 @@ type ManifestSourceBackedCycleTestFixture = {
       id: string;
       missing_slots: Array<{ key: string; date: string; time: string }>;
     };
-    rolling_evidence: {
-      id: string;
-      page_count: number;
-      benchmarks: Record<string, unknown>;
+        rolling_evidence: {
+      snapshot: {
+        id: string;
+        page_count: number;
+        benchmarks: Record<string, unknown>;
+      };
+      first_page: {
+        success: boolean;
+        page_index: number;
+        items: unknown[];
+        consumption: { complete: boolean; consumed_page_count: number; required_page_count: number };
+      };
     };
   };
   sourceBatchId: string;
@@ -324,21 +332,22 @@ async function prepareManifestSourceBackedCycleForTest(
     operation_id: `test-source-backed-prepare-${crypto.randomUUID()}`,
     proceed_confirmed: true,
   });
-  expect(prepared.cycle.missing_slots.length).toBeGreaterThan(0);
-  expect(prepared.rolling_evidence.id).toBeTruthy();
-  expect(prepared.rolling_evidence.benchmarks).toMatchObject({ primary_metric: "24_hour_likes" });
+    expect(prepared.cycle.missing_slots.length).toBeGreaterThan(0);
+  expect(prepared.rolling_evidence.snapshot.id).toBeTruthy();
+  expect(prepared.rolling_evidence.snapshot.benchmarks).toMatchObject({ primary_metric: "24_hour_likes" });
+  expect(prepared.rolling_evidence.first_page).toMatchObject({ success: true, page_index: 0 });
 
   const maturePostIds: string[] = [];
-  const pageCount = Math.max(1, Number(prepared.rolling_evidence.page_count ?? 0));
+  const pageCount = Math.max(1, Number(prepared.rolling_evidence.snapshot.page_count ?? 0));
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const page = await mcpTool<{
       success: boolean;
       items: Array<{ published_post_id: string; maturity_state: string }>;
       consumption: { complete: boolean; consumed_page_count: number; required_page_count: number };
     }>("get_manifest_cycle_analysis_page", {
-      brand_key: "manifest_mental",
+            brand_key: "manifest_mental",
       cycle_id: prepared.cycle.id,
-      snapshot_id: prepared.rolling_evidence.id,
+      snapshot_id: prepared.rolling_evidence.snapshot.id,
       page_index: pageIndex,
       proceed_confirmed: true,
     });
@@ -364,9 +373,9 @@ async function prepareManifestSourceBackedCycleForTest(
     exploration_mode: index === 0 ? "exploit" : "hybrid",
   }));
   const strategyPayload: Record<string, unknown> = {
-    brand_key: "manifest_mental",
+        brand_key: "manifest_mental",
     cycle_id: prepared.cycle.id,
-    snapshot_id: prepared.rolling_evidence.id,
+    snapshot_id: prepared.rolling_evidence.snapshot.id,
     account_conclusion: {
       conclusion: "Use the proven source-backed recognition mechanism while varying execution and protecting audience trust.",
       published_post_ids: maturePostIds.slice(0, 5),
@@ -380,7 +389,7 @@ async function prepareManifestSourceBackedCycleForTest(
       test: ["controlled payoff wording variations"],
       unresolved_questions: ["Which source-backed payoff wording produces the strongest 24-hour likes?"],
     },
-    benchmarks: prepared.rolling_evidence.benchmarks,
+        benchmarks: prepared.rolling_evidence.snapshot.benchmarks,
     strongest_executions: [],
     weakest_executions: [],
     directives: {
