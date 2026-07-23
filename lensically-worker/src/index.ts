@@ -13969,7 +13969,103 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ success: false, error: "brand_key is required or unavailable" }, 400);
   }
 
-    if (toolName === "prepare_manifest_autonomous_cycle") {
+      if (toolName === "get_manifest_cycle_analysis_page") {
+    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
+    const snapshotId = normalizeOperatorText(payload.snapshot_id, 160, true);
+    const pageIndex = Math.max(0, Math.trunc(Number(payload.page_index ?? 0)));
+    if (!cycleId) return operatorJsonResponse({ success: false, error: "autonomous_cycle_id_required" }, 400);
+    try {
+      return operatorJsonResponse(await readManifestEvidencePage(env.DB, {
+        brandKey: brand.brand_key,
+        cycleId,
+        snapshotId,
+        pageIndex,
+      }));
+    } catch (error) {
+      return operatorJsonResponse({
+        success: false,
+        error: error instanceof Error ? error.message : "manifest_evidence_page_read_failed",
+      }, 400);
+    }
+  }
+
+  if (toolName === "commit_manifest_cycle_strategy") {
+    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
+    const snapshotId = normalizeOperatorText(payload.snapshot_id, 160);
+    if (!cycleId || !snapshotId) {
+      return operatorJsonResponse({ success: false, error: "cycle_id_and_snapshot_id_required" }, 400);
+    }
+    const accountConclusion = payload.account_conclusion && typeof payload.account_conclusion === "object" && !Array.isArray(payload.account_conclusion)
+      ? payload.account_conclusion as Record<string, unknown>
+      : {};
+    const contentFocus = payload.content_focus && typeof payload.content_focus === "object" && !Array.isArray(payload.content_focus)
+      ? payload.content_focus as Record<string, unknown>
+      : {};
+    const benchmarks = payload.benchmarks && typeof payload.benchmarks === "object" && !Array.isArray(payload.benchmarks)
+      ? payload.benchmarks as Record<string, unknown>
+      : {};
+    const directives = payload.directives && typeof payload.directives === "object" && !Array.isArray(payload.directives)
+      ? payload.directives as Record<string, unknown>
+      : {};
+    const strongestExecutions = Array.isArray(payload.strongest_executions)
+      ? payload.strongest_executions.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
+      : [];
+    const weakestExecutions = Array.isArray(payload.weakest_executions)
+      ? payload.weakest_executions.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
+      : [];
+    const experiments = Array.isArray(payload.experiments)
+      ? payload.experiments.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
+      : [];
+    const risks = Array.isArray(payload.risks) ? payload.risks : [];
+    const lineup = Array.isArray(payload.lineup)
+      ? payload.lineup.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
+      : [];
+    if (!Object.keys(accountConclusion).length || !Object.keys(contentFocus).length
+      || !Object.keys(benchmarks).length || !Object.keys(directives).length || !lineup.length) {
+      return operatorJsonResponse({ success: false, error: "complete_cycle_strategy_required" }, 400);
+    }
+    try {
+      const strategy = await commitManifestCycleStrategy(env.DB, {
+        cycleId,
+        brandKey: brand.brand_key,
+        snapshotId,
+        accountConclusion,
+        contentFocus,
+        benchmarks,
+        strongestExecutions,
+        weakestExecutions,
+        directives,
+        experiments,
+        risks,
+        lineup,
+      });
+      await appendManifestCycleEvent(env.DB, {
+        cycleId,
+        brandKey: brand.brand_key,
+        eventKey: `cycle-strategy:${String(strategy.id ?? "locked")}`,
+        eventType: "cycle_strategy_locked",
+        payload: {
+          strategy_id: strategy.id ?? null,
+          snapshot_id: snapshotId,
+          lineup_count: lineup.length,
+          source_backed_generation_only: true,
+          primary_metric: "24_hour_likes",
+        },
+      });
+      return operatorJsonResponse({
+        success: true,
+        strategy,
+        next_action: "Generate candidates only from each locked plan item's canonical source card, run every required candidate gate, and persist the first exact planned slot.",
+      });
+    } catch (error) {
+      return operatorJsonResponse({
+        success: false,
+        error: error instanceof Error ? error.message : "manifest_cycle_strategy_commit_failed",
+      }, 400);
+    }
+  }
+
+  if (toolName === "prepare_manifest_autonomous_cycle") {
     return operatorJsonResponse(await prepareManifestAutonomousCycle(env, brand, payload));
   }
 
