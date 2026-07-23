@@ -57,7 +57,8 @@
       "get_hourly_coverage",
       "attach_manifest_review_draft",
       "schedule_manifest_review_batch",
-      "get_performance_learning",
+            "get_performance_learning",
+      "delete_scheduled_post",
       "edit_scheduled_post",
       "skip_manifest_review_source",
       "list_accounts",
@@ -365,7 +366,7 @@
       "live_verification": "The exact deployed Main tool accepts exactly one completed model-evaluated post, enforces the prepared slot, exact duplicates, explicit banned phrases, idempotency, and complete lineage, persists without internal gate fanout or runway scans, performs no Threads API call, and replays without duplicate posts.",
       "compatibility_bridge": false
     },
-    {
+        {
       "capability_id": "content.review_manifest_scheduled_post",
       "directory_entry_id": "content.manifest_scheduled_review",
       "canonical_handler": "review_manifest_scheduled_post",
@@ -375,6 +376,17 @@
       "release_scope": "operator-content",
       "live_verification": "The exact deployed Main tool records optional scoped owner criticism and can gate and replace one unpublished scheduled post in the same slot without pausing the autonomous runway or converting temporary feedback into a permanent ban.",
             "compatibility_bridge": false
+    },
+    {
+      "capability_id": "publishing.delete_scheduled_post_with_reason",
+      "directory_entry_id": "publishing.scheduled_posts",
+      "canonical_handler": "delete_scheduled_post",
+      "route_intent": "delete scheduled post with reason",
+      "implementation_mode": "new_handler",
+      "focused_regression": "requires a nonempty reason, removes only an approved unpublished post, preserves durable deletion evidence, exposes it through schedule reads, and writes no strategy memory",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool deletes one approved unpublished scheduled post only with a reason and returns the preserved original text, slot, actor, source, timestamp, and reason; list_scheduled_posts exposes the same deletion record and the next autonomous prepare consumes recent deletion reasons.",
+      "compatibility_bridge": false
     },
     {
       "capability_id": "strategy.read_manifest_intelligence_foundation",
