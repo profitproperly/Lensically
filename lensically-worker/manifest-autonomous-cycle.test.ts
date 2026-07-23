@@ -5,10 +5,13 @@ import {
 } from "./src/index";
 import {
       MANIFEST_CYCLE_RECEIPT_READ_VERSION,
-  MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+    MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
   MANIFEST_INTELLIGENCE_FOUNDATION_VERSION,
   MANIFEST_NONINTERFERENCE_POLICY,
+  MANIFEST_EVIDENCE_PAGE_MAX_BYTES,
+  MANIFEST_EVIDENCE_PAGE_SIZE,
     buildManifestCycleReceiptRead,
+  buildManifestEvidencePages,
   buildManifestExposureDimensions,
   buildManifestLikesBenchmarks,
   normalizeManifestSourceContext,
@@ -287,7 +290,7 @@ describe("Manifest intelligence foundation", () => {
     expect(MANIFEST_FOLLOWER_ATTRIBUTION_POLICY.account_level_only).toBe(true);
   });
 
-  it("builds mature likes-first benchmarks and excludes immature evidence", () => {
+    it("builds mature likes-first benchmarks and excludes immature evidence", () => {
     const benchmarks = buildManifestLikesBenchmarks([
       { maturity_state: "mature", primary_likes: 10 },
       { maturity_state: "mature", primary_likes: 30 },
@@ -303,6 +306,42 @@ describe("Manifest intelligence foundation", () => {
       minimum_likes: 10,
       maximum_likes: 50,
     });
+  });
+
+  it("packs every strategy evidence item into complete byte-bounded canonical pages", () => {
+    const posts = Array.from({ length: 35 }, (_, index) => ({
+      published_post_id: `post-${index + 1}`,
+      text: `Source-backed evidence post ${index + 1}: ${"evidence ".repeat(45)}`,
+      maturity_state: index < 20 ? "mature" : "immature",
+      primary_likes: index < 20 ? index + 1 : null,
+      lineage: { source_card_id: `card-${index + 1}` },
+    }));
+    const futureSchedule = Array.from({ length: 20 }, (_, index) => ({ slot_key: `2026-07-24T${String(index).padStart(2, "0")}:00`, scheduled_post_id: index + 1 }));
+    const hardBans = Array.from({ length: 15 }, (_, index) => ({ rule_key: `ban-${index + 1}`, pattern: `Never use banned pattern ${index + 1}.` }));
+    const experiments = Array.from({ length: 5 }, (_, index) => ({ experiment_key: `experiment-${index + 1}`, status: "running" }));
+    const pages = buildManifestEvidencePages({
+      summary: { post_count: posts.length, primary_metric: "24_hour_likes" },
+      posts,
+      benchmarks: { primary_metric: "24_hour_likes", median_likes: 10 },
+      previousBenchmarks: { primary_metric: "24_hour_likes", median_likes: 8 },
+      recentExposure: { published: [{ published_post_id: "recent-1" }], scheduled: [{ scheduled_post_id: 99 }] },
+      futureSchedule,
+      hardBans,
+      experiments,
+    });
+    const expectedItemCount = 3 + 2 + futureSchedule.length + hardBans.length + experiments.length + posts.length;
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pages.reduce((total, page) => total + Number(page.item_count), 0)).toBe(expectedItemCount);
+    for (const page of pages) {
+      expect(Number(page.item_count)).toBeGreaterThan(0);
+      expect(Number(page.item_count)).toBeLessThanOrEqual(MANIFEST_EVIDENCE_PAGE_SIZE);
+      expect(Number(page.byte_count)).toBeLessThanOrEqual(MANIFEST_EVIDENCE_PAGE_MAX_BYTES);
+      expect((page.items as unknown[]).length).toBe(Number(page.item_count));
+    }
+    const publishedIds = pages.flatMap((page) => page.items as Array<{ evidence_type: string; data: Record<string, unknown> }>)
+      .filter((item) => item.evidence_type === "published_post")
+      .map((item) => item.data.published_post_id);
+    expect(publishedIds).toEqual(posts.map((post) => post.published_post_id));
   });
 });
 
