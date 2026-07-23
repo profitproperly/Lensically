@@ -716,8 +716,9 @@ function compactManifestRollingEvidence(value: unknown): Record<string, unknown>
       mature_count: snapshot.mature_count ?? 0,
       immature_count: snapshot.immature_count ?? 0,
       incomplete_count: snapshot.incomplete_count ?? 0,
-      page_size: snapshot.page_size ?? null,
+            page_size: snapshot.page_size ?? null,
       page_count: snapshot.page_count ?? 0,
+      page_byte_budget: snapshot.page_byte_budget ?? null,
       benchmarks: snapshot.benchmarks ?? {},
       previous_benchmarks: snapshot.previous_benchmarks ?? {},
       context_counts: {
