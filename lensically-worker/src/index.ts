@@ -9561,6 +9561,19 @@ async function runOperatorGates(
     results.push(buildGateResult(gate, "not_applicable", "Gate has no v1 backend evaluator for this context."));
   }
 
+    if (results.length === 0) {
+    results.push({
+      gate_id: "required-gate-execution",
+      gate_key: "required_gate_execution_gate",
+      result: "fail",
+      blocking: true,
+      rationale: "No candidate gate executed for this context.",
+      evaluated_by: "backend",
+      evidence: { stage_scope: input.stageScope, source_card_id: input.sourceCardId ?? null },
+      repair_guidance: "Load the applicable gates and provide the source card, candidate text, and required model evaluations before treating the candidate as showable.",
+    });
+  }
+
   if (input.draftId) {
     for (const result of results) {
       await env.DB.prepare(
