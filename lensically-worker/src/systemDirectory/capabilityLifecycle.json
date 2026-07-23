@@ -378,12 +378,12 @@
             "compatibility_bridge": false
     },
     {
-      "capability_id": "publishing.delete_scheduled_post_with_reason",
-      "directory_entry_id": "publishing.scheduled_posts",
+            "capability_id": "publishing.delete_scheduled_post_with_reason",
+      "directory_entry_id": "publishing.scheduled_post_deletion",
       "canonical_handler": "delete_scheduled_post",
       "route_intent": "delete scheduled post with reason",
       "implementation_mode": "new_handler",
-      "focused_regression": "requires a nonempty reason, removes only an approved unpublished post, preserves durable deletion evidence, exposes it through schedule reads, and writes no strategy memory",
+            "focused_regression": "requires and preserves scheduled-post deletion reasons without writing strategy memory",
       "release_scope": "operator-content",
       "live_verification": "The exact deployed Main tool deletes one approved unpublished scheduled post only with a reason and returns the preserved original text, slot, actor, source, timestamp, and reason; list_scheduled_posts exposes the same deletion record and the next autonomous prepare consumes recent deletion reasons.",
       "compatibility_bridge": false
