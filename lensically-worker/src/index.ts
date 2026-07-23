@@ -12217,7 +12217,23 @@ async function prepareManifestAutonomousCycle(
       normalizeOperatorJson(missingSlots, []),
             normalizeOperatorJson(accountPosition, {}),
     ).run();
-  }
+    }
+
+  const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
+    cycle_id: cycleId,
+    as_of: clock.effective_now_iso,
+    effective_now_ms: effectiveNowMs,
+    timezone,
+    future_schedule: coverage.scheduled_records.map((record) => ({ ...record })),
+  });
+  const evidenceSnapshot = rollingEvidence.snapshot && typeof rollingEvidence.snapshot === "object" && !Array.isArray(rollingEvidence.snapshot)
+    ? rollingEvidence.snapshot as Record<string, unknown>
+    : {};
+  await env.DB.prepare(
+    `UPDATE operator_autonomous_growth_cycles
+     SET evidence_snapshot_id = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND brand_key = ?`,
+  ).bind(evidenceSnapshot.id ?? null, cycleId, brand.brand_key).run();
 
   const intelligencePolicy = await ensureManifestIntelligencePolicy(env.DB, brand.brand_key);
   let inputStrategyVersion = await getLatestManifestStrategyVersion(env.DB, brand.brand_key);
@@ -12244,8 +12260,11 @@ async function prepareManifestAutonomousCycle(
       sourceCycleId: cycleId,
     });
   }
-  const publishedExposure = Array.isArray(accountPosition.recent_published_posts)
-    ? accountPosition.recent_published_posts as Record<string, unknown>[]
+    const recentEvidence = evidenceSnapshot.recent_exposure && typeof evidenceSnapshot.recent_exposure === "object" && !Array.isArray(evidenceSnapshot.recent_exposure)
+    ? evidenceSnapshot.recent_exposure as Record<string, unknown>
+    : {};
+  const publishedExposure = Array.isArray(recentEvidence.posts)
+    ? recentEvidence.posts as Record<string, unknown>[]
     : [];
   const scheduledExposure = coverage.scheduled_records.map((record) => ({ ...record }));
   const exposureSnapshot = await createManifestExposureSnapshot(env.DB, {
@@ -12272,9 +12291,11 @@ async function prepareManifestAutonomousCycle(
     startupState: {
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-                        data_consulted: ["growth mission", "strategy memory", "performance learning", "Content Focus", "learning brief", "operator benchmarks", "run comparison", "portfolio states", "controlled experiments", "Saved Pattern intelligence", "semantic repetition exposure", "account-level follower checkpoint", "recent published exposure", "future scheduled exposure", "scheduled deletion reasons", "active gates"],
-            intelligence_policy: intelligencePolicy,
-      decision_intelligence: decisionIntelligenceReceiptReference,
+                              data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "scheduled deletion reasons", "operational gates"],
+      intelligence_policy: intelligencePolicy,
+      evidence_snapshot_id: evidenceSnapshot.id ?? null,
+      evidence_page_count: evidenceSnapshot.page_count ?? 0,
+      legacy_decision_intelligence_supporting_only: decisionIntelligenceReceiptReference,
     },
     inputStrategyVersionId: normalizeOperatorText(inputStrategyVersion.id, 160, true),
     exposureSnapshotId: normalizeOperatorText(exposureSnapshot.id, 160, true),
