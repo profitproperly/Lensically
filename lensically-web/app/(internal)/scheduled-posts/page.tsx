@@ -1454,10 +1454,50 @@ export default function ScheduledPostsPage() {
                 </li>
               );
             })}
-            </ul>
+                        </ul>
           </>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Deleted post history</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Deleted posts remain available to you and the autonomous model with the original slot and deletion reason.
+          </p>
+        </div>
+        {!deletedPosts.length ? (
+          <p className="text-sm text-slate-600">No audited scheduled-post deletions yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {deletedPosts.map((deletedPost) => (
+              <li key={deletedPost.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Originally scheduled {formatScheduledLocalTime(
+                      deletedPost.scheduled_time_utc,
+                      timezone,
+                      clockFormatPreference,
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Deleted by {deletedPost.deleted_by} via {deletedPost.deletion_source}
+                    {formatDebugTimestamp(deletedPost.deleted_at)
+                      ? ` · ${formatDebugTimestamp(deletedPost.deleted_at)}`
+                      : ""}
+                  </p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-900">{deletedPost.post_text}</p>
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Deletion reason</p>
+                  <p className="mt-1 text-sm text-amber-950">{deletedPost.reason}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>
   );
 }
+
