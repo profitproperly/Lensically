@@ -20549,7 +20549,9 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     retirement_condition: retirementCondition,
     progress_recorded: true,
     deferred_work_preserved: true,
-    checkpoint: `Continue from durable outcome state after tool:${toolName}; do not reconstruct the next action from chat memory.`,
+        checkpoint: manifestAutonomousCycleTool
+      ? `Continue the same canonical Manifest cycle after tool:${toolName}; use its receipt, exact remaining slots, and deterministic operation IDs. Do not switch to unrelated durable work.`
+      : `Continue from durable outcome state after tool:${toolName}; do not reconstruct the next action from chat memory.`,
     deferred_work_ledger: "operator_work_ledger",
   };
   const validation = validateOperatorActionClosure(closure);
