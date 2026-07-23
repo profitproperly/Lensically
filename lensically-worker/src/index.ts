@@ -12630,9 +12630,23 @@ async function persistManifestAutonomousPost(
   const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
   const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
   const slotKey = date && time ? `${date}T${time}` : "";
-    if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
+      if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
     || !MANIFEST_AUTONOMOUS_GENERATION_MODES.has(generationMode)) {
     return rejectPersist("invalid_autonomous_post", {}, slotKey || null);
+  }
+  const sourceGroundedGenerationModes = new Set([
+    "franchise_deployment",
+    "controlled_variation",
+    "mechanism_expansion",
+  ]);
+  if (sourceGroundedGenerationModes.has(generationMode)
+    && !["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)) {
+    return rejectPersist("source_grounding_required_for_generation_mode", {
+      generation_mode: generationMode,
+      received_source_kind: sourceContextValidation.value.kind,
+      allowed_source_kinds: ["saved_pattern", "source_card"],
+      corrective_action: "Select a real qualified Saved Pattern or existing source card and provide its source_card_id or source_selection_id. Use original_discovery only for genuinely source-independent discovery.",
+    }, slotKey || null);
   }
   const targetSlots = Array.isArray(cycle.target_slots)
     ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
