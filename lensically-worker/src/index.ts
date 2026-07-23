@@ -12349,12 +12349,15 @@ async function prepareManifestAutonomousCycle(
       cycle: compactCycle,
       intelligence_engine_refresh: intelligenceEngineRefresh,
             measurement_audit_refresh: measurementAuditRefresh,
-            decision_intelligence: decisionIntelligenceReceiptReference,
+                  decision_intelligence: decisionIntelligenceReceiptReference,
+      rolling_evidence: rollingEvidence,
+      strategy_required: missingSlots.length > 0,
+      source_backed_generation_only: true,
       recent_scheduled_deletions: recentScheduledDeletions,
       remaining_missing_count: missingSlots.length,
       next_missing_slot: missingSlots[0] ?? null,
       next_action: missingSlots.length > 0
-        ? `Continue autonomous Manifest cycle ${cycleId} now: build the complete remaining portfolio, then persist the first exact missing slot ${missingSlots[0]?.key ?? "returned by cycle.missing_slots"}. Preparation is nonterminal and the turn must not end.`
+        ? `Read every remaining analysis page for cycle ${cycleId}, perform the complete model-led account review, then call commit_manifest_cycle_strategy once with a source-card-backed lineup covering all ${missingSlots.length} authoritative missing slots. Do not generate or persist a post before the strategy is locked.`
         : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
       reconciliation_contract: {
         authoritative_clock_source: clock.source,
@@ -12373,12 +12376,15 @@ async function prepareManifestAutonomousCycle(
                 cycle: preparedCycle,
                 intelligence_engine_refresh: intelligenceEngineRefresh,
                 measurement_audit_refresh: measurementAuditRefresh,
-                decision_intelligence: decisionIntelligence,
+                                decision_intelligence: decisionIntelligence,
+    rolling_evidence: rollingEvidence,
+    strategy_required: missingSlots.length > 0,
+    source_backed_generation_only: true,
     recent_scheduled_deletions: recentScheduledDeletions,
     remaining_missing_count: missingSlots.length,
     next_missing_slot: missingSlots[0] ?? null,
     next_action: missingSlots.length > 0
-      ? `Continue autonomous Manifest cycle ${cycleId} now: build the complete missing-slot portfolio, then persist the first exact missing slot ${missingSlots[0]?.key ?? "returned by cycle.missing_slots"}. Preparation is nonterminal and the turn must not end.`
+      ? `Read every remaining analysis page for cycle ${cycleId}, perform the complete model-led account review, then call commit_manifest_cycle_strategy once with a source-card-backed lineup covering all ${missingSlots.length} authoritative missing slots. Do not generate or persist a post before the strategy is locked.`
       : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
     intelligence_foundation: {
       policy: intelligencePolicy,
@@ -12396,8 +12402,15 @@ async function prepareManifestAutonomousCycle(
       follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
       noninterference_policy: MANIFEST_NONINTERFERENCE_POLICY,
     },
-    strategy_contract: {
-      objective: "Build and sequence the highest-value 48-hour growth portfolio before persisting the first post. Posts are strategic moves, not interchangeable slot filler.",
+        strategy_contract: {
+      objective: "Inspect the complete rolling 28-day evidence, form one fresh account-wide conclusion, and lock one source-backed strategy and full authoritative missing-slot lineup before generating the first candidate.",
+      analysis_window_days: MANIFEST_ANALYSIS_WINDOW_DAYS,
+      primary_performance_metric: "24_hour_likes",
+      recent_exposure_window_hours: MANIFEST_RECENT_EXPOSURE_HOURS,
+      one_strategy_per_cycle: true,
+      source_backed_generation_only: true,
+      original_model_posts_forbidden: true,
+      every_analysis_page_required: true,
       fixed_percentages: false,
       winner_preservation: "Continue using winners while comparable performance remains strong, while spacing them when recent published or scheduled exposure is dense.",
       repetition_distinction: "Mechanism repetition can be productive; clustered execution sameness must be rejected, rewritten, or moved to a later slot.",
@@ -12407,8 +12420,9 @@ async function prepareManifestAutonomousCycle(
       future_schedule_required: true,
       delivery_incident_awareness_required: true,
       family_roles: ["franchise", "core", "emerging", "prospect", "cooling", "dormant"],
-      generation_modes: Array.from(MANIFEST_AUTONOMOUS_GENERATION_MODES),
-            strategy_change_rule: "Change strategy when authoritative learning, benchmark movement, portfolio evidence, experiment results, audience response, account position, recent exposure, or opportunity changes—not merely because another day began.",
+            generation_modes: ["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment"],
+      source_kinds: ["saved_pattern", "source_card"],
+      strategy_change_rule: "Change strategy when authoritative learning, benchmark movement, portfolio evidence, experiment results, audience response, account position, recent exposure, or opportunity changes—not merely because another day began.",
       sequencing_rule: "A franchise may stay in the portfolio and still move later in the day. The earliest slot is reserved for the strongest contextually appropriate move after exposure and novelty review.",
       scheduled_task_consumption_rule: "Before generating or placing any post, consume every field in decision_intelligence. Persist an intelligence_application_assessment explaining which learned directive changed the move or why evidence required preserving the current strategy.",
       decision_influence_receipt_required: true,
