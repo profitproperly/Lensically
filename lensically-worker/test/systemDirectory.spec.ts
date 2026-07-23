@@ -1396,6 +1396,40 @@ describe("System Directory foundation", () => {
   });
 
   
+  
+  it("prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review", () => {
+    const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "strategy.manifest_autonomous_cycle");
+    expect(entry).toMatchObject({ route_intent: "prepare manifest autonomous cycle" });
+    expect(entry?.capabilities).toEqual(expect.arrayContaining([
+      "capture complete likes-first evidence",
+      "return canonical analysis pages",
+    ]));
+    expect(entry?.hard_gates).toContain("No post may be generated during preparation.");
+  });
+
+  it("reads and durably records one complete rolling evidence page without truncation", () => {
+    const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "strategy.manifest_cycle_analysis_page");
+    expect(entry).toMatchObject({ route_intent: "get manifest cycle analysis page" });
+    expect(entry?.payload.required_inputs).toEqual(expect.arrayContaining(["cycle_id", "snapshot_id", "page_number"]));
+    expect(entry?.hard_gates).toContain("Post evidence must not be silently truncated.");
+  });
+
+  it("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup", () => {
+    const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "strategy.manifest_cycle_strategy");
+    expect(entry).toMatchObject({ route_intent: "commit manifest cycle strategy" });
+    expect(entry?.hard_gates).toEqual(expect.arrayContaining([
+      "Exactly one strategy is allowed per cycle.",
+      "Original model sources are forbidden.",
+    ]));
+  });
+
+  it("persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt", () => {
+    const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "content.manifest_autonomous_post_persistence");
+    expect(entry).toMatchObject({ route_intent: "persist manifest autonomous post" });
+    expect(entry?.payload.required_inputs).toEqual(expect.arrayContaining(["cycle_strategy_id", "plan_item_id"]));
+    expect(entry?.hard_gates).toContain("A nonempty passing owner-rule and backend gate receipt is mandatory.");
+  });
+
   it("routes deployment through the explicit exact-SHA Main workflow", () => {
     const deployment = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((entry) => entry.id === "deployment.main_worker");
     expect(deployment).toMatchObject({
