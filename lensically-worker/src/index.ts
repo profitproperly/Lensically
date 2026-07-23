@@ -20530,7 +20530,9 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     role: AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
     current_live_state: `tool:${toolName}; outcome:${failed ? "failed" : "completed"}; production_commit:${env.LENSICALLY_COMMIT_SHA?.trim() || "runtime-bound"}`,
     target_agent_native_state: "Mission-driven scheduled operation with durable state, one active outcome, evidence-gated execution, and optional owner interaction.",
-    active_outcome: durableOutcome ?? "Select and activate the highest-value deferred outcome through the durable intake guard.",
+        active_outcome: manifestAutonomousCycleTool
+      ? "Complete the active autonomous Manifest cycle through canonical receipt closure with zero cycle-horizon missing slots."
+      : durableOutcome ?? "Select and activate the highest-value deferred outcome through the durable intake guard.",
     next_action: nextAction,
     priority_reason: hasIncident
       ? "P0/P1 hardening incidents supersede normal work."
