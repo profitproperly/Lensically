@@ -385,7 +385,7 @@
       "implementation_mode": "new_handler",
             "focused_regression": "persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool rejects original model posts, missing or mismatched cycle strategies and plan items, incomplete analysis consumption, missing canonical source cards, empty or failed owner-rule evaluation, source-fidelity failures, exact duplicates, semantic collisions, slot conflicts, and incomplete lineage; a passing post stores evidence-to-strategy-to-plan-to-source-to-gate lineage and replays idempotently."
+            "live_verification": "The exact deployed Main tool rejects original model posts, missing or mismatched cycle strategies and plan items, incomplete analysis consumption, missing canonical source cards, empty or failed owner-rule evaluation, source-fidelity failures, exact duplicates, semantic collisions, slot conflicts, and incomplete lineage; a passing post stores evidence-to-strategy-to-plan-to-source-to-gate lineage and replays idempotently.",
       "compatibility_bridge": false
     },
         {
