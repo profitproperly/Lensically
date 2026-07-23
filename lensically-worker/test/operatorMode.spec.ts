@@ -4079,6 +4079,168 @@ describe("operator mode MCP endpoint", () => {
     expect(reviewed.operational_effect).toContain("No production change");
   }, 30000);
 
+    it("rejects original model sources before the cycle strategy is locked", async () => {
+    const fixture = await prepareManifestSourceBackedCycleForTest({ commitStrategy: false });
+    const invalidStrategy = JSON.parse(JSON.stringify(fixture.strategyPayload)) as Record<string, unknown>;
+    invalidStrategy.lineup = (invalidStrategy.lineup as Array<Record<string, unknown>>).map((item) => ({
+      ...item,
+      generation_mode: "adjacent_experiment",
+      source_kind: "operator_hypothesis",
+      source_card_id: fixture.sourceCardId,
+    }));
+    const rejected = await mcpTool<{ success: boolean; error: string }>(
+      "commit_manifest_cycle_strategy",
+      invalidStrategy,
+    );
+    expect(rejected).toMatchObject({
+      success: false,
+      error: "manifest_cycle_lineup_source_backed_only",
+    });
+    const stored = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_manifest_cycle_strategies WHERE cycle_id = ?`,
+    ).bind(fixture.prepared.cycle.id).first<{ total: number }>();
+    expect(Number(stored?.total ?? 0)).toBe(0);
+  }, 30000);
+
+  it("rejects follower attribution before source-backed scheduling state is created", async () => {
+    const fixture = await prepareManifestSourceBackedCycleForTest();
+    const payload = buildManifestSourceBackedPersistPayload(fixture);
+    const post = payload.post as Record<string, unknown>;
+    post.strategy = {
+      ...(post.strategy as Record<string, unknown>),
+      expected_followers_from_post: 25,
+    };
+    const rejected = await mcpTool<{ success: boolean; error: string; details: string[] }>(
+      "persist_manifest_autonomous_post",
+      payload,
+    );
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toBe("follower_attribution_forbidden");
+    const scheduled = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_autonomous_lineup_items
+       WHERE cycle_id = ? AND scheduled_post_id IS NOT NULL`,
+    ).bind(fixture.prepared.cycle.id).first<{ total: number }>();
+    expect(Number(scheduled?.total ?? 0)).toBe(0);
+  }, 30000);
+
+  it("persists one source-backed autonomous post through evidence, strategy, plan, gates, and complete lineage", async () => {
+    const fixture = await prepareManifestSourceBackedCycleForTest();
+    const payload = buildManifestSourceBackedPersistPayload(fixture);
+    const slot = fixture.prepared.cycle.missing_slots[0];
+    const persisted = await mcpTool<{
+      success: boolean;
+      scheduled_post_id: number;
+      strategy_version_id: string;
+      hypothesis_id: string;
+      publish_lineage_complete: boolean;
+      intelligence_lineage_complete: boolean;
+      lineage: {
+        source_batch_id: string;
+        source_selection_id: string;
+        source_card_id: string;
+        generation_run_id: string;
+        draft_id: string;
+        inventory_id: string;
+        hypothesis_id: string;
+        strategy_version_id: string;
+      };
+      server_checks: {
+        canonical_hard_bans_complete: boolean;
+        source_fidelity_passed: boolean;
+        semantic_repetition_collision: boolean;
+        threads_api_call: boolean;
+      };
+    }>("persist_manifest_autonomous_post", payload);
+    expect(persisted.success).toBe(true);
+    expect(persisted.scheduled_post_id).toBeGreaterThan(0);
+    expect(persisted.strategy_version_id).toBe(fixture.cycleStrategyId);
+    expect(persisted.lineage).toMatchObject({
+      source_batch_id: fixture.sourceBatchId,
+      source_selection_id: fixture.sourceSelectionId,
+      source_card_id: fixture.sourceCardId,
+      strategy_version_id: fixture.cycleStrategyId,
+    });
+    expect(persisted.lineage.generation_run_id).toBeTruthy();
+    expect(persisted.lineage.draft_id).toBeTruthy();
+    expect(persisted.lineage.inventory_id).toBeTruthy();
+    expect(persisted.hypothesis_id).toBe(persisted.lineage.hypothesis_id);
+    expect(persisted.publish_lineage_complete).toBe(true);
+    expect(persisted.intelligence_lineage_complete).toBe(true);
+    expect(persisted.server_checks).toMatchObject({
+      canonical_hard_bans_complete: true,
+      source_fidelity_passed: true,
+      semantic_repetition_collision: false,
+      threads_api_call: false,
+    });
+
+    const storedLineage = await env.DB.prepare(
+      `SELECT l.cycle_strategy_id, l.cycle_plan_item_id, l.gate_receipt_id,
+              plan.status AS plan_status, receipt.passed AS gate_passed,
+              receipt.results_json
+       FROM operator_autonomous_lineup_items l
+       JOIN operator_manifest_cycle_plan_items plan ON plan.id = l.cycle_plan_item_id
+       JOIN operator_manifest_candidate_gate_receipts receipt ON receipt.id = l.gate_receipt_id
+       WHERE l.cycle_id = ? AND l.slot_key = ? AND l.scheduled_post_id = ? LIMIT 1`,
+    ).bind(fixture.prepared.cycle.id, slot.key, persisted.scheduled_post_id).first<{
+      cycle_strategy_id: string;
+      cycle_plan_item_id: string;
+      gate_receipt_id: string;
+      plan_status: string;
+      gate_passed: number;
+      results_json: string;
+    }>();
+    expect(storedLineage).toMatchObject({
+      cycle_strategy_id: fixture.cycleStrategyId,
+      cycle_plan_item_id: fixture.planItemIds.get(slot.key),
+      plan_status: "scheduled",
+      gate_passed: 1,
+    });
+    expect(storedLineage?.gate_receipt_id).toBeTruthy();
+    expect(JSON.parse(String(storedLineage?.results_json ?? "[]")).length).toBeGreaterThan(0);
+
+    const publishLineage = await getScheduledPostPublishLineageStatus(
+      env,
+      persisted.scheduled_post_id,
+      "35758578720393972",
+    );
+    expect(publishLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
+
+    const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
+    expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
+    const duplicateCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM scheduled_posts WHERE id = ?`,
+    ).bind(persisted.scheduled_post_id).first<{ total: number }>();
+    expect(Number(duplicateCount?.total ?? 0)).toBe(1);
+  }, 30000);
+
+  it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
+    const fixture = await prepareManifestSourceBackedCycleForTest();
+    const persisted = await mcpTool<{ scheduled_post_id: number }>(
+      "persist_manifest_autonomous_post",
+      buildManifestSourceBackedPersistPayload(fixture),
+    );
+    const reviewed = await mcpTool<{
+      success: boolean;
+      action: string;
+      lesson_scope: string;
+      operational_effect: string;
+    }>("review_manifest_scheduled_post", {
+      brand_key: "manifest_mental",
+      scheduled_post_id: persisted.scheduled_post_id,
+      action: "keep",
+      feedback: "Keep this source-backed post. This is post-specific approval, not a permanent rule.",
+      lesson_scope: "post_specific",
+      operation_id: `test-source-backed-review-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    expect(reviewed).toMatchObject({
+      success: true,
+      action: "keep",
+      lesson_scope: "post_specific",
+    });
+    expect(reviewed.operational_effect).toContain("No production change");
+  }, 30000);
+
   it.skip("retired: bloated internal registry contract", async () => {
     const initialized = await mcpRequest<{ serverInfo: { name: string }; capabilities: Record<string, unknown>; instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
