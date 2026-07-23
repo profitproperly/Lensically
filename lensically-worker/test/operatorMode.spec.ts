@@ -6223,8 +6223,9 @@ describe("operator mode MCP endpoint", () => {
     expect(publishedRetry.structuredContent.error).toBe("scheduled_post_already_published");
   }, 40000);
 
-    it("requires and preserves scheduled-post deletion reasons without writing strategy memory", async () => {
+      it("requires and preserves scheduled-post deletion reasons without writing strategy memory", async () => {
     await operatorTool("list_accounts");
+    await ensureMcpAccountOpen(BRAND_KEY);
     const inserted = await env.DB.prepare(
       `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
        VALUES ('workspace-owner', 'vectrix', 'Deletion audit fixture', 'approved', '2099-01-03T14:00:00.000Z')`,
