@@ -13001,8 +13001,9 @@ async function persistManifestAutonomousPost(
     family_key: familyKey,
     source_mechanism: sourceMechanism,
     audience_reward: audienceReward,
-        strategic_purpose: strategicPurpose,
-    strategic_thesis: strategicThesis,
+            strategic_purpose: strategicPurpose,
+    strategic_thesis: effectiveStrategicThesis,
+    cycle_strategic_thesis_reused: cycleStrategicThesisReused,
     strategy_version_id: outputStrategyVersion.id ?? null,
     post_hypothesis: hypothesisValidation.value,
     source_context: {
