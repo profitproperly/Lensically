@@ -687,6 +687,72 @@ function compactManifestAutonomousSlot(value: unknown): Record<string, unknown> 
   return { key, date, time };
 }
 
+function compactManifestRollingEvidence(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rolling = value as Record<string, unknown>;
+  const snapshot = rolling.snapshot && typeof rolling.snapshot === "object" && !Array.isArray(rolling.snapshot)
+    ? rolling.snapshot as Record<string, unknown>
+    : {};
+  const firstPage = rolling.first_page && typeof rolling.first_page === "object" && !Array.isArray(rolling.first_page)
+    ? rolling.first_page as Record<string, unknown>
+    : {};
+  const pagination = firstPage.pagination && typeof firstPage.pagination === "object" && !Array.isArray(firstPage.pagination)
+    ? firstPage.pagination as Record<string, unknown>
+    : {};
+  const consumption = firstPage.consumption && typeof firstPage.consumption === "object" && !Array.isArray(firstPage.consumption)
+    ? firstPage.consumption as Record<string, unknown>
+    : {};
+  const countItems = (candidate: unknown): number => Array.isArray(candidate) ? candidate.length : 0;
+  return {
+    snapshot: {
+      id: snapshot.id ?? null,
+      snapshot_version: snapshot.snapshot_version ?? null,
+      as_of: snapshot.as_of ?? null,
+      timezone: snapshot.timezone ?? null,
+      window_days: snapshot.window_days ?? null,
+      window_start: snapshot.window_start ?? null,
+      window_end: snapshot.window_end ?? null,
+      post_count: snapshot.post_count ?? 0,
+      mature_count: snapshot.mature_count ?? 0,
+      immature_count: snapshot.immature_count ?? 0,
+      incomplete_count: snapshot.incomplete_count ?? 0,
+      page_size: snapshot.page_size ?? null,
+      page_count: snapshot.page_count ?? 0,
+      benchmarks: snapshot.benchmarks ?? {},
+      previous_benchmarks: snapshot.previous_benchmarks ?? {},
+      context_counts: {
+        future_schedule: countItems(snapshot.future_schedule),
+        hard_bans: countItems(snapshot.hard_bans),
+        experiments: countItems(snapshot.experiments),
+      },
+      source_hash: snapshot.source_hash ?? null,
+    },
+    first_page: {
+      success: firstPage.success !== false,
+      page_index: 0,
+      items: [],
+      items_included: false,
+      retrieval_tool: "get_manifest_cycle_analysis_page",
+      retrieval_required: Number(snapshot.page_count ?? 0) > 0,
+      pagination: {
+        page_size: pagination.page_size ?? snapshot.page_size ?? null,
+        page_count: pagination.page_count ?? snapshot.page_count ?? 0,
+        returned: 0,
+        has_more: Number(snapshot.page_count ?? 0) > 0,
+        next_page_index: Number(snapshot.page_count ?? 0) > 0 ? 0 : null,
+      },
+      consumption: {
+        consumed_page_count: consumption.consumed_page_count ?? 0,
+        required_page_count: consumption.required_page_count ?? snapshot.page_count ?? 0,
+        complete: consumption.complete === true,
+      },
+      instruction: Number(snapshot.page_count ?? 0) > 0
+        ? "Call get_manifest_cycle_analysis_page starting at page_index 0 and continue through every page. Preparation does not count any page as consumed."
+        : "No post-evidence pages exist for this snapshot; strategy may use the explicit evidence-incomplete state.",
+    },
+  };
+}
+
 function compactManifestAutonomousPreparationPayload(
   payload: Record<string, unknown>,
   originalBytes: number,
@@ -775,10 +841,14 @@ function compactManifestAutonomousPreparationPayload(
       }, []),
       consumption_contract: decision.consumption_contract ?? {},
     };
-    const bounded: Record<string, unknown> = {
+        const bounded: Record<string, unknown> = {
       success: true,
       reused_existing: payload.reused_existing === true,
       refreshed_live_state: payload.refreshed_live_state === true,
+      rolling_evidence: compactManifestRollingEvidence(payload.rolling_evidence),
+      strategy_required: payload.strategy_required === true,
+      source_backed_generation_only: payload.source_backed_generation_only === true,
+      next_action: payload.next_action ?? null,
       cycle: {
         id: cycle.id ?? null,
         brand_key: cycle.brand_key ?? null,
@@ -863,7 +933,8 @@ function compactManifestAutonomousPreparationPayload(
         actionable_autonomous_cycle_preserved: true,
         all_target_slots_preserved: targetSlots.length === (Array.isArray(cycle.target_slots) ? cycle.target_slots.length : 0),
         all_missing_slots_preserved: missingSlots.length === (Array.isArray(cycle.missing_slots) ? cycle.missing_slots.length : 0),
-        decision_intelligence_categories_preserved: true,
+                decision_intelligence_categories_preserved: true,
+        rolling_evidence_manifest_preserved: true,
       },
     };
     (bounded.payload_contract as Record<string, unknown>).returned_bytes = operatorPayloadBytes(bounded);
@@ -992,10 +1063,14 @@ function compactManifestAutonomousPreparationPayload(
     }, []),
     consumption_contract: decision.consumption_contract ?? {},
   };
-  const minimal: Record<string, unknown> = {
+    const minimal: Record<string, unknown> = {
     success: true,
     reused_existing: payload.reused_existing === true,
     refreshed_live_state: payload.refreshed_live_state === true,
+    rolling_evidence: compactManifestRollingEvidence(payload.rolling_evidence),
+    strategy_required: payload.strategy_required === true,
+    source_backed_generation_only: payload.source_backed_generation_only === true,
+    next_action: payload.next_action ?? null,
     cycle: {
       id: cycle.id ?? null,
       brand_key: cycle.brand_key ?? null,
@@ -1105,7 +1180,8 @@ function compactManifestAutonomousPreparationPayload(
       actionable_autonomous_cycle_preserved: true,
       all_target_slots_preserved: true,
       all_missing_slots_preserved: true,
-      decision_intelligence_categories_preserved: true,
+            decision_intelligence_categories_preserved: true,
+      rolling_evidence_manifest_preserved: true,
       minimal_operational_tier: true,
     },
   };
@@ -12030,21 +12106,27 @@ async function buildManifestRollingEvidence(
     experiments,
     pageSize: MANIFEST_EVIDENCE_PAGE_SIZE,
   });
-  const firstPage = Number(snapshot.page_count ?? 0) > 0
-    ? await readManifestEvidencePage(env.DB, {
-      brandKey: brand.brand_key,
-      cycleId: input.cycle_id,
-      snapshotId: String(snapshot.id),
-      pageIndex: 0,
-    })
-    : {
-      success: true,
-      snapshot,
-      page_index: 0,
-      items: [],
-      pagination: { page_size: MANIFEST_EVIDENCE_PAGE_SIZE, page_count: 0, returned: 0, has_more: false, next_page_index: null },
-      consumption: { consumed_page_count: 0, required_page_count: 0, complete: true },
-    };
+    const pageCount = Number(snapshot.page_count ?? 0);
+  const consumption = await getManifestEvidenceConsumptionState(env.DB, input.cycle_id, brand.brand_key);
+  const firstPage = {
+    success: true,
+    snapshot,
+    page_index: 0,
+    items: [],
+    items_included: false,
+    retrieval_tool: "get_manifest_cycle_analysis_page",
+    pagination: {
+      page_size: Number(snapshot.page_size ?? MANIFEST_EVIDENCE_PAGE_SIZE),
+      page_count: pageCount,
+      returned: 0,
+      has_more: pageCount > 0,
+      next_page_index: pageCount > 0 ? 0 : null,
+    },
+    consumption,
+    instruction: pageCount > 0
+      ? "Call get_manifest_cycle_analysis_page starting at page_index 0 and continue until every page is consumed."
+      : "No post-evidence pages exist for this snapshot.",
+  };
   return { snapshot, first_page: firstPage };
 }
 
