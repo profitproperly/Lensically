@@ -12836,7 +12836,7 @@ async function persistManifestAutonomousPost(
         family_key: familyKey,
         generation_mode: generationMode,
         source_context: sourceContextValidation.value as unknown as Record<string, unknown>,
-        strategic_thesis: strategicThesis,
+                strategic_thesis: effectiveStrategicThesis,
         model_evaluation: { ...modelEvaluation, intelligence_application_assessment: intelligenceApplicationAssessment },
         semantic_repetition: {},
         experiment_assignment: reusedExperimentAssignment,
