@@ -6284,7 +6284,7 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(Number(memoryAfter?.total ?? 0)).toBe(Number(memoryBefore?.total ?? 0));
 
-    const listed = await mcpTool<{ deleted_items: Array<{ scheduled_post_id: number; reason: string }> }>("list_scheduled_posts", {
+        const listed = await mcpTool<{ deleted_items: Array<{ scheduled_post_id: number; reason: string }> }>("list_scheduled_posts", {
       brand_key: BRAND_KEY,
       date: "2099-01-03",
       timezone: "America/New_York",
@@ -6293,6 +6293,39 @@ describe("operator mode MCP endpoint", () => {
       scheduled_post_id: scheduledPostId,
       reason: "Generic filler did not meet the account quality floor.",
     }));
+
+    const recoveryFixture = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'vectrix', 'Future paused retirement fixture', 'approved', '2099-01-04T14:00:00.000Z')`,
+    ).run();
+    const recoveryPostId = Number(recoveryFixture.meta?.last_row_id ?? 0);
+    await mcpTool("setScheduledPostSchedulerMode", {
+      brand_key: BRAND_KEY,
+      mode: "paused",
+      reason: "Focused audited retirement regression.",
+      owner_response: "Approved for test",
+    });
+    const recovered = await mcpTool<{
+      ok: boolean;
+      recovery: { retired_post_ids: number[]; deletion_records: Array<{ scheduled_post_id: number; reason: string }>; strategy_memory_written: boolean };
+    }>("recoverOverdueScheduledPosts", {
+      brand_key: BRAND_KEY,
+      actions: [{ scheduled_post_id: recoveryPostId, action: "retire" }],
+      reason: "Owner-directed future post removal during paused quality cleanup.",
+      owner_response: "Approved for test",
+      operation_id: "future-retirement-fixture",
+    });
+    expect(recovered.ok).toBe(true);
+    expect(recovered.recovery.retired_post_ids).toEqual([recoveryPostId]);
+    expect(recovered.recovery.deletion_records).toContainEqual(expect.objectContaining({
+      scheduled_post_id: recoveryPostId,
+      reason: "Owner-directed future post removal during paused quality cleanup.",
+    }));
+    expect(recovered.recovery.strategy_memory_written).toBe(false);
+    const futureScheduledRow = await env.DB.prepare(
+      `SELECT id FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(recoveryPostId).first<{ id: number }>();
+    expect(futureScheduledRow).toBeNull();
   }, 30000);
 
   it("hides scheduled posts from other account scopes when editing", async () => {

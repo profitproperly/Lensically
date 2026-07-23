@@ -16931,9 +16931,9 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
-    name: "recoverOverdueScheduledPosts",
-    title: "Recover overdue scheduled posts",
-    description: "While the universal scheduler is paused, transactionally retire or move up to 25 overdue approved rows to explicit future timestamps. Normal activation remains blocked until no overdue rows remain.",
+        name: "recoverOverdueScheduledPosts",
+    title: "Recover or retire scheduled posts while paused",
+    description: "While the universal scheduler is paused, retire up to 25 approved unpublished future or overdue rows through the audited deletion ledger, or move overdue rows to explicit future timestamps. Every retirement requires and preserves the supplied reason. Normal activation remains blocked until no overdue rows remain.",
     inputSchema: {
       type: "object",
       properties: {
@@ -22007,7 +22007,7 @@ async function handleOperatorMcpAdminTool(
         return { ok: true, scheduler: result };
   }
 
-  if (toolName === "recoverOverdueScheduledPosts") {
+    if (toolName === "recoverOverdueScheduledPosts") {
     const reason = normalizeOperatorText(args.reason, 500);
     const actions = Array.isArray(args.actions)
       ? args.actions.map((entry) => {
@@ -22021,6 +22021,55 @@ async function handleOperatorMcpAdminTool(
       : [];
     if (!reason || !actions.length) {
       return { ok: false, error: "recovery_actions_and_reason_required" };
+    }
+    if (actions.length > 25 || actions.some((action) => !Number.isInteger(action.scheduled_post_id) || action.scheduled_post_id <= 0 || !["retire", "reschedule"].includes(action.action))) {
+      return { ok: false, error: "valid_recovery_actions_1_to_25_required" };
+    }
+    if (actions.every((action) => action.action === "retire")) {
+      const brand = await resolveOperatorBrandFromPayload(env, args);
+      if (!brand) return { ok: false, error: "brand_key_required_for_audited_retirement" };
+      const schedulerState = await readScheduledPostSchedulerHealth(env);
+      const control = schedulerState.control && typeof schedulerState.control === "object"
+        ? schedulerState.control as Record<string, unknown>
+        : {};
+      if (String(control.mode ?? "") !== "paused") {
+        return { ok: false, error: "scheduler_must_be_paused_for_audited_retirement", scheduler: schedulerState };
+      }
+      const parentOperationId = normalizeOperatorText(args.operation_id, 180, true);
+      const deletedRecords: ScheduledPostDeletionRecord[] = [];
+      const failed: Array<{ scheduled_post_id: number; error: string }> = [];
+      for (const action of actions) {
+        const deletion = await deleteScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, action.scheduled_post_id, {
+          expectedThreadsUserId: brand.profile.threads_user_id,
+          reason,
+          deletedBy: "model",
+          deletionSource: "mcp",
+          operationId: parentOperationId ? `${parentOperationId}:${action.scheduled_post_id}` : null,
+        });
+        if (deletion.outcome === "deleted" && deletion.record) {
+          deletedRecords.push(deletion.record);
+        } else {
+          failed.push({ scheduled_post_id: action.scheduled_post_id, error: deletion.outcome });
+        }
+      }
+      if (failed.length > 0) {
+        return {
+          ok: false,
+          error: "audited_scheduled_retirement_incomplete",
+          deleted_post_ids: deletedRecords.map((record) => record.scheduled_post_id),
+          failed,
+          scheduler: await readScheduledPostSchedulerHealth(env),
+        };
+      }
+      return {
+        ok: true,
+        recovery: {
+          retired_post_ids: deletedRecords.map((record) => record.scheduled_post_id),
+          deletion_records: deletedRecords,
+          strategy_memory_written: false,
+        },
+        scheduler: await readScheduledPostSchedulerHealth(env),
+      };
     }
     const result = await recoverScheduledPostSchedulerOverdue(env, actions, reason);
     return { ok: true, scheduler: result };
