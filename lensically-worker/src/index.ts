@@ -11777,11 +11777,52 @@ async function prepareManifestAutonomousCycle(
     refresh_owner: "performance_evaluator_and_insights_cycle",
     reason: "Autonomous preparation consumes durable Content Focus, maturity, comparable, semantic, portfolio, experiment, and confidence state without recomputing the intelligence engine inside one scheduled-task invocation.",
   };
+    await ensureManifestMeasurementAuditTables(env.DB);
+  const [qualifiedPatternState, derivedPatternState] = await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS total, MAX(updated_at) AS latest_updated_at
+      FROM external_patterns
+      WHERE app_user_id = ? AND account_id = ? AND likes >= ?`)
+      .bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, MANIFEST_SOURCE_MIN_VERIFIED_LIKES)
+      .first<Record<string, unknown>>(),
+    env.DB.prepare(`SELECT COUNT(*) AS total, MAX(source_updated_at) AS latest_source_updated_at
+      FROM operator_manifest_saved_pattern_intelligence
+      WHERE brand_key = ?`)
+      .bind(brand.brand_key)
+      .first<Record<string, unknown>>(),
+  ]);
+  const qualifiedPatternCount = Number(qualifiedPatternState?.total ?? 0);
+  const derivedPatternCount = Number(derivedPatternState?.total ?? 0);
+  const qualifiedPatternUpdatedAt = normalizeOperatorText(qualifiedPatternState?.latest_updated_at, 100, true);
+  const derivedPatternUpdatedAt = normalizeOperatorText(derivedPatternState?.latest_source_updated_at, 100, true);
+  const savedPatternRefreshRequired = qualifiedPatternCount > 0 && (
+    derivedPatternCount !== qualifiedPatternCount
+    || !derivedPatternUpdatedAt
+    || Boolean(qualifiedPatternUpdatedAt && derivedPatternUpdatedAt < qualifiedPatternUpdatedAt)
+  );
+  const savedPatternIntelligenceRefresh = savedPatternRefreshRequired
+    ? await refreshManifestSavedPatternIntelligence(env.DB, {
+      brand_key: brand.brand_key,
+      account_id: brand.account_id,
+      app_user_id: SAVED_PATTERNS_APP_USER_ID,
+    })
+    : {
+      qualified_pattern_count: qualifiedPatternCount,
+      derived_pattern_count: derivedPatternCount,
+      recomputed: false,
+      current: true,
+    };
   const measurementAuditRefresh = {
-    mode: "latest_persisted_measurement_state",
-    recomputed: false,
-    refresh_owner: "performance_evaluator_and_insights_cycle",
-    reason: "Autonomous preparation consumes the latest durable learning, benchmark, Saved Pattern, and follower records without recomputing the full measurement layer inside one Worker invocation.",
+    mode: savedPatternRefreshRequired
+      ? "saved_pattern_intelligence_refreshed"
+      : "latest_persisted_measurement_state",
+    recomputed: savedPatternRefreshRequired,
+    refresh_owner: savedPatternRefreshRequired
+      ? "autonomous_prepare_source_grounding"
+      : "performance_evaluator_and_insights_cycle",
+    saved_pattern_intelligence: savedPatternIntelligenceRefresh,
+    reason: savedPatternRefreshRequired
+      ? "Autonomous preparation repaired empty or stale Saved Pattern intelligence before generation so the source library cannot silently disappear."
+      : "Autonomous preparation consumed current durable learning, benchmark, Saved Pattern, and follower records without recomputing the full measurement layer.",
   };
     const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, brand.brand_key);
   const decisionIntelligenceReceiptReference = {
