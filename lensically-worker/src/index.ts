@@ -13117,19 +13117,6 @@ async function persistManifestAutonomousPost(
       );
     }
   }
-  const normalizedText = normalizeCreativeComparisonText(text);
-  const bannedMemories = await listGptStrategyMemory(env, brand.account_id, ["banned_phrase"], 100, 0);
-  const bannedPhraseHits = bannedMemories.flatMap((memory) => {
-    const candidates = [memory.title, memory.body]
-      .map((value) => normalizeCreativeComparisonText(value))
-      .filter((value) => value.length >= 3);
-    return candidates
-      .filter((phrase, index, all) => all.indexOf(phrase) === index && normalizedText.includes(phrase))
-      .map((phrase) => ({ memory_id: memory.id, phrase, title: memory.title }));
-  });
-    if (bannedPhraseHits.length) {
-    return rejectPersist("explicit_banned_phrase", { slot_key: slotKey, banned_phrase_hits: bannedPhraseHits }, slotKey);
-  }
     const duplicate = await env.DB.prepare(
     `SELECT id, status, scheduled_time FROM scheduled_posts
      WHERE threads_user_id = ? AND lower(trim(post_text)) = lower(trim(?))
@@ -13141,7 +13128,7 @@ async function persistManifestAutonomousPost(
     scheduleIdempotencyKey,
     Number(exactScheduled?.id ?? 0),
   ).first<Record<string, unknown>>();
-        if (duplicate) {
+  if (duplicate) {
     return rejectPersist("exact_duplicate_post", {
       slot_key: slotKey,
       duplicate_scheduled_post_id: Number(duplicate.id),
@@ -13152,7 +13139,7 @@ async function persistManifestAutonomousPost(
     brand_key: brand.brand_key,
     text,
     metadata: {
-            ...postStrategy,
+      ...postStrategy,
       family_key: familyKey,
       source_mechanism: sourceMechanism,
       audience_reward: audienceReward,
@@ -13161,31 +13148,119 @@ async function persistManifestAutonomousPost(
     },
     candidate_slot_utc: scheduledUtc,
     exclude_scheduled_post_id: exactScheduled ? Number(exactScheduled.id) : null,
-    recent_hours: 48,
+    recent_hours: 72,
     future_hours: 48,
   });
   if (semanticRepetition.semantic_repetition_blocked === true) {
     return rejectPersist("semantic_repetition_collision", {
       slot_key: slotKey,
       semantic_repetition: semanticRepetition,
-      required_action: "Rewrite the premise, scenario, reward, or sentence architecture, or move the execution outside the collision window while preserving any proven family mechanism.",
+      required_action: "Preserve the proven source mechanism while rewriting or respacing the repeated premise, reward, opening, closing, scenario, or sentence architecture.",
     }, slotKey);
   }
-        const sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
+  let sourceCard: Record<string, unknown>;
+  try {
+    sourceCard = await ensureManifestAutonomousSourceCard(env, brand, cycleId, post);
+  } catch (error) {
+    return rejectPersist(
+      error instanceof Error ? error.message : "canonical_source_card_required",
+      { slot_key: slotKey },
+      slotKey,
+    );
+  }
   const sourceCardId = String(sourceCard.id ?? "");
   const familyId = normalizeOperatorText(sourceCard.family_id, 120, true);
   const sourceSelectionId = normalizeOperatorText(sourceCard.source_selection_id, 120, true);
-  if (!sourceSelectionId) {
+  if (!sourceSelectionId || sourceCard.status !== "locked") {
     await linkManifestHypothesisResult(env.DB, {
       cycleId, slotKey, status: "source_lineage_failed", hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
     });
-    return { success: false, error: "autonomous_source_lineage_missing", slot_key: slotKey };
+    return rejectPersist("autonomous_source_lineage_missing", {
+      source_card_id: sourceCardId || null,
+      source_selection_id: sourceSelectionId,
+      source_card_status: sourceCard.status ?? null,
+    }, slotKey);
+  }
+  const draftAnalysis = {
+    opening_phrase: extractOpeningPhrase(text),
+    hook_style: normalizeOperatorText(postStrategy.hook_style, 120, true),
+    lane_key: normalizeOperatorMachineKey(postStrategy.pillar, ""),
+    preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
+    transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
+    audience_reward_delivered: true,
+  };
+  const suppliedGateSummary = modelEvaluation.gate_summary && typeof modelEvaluation.gate_summary === "object" && !Array.isArray(modelEvaluation.gate_summary)
+    ? modelEvaluation.gate_summary as Record<string, unknown>
+    : {};
+  const suppliedGateResults = Array.isArray(suppliedGateSummary.results)
+    ? suppliedGateSummary.results.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
+    : [];
+  const canonicalHardBans = await listManifestHardBans(env.DB, brand.brand_key);
+  const ownerHardBans = canonicalHardBans.filter((rule) => !String(rule.source_authority ?? "").startsWith("operator_gate:"));
+  const missingHardBanResults = ownerHardBans.filter((rule) => {
+    const ruleKey = String(rule.rule_key ?? "");
+    const result = suppliedGateResults.find((item) => String(item.rule_key ?? item.gate_key ?? "") === ruleKey);
+    const status = String(result?.status ?? "").toLowerCase();
+    return !result || result.executed !== true || status !== "pass" || !normalizeOperatorText(result.evidence ?? result.reason, 4000, true);
+  });
+  if (missingHardBanResults.length) {
+    return rejectPersist("canonical_hard_ban_evaluation_incomplete", {
+      slot_key: slotKey,
+      missing_rule_keys: missingHardBanResults.map((rule) => rule.rule_key),
+      required_action: "Evaluate every canonical owner hard-ban rule against the exact candidate and provide explicit pass evidence. A summary statement is insufficient.",
+    }, slotKey);
+  }
+  const serverGateSuite = await runOperatorGates(env, {
+    brand,
+    sourceCardId,
+    draftText: text,
+    stageScope: "gate_evaluation",
+    laneKey: normalizeOperatorMachineKey(postStrategy.pillar, "") || null,
+    contentType: normalizeOperatorText(postStrategy.format, 120, true),
+    draftAnalysis,
+    modelGateResults: suppliedGateResults,
+  });
+  if (!serverGateSuite.gate_results.length) {
+    return rejectPersist("required_candidate_gate_execution_empty", { slot_key: slotKey }, slotKey);
+  }
+  if (!serverGateSuite.showable) {
+    return rejectPersist("candidate_gate_suite_failed", {
+      slot_key: slotKey,
+      blocking_failures: serverGateSuite.blocking_failures,
+      warnings: serverGateSuite.warnings,
+    }, slotKey);
+  }
+  const gateResults: Record<string, unknown>[] = [
+    { gate_key: "locked_cycle_strategy", executed: true, status: "pass", evidence: requestedCycleStrategyId },
+    { gate_key: "exact_cycle_plan_item", executed: true, status: "pass", evidence: requestedCyclePlanItemId },
+    { gate_key: "canonical_source_lineage", executed: true, status: "pass", evidence: { source_card_id: sourceCardId, source_selection_id: sourceSelectionId } },
+    { gate_key: "exact_duplicate", executed: true, status: "pass", evidence: "No other scheduled post has identical normalized text." },
+    { gate_key: "slot_collision", executed: true, status: "pass", evidence: { slot_key: slotKey, open: true } },
+    { gate_key: "semantic_repetition", executed: true, status: "pass", evidence: semanticRepetition },
+    ...suppliedGateResults.map((result) => ({ ...result, executed: true })),
+    ...serverGateSuite.gate_results.map((result) => ({ ...result, executed: true })),
+  ];
+  const gateReceipt = await recordManifestCandidateGateReceipt(env.DB, {
+    cycleId,
+    strategyId: requestedCycleStrategyId,
+    planItemId: requestedCyclePlanItemId,
+    brandKey: brand.brand_key,
+    slotKey,
+    candidateText: text,
+    results: gateResults,
+  });
+  if (gateReceipt.passed !== true) {
+    return rejectPersist("candidate_gate_receipt_failed", {
+      slot_key: slotKey,
+      gate_receipt_id: gateReceipt.id ?? null,
+      results: gateReceipt.results ?? [],
+    }, slotKey);
   }
   postHypothesis = await recordManifestPostHypothesis(env.DB, {
     cycleId,
     brandKey: brand.brand_key,
     slotKey,
-    strategyVersionId: normalizeOperatorText(outputStrategyVersion.id, 160, true),
+    strategyVersionId: requestedCycleStrategyId,
     source: {
       ...sourceContextValidation.value,
       source_card_id: sourceCardId,
@@ -13200,18 +13275,18 @@ async function persistManifestAutonomousPost(
   const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
   const lineupId = `autonomous-lineup-${identityHash.slice(0, 32)}`;
   const inventoryId = `autonomous-inventory-${identityHash.slice(0, 32)}`;
-    const strategy: Record<string, unknown> = {
+  const strategy: Record<string, unknown> = {
     ...postStrategy,
     autonomous_engine_version: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
     autonomous_cycle_id: cycleId,
+    cycle_strategy_id: requestedCycleStrategyId,
+    cycle_plan_item_id: requestedCyclePlanItemId,
     generation_mode: generationMode,
     family_key: familyKey,
     source_mechanism: sourceMechanism,
     audience_reward: audienceReward,
-            strategic_purpose: strategicPurpose,
-    strategic_thesis: effectiveStrategicThesis,
-    cycle_strategic_thesis_reused: cycleStrategicThesisReused,
-    strategy_version_id: outputStrategyVersion.id ?? null,
+    strategic_purpose: strategicPurpose,
+    cycle_strategy: effectiveStrategicThesis,
     post_hypothesis: hypothesisValidation.value,
     source_context: {
       ...sourceContextValidation.value,
@@ -13219,6 +13294,7 @@ async function persistManifestAutonomousPost(
       source_selection_id: sourceSelectionId,
     },
     model_evaluation: modelEvaluation,
+    gate_receipt_id: gateReceipt.id ?? null,
   };
   const scheduled = exactScheduled
     ? {
@@ -13237,34 +13313,32 @@ async function persistManifestAutonomousPost(
         timezone,
       );
   if (!scheduled.success || !scheduled.scheduledPostId) {
-    return { success: false, error: scheduled.error ?? "autonomous_schedule_failed", slot_key: slotKey };
+    return rejectPersist("autonomous_schedule_failed_after_gate_pass", {
+      slot_key: slotKey,
+      detail: scheduled.error ?? null,
+      gate_receipt_id: gateReceipt.id ?? null,
+    }, slotKey);
   }
   await ensureGptPostStrategyTagsTable(env);
   await ensureOperatorWorkflowTables(env);
-  const draftAnalysis = {
-    opening_phrase: extractOpeningPhrase(text),
-    hook_style: normalizeOperatorText(strategy.hook_style, 120, true),
-    lane_key: normalizeOperatorMachineKey(strategy.pillar, ""),
-    preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
-    transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
-    audience_reward_delivered: true,
-  };
   const gateSummary = {
     model_orchestrated: true,
     model_evaluation: modelEvaluation,
+    gate_receipt_id: gateReceipt.id ?? null,
+    gate_receipt_version: gateReceipt.receipt_version ?? null,
+    gate_results: gateResults,
     server_checks: {
       slot_open: true,
-            exact_duplicate: false,
-      explicit_banned_phrase: false,
+      exact_duplicate: false,
+      canonical_hard_bans_complete: true,
+      source_fidelity_passed: true,
       semantic_repetition_collision: false,
       semantic_repetition_summary: {
         highest_score: semanticRepetition.highest_score ?? 0,
         high_similarity: semanticRepetition.high_similarity ?? null,
         candidate_signature: semanticRepetition.signature ?? null,
       },
-      no_internal_gate_fanout: true,
-      no_internal_runway_scan: true,
-      no_threads_api_call: true,
+      threads_api_call: false,
     },
   };
   const normalizedStrategy = normalizeGptPostStrategyInput(strategy);
