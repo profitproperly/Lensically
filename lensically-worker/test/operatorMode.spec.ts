@@ -3364,7 +3364,7 @@ describe("operator mode MCP endpoint", () => {
     expect(first.intelligence_foundation.foundation_version).toBe("manifest-intelligence-foundation-v3");
     expect(first.intelligence_foundation.policy.noninterference.learning_source).toBe("observable_post_engagement");
     expect(first.intelligence_foundation.policy.follower_attribution.account_level_only).toBe(true);
-    expect(first.intelligence_foundation.latest_strategy_version?.id).toBeTruthy();
+    expect(first.intelligence_foundation.latest_strategy_version).toBeNull();
     expect(first.intelligence_foundation.latest_cycle_receipt?.cycle_id).toBe(prepared.cycle.id);
     expect(first.intelligence_foundation.latest_cycle_receipt?.exposure_snapshot?.id).toBeTruthy();
     expect(second).toEqual(first);
