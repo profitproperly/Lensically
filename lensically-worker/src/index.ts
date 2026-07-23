@@ -79,7 +79,7 @@ import {
   createManifestEvidenceSnapshot,
   createManifestExposureSnapshot,
   ensureManifestIntelligencePolicy,
-  ensureManifestStrategyVersion,
+  
   finalizeManifestCycleReceipt,
   getLatestManifestStrategyVersion,
   getManifestCyclePlanItem,
@@ -12236,30 +12236,11 @@ async function prepareManifestAutonomousCycle(
   ).bind(evidenceSnapshot.id ?? null, cycleId, brand.brand_key).run();
 
   const intelligencePolicy = await ensureManifestIntelligencePolicy(env.DB, brand.brand_key);
-  let inputStrategyVersion = await getLatestManifestStrategyVersion(env.DB, brand.brand_key);
-  if (!inputStrategyVersion) {
-    const performancePosition = accountPosition.performance && typeof accountPosition.performance === "object" && !Array.isArray(accountPosition.performance)
-      ? accountPosition.performance as Record<string, unknown>
-      : {};
-    inputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
-      brandKey: brand.brand_key,
-      strategy: {
-        contract_version: "manifest-cycle-input-strategy-v1",
-        mission_objective: profile?.objective ?? null,
-        content_focus: accountPosition.content_focus ?? null,
-        performance_brief: performancePosition.brief ?? null,
-        portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? null,
-        intelligence_policy: intelligencePolicy,
-      },
-      evidence: {
-        captured_at: clock.effective_now_iso,
-        sources: ["growth mission", "Content Focus", "performance learning", "recent exposure", "owner policy"],
-      },
-      changeSummary: "Seed the first durable strategy version from the live autonomous account position.",
-      reversalConditions: ["Replace or revise only when observable engagement evidence or account conditions materially change."],
-      sourceCycleId: cycleId,
-    });
-  }
+    const inputStrategyVersion = (await getLatestManifestStrategyVersion(env.DB, brand.brand_key)) ?? {
+    id: null,
+    strategy: null,
+    status: "legacy_strategy_unavailable",
+  };
     const recentEvidence = evidenceSnapshot.recent_exposure && typeof evidenceSnapshot.recent_exposure === "object" && !Array.isArray(evidenceSnapshot.recent_exposure)
     ? evidenceSnapshot.recent_exposure as Record<string, unknown>
     : {};
@@ -12388,7 +12369,7 @@ async function prepareManifestAutonomousCycle(
       : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
     intelligence_foundation: {
       policy: intelligencePolicy,
-      input_strategy_version: inputStrategyVersion,
+            legacy_input_strategy_reference: inputStrategyVersion,
       exposure_snapshot: {
         id: exposureSnapshot.id ?? null,
         ledger_version: exposureSnapshot.ledger_version ?? null,
