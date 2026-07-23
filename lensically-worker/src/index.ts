@@ -7530,10 +7530,15 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       horizon_end_local TEXT NOT NULL,
       target_slots_json TEXT NOT NULL,
       missing_slots_json TEXT NOT NULL,
-      account_position_json TEXT NOT NULL,
+            account_position_json TEXT NOT NULL,
       strategic_thesis_json TEXT,
       scheduled_post_ids_json TEXT NOT NULL DEFAULT '[]',
       error_json TEXT,
+      receipt_id TEXT,
+      strategy_version_id TEXT,
+      exposure_snapshot_id TEXT,
+      evidence_snapshot_id TEXT,
+      cycle_strategy_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(brand_key, operation_id)
@@ -7555,8 +7560,13 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       generation_mode TEXT NOT NULL,
       family_key TEXT NOT NULL,
       strategic_purpose TEXT NOT NULL,
-      strategy_json TEXT NOT NULL,
+            strategy_json TEXT NOT NULL,
+      cycle_strategy_id TEXT,
+      cycle_plan_item_id TEXT,
+      gate_receipt_id TEXT,
       source_card_id TEXT,
+      source_selection_id TEXT,
+      hypothesis_id TEXT,
       generation_run_id TEXT,
       draft_id TEXT,
       scheduled_post_id INTEGER,
@@ -7566,11 +7576,28 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(cycle_id, slot_key)
     )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_autonomous_lineup_schedule
-     ON operator_autonomous_lineup_items (brand_key, scheduled_post_id, updated_at DESC)`,
-  ).run();
+    ).run();
+  for (const column of [
+    ["cycle_strategy_id", "TEXT"],
+    ["cycle_plan_item_id", "TEXT"],
+    ["gate_receipt_id", "TEXT"],
+    ["source_selection_id", "TEXT"],
+    ["hypothesis_id", "TEXT"],
+  ] as const) {
+    await env.DB.prepare(`ALTER TABLE operator_autonomous_lineup_items ADD COLUMN ${column[0]} ${column[1]}`)
+      .run()
+      .catch(() => undefined);
+  }
+  await env.DB.batch([
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_autonomous_lineup_schedule
+      ON operator_autonomous_lineup_items (brand_key, scheduled_post_id, updated_at DESC)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_autonomous_lineup_strategy
+      ON operator_autonomous_lineup_items (cycle_strategy_id, cycle_id, slot_key)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_autonomous_lineup_plan
+      ON operator_autonomous_lineup_items (cycle_plan_item_id)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_autonomous_lineup_gate
+      ON operator_autonomous_lineup_items (gate_receipt_id)`),
+  ]);
 
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_decision_proposals (
@@ -13483,13 +13510,14 @@ async function persistManifestAutonomousPost(
     env.DB.prepare(
                   `INSERT INTO operator_autonomous_lineup_items (
         id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
-        generation_mode, family_key, strategic_purpose, strategy_json,
-        cycle_plan_item_id, gate_receipt_id,
+                generation_mode, family_key, strategic_purpose, strategy_json,
+        cycle_strategy_id, cycle_plan_item_id, gate_receipt_id,
         source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
       ON CONFLICT(cycle_id, slot_key) DO UPDATE SET
         text = excluded.text,
-        strategy_json = excluded.strategy_json,
+                strategy_json = excluded.strategy_json,
+        cycle_strategy_id = excluded.cycle_strategy_id,
         cycle_plan_item_id = excluded.cycle_plan_item_id,
         gate_receipt_id = excluded.gate_receipt_id,
         source_card_id = excluded.source_card_id,
@@ -13511,7 +13539,8 @@ async function persistManifestAutonomousPost(
       generationMode,
       familyKey,
             strategicPurpose,
-      normalizeOperatorJson(strategy, {}),
+            normalizeOperatorJson(strategy, {}),
+      requestedCycleStrategyId,
       requestedCyclePlanItemId,
       gateReceipt.id ?? null,
       sourceCardId,
@@ -13609,13 +13638,16 @@ async function persistManifestAutonomousPost(
     brand.profile.threads_user_id,
   );
   const intelligenceLineage = await env.DB.prepare(
-        `SELECT l.hypothesis_id, l.source_selection_id, l.cycle_id, l.slot_key,
-            l.cycle_plan_item_id, l.gate_receipt_id,
+                `SELECT l.hypothesis_id, l.source_selection_id, l.cycle_id, l.slot_key,
+            l.cycle_strategy_id, l.cycle_plan_item_id, l.gate_receipt_id,
+            strategy.id AS stored_cycle_strategy_id,
             h.id AS stored_hypothesis_id, h.scheduled_post_id AS hypothesis_scheduled_post_id,
             h.status AS hypothesis_status, h.locked_at AS hypothesis_locked_at,
             plan.id AS stored_plan_item_id, plan.status AS plan_status,
             gate.id AS stored_gate_receipt_id, gate.passed AS gate_passed
-     FROM operator_autonomous_lineup_items l
+          FROM operator_autonomous_lineup_items l
+     LEFT JOIN operator_manifest_cycle_strategies strategy
+       ON strategy.id = l.cycle_strategy_id AND strategy.cycle_id = l.cycle_id AND strategy.brand_key = l.brand_key
      LEFT JOIN operator_manifest_post_hypotheses h
        ON h.id = l.hypothesis_id AND h.cycle_id = l.cycle_id AND h.slot_key = l.slot_key
      LEFT JOIN operator_manifest_cycle_plan_items plan
@@ -13625,7 +13657,12 @@ async function persistManifestAutonomousPost(
      WHERE l.cycle_id = ? AND l.brand_key = ? AND l.slot_key = ? AND l.scheduled_post_id = ?
      LIMIT 1`,
   ).bind(cycleId, brand.brand_key, slotKey, scheduled.scheduledPostId).first<Record<string, unknown>>();
-  const intelligenceMissingStages: string[] = [];
+    const intelligenceMissingStages: string[] = [];
+  if (!intelligenceLineage?.cycle_strategy_id
+    || !intelligenceLineage?.stored_cycle_strategy_id
+    || String(intelligenceLineage.cycle_strategy_id) !== requestedCycleStrategyId) {
+    intelligenceMissingStages.push("cycle_strategy");
+  }
     if (!intelligenceLineage?.source_selection_id) intelligenceMissingStages.push("source_selection");
   if (!intelligenceLineage?.cycle_plan_item_id || !intelligenceLineage?.stored_plan_item_id || String(intelligenceLineage.plan_status) !== "scheduled") intelligenceMissingStages.push("cycle_plan_item");
   if (!intelligenceLineage?.gate_receipt_id || !intelligenceLineage?.stored_gate_receipt_id || Number(intelligenceLineage.gate_passed ?? 0) !== 1) intelligenceMissingStages.push("candidate_gate_receipt");
