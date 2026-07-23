@@ -225,9 +225,292 @@ async function mcpTool<T = Record<string, unknown>>(toolName: string, args: Reco
   if (result.isError) {
     throw new Error(`${toolName} returned MCP isError: ${JSON.stringify(result.structuredContent)}`);
   }
-  return result.structuredContent as T;
+    return result.structuredContent as T;
 }
 
+type ManifestSourceBackedCycleTestFixture = {
+  prepared: {
+    cycle: {
+      id: string;
+      missing_slots: Array<{ key: string; date: string; time: string }>;
+    };
+    rolling_evidence: {
+      id: string;
+      page_count: number;
+      benchmarks: Record<string, unknown>;
+    };
+  };
+  sourceBatchId: string;
+  sourceSelectionId: string;
+  sourceCardId: string;
+  cycleStrategyId: string | null;
+  planItemIds: Map<string, string>;
+  gateResults: Array<Record<string, unknown>>;
+  strategyPayload: Record<string, unknown>;
+};
+
+async function prepareManifestSourceBackedCycleForTest(
+  options: { commitStrategy?: boolean } = {},
+): Promise<ManifestSourceBackedCycleTestFixture> {
+  await activateManifestAutonomyForTest();
+  const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
+    brand_key: "manifest_mental",
+    proceed_confirmed: true,
+  });
+  const sourceBatchId = crypto.randomUUID();
+  const sourceSelectionId = crypto.randomUUID();
+  const sourceIdentityKey = `threads:test-source-backed-${crypto.randomUUID().slice(0, 8)}`;
+  const sourceText = "If your finger touched this today, expect a financial win within 7 days.";
+  await env.DB.prepare(
+    `INSERT INTO operator_source_selection_batches (
+      id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+      qualified_pool_count, requested_count, selected_count, selected_at, metadata_json
+    ) VALUES (?, 'manifest_mental', ?, 'test_fixture', 1000, 1, 1, 1, CURRENT_TIMESTAMP, '{}')`,
+  ).bind(sourceBatchId, session.workflow_session_id).run();
+  await env.DB.prepare(
+    `INSERT INTO operator_source_selections (
+      id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+      source_type, internal_source_id, threads_post_id, canonical_source_url,
+      post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+    ) VALUES (?, ?, 'manifest_mental', ?, 1, ?, 'saved_pattern', ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)`,
+  ).bind(
+    sourceSelectionId,
+    sourceBatchId,
+    session.workflow_session_id,
+    sourceIdentityKey,
+    sourceIdentityKey,
+    sourceIdentityKey,
+    `https://www.threads.com/@fixture/post/${sourceIdentityKey.split(":").pop()}`,
+    sourceText,
+    JSON.stringify({ likes: 2500 }),
+    JSON.stringify({
+      source_identity_key: sourceIdentityKey,
+      source_type: "saved_pattern",
+      internal_source_id: sourceIdentityKey,
+      threads_post_id: sourceIdentityKey,
+      text: sourceText,
+      metrics: { likes: 2500 },
+    }),
+  ).run();
+  const sourceCard = await mcpTool<{ source_card_id: string }>("create_source_card", {
+    brand_key: "manifest_mental",
+    workflow_session_id: session.workflow_session_id,
+    source_selection_id: sourceSelectionId,
+    title: "Source-backed finger-touch fixture",
+    source_mechanism: "Physical contact with the post acts as personal selection for a near-term financial outcome.",
+    required_product: "A personal near-term financial confirmation.",
+    transformation_contract: {
+      must_preserve_exact: ["If your finger touched this"],
+      must_preserve_function: ["Physical contact with the post acts as personal selection."],
+      may_reuse: ["If your finger touched this"],
+      audience_reward: "Personal confirmation that favorable financial news is approaching.",
+      notes: "Stay close to the Saved Pattern. Do not invent a new premise.",
+    },
+    forbidden_surfaces: [],
+    pass_conditions: ["The finger-touch selection mechanism and near-term financial payoff remain clear."],
+    fail_conditions: ["The premise drifts away from the Saved Pattern or copies the full source exactly."],
+    proceed_confirmed: true,
+  });
+  await mcpTool("lock_source_card", {
+    brand_key: "manifest_mental",
+    source_card_id: sourceCard.source_card_id,
+    proceed_confirmed: true,
+  });
+
+  const prepared = await mcpTool<ManifestSourceBackedCycleTestFixture["prepared"]>("prepare_manifest_autonomous_cycle", {
+    brand_key: "manifest_mental",
+    timezone: "America/New_York",
+    horizon_hours: 48,
+    operation_id: `test-source-backed-prepare-${crypto.randomUUID()}`,
+    proceed_confirmed: true,
+  });
+  expect(prepared.cycle.missing_slots.length).toBeGreaterThan(0);
+  expect(prepared.rolling_evidence.id).toBeTruthy();
+  expect(prepared.rolling_evidence.benchmarks).toMatchObject({ primary_metric: "24_hour_likes" });
+
+  const maturePostIds: string[] = [];
+  const pageCount = Math.max(1, Number(prepared.rolling_evidence.page_count ?? 0));
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const page = await mcpTool<{
+      success: boolean;
+      items: Array<{ published_post_id: string; maturity_state: string }>;
+      consumption: { complete: boolean; consumed_page_count: number; required_page_count: number };
+    }>("get_manifest_cycle_analysis_page", {
+      brand_key: "manifest_mental",
+      cycle_id: prepared.cycle.id,
+      snapshot_id: prepared.rolling_evidence.id,
+      page_index: pageIndex,
+      proceed_confirmed: true,
+    });
+    expect(page.success).toBe(true);
+    maturePostIds.push(...page.items
+      .filter((item) => item.maturity_state === "mature")
+      .map((item) => item.published_post_id));
+    if (pageIndex === pageCount - 1) expect(page.consumption.complete).toBe(true);
+  }
+
+  const lineup = prepared.cycle.missing_slots.map((slot, index) => ({
+    slot_key: slot.key,
+    family_key: "test_source_backed_finger_touch",
+    strategic_role: index === 0 ? "Lead source-backed move" : "Supporting source-backed variation",
+    generation_mode: "controlled_variation",
+    source_kind: "saved_pattern",
+    source_card_id: sourceCard.source_card_id,
+    source_selection_id: sourceSelectionId,
+    audience_reward: "Personal confirmation that favorable financial news is approaching.",
+    hook_direction: "Preserve the finger-touch recognition hook and vary only the financial payoff wording.",
+    placement_reason: `Authoritative missing slot ${slot.key} is assigned to the locked source-backed portfolio.`,
+    nearby_avoid: ["Do not repeat the exact payoff wording in adjacent slots."],
+    exploration_mode: index === 0 ? "exploit" : "hybrid",
+  }));
+  const strategyPayload: Record<string, unknown> = {
+    brand_key: "manifest_mental",
+    cycle_id: prepared.cycle.id,
+    snapshot_id: prepared.rolling_evidence.id,
+    account_conclusion: {
+      conclusion: "Use the proven source-backed recognition mechanism while varying execution and protecting audience trust.",
+      published_post_ids: maturePostIds.slice(0, 5),
+      uncertainty: maturePostIds.length ? "Mature evidence is available but remains account-context dependent." : "No mature post evidence exists in this isolated fixture.",
+    },
+    content_focus: {
+      emphasize: ["source-backed finger-touch recognition"],
+      preserve: ["near-term concrete payoff"],
+      reduce: ["generic aphorisms"],
+      avoid_clustering: ["identical financial payoff wording"],
+      test: ["controlled payoff wording variations"],
+      unresolved_questions: ["Which source-backed payoff wording produces the strongest 24-hour likes?"],
+    },
+    benchmarks: prepared.rolling_evidence.benchmarks,
+    strongest_executions: [],
+    weakest_executions: [],
+    directives: {
+      source_backed_generation_only: true,
+      original_model_posts_forbidden: true,
+      primary_metric: "24_hour_likes",
+    },
+    experiments: [],
+    risks: ["Do not allow source-backed execution to become exact-copy repetition."],
+    lineup,
+    proceed_confirmed: true,
+  };
+
+  let cycleStrategyId: string | null = null;
+  const planItemIds = new Map<string, string>();
+  if (options.commitStrategy !== false) {
+    const committed = await mcpTool<{ success: boolean; strategy: { id: string } }>(
+      "commit_manifest_cycle_strategy",
+      strategyPayload,
+    );
+    expect(committed.success).toBe(true);
+    cycleStrategyId = committed.strategy.id;
+    const planRows = await env.DB.prepare(
+      `SELECT id, slot_key FROM operator_manifest_cycle_plan_items
+       WHERE cycle_id = ? AND brand_key = 'manifest_mental'`,
+    ).bind(prepared.cycle.id).all<{ id: string; slot_key: string }>();
+    for (const row of planRows.results ?? []) planItemIds.set(row.slot_key, row.id);
+    expect(planItemIds.size).toBe(prepared.cycle.missing_slots.length);
+  }
+
+  const hardBanRows = await env.DB.prepare(
+    `SELECT rule_key FROM operator_manifest_hard_bans
+     WHERE brand_key = 'manifest_mental' AND active = 1`,
+  ).all<{ rule_key: string }>();
+  const modelGateRows = await env.DB.prepare(
+    `SELECT gate_key FROM operator_gates
+     WHERE active = 1 AND stage_scope = 'gate_evaluation'
+       AND evaluator IN ('model', 'hybrid')
+       AND (brand_key IS NULL OR brand_key = 'manifest_mental')`,
+  ).all<{ gate_key: string }>();
+  const gateKeys = new Set<string>([
+    ...(hardBanRows.results ?? []).map((row) => row.rule_key),
+    ...(modelGateRows.results ?? []).map((row) => row.gate_key),
+  ]);
+  const gateResults = Array.from(gateKeys).map((gateKey) => ({
+    gate_key: gateKey,
+    rule_key: gateKey,
+    result: "pass",
+    status: "pass",
+    executed: true,
+    rationale: `The exact source-backed candidate passes ${gateKey} in this isolated regression.`,
+    evidence: `Candidate reviewed against ${gateKey}; no prohibited surface or behavior is present.`,
+  }));
+
+  return {
+    prepared,
+    sourceBatchId,
+    sourceSelectionId,
+    sourceCardId: sourceCard.source_card_id,
+    cycleStrategyId,
+    planItemIds,
+    gateResults,
+    strategyPayload,
+  };
+}
+
+function buildManifestSourceBackedPersistPayload(
+  fixture: ManifestSourceBackedCycleTestFixture,
+  slotIndex = 0,
+  text = "If your finger touched this today, expect good money news within 7 days.",
+): Record<string, unknown> {
+  const slot = fixture.prepared.cycle.missing_slots[slotIndex];
+  if (!slot || !fixture.cycleStrategyId) throw new Error("manifest_source_backed_fixture_not_committed");
+  const cyclePlanItemId = fixture.planItemIds.get(slot.key);
+  if (!cyclePlanItemId) throw new Error("manifest_source_backed_plan_item_missing");
+  return {
+    brand_key: "manifest_mental",
+    cycle_id: fixture.prepared.cycle.id,
+    cycle_strategy_id: fixture.cycleStrategyId,
+    cycle_plan_item_id: cyclePlanItemId,
+    post: {
+      date: slot.date,
+      time: slot.time,
+      text,
+      generation_mode: "controlled_variation",
+      family_key: "test_source_backed_finger_touch",
+      source_mechanism: "Physical contact with the post acts as personal selection for a near-term financial outcome.",
+      audience_reward: "Personal confirmation that favorable financial news is approaching.",
+      strategic_purpose: "Execute the exact source-backed plan item without inventing a new premise.",
+      preserved_functions: ["Physical contact with the post acts as personal selection."],
+      transformed_elements: ["financial payoff wording"],
+      source_context: {
+        kind: "saved_pattern",
+        source_type: "saved_pattern",
+        source_card_id: fixture.sourceCardId,
+        source_selection_id: fixture.sourceSelectionId,
+      },
+      hypothesis: {
+        expected_response_type: "likes",
+        expected_audience_reward: "Personal confirmation that favorable financial news is approaching.",
+        hook_rationale: "The source-backed recognition hook selects the reader immediately.",
+        premise_rationale: "The execution preserves the proven premise and varies only payoff wording.",
+        exploration_mode: "hybrid",
+        comparable_post_ids: [],
+        expected_performance_range: { likes: { min: 1, max: 1000 } },
+        uncertainty: "Distribution and 24-hour likes remain uncertain until the post matures.",
+        falsification_conditions: ["The source-backed variation materially underperforms comparable mature executions."],
+      },
+      strategy: {
+        pillar: "money",
+        hook_style: "finger_touch",
+        format: "short_text",
+        intent: "likes",
+        novelty_level: "controlled_variation",
+      },
+    },
+    model_evaluation: {
+      generation_passed: true,
+      scheduling_passed: true,
+      novelty_assessment: "The payoff wording changes while the Saved Pattern premise remains intact.",
+      winner_preservation_assessment: "The candidate preserves the proven recognition mechanism and does not invent a replacement premise.",
+      slot_placement_assessment: `The candidate matches the exact locked plan item for ${slot.key}.`,
+      recent_exposure_assessment: "The 72-hour published exposure and future runway were reviewed before placement.",
+      intelligence_application_assessment: "The locked likes-first cycle strategy selected this Saved Pattern and exact plan item.",
+      gate_summary: { results: fixture.gateResults },
+    },
+    operation_id: `test-source-backed-persist-${crypto.randomUUID()}`,
+    proceed_confirmed: true,
+  };
+}
 
 async function resetTables(): Promise<void> {
       mcpSelectedKey = null;
