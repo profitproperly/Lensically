@@ -12661,19 +12661,20 @@ async function persistManifestAutonomousPost(
     : [];
                 const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
   if (!targetSlot) return rejectPersist("slot_outside_prepared_cycle", { slot_key: slotKey }, slotKey);
-  const outputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
+    const outputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
     brandKey: brand.brand_key,
-    strategy: strategicThesis,
+    strategy: effectiveStrategicThesis,
     evidence: {
       cycle_id: cycleId,
       input_strategy_version_id: cycle.strategy_version_id ?? null,
       account_position_captured_at: (cycle.account_position as Record<string, unknown> | undefined)?.captured_at ?? null,
       follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+      cycle_strategic_thesis_reused: cycleStrategicThesisReused,
     },
-    changeSummary: normalizeOperatorText(strategicThesis.change_summary, 4000, true)
+    changeSummary: normalizeOperatorText(effectiveStrategicThesis.change_summary, 4000, true)
       ?? `Autonomous strategy thesis selected for cycle ${cycleId}.`,
-    reversalConditions: Array.isArray(strategicThesis.reversal_conditions)
-      ? strategicThesis.reversal_conditions.map(String).slice(0, 20)
+    reversalConditions: Array.isArray(effectiveStrategicThesis.reversal_conditions)
+      ? effectiveStrategicThesis.reversal_conditions.map(String).slice(0, 20)
       : ["Revise only when observable engagement evidence contradicts the thesis or account conditions materially change."],
     sourceCycleId: cycleId,
     parentVersionId: normalizeOperatorText(cycle.strategy_version_id, 160, true),
