@@ -20534,11 +20534,13 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
       ? "Complete the active autonomous Manifest cycle through canonical receipt closure with zero cycle-horizon missing slots."
       : durableOutcome ?? "Select and activate the highest-value deferred outcome through the durable intake guard.",
     next_action: nextAction,
-    priority_reason: hasIncident
-      ? "P0/P1 hardening incidents supersede normal work."
-      : workState?.scope_frozen === 1
-        ? "The durable active-outcome scope is frozen until its recorded completion conditions pass."
-        : "The operator must select the highest-value eligible deferred outcome before new execution begins.",
+        priority_reason: manifestAutonomousCycleTool
+      ? "The prepared Manifest cycle remains the sole active objective until its canonical completion receipt proves zero cycle-horizon missing slots."
+      : hasIncident
+        ? "P0/P1 hardening incidents supersede normal work."
+        : workState?.scope_frozen === 1
+          ? "The durable active-outcome scope is frozen until its recorded completion conditions pass."
+          : "The operator must select the highest-value eligible deferred outcome before new execution begins.",
     completion_evidence: failed
       ? ["shared cause repaired", "focused regression passed", "exact tested head released", "live behavior verified"]
       : ["result verified", "durable state updated", "next checkpoint selected"],
