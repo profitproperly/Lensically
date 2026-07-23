@@ -13077,7 +13077,7 @@ async function persistManifestAutonomousPost(
       brand.profile.threads_user_id,
       strategicPurpose,
       `Model-orchestrated autonomous ${generationMode} for ${slotKey}`,
-      normalizeOperatorJson({ cycle_id: cycleId, strategic_thesis: strategicThesis, strategy, model_evaluation: modelEvaluation }, {}),
+            normalizeOperatorJson({ cycle_id: cycleId, strategic_thesis: effectiveStrategicThesis, cycle_strategic_thesis_reused: cycleStrategicThesisReused, strategy, model_evaluation: modelEvaluation }, {}),
       sourceCardId,
       familyId,
       Number(sourceCard.version_number ?? 1),
