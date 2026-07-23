@@ -11882,7 +11882,7 @@ async function prepareManifestAutonomousCycle(
     brand.profile.threads_user_id,
     { limit: 100 },
   );
-  const accountPosition = {
+    const accountPosition: Record<string, unknown> = {
     ...(await buildManifestAutonomousAccountPosition(
       env,
       brand,
