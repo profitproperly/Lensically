@@ -32674,7 +32674,19 @@ async function deleteScheduledPostForAppUser(
   };
 }
 
+export function auditedScheduledRetirementPostStateVerified(
+  remainingScheduledCount: number,
+  deletionRecordCount: number,
+  expectedCount: number,
+): boolean {
+  return Number.isInteger(expectedCount)
+    && expectedCount >= 0
+    && remainingScheduledCount === 0
+    && deletionRecordCount === expectedCount;
+}
+
 async function deleteScheduledPostsForAppUserBatch(
+
   env: Env,
   appUserId: string,
   scheduledPostIds: number[],
@@ -32810,11 +32822,33 @@ async function deleteScheduledPostsForAppUserBatch(
     `DELETE FROM scheduled_posts
      WHERE id IN (${mutationPlaceholders}) AND user_id = ? AND threads_user_id = ? AND status = ?`,
   ).bind(...pendingIds, appUserId, input.expectedThreadsUserId, SCHEDULED_POST_STATUS_APPROVED));
-  const results = await env.DB.batch(statements);
-  const deleteChanges = Number(results[results.length - 1]?.meta?.changes ?? 0);
-  if (deleteChanges !== pendingIds.length) {
-    throw new Error(`audited_scheduled_retirement_race:deleted=${deleteChanges}:expected=${pendingIds.length}`);
+    await env.DB.batch(statements);
+  const verification = await env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM scheduled_posts
+        WHERE id IN (${mutationPlaceholders}) AND user_id = ? AND threads_user_id = ?) AS remaining_scheduled,
+       (SELECT COUNT(DISTINCT scheduled_post_id) FROM scheduled_post_deletions
+        WHERE scheduled_post_id IN (${mutationPlaceholders}) AND user_id = ? AND threads_user_id = ?) AS deletion_records`,
+  ).bind(
+    ...pendingIds,
+    appUserId,
+    input.expectedThreadsUserId,
+    ...pendingIds,
+    appUserId,
+    input.expectedThreadsUserId,
+  ).first<{ remaining_scheduled: number | string; deletion_records: number | string }>();
+  const remainingScheduledCount = Number(verification?.remaining_scheduled ?? -1);
+  const deletionRecordCount = Number(verification?.deletion_records ?? -1);
+  if (!auditedScheduledRetirementPostStateVerified(
+    remainingScheduledCount,
+    deletionRecordCount,
+    pendingIds.length,
+  )) {
+    throw new Error(
+      `audited_scheduled_retirement_post_state_mismatch:remaining=${remainingScheduledCount}:recorded=${deletionRecordCount}:expected=${pendingIds.length}`,
+    );
   }
+
   const recordMap = new Map([...replayRows, ...newRecords].map((record) => [record.scheduled_post_id, record]));
   return {
     records: ids.map((id) => recordMap.get(id)).filter((record): record is ScheduledPostDeletionRecord => Boolean(record)),

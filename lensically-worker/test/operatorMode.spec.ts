@@ -2,7 +2,9 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker, {
     ScheduledPostScheduler,
-  activateNextApprovedScheduledPostCanary,
+    activateNextApprovedScheduledPostCanary,
+  auditedScheduledRetirementPostStateVerified,
+
         buildManifestRollingHourlySlots,
     buildOperatorContentFocusDailyDecisions,
   buildOperatorMaturityObservation,
@@ -6364,9 +6366,17 @@ describe("operator mode MCP endpoint", () => {
       `SELECT id FROM scheduled_posts WHERE id = ? LIMIT 1`,
     ).bind(additionalPostId).first<{ id: number }>();
     expect(additionalScheduledRow).toBeNull();
-  }, 30000);
+    }, 30000);
+
+  it("verifies audited retirement from persisted post-state instead of D1 batch metadata", () => {
+    expect(auditedScheduledRetirementPostStateVerified(0, 2, 2)).toBe(true);
+    expect(auditedScheduledRetirementPostStateVerified(1, 2, 2)).toBe(false);
+    expect(auditedScheduledRetirementPostStateVerified(0, 1, 2)).toBe(false);
+    expect(auditedScheduledRetirementPostStateVerified(0, 4, 2)).toBe(false);
+  });
 
   it("hides scheduled posts from other account scopes when editing", async () => {
+
     await operatorTool("list_accounts");
     const inserted = await env.DB.prepare(
       `INSERT INTO scheduled_posts (
