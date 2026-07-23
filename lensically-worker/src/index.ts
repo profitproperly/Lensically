@@ -12708,44 +12708,7 @@ async function persistManifestAutonomousPost(
       corrective_action: "Select a real qualified Saved Pattern or existing source card and provide its source_card_id or source_selection_id. Use original_discovery only for genuinely source-independent discovery.",
     }, slotKey || null);
   }
-  if (sourceContextValidation.value.kind === "operator_hypothesis") {
-    const qualifiedSourceRows = await env.DB.prepare(
-      `SELECT source_identity_key FROM operator_manifest_saved_pattern_intelligence
-       WHERE brand_key = ? AND exclusion_state = 'active'
-         AND reuse_state IN ('ready', 'proven', 'monitor')
-       ORDER BY CASE reuse_state WHEN 'proven' THEN 1 WHEN 'ready' THEN 2 ELSE 3 END,
-                datetime(updated_at) DESC LIMIT 250`,
-    ).bind(brand.brand_key).all<{ source_identity_key: string }>();
-    const qualifiedSourceIdentities = new Set(
-      (qualifiedSourceRows.results ?? [])
-        .map((row) => normalizeOperatorText(row.source_identity_key, 1000, true))
-        .filter((value): value is string => Boolean(value)),
-    );
-    if (qualifiedSourceIdentities.size > 0) {
-      const consideredQualifiedSource = candidateTrace.some((candidate) => {
-        const identity = normalizeOperatorText(
-          candidate.source_identity_key
-            ?? candidate.pattern_identity_key
-            ?? candidate.saved_pattern_identity_key,
-          1000,
-          true,
-        );
-        const decision = normalizeOperatorMachineKey(candidate.decision, "");
-        const reason = normalizeOperatorText(candidate.reason, 2000, true);
-        return Boolean(identity
-          && qualifiedSourceIdentities.has(identity)
-          && ["rejected", "not_selected", "deferred"].includes(decision)
-          && reason);
-      });
-      if (!consideredQualifiedSource) {
-        return rejectPersist("qualified_source_consideration_required", {
-          received_source_kind: sourceContextValidation.value.kind,
-          qualified_source_count: qualifiedSourceIdentities.size,
-          corrective_action: "Before using a model-originated hypothesis, consider at least one real qualified Saved Pattern from decision_intelligence.saved_pattern_candidates. Record its source_identity_key, a rejected/not_selected/deferred decision, and a specific reason in candidate_trace.",
-        }, slotKey || null);
-      }
-    }
-  }
+  
   const targetSlots = Array.isArray(cycle.target_slots)
     ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
     : [];
