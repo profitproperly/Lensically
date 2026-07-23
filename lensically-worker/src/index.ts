@@ -13405,14 +13405,17 @@ async function persistManifestAutonomousPost(
       brand.account_id,
     ),
     env.DB.prepare(
-            `INSERT INTO operator_autonomous_lineup_items (
+                  `INSERT INTO operator_autonomous_lineup_items (
         id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
         generation_mode, family_key, strategic_purpose, strategy_json,
+        cycle_plan_item_id, gate_receipt_id,
         source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
       ON CONFLICT(cycle_id, slot_key) DO UPDATE SET
         text = excluded.text,
         strategy_json = excluded.strategy_json,
+        cycle_plan_item_id = excluded.cycle_plan_item_id,
+        gate_receipt_id = excluded.gate_receipt_id,
         source_card_id = excluded.source_card_id,
         source_selection_id = excluded.source_selection_id,
         hypothesis_id = excluded.hypothesis_id,
@@ -13431,8 +13434,10 @@ async function persistManifestAutonomousPost(
       text,
       generationMode,
       familyKey,
-      strategicPurpose,
-            normalizeOperatorJson(strategy, {}),
+            strategicPurpose,
+      normalizeOperatorJson(strategy, {}),
+      requestedCyclePlanItemId,
+      gateReceipt.id ?? null,
       sourceCardId,
       sourceSelectionId,
       normalizeOperatorText(postHypothesis.id, 160, true),
