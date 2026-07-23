@@ -215,12 +215,17 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
         hypothesis_json, comparison_group_json, latest_result_json, updated_at
       FROM operator_manifest_experiments WHERE brand_key = ?
                         ORDER BY datetime(updated_at) DESC LIMIT 4`).bind(brandKey).all<JsonRecord>(),
-    db.prepare(`SELECT pattern_identity_key, source_identity_key, mechanism_json,
-        adaptation_options_json, confidence_json, reuse_state, results_json, updated_at
-      FROM operator_manifest_saved_pattern_intelligence WHERE brand_key = ?
-        AND exclusion_state = 'active'
-      ORDER BY CASE reuse_state WHEN 'proven' THEN 1 WHEN 'ready' THEN 2 WHEN 'monitor' THEN 3 ELSE 4 END,
-                                datetime(updated_at) DESC LIMIT 4`).bind(brandKey).all<JsonRecord>(),
+        db.prepare(`SELECT intelligence.pattern_identity_key, intelligence.source_identity_key,
+        intelligence.external_pattern_id, intelligence.mechanism_json,
+        intelligence.adaptation_options_json, intelligence.confidence_json,
+        intelligence.reuse_state, intelligence.results_json, intelligence.verified_metrics_json,
+        intelligence.updated_at, pattern.post_text AS source_text,
+        pattern.source_url, pattern.likes, pattern.views, pattern.replies, pattern.reposts, pattern.shares
+      FROM operator_manifest_saved_pattern_intelligence intelligence
+      LEFT JOIN external_patterns pattern ON pattern.id = intelligence.external_pattern_id
+      WHERE intelligence.brand_key = ? AND intelligence.exclusion_state = 'active'
+      ORDER BY CASE intelligence.reuse_state WHEN 'proven' THEN 1 WHEN 'ready' THEN 2 WHEN 'monitor' THEN 3 ELSE 4 END,
+        COALESCE(pattern.likes, 0) DESC, datetime(intelligence.updated_at) DESC LIMIT 8`).bind(brandKey).all<JsonRecord>(),
     db.prepare(`SELECT signature_json, observed_at FROM operator_manifest_semantic_signatures
                         WHERE brand_key = ? ORDER BY datetime(observed_at) DESC LIMIT 18`).bind(brandKey).all<JsonRecord>(),
   ]);
