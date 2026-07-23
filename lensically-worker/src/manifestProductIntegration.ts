@@ -259,9 +259,20 @@ export async function buildManifestDecisionIntelligence(db: D1Database, brandKey
     comparison_group: compact(parseJson(row.comparison_group_json, {}), 4),
         latest_result: compact(parseJson(row.latest_result_json, {}), 4),
   }));
-  const savedPatterns = (savedRows.results ?? []).map((row) => ({
+    const savedPatterns = (savedRows.results ?? []).map((row) => ({
     pattern_identity_key: row.pattern_identity_key,
     source_identity_key: row.source_identity_key,
+    external_pattern_id: number(row.external_pattern_id),
+    source_text: row.source_text ?? null,
+    source_url: row.source_url ?? null,
+    verified_metrics: {
+      likes: number(row.likes),
+      views: number(row.views),
+      replies: number(row.replies),
+      reposts: number(row.reposts),
+      shares: number(row.shares),
+      ...record(parseJson(row.verified_metrics_json, {})),
+    },
         mechanism: compact(parseJson(row.mechanism_json, {}), 4),
     adaptation_options: compact(parseJson(row.adaptation_options_json, {}), 4),
     confidence: compact(parseJson(row.confidence_json, {}), 4),
