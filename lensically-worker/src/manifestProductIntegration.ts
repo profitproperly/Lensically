@@ -87,6 +87,28 @@ function uniqueStrings(values: unknown[], limit = 20): string[] {
 export async function ensureManifestProductIntegrationTables(db: D1Database): Promise<void> {
   await ensureManifestMeasurementAuditTables(db);
     await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS external_patterns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_user_id TEXT NOT NULL,
+      account_id TEXT NOT NULL DEFAULT 'manifest-mental',
+      platform TEXT NOT NULL DEFAULT 'threads',
+      source_url TEXT NOT NULL,
+      post_id TEXT,
+      author_handle TEXT,
+      author_display_name TEXT,
+      post_text TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      views INTEGER,
+      posted_at TEXT,
+      capture_confidence TEXT NOT NULL DEFAULT 'medium',
+      raw_payload TEXT,
+      saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(app_user_id, account_id, source_url)
+    )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS operator_manifest_decision_influences (
       id TEXT PRIMARY KEY,
       influence_key TEXT NOT NULL UNIQUE,
