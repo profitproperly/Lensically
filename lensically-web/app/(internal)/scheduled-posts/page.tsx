@@ -54,9 +54,23 @@ type ScheduledPostStrategy = {
   novelty_level?: string | null;
 };
 
+type ScheduledPostDeletion = {
+  id: string;
+  scheduled_post_id: number;
+  post_text: string;
+  scheduled_time_utc: string;
+  status_before: string;
+  reason: string;
+  deleted_by: "owner" | "model";
+  deletion_source: "ui" | "mcp";
+  operation_id?: string | null;
+  deleted_at: string;
+};
+
 type ScheduledPostsResponse = {
   success?: boolean;
   scheduled_posts?: ScheduledPost[];
+  deleted_posts?: ScheduledPostDeletion[];
   error?: string;
 };
 
@@ -284,7 +298,8 @@ export default function ScheduledPostsPage() {
   const [threadsUserId, setThreadsUserId] = useState<string>("");
   const [loadingConnection, setLoadingConnection] = useState(true);
   const [connectionError, setConnectionError] = useState("");
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+    const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const [deletedPosts, setDeletedPosts] = useState<ScheduledPostDeletion[]>([]);
   const [loadingScheduledPosts, setLoadingScheduledPosts] = useState(false);
   const [scheduledPostsError, setScheduledPostsError] = useState("");
   const [deleteScheduledPostError, setDeleteScheduledPostError] = useState("");
@@ -425,8 +440,9 @@ export default function ScheduledPostsPage() {
   }, []);
 
   useEffect(() => {
-    if (!threadsUserId) {
+        if (!threadsUserId) {
       setScheduledPosts([]);
+      setDeletedPosts([]);
       setSelectedScheduledPostIds([]);
       setIsBulkSelectionMode(false);
       setScheduledPostsError("");
@@ -469,8 +485,9 @@ export default function ScheduledPostsPage() {
       );
 
       const data = (await response.json().catch(() => null)) as ScheduledPostsResponse | null;
-      if (Array.isArray(data?.scheduled_posts)) {
+            if (Array.isArray(data?.scheduled_posts)) {
         setScheduledPosts(data.scheduled_posts);
+        setDeletedPosts(Array.isArray(data.deleted_posts) ? data.deleted_posts : []);
         setScheduledPostsError("");
         return;
       }
@@ -485,8 +502,9 @@ export default function ScheduledPostsPage() {
         return;
       }
 
-      const nextPosts = Array.isArray(data?.scheduled_posts) ? data.scheduled_posts : [];
+            const nextPosts = Array.isArray(data?.scheduled_posts) ? data.scheduled_posts : [];
       setScheduledPosts(nextPosts);
+      setDeletedPosts(Array.isArray(data?.deleted_posts) ? data.deleted_posts : []);
     } catch {
       setScheduledPostsError("Could not load scheduled posts.");
     } finally {
