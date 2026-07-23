@@ -628,6 +628,98 @@ export function buildManifestLikesBenchmarks(posts: JsonRecord[]): JsonRecord {
   };
 }
 
+function manifestEvidenceJsonBytes(value: unknown): number {
+  return new TextEncoder().encode(stableManifestJson(value)).byteLength;
+}
+
+function manifestEvidenceCollectionItems(evidenceType: string, value: unknown): JsonRecord[] {
+  if (Array.isArray(value)) {
+    return value.map((item, index) => ({ evidence_type: evidenceType, item_index: index, data: item }));
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value as JsonRecord).flatMap(([key, child]) => {
+      if (Array.isArray(child)) {
+        return child.map((item, index) => ({ evidence_type: evidenceType, section_key: key, item_index: index, data: item }));
+      }
+      return [{ evidence_type: evidenceType, section_key: key, data: child }];
+    });
+  }
+  return [{ evidence_type: evidenceType, data: value }];
+}
+
+export function buildManifestEvidencePages(input: {
+  summary: JsonRecord;
+  posts: JsonRecord[];
+  benchmarks: JsonRecord;
+  previousBenchmarks?: JsonRecord;
+  recentExposure: JsonRecord;
+  futureSchedule: JsonRecord[];
+  hardBans: JsonRecord[];
+  experiments: JsonRecord[];
+  maxItems?: number;
+  maxBytes?: number;
+}): JsonRecord[] {
+  const maxItems = Math.max(1, Math.min(25, Math.trunc(input.maxItems ?? MANIFEST_EVIDENCE_PAGE_SIZE)));
+  const maxBytes = Math.max(4000, Math.min(18000, Math.trunc(input.maxBytes ?? MANIFEST_EVIDENCE_PAGE_MAX_BYTES)));
+  const items: JsonRecord[] = [
+    { evidence_type: "snapshot_summary", data: input.summary },
+    { evidence_type: "likes_first_benchmarks", data: input.benchmarks },
+    { evidence_type: "previous_likes_first_benchmarks", data: input.previousBenchmarks ?? {} },
+    ...manifestEvidenceCollectionItems("recent_exposure", input.recentExposure),
+    ...manifestEvidenceCollectionItems("future_schedule", input.futureSchedule),
+    ...manifestEvidenceCollectionItems("hard_ban", input.hardBans),
+    ...manifestEvidenceCollectionItems("experiment", input.experiments),
+    ...input.posts.map((post, index) => ({ evidence_type: "published_post", item_index: index, data: post })),
+  ];
+  const pages: JsonRecord[] = [];
+  let current: JsonRecord[] = [];
+  const flush = (): void => {
+    if (!current.length) return;
+    const payload = { page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, items: current };
+    const evidenceTypes = Array.from(new Set(current.map((item) => text(item.evidence_type, 120)).filter(Boolean)));
+    pages.push({
+      page_index: pages.length,
+      item_count: current.length,
+      byte_count: manifestEvidenceJsonBytes(payload),
+      evidence_types: evidenceTypes,
+      items: current,
+    });
+    current = [];
+  };
+  for (const item of items) {
+    const singleBytes = manifestEvidenceJsonBytes({ page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, items: [item] });
+    if (singleBytes > maxBytes) throw new Error("manifest_evidence_item_exceeds_page_budget");
+    const candidate = [...current, item];
+    const candidateBytes = manifestEvidenceJsonBytes({ page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, items: candidate });
+    if (current.length && (candidate.length > maxItems || candidateBytes > maxBytes)) flush();
+    current.push(item);
+  }
+  flush();
+  return pages;
+}
+
+function compactEvidenceSnapshotManifest(snapshot: JsonRecord): JsonRecord {
+  return {
+    id: snapshot.id ?? null,
+    cycle_id: snapshot.cycle_id ?? null,
+    brand_key: snapshot.brand_key ?? null,
+    snapshot_version: snapshot.snapshot_version ?? MANIFEST_EVIDENCE_SNAPSHOT_VERSION,
+    as_of: snapshot.as_of ?? null,
+    timezone: snapshot.timezone ?? null,
+    window_days: numeric(snapshot.window_days, MANIFEST_ANALYSIS_WINDOW_DAYS),
+    window_start: snapshot.window_start ?? null,
+    window_end: snapshot.window_end ?? null,
+    post_count: numeric(snapshot.post_count),
+    mature_count: numeric(snapshot.mature_count),
+    immature_count: numeric(snapshot.immature_count),
+    incomplete_count: numeric(snapshot.incomplete_count),
+    page_size: numeric(snapshot.page_size, MANIFEST_EVIDENCE_PAGE_SIZE),
+    page_count: numeric(snapshot.page_count),
+    page_byte_budget: numeric(snapshot.page_byte_budget, MANIFEST_EVIDENCE_PAGE_MAX_BYTES),
+    source_hash: snapshot.source_hash ?? null,
+  };
+}
+
 function serializeEvidenceSnapshot(row: JsonRecord): JsonRecord {
   return {
     ...row,
