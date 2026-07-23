@@ -512,9 +512,17 @@ export default function ScheduledPostsPage() {
     }
   }
 
-  async function deleteScheduledPost(scheduledPostId: number) {
+    async function deleteScheduledPost(scheduledPostId: number) {
+    const reason = window.prompt(
+      "Why are you deleting this scheduled post? This reason will be saved for you and the autonomous model.",
+    )?.trim();
+    if (!reason) {
+      setDeleteScheduledPostError("A deletion reason is required.");
+      setDeleteScheduledPostSuccess("");
+      return;
+    }
     const confirmed = window.confirm(
-      "Delete this scheduled post? This action cannot be undone and the post will not be published.",
+      "Delete this scheduled post? The post will not publish, but its text, slot, and deletion reason will remain in history.",
     );
     if (!confirmed) {
       return;
@@ -533,11 +541,13 @@ export default function ScheduledPostsPage() {
         },
         body: JSON.stringify({
           scheduled_post_id: scheduledPostId,
+          threads_user_id: threadsUserId,
+          reason,
         }),
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { success?: boolean; error?: string; deleted?: boolean }
+        | { success?: boolean; error?: string; deleted?: boolean; deletion?: ScheduledPostDeletion }
         | null;
 
       if (!response.ok || data?.success === false || data?.deleted !== true) {
@@ -548,7 +558,15 @@ export default function ScheduledPostsPage() {
       setScheduledPosts((currentPosts) =>
         currentPosts.filter((post) => post.id !== scheduledPostId),
       );
-      setDeleteScheduledPostSuccess("Scheduled post deleted.");
+      if (data.deletion) {
+        setDeletedPosts((currentPosts) => [
+          data.deletion as ScheduledPostDeletion,
+          ...currentPosts.filter((post) => post.id !== data.deletion?.id),
+        ]);
+      } else {
+        void loadScheduledPosts();
+      }
+      setDeleteScheduledPostSuccess("Scheduled post deleted and its reason was saved.");
       setScheduledPostsError("");
     } catch {
       setDeleteScheduledPostError("Could not delete scheduled post.");
@@ -594,8 +612,9 @@ export default function ScheduledPostsPage() {
     setDeleteScheduledPostSuccess("");
   }
 
-  async function deleteScheduledPostRequest(scheduledPostId: number): Promise<{
+    async function deleteScheduledPostRequest(scheduledPostId: number, reason: string): Promise<{
     success: boolean;
+    deletion?: ScheduledPostDeletion;
     error?: string;
   }> {
     try {
@@ -607,11 +626,13 @@ export default function ScheduledPostsPage() {
         },
         body: JSON.stringify({
           scheduled_post_id: scheduledPostId,
+          threads_user_id: threadsUserId,
+          reason,
         }),
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { success?: boolean; error?: string; deleted?: boolean }
+        | { success?: boolean; error?: string; deleted?: boolean; deletion?: ScheduledPostDeletion }
         | null;
 
       if (!response.ok || data?.success === false || data?.deleted !== true) {
@@ -621,7 +642,7 @@ export default function ScheduledPostsPage() {
         };
       }
 
-      return { success: true };
+      return { success: true, deletion: data.deletion };
     } catch {
       return {
         success: false,
@@ -630,7 +651,7 @@ export default function ScheduledPostsPage() {
     }
   }
 
-  async function handleBulkDeleteSelectedPosts() {
+    async function handleBulkDeleteSelectedPosts() {
     const selectedIds = [...selectedScheduledPostIds];
     if (!selectedIds.length) {
       setDeleteScheduledPostError("Select at least one scheduled post to delete.");
@@ -638,8 +659,16 @@ export default function ScheduledPostsPage() {
       return;
     }
 
+    const reason = window.prompt(
+      `Why are you deleting these ${selectedIds.length} scheduled posts? The same reason will be saved with each post.`,
+    )?.trim();
+    if (!reason) {
+      setDeleteScheduledPostError("A deletion reason is required.");
+      setDeleteScheduledPostSuccess("");
+      return;
+    }
     const confirmed = window.confirm(
-      `Delete ${selectedIds.length} scheduled post${selectedIds.length === 1 ? "" : "s"}? This action cannot be undone and the selected posts will not be published.`,
+      `Delete ${selectedIds.length} scheduled post${selectedIds.length === 1 ? "" : "s"}? Their text, slots, and deletion reason will remain in history.`,
     );
     if (!confirmed) {
       return;
@@ -650,13 +679,15 @@ export default function ScheduledPostsPage() {
     setDeleteScheduledPostSuccess("");
 
     const deletedIds: number[] = [];
+    const deletedRecords: ScheduledPostDeletion[] = [];
     const failedIds: number[] = [];
     let lastError = "";
 
     for (const scheduledPostId of selectedIds) {
-      const result = await deleteScheduledPostRequest(scheduledPostId);
+      const result = await deleteScheduledPostRequest(scheduledPostId, reason);
       if (result.success) {
         deletedIds.push(scheduledPostId);
+        if (result.deletion) deletedRecords.push(result.deletion);
       } else {
         failedIds.push(scheduledPostId);
         lastError = result.error || "Could not delete scheduled post.";
@@ -670,6 +701,14 @@ export default function ScheduledPostsPage() {
       setSelectedScheduledPostIds((currentIds) =>
         currentIds.filter((id) => !deletedIds.includes(id)),
       );
+      if (deletedRecords.length > 0) {
+        setDeletedPosts((currentPosts) => [
+          ...deletedRecords,
+          ...currentPosts.filter((post) => !deletedRecords.some((deleted) => deleted.id === post.id)),
+        ]);
+      } else {
+        void loadScheduledPosts();
+      }
       setScheduledPostsError("");
     }
 
@@ -682,7 +721,7 @@ export default function ScheduledPostsPage() {
       setDeleteScheduledPostSuccess("");
     } else {
       setDeleteScheduledPostSuccess(
-        `Deleted ${deletedIds.length} scheduled post${deletedIds.length === 1 ? "" : "s"}.`,
+        `Deleted ${deletedIds.length} scheduled post${deletedIds.length === 1 ? "" : "s"} and saved the reason.`,
       );
       setDeleteScheduledPostError("");
       setIsBulkSelectionMode(false);
