@@ -1,6 +1,6 @@
 import {
   ensureManifestIntelligenceTables,
-  ensureManifestStrategyVersion,
+  
   getLatestManifestStrategyVersion,
 } from "./manifestIntelligence";
 import {
@@ -424,43 +424,8 @@ async function refreshManifestLearningBrief(db: D1Database, brandKey: string): P
     evidence_window_start: safeIso(maturityWindow?.window_start),
     evidence_window_end: safeIso(maturityWindow?.window_end),
   });
-  const latestStrategy = await getLatestManifestStrategyVersion(db, brandKey);
-  const strategyChange = record(brief.strategy_change);
-  let strategyVersionId: string | null = null;
-  if (strategyChange.warranted === true) {
-    const latestStrategyBody = record(latestStrategy?.strategy);
-    const nextStrategy = {
-      ...latestStrategyBody,
-      intelligence_directives: record(strategyChange.directives),
-      intelligence_learning_brief_key: sourceFingerprint,
-      intelligence_learning_brief_version: MANIFEST_LEARNING_BRIEF_VERSION,
-    };
-    const latestCycle = await db.prepare(`SELECT id FROM operator_autonomous_growth_cycles
-      WHERE brand_key = ? ORDER BY datetime(updated_at) DESC LIMIT 1`).bind(brandKey).first<{ id: string }>();
-    const strategy = await ensureManifestStrategyVersion(db, {
-      brandKey,
-      strategy: nextStrategy,
-      evidence: {
-        learning_brief_key: sourceFingerprint,
-        authoritative_post_count: authoritativePostCount,
-        reliable_changes: [
-          ...array(brief.improvements).filter((item) => record(item).confidence === "reliable"),
-          ...array(brief.weakening).filter((item) => record(item).confidence === "reliable"),
-        ],
-        verified_decay: brief.fatigue,
-        disproven_assumptions: brief.disproven_assumptions,
-        experiment_decisions: brief.experiment_decisions,
-      },
-      changeSummary: "Automatic Manifest strategy update from authoritative mature learning brief.",
-      reversalConditions: [
-        "Reverse or reduce a directive when matched 24-hour evidence becomes contested or reliably contradicting.",
-        "Do not cool a family from frequency alone; require verified comparable decay.",
-      ],
-      sourceCycleId: latestCycle?.id ?? null,
-      parentVersionId: text(latestStrategy?.id, 160) || null,
-    });
-    strategyVersionId = text(strategy.id, 160) || null;
-  }
+    const strategyChange = record(brief.strategy_change);
+  const strategyVersionId: string | null = null;
   const briefKey = sourceFingerprint;
   await db.prepare(`INSERT INTO operator_manifest_learning_briefs (
       id, brand_key, brief_key, brief_version, source_fingerprint,
@@ -482,8 +447,9 @@ async function refreshManifestLearningBrief(db: D1Database, brandKey: string): P
     brief_key: briefKey,
     source_fingerprint: sourceFingerprint,
     authoritative_post_count: authoritativePostCount,
-    strategy_change_warranted: strategyChange.warranted === true,
-    strategy_version_id: strategyVersionId,
+        strategy_change_warranted: strategyChange.warranted === true,
+    strategy_version_id: null,
+    strategy_authority: "measurement_only_cycle_model_commits_strategy",
     brief,
   };
 }
