@@ -869,54 +869,65 @@ export async function readManifestEvidencePage(db: D1Database, input: {
     : await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? AND brand_key = ? LIMIT 1`)
       .bind(input.cycleId, input.brandKey).first<JsonRecord>();
   if (!snapshot) throw new Error("manifest_evidence_snapshot_not_found");
-  const serialized = serializeEvidenceSnapshot(snapshot);
+    const serialized = serializeEvidenceSnapshot(snapshot);
   const pageCount = numeric(serialized.page_count);
   const pageIndex = Math.trunc(input.pageIndex);
-  if (pageIndex < 0 || pageIndex >= Math.max(1, pageCount)) throw new Error("manifest_evidence_page_out_of_range");
-  const pageSize = numeric(serialized.page_size, MANIFEST_EVIDENCE_PAGE_SIZE);
-  const rows = pageCount === 0 ? { results: [] as JsonRecord[] } : await db.prepare(`SELECT *
-      FROM operator_manifest_evidence_posts WHERE snapshot_id = ?
-      ORDER BY datetime(published_at) DESC, published_post_id DESC LIMIT ? OFFSET ?`)
-    .bind(snapshot.id, pageSize, pageIndex * pageSize).all<JsonRecord>();
-  await db.prepare(`INSERT INTO operator_manifest_analysis_page_reads (
-      id, snapshot_id, cycle_id, brand_key, page_index
-    ) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(snapshot_id, page_index) DO UPDATE SET read_at = CURRENT_TIMESTAMP`)
-    .bind(crypto.randomUUID(), snapshot.id, input.cycleId, input.brandKey, pageIndex).run();
-  const items = (rows.results ?? []).map((row) => ({
-    published_post_id: row.published_post_id,
-    scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : numeric(row.scheduled_post_id),
-    text: row.text,
-    published_at: row.published_at,
-    age_hours: numeric(row.age_hours),
-    maturity_state: row.maturity_state,
-    primary_likes: row.primary_likes === null || row.primary_likes === undefined ? null : numeric(row.primary_likes),
-    like_rate: row.like_rate === null || row.like_rate === undefined ? null : numeric(row.like_rate),
-    metrics: parseJson(row.metrics_json, {}),
-    maturity_snapshots: parseJson(row.maturity_snapshots_json, []),
-    lineage: parseJson(row.lineage_json, {}),
-    classification: parseJson(row.classification_json, {}),
-  }));
+  if (pageIndex < 0 || pageIndex >= pageCount) throw new Error("manifest_evidence_page_out_of_range");
+  const pageRow = await db.prepare(`SELECT * FROM operator_manifest_evidence_pages
+      WHERE snapshot_id = ? AND cycle_id = ? AND brand_key = ? AND page_index = ? LIMIT 1`)
+    .bind(snapshot.id, input.cycleId, input.brandKey, pageIndex).first<JsonRecord>();
+  if (!pageRow) throw new Error("manifest_evidence_page_missing");
+  const items = parseJson(pageRow.items_json, []) as JsonRecord[];
+  if (!Array.isArray(items) || items.length !== numeric(pageRow.item_count)) {
+    throw new Error("manifest_evidence_page_integrity_failed");
+  }
+  const storedPageBytes = numeric(pageRow.byte_count);
+  const actualPageBytes = manifestEvidenceJsonBytes({
+    page_contract_version: pageRow.page_contract_version,
+    items,
+  });
+  if (actualPageBytes !== storedPageBytes || actualPageBytes > MANIFEST_EVIDENCE_PAGE_MAX_BYTES) {
+    throw new Error("manifest_evidence_page_integrity_failed");
+  }
   const consumedRow = await db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`)
     .bind(snapshot.id).first<JsonRecord>();
-  return {
+  const currentRead = await db.prepare(`SELECT id FROM operator_manifest_analysis_page_reads
+      WHERE snapshot_id = ? AND page_index = ? LIMIT 1`)
+    .bind(snapshot.id, pageIndex).first<JsonRecord>();
+  const consumedPageCount = numeric(consumedRow?.total) + (currentRead ? 0 : 1);
+  const response: JsonRecord = {
     success: true,
-    snapshot: serialized,
+    complete_page: true,
+    snapshot: compactEvidenceSnapshotManifest(serialized),
+    page_contract_version: pageRow.page_contract_version,
     page_index: pageIndex,
+    page_byte_count: storedPageBytes,
+    evidence_types: parseJson(pageRow.evidence_types_json, []),
     items,
     pagination: {
-      page_size: pageSize,
+      page_size: numeric(serialized.page_size, MANIFEST_EVIDENCE_PAGE_SIZE),
       page_count: pageCount,
       returned: items.length,
       has_more: pageIndex + 1 < pageCount,
       next_page_index: pageIndex + 1 < pageCount ? pageIndex + 1 : null,
     },
     consumption: {
-      consumed_page_count: numeric(consumedRow?.total),
+      consumed_page_count: consumedPageCount,
       required_page_count: pageCount,
-      complete: numeric(consumedRow?.total) >= pageCount,
+      complete: consumedPageCount >= pageCount,
     },
+    response_bytes: 0,
   };
+  response.response_bytes = manifestEvidenceJsonBytes(response);
+  if (numeric(response.response_bytes) > MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES) {
+    throw new Error("manifest_evidence_response_exceeds_payload_budget");
+  }
+  await db.prepare(`INSERT INTO operator_manifest_analysis_page_reads (
+      id, snapshot_id, cycle_id, brand_key, page_index
+    ) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(snapshot_id, page_index) DO UPDATE SET read_at = CURRENT_TIMESTAMP`)
+    .bind(crypto.randomUUID(), snapshot.id, input.cycleId, input.brandKey, pageIndex).run();
+  return response;
 }
 
 export async function getManifestEvidenceConsumptionState(db: D1Database, cycleId: string, brandKey: string): Promise<JsonRecord> {
