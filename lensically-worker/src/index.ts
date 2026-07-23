@@ -10896,8 +10896,8 @@ async function buildManifestQualifiedSourcePool(
         source_url: canonicalSourceUrl,
         capture_confidence: row.capture_confidence ?? null,
         source_updated_at: row.updated_at ?? null,
-        why_relevant: "Saved Pattern qualified by the verified 1,000-like source gate.",
-        evidence_role: "market_signal",
+                why_relevant: "Saved Pattern qualified by the verified 1,000-like source gate.",
+        evidence_role: "market_evidence",
         lane_key: null,
         risk_notes: [],
       });
@@ -11505,8 +11505,8 @@ async function listSourceCandidatesForBrand(
         },
         posted_at: row.posted_at ?? null,
         source_url: row.source_url ?? null,
-        why_relevant: "Saved external/reference pattern with captured metrics.",
-        evidence_role: "market_signal",
+                why_relevant: "Saved external/reference pattern with captured metrics.",
+        evidence_role: "market_evidence",
         lane_key: null,
         risk_notes: [],
       });
@@ -11521,8 +11521,6 @@ const MANIFEST_AUTONOMOUS_GENERATION_MODES = new Set([
   "controlled_variation",
   "mechanism_expansion",
   "adjacent_experiment",
-  "original_discovery",
-  "market_response",
 ]);
 
 async function readManifestAutonomousCycle(
