@@ -3209,6 +3209,89 @@ describe("operator mode MCP endpoint", () => {
     ).bind(prepared.cycle.id, `rejected:${operationId}`).first<{ event_type: string; payload_json: string }>();
     expect(rejectionEvent?.event_type).toBe("candidate_rejected");
     expect(rejectionEvent?.payload_json).toContain("follower_attribution_forbidden");
+    }, 30000);
+
+  it("requires operator hypotheses to prove consideration of a qualified Saved Pattern", async () => {
+    await activateManifestAutonomyForTest();
+    const prepared = await mcpTool<{
+      cycle: { id: string; missing_slots: Array<{ key: string; date: string; time: string }> };
+    }>("prepare_manifest_autonomous_cycle", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      operation_id: `test-qualified-source-prepare-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    const slot = prepared.cycle.missing_slots[0];
+    expect(slot).toBeTruthy();
+    const sourceIdentityKey = `threads:test-qualified-${crypto.randomUUID().slice(0, 8)}`;
+    await env.DB.prepare(
+      `INSERT INTO operator_manifest_saved_pattern_intelligence (
+        id, brand_key, pattern_identity_key, external_pattern_id, source_identity_key,
+        verified_metrics_json, semantic_json, mechanism_json, adaptation_options_json,
+        similarity_json, usage_json, results_json, confidence_json, reuse_state,
+        exclusion_state, source_updated_at, intelligence_version
+      ) VALUES (?, 'manifest_mental', ?, NULL, ?, '{}', '{}', '{}', '{}', '[]', '{}', '{}', '{}', 'ready', 'active', CURRENT_TIMESTAMP, 'test-v1')`,
+    ).bind(crypto.randomUUID(), sourceIdentityKey, sourceIdentityKey).run();
+    const operationId = `test-qualified-source-rejection-${crypto.randomUUID()}`;
+    const rejected = await mcpTool<{ success: boolean; error: string; corrective_action?: string }>(
+      "persist_manifest_autonomous_post",
+      {
+        brand_key: "manifest_mental",
+        cycle_id: prepared.cycle.id,
+        strategic_thesis: {
+          position: "Test one genuinely original concise premise only after source review.",
+          invalidator: "The premise does not clear the account quality floor.",
+        },
+        post: {
+          date: slot.date,
+          time: slot.time,
+          text: `Original discovery candidate ${crypto.randomUUID().slice(0, 8)}.`,
+          generation_mode: "original_discovery",
+          family_key: `test_original_discovery_${crypto.randomUUID().slice(0, 8)}`,
+          source_mechanism: "A concise original direct statement.",
+          audience_reward: "A clear and specific reflection.",
+          strategic_purpose: "Verify that original discovery cannot silently bypass qualified sources.",
+          source_context: { kind: "operator_hypothesis", source_type: "operator_hypothesis" },
+          hypothesis: {
+            expected_response_type: "likes",
+            expected_audience_reward: "A clear and specific reflection.",
+            hook_rationale: "The direct opening is immediately understandable.",
+            premise_rationale: "The premise is intentionally source-independent.",
+            exploration_mode: "explore",
+            comparable_post_ids: [],
+            expected_performance_range: { views: { min: 100, max: 10_000 }, likes: { min: 5, max: 1_000 } },
+            uncertainty: "Original discovery may underperform established source-backed mechanisms.",
+            falsification_conditions: ["Comparable mature posts consistently outperform the candidate."],
+          },
+          strategy: { pillar: "clarity", hook_style: "direct_statement", novelty_level: "original_discovery" },
+        },
+        model_evaluation: {
+          generation_passed: true,
+          scheduling_passed: true,
+          novelty_assessment: "The premise is distinct from recent inventory.",
+          winner_preservation_assessment: "The candidate does not replace a proven winner.",
+          slot_placement_assessment: "The slot is authoritative and future-facing.",
+          recent_exposure_assessment: "Recent exposure was reviewed for clustering.",
+          intelligence_application_assessment: "The model chose original discovery without recording any qualified source consideration.",
+          candidate_trace: [],
+        },
+        operation_id: operationId,
+        proceed_confirmed: true,
+      },
+    );
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toBe("qualified_source_consideration_required");
+    expect(rejected.corrective_action).toContain("source_identity_key");
+    const scheduled = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM operator_autonomous_lineup_items WHERE cycle_id = ? AND slot_key = ?`,
+    ).bind(prepared.cycle.id, slot.key).first<{ total: number }>();
+    expect(Number(scheduled?.total ?? 0)).toBe(0);
+    const rejectionEvent = await env.DB.prepare(
+      `SELECT payload_json FROM operator_manifest_cycle_receipt_events
+       WHERE cycle_id = ? AND event_key = ? LIMIT 1`,
+    ).bind(prepared.cycle.id, `rejected:${operationId}`).first<{ payload_json: string }>();
+    expect(rejectionEvent?.payload_json).toContain("qualified_source_consideration_required");
   }, 30000);
 
     it("persists one model-orchestrated autonomous post with full lineage into one exact missing slot", async () => {
