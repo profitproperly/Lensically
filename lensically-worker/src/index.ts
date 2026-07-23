@@ -12001,8 +12001,13 @@ async function prepareManifestAutonomousCycle(
       refreshed_live_state: true,
       cycle: compactCycle,
       intelligence_engine_refresh: intelligenceEngineRefresh,
-      measurement_audit_refresh: measurementAuditRefresh,
+            measurement_audit_refresh: measurementAuditRefresh,
       decision_intelligence: decisionIntelligenceReceiptReference,
+      remaining_missing_count: missingSlots.length,
+      next_missing_slot: missingSlots[0] ?? null,
+      next_action: missingSlots.length > 0
+        ? `Continue autonomous Manifest cycle ${cycleId} now: build the complete remaining portfolio, then persist the first exact missing slot ${missingSlots[0]?.key ?? "returned by cycle.missing_slots"}. Preparation is nonterminal and the turn must not end.`
+        : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
       reconciliation_contract: {
         authoritative_clock_source: clock.source,
         effective_now_iso: clock.effective_now_iso,
