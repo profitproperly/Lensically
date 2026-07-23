@@ -21334,7 +21334,19 @@ function operatorMcpToolNameRequiresProceed(toolName: string): boolean {
   return ACCOUNT_SCOPED_MCP_ADMIN_TOOLS.has(toolName);
 }
 
+const MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS = new Set<string>([
+  "prepare_manifest_autonomous_cycle",
+  "persist_manifest_autonomous_post",
+  "get_hourly_coverage",
+  "get_manifest_cycle_receipt",
+  "get_manifest_intelligence_audit",
+  "get_manifest_intelligence_foundation",
+]);
+
 function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, unknown>): boolean {
+  if (MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS.has(toolName)) {
+    return false;
+  }
   if (operatorMcpToolNameRequiresProceed(toolName)) {
     return true;
   }
