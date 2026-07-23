@@ -854,13 +854,59 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
   if (consumption.complete !== true || String(consumption.snapshot_id ?? "") !== input.snapshotId) {
     throw new Error("manifest_analysis_pages_not_fully_consumed");
   }
-  const followerBoundary = validateManifestFollowerAttributionBoundary({
+    const followerBoundary = validateManifestFollowerAttributionBoundary({
     account_conclusion: input.accountConclusion,
     content_focus: input.contentFocus,
     directives: input.directives,
     lineup: input.lineup,
   });
   if (!followerBoundary.ok) throw new Error(followerBoundary.errors.join("|"));
+  const snapshot = await db.prepare(`SELECT post_count, mature_count, immature_count, incomplete_count, benchmarks_json
+    FROM operator_manifest_evidence_snapshots WHERE id = ? AND cycle_id = ? AND brand_key = ? LIMIT 1`)
+    .bind(input.snapshotId, input.cycleId, input.brandKey).first<JsonRecord>();
+  if (!snapshot) throw new Error("manifest_evidence_snapshot_not_found");
+  const snapshotBenchmarks = parseJson(snapshot.benchmarks_json, {}) as JsonRecord;
+  if (text(input.benchmarks.primary_metric, 100) !== "24_hour_likes"
+    || text(snapshotBenchmarks.primary_metric, 100) !== "24_hour_likes") {
+    throw new Error("manifest_cycle_strategy_likes_first_benchmark_required");
+  }
+  const matureRows = await db.prepare(`SELECT published_post_id FROM operator_manifest_evidence_posts
+    WHERE snapshot_id = ? AND maturity_state = 'mature'`).bind(input.snapshotId).all<{ published_post_id: string }>();
+  const allRows = await db.prepare(`SELECT published_post_id, maturity_state FROM operator_manifest_evidence_posts
+    WHERE snapshot_id = ?`).bind(input.snapshotId).all<{ published_post_id: string; maturity_state: string }>();
+  const maturePostIds = new Set((matureRows.results ?? []).map((row) => String(row.published_post_id)));
+  const allPostIds = new Set((allRows.results ?? []).map((row) => String(row.published_post_id)));
+  const citationIds = (value: JsonRecord): string[] => {
+    const raw = value.published_post_ids ?? value.post_ids ?? value.evidence_post_ids
+      ?? (value.published_post_id ? [value.published_post_id] : []);
+    return Array.isArray(raw) ? raw.map(String).filter(Boolean) : [];
+  };
+  const conclusionCitations = citationIds(input.accountConclusion);
+  if (maturePostIds.size > 0 && conclusionCitations.length === 0) {
+    throw new Error("manifest_account_conclusion_mature_evidence_citations_required");
+  }
+  for (const citedId of conclusionCitations) {
+    if (!allPostIds.has(citedId)) throw new Error("manifest_account_conclusion_unknown_post_citation");
+    if (!maturePostIds.has(citedId)) throw new Error("manifest_account_conclusion_immature_post_citation_forbidden");
+  }
+  const validateExecutionEvidence = (items: JsonRecord[], label: string): void => {
+    for (const item of items) {
+      const ids = citationIds(item);
+      if (!ids.length) throw new Error(`manifest_${label}_mature_post_citations_required`);
+      if (!text(item.reason ?? item.analysis ?? item.why ?? item.conclusion, 4000)) {
+        throw new Error(`manifest_${label}_reason_required`);
+      }
+      for (const citedId of ids) {
+        if (!allPostIds.has(citedId)) throw new Error(`manifest_${label}_unknown_post_citation`);
+        if (!maturePostIds.has(citedId)) throw new Error(`manifest_${label}_immature_post_citation_forbidden`);
+      }
+    }
+  };
+  validateExecutionEvidence(input.strongestExecutions, "strongest_execution");
+  validateExecutionEvidence(input.weakestExecutions, "weakest_execution");
+  for (const key of ["emphasize", "preserve", "reduce", "avoid_clustering", "test", "unresolved_questions"]) {
+    if (!Array.isArray(input.contentFocus[key])) throw new Error(`manifest_content_focus_${key}_array_required`);
+  }
   const cycle = await db.prepare(`SELECT missing_slots_json FROM operator_autonomous_growth_cycles WHERE id = ? AND brand_key = ? LIMIT 1`)
     .bind(input.cycleId, input.brandKey).first<JsonRecord>();
   if (!cycle) throw new Error("manifest_cycle_not_found");
@@ -873,7 +919,17 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
     const sourceKind = text(item.source_kind, 60);
     if (!slotKey || receivedKeys.has(slotKey) || !requiredKeys.has(slotKey)) throw new Error("manifest_cycle_lineup_slot_invalid");
     if (!["saved_pattern", "source_card"].includes(sourceKind)) throw new Error("manifest_cycle_lineup_source_backed_only");
-    if (!text(item.source_card_id, 160)) throw new Error("manifest_cycle_lineup_source_card_required");
+        const sourceCardId = text(item.source_card_id, 160);
+    if (!sourceCardId) throw new Error("manifest_cycle_lineup_source_card_required");
+    const sourceCard = await db.prepare(`SELECT id, status, source_selection_id FROM operator_source_cards
+      WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sourceCardId, input.brandKey).first<JsonRecord>();
+    if (!sourceCard || String(sourceCard.status) !== "locked" || !text(sourceCard.source_selection_id, 160)) {
+      throw new Error("manifest_cycle_lineup_locked_source_card_lineage_required");
+    }
+    if (text(item.source_selection_id, 160) && text(item.source_selection_id, 160) !== text(sourceCard.source_selection_id, 160)) {
+      throw new Error("manifest_cycle_lineup_source_selection_mismatch");
+    }
+    item.source_selection_id = text(sourceCard.source_selection_id, 160);
     if (!allowedModes.has(text(item.generation_mode, 80))) throw new Error("manifest_cycle_lineup_generation_mode_invalid");
     for (const requiredField of ["family_key", "strategic_role", "audience_reward", "hook_direction", "placement_reason", "exploration_mode"]) {
       if (!text(item[requiredField], 4000)) throw new Error(`manifest_cycle_lineup_${requiredField}_required`);
@@ -894,7 +950,7 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
     risks: input.risks,
     lineup: input.lineup,
   };
-  const strategyHash = await hash(body);
+    const strategyHash = await hash({ cycle_id: input.cycleId, ...body });
   const existing = await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE cycle_id = ? LIMIT 1`)
     .bind(input.cycleId).first<JsonRecord>();
   if (existing) {
