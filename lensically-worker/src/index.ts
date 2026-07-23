@@ -32706,7 +32706,27 @@ async function deleteScheduledPostsForAppUserBatch(
     ).bind(...replayOperationIds).all<Record<string, unknown>>();
     replayRows.push(...(replays.results ?? []).map((row) => mapScheduledPostDeletionRow(row)));
   }
-  const replayedIds = new Set(replayRows.map((record) => record.scheduled_post_id));
+    const replayedIds = new Set(replayRows.map((record) => record.scheduled_post_id));
+  const unreconciledIds = ids.filter((id) => !replayedIds.has(id));
+  if (unreconciledIds.length > 0) {
+    const historyPlaceholders = unreconciledIds.map(() => "?").join(", ");
+    const historicalRows = await env.DB.prepare(
+      `SELECT * FROM scheduled_post_deletions
+       WHERE scheduled_post_id IN (${historyPlaceholders}) AND user_id = ? AND threads_user_id = ?
+       ORDER BY datetime(created_at) DESC`,
+    ).bind(...unreconciledIds, appUserId, input.expectedThreadsUserId).all<Record<string, unknown>>();
+    const newestHistoryByPostId = new Map<number, ScheduledPostDeletionRecord>();
+    for (const row of historicalRows.results ?? []) {
+      const record = mapScheduledPostDeletionRow(row);
+      if (!newestHistoryByPostId.has(record.scheduled_post_id)) {
+        newestHistoryByPostId.set(record.scheduled_post_id, record);
+      }
+    }
+    for (const record of newestHistoryByPostId.values()) {
+      replayRows.push(record);
+      replayedIds.add(record.scheduled_post_id);
+    }
+  }
   const pendingIds = ids.filter((id) => !replayedIds.has(id));
   if (pendingIds.length === 0) {
     const replayMap = new Map(replayRows.map((record) => [record.scheduled_post_id, record]));

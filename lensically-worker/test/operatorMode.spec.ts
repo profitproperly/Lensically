@@ -6330,10 +6330,40 @@ describe("operator mode MCP endpoint", () => {
       })),
     ));
     expect(recovered.recovery.strategy_memory_written).toBe(false);
-    const remainingFixtureRows = await env.DB.prepare(
+        const remainingFixtureRows = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM scheduled_posts WHERE id IN (${recoveryPostIds.map(() => "?").join(", ")})`,
     ).bind(...recoveryPostIds).first<{ total: number | string }>();
     expect(Number(remainingFixtureRows?.total ?? 0)).toBe(0);
+
+    const additionalFixture = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'vectrix', 'Mixed replay fixture', 'approved', '2099-01-05T14:00:00.000Z')`,
+    ).run();
+    const additionalPostId = Number(additionalFixture.meta?.last_row_id ?? 0);
+    const replayedRecovery = await mcpTool<{
+      ok: boolean;
+      recovery: { retired_post_ids: number[]; replayed_post_ids: number[]; deletion_records: Array<{ scheduled_post_id: number }> };
+    }>("recoverOverdueScheduledPosts", {
+      brand_key: BRAND_KEY,
+      actions: [
+        ...recoveryPostIds.slice(0, 3).map((scheduled_post_id) => ({ scheduled_post_id, action: "retire" })),
+        { scheduled_post_id: additionalPostId, action: "retire" },
+      ],
+      reason: "Reconcile prior deletion history and retire one additional post.",
+      owner_response: "Approved for test",
+      operation_id: "future-retirement-reconciliation-fixture",
+    });
+    expect(replayedRecovery.ok).toBe(true);
+    expect(replayedRecovery.recovery.retired_post_ids).toEqual([
+      ...recoveryPostIds.slice(0, 3),
+      additionalPostId,
+    ]);
+    expect(replayedRecovery.recovery.replayed_post_ids).toEqual(expect.arrayContaining(recoveryPostIds.slice(0, 3)));
+    expect(replayedRecovery.recovery.deletion_records).toHaveLength(4);
+    const additionalScheduledRow = await env.DB.prepare(
+      `SELECT id FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(additionalPostId).first<{ id: number }>();
+    expect(additionalScheduledRow).toBeNull();
   }, 30000);
 
   it("hides scheduled posts from other account scopes when editing", async () => {
