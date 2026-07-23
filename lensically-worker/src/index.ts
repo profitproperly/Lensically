@@ -12758,8 +12758,23 @@ async function persistManifestAutonomousPost(
       slotKey,
       payload: { operation_id: operationId, error, ...details },
     });
-    return { success: false, error, ...details };
+        return { success: false, error, ...details };
   };
+  const requestedCycleStrategyId = normalizeOperatorText(payload.cycle_strategy_id, 160);
+  const requestedCyclePlanItemId = normalizeOperatorText(payload.cycle_plan_item_id, 160);
+  const cycleStrategy = await getManifestCycleStrategy(env.DB, cycleId, brand.brand_key);
+  if (!cycleStrategy) return rejectPersist("manifest_cycle_strategy_required_before_persist");
+  if (!requestedCycleStrategyId || String(cycleStrategy.id ?? "") !== requestedCycleStrategyId) {
+    return rejectPersist("manifest_cycle_strategy_mismatch", {
+      expected_cycle_strategy_id: cycleStrategy.id ?? null,
+      received_cycle_strategy_id: requestedCycleStrategyId ?? null,
+    });
+  }
+  const evidenceConsumption = await getManifestEvidenceConsumptionState(env.DB, cycleId, brand.brand_key);
+  if (evidenceConsumption.complete !== true) {
+    return rejectPersist("manifest_analysis_pages_not_fully_consumed", evidenceConsumption);
+  }
+  if (!requestedCyclePlanItemId) return rejectPersist("manifest_cycle_plan_item_required");
     const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
     ? payload.post as Record<string, unknown>
     : {};
@@ -12808,23 +12823,12 @@ async function persistManifestAutonomousPost(
       ],
     });
   }
-    const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
-    ? payload.strategic_thesis as Record<string, unknown>
-    : {};
-                if (!Object.keys(strategicThesis).length) {
-    return rejectPersist("strategic_thesis_required");
-  }
-  const existingCycleStrategicThesis = cycle.strategic_thesis
-    && typeof cycle.strategic_thesis === "object"
-    && !Array.isArray(cycle.strategic_thesis)
-    && Object.keys(cycle.strategic_thesis as Record<string, unknown>).length > 0
-      ? cycle.strategic_thesis as Record<string, unknown>
-      : null;
-  const effectiveStrategicThesis = existingCycleStrategicThesis ?? strategicThesis;
-  const cycleStrategicThesisReused = existingCycleStrategicThesis !== null;
+      const effectiveStrategicThesis = cycleStrategy;
+  const cycleStrategicThesisReused = true;
+  const outputStrategyVersion = { id: String(cycleStrategy.id ?? requestedCycleStrategyId) };
   const followerBoundary = validateManifestFollowerAttributionBoundary({
-    strategic_thesis: strategicThesis,
-        post_strategy: postStrategy,
+    cycle_strategy: cycleStrategy,
+    post_strategy: postStrategy,
     model_evaluation: modelEvaluation,
   });
     if (!followerBoundary.ok) {
@@ -12839,49 +12843,50 @@ async function persistManifestAutonomousPost(
   const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
   const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
   const slotKey = date && time ? `${date}T${time}` : "";
-      if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
-    || !MANIFEST_AUTONOMOUS_GENERATION_MODES.has(generationMode)) {
-    return rejectPersist("invalid_autonomous_post", {}, slotKey || null);
-  }
-  const sourceGroundedGenerationModes = new Set([
+        const allowedSourceBackedGenerationModes = new Set([
     "franchise_deployment",
     "controlled_variation",
     "mechanism_expansion",
+    "adjacent_experiment",
   ]);
-    if (sourceGroundedGenerationModes.has(generationMode)
-    && !["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)) {
-    return rejectPersist("source_grounding_required_for_generation_mode", {
-      generation_mode: generationMode,
-      received_source_kind: sourceContextValidation.value.kind,
-      allowed_source_kinds: ["saved_pattern", "source_card"],
-      corrective_action: "Select a real qualified Saved Pattern or existing source card and provide its source_card_id or source_selection_id. Use original_discovery only for genuinely source-independent discovery.",
+  if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
+    || !allowedSourceBackedGenerationModes.has(generationMode)) {
+    return rejectPersist("invalid_source_backed_autonomous_post", {
+      allowed_generation_modes: Array.from(allowedSourceBackedGenerationModes),
     }, slotKey || null);
   }
-  
+  if (!["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)
+    || !sourceContextValidation.value.source_card_id) {
+    return rejectPersist("canonical_source_card_required", {
+      received_source_kind: sourceContextValidation.value.kind,
+      corrective_action: "Create or recover a locked canonical source card from a qualified Saved Pattern or proven prior winner before generation.",
+    }, slotKey || null);
+  }
+
   const targetSlots = Array.isArray(cycle.target_slots)
     ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
     : [];
-                const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
+                  const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
   if (!targetSlot) return rejectPersist("slot_outside_prepared_cycle", { slot_key: slotKey }, slotKey);
-    const outputStrategyVersion = await ensureManifestStrategyVersion(env.DB, {
-    brandKey: brand.brand_key,
-    strategy: effectiveStrategicThesis,
-    evidence: {
-      cycle_id: cycleId,
-      input_strategy_version_id: cycle.strategy_version_id ?? null,
-      account_position_captured_at: (cycle.account_position as Record<string, unknown> | undefined)?.captured_at ?? null,
-      follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
-      cycle_strategic_thesis_reused: cycleStrategicThesisReused,
-    },
-    changeSummary: normalizeOperatorText(effectiveStrategicThesis.change_summary, 4000, true)
-      ?? `Autonomous strategy thesis selected for cycle ${cycleId}.`,
-    reversalConditions: Array.isArray(effectiveStrategicThesis.reversal_conditions)
-      ? effectiveStrategicThesis.reversal_conditions.map(String).slice(0, 20)
-      : ["Revise only when observable engagement evidence contradicts the thesis or account conditions materially change."],
-    sourceCycleId: cycleId,
-    parentVersionId: normalizeOperatorText(cycle.strategy_version_id, 160, true),
-  });
-  await linkManifestCycleStrategy(env.DB, cycleId, String(outputStrategyVersion.id));
+  const cyclePlanItem = await getManifestCyclePlanItem(env.DB, cycleId, brand.brand_key, slotKey);
+  if (!cyclePlanItem || String(cyclePlanItem.id ?? "") !== requestedCyclePlanItemId) {
+    return rejectPersist("manifest_cycle_plan_item_mismatch", {
+      slot_key: slotKey,
+      expected_cycle_plan_item_id: cyclePlanItem?.id ?? null,
+      received_cycle_plan_item_id: requestedCyclePlanItemId,
+    }, slotKey);
+  }
+  if (String(cyclePlanItem.strategy_id ?? "") !== requestedCycleStrategyId
+    || String(cyclePlanItem.source_card_id ?? "") !== String(sourceContextValidation.value.source_card_id ?? "")
+    || normalizeOperatorMachineKey(cyclePlanItem.family_key, "") !== familyKey
+    || normalizeOperatorMachineKey(cyclePlanItem.generation_mode, "") !== generationMode) {
+    return rejectPersist("candidate_does_not_match_locked_cycle_plan", {
+      slot_key: slotKey,
+      planned_family_key: cyclePlanItem.family_key ?? null,
+      planned_generation_mode: cyclePlanItem.generation_mode ?? null,
+      planned_source_card_id: cyclePlanItem.source_card_id ?? null,
+    }, slotKey);
+  }
   let postHypothesis = await recordManifestPostHypothesis(env.DB, {
     cycleId,
     brandKey: brand.brand_key,
