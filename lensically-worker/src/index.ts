@@ -13366,12 +13366,12 @@ async function persistManifestAutonomousPost(
   scheduledIds.add(scheduled.scheduledPostId);
   await env.DB.prepare(
     `UPDATE operator_autonomous_growth_cycles
-     SET status = ?, strategic_thesis_json = ?, missing_slots_json = ?,
+          SET status = ?, strategic_thesis_json = ?, missing_slots_json = ?,
          scheduled_post_ids_json = ?, error_json = '[]', updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND brand_key = ?`,
   ).bind(
     remainingMissing.length ? "partially_committed" : "completed",
-    normalizeOperatorJson(strategicThesis, {}),
+    normalizeOperatorJson(effectiveStrategicThesis, {}),
     normalizeOperatorJson(remainingMissing, []),
     normalizeOperatorJson(Array.from(scheduledIds), []),
         cycleId,
