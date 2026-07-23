@@ -3,13 +3,16 @@ export const MANIFEST_CYCLE_RECEIPT_VERSION = "manifest-cycle-receipt-v3";
 export const MANIFEST_STRATEGY_VERSION_CONTRACT = "manifest-strategy-version-v1";
 export const MANIFEST_CYCLE_STRATEGY_CONTRACT = "manifest-cycle-strategy-v1";
 export const MANIFEST_EXPOSURE_LEDGER_VERSION = "manifest-exposure-ledger-v3";
-export const MANIFEST_EVIDENCE_SNAPSHOT_VERSION = "manifest-evidence-snapshot-v1";
+export const MANIFEST_EVIDENCE_SNAPSHOT_VERSION = "manifest-evidence-snapshot-v2";
+export const MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION = "manifest-evidence-page-v1";
 export const MANIFEST_CANDIDATE_GATE_RECEIPT_VERSION = "manifest-candidate-gate-receipt-v1";
 export const MANIFEST_POST_HYPOTHESIS_VERSION = "manifest-post-hypothesis-v3";
 export const MANIFEST_CYCLE_RECEIPT_READ_VERSION = "manifest-cycle-receipt-read-v2";
 export const MANIFEST_ANALYSIS_WINDOW_DAYS = 28;
 export const MANIFEST_RECENT_EXPOSURE_HOURS = 72;
-export const MANIFEST_EVIDENCE_PAGE_SIZE = 80;
+export const MANIFEST_EVIDENCE_PAGE_SIZE = 12;
+export const MANIFEST_EVIDENCE_PAGE_MAX_BYTES = 12000;
+export const MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES = 20000;
 
 export const MANIFEST_NONINTERFERENCE_POLICY = {
   version: "manifest-owner-noninterference-v1",
@@ -360,13 +363,14 @@ export async function ensureManifestIntelligenceTables(db: D1Database): Promise<
       window_days INTEGER NOT NULL DEFAULT 28, window_start TEXT NOT NULL, window_end TEXT NOT NULL,
       post_count INTEGER NOT NULL DEFAULT 0, mature_count INTEGER NOT NULL DEFAULT 0,
       immature_count INTEGER NOT NULL DEFAULT 0, incomplete_count INTEGER NOT NULL DEFAULT 0,
-      page_size INTEGER NOT NULL DEFAULT 80, page_count INTEGER NOT NULL DEFAULT 0,
+            page_size INTEGER NOT NULL DEFAULT 12, page_count INTEGER NOT NULL DEFAULT 0,
+      page_byte_budget INTEGER NOT NULL DEFAULT 12000,
       benchmarks_json TEXT NOT NULL DEFAULT '{}', previous_benchmarks_json TEXT NOT NULL DEFAULT '{}',
       recent_exposure_json TEXT NOT NULL DEFAULT '{}', future_schedule_json TEXT NOT NULL DEFAULT '[]',
       hard_bans_json TEXT NOT NULL DEFAULT '[]', experiments_json TEXT NOT NULL DEFAULT '[]',
       source_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts (
+        `CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts (
       id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, brand_key TEXT NOT NULL,
       published_post_id TEXT NOT NULL, scheduled_post_id INTEGER, text TEXT NOT NULL,
       published_at TEXT NOT NULL, age_hours REAL NOT NULL, maturity_state TEXT NOT NULL,
@@ -374,6 +378,14 @@ export async function ensureManifestIntelligenceTables(db: D1Database): Promise<
       maturity_snapshots_json TEXT NOT NULL DEFAULT '[]', lineage_json TEXT NOT NULL DEFAULT '{}',
       classification_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(snapshot_id, published_post_id))`,
+    `CREATE TABLE IF NOT EXISTS operator_manifest_evidence_pages (
+      id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL,
+      page_index INTEGER NOT NULL, page_contract_version TEXT NOT NULL, item_count INTEGER NOT NULL,
+      byte_count INTEGER NOT NULL, evidence_types_json TEXT NOT NULL DEFAULT '[]',
+      items_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(snapshot_id, page_index))`,
+    `CREATE INDEX IF NOT EXISTS idx_manifest_evidence_pages_snapshot
+      ON operator_manifest_evidence_pages (snapshot_id, page_index ASC)`,
     `CREATE INDEX IF NOT EXISTS idx_manifest_evidence_posts_page
       ON operator_manifest_evidence_posts (snapshot_id, published_at DESC, published_post_id DESC)`,
     `CREATE TABLE IF NOT EXISTS operator_manifest_analysis_page_reads (
@@ -453,7 +465,8 @@ export async function ensureManifestIntelligenceTables(db: D1Database): Promise<
     { table: "operator_autonomous_lineup_items", column: "cycle_strategy_id", definition: "TEXT" },
     { table: "operator_autonomous_lineup_items", column: "cycle_plan_item_id", definition: "TEXT" },
     { table: "operator_autonomous_lineup_items", column: "gate_receipt_id", definition: "TEXT" },
-    { table: "operator_autonomous_lineup_items", column: "source_selection_id", definition: "TEXT" },
+        { table: "operator_autonomous_lineup_items", column: "source_selection_id", definition: "TEXT" },
+    { table: "operator_manifest_evidence_snapshots", column: "page_byte_budget", definition: "INTEGER NOT NULL DEFAULT 12000" },
     { table: "operator_manifest_exposure_snapshots", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
     { table: "operator_manifest_exposure_snapshots", column: "updated_at", definition: "TEXT" },
     { table: "operator_manifest_post_hypotheses", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
