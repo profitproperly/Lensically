@@ -936,12 +936,21 @@ function compactManifestAutonomousPreparationPayload(
     }),
     saved_pattern_candidates: (Array.isArray(decision.saved_pattern_candidates) ? decision.saved_pattern_candidates : []).slice(0, 8).map((value) => {
       const pattern = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-      return {
+            return {
         pattern_identity_key: pattern.pattern_identity_key ?? null,
         source_identity_key: pattern.source_identity_key ?? null,
+        external_pattern_id: pattern.external_pattern_id ?? null,
+        source_text: typeof pattern.source_text === "string" ? pattern.source_text.slice(0, 1200) : null,
+        source_url: pattern.source_url ?? null,
         reuse_state: pattern.reuse_state ?? null,
+        verified_metrics: compactOperatorPayloadValue(pattern.verified_metrics ?? {}, "decision_intelligence.saved_pattern_candidates.verified_metrics", {
+          arrayItems: 3, stringChars: 160, objectKeys: 12, maxDepth: 3,
+        }, []),
         mechanism: compactOperatorPayloadValue(pattern.mechanism ?? {}, "decision_intelligence.saved_pattern_candidates.mechanism", {
           arrayItems: 3, stringChars: 220, objectKeys: 12, maxDepth: 3,
+        }, []),
+        adaptation_options: compactOperatorPayloadValue(pattern.adaptation_options ?? {}, "decision_intelligence.saved_pattern_candidates.adaptation_options", {
+          arrayItems: 8, stringChars: 300, objectKeys: 20, maxDepth: 4,
         }, []),
         confidence: compactOperatorPayloadValue(pattern.confidence ?? {}, "decision_intelligence.saved_pattern_candidates.confidence", {
           arrayItems: 3, stringChars: 160, objectKeys: 10, maxDepth: 3,
