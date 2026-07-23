@@ -3361,7 +3361,7 @@ describe("operator mode MCP endpoint", () => {
       brand_key: "manifest_mental",
       proceed_confirmed: true,
     });
-    expect(first.intelligence_foundation.foundation_version).toBe("manifest-intelligence-foundation-v2");
+    expect(first.intelligence_foundation.foundation_version).toBe("manifest-intelligence-foundation-v3");
     expect(first.intelligence_foundation.policy.noninterference.learning_source).toBe("observable_post_engagement");
     expect(first.intelligence_foundation.policy.follower_attribution.account_level_only).toBe(true);
     expect(first.intelligence_foundation.latest_strategy_version?.id).toBeTruthy();
