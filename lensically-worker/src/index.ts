@@ -22035,41 +22035,36 @@ async function handleOperatorMcpAdminTool(
       if (String(control.mode ?? "") !== "paused") {
         return { ok: false, error: "scheduler_must_be_paused_for_audited_retirement", scheduler: schedulerState };
       }
-      const parentOperationId = normalizeOperatorText(args.operation_id, 180, true);
-      const deletedRecords: ScheduledPostDeletionRecord[] = [];
-      const failed: Array<{ scheduled_post_id: number; error: string }> = [];
-      for (const action of actions) {
-        const deletion = await deleteScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, action.scheduled_post_id, {
-          expectedThreadsUserId: brand.profile.threads_user_id,
-          reason,
-          deletedBy: "model",
-          deletionSource: "mcp",
-          operationId: parentOperationId ? `${parentOperationId}:${action.scheduled_post_id}` : null,
-        });
-        if (deletion.outcome === "deleted" && deletion.record) {
-          deletedRecords.push(deletion.record);
-        } else {
-          failed.push({ scheduled_post_id: action.scheduled_post_id, error: deletion.outcome });
-        }
-      }
-      if (failed.length > 0) {
+            try {
+        const deletionBatch = await deleteScheduledPostsForAppUserBatch(
+          env,
+          WORKSPACE_APP_USER_ID,
+          actions.map((action) => action.scheduled_post_id),
+          {
+            expectedThreadsUserId: brand.profile.threads_user_id,
+            reason,
+            deletedBy: "model",
+            deletionSource: "mcp",
+            parentOperationId: normalizeOperatorText(args.operation_id, 180, true),
+          },
+        );
+        return {
+          ok: true,
+          recovery: {
+            retired_post_ids: deletionBatch.records.map((record) => record.scheduled_post_id),
+            deletion_records: deletionBatch.records,
+            replayed_post_ids: deletionBatch.replayed_post_ids,
+            strategy_memory_written: false,
+          },
+          scheduler: await readScheduledPostSchedulerHealth(env),
+        };
+      } catch (error) {
         return {
           ok: false,
-          error: "audited_scheduled_retirement_incomplete",
-          deleted_post_ids: deletedRecords.map((record) => record.scheduled_post_id),
-          failed,
+          error: getErrorMessage(error),
           scheduler: await readScheduledPostSchedulerHealth(env),
         };
       }
-      return {
-        ok: true,
-        recovery: {
-          retired_post_ids: deletedRecords.map((record) => record.scheduled_post_id),
-          deletion_records: deletedRecords,
-          strategy_memory_written: false,
-        },
-        scheduler: await readScheduledPostSchedulerHealth(env),
-      };
     }
     const result = await recoverScheduledPostSchedulerOverdue(env, actions, reason);
     return { ok: true, scheduler: result };
@@ -32661,7 +32656,7 @@ async function deleteScheduledPostForAppUser(
     ).bind(input.deletedBy === "owner" ? "owner_deleted" : "model_deleted", reason, scheduledPostId).run();
   }
 
-  return {
+    return {
     outcome: "deleted",
     record: {
       id: deletionId,
@@ -32676,6 +32671,134 @@ async function deleteScheduledPostForAppUser(
       deleted_at: deletedAt,
     },
     replayed: false,
+  };
+}
+
+async function deleteScheduledPostsForAppUserBatch(
+  env: Env,
+  appUserId: string,
+  scheduledPostIds: number[],
+  input: {
+    expectedThreadsUserId: string;
+    reason: string;
+    deletedBy: "owner" | "model";
+    deletionSource: "ui" | "mcp";
+    parentOperationId?: string | null;
+  },
+): Promise<{ records: ScheduledPostDeletionRecord[]; replayed_post_ids: number[] }> {
+  const reason = input.reason.trim();
+  const ids = Array.from(new Set(scheduledPostIds.map((id) => Math.trunc(Number(id)))));
+  if (!reason) throw new Error("scheduled_post_deletion_reason_required");
+  if (!ids.length || ids.length > 25 || ids.some((id) => !Number.isInteger(id) || id <= 0)) {
+    throw new Error("scheduled_post_ids_1_to_25_required");
+  }
+  await ensureScheduledPostDeletionsTable(env);
+  const parentOperationId = normalizeOperatorText(input.parentOperationId, 180, true);
+  const operationIdByPostId = new Map<number, string | null>(
+    ids.map((id) => [id, parentOperationId ? normalizeOperatorText(`${parentOperationId}:${id}`, 240, true) : null]),
+  );
+  const replayRows: ScheduledPostDeletionRecord[] = [];
+  const replayOperationIds = Array.from(operationIdByPostId.values()).filter((value): value is string => Boolean(value));
+  if (replayOperationIds.length > 0) {
+    const placeholders = replayOperationIds.map(() => "?").join(", ");
+    const replays = await env.DB.prepare(
+      `SELECT * FROM scheduled_post_deletions WHERE operation_id IN (${placeholders})`,
+    ).bind(...replayOperationIds).all<Record<string, unknown>>();
+    replayRows.push(...(replays.results ?? []).map((row) => mapScheduledPostDeletionRow(row)));
+  }
+  const replayedIds = new Set(replayRows.map((record) => record.scheduled_post_id));
+  const pendingIds = ids.filter((id) => !replayedIds.has(id));
+  if (pendingIds.length === 0) {
+    const replayMap = new Map(replayRows.map((record) => [record.scheduled_post_id, record]));
+    return {
+      records: ids.map((id) => replayMap.get(id)).filter((record): record is ScheduledPostDeletionRecord => Boolean(record)),
+      replayed_post_ids: ids,
+    };
+  }
+
+  const pendingPlaceholders = pendingIds.map(() => "?").join(", ");
+  const existingRows = await env.DB.prepare(
+    `SELECT id, user_id, threads_user_id, post_text, status, scheduled_time
+     FROM scheduled_posts
+     WHERE id IN (${pendingPlaceholders}) AND user_id = ?`,
+  ).bind(...pendingIds, appUserId).all<Record<string, unknown>>();
+  const existingById = new Map((existingRows.results ?? []).map((row) => [Number(row.id), row]));
+  const validationFailures: Array<{ scheduled_post_id: number; error: string }> = [];
+  for (const id of pendingIds) {
+    const row = existingById.get(id);
+    if (!row || String(row.threads_user_id ?? "") !== input.expectedThreadsUserId) {
+      validationFailures.push({ scheduled_post_id: id, error: "not_found" });
+    } else if (String(row.status ?? "") !== SCHEDULED_POST_STATUS_APPROVED) {
+      validationFailures.push({ scheduled_post_id: id, error: "not_deletable" });
+    }
+  }
+  if (validationFailures.length > 0) {
+    throw new Error(`audited_scheduled_retirement_validation_failed:${JSON.stringify(validationFailures)}`);
+  }
+
+  const deletedAt = new Date().toISOString();
+  const newRecords = pendingIds.map((id): ScheduledPostDeletionRecord => {
+    const row = existingById.get(id) as Record<string, unknown>;
+    return {
+      id: crypto.randomUUID(),
+      scheduled_post_id: id,
+      post_text: String(row.post_text ?? ""),
+      scheduled_time_utc: String(row.scheduled_time ?? ""),
+      status_before: String(row.status ?? ""),
+      reason,
+      deleted_by: input.deletedBy,
+      deletion_source: input.deletionSource,
+      operation_id: operationIdByPostId.get(id) ?? null,
+      deleted_at: deletedAt,
+    };
+  });
+  const statements = newRecords.map((record) => env.DB.prepare(
+    `INSERT INTO scheduled_post_deletions (
+      id, scheduled_post_id, user_id, threads_user_id, post_text, scheduled_time,
+      status_before, reason, deleted_by, deletion_source, operation_id, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    record.id,
+    record.scheduled_post_id,
+    appUserId,
+    input.expectedThreadsUserId,
+    record.post_text,
+    record.scheduled_time_utc,
+    record.status_before,
+    record.reason,
+    record.deleted_by,
+    record.deletion_source,
+    record.operation_id,
+    record.deleted_at,
+  ));
+  const mutationPlaceholders = pendingIds.map(() => "?").join(", ");
+  if (await doesTableExist(env, "gpt_generation_drafts")) {
+    statements.push(env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'rejected', rejection_reason = ?, owner_feedback = ?, scheduled_post_id = NULL
+       WHERE scheduled_post_id IN (${mutationPlaceholders})`,
+    ).bind(reason, reason, ...pendingIds));
+  }
+  if (await doesTableExist(env, "operator_autonomous_lineup_items")) {
+    statements.push(env.DB.prepare(
+      `UPDATE operator_autonomous_lineup_items
+       SET status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE scheduled_post_id IN (${mutationPlaceholders})`,
+    ).bind(input.deletedBy === "owner" ? "owner_deleted" : "model_deleted", reason, ...pendingIds));
+  }
+  statements.push(env.DB.prepare(
+    `DELETE FROM scheduled_posts
+     WHERE id IN (${mutationPlaceholders}) AND user_id = ? AND threads_user_id = ? AND status = ?`,
+  ).bind(...pendingIds, appUserId, input.expectedThreadsUserId, SCHEDULED_POST_STATUS_APPROVED));
+  const results = await env.DB.batch(statements);
+  const deleteChanges = Number(results[results.length - 1]?.meta?.changes ?? 0);
+  if (deleteChanges !== pendingIds.length) {
+    throw new Error(`audited_scheduled_retirement_race:deleted=${deleteChanges}:expected=${pendingIds.length}`);
+  }
+  const recordMap = new Map([...replayRows, ...newRecords].map((record) => [record.scheduled_post_id, record]));
+  return {
+    records: ids.map((id) => recordMap.get(id)).filter((record): record is ScheduledPostDeletionRecord => Boolean(record)),
+    replayed_post_ids: Array.from(replayedIds),
   };
 }
 
