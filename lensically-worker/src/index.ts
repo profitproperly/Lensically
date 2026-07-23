@@ -12610,9 +12610,17 @@ async function persistManifestAutonomousPost(
     const strategicThesis = payload.strategic_thesis && typeof payload.strategic_thesis === "object" && !Array.isArray(payload.strategic_thesis)
     ? payload.strategic_thesis as Record<string, unknown>
     : {};
-        if (!Object.keys(strategicThesis).length) {
+                if (!Object.keys(strategicThesis).length) {
     return rejectPersist("strategic_thesis_required");
   }
+  const existingCycleStrategicThesis = cycle.strategic_thesis
+    && typeof cycle.strategic_thesis === "object"
+    && !Array.isArray(cycle.strategic_thesis)
+    && Object.keys(cycle.strategic_thesis as Record<string, unknown>).length > 0
+      ? cycle.strategic_thesis as Record<string, unknown>
+      : null;
+  const effectiveStrategicThesis = existingCycleStrategicThesis ?? strategicThesis;
+  const cycleStrategicThesisReused = existingCycleStrategicThesis !== null;
   const followerBoundary = validateManifestFollowerAttributionBoundary({
     strategic_thesis: strategicThesis,
         post_strategy: postStrategy,
