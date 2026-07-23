@@ -446,8 +446,12 @@ export async function ensureManifestIntelligenceTables(db: D1Database): Promise<
   await ensureColumns(db, [
     { table: "operator_autonomous_growth_cycles", column: "receipt_id", definition: "TEXT" },
     { table: "operator_autonomous_growth_cycles", column: "strategy_version_id", definition: "TEXT" },
-    { table: "operator_autonomous_growth_cycles", column: "exposure_snapshot_id", definition: "TEXT" },
+        { table: "operator_autonomous_growth_cycles", column: "exposure_snapshot_id", definition: "TEXT" },
+    { table: "operator_autonomous_growth_cycles", column: "evidence_snapshot_id", definition: "TEXT" },
+    { table: "operator_autonomous_growth_cycles", column: "cycle_strategy_id", definition: "TEXT" },
     { table: "operator_autonomous_lineup_items", column: "hypothesis_id", definition: "TEXT" },
+    { table: "operator_autonomous_lineup_items", column: "cycle_plan_item_id", definition: "TEXT" },
+    { table: "operator_autonomous_lineup_items", column: "gate_receipt_id", definition: "TEXT" },
     { table: "operator_autonomous_lineup_items", column: "source_selection_id", definition: "TEXT" },
     { table: "operator_manifest_exposure_snapshots", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
     { table: "operator_manifest_exposure_snapshots", column: "updated_at", definition: "TEXT" },
@@ -572,6 +576,408 @@ export async function createManifestExposureSnapshot(db: D1Database, input: {
   ).run();
   const row = await db.prepare(`SELECT * FROM operator_manifest_exposure_snapshots WHERE id = ?`).bind(id).first<JsonRecord>();
   return { ...serializeExposure(row ?? { id, dimensions_json: dimensions, revision: 1 }), refreshed: false };
+}
+
+function numeric(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function percentile(values: number[], fraction: number): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const position = Math.max(0, Math.min(sorted.length - 1, (sorted.length - 1) * fraction));
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower] ?? null;
+  const weight = position - lower;
+  return Number(((sorted[lower] ?? 0) * (1 - weight) + (sorted[upper] ?? 0) * weight).toFixed(4));
+}
+
+export function buildManifestLikesBenchmarks(posts: JsonRecord[]): JsonRecord {
+  const mature = posts.filter((post) => String(post.maturity_state) === "mature" && Number.isFinite(Number(post.primary_likes)));
+  const likes = mature.map((post) => Number(post.primary_likes));
+  const total = posts.length;
+  return {
+    version: "manifest-likes-first-benchmarks-v1",
+    primary_metric: "24_hour_likes",
+    mature_sample_size: mature.length,
+    total_post_count: total,
+    evidence_completeness: total > 0 ? Number((mature.length / total).toFixed(6)) : 0,
+    minimum_likes: percentile(likes, 0),
+    p25_likes: percentile(likes, 0.25),
+    median_likes: percentile(likes, 0.5),
+    p75_likes: percentile(likes, 0.75),
+    p90_likes: percentile(likes, 0.9),
+    maximum_likes: percentile(likes, 1),
+    interpretation: "Rank mature posts primarily by 24-hour likes. Use like rate and other engagement only to diagnose distribution and response quality.",
+  };
+}
+
+function serializeEvidenceSnapshot(row: JsonRecord): JsonRecord {
+  return {
+    ...row,
+    window_days: numeric(row.window_days, MANIFEST_ANALYSIS_WINDOW_DAYS),
+    post_count: numeric(row.post_count),
+    mature_count: numeric(row.mature_count),
+    immature_count: numeric(row.immature_count),
+    incomplete_count: numeric(row.incomplete_count),
+    page_size: numeric(row.page_size, MANIFEST_EVIDENCE_PAGE_SIZE),
+    page_count: numeric(row.page_count),
+    benchmarks: parseJson(row.benchmarks_json, {}),
+    previous_benchmarks: parseJson(row.previous_benchmarks_json, {}),
+    recent_exposure: parseJson(row.recent_exposure_json, {}),
+    future_schedule: parseJson(row.future_schedule_json, []),
+    hard_bans: parseJson(row.hard_bans_json, []),
+    experiments: parseJson(row.experiments_json, []),
+  };
+}
+
+export async function createManifestEvidenceSnapshot(db: D1Database, input: {
+  cycleId: string; brandKey: string; asOf: string; timezone: string;
+  windowStart: string; windowEnd: string; posts: JsonRecord[];
+  benchmarks: JsonRecord; previousBenchmarks?: JsonRecord;
+  recentExposure: JsonRecord; futureSchedule: JsonRecord[];
+  hardBans: JsonRecord[]; experiments: JsonRecord[]; pageSize?: number;
+}): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  const pageSize = Math.max(25, Math.min(100, Math.trunc(input.pageSize ?? MANIFEST_EVIDENCE_PAGE_SIZE)));
+  const postCount = input.posts.length;
+  const matureCount = input.posts.filter((post) => post.maturity_state === "mature").length;
+  const immatureCount = input.posts.filter((post) => post.maturity_state === "immature").length;
+  const incompleteCount = input.posts.filter((post) => post.maturity_state === "evidence_incomplete").length;
+  const pageCount = postCount === 0 ? 0 : Math.ceil(postCount / pageSize);
+  const sourceHash = await hash({
+    posts: input.posts,
+    benchmarks: input.benchmarks,
+    previous_benchmarks: input.previousBenchmarks ?? {},
+    recent_exposure: input.recentExposure,
+    future_schedule: input.futureSchedule,
+    hard_bans: input.hardBans,
+    experiments: input.experiments,
+  });
+  const existing = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? LIMIT 1`)
+    .bind(input.cycleId).first<JsonRecord>();
+  const snapshotId = text(existing?.id, 160) || crypto.randomUUID();
+  if (existing && String(existing.brand_key) !== input.brandKey) throw new Error("manifest_evidence_cycle_brand_conflict");
+  await db.prepare(`INSERT INTO operator_manifest_evidence_snapshots (
+      id, cycle_id, brand_key, snapshot_version, as_of, timezone, window_days,
+      window_start, window_end, post_count, mature_count, immature_count, incomplete_count,
+      page_size, page_count, benchmarks_json, previous_benchmarks_json, recent_exposure_json,
+      future_schedule_json, hard_bans_json, experiments_json, source_hash, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(cycle_id) DO UPDATE SET
+      snapshot_version = excluded.snapshot_version, as_of = excluded.as_of, timezone = excluded.timezone,
+      window_days = excluded.window_days, window_start = excluded.window_start, window_end = excluded.window_end,
+      post_count = excluded.post_count, mature_count = excluded.mature_count,
+      immature_count = excluded.immature_count, incomplete_count = excluded.incomplete_count,
+      page_size = excluded.page_size, page_count = excluded.page_count,
+      benchmarks_json = excluded.benchmarks_json, previous_benchmarks_json = excluded.previous_benchmarks_json,
+      recent_exposure_json = excluded.recent_exposure_json, future_schedule_json = excluded.future_schedule_json,
+      hard_bans_json = excluded.hard_bans_json, experiments_json = excluded.experiments_json,
+      source_hash = excluded.source_hash, updated_at = CURRENT_TIMESTAMP`).bind(
+      snapshotId, input.cycleId, input.brandKey, MANIFEST_EVIDENCE_SNAPSHOT_VERSION,
+      input.asOf, input.timezone, MANIFEST_ANALYSIS_WINDOW_DAYS, input.windowStart, input.windowEnd,
+      postCount, matureCount, immatureCount, incompleteCount, pageSize, pageCount,
+      stableManifestJson(input.benchmarks), stableManifestJson(input.previousBenchmarks ?? {}),
+      stableManifestJson(input.recentExposure), stableManifestJson(input.futureSchedule),
+      stableManifestJson(input.hardBans), stableManifestJson(input.experiments), sourceHash,
+    ).run();
+  if (!existing || String(existing.source_hash) !== sourceHash) {
+    await db.batch([
+      db.prepare(`DELETE FROM operator_manifest_evidence_posts WHERE snapshot_id = ?`).bind(snapshotId),
+      db.prepare(`DELETE FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`).bind(snapshotId),
+    ]);
+    for (let offset = 0; offset < input.posts.length; offset += 75) {
+      const chunk = input.posts.slice(offset, offset + 75);
+      await db.batch(chunk.map((post) => db.prepare(`INSERT INTO operator_manifest_evidence_posts (
+          id, snapshot_id, brand_key, published_post_id, scheduled_post_id, text, published_at,
+          age_hours, maturity_state, primary_likes, like_rate, metrics_json,
+          maturity_snapshots_json, lineage_json, classification_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          crypto.randomUUID(), snapshotId, input.brandKey, String(post.published_post_id ?? post.post_id ?? ""),
+          post.scheduled_post_id === null || post.scheduled_post_id === undefined ? null : numeric(post.scheduled_post_id),
+          text(post.text ?? post.post_text, 20000), text(post.published_at ?? post.post_timestamp, 100),
+          numeric(post.age_hours), text(post.maturity_state, 80),
+          post.primary_likes === null || post.primary_likes === undefined ? null : numeric(post.primary_likes),
+          post.like_rate === null || post.like_rate === undefined ? null : numeric(post.like_rate),
+          stableManifestJson(post.metrics ?? {}), stableManifestJson(post.maturity_snapshots ?? []),
+          stableManifestJson(post.lineage ?? {}), stableManifestJson(post.classification ?? {}),
+        )));
+    }
+  }
+  const row = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE id = ?`).bind(snapshotId).first<JsonRecord>();
+  return { ...serializeEvidenceSnapshot(row ?? { id: snapshotId }), refreshed: Boolean(existing), source_changed: !existing || String(existing.source_hash) !== sourceHash };
+}
+
+export async function readManifestEvidencePage(db: D1Database, input: {
+  brandKey: string; cycleId: string; snapshotId?: string | null; pageIndex: number;
+}): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  const snapshot = input.snapshotId
+    ? await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE id = ? AND cycle_id = ? AND brand_key = ? LIMIT 1`)
+      .bind(input.snapshotId, input.cycleId, input.brandKey).first<JsonRecord>()
+    : await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? AND brand_key = ? LIMIT 1`)
+      .bind(input.cycleId, input.brandKey).first<JsonRecord>();
+  if (!snapshot) throw new Error("manifest_evidence_snapshot_not_found");
+  const serialized = serializeEvidenceSnapshot(snapshot);
+  const pageCount = numeric(serialized.page_count);
+  const pageIndex = Math.trunc(input.pageIndex);
+  if (pageIndex < 0 || pageIndex >= Math.max(1, pageCount)) throw new Error("manifest_evidence_page_out_of_range");
+  const pageSize = numeric(serialized.page_size, MANIFEST_EVIDENCE_PAGE_SIZE);
+  const rows = pageCount === 0 ? { results: [] as JsonRecord[] } : await db.prepare(`SELECT *
+      FROM operator_manifest_evidence_posts WHERE snapshot_id = ?
+      ORDER BY datetime(published_at) DESC, published_post_id DESC LIMIT ? OFFSET ?`)
+    .bind(snapshot.id, pageSize, pageIndex * pageSize).all<JsonRecord>();
+  await db.prepare(`INSERT INTO operator_manifest_analysis_page_reads (
+      id, snapshot_id, cycle_id, brand_key, page_index
+    ) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(snapshot_id, page_index) DO UPDATE SET read_at = CURRENT_TIMESTAMP`)
+    .bind(crypto.randomUUID(), snapshot.id, input.cycleId, input.brandKey, pageIndex).run();
+  const items = (rows.results ?? []).map((row) => ({
+    published_post_id: row.published_post_id,
+    scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : numeric(row.scheduled_post_id),
+    text: row.text,
+    published_at: row.published_at,
+    age_hours: numeric(row.age_hours),
+    maturity_state: row.maturity_state,
+    primary_likes: row.primary_likes === null || row.primary_likes === undefined ? null : numeric(row.primary_likes),
+    like_rate: row.like_rate === null || row.like_rate === undefined ? null : numeric(row.like_rate),
+    metrics: parseJson(row.metrics_json, {}),
+    maturity_snapshots: parseJson(row.maturity_snapshots_json, []),
+    lineage: parseJson(row.lineage_json, {}),
+    classification: parseJson(row.classification_json, {}),
+  }));
+  const consumedRow = await db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`)
+    .bind(snapshot.id).first<JsonRecord>();
+  return {
+    success: true,
+    snapshot: serialized,
+    page_index: pageIndex,
+    items,
+    pagination: {
+      page_size: pageSize,
+      page_count: pageCount,
+      returned: items.length,
+      has_more: pageIndex + 1 < pageCount,
+      next_page_index: pageIndex + 1 < pageCount ? pageIndex + 1 : null,
+    },
+    consumption: {
+      consumed_page_count: numeric(consumedRow?.total),
+      required_page_count: pageCount,
+      complete: numeric(consumedRow?.total) >= pageCount,
+    },
+  };
+}
+
+export async function getManifestEvidenceConsumptionState(db: D1Database, cycleId: string, brandKey: string): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  const snapshot = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? AND brand_key = ? LIMIT 1`)
+    .bind(cycleId, brandKey).first<JsonRecord>();
+  if (!snapshot) return { complete: false, error: "manifest_evidence_snapshot_not_found" };
+  const row = await db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`)
+    .bind(snapshot.id).first<JsonRecord>();
+  const required = numeric(snapshot.page_count);
+  const consumed = numeric(row?.total);
+  return { snapshot_id: snapshot.id, required_page_count: required, consumed_page_count: consumed, complete: consumed >= required };
+}
+
+export async function syncManifestHardBans(db: D1Database, brandKey: string, rules: JsonRecord[]): Promise<JsonRecord[]> {
+  await ensureManifestIntelligenceTables(db);
+  for (const rule of rules) {
+    const ruleKey = text(rule.rule_key ?? rule.id, 240);
+    const pattern = text(rule.pattern ?? rule.body ?? rule.description, 8000);
+    if (!ruleKey || !pattern) continue;
+    await db.prepare(`INSERT INTO operator_manifest_hard_bans (
+        id, brand_key, rule_key, description, rule_type, pattern, scope,
+        pass_examples_json, fail_examples_json, source_authority, active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      ON CONFLICT(brand_key, rule_key) DO UPDATE SET
+        description = excluded.description, rule_type = excluded.rule_type, pattern = excluded.pattern,
+        scope = excluded.scope, pass_examples_json = excluded.pass_examples_json,
+        fail_examples_json = excluded.fail_examples_json, source_authority = excluded.source_authority,
+        active = 1, updated_at = CURRENT_TIMESTAMP`).bind(
+        crypto.randomUUID(), brandKey, ruleKey,
+        text(rule.description ?? rule.title, 2000) || ruleKey,
+        text(rule.rule_type, 80) || "semantic_rule",
+        pattern, text(rule.scope, 160) || "manifest_generation",
+        stableManifestJson(rule.pass_examples ?? []), stableManifestJson(rule.fail_examples ?? []),
+        text(rule.source_authority ?? rule.source, 500) || "owner_memory",
+      ).run();
+  }
+  return listManifestHardBans(db, brandKey);
+}
+
+export async function listManifestHardBans(db: D1Database, brandKey: string): Promise<JsonRecord[]> {
+  await ensureManifestIntelligenceTables(db);
+  const rows = await db.prepare(`SELECT rule_key, description, rule_type, pattern, scope,
+      pass_examples_json, fail_examples_json, source_authority, updated_at
+    FROM operator_manifest_hard_bans WHERE brand_key = ? AND active = 1
+    ORDER BY datetime(updated_at) DESC, rule_key ASC`).bind(brandKey).all<JsonRecord>();
+  return (rows.results ?? []).map((row) => ({
+    rule_key: row.rule_key,
+    description: row.description,
+    rule_type: row.rule_type,
+    pattern: row.pattern,
+    scope: row.scope,
+    pass_examples: parseJson(row.pass_examples_json, []),
+    fail_examples: parseJson(row.fail_examples_json, []),
+    source_authority: row.source_authority,
+    updated_at: row.updated_at,
+  }));
+}
+
+function serializeCycleStrategy(row: JsonRecord): JsonRecord {
+  return {
+    ...row,
+    account_conclusion: parseJson(row.account_conclusion_json, {}),
+    content_focus: parseJson(row.content_focus_json, {}),
+    benchmarks: parseJson(row.benchmarks_json, {}),
+    strongest_executions: parseJson(row.strongest_json, []),
+    weakest_executions: parseJson(row.weakest_json, []),
+    directives: parseJson(row.directives_json, {}),
+    experiments: parseJson(row.experiments_json, []),
+    risks: parseJson(row.risks_json, []),
+    lineup: parseJson(row.lineup_json, []),
+  };
+}
+
+export async function commitManifestCycleStrategy(db: D1Database, input: {
+  cycleId: string; brandKey: string; snapshotId: string;
+  accountConclusion: JsonRecord; contentFocus: JsonRecord; benchmarks: JsonRecord;
+  strongestExecutions: JsonRecord[]; weakestExecutions: JsonRecord[];
+  directives: JsonRecord; experiments: JsonRecord[]; risks: unknown[]; lineup: JsonRecord[];
+}): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  const consumption = await getManifestEvidenceConsumptionState(db, input.cycleId, input.brandKey);
+  if (consumption.complete !== true || String(consumption.snapshot_id ?? "") !== input.snapshotId) {
+    throw new Error("manifest_analysis_pages_not_fully_consumed");
+  }
+  const followerBoundary = validateManifestFollowerAttributionBoundary({
+    account_conclusion: input.accountConclusion,
+    content_focus: input.contentFocus,
+    directives: input.directives,
+    lineup: input.lineup,
+  });
+  if (!followerBoundary.ok) throw new Error(followerBoundary.errors.join("|"));
+  const cycle = await db.prepare(`SELECT missing_slots_json FROM operator_autonomous_growth_cycles WHERE id = ? AND brand_key = ? LIMIT 1`)
+    .bind(input.cycleId, input.brandKey).first<JsonRecord>();
+  if (!cycle) throw new Error("manifest_cycle_not_found");
+  const missingSlots = parseJson(cycle.missing_slots_json, []) as JsonRecord[];
+  const requiredKeys = new Set(missingSlots.map((slot) => text(slot.key, 40)).filter(Boolean));
+  const receivedKeys = new Set<string>();
+  const allowedModes = new Set(["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment"]);
+  for (const item of input.lineup) {
+    const slotKey = text(item.slot_key, 40);
+    const sourceKind = text(item.source_kind, 60);
+    if (!slotKey || receivedKeys.has(slotKey) || !requiredKeys.has(slotKey)) throw new Error("manifest_cycle_lineup_slot_invalid");
+    if (!["saved_pattern", "source_card"].includes(sourceKind)) throw new Error("manifest_cycle_lineup_source_backed_only");
+    if (!text(item.source_card_id, 160)) throw new Error("manifest_cycle_lineup_source_card_required");
+    if (!allowedModes.has(text(item.generation_mode, 80))) throw new Error("manifest_cycle_lineup_generation_mode_invalid");
+    for (const requiredField of ["family_key", "strategic_role", "audience_reward", "hook_direction", "placement_reason", "exploration_mode"]) {
+      if (!text(item[requiredField], 4000)) throw new Error(`manifest_cycle_lineup_${requiredField}_required`);
+    }
+    receivedKeys.add(slotKey);
+  }
+  if (receivedKeys.size !== requiredKeys.size || [...requiredKeys].some((key) => !receivedKeys.has(key))) {
+    throw new Error("manifest_cycle_lineup_must_cover_every_authoritative_missing_slot");
+  }
+  const body = {
+    account_conclusion: input.accountConclusion,
+    content_focus: input.contentFocus,
+    benchmarks: input.benchmarks,
+    strongest_executions: input.strongestExecutions,
+    weakest_executions: input.weakestExecutions,
+    directives: input.directives,
+    experiments: input.experiments,
+    risks: input.risks,
+    lineup: input.lineup,
+  };
+  const strategyHash = await hash(body);
+  const existing = await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE cycle_id = ? LIMIT 1`)
+    .bind(input.cycleId).first<JsonRecord>();
+  if (existing) {
+    if (String(existing.strategy_hash) !== strategyHash) throw new Error("manifest_cycle_strategy_locked_conflict");
+    return { ...serializeCycleStrategy(existing), replayed: true };
+  }
+  const strategyId = crypto.randomUUID();
+  const lockedAt = new Date().toISOString();
+  await db.prepare(`INSERT INTO operator_manifest_cycle_strategies (
+      id, cycle_id, brand_key, snapshot_id, contract_version, account_conclusion_json,
+      content_focus_json, benchmarks_json, strongest_json, weakest_json, directives_json,
+      experiments_json, risks_json, lineup_json, strategy_hash, status, locked_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?)`)
+    .bind(
+      strategyId, input.cycleId, input.brandKey, input.snapshotId, MANIFEST_CYCLE_STRATEGY_CONTRACT,
+      stableManifestJson(input.accountConclusion), stableManifestJson(input.contentFocus),
+      stableManifestJson(input.benchmarks), stableManifestJson(input.strongestExecutions),
+      stableManifestJson(input.weakestExecutions), stableManifestJson(input.directives),
+      stableManifestJson(input.experiments), stableManifestJson(input.risks),
+      stableManifestJson(input.lineup), strategyHash, lockedAt,
+    ).run();
+  for (let offset = 0; offset < input.lineup.length; offset += 50) {
+    await db.batch(input.lineup.slice(offset, offset + 50).map((item) => {
+      const slotKey = text(item.slot_key, 40);
+      const [slotDate, slotTime] = slotKey.split("T");
+      return db.prepare(`INSERT INTO operator_manifest_cycle_plan_items (
+          id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+          family_key, strategic_role, generation_mode, source_kind, source_card_id,
+          source_selection_id, audience_reward, hook_direction, placement_reason,
+          nearby_avoid_json, exploration_mode, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned')`)
+        .bind(
+          crypto.randomUUID(), strategyId, input.cycleId, input.brandKey, slotKey, slotDate, slotTime,
+          text(item.family_key, 240), text(item.strategic_role, 500), text(item.generation_mode, 80),
+          text(item.source_kind, 60), text(item.source_card_id, 160), text(item.source_selection_id, 160) || null,
+          text(item.audience_reward, 4000), text(item.hook_direction, 4000), text(item.placement_reason, 4000),
+          stableManifestJson(item.nearby_avoid ?? []), text(item.exploration_mode, 80),
+        );
+    }));
+  }
+  await db.prepare(`UPDATE operator_autonomous_growth_cycles
+    SET cycle_strategy_id = ?, evidence_snapshot_id = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND brand_key = ?`).bind(strategyId, input.snapshotId, input.cycleId, input.brandKey).run();
+  const row = await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE id = ?`).bind(strategyId).first<JsonRecord>();
+  return { ...serializeCycleStrategy(row ?? { id: strategyId }), replayed: false };
+}
+
+export async function getManifestCycleStrategy(db: D1Database, cycleId: string, brandKey: string): Promise<JsonRecord | null> {
+  await ensureManifestIntelligenceTables(db);
+  const row = await db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE cycle_id = ? AND brand_key = ? LIMIT 1`)
+    .bind(cycleId, brandKey).first<JsonRecord>();
+  return row ? serializeCycleStrategy(row) : null;
+}
+
+export async function getManifestCyclePlanItem(db: D1Database, cycleId: string, brandKey: string, slotKey: string): Promise<JsonRecord | null> {
+  await ensureManifestIntelligenceTables(db);
+  const row = await db.prepare(`SELECT * FROM operator_manifest_cycle_plan_items
+    WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? LIMIT 1`).bind(cycleId, brandKey, slotKey).first<JsonRecord>();
+  return row ? { ...row, nearby_avoid: parseJson(row.nearby_avoid_json, []) } : null;
+}
+
+export async function recordManifestCandidateGateReceipt(db: D1Database, input: {
+  cycleId: string; strategyId: string; planItemId: string; brandKey: string;
+  slotKey: string; candidateText: string; results: JsonRecord[];
+}): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  if (!input.results.length) throw new Error("manifest_candidate_gate_receipt_empty");
+  const passed = input.results.every((result) => result.executed === true && !["fail", "block", "blocked"].includes(text(result.status, 40).toLowerCase()));
+  const candidateHash = await hash({ text: input.candidateText, slot_key: input.slotKey });
+  const existing = await db.prepare(`SELECT * FROM operator_manifest_candidate_gate_receipts
+    WHERE cycle_id = ? AND slot_key = ? AND candidate_hash = ? LIMIT 1`)
+    .bind(input.cycleId, input.slotKey, candidateHash).first<JsonRecord>();
+  if (existing) return { ...existing, results: parseJson(existing.results_json, []), passed: numeric(existing.passed) === 1, replayed: true };
+  const id = crypto.randomUUID();
+  await db.prepare(`INSERT INTO operator_manifest_candidate_gate_receipts (
+      id, cycle_id, strategy_id, plan_item_id, brand_key, slot_key,
+      candidate_hash, receipt_version, results_json, passed
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      id, input.cycleId, input.strategyId, input.planItemId, input.brandKey, input.slotKey,
+      candidateHash, MANIFEST_CANDIDATE_GATE_RECEIPT_VERSION, stableManifestJson(input.results), passed ? 1 : 0,
+    ).run();
+  return { id, candidate_hash: candidateHash, receipt_version: MANIFEST_CANDIDATE_GATE_RECEIPT_VERSION, results: input.results, passed, replayed: false };
 }
 
 function serializeReceipt(row: JsonRecord): JsonRecord {
