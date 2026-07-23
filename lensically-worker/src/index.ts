@@ -94,8 +94,9 @@ import {
 } from "./manifestIntelligenceEngine";
 import {
   buildManifestMeasurementAuditRead,
-  ensureManifestMeasurementAuditTables,
+    ensureManifestMeasurementAuditTables,
   refreshManifestMeasurementAudit,
+  refreshManifestSavedPatternIntelligence,
   type ManifestAuditSection,
 } from "./manifestMeasurementAudit";
 import {
