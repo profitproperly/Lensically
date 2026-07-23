@@ -904,7 +904,7 @@ export function buildManifestSavedPatternIntelligence(input: {
   };
 }
 
-async function refreshManifestSavedPatternIntelligence(db: D1Database, input: {
+export async function refreshManifestSavedPatternIntelligence(db: D1Database, input: {
   brand_key: string;
   account_id: string;
   app_user_id: string;
