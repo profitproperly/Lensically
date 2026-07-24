@@ -4295,10 +4295,18 @@ describe("operator mode MCP endpoint", () => {
       persisted.scheduled_post_id,
       "35758578720393972",
     );
-    expect(publishLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
+        expect(publishLineage).toMatchObject({ required: true, complete: true, missing_stages: [] });
 
-    const replayed = await mcpTool<typeof persisted>("persist_manifest_autonomous_post", payload);
+    await env.DB.prepare(
+      `DELETE FROM operator_operation_receipts WHERE tool_name = 'persist_manifest_autonomous_post'`,
+    ).run();
+    const replayed = await mcpTool<typeof persisted & { reused?: boolean; replayed_persist_event?: boolean }>(
+      "persist_manifest_autonomous_post",
+      payload,
+    );
     expect(replayed.scheduled_post_id).toBe(persisted.scheduled_post_id);
+    expect(replayed.reused).toBe(true);
+    expect(replayed.replayed_persist_event).toBe(true);
         const duplicateCount = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM scheduled_posts WHERE id = ?`,
     ).bind(persisted.scheduled_post_id).first<{ total: number }>();

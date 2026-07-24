@@ -14045,7 +14045,41 @@ async function persistManifestAutonomousPost(
       existingScheduledPostId,
       brand.profile.threads_user_id,
     );
-        if (existingLineage.complete === true) {
+                if (existingLineage.complete === true) {
+      const priorPersistEvent = await env.DB.prepare(
+        `SELECT event_type, payload_json
+         FROM operator_manifest_cycle_receipt_events
+         WHERE cycle_id = ? AND event_key = ? LIMIT 1`,
+      ).bind(cycleId, `persist:${operationId}`).first<Record<string, unknown>>();
+      const priorPersistPayload = priorPersistEvent?.payload_json
+        ? safeParseJsonString(String(priorPersistEvent.payload_json))
+        : null;
+      const priorPersistPayloadRecord = priorPersistPayload && typeof priorPersistPayload === "object" && !Array.isArray(priorPersistPayload)
+        ? priorPersistPayload as Record<string, unknown>
+        : {};
+      const priorScheduledPostId = Number(priorPersistPayloadRecord.scheduled_post_id ?? 0);
+      if (["post_persisted", "post_reused"].includes(String(priorPersistEvent?.event_type ?? ""))
+        && priorScheduledPostId === existingScheduledPostId) {
+        return {
+          success: true,
+          reused: true,
+          replayed_persist_event: true,
+          slot_key: slotKey,
+          scheduled_post_id: existingScheduledPostId,
+          lineage: existingLineage.lineage ?? {
+            source_card_id: existingLineup?.source_card_id ?? null,
+            source_selection_id: existingLineup?.source_selection_id ?? null,
+            generation_run_id: existingLineup?.generation_run_id ?? null,
+            draft_id: existingLineup?.draft_id ?? null,
+          },
+          publish_lineage_complete: true,
+          hypothesis_id: priorPersistPayloadRecord.hypothesis_id ?? postHypothesis.id ?? null,
+          strategy_version_id: priorPersistPayloadRecord.strategy_version_id ?? outputStrategyVersion.id ?? null,
+          experiment_assignment: priorPersistPayloadRecord.experiment_assignment ?? null,
+          decision_influence: priorPersistPayloadRecord.decision_influence ?? null,
+          coverage_reconciliation_required: true,
+        };
+      }
       await linkManifestHypothesisResult(env.DB, {
         cycleId,
         slotKey,
