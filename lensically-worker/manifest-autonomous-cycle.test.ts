@@ -5,6 +5,7 @@ import {
   dedupeManifestEvidencePosts,
 
   normalizeManifestThreadsTimestampForSqlite,
+  operatorToolRequiresLegacyPreparation,
   resolveManifestAutonomousClock,
 } from "./src/index";
 import {
