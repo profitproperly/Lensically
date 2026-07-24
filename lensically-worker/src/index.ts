@@ -13023,8 +13023,8 @@ async function prepareManifestAutonomousCycle(
       if (activeBrief?.id) {
         const brief = operatorRecord(safeParseJsonString(String(activeBrief.brief_json ?? "{}")));
         await env.DB.prepare(
-          `UPDATE operator_generation_learning_briefs
-           SET brief_json = ?, updated_at = CURRENT_TIMESTAMP
+                    `UPDATE operator_generation_learning_briefs
+           SET brief_json = ?
            WHERE id = ? AND brand_key = ?`,
         ).bind(normalizeOperatorJson({
           ...brief,
