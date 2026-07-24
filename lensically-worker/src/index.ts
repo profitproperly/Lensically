@@ -12200,7 +12200,7 @@ async function buildManifestRollingEvidence(
       ? "Call get_manifest_cycle_analysis_page starting at page_index 0 and continue until every page is consumed."
       : "No post-evidence pages exist for this snapshot.",
   };
-  return { snapshot, first_page: firstPage };
+    return { snapshot, first_page: firstPage, maturity_refresh: maturityRefresh };
 }
 
 async function prepareManifestAutonomousCycle(
@@ -12387,13 +12387,7 @@ async function prepareManifestAutonomousCycle(
     ).run();
     }
 
-    const performanceEvidenceRefresh = await refreshOperatorPerformanceEvaluator(
-    env,
-    brand.brand_key,
-    brand.account_id,
-    brand.profile.threads_user_id,
-  );
-  const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
+      const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
     cycle_id: cycleId,
     as_of: clock.effective_now_iso,
     effective_now_ms: effectiveNowMs,
@@ -12447,11 +12441,12 @@ async function prepareManifestAutonomousCycle(
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
                                                             data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "scheduled deletion reasons", "operational gates"],
-      maturity_refresh: {
-        evaluator_version: performanceEvidenceRefresh.evaluator_version ?? null,
-        fingerprinted_posts: Number(performanceEvidenceRefresh.fingerprinted_posts ?? 0),
-        maturity_scores_upserted: Number(performanceEvidenceRefresh.maturity_scores_upserted ?? 0),
-        evidence_records: Number(performanceEvidenceRefresh.evidence_records ?? 0),
+            maturity_refresh: rollingEvidence.maturity_refresh ?? {
+        source: "operator_post_performance_scores",
+        checkpoint_hours: [6, 12, 18, 24],
+        record_count: 0,
+        mature_24h_record_count: 0,
+        mode: "bounded_persisted_checkpoint_read",
       },
       intelligence_policy: intelligencePolicy,
       evidence_snapshot_id: evidenceSnapshot.id ?? null,
