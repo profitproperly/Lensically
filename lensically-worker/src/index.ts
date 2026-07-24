@@ -14617,44 +14617,63 @@ async function persistManifestAutonomousPost(
     scheduled_post_id: scheduled.scheduledPostId,
     observed_at: scheduled.scheduledTimeUtc ?? scheduledUtc,
   });
-    const publishLineage = await getScheduledPostPublishLineageStatus(
-    env,
-    scheduled.scheduledPostId,
-    brand.profile.threads_user_id,
-  );
-  const intelligenceLineage = await env.DB.prepare(
-                `SELECT l.hypothesis_id, l.source_selection_id, l.cycle_id, l.slot_key,
-            l.cycle_strategy_id, l.cycle_plan_item_id, l.gate_receipt_id,
+      const lineageStatus = await env.DB.prepare(
+    `SELECT d.id AS draft_id, r.id AS generation_run_id, c.id AS source_card_id,
+            s.id AS source_selection_id, s.batch_id AS source_batch_id,
+            l.hypothesis_id, l.source_selection_id AS lineup_source_selection_id,
+            l.cycle_id, l.slot_key, l.cycle_strategy_id, l.cycle_plan_item_id, l.gate_receipt_id,
             strategy.id AS stored_cycle_strategy_id,
             h.id AS stored_hypothesis_id, h.scheduled_post_id AS hypothesis_scheduled_post_id,
             h.status AS hypothesis_status, h.locked_at AS hypothesis_locked_at,
             plan.id AS stored_plan_item_id, plan.status AS plan_status,
             gate.id AS stored_gate_receipt_id, gate.passed AS gate_passed
-          FROM operator_autonomous_lineup_items l
-     LEFT JOIN operator_manifest_cycle_strategies strategy
-       ON strategy.id = l.cycle_strategy_id AND strategy.cycle_id = l.cycle_id AND strategy.brand_key = l.brand_key
-     LEFT JOIN operator_manifest_post_hypotheses h
-       ON h.id = l.hypothesis_id AND h.cycle_id = l.cycle_id AND h.slot_key = l.slot_key
-     LEFT JOIN operator_manifest_cycle_plan_items plan
-       ON plan.id = l.cycle_plan_item_id AND plan.cycle_id = l.cycle_id AND plan.slot_key = l.slot_key
-     LEFT JOIN operator_manifest_candidate_gate_receipts gate
-       ON gate.id = l.gate_receipt_id AND gate.cycle_id = l.cycle_id AND gate.slot_key = l.slot_key
-     WHERE l.cycle_id = ? AND l.brand_key = ? AND l.slot_key = ? AND l.scheduled_post_id = ?
-     LIMIT 1`,
-  ).bind(cycleId, brand.brand_key, slotKey, scheduled.scheduledPostId).first<Record<string, unknown>>();
-    const intelligenceMissingStages: string[] = [];
-  if (!intelligenceLineage?.cycle_strategy_id
-    || !intelligenceLineage?.stored_cycle_strategy_id
-    || String(intelligenceLineage.cycle_strategy_id) !== requestedCycleStrategyId) {
+       FROM operator_autonomous_lineup_items l
+       LEFT JOIN gpt_generation_drafts d
+         ON d.id = l.draft_id AND d.scheduled_post_id = l.scheduled_post_id
+        AND d.account_id = ? AND d.threads_user_id = ?
+       LEFT JOIN gpt_generation_runs r
+         ON r.id = l.generation_run_id AND r.id = d.run_id
+        AND r.account_id = d.account_id AND r.threads_user_id = d.threads_user_id
+       LEFT JOIN operator_source_cards c
+         ON c.id = l.source_card_id AND c.brand_key = l.brand_key
+       LEFT JOIN operator_source_selections s
+         ON s.id = l.source_selection_id AND s.brand_key = l.brand_key
+       LEFT JOIN operator_manifest_cycle_strategies strategy
+         ON strategy.id = l.cycle_strategy_id AND strategy.cycle_id = l.cycle_id AND strategy.brand_key = l.brand_key
+       LEFT JOIN operator_manifest_post_hypotheses h
+         ON h.id = l.hypothesis_id AND h.cycle_id = l.cycle_id AND h.slot_key = l.slot_key
+       LEFT JOIN operator_manifest_cycle_plan_items plan
+         ON plan.id = l.cycle_plan_item_id AND plan.cycle_id = l.cycle_id AND plan.slot_key = l.slot_key
+       LEFT JOIN operator_manifest_candidate_gate_receipts gate
+         ON gate.id = l.gate_receipt_id AND gate.cycle_id = l.cycle_id AND gate.slot_key = l.slot_key
+      WHERE l.cycle_id = ? AND l.brand_key = ? AND l.slot_key = ? AND l.scheduled_post_id = ?
+      LIMIT 1`,
+  ).bind(
+    brand.account_id,
+    brand.profile.threads_user_id,
+    cycleId,
+    brand.brand_key,
+    slotKey,
+    scheduled.scheduledPostId,
+  ).first<Record<string, unknown>>();
+  const publishMissingStages: string[] = [];
+  if (!lineageStatus?.source_selection_id || !lineageStatus?.source_batch_id) publishMissingStages.push("source");
+  if (!lineageStatus?.source_card_id) publishMissingStages.push("source_card");
+  if (!lineageStatus?.generation_run_id) publishMissingStages.push("generation_run");
+  if (!lineageStatus?.draft_id) publishMissingStages.push("draft");
+  const intelligenceMissingStages: string[] = [];
+  if (!lineageStatus?.cycle_strategy_id
+    || !lineageStatus?.stored_cycle_strategy_id
+    || String(lineageStatus.cycle_strategy_id) !== requestedCycleStrategyId) {
     intelligenceMissingStages.push("cycle_strategy");
   }
-    if (!intelligenceLineage?.source_selection_id) intelligenceMissingStages.push("source_selection");
-  if (!intelligenceLineage?.cycle_plan_item_id || !intelligenceLineage?.stored_plan_item_id || String(intelligenceLineage.plan_status) !== "scheduled") intelligenceMissingStages.push("cycle_plan_item");
-  if (!intelligenceLineage?.gate_receipt_id || !intelligenceLineage?.stored_gate_receipt_id || Number(intelligenceLineage.gate_passed ?? 0) !== 1) intelligenceMissingStages.push("candidate_gate_receipt");
-  if (!intelligenceLineage?.hypothesis_id || !intelligenceLineage?.stored_hypothesis_id) intelligenceMissingStages.push("hypothesis");
-  if (Number(intelligenceLineage?.hypothesis_scheduled_post_id ?? 0) !== scheduled.scheduledPostId) intelligenceMissingStages.push("hypothesis_schedule_link");
-  if (!intelligenceLineage?.hypothesis_locked_at || String(intelligenceLineage?.hypothesis_status) !== "scheduled") intelligenceMissingStages.push("hypothesis_lock");
-  if (publishLineage.complete !== true || intelligenceMissingStages.length > 0) {
+  if (!lineageStatus?.lineup_source_selection_id) intelligenceMissingStages.push("source_selection");
+  if (!lineageStatus?.cycle_plan_item_id || !lineageStatus?.stored_plan_item_id || String(lineageStatus.plan_status) !== "scheduled") intelligenceMissingStages.push("cycle_plan_item");
+  if (!lineageStatus?.gate_receipt_id || !lineageStatus?.stored_gate_receipt_id || Number(lineageStatus.gate_passed ?? 0) !== 1) intelligenceMissingStages.push("candidate_gate_receipt");
+  if (!lineageStatus?.hypothesis_id || !lineageStatus?.stored_hypothesis_id) intelligenceMissingStages.push("hypothesis");
+  if (Number(lineageStatus?.hypothesis_scheduled_post_id ?? 0) !== scheduled.scheduledPostId) intelligenceMissingStages.push("hypothesis_schedule_link");
+  if (!lineageStatus?.hypothesis_locked_at || String(lineageStatus?.hypothesis_status) !== "scheduled") intelligenceMissingStages.push("hypothesis_lock");
+  if (publishMissingStages.length > 0 || intelligenceMissingStages.length > 0) {
     await linkManifestHypothesisResult(env.DB, {
       cycleId,
       slotKey,
@@ -14671,16 +14690,16 @@ async function persistManifestAutonomousPost(
       slotKey,
             payload: {
         scheduled_post_id: scheduled.scheduledPostId,
-        missing_stages: [
-          ...(Array.isArray(publishLineage.missing_stages) ? publishLineage.missing_stages.map(String) : []),
+                missing_stages: [
+          ...publishMissingStages,
           ...intelligenceMissingStages,
         ],
       },
     });
-    const missingStages = [
-      ...(Array.isArray(publishLineage.missing_stages) ? publishLineage.missing_stages.map(String) : []),
+        const missingStages = [
+      ...publishMissingStages,
       ...intelligenceMissingStages,
-    ]; 
+    ];  
     await env.DB.prepare(
       `UPDATE scheduled_posts SET publish_error_message = ? WHERE id = ? AND threads_user_id = ?`,
     ).bind(
@@ -14696,9 +14715,7 @@ async function persistManifestAutonomousPost(
       missing_stages: missingStages,
     };
   }
-    const publishLineageRow = publishLineage.lineage && typeof publishLineage.lineage === "object"
-    ? publishLineage.lineage as Record<string, unknown>
-    : {};
+      const publishLineageRow = lineageStatus ?? {};
     await linkManifestHypothesisResult(env.DB, {
     cycleId,
     slotKey,
