@@ -4244,7 +4244,10 @@ describe("operator mode MCP endpoint", () => {
         semantic_repetition_collision: boolean;
         threads_api_call: boolean;
       };
-    }>("persist_manifest_autonomous_post", payload);
+        }>("persist_manifest_autonomous_post", payload);
+    if (!persisted.success) {
+      throw new Error(`source_backed_persist_failed:${JSON.stringify(persisted)}`);
+    }
     expect(persisted.success).toBe(true);
     expect(persisted.scheduled_post_id).toBeGreaterThan(0);
     expect(persisted.strategy_version_id).toBe(fixture.cycleStrategyId);
