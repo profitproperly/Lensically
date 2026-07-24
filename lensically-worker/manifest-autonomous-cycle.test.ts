@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-    buildManifestCycleMaturitySnapshot,
+        buildManifestCycleMaturitySnapshot,
   buildManifestRollingHourlySlots,
+  compactManifestAutonomousPreparationPayload,
   dedupeManifestEvidencePosts,
 
     normalizeManifestThreadsTimestampForSqlite,
@@ -142,7 +143,71 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(normalizeManifestThreadsTimestampForSqlite("not-a-timestamp")).toBeNull();
   });
 
-    it("identifies the latest maturity checkpoint due from live observation time", () => {
+      it("compacts fresh and reused autonomous preparation without losing the operational contract", () => {
+    const slots = buildManifestRollingHourlySlots("2026-07-24", 10, 48);
+    const payload = {
+      success: true,
+      reused_existing: true,
+      refreshed_live_state: true,
+      cycle: {
+        id: "cycle-1",
+        operation_id: "manifest-2026-07-24-prepare",
+        brand_key: "manifest_mental",
+        status: "prepared",
+        timezone: "America/New_York",
+        horizon_hours: 48,
+        target_slots: slots,
+        missing_slots: slots.slice(3),
+        scheduled_post_ids: [1, 2, 3],
+        account_position: {
+          runway: { target_slot_count: 48, occupied_slot_count: 3, missing_slot_count: 45, occupied_slots: slots.slice(0, 3) },
+          performance: { large_context: "x".repeat(50000) },
+          recent_published_posts: Array.from({ length: 40 }, (_, index) => ({ id: `post-${index}`, text: "y".repeat(2000) })),
+        },
+      },
+      rolling_evidence: {
+        snapshot: {
+          id: "snapshot-1",
+          page_count: 51,
+          page_size: 4,
+          page_byte_budget: 12000,
+          maturity_refresh: {
+            collection_source: "autonomous_prepare",
+            due_checkpoint_post_count: 7,
+            due_checkpoint_count: 7,
+            maturity_scores_upserted: 7,
+          },
+        },
+        first_page: { pagination: { page_count: 51 }, consumption: { consumed_page_count: 0, required_page_count: 51, complete: false } },
+      },
+      intelligence_engine_refresh: {
+        mode: "autonomous_prepare_live_refresh",
+        recomputed: true,
+        refresh_owner: "autonomous_prepare",
+        due_checkpoint_post_count: 7,
+        due_checkpoint_count: 7,
+        metric_snapshots: { inserted: 7, unchanged: 0, anomalous: 0, linked: 7 },
+        evaluator_version: "performance-evaluator-v3",
+        maturity_scores_upserted: 7,
+        evidence_records: 100,
+      },
+      decision_intelligence: { learning_brief: { text: "z".repeat(50000) } },
+    };
+    const compacted = compactManifestAutonomousPreparationPayload(payload, 1_240_000);
+    expect(compacted).not.toBeNull();
+    expect(compacted?.cycle).toMatchObject({ id: "cycle-1", operation_id: "manifest-2026-07-24-prepare" });
+    expect((compacted?.cycle as Record<string, unknown>).target_slots).toHaveLength(48);
+    expect((compacted?.cycle as Record<string, unknown>).missing_slots).toHaveLength(45);
+    expect(compacted?.rolling_evidence).toMatchObject({
+      snapshot: { id: "snapshot-1", page_count: 51, maturity_refresh: { due_checkpoint_count: 7 } },
+    });
+    expect(compacted?.persistence_contract).toMatchObject({ tool: "persist_manifest_autonomous_post", posts_per_call: 1 });
+    expect(compacted?.payload_contract).toMatchObject({ server_bounded: true, actionable_autonomous_cycle_preserved: true });
+    const contract = compacted?.payload_contract as Record<string, unknown>;
+    expect(Number(contract.returned_bytes)).toBeLessThanOrEqual(Number(contract.byte_limit));
+  });
+
+  it("identifies the latest maturity checkpoint due from live observation time", () => {
     const publishedAt = Date.parse("2026-07-23T14:00:00.000Z");
     expect(resolveOperatorDueMaturityCheckpoint(
       publishedAt,

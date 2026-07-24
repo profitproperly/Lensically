@@ -726,7 +726,10 @@ function compactManifestRollingEvidence(value: unknown): Record<string, unknown>
         hard_bans: countItems(snapshot.hard_bans),
         experiments: countItems(snapshot.experiments),
       },
-      source_hash: snapshot.source_hash ?? null,
+            source_hash: snapshot.source_hash ?? null,
+      maturity_refresh: compactOperatorPayloadValue(snapshot.maturity_refresh ?? {}, "rolling_evidence.snapshot.maturity_refresh", {
+        arrayItems: 8, stringChars: 320, objectKeys: 24, maxDepth: 4,
+      }, []),
     },
     first_page: {
       success: firstPage.success !== false,
@@ -754,17 +757,31 @@ function compactManifestRollingEvidence(value: unknown): Record<string, unknown>
   };
 }
 
-function compactManifestAutonomousPreparationPayload(
+export function compactManifestAutonomousPreparationPayload(
   payload: Record<string, unknown>,
   originalBytes: number,
 ): Record<string, unknown> | null {
   const cycle = payload.cycle && typeof payload.cycle === "object" && !Array.isArray(payload.cycle)
     ? payload.cycle as Record<string, unknown>
     : null;
+  const rollingEvidence = payload.rolling_evidence && typeof payload.rolling_evidence === "object" && !Array.isArray(payload.rolling_evidence)
+    ? payload.rolling_evidence as Record<string, unknown>
+    : null;
   const persistence = payload.persistence_contract && typeof payload.persistence_contract === "object" && !Array.isArray(payload.persistence_contract)
     ? payload.persistence_contract as Record<string, unknown>
     : null;
-  if (payload.success !== true || !cycle || persistence?.tool !== "persist_manifest_autonomous_post") return null;
+  const canonicalPersistence = persistence?.tool === "persist_manifest_autonomous_post"
+    ? persistence
+    : {
+        tool: "persist_manifest_autonomous_post",
+        posts_per_call: 1,
+        model_orchestrated: true,
+        preserve_existing_schedule: true,
+        exact_missing_slots_only: true,
+        source_backed_generation_only: true,
+      };
+  if (payload.success !== true || !cycle || !rollingEvidence || !cycle.id || !cycle.operation_id) return null;
+
 
   const accountPosition = cycle.account_position && typeof cycle.account_position === "object" && !Array.isArray(cycle.account_position)
     ? cycle.account_position as Record<string, unknown>
@@ -899,11 +916,19 @@ function compactManifestAutonomousPreparationPayload(
           portfolio_sequence_policy: accountPosition.portfolio_sequence_policy ?? {},
         },
                   },
-      intelligence_engine_refresh: payload.intelligence_engine_refresh && typeof payload.intelligence_engine_refresh === "object" && !Array.isArray(payload.intelligence_engine_refresh)
+            intelligence_engine_refresh: payload.intelligence_engine_refresh && typeof payload.intelligence_engine_refresh === "object" && !Array.isArray(payload.intelligence_engine_refresh)
         ? {
             mode: (payload.intelligence_engine_refresh as Record<string, unknown>).mode ?? null,
             recomputed: (payload.intelligence_engine_refresh as Record<string, unknown>).recomputed === true,
             refresh_owner: (payload.intelligence_engine_refresh as Record<string, unknown>).refresh_owner ?? null,
+            due_checkpoint_post_count: (payload.intelligence_engine_refresh as Record<string, unknown>).due_checkpoint_post_count ?? 0,
+            due_checkpoint_count: (payload.intelligence_engine_refresh as Record<string, unknown>).due_checkpoint_count ?? 0,
+            metric_snapshots: compactOperatorPayloadValue((payload.intelligence_engine_refresh as Record<string, unknown>).metric_snapshots ?? {}, "intelligence_engine_refresh.metric_snapshots", {
+              arrayItems: 4, stringChars: 220, objectKeys: 16, maxDepth: 3,
+            }, []),
+            evaluator_version: (payload.intelligence_engine_refresh as Record<string, unknown>).evaluator_version ?? null,
+            maturity_scores_upserted: (payload.intelligence_engine_refresh as Record<string, unknown>).maturity_scores_upserted ?? 0,
+            evidence_records: (payload.intelligence_engine_refresh as Record<string, unknown>).evidence_records ?? 0,
           }
         : null,
       measurement_audit_refresh: payload.measurement_audit_refresh && typeof payload.measurement_audit_refresh === "object" && !Array.isArray(payload.measurement_audit_refresh)
@@ -920,7 +945,7 @@ function compactManifestAutonomousPreparationPayload(
       }, []),
       strategy_contract: payload.strategy_contract ?? {},
       reconciliation_contract: payload.reconciliation_contract ?? {},
-      persistence_contract: payload.persistence_contract ?? {},
+            persistence_contract: canonicalPersistence,
       operator_action_closure: compactOperatorPayloadValue(payload.operator_action_closure ?? {}, "operator_action_closure", {
         arrayItems: 8, stringChars: attempt.stringChars, objectKeys: 32, maxDepth: 5,
       }, []),
@@ -1165,7 +1190,7 @@ function compactManifestAutonomousPreparationPayload(
     reconciliation_contract: compactOperatorPayloadValue(payload.reconciliation_contract ?? {}, "reconciliation_contract", {
       arrayItems: 20, stringChars: 320, objectKeys: 32, maxDepth: 4,
     }, []),
-    persistence_contract: compactOperatorPayloadValue(payload.persistence_contract ?? {}, "persistence_contract", {
+        persistence_contract: compactOperatorPayloadValue(canonicalPersistence, "persistence_contract", {
       arrayItems: 20, stringChars: 320, objectKeys: 32, maxDepth: 4,
     }, []),
     operator_action_closure: compactOperatorPayloadValue(payload.operator_action_closure ?? {}, "operator_action_closure", {
@@ -21455,7 +21480,10 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     "get_hourly_coverage",
     "get_manifest_cycle_receipt",
     "get_manifest_intelligence_audit",
-    "get_manifest_intelligence_foundation",
+        "get_manifest_intelligence_foundation",
+    "get_manifest_cycle_analysis_page",
+    "commit_manifest_cycle_strategy",
+    "get_performance_learning",
   ]).has(toolName);
   const cyclePayload = operatorRecord(result.cycle);
   const cycleReceiptPayload = operatorRecord(result.cycle_receipt);
