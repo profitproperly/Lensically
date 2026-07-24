@@ -150,8 +150,8 @@ for (const [documentName, documentText] of [["AGENTS.md", agentRules], ["CURRENT
   }
 }
 
-if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";')
-    || !router.includes('MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v1"')
+if (!source.includes('const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v2";')
+        || !router.includes('MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v2"')
     || !router.includes("source_defined_static_route")
     || !router.includes("d1_execution_library_bypassed: true")
     || !router.includes("discovery_allowed: false")
@@ -231,7 +231,7 @@ if (!source.includes("const RETIRED_EXECUTION_TABLES")
 const directMainContractChecks = [
   ["public_allowlist", source.includes("const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")],
   ["public_tool_builder", source.includes("buildOperatorPublicMcpTools")],
-  ["direct_contract_metadata", source.includes('public_contract: "direct_typed_tools_v1"')],
+    ["direct_contract_metadata", source.includes('public_contract: "direct_typed_tools_v2"')],
   ["direct_discovery", source.includes("const tools = await buildOperatorPublicMcpTools(env)")],
   ["direct_entry_gate", source.includes("const directPublicEntry = isOperatorPublicDirectToolName(requestedToolName)")],
   ["legacy_gateway_hidden", source.includes("const legacyGatewayEntry = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY")],
