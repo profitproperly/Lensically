@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
         buildManifestCycleMaturitySnapshot,
   buildManifestRollingHourlySlots,
-  compactManifestAutonomousPreparationPayload,
+    compactManifestAutonomousPreparationPayload,
   dedupeManifestEvidencePosts,
+  isExpectedHardeningControlResult,
 
     normalizeManifestThreadsTimestampForSqlite,
   operatorToolRequiresLegacyPreparation,
@@ -44,6 +45,16 @@ import {
   buildManifestRunComparison,
   buildManifestSavedPatternIntelligence,
 } from "./src/manifestMeasurementAudit";
+
+describe("Operator hardening controls", () => {
+  it("keeps transient workflow dispatch transport failures retryable and nonblocking", () => {
+    expect(isExpectedHardeningControlResult(
+      "runGitHubWorkflow",
+      "workflow_dispatch_temporarily_unavailable",
+      { ok: false, status: 504, retryable: true },
+    )).toBe(true);
+  });
+});
 
 describe("Manifest autonomous clock and horizon", () => {
     it("uses Threads server time when the runtime clock is behind", () => {

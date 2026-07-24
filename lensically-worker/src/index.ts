@@ -20994,7 +20994,8 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
       "file_not_found", "query_and_known_file_prefix_required", "known_file_path_required", "run_id_required", "validation_task_required", "workflow_stage_blocked",
     "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
       "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
-  "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
+    "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
+  "workflow_dispatch_temporarily_unavailable",
 ]);
 export function isExpectedHardeningControlResult(
   toolName: string,
@@ -25142,8 +25143,20 @@ async function handleOperatorMcpEngineeringTool(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ref, inputs }),
     });
-    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched Main workflow task ${task}${releaseSha ? ` for ${releaseSha}` : ""}.`, testsRun: [{ workflow_id: workflowId, task, release_sha: releaseSha ?? null }], result: result.ok ? "ok" : "failed", metadata: { status: result.status } });
-    return { ok: result.ok, status: result.status, workflow_id: workflowId, task, release_id: releaseId || null, release_sha: releaseSha ?? null };
+        const transientDispatchFailure = !result.ok && [502, 504].includes(Number(result.status));
+    await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched Main workflow task ${task}${releaseSha ? ` for ${releaseSha}` : ""}.`, testsRun: [{ workflow_id: workflowId, task, release_sha: releaseSha ?? null }], result: result.ok ? "ok" : transientDispatchFailure ? "retryable" : "failed", metadata: { status: result.status, transient_dispatch_failure: transientDispatchFailure } });
+    return {
+      ok: result.ok,
+      status: result.status,
+      error: transientDispatchFailure ? "workflow_dispatch_temporarily_unavailable" : result.ok ? undefined : "workflow_dispatch_failed",
+      retryable: transientDispatchFailure,
+      side_effect_state: transientDispatchFailure ? "unknown" : result.ok ? "confirmed" : "not_confirmed",
+      required_next_action: transientDispatchFailure ? "List recent workflow runs before retrying because the dispatch may have succeeded despite the transport response." : null,
+      workflow_id: workflowId,
+      task,
+      release_id: releaseId || null,
+      release_sha: releaseSha ?? null,
+    };
   }
 
   if (toolName === "listGitHubWorkflowRuns") {
