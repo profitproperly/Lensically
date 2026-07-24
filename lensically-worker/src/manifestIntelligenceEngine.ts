@@ -613,10 +613,11 @@ export async function upsertManifestLearningObservation(db: D1Database, input: {
   confidence_score: number;
   confidence_label: ManifestConfidenceLabel;
   state: string;
-  evidence: JsonRecord;
+    evidence: JsonRecord;
   reason: string;
+  skip_table_ensure?: boolean;
 }): Promise<{ transitioned: boolean; from_state: string | null; to_state: string }> {
-  await ensureManifestIntelligenceEngineTables(db);
+  if (input.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
   const previous = await db.prepare(`SELECT confidence_label, state
     FROM operator_manifest_learning_observations
     WHERE brand_key = ? AND level = ? AND feature_key = ? AND checkpoint_hours = 24 LIMIT 1`)
@@ -663,9 +664,10 @@ export async function upsertManifestSemanticSignature(db: D1Database, input: {
   metadata?: JsonRecord | null;
   scheduled_post_id?: number | null;
   published_post_id?: string | null;
-  observed_at?: string | null;
+    observed_at?: string | null;
+  skip_table_ensure?: boolean;
 }): Promise<ManifestSemanticSignature> {
-  await ensureManifestIntelligenceEngineTables(db);
+  if (input.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
   const signature = buildManifestSemanticSignature({ text: input.text, metadata: input.metadata });
   await db.prepare(`INSERT INTO operator_manifest_semantic_signatures (
     id, brand_key, content_type, content_id, scheduled_post_id, published_post_id, observed_at,
@@ -792,8 +794,20 @@ export async function registerManifestExperimentAssignment(db: D1Database, input
 export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
   brand_key: string;
   threads_user_id: string;
-}): Promise<JsonRecord> {
+}, options: {
+  phase?: "full" | "semantic_signatures" | "maturity_comparables" | "learning_observations" | "portfolio_experiments";
+  learning_offset?: number;
+  learning_limit?: number;
+} = {}): Promise<JsonRecord> {
   await ensureManifestIntelligenceEngineTables(db);
+  const phase = options.phase ?? "full";
+  const runSemantic = phase === "full" || phase === "semantic_signatures";
+  const runMaturity = phase === "full" || phase === "maturity_comparables";
+  const runLearning = phase === "full" || phase === "learning_observations";
+  const runPortfolio = phase === "full" || phase === "portfolio_experiments";
+  let publishedRows: JsonRecord[] = [];
+  let scheduledCount = 0;
+  if (runSemantic) {
   const published = await db.prepare(`SELECT a.post_id, a.post_text, a.post_timestamp,
       s.id AS scheduled_post_id, t.hook_style, t.pillar, t.format, t.metadata_json,
       f.fingerprint_json, c.family_id, fam.source_identity_key,
@@ -810,7 +824,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
         ORDER BY substr(a.post_timestamp, 1, 19) DESC LIMIT 250`).bind(
       input.brand_key, input.brand_key, input.brand_key, input.brand_key, input.threads_user_id,
     ).all<JsonRecord>();
-  const publishedRows = published.results ?? [];
+    publishedRows = published.results ?? [];
   for (const row of publishedRows) {
     await upsertManifestSemanticSignature(db, {
       brand_key: input.brand_key,
@@ -824,8 +838,9 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
         ...record(parseJson(row.metadata_json, {})),
       },
       scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : number(row.scheduled_post_id),
-      published_post_id: String(row.post_id),
+            published_post_id: String(row.post_id),
       observed_at: text(row.post_timestamp, 100) || null,
+      skip_table_ensure: true,
     });
   }
   const scheduled = await db.prepare(`SELECT s.id, s.post_text, s.scheduled_time, t.hook_style, t.pillar,
@@ -835,6 +850,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     LEFT JOIN operator_autonomous_lineup_items l ON l.scheduled_post_id = s.id AND l.brand_key = ?
     WHERE s.threads_user_id = ? AND s.status IN ('approved', 'posting') AND datetime(s.scheduled_time) >= datetime('now')
     ORDER BY datetime(s.scheduled_time) ASC LIMIT 168`).bind(input.brand_key, input.threads_user_id).all<JsonRecord>();
+    scheduledCount = scheduled.results?.length ?? 0;
   for (const row of scheduled.results ?? []) {
     await upsertManifestSemanticSignature(db, {
       brand_key: input.brand_key,
@@ -849,9 +865,20 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
         generation_mode: row.generation_mode,
         ...record(parseJson(row.metadata_json, {})),
       },
-      scheduled_post_id: number(row.id),
+            scheduled_post_id: number(row.id),
       observed_at: text(row.scheduled_time, 100) || null,
+      skip_table_ensure: true,
     });
+  }
+  }
+  if (phase === "semantic_signatures") {
+    return {
+      engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
+      phase,
+      published_signatures: publishedRows.length,
+      scheduled_signatures: scheduledCount,
+      continuation_required: false,
+    };
   }
   const scoreRows = await db.prepare(`SELECT s.published_post_id, s.checkpoint_hours, s.metrics_json,
       s.rates_json, s.velocity_json, s.scores_json, s.distribution_state,
@@ -882,6 +909,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       scores: record(parseJson(row.scores_json, {})),
       distribution_state: text(row.distribution_state, 80),
     });
+        if (runMaturity) {
     await db.prepare(`INSERT INTO operator_manifest_maturity_evaluations (
       id, brand_key, published_post_id, checkpoint_hours, evaluation_version, evaluation_json, structural_change_allowed
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -889,8 +917,9 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       evaluation_version = excluded.evaluation_version, evaluation_json = excluded.evaluation_json,
       structural_change_allowed = excluded.structural_change_allowed, updated_at = CURRENT_TIMESTAMP`).bind(
       crypto.randomUUID(), input.brand_key, String(row.published_post_id), maturity.checkpoint_hours,
-      MANIFEST_MATURITY_EVALUATION_VERSION, stableJson(maturity), maturity.structural_change_allowed ? 1 : 0,
+            MANIFEST_MATURITY_EVALUATION_VERSION, stableJson(maturity), maturity.structural_change_allowed ? 1 : 0,
     ).run();
+    }
     const familyKey = machine(row.autonomous_family_key ?? row.family_id, "unlinked");
     const placement = text(row.slot_time, 20) || timeBucket(row.post_timestamp);
     const candidate: ManifestComparableCandidate = {
@@ -914,6 +943,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       placement_key: machine(placement, "unknown"),
     });
   }
+    if (runMaturity) {
   for (const target of candidates) {
     const analysis = buildManifestComparableAnalysis(target, candidates);
     await db.prepare(`INSERT INTO operator_manifest_comparable_analyses (
@@ -923,10 +953,24 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       analysis_version = excluded.analysis_version, comparable_post_ids_json = excluded.comparable_post_ids_json,
       analysis_json = excluded.analysis_json, updated_at = CURRENT_TIMESTAMP`).bind(
       crypto.randomUUID(), input.brand_key, target.published_post_id, target.checkpoint_hours,
-      MANIFEST_COMPARABLE_ANALYSIS_VERSION, stableJson(analysis.comparable_post_ids ?? []), stableJson(analysis),
+            MANIFEST_COMPARABLE_ANALYSIS_VERSION, stableJson(analysis.comparable_post_ids ?? []), stableJson(analysis),
     ).run();
   }
-  await db.prepare(`UPDATE operator_manifest_learning_observations SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(input.brand_key).run();
+  }
+  if (phase === "maturity_comparables") {
+    return {
+      engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
+      phase,
+      maturity_evaluations: maturityRows.length,
+      comparable_analyses: candidates.length,
+      continuation_required: false,
+    };
+  }
+  const learningOffset = Math.max(0, Math.trunc(options.learning_offset ?? 0));
+  const learningLimit = Math.max(1, Math.min(180, Math.trunc(options.learning_limit ?? 180)));
+  if (runLearning && learningOffset === 0) {
+    await db.prepare(`UPDATE operator_manifest_learning_observations SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(input.brand_key).run();
+  }
   const authoritativeRows = maturityRows.filter((item) => item.maturity.structural_change_allowed);
   const globalMedian = median(authoritativeRows.map((item) => item.maturity.overall_score));
   const groups = new Map<string, { level: string; feature_key: string; rows: typeof authoritativeRows }>();
@@ -947,8 +991,11 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       groups.set(key, group);
     }
   }
-  const familyObservations = new Map<string, JsonRecord>();
-  for (const group of groups.values()) {
+    const familyObservations = new Map<string, JsonRecord>();
+  const groupValues = [...groups.values()];
+  const learningEnd = Math.min(groupValues.length, learningOffset + learningLimit);
+  for (let groupIndex = 0; groupIndex < groupValues.length; groupIndex += 1) {
+    const group = groupValues[groupIndex];
     const scores = group.rows.map((item) => item.maturity.overall_score);
     const groupMedian = median(scores);
     const effect = groupMedian - globalMedian;
@@ -968,6 +1015,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       global_median_overall: globalMedian,
       structural_change_allowed: confidence.transition_allowed,
     };
+            if (runLearning && groupIndex >= learningOffset && groupIndex < learningEnd) {
         await upsertManifestLearningObservation(db, {
       brand_key: input.brand_key,
       level: group.level,
@@ -980,9 +1028,11 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       confidence_score: confidence.score,
       confidence_label: confidence.label,
       state,
-      evidence,
+            evidence,
       reason: confidence.reason,
+      skip_table_ensure: true,
     });
+    }
     if (group.level === "family") familyObservations.set(group.feature_key, {
       sample_size: scores.length, median_overall: groupMedian, supporting_count: supporting,
       contradicting_count: contradicting, confidence,
@@ -990,6 +1040,18 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       weak_count: scores.filter((score) => score <= 35).length,
     });
   }
+    if (phase === "learning_observations") {
+    return {
+      engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
+      phase,
+      learning_observations_processed: Math.max(0, learningEnd - learningOffset),
+      learning_observation_total: groupValues.length,
+      next_offset: learningEnd < groupValues.length ? learningEnd : null,
+      continuation_required: learningEnd < groupValues.length,
+    };
+  }
+  let experimentsEvaluated = 0;
+  if (runPortfolio) {
   for (const [familyKey, evidence] of familyObservations) {
     const current = await db.prepare(`SELECT role, confidence_label FROM operator_manifest_portfolio_states
       WHERE brand_key = ? AND family_key = ? LIMIT 1`).bind(input.brand_key, familyKey).first<JsonRecord>();
@@ -1034,9 +1096,8 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       ).run();
     }
   }
-  const experiments = await db.prepare(`SELECT * FROM operator_manifest_experiments
+    const experiments = await db.prepare(`SELECT * FROM operator_manifest_experiments
     WHERE brand_key = ? AND status IN ('running', 'planned')`).bind(input.brand_key).all<JsonRecord>();
-  let experimentsEvaluated = 0;
   for (const experiment of experiments.results ?? []) {
     const assignments = await db.prepare(`SELECT a.scheduled_post_id, s.published_post_id, score.scores_json
       FROM operator_manifest_experiment_assignments a
@@ -1065,12 +1126,13 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       stableJson({ ...result, variant_count: variantScores.length, control_count: controls.length }),
       result.decision, terminal ? "completed" : "running", experiment.id,
     ).run();
-    experimentsEvaluated += 1;
+        experimentsEvaluated += 1;
+  }
   }
   return {
     engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
     published_signatures: publishedRows.length,
-    scheduled_signatures: scheduled.results?.length ?? 0,
+        scheduled_signatures: scheduledCount,
     maturity_evaluations: maturityRows.length,
     comparable_analyses: candidates.length,
     learning_observations: groups.size,

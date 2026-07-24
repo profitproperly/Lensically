@@ -12796,14 +12796,126 @@ async function prepareManifestAutonomousCycle(
         next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Core maturity scoring and evidence are complete; the next invocation refreshes Manifest intelligence only.",
       };
     }
-        if (String(checkpoint.phase ?? "") === "manifest_intelligence") {
+            if (String(checkpoint.phase ?? "") === "manifest_intelligence") {
       const intelligenceEngine = await refreshManifestIntelligenceEngine(env.DB, {
         brand_key: brand.brand_key,
         threads_user_id: brand.profile.threads_user_id,
-      });
-      const intelligenceSummary = compactOperatorPayloadValue(intelligenceEngine, "manifest_intelligence", {
+      }, { phase: "semantic_signatures" });
+      const intelligenceSummary = compactOperatorPayloadValue(intelligenceEngine, "manifest_intelligence.semantic", {
         arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
       }, []);
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "manifest_intelligence_maturity",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: state.threads_snapshot ?? {},
+          intelligence_engine: { semantic_signatures: intelligenceSummary },
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "manifest_intelligence_semantic",
+        next_stage: "manifest_intelligence_maturity",
+        intelligence_engine: intelligenceSummary,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Semantic exposure signatures are refreshed; the next invocation refreshes maturity and comparable analyses only.",
+      };
+    }
+    if (String(checkpoint.phase ?? "") === "manifest_intelligence_maturity") {
+      const maturity = await refreshManifestIntelligenceEngine(env.DB, {
+        brand_key: brand.brand_key,
+        threads_user_id: brand.profile.threads_user_id,
+      }, { phase: "maturity_comparables" });
+      const maturitySummary = compactOperatorPayloadValue(maturity, "manifest_intelligence.maturity", {
+        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
+      }, []);
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "manifest_intelligence_learning",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: state.threads_snapshot ?? {},
+          intelligence_engine: {
+            ...operatorRecord(state.intelligence_engine),
+            maturity_comparables: maturitySummary,
+          },
+          learning_offset: 0,
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "manifest_intelligence_maturity",
+        next_stage: "manifest_intelligence_learning",
+        intelligence_engine: maturitySummary,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Maturity and comparable analyses are refreshed; the next invocation begins bounded multi-level learning observations.",
+      };
+    }
+    if (String(checkpoint.phase ?? "") === "manifest_intelligence_learning") {
+      const learningOffset = Math.max(0, Math.trunc(Number(state.learning_offset ?? 0)));
+      const learning = await refreshManifestIntelligenceEngine(env.DB, {
+        brand_key: brand.brand_key,
+        threads_user_id: brand.profile.threads_user_id,
+      }, { phase: "learning_observations", learning_offset: learningOffset, learning_limit: 180 });
+      const learningSummary = compactOperatorPayloadValue(learning, "manifest_intelligence.learning", {
+        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
+      }, []);
+      const learningContinuation = learning.continuation_required === true;
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: learningContinuation ? "manifest_intelligence_learning" : "manifest_intelligence_portfolio",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: state.threads_snapshot ?? {},
+          intelligence_engine: {
+            ...operatorRecord(state.intelligence_engine),
+            learning_observations: learningSummary,
+          },
+          learning_offset: learningContinuation ? Number(learning.next_offset ?? learningOffset + 180) : null,
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "manifest_intelligence_learning_batch",
+        next_stage: learningContinuation ? "manifest_intelligence_learning" : "manifest_intelligence_portfolio",
+        intelligence_engine: learningSummary,
+        next_action: learningContinuation
+          ? "Call prepare_manifest_autonomous_cycle again with the identical inputs. The next bounded learning-observation batch will resume from the persisted offset."
+          : "Call prepare_manifest_autonomous_cycle again with the identical inputs. Multi-level learning is complete; the next invocation refreshes portfolio states and experiments.",
+      };
+    }
+    if (String(checkpoint.phase ?? "") === "manifest_intelligence_portfolio") {
+      const portfolio = await refreshManifestIntelligenceEngine(env.DB, {
+        brand_key: brand.brand_key,
+        threads_user_id: brand.profile.threads_user_id,
+      }, { phase: "portfolio_experiments" });
+      const portfolioSummary = compactOperatorPayloadValue(portfolio, "manifest_intelligence.portfolio", {
+        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
+      }, []);
+      const completeIntelligence = {
+        ...operatorRecord(state.intelligence_engine),
+        portfolio_experiments: portfolioSummary,
+      };
       await writeManifestPrepareCheckpoint(env.DB, {
         brand_key: brand.brand_key,
         operation_id: explicitOperationId,
@@ -12813,7 +12925,7 @@ async function prepareManifestAutonomousCycle(
         state: {
           runtime_now_iso: runtimeNowIso,
           threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: intelligenceSummary,
+          intelligence_engine: completeIntelligence,
         },
       });
       return {
@@ -12822,10 +12934,10 @@ async function prepareManifestAutonomousCycle(
         continuation_required: true,
         operation_id: explicitOperationId,
         checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_intelligence",
+        stage_completed: "manifest_intelligence_portfolio",
         next_stage: "manifest_measurement_audit",
-        intelligence_engine: intelligenceSummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. The intelligence engine is durably refreshed; the next invocation refreshes the measurement audit only.",
+        intelligence_engine: portfolioSummary,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. All intelligence-engine phases are complete; the next invocation refreshes the measurement audit only.",
       };
     }
     if (String(checkpoint.phase ?? "") === "manifest_measurement_audit") {
