@@ -233,11 +233,16 @@ describe("Manifest autonomous clock and horizon", () => {
       Date.parse("2026-07-24T14:55:00.000Z"),
       [6, 12, 18, 24],
     )).toBeNull();
-    expect(resolveOperatorDueMaturityCheckpoint(
+        expect(resolveOperatorDueMaturityCheckpoint(
       publishedAt,
       Date.parse("2026-07-24T07:00:00.000Z"),
       [6],
     )).toBe(12);
+    expect(resolveOperatorDueMaturityCheckpoint(
+      publishedAt,
+      Date.parse("2026-07-26T14:00:00.000Z"),
+      [6, 12, 18],
+    )).toBeNull();
   });
 
   it("keeps canonical cycle reads and strategy commit off the legacy workflow bootstrap", () => {

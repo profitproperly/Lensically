@@ -31493,10 +31493,15 @@ export function resolveOperatorDueMaturityCheckpoint(
   completedCheckpoints: readonly number[],
 ): number | null {
   if (!Number.isFinite(publishedAtMs) || !Number.isFinite(observedAtMs) || observedAtMs < publishedAtMs) return null;
-  const ageHours = (observedAtMs - publishedAtMs) / 3600000;
+    const ageHours = (observedAtMs - publishedAtMs) / 3600000;
   const completed = new Set(completedCheckpoints.filter(Number.isFinite));
   return [...OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS]
-    .filter((checkpoint) => ageHours >= checkpoint && !completed.has(checkpoint))
+    .filter((checkpoint) => {
+      const toleranceHours = checkpoint === 24 ? 12 : 7;
+      return ageHours >= checkpoint
+        && ageHours <= checkpoint + toleranceHours
+        && !completed.has(checkpoint);
+    })
     .sort((left, right) => right - left)[0] ?? null;
 }
 
