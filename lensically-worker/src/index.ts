@@ -32052,6 +32052,7 @@ async function getLatestOperatorPerformanceLearning(
   brandKey: GptBrandKey,
   includePosts = false,
 ): Promise<Record<string, unknown>> {
+  await ensureOperatorWorkflowTables(env);
   await ensureOperatorPerformanceEvaluatorTables(env);
   const briefRow = await env.DB.prepare(
         `SELECT id, checkpoint_hours, sample_size, brief_json, generated_at
