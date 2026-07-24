@@ -15285,13 +15285,40 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-        if (toolName === "get_hourly_coverage") {
+                if (toolName === "get_hourly_coverage") {
     const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
     const startDate = normalizeOperatorText(payload.start_date, 20, true);
     const horizonDays = Math.min(Math.max(Math.trunc(Number(payload.horizon_days ?? 14)), 1), 60);
     const coverageResult = await getOperatorHourlyCoverage(env, brand, timezone, horizonDays, startDate);
     const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
+    let coverageResponse: Record<string, unknown> = { ...coverageResult };
     if (brand.brand_key === "manifest_mental" && cycleId) {
+      const earliestIncompleteDate = normalizeOperatorText(coverageResult.earliest_incomplete_date, 20, true);
+      const nextOpenSlot = normalizeOperatorText(coverageResult.next_open_slot, 20, true);
+      const nextSlotKey = earliestIncompleteDate && nextOpenSlot
+        ? `${earliestIncompleteDate}T${nextOpenSlot}`
+        : null;
+      const nextCyclePlanItem = nextSlotKey
+        ? await env.DB.prepare(
+            `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+                    family_key, strategic_role, generation_mode, source_kind, source_card_id,
+                    source_selection_id, audience_reward, hook_direction, placement_reason,
+                    nearby_avoid_json, exploration_mode, status
+             FROM operator_manifest_cycle_plan_items
+             WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND status = 'planned'
+             LIMIT 1`,
+          ).bind(cycleId, brand.brand_key, nextSlotKey).first<Record<string, unknown>>()
+        : null;
+      coverageResponse = {
+        ...coverageResult,
+        cycle_id: cycleId,
+        next_cycle_plan_item: nextCyclePlanItem
+          ? {
+              ...nextCyclePlanItem,
+              nearby_avoid: safeParseJsonString(String(nextCyclePlanItem.nearby_avoid_json ?? "[]")) ?? [],
+            }
+          : null,
+      };
       const coverageOperationId = normalizeOperatorText(payload.operation_id, 240, true)
         ?? `${coverageResult.current_local_date ?? "current"}-${coverageResult.current_local_time ?? "coverage"}`;
       await appendManifestCycleEvent(env.DB, {
@@ -15299,10 +15326,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         brandKey: brand.brand_key,
         eventKey: `coverage:${coverageOperationId}`,
         eventType: "coverage_reconciled",
-        payload: coverageResult,
+        payload: coverageResponse,
       });
     }
-    return operatorJsonResponse(coverageResult);
+    return operatorJsonResponse(coverageResponse);
   }
 
   if (toolName === "claim_manifest_review_batch") {
@@ -18526,7 +18553,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "get_hourly_coverage",
     title: "Get hourly publishing coverage",
-    description: "Inspect the selected account schedule from the next viable hour forward and return the earliest incomplete publishing day, its open hourly slots, and the next open slot. Past missed hours are never backfilled.",
+        description: "Inspect the selected account schedule from the next viable hour forward and return the earliest incomplete publishing day, its open hourly slots, and the next open slot. Past missed hours are never backfilled. When a Manifest cycle_id is supplied, also return next_cycle_plan_item with the exact locked plan UUID and source-backed execution contract required by persist_manifest_autonomous_post.",
         inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, start_date: { type: "string" }, timezone: { type: "string" }, horizon_days: { type: "integer", minimum: 1, maximum: 60, default: 14 }, cycle_id: { type: "string", description: "Optional autonomous cycle ID. When present, append this coverage reconciliation to that cycle's immutable receipt." }, operation_id: { type: "string", description: "Stable identity for this coverage checkpoint." } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },

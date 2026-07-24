@@ -4178,6 +4178,43 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(scheduled?.total ?? 0)).toBe(0);
   }, 30000);
 
+        it("returns the next exact locked cycle plan item from hourly coverage", async () => {
+    const fixture = await prepareManifestSourceBackedCycleForTest();
+    const coverage = await mcpTool<{
+      ok: boolean;
+      cycle_id: string;
+      next_open_slot: string;
+      next_cycle_plan_item: {
+        id: string;
+        strategy_id: string;
+        cycle_id: string;
+        slot_key: string;
+        source_card_id: string;
+        source_selection_id: string;
+        status: string;
+      } | null;
+    }>("get_hourly_coverage", {
+      brand_key: "manifest_mental",
+      timezone: "America/New_York",
+      horizon_days: 3,
+      cycle_id: fixture.prepared.cycle.id,
+      operation_id: `test-cycle-coverage-next-plan-${crypto.randomUUID()}`,
+      proceed_confirmed: true,
+    });
+    expect(coverage.ok).toBe(true);
+    expect(coverage.cycle_id).toBe(fixture.prepared.cycle.id);
+    expect(coverage.next_cycle_plan_item).not.toBeNull();
+    const nextPlan = coverage.next_cycle_plan_item!;
+    expect(nextPlan).toMatchObject({
+      strategy_id: fixture.cycleStrategyId,
+      cycle_id: fixture.prepared.cycle.id,
+      status: "planned",
+      source_card_id: fixture.sourceCardId,
+      source_selection_id: fixture.sourceSelectionId,
+    });
+    expect(nextPlan.id).toBe(fixture.planItemIds.get(nextPlan.slot_key));
+  }, 30000);
+
     it("reads a complete cycle receipt after source-backed persistence without mutation", async () => {
     const fixture = await prepareManifestSourceBackedCycleForTest();
     const payload = buildManifestSourceBackedPersistPayload(fixture);
