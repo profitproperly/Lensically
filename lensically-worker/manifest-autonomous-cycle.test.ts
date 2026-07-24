@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
         buildManifestCycleMaturitySnapshot,
   buildManifestRollingHourlySlots,
-    compactManifestAutonomousPreparationPayload,
+      compactManifestAutonomousPreparationPayload,
+  compactManifestPrepareThreadsSnapshot,
   dedupeManifestEvidencePosts,
   isExpectedHardeningControlResult,
 
@@ -45,6 +46,39 @@ import {
   buildManifestRunComparison,
   buildManifestSavedPatternIntelligence,
 } from "./src/manifestMeasurementAudit";
+
+describe("Manifest preparation checkpoints", () => {
+  it("persists only the bounded live-evidence fields needed by the next preparation invocation", () => {
+    expect(compactManifestPrepareThreadsSnapshot({
+      refreshed: true,
+      complete: true,
+      threads_server_time_iso: "2026-07-24T16:00:00.000Z",
+      latest_published_at: "2026-07-24T15:00:00.000Z",
+      published_count: 40,
+      due_checkpoint_post_count: 2,
+      due_checkpoint_count: 2,
+      processed_due_checkpoint_count: 2,
+      remaining_due_checkpoint_count: 0,
+      metric_snapshots: { inserted: 2, linked: 2 },
+      performance_evaluation: {
+        evaluator_version: "performance-evaluator-v3",
+        maturity_scores_upserted: 2,
+        evidence_records: 120,
+        oversized_internal_rows: Array.from({ length: 100 }, () => ({ text: "x".repeat(1000) })),
+      },
+    })).toEqual(expect.objectContaining({
+      refreshed: true,
+      complete: true,
+      published_count: 40,
+      due_checkpoint_count: 2,
+      performance_evaluation: {
+        evaluator_version: "performance-evaluator-v3",
+        maturity_scores_upserted: 2,
+        evidence_records: 120,
+      },
+    }));
+  });
+});
 
 describe("Operator hardening controls", () => {
   it("keeps transient workflow dispatch transport failures retryable and nonblocking", () => {

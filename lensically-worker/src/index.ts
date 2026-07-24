@@ -12468,6 +12468,118 @@ async function buildManifestRollingEvidence(
     return { snapshot, first_page: firstPage, maturity_refresh: maturityRefresh };
 }
 
+const MANIFEST_PREPARE_CHECKPOINT_VERSION = "manifest-prepare-checkpoint-v1";
+
+async function ensureManifestPrepareCheckpointTable(db: D1Database): Promise<void> {
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_manifest_prepare_checkpoints (
+      id TEXT PRIMARY KEY,
+      brand_key TEXT NOT NULL,
+      operation_id TEXT NOT NULL,
+      checkpoint_version TEXT NOT NULL,
+      phase TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      horizon_hours INTEGER NOT NULL,
+      state_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(brand_key, operation_id)
+    )`,
+  ).run();
+}
+
+async function readManifestPrepareCheckpoint(
+  db: D1Database,
+  brandKey: string,
+  operationId: string,
+): Promise<Record<string, unknown> | null> {
+  const row = await db.prepare(
+    `SELECT * FROM operator_manifest_prepare_checkpoints
+     WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
+  ).bind(brandKey, operationId).first<Record<string, unknown>>();
+  if (!row) return null;
+  return {
+    ...row,
+    state: safeParseJsonString(String(row.state_json ?? "{}")) ?? {},
+  };
+}
+
+async function writeManifestPrepareCheckpoint(
+  db: D1Database,
+  input: {
+    brand_key: string;
+    operation_id: string;
+    phase: string;
+    timezone: string;
+    horizon_hours: number;
+    state: Record<string, unknown>;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO operator_manifest_prepare_checkpoints (
+      id, brand_key, operation_id, checkpoint_version, phase,
+      timezone, horizon_hours, state_json, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(brand_key, operation_id) DO UPDATE SET
+      checkpoint_version = excluded.checkpoint_version,
+      phase = excluded.phase,
+      timezone = excluded.timezone,
+      horizon_hours = excluded.horizon_hours,
+      state_json = excluded.state_json,
+      updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    crypto.randomUUID(),
+    input.brand_key,
+    input.operation_id,
+    MANIFEST_PREPARE_CHECKPOINT_VERSION,
+    input.phase,
+    input.timezone,
+    input.horizon_hours,
+    normalizeOperatorJson(input.state, {}),
+  ).run();
+}
+
+async function clearManifestPrepareCheckpoint(
+  db: D1Database,
+  brandKey: string,
+  operationId: string,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM operator_manifest_prepare_checkpoints
+     WHERE brand_key = ? AND operation_id = ?`,
+  ).bind(brandKey, operationId).run();
+}
+
+export function compactManifestPrepareThreadsSnapshot(
+  snapshot: Record<string, unknown>,
+): Record<string, unknown> {
+  const evaluation = snapshot.performance_evaluation && typeof snapshot.performance_evaluation === "object" && !Array.isArray(snapshot.performance_evaluation)
+    ? snapshot.performance_evaluation as Record<string, unknown>
+    : {};
+  return {
+    refreshed: snapshot.refreshed === true,
+    complete: snapshot.complete === true,
+    threads_server_time_iso: snapshot.threads_server_time_iso ?? null,
+    latest_published_at: snapshot.latest_published_at ?? null,
+    published_count: Number(snapshot.published_count ?? 0),
+    list_metrics_available: snapshot.list_metrics_available === true,
+    list_metrics_complete: snapshot.list_metrics_complete === true,
+    due_checkpoint_post_count: Number(snapshot.due_checkpoint_post_count ?? 0),
+    due_checkpoint_count: Number(snapshot.due_checkpoint_count ?? 0),
+    processed_due_checkpoint_count: Number(snapshot.processed_due_checkpoint_count ?? 0),
+    remaining_due_checkpoint_count: Number(snapshot.remaining_due_checkpoint_count ?? 0),
+    continuation_required: snapshot.continuation_required === true,
+    max_insight_calls_per_invocation: Number(snapshot.max_insight_calls_per_invocation ?? 0),
+    metric_snapshots: snapshot.metric_snapshots ?? null,
+    performance_evaluation: {
+      evaluator_version: evaluation.evaluator_version ?? null,
+      maturity_scores_upserted: Number(evaluation.maturity_scores_upserted ?? 0),
+      evidence_records: Number(evaluation.evidence_records ?? 0),
+    },
+    error: snapshot.error ?? null,
+  };
+}
+
 async function prepareManifestAutonomousCycle(
   env: Env,
   brand: GptResolvedBrand,
@@ -12478,16 +12590,83 @@ async function prepareManifestAutonomousCycle(
   if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
     return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
   }
-  const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
   const horizonHours = Math.min(Math.max(Math.trunc(Number(payload.horizon_hours ?? MANIFEST_AUTONOMOUS_RUNWAY_HOURS)), 1), 72);
-    const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
-    const runtimeNowIso = new Date().toISOString();
-  const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+  const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
+  const phasedPreparation = Boolean(explicitOperationId) && !hasTestRuntimeTokens(env);
+  let runtimeNowIso = new Date().toISOString();
+  let threadsSnapshot: Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
+  if (phasedPreparation && explicitOperationId) {
+    await ensureManifestPrepareCheckpointTable(env.DB);
+    const checkpoint = await readManifestPrepareCheckpoint(env.DB, brand.brand_key, explicitOperationId);
+    if (checkpoint
+      && (String(checkpoint.timezone ?? "") !== timezone
+        || Number(checkpoint.horizon_hours ?? 0) !== horizonHours)) {
+      return {
+        success: false,
+        error: "idempotency_key_payload_mismatch",
+        operation_id: explicitOperationId,
+        stored_timezone: checkpoint.timezone ?? null,
+        requested_timezone: timezone,
+        stored_horizon_hours: Number(checkpoint.horizon_hours ?? 0),
+        requested_horizon_hours: horizonHours,
+      };
+    }
+    if (!checkpoint || String(checkpoint.phase ?? "") === "live_evidence_refresh") {
+      const refreshedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+      if (!refreshedSnapshot.refreshed || !refreshedSnapshot.complete) {
+        return {
+          success: false,
+          error: refreshedSnapshot.error ?? "manifest_live_evidence_refresh_incomplete",
+          stage: "live_evidence_refresh",
+          retryable: refreshedSnapshot.continuation_required === true,
+          continuation_required: refreshedSnapshot.continuation_required === true,
+          remaining_due_checkpoint_count: refreshedSnapshot.remaining_due_checkpoint_count,
+          next_action: refreshedSnapshot.continuation_required === true
+            ? "Call prepare_manifest_autonomous_cycle again with the identical operation_id. The prior bounded refresh was persisted; the next invocation advances the remaining due checkpoint batch without replaying completed work."
+            : "Repair the live evidence refresh failure before strategy work.",
+          threads_snapshot: refreshedSnapshot,
+        };
+      }
+      threadsSnapshot = compactManifestPrepareThreadsSnapshot(refreshedSnapshot as unknown as Record<string, unknown>) as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "cycle_construction",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: threadsSnapshot as unknown as Record<string, unknown>,
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "live_evidence_refresh",
+        next_stage: "cycle_construction",
+        threads_snapshot: threadsSnapshot,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical operation_id, timezone, and horizon_hours. The live evaluator result is durably checkpointed and will not be recomputed in the next invocation.",
+      };
+    }
+    const state = checkpoint.state && typeof checkpoint.state === "object" && !Array.isArray(checkpoint.state)
+      ? checkpoint.state as Record<string, unknown>
+      : {};
+    runtimeNowIso = normalizeOperatorText(state.runtime_now_iso, 100, true) ?? runtimeNowIso;
+    threadsSnapshot = (state.threads_snapshot && typeof state.threads_snapshot === "object" && !Array.isArray(state.threads_snapshot)
+      ? state.threads_snapshot
+      : {}) as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
+  } else {
+    threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+  }
   if (!threadsSnapshot.refreshed || !threadsSnapshot.complete) {
     return {
       success: false,
       error: threadsSnapshot.error ?? "manifest_live_evidence_refresh_incomplete",
-            stage: "live_evidence_refresh",
+      stage: "live_evidence_refresh",
       retryable: threadsSnapshot.continuation_required === true,
       continuation_required: threadsSnapshot.continuation_required === true,
       remaining_due_checkpoint_count: threadsSnapshot.remaining_due_checkpoint_count,
@@ -12497,6 +12676,7 @@ async function prepareManifestAutonomousCycle(
       threads_snapshot: threadsSnapshot,
     };
   }
+
 
     const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
   const databaseClockRow = await env.DB.prepare(
@@ -12756,7 +12936,7 @@ async function prepareManifestAutonomousCycle(
     },
     startedAt: clock.effective_now_iso,
   });
-    await appendManifestCycleEvent(env.DB, {
+        await appendManifestCycleEvent(env.DB, {
     cycleId,
     brandKey: brand.brand_key,
         eventKey: `cycle-prepared:${exposureSnapshot.revision ?? 1}:${runtimeNowIso}`,
@@ -12773,6 +12953,9 @@ async function prepareManifestAutonomousCycle(
       effective_now_iso: clock.effective_now_iso,
     },
     });
+  if (phasedPreparation && explicitOperationId) {
+    await clearManifestPrepareCheckpoint(env.DB, brand.brand_key, explicitOperationId);
+  }
   const preparedCycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
   if (existing?.id) {
     const compactCycle = preparedCycle ? {
