@@ -14093,7 +14093,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
   }
-  await prepareOperatorMode(env);
+  if (operatorToolRequiresLegacyPreparation(toolName)) {
+    await prepareOperatorMode(env);
+  }
     const payload = await readOperatorPayload(request);
     if (toolName.startsWith("mm_")) {
     toolName = toolName.slice(3);
