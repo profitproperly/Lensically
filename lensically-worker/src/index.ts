@@ -10939,7 +10939,20 @@ function parseOperatorTimestampMs(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export function buildManifestCycleMaturitySnapshot(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    checkpoint_hours: Number(row.checkpoint_hours ?? 0),
+    updated_at: row.updated_at ?? null,
+    metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
+    rates: safeParseJsonString(String(row.rates_json ?? "{}")) ?? {},
+    velocity: safeParseJsonString(String(row.velocity_json ?? "{}")) ?? {},
+    scores: safeParseJsonString(String(row.scores_json ?? "{}")) ?? {},
+    distribution_state: row.distribution_state ?? null,
+  };
+}
+
 export function normalizeManifestThreadsTimestampForSqlite(value: unknown): string | null {
+
   const parsed = parseOperatorTimestampMs(value);
   return parsed === null ? null : new Date(parsed).toISOString().slice(0, 19);
 }
@@ -11969,36 +11982,42 @@ async function buildManifestRollingEvidence(
     && latestArchiveMs <= input.effective_now_ms) {
     throw new Error("manifest_recent_archive_evidence_integrity_failed");
   }
-  const maturityRows = await env.DB.prepare(
-    `SELECT maturity.published_post_id, maturity.checkpoint_hours,
-            maturity.evaluation_json, maturity.updated_at
-     FROM operator_manifest_maturity_evaluations maturity
-     JOIN threads_posts_archive archive ON archive.post_id = maturity.published_post_id
-          WHERE maturity.brand_key = ?
+    const maturityRows = await env.DB.prepare(
+    `SELECT scores.published_post_id, scores.checkpoint_hours,
+            scores.metrics_json, scores.rates_json, scores.velocity_json,
+            scores.scores_json, scores.distribution_state, scores.updated_at
+     FROM operator_post_performance_scores scores
+     JOIN threads_posts_archive archive ON archive.post_id = scores.published_post_id
+     WHERE scores.brand_key = ?
+       AND scores.valid_for_learning = 1
+       AND scores.checkpoint_hours IN (6, 12, 18, 24)
        AND archive.threads_user_id = ?
        AND substr(archive.post_timestamp, 1, 19) >= ?
        AND substr(archive.post_timestamp, 1, 19) <= ?
-     ORDER BY maturity.published_post_id, maturity.checkpoint_hours ASC`,
+     ORDER BY scores.published_post_id, scores.checkpoint_hours ASC`,
   ).bind(
-        brand.brand_key,
+    brand.brand_key,
     brand.profile.threads_user_id,
     windowStartKey,
     windowEndKey,
   ).all<Record<string, unknown>>();
+
   const maturityByPost = new Map<string, Record<string, unknown>[]>();
-  for (const row of maturityRows.results ?? []) {
+    for (const row of maturityRows.results ?? []) {
     const key = String(row.published_post_id ?? "");
-    const evaluation = safeParseJsonString(String(row.evaluation_json ?? "{}")) ?? {};
     const list = maturityByPost.get(key) ?? [];
-    list.push({
-      checkpoint_hours: Number(row.checkpoint_hours ?? 0),
-      updated_at: row.updated_at ?? null,
-      ...(evaluation && typeof evaluation === "object" && !Array.isArray(evaluation)
-        ? evaluation as Record<string, unknown>
-        : {}),
-    });
+    list.push(buildManifestCycleMaturitySnapshot(row));
     maturityByPost.set(key, list);
   }
+  const maturityRefresh = {
+    source: "operator_post_performance_scores",
+    checkpoint_hours: [6, 12, 18, 24],
+    record_count: (maturityRows.results ?? []).length,
+    mature_24h_record_count: (maturityRows.results ?? [])
+      .filter((row) => Number(row.checkpoint_hours ?? 0) === 24).length,
+    mode: "bounded_persisted_checkpoint_read",
+  };
+
   const evidencePosts = (publishedRows.results ?? []).map((row) => {
     const publishedAt = String(row.post_timestamp ?? "");
     const publishedMs = parseOperatorTimestampMs(publishedAt) ?? input.effective_now_ms;
