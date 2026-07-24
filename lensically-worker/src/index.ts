@@ -12900,7 +12900,7 @@ async function prepareManifestAutonomousCycle(
           manifest_layers_deferred: false,
           manifest_layers_finalized: true,
         },
-      } as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
+            } as unknown as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
       await writeManifestPrepareCheckpoint(env.DB, {
         brand_key: brand.brand_key,
         operation_id: explicitOperationId,
