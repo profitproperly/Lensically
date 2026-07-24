@@ -1007,6 +1007,8 @@ export async function readManifestEvidencePage(db: D1Database, input: {
       required_page_count: pageCount,
       complete: consumedPageCount >= pageCount,
     },
+    response_bytes: Math.min(MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES, storedPageBytes + 2048),
+    response_bytes_estimated: true,
   };
   return response;
 }
