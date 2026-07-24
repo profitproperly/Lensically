@@ -32254,8 +32254,9 @@ async function refreshOperatorPerformanceEvaluator(
         json_extract(value, '$.source_selection_id'),
         json_extract(value, '$.text_hash'),
         json_extract(value, '$.fingerprint_version'),
-        json_extract(value, '$.fingerprint_json')
+                json_extract(value, '$.fingerprint_json')
       FROM json_each(?)
+      WHERE true
       ON CONFLICT(brand_key, published_post_id) DO UPDATE SET
         scheduled_post_id = excluded.scheduled_post_id,
         draft_id = excluded.draft_id,
@@ -32288,8 +32289,9 @@ async function refreshOperatorPerformanceEvaluator(
         json_extract(value, '$.scores_json'),
         json_extract(value, '$.distribution_state'),
         1,
-        json_extract(value, '$.evaluator_version')
+                json_extract(value, '$.evaluator_version')
       FROM json_each(?)
+      WHERE true
       ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
         snapshot_id = excluded.snapshot_id,
         captured_at = excluded.captured_at,
@@ -32486,8 +32488,9 @@ async function refreshOperatorPerformanceEvaluator(
         json_extract(value, '$.confidence_label'),
         json_extract(value, '$.direction'),
         'active',
-        json_extract(value, '$.evaluator_version')
+                json_extract(value, '$.evaluator_version')
       FROM json_each(?)
+      WHERE true
       ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
         sample_size = excluded.sample_size,
         cohort_size = excluded.cohort_size,
@@ -32520,8 +32523,9 @@ async function refreshOperatorPerformanceEvaluator(
         json_extract(value, '$.confidence_label'),
         json_extract(value, '$.evidence_json'),
         'active',
-        json_extract(value, '$.evaluator_version')
+                json_extract(value, '$.evaluator_version')
       FROM json_each(?)
+      WHERE true
       ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
         hypothesis_text = excluded.hypothesis_text,
         direction = excluded.direction,
@@ -32812,8 +32816,9 @@ async function refreshOperatorContentFocus(
         json_extract(value, '$.stop_directives_json'),
         json_extract(value, '$.horizon_evidence_json'),
         CAST(json_extract(value, '$.manual_lock') AS INTEGER),
-        json_extract(value, '$.last_review_id')
+                json_extract(value, '$.last_review_id')
       FROM json_each(?)
+      WHERE true
       ON CONFLICT(brand_key, source_card_family_id) DO UPDATE SET
         source_identity_key = excluded.source_identity_key,
         status = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.status ELSE excluded.status END,
