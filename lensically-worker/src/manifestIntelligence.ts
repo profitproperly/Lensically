@@ -975,19 +975,17 @@ export async function readManifestEvidencePage(db: D1Database, input: {
     throw new Error("manifest_evidence_page_integrity_failed");
   }
   const storedPageBytes = numeric(pageRow.byte_count);
-  const actualPageBytes = manifestEvidenceJsonBytes({
-    page_contract_version: pageRow.page_contract_version,
-    items,
-  });
-  if (actualPageBytes !== storedPageBytes || actualPageBytes > MANIFEST_EVIDENCE_PAGE_MAX_BYTES) {
+  if (storedPageBytes <= 0 || storedPageBytes > MANIFEST_EVIDENCE_PAGE_MAX_BYTES) {
     throw new Error("manifest_evidence_page_integrity_failed");
   }
+  await db.prepare(`INSERT INTO operator_manifest_analysis_page_reads (
+      id, snapshot_id, cycle_id, brand_key, page_index
+    ) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(snapshot_id, page_index) DO UPDATE SET read_at = CURRENT_TIMESTAMP`)
+    .bind(crypto.randomUUID(), snapshot.id, input.cycleId, input.brandKey, pageIndex).run();
   const consumedRow = await db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`)
     .bind(snapshot.id).first<JsonRecord>();
-  const currentRead = await db.prepare(`SELECT id FROM operator_manifest_analysis_page_reads
-      WHERE snapshot_id = ? AND page_index = ? LIMIT 1`)
-    .bind(snapshot.id, pageIndex).first<JsonRecord>();
-  const consumedPageCount = numeric(consumedRow?.total) + (currentRead ? 0 : 1);
+  const consumedPageCount = numeric(consumedRow?.total);
   const response: JsonRecord = {
     success: true,
     complete_page: true,
