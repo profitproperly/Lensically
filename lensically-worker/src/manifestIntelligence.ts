@@ -1255,24 +1255,59 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
       stableManifestJson(input.experiments), stableManifestJson(input.risks),
       stableManifestJson(input.lineup), strategyHash, lockedAt,
     ).run();
-  for (let offset = 0; offset < input.lineup.length; offset += 50) {
-    await db.batch(input.lineup.slice(offset, offset + 50).map((item) => {
-      const slotKey = text(item.slot_key, 40);
-      const [slotDate, slotTime] = slotKey.split("T");
-      return db.prepare(`INSERT INTO operator_manifest_cycle_plan_items (
-          id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
-          family_key, strategic_role, generation_mode, source_kind, source_card_id,
-          source_selection_id, audience_reward, hook_direction, placement_reason,
-          nearby_avoid_json, exploration_mode, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned')`)
-        .bind(
-          crypto.randomUUID(), strategyId, input.cycleId, input.brandKey, slotKey, slotDate, slotTime,
-          text(item.family_key, 240), text(item.strategic_role, 500), text(item.generation_mode, 80),
-          text(item.source_kind, 60), text(item.source_card_id, 160), text(item.source_selection_id, 160) || null,
-          text(item.audience_reward, 4000), text(item.hook_direction, 4000), text(item.placement_reason, 4000),
-          stableManifestJson(item.nearby_avoid ?? []), text(item.exploration_mode, 80),
-        );
-    }));
+  const planWriteRows = input.lineup.map((item) => {
+    const slotKey = text(item.slot_key, 40);
+    const [slotDate, slotTime] = slotKey.split("T");
+    return {
+      id: crypto.randomUUID(),
+      strategy_id: strategyId,
+      cycle_id: input.cycleId,
+      brand_key: input.brandKey,
+      slot_key: slotKey,
+      slot_date: slotDate,
+      slot_time: slotTime,
+      family_key: text(item.family_key, 240),
+      strategic_role: text(item.strategic_role, 500),
+      generation_mode: text(item.generation_mode, 80),
+      source_kind: text(item.source_kind, 60),
+      source_card_id: text(item.source_card_id, 160),
+      source_selection_id: text(item.source_selection_id, 160) || null,
+      audience_reward: text(item.audience_reward, 4000),
+      hook_direction: text(item.hook_direction, 4000),
+      placement_reason: text(item.placement_reason, 4000),
+      nearby_avoid_json: stableManifestJson(item.nearby_avoid ?? []),
+      exploration_mode: text(item.exploration_mode, 80),
+    };
+  });
+  for (const chunk of chunkManifestEvidenceWriteRows(planWriteRows)) {
+    await db.prepare(`INSERT INTO operator_manifest_cycle_plan_items (
+        id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+        family_key, strategic_role, generation_mode, source_kind, source_card_id,
+        source_selection_id, audience_reward, hook_direction, placement_reason,
+        nearby_avoid_json, exploration_mode, status
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.strategy_id'),
+        json_extract(value, '$.cycle_id'),
+        json_extract(value, '$.brand_key'),
+        json_extract(value, '$.slot_key'),
+        json_extract(value, '$.slot_date'),
+        json_extract(value, '$.slot_time'),
+        json_extract(value, '$.family_key'),
+        json_extract(value, '$.strategic_role'),
+        json_extract(value, '$.generation_mode'),
+        json_extract(value, '$.source_kind'),
+        json_extract(value, '$.source_card_id'),
+        json_extract(value, '$.source_selection_id'),
+        json_extract(value, '$.audience_reward'),
+        json_extract(value, '$.hook_direction'),
+        json_extract(value, '$.placement_reason'),
+        json_extract(value, '$.nearby_avoid_json'),
+        json_extract(value, '$.exploration_mode'),
+        'planned'
+      FROM json_each(?)`)
+      .bind(stableManifestJson(chunk)).run();
   }
     await db.batch([
     db.prepare(`UPDATE operator_autonomous_growth_cycles
