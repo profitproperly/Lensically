@@ -7,7 +7,8 @@ import {
 
     normalizeManifestThreadsTimestampForSqlite,
   operatorToolRequiresLegacyPreparation,
-  resolveOperatorDueMaturityCheckpoint,
+    resolveOperatorDueMaturityCheckpoint,
+  selectManifestDueCheckpointRefreshBatch,
   resolveManifestAutonomousClock,
 } from "./src/index";
 import {
@@ -205,6 +206,19 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(compacted?.payload_contract).toMatchObject({ server_bounded: true, actionable_autonomous_cycle_preserved: true });
     const contract = compacted?.payload_contract as Record<string, unknown>;
     expect(Number(contract.returned_bytes)).toBeLessThanOrEqual(Number(contract.byte_limit));
+  });
+
+    it("bounds due checkpoint insight hydration while allowing complete list metrics to finish in one pass", () => {
+    const due = Array.from({ length: 27 }, (_, index) => ({ post_id: `post-${index}` }));
+    const bounded = selectManifestDueCheckpointRefreshBatch(due, false);
+    expect(bounded.processed).toHaveLength(10);
+    expect(bounded.remaining).toHaveLength(17);
+    expect(bounded.processed[0]).toEqual({ post_id: "post-0" });
+    expect(bounded.remaining[0]).toEqual({ post_id: "post-10" });
+
+    const completeList = selectManifestDueCheckpointRefreshBatch(due, true);
+    expect(completeList.processed).toHaveLength(27);
+    expect(completeList.remaining).toHaveLength(0);
   });
 
   it("identifies the latest maturity checkpoint due from live observation time", () => {
