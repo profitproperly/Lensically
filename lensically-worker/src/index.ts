@@ -19275,11 +19275,11 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.38.0";
+export const OPERATOR_MCP_VERSION = "1.38.1";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
-const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v1";
+const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v2";
 const OPERATOR_MCP_SESSION_VERSION = "deployment-scoped-mcp-session-v1";
 const OPERATOR_MCP_SESSION_TTL_SECONDS = 60 * 60 * 12;
 
@@ -19296,7 +19296,7 @@ function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
     deployment_id: env.CF_VERSION_METADATA?.id ?? null,
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
     public_gateway: "direct_typed_tools",
-    public_contract: "direct_typed_tools_v1",
+        public_contract: "direct_typed_tools_v2",
         deployment_fresh_sessions: true,
     router_version: OPERATOR_REGISTRY_GENERATION,
     components: [

@@ -3283,7 +3283,7 @@ describe("operator mode MCP endpoint", () => {
     expect(startup.runtime?.execution_kernel).toMatchObject({
       name: "Execution Kernel",
       version: "lensically-execution-kernel-v1",
-      public_contract: "direct_typed_tools_v1",
+            public_contract: "direct_typed_tools_v2",
       deployment_fresh_sessions: true,
     });
         expect(initialized.instructions).toContain("advertised direct typed tool");
@@ -4623,7 +4623,7 @@ describe("operator mode MCP endpoint", () => {
     expect(startup.account_data_loaded).toBe(false);
     expect(startup.no_account_sections_present).toBe(true);
         expect(startup.tool_surface.public_tool_count).toBe(registry.tools.length);
-    expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v1" });
+        expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v2" });
     expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
         expect(startup.source_documents.every((document) => !Object.prototype.hasOwnProperty.call(document, "excerpt"))).toBe(true);
     expect(startup.boundary.first_key_response_template).toHaveLength(4);
@@ -6618,7 +6618,7 @@ describe("operator mode MCP endpoint", () => {
     expect(response.status).toBe(200);
         expect(payload.status).toBe("ok");
     expect(payload.mcp_version).toBe(OPERATOR_MCP_VERSION);
-    expect(payload.registry_generation).toBe("static-execution-router-v1");
+        expect(payload.registry_generation).toBe("static-execution-router-v2");
     expect(payload.live_tool_count).toBeGreaterThan(0);
     expect(payload.timestamp).toBeTruthy();
     expect(payload.tools).toBeUndefined();
