@@ -1007,17 +1007,7 @@ export async function readManifestEvidencePage(db: D1Database, input: {
       required_page_count: pageCount,
       complete: consumedPageCount >= pageCount,
     },
-    response_bytes: 0,
   };
-  response.response_bytes = manifestEvidenceJsonBytes(response);
-  if (numeric(response.response_bytes) > MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES) {
-    throw new Error("manifest_evidence_response_exceeds_payload_budget");
-  }
-  await db.prepare(`INSERT INTO operator_manifest_analysis_page_reads (
-      id, snapshot_id, cycle_id, brand_key, page_index
-    ) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(snapshot_id, page_index) DO UPDATE SET read_at = CURRENT_TIMESTAMP`)
-    .bind(crypto.randomUUID(), snapshot.id, input.cycleId, input.brandKey, pageIndex).run();
   return response;
 }
 
