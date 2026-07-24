@@ -93,14 +93,25 @@ const result = spawnSync(
   ],
   {
     cwd: process.cwd(),
-    stdio: "inherit",
+    encoding: "utf8",
+    stdio: "pipe",
     shell: process.platform === "win32",
   },
 );
 
+if (result.stdout) process.stdout.write(result.stdout);
+if (result.stderr) process.stderr.write(result.stderr);
 if (result.error) {
   console.error(result.error.message);
   process.exit(1);
+}
+if ((result.status ?? 1) !== 0) {
+  const failureOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim().slice(-3000);
+  const annotation = failureOutput
+    .replace(/%/g, "%25")
+    .replace(/\r/g, "%0D")
+    .replace(/\n/g, "%0A");
+  console.error(`::error title=Operator shard ${shardNumber}/${shardCount} failed::${annotation}`);
 }
 
 process.exit(result.status ?? 1);
