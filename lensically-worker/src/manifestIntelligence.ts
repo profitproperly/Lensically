@@ -328,9 +328,9 @@ async function ensureColumns(db: D1Database, columns: Array<{
   definition: string;
 }>): Promise<void> {
   const tableInfo = await db.batch(columns.map(({ table }) => db.prepare(`PRAGMA table_info(${table})`)));
-  const missing = columns.filter(({ column }, index) => {
+    const missing = columns.filter(({ column }, index) => {
     const rows = (tableInfo[index]?.results ?? []) as Array<{ name?: string }>;
-    return !rows.some((row) => row.name === column);
+    return rows.length > 0 && !rows.some((row) => row.name === column);
   });
   if (missing.length > 0) {
     await db.batch(missing.map(({ table, column, definition }) =>
