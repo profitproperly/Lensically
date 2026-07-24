@@ -14,8 +14,10 @@ import {
   MANIFEST_NONINTERFERENCE_POLICY,
   MANIFEST_EVIDENCE_PAGE_MAX_BYTES,
   MANIFEST_EVIDENCE_PAGE_SIZE,
-    buildManifestCycleReceiptRead,
+      buildManifestCycleReceiptRead,
   buildManifestEvidencePages,
+  chunkManifestEvidenceWriteRows,
+
   buildManifestExposureDimensions,
   buildManifestLikesBenchmarks,
   normalizeManifestSourceContext,
@@ -375,7 +377,26 @@ describe("Manifest intelligence foundation", () => {
     });
   });
 
+    it("chunks large evidence writes by row count and byte budget", () => {
+    const rowBounded = chunkManifestEvidenceWriteRows(
+      Array.from({ length: 205 }, (_, index) => ({ id: `row-${index}`, text: "evidence" })),
+      100,
+      1_000_000,
+    );
+    expect(rowBounded.map((chunk) => chunk.length)).toEqual([100, 100, 5]);
+
+    const byteBounded = chunkManifestEvidenceWriteRows(
+      Array.from({ length: 10 }, (_, index) => ({ id: `large-${index}`, text: "x".repeat(400) })),
+      100,
+      1024,
+    );
+    expect(byteBounded.length).toBeGreaterThan(1);
+    expect(byteBounded.flat()).toHaveLength(10);
+    expect(byteBounded.every((chunk) => chunk.length > 0)).toBe(true);
+  });
+
   it("packs every strategy evidence item into complete byte-bounded canonical pages", () => {
+
     const posts = Array.from({ length: 35 }, (_, index) => ({
       published_post_id: `post-${index + 1}`,
       text: `Source-backed evidence post ${index + 1}: ${"evidence ".repeat(45)}`,
