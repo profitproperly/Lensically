@@ -14531,7 +14531,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-  if (toolName === "get_manifest_review_batch") {
+    if (toolName === "get_manifest_review_batch") {
+    await ensureOperatorWorkflowTables(env);
     if (brand.brand_key !== "manifest_mental") {
       return operatorJsonResponse({ success: false, error: "review_batch_not_configured_for_brand" }, 400);
     }
