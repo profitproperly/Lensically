@@ -1038,29 +1038,51 @@ export async function getManifestEvidenceConsumptionState(db: D1Database, cycleI
 
 export async function syncManifestHardBans(db: D1Database, brandKey: string, rules: JsonRecord[]): Promise<JsonRecord[]> {
   await ensureManifestIntelligenceTables(db);
-  for (const rule of rules) {
+  const writeRows = rules.map((rule) => {
     const ruleKey = text(rule.rule_key ?? rule.id, 240);
     const pattern = text(rule.pattern ?? rule.body ?? rule.description, 8000);
-    if (!ruleKey || !pattern) continue;
+    if (!ruleKey || !pattern) return null;
+    return {
+      id: crypto.randomUUID(),
+      brand_key: brandKey,
+      rule_key: ruleKey,
+      description: text(rule.description ?? rule.title, 2000) || ruleKey,
+      rule_type: text(rule.rule_type, 80) || "semantic_rule",
+      pattern,
+      scope: text(rule.scope, 160) || "manifest_generation",
+      pass_examples_json: stableManifestJson(rule.pass_examples ?? []),
+      fail_examples_json: stableManifestJson(rule.fail_examples ?? []),
+      source_authority: text(rule.source_authority ?? rule.source, 500) || "owner_memory",
+    };
+  }).filter((row): row is NonNullable<typeof row> => row !== null);
+  for (const chunk of chunkManifestEvidenceWriteRows(writeRows)) {
     await db.prepare(`INSERT INTO operator_manifest_hard_bans (
         id, brand_key, rule_key, description, rule_type, pattern, scope,
         pass_examples_json, fail_examples_json, source_authority, active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.brand_key'),
+        json_extract(value, '$.rule_key'),
+        json_extract(value, '$.description'),
+        json_extract(value, '$.rule_type'),
+        json_extract(value, '$.pattern'),
+        json_extract(value, '$.scope'),
+        json_extract(value, '$.pass_examples_json'),
+        json_extract(value, '$.fail_examples_json'),
+        json_extract(value, '$.source_authority'),
+        1
+      FROM json_each(?)
       ON CONFLICT(brand_key, rule_key) DO UPDATE SET
         description = excluded.description, rule_type = excluded.rule_type, pattern = excluded.pattern,
         scope = excluded.scope, pass_examples_json = excluded.pass_examples_json,
         fail_examples_json = excluded.fail_examples_json, source_authority = excluded.source_authority,
-        active = 1, updated_at = CURRENT_TIMESTAMP`).bind(
-        crypto.randomUUID(), brandKey, ruleKey,
-        text(rule.description ?? rule.title, 2000) || ruleKey,
-        text(rule.rule_type, 80) || "semantic_rule",
-        pattern, text(rule.scope, 160) || "manifest_generation",
-        stableManifestJson(rule.pass_examples ?? []), stableManifestJson(rule.fail_examples ?? []),
-        text(rule.source_authority ?? rule.source, 500) || "owner_memory",
-      ).run();
+        active = 1, updated_at = CURRENT_TIMESTAMP`)
+      .bind(stableManifestJson(chunk)).run();
   }
   return listManifestHardBans(db, brandKey);
 }
+
 
 export async function listManifestHardBans(db: D1Database, brandKey: string): Promise<JsonRecord[]> {
   await ensureManifestIntelligenceTables(db);
