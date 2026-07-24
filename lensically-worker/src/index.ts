@@ -32048,16 +32048,30 @@ function operatorContentFocusDailyCandidates(families: Array<Record<string, unkn
   });
 }
 
-async function runOperatorD1StatementBatches(
-  db: D1Database,
-  statements: D1PreparedStatement[],
-  chunkSize = 40,
-): Promise<void> {
-  const boundedChunkSize = Math.max(1, Math.min(50, Math.trunc(chunkSize)));
-  for (let offset = 0; offset < statements.length; offset += boundedChunkSize) {
-    await db.batch(statements.slice(offset, offset + boundedChunkSize));
+function chunkOperatorJsonRows<T>(
+  rows: T[],
+  maxRows = 100,
+  maxBytes = 400000,
+): T[][] {
+  const boundedRows = Math.max(1, Math.trunc(maxRows));
+  const boundedBytes = Math.max(4096, Math.trunc(maxBytes));
+  const chunks: T[][] = [];
+  let current: T[] = [];
+  let currentBytes = 2;
+  for (const row of rows) {
+    const rowBytes = new TextEncoder().encode(normalizeOperatorJson(row, {})).length + (current.length ? 1 : 0);
+    if (current.length && (current.length >= boundedRows || currentBytes + rowBytes > boundedBytes)) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 2;
+    }
+    current.push(row);
+    currentBytes += rowBytes;
   }
+  if (current.length) chunks.push(current);
+  return chunks;
 }
+
 
 async function refreshOperatorPerformanceEvaluator(
   env: Env,
@@ -32148,8 +32162,8 @@ async function refreshOperatorPerformanceEvaluator(
 
     let fingerprintedPosts = 0;
   let maturityScores = 0;
-  const fingerprintStatements: D1PreparedStatement[] = [];
-  const maturityStatements: D1PreparedStatement[] = [];
+    const fingerprintWriteRows: Record<string, unknown>[] = [];
+  const maturityWriteRows: Record<string, unknown>[] = [];
   for (const [postId, row] of postsById) {
     const text = String(row.post_text ?? "");
     const publishedAtMs = Date.parse(String(row.post_timestamp ?? row.published_at ?? ""));
@@ -32175,29 +32189,18 @@ async function refreshOperatorPerformanceEvaluator(
       sourceSelection: { source_identity_key: row.source_identity_key },
       adaptationPlan: operatorRecord(safeParseJsonString(String(row.adaptation_plan_json ?? ""))),
     });
-        fingerprintStatements.push(env.DB.prepare(
-      `INSERT INTO operator_post_fingerprints (
-        id, brand_key, published_post_id, scheduled_post_id, draft_id, source_card_id,
-        source_selection_id, text_hash, fingerprint_version, fingerprint_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(brand_key, published_post_id) DO UPDATE SET
-        scheduled_post_id = excluded.scheduled_post_id,
-        draft_id = excluded.draft_id,
-        source_card_id = excluded.source_card_id,
-        source_selection_id = excluded.source_selection_id,
-        text_hash = excluded.text_hash,
-        fingerprint_version = excluded.fingerprint_version,
-        fingerprint_json = excluded.fingerprint_json,
-        updated_at = CURRENT_TIMESTAMP`,
-    ).bind(
-      crypto.randomUUID(), brandKey, postId,
-      row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : Number(row.scheduled_post_id),
-      row.draft_id ? String(row.draft_id) : null,
-      row.source_card_id ? String(row.source_card_id) : null,
-      row.source_selection_id ? String(row.source_selection_id) : null,
-      String(fingerprint.text_hash ?? ""), OPERATOR_POST_FINGERPRINT_VERSION,
-            normalizeOperatorJson(fingerprint, {}),
-    ));
+            fingerprintWriteRows.push({
+      id: crypto.randomUUID(),
+      brand_key: brandKey,
+      published_post_id: postId,
+      scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : Number(row.scheduled_post_id),
+      draft_id: row.draft_id ? String(row.draft_id) : null,
+      source_card_id: row.source_card_id ? String(row.source_card_id) : null,
+      source_selection_id: row.source_selection_id ? String(row.source_selection_id) : null,
+      text_hash: String(fingerprint.text_hash ?? ""),
+      fingerprint_version: OPERATOR_POST_FINGERPRINT_VERSION,
+      fingerprint_json: normalizeOperatorJson(fingerprint, {}),
+    });
     fingerprintedPosts += 1;
 
     let previousSelection: { row: Record<string, unknown>; ageHours: number } | null = null;
@@ -32215,38 +32218,91 @@ async function refreshOperatorPerformanceEvaluator(
         previousMetrics,
         previousAgeHours: previousSelection?.ageHours ?? null,
       });
-            maturityStatements.push(env.DB.prepare(
-        `INSERT INTO operator_post_performance_scores (
-          id, brand_key, published_post_id, checkpoint_hours, snapshot_id, captured_at,
-          post_age_hours, metrics_json, rates_json, velocity_json, scores_json,
-          distribution_state, valid_for_learning, evaluator_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-        ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
-          snapshot_id = excluded.snapshot_id,
-          captured_at = excluded.captured_at,
-          post_age_hours = excluded.post_age_hours,
-          metrics_json = excluded.metrics_json,
-          rates_json = excluded.rates_json,
-          velocity_json = excluded.velocity_json,
-          distribution_state = excluded.distribution_state,
-          valid_for_learning = 1,
-          evaluator_version = excluded.evaluator_version,
-          updated_at = CURRENT_TIMESTAMP`,
-      ).bind(
-        crypto.randomUUID(), brandKey, postId, checkpointHours,
-        String(selection.row.id), String(selection.row.captured_at), Number(selection.ageHours.toFixed(3)),
-        normalizeOperatorJson(observation.metrics, {}), normalizeOperatorJson(observation.rates, {}),
-        normalizeOperatorJson(observation.velocity, {}),
-        normalizeOperatorJson({ reach: 50, resonance: 50, propagation: 50, conversation: 50, overall: 50 }, {}),
-                observation.distribution_state, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-      ));
+                  maturityWriteRows.push({
+        id: crypto.randomUUID(),
+        brand_key: brandKey,
+        published_post_id: postId,
+        checkpoint_hours: checkpointHours,
+        snapshot_id: String(selection.row.id),
+        captured_at: String(selection.row.captured_at),
+        post_age_hours: Number(selection.ageHours.toFixed(3)),
+        metrics_json: normalizeOperatorJson(observation.metrics, {}),
+        rates_json: normalizeOperatorJson(observation.rates, {}),
+        velocity_json: normalizeOperatorJson(observation.velocity, {}),
+        scores_json: normalizeOperatorJson({ reach: 50, resonance: 50, propagation: 50, conversation: 50, overall: 50 }, {}),
+        distribution_state: observation.distribution_state,
+        evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+      });
       maturityScores += 1;
       previousSelection = selection;
     }
   }
 
-    await runOperatorD1StatementBatches(env.DB, fingerprintStatements);
-  await runOperatorD1StatementBatches(env.DB, maturityStatements);
+      for (const chunk of chunkOperatorJsonRows(fingerprintWriteRows)) {
+    await env.DB.prepare(
+      `INSERT INTO operator_post_fingerprints (
+        id, brand_key, published_post_id, scheduled_post_id, draft_id, source_card_id,
+        source_selection_id, text_hash, fingerprint_version, fingerprint_json
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.brand_key'),
+        json_extract(value, '$.published_post_id'),
+        CAST(json_extract(value, '$.scheduled_post_id') AS INTEGER),
+        json_extract(value, '$.draft_id'),
+        json_extract(value, '$.source_card_id'),
+        json_extract(value, '$.source_selection_id'),
+        json_extract(value, '$.text_hash'),
+        json_extract(value, '$.fingerprint_version'),
+        json_extract(value, '$.fingerprint_json')
+      FROM json_each(?)
+      ON CONFLICT(brand_key, published_post_id) DO UPDATE SET
+        scheduled_post_id = excluded.scheduled_post_id,
+        draft_id = excluded.draft_id,
+        source_card_id = excluded.source_card_id,
+        source_selection_id = excluded.source_selection_id,
+        text_hash = excluded.text_hash,
+        fingerprint_version = excluded.fingerprint_version,
+        fingerprint_json = excluded.fingerprint_json,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(normalizeOperatorJson(chunk, [])).run();
+  }
+  for (const chunk of chunkOperatorJsonRows(maturityWriteRows)) {
+    await env.DB.prepare(
+      `INSERT INTO operator_post_performance_scores (
+        id, brand_key, published_post_id, checkpoint_hours, snapshot_id, captured_at,
+        post_age_hours, metrics_json, rates_json, velocity_json, scores_json,
+        distribution_state, valid_for_learning, evaluator_version
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.brand_key'),
+        json_extract(value, '$.published_post_id'),
+        CAST(json_extract(value, '$.checkpoint_hours') AS INTEGER),
+        json_extract(value, '$.snapshot_id'),
+        json_extract(value, '$.captured_at'),
+        CAST(json_extract(value, '$.post_age_hours') AS REAL),
+        json_extract(value, '$.metrics_json'),
+        json_extract(value, '$.rates_json'),
+        json_extract(value, '$.velocity_json'),
+        json_extract(value, '$.scores_json'),
+        json_extract(value, '$.distribution_state'),
+        1,
+        json_extract(value, '$.evaluator_version')
+      FROM json_each(?)
+      ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
+        snapshot_id = excluded.snapshot_id,
+        captured_at = excluded.captured_at,
+        post_age_hours = excluded.post_age_hours,
+        metrics_json = excluded.metrics_json,
+        rates_json = excluded.rates_json,
+        velocity_json = excluded.velocity_json,
+        distribution_state = excluded.distribution_state,
+        valid_for_learning = 1,
+        evaluator_version = excluded.evaluator_version,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(normalizeOperatorJson(chunk, [])).run();
+  }
 
   const scoreRows = await env.DB.prepare(
     `SELECT id, published_post_id, checkpoint_hours, metrics_json, rates_json, velocity_json, scores_json
@@ -32260,7 +32316,7 @@ async function refreshOperatorPerformanceEvaluator(
     rows.push(row);
     byCheckpoint.set(checkpoint, rows);
   }
-    const scoreUpdateStatements: D1PreparedStatement[] = [];
+      const scoreUpdateRows: Array<{ id: string; scores_json: string }> = [];
   for (const rows of byCheckpoint.values()) {
     const parsed = rows.map((row) => ({
       row,
@@ -32290,14 +32346,25 @@ async function refreshOperatorPerformanceEvaluator(
         conversation: Number(conversation.toFixed(2)),
         overall: Number(operatorAverage([reach, resonance, propagation, conversation]).toFixed(2)),
       };
-            scoreUpdateStatements.push(env.DB.prepare(
-        `UPDATE operator_post_performance_scores SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      ).bind(normalizeOperatorJson(scores, {}), item.row.id));
+                  scoreUpdateRows.push({ id: String(item.row.id), scores_json: normalizeOperatorJson(scores, {}) });
       item.row.scores_json = normalizeOperatorJson(scores, {});
     }
   }
 
-    await runOperatorD1StatementBatches(env.DB, scoreUpdateStatements);
+      for (const chunk of chunkOperatorJsonRows(scoreUpdateRows)) {
+    await env.DB.prepare(
+      `WITH updates AS (
+        SELECT
+          json_extract(value, '$.id') AS id,
+          json_extract(value, '$.scores_json') AS scores_json
+        FROM json_each(?)
+      )
+      UPDATE operator_post_performance_scores
+      SET scores_json = (SELECT updates.scores_json FROM updates WHERE updates.id = operator_post_performance_scores.id),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id IN (SELECT id FROM updates)`,
+    ).bind(normalizeOperatorJson(chunk, [])).run();
+  }
 
   await env.DB.prepare(`UPDATE operator_performance_evidence SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
   await env.DB.prepare(`UPDATE operator_performance_hypotheses SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
@@ -32316,8 +32383,8 @@ async function refreshOperatorPerformanceEvaluator(
     joinedByCheckpoint.set(checkpoint, rows);
   }
     const evidenceRows: Array<Record<string, unknown>> = [];
-  const evidenceStatements: D1PreparedStatement[] = [];
-  const hypothesisStatements: D1PreparedStatement[] = [];
+    const evidenceWriteRows: Record<string, unknown>[] = [];
+  const hypothesisWriteRows: Record<string, unknown>[] = [];
   for (const [checkpointHours, rows] of joinedByCheckpoint) {
     const baselineOverall = calculateMedian(rows.map((row) => operatorScoreRecord(safeParseJsonString(String(row.scores_json ?? "{}"))).overall));
     const groups = new Map<string, { dimension: string; feature: string; rows: Array<Record<string, unknown>> }>();
@@ -32352,27 +32419,21 @@ async function refreshOperatorPerformanceEvaluator(
         overall_score_vs_cohort: Number(effectValue.toFixed(2)),
         cohort_median_overall_score: Number(baselineOverall.toFixed(2)),
       };
-            evidenceStatements.push(env.DB.prepare(
-        `INSERT INTO operator_performance_evidence (
-          id, brand_key, checkpoint_hours, dimension, feature_key, sample_size, cohort_size,
-          medians_json, effect_json, confidence_score, confidence_label, direction, status, evaluator_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-        ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
-          sample_size = excluded.sample_size,
-          cohort_size = excluded.cohort_size,
-          medians_json = excluded.medians_json,
-          effect_json = excluded.effect_json,
-          confidence_score = excluded.confidence_score,
-          confidence_label = excluded.confidence_label,
-          direction = excluded.direction,
-          status = 'active',
-          evaluator_version = excluded.evaluator_version,
-          updated_at = CURRENT_TIMESTAMP`,
-      ).bind(
-        crypto.randomUUID(), brandKey, checkpointHours, group.dimension, group.feature,
-        sampleSize, rows.length, normalizeOperatorJson(medians, {}), normalizeOperatorJson(effect, {}),
-                confidenceScore, confidenceLabel, direction, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-      ));
+                  evidenceWriteRows.push({
+        id: crypto.randomUUID(),
+        brand_key: brandKey,
+        checkpoint_hours: checkpointHours,
+        dimension: group.dimension,
+        feature_key: group.feature,
+        sample_size: sampleSize,
+        cohort_size: rows.length,
+        medians_json: normalizeOperatorJson(medians, {}),
+        effect_json: normalizeOperatorJson(effect, {}),
+        confidence_score: confidenceScore,
+        confidence_label: confidenceLabel,
+        direction,
+        evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+      });
       const evidence = {
         checkpoint_hours: checkpointHours,
         dimension: group.dimension,
@@ -32388,31 +32449,91 @@ async function refreshOperatorPerformanceEvaluator(
       evidenceRows.push(evidence);
       if (sampleSize >= 3 && direction !== "neutral") {
         const hypothesisText = `At the ${checkpointHours}-hour maturity checkpoint, ${group.dimension}=${group.feature} is associated with ${direction === "positive" ? "stronger" : "weaker"} normalized post performance across ${sampleSize} posts.`;
-                hypothesisStatements.push(env.DB.prepare(
-          `INSERT INTO operator_performance_hypotheses (
-            id, brand_key, checkpoint_hours, dimension, feature_key, hypothesis_text,
-            direction, sample_size, confidence_score, confidence_label, evidence_json, status, evaluator_version
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-          ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
-            hypothesis_text = excluded.hypothesis_text,
-            direction = excluded.direction,
-            sample_size = excluded.sample_size,
-            confidence_score = excluded.confidence_score,
-            confidence_label = excluded.confidence_label,
-            evidence_json = excluded.evidence_json,
-            status = 'active',
-            evaluator_version = excluded.evaluator_version,
-            updated_at = CURRENT_TIMESTAMP`,
-        ).bind(
-          crypto.randomUUID(), brandKey, checkpointHours, group.dimension, group.feature,
-          hypothesisText, direction, sampleSize, confidenceScore, confidenceLabel,
-                    normalizeOperatorJson(evidence, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-        ));
+                        hypothesisWriteRows.push({
+          id: crypto.randomUUID(),
+          brand_key: brandKey,
+          checkpoint_hours: checkpointHours,
+          dimension: group.dimension,
+          feature_key: group.feature,
+          hypothesis_text: hypothesisText,
+          direction,
+          sample_size: sampleSize,
+          confidence_score: confidenceScore,
+          confidence_label: confidenceLabel,
+          evidence_json: normalizeOperatorJson(evidence, {}),
+          evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+        });
       }
     }
   }
-  await runOperatorD1StatementBatches(env.DB, evidenceStatements);
-  await runOperatorD1StatementBatches(env.DB, hypothesisStatements);
+    for (const chunk of chunkOperatorJsonRows(evidenceWriteRows)) {
+    await env.DB.prepare(
+      `INSERT INTO operator_performance_evidence (
+        id, brand_key, checkpoint_hours, dimension, feature_key, sample_size, cohort_size,
+        medians_json, effect_json, confidence_score, confidence_label, direction, status, evaluator_version
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.brand_key'),
+        CAST(json_extract(value, '$.checkpoint_hours') AS INTEGER),
+        json_extract(value, '$.dimension'),
+        json_extract(value, '$.feature_key'),
+        CAST(json_extract(value, '$.sample_size') AS INTEGER),
+        CAST(json_extract(value, '$.cohort_size') AS INTEGER),
+        json_extract(value, '$.medians_json'),
+        json_extract(value, '$.effect_json'),
+        CAST(json_extract(value, '$.confidence_score') AS REAL),
+        json_extract(value, '$.confidence_label'),
+        json_extract(value, '$.direction'),
+        'active',
+        json_extract(value, '$.evaluator_version')
+      FROM json_each(?)
+      ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
+        sample_size = excluded.sample_size,
+        cohort_size = excluded.cohort_size,
+        medians_json = excluded.medians_json,
+        effect_json = excluded.effect_json,
+        confidence_score = excluded.confidence_score,
+        confidence_label = excluded.confidence_label,
+        direction = excluded.direction,
+        status = 'active',
+        evaluator_version = excluded.evaluator_version,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(normalizeOperatorJson(chunk, [])).run();
+  }
+  for (const chunk of chunkOperatorJsonRows(hypothesisWriteRows)) {
+    await env.DB.prepare(
+      `INSERT INTO operator_performance_hypotheses (
+        id, brand_key, checkpoint_hours, dimension, feature_key, hypothesis_text,
+        direction, sample_size, confidence_score, confidence_label, evidence_json, status, evaluator_version
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.brand_key'),
+        CAST(json_extract(value, '$.checkpoint_hours') AS INTEGER),
+        json_extract(value, '$.dimension'),
+        json_extract(value, '$.feature_key'),
+        json_extract(value, '$.hypothesis_text'),
+        json_extract(value, '$.direction'),
+        CAST(json_extract(value, '$.sample_size') AS INTEGER),
+        CAST(json_extract(value, '$.confidence_score') AS REAL),
+        json_extract(value, '$.confidence_label'),
+        json_extract(value, '$.evidence_json'),
+        'active',
+        json_extract(value, '$.evaluator_version')
+      FROM json_each(?)
+      ON CONFLICT(brand_key, checkpoint_hours, dimension, feature_key) DO UPDATE SET
+        hypothesis_text = excluded.hypothesis_text,
+        direction = excluded.direction,
+        sample_size = excluded.sample_size,
+        confidence_score = excluded.confidence_score,
+        confidence_label = excluded.confidence_label,
+        evidence_json = excluded.evidence_json,
+        status = 'active',
+        evaluator_version = excluded.evaluator_version,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(normalizeOperatorJson(chunk, [])).run();
+  }
 
   const checkpointCounts = Array.from(joinedByCheckpoint.entries())
     .map(([checkpoint, rows]) => ({ checkpoint, sample_size: rows.length }))
@@ -32581,46 +32702,35 @@ async function upsertOperatorContentFocusReview(
   return reviewId;
 }
 
-function buildOperatorContentFocusFamilyStateStatement(
-  env: Env,
+function buildOperatorContentFocusFamilyStateRow(
   brandKey: GptBrandKey,
   family: Record<string, unknown>,
   current: Record<string, unknown> | undefined,
   reviewId: string | null,
-    decision: OperatorContentFocusDecision | undefined,
-): D1PreparedStatement {
+  decision: OperatorContentFocusDecision | undefined,
+): Record<string, unknown> {
   const status = family.status as OperatorContentFocusStatus;
   let weight = Number(family.allocation_weight ?? 0);
   if (weight > 0 && decision?.role === "use_more") weight += 0.2;
   if (weight > 0 && decision?.role === "use_less") weight = Math.max(0.05, weight - 0.3);
   if (weight > 0 && decision?.role === "learn_next") weight += 0.05;
-    return env.DB.prepare(
-    `INSERT INTO operator_content_focus_family_states (
-      id, brand_key, source_card_family_id, source_identity_key, status,
-      recommended_status, confidence_score, confidence_label, allocation_weight,
-      decision_reason, reuse_directives_json, stop_directives_json,
-      horizon_evidence_json, manual_lock, last_review_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(brand_key, source_card_family_id) DO UPDATE SET
-      source_identity_key = excluded.source_identity_key,
-      status = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.status ELSE excluded.status END,
-      recommended_status = excluded.recommended_status,
-      confidence_score = excluded.confidence_score,
-      confidence_label = excluded.confidence_label,
-      allocation_weight = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.allocation_weight ELSE excluded.allocation_weight END,
-      decision_reason = excluded.decision_reason,
-      reuse_directives_json = excluded.reuse_directives_json,
-      stop_directives_json = excluded.stop_directives_json,
-      horizon_evidence_json = excluded.horizon_evidence_json,
-      last_review_id = excluded.last_review_id,
-      updated_at = CURRENT_TIMESTAMP`,
-  ).bind(
-    current?.id ?? crypto.randomUUID(), brandKey, family.source_card_family_id,
-    family.source_identity_key, status, family.recommended_status,
-    family.confidence_score, family.confidence_label, weight, family.decision_reason,
-    normalizeOperatorJson(family.reuse_directives, {}), normalizeOperatorJson(family.stop_directives, {}),
-        normalizeOperatorJson(family.horizons, {}), Number(current?.manual_lock ?? 0), reviewId,
-  );
+      return {
+    id: current?.id ?? crypto.randomUUID(),
+    brand_key: brandKey,
+    source_card_family_id: family.source_card_family_id,
+    source_identity_key: family.source_identity_key,
+    status,
+    recommended_status: family.recommended_status,
+    confidence_score: family.confidence_score,
+    confidence_label: family.confidence_label,
+    allocation_weight: weight,
+    decision_reason: family.decision_reason,
+    reuse_directives_json: normalizeOperatorJson(family.reuse_directives, {}),
+    stop_directives_json: normalizeOperatorJson(family.stop_directives, {}),
+    horizon_evidence_json: normalizeOperatorJson(family.horizons, {}),
+    manual_lock: Number(current?.manual_lock ?? 0),
+    last_review_id: reviewId,
+  };
 }
 
 async function refreshOperatorContentFocus(
@@ -32669,10 +32779,9 @@ async function refreshOperatorContentFocus(
   }
   const authorityReviewId = reviewIds.get(authority) ?? reviewIds.get("daily") ?? null;
     const decisionByFamily = new Map(dailyDecisions.map((decision) => [decision.source_card_family_id, decision]));
-  const familyStateStatements = families.map((family) => {
+    const familyStateRows = families.map((family) => {
     const familyId = String(family.source_card_family_id);
-    return buildOperatorContentFocusFamilyStateStatement(
-      env,
+    return buildOperatorContentFocusFamilyStateRow(
       brandKey,
       family,
       built.current_by_family.get(familyId),
@@ -32680,7 +32789,46 @@ async function refreshOperatorContentFocus(
       decisionByFamily.get(familyId),
     );
   });
-  await runOperatorD1StatementBatches(env.DB, familyStateStatements);
+  for (const chunk of chunkOperatorJsonRows(familyStateRows)) {
+    await env.DB.prepare(
+      `INSERT INTO operator_content_focus_family_states (
+        id, brand_key, source_card_family_id, source_identity_key, status,
+        recommended_status, confidence_score, confidence_label, allocation_weight,
+        decision_reason, reuse_directives_json, stop_directives_json,
+        horizon_evidence_json, manual_lock, last_review_id
+      )
+      SELECT
+        json_extract(value, '$.id'),
+        json_extract(value, '$.brand_key'),
+        json_extract(value, '$.source_card_family_id'),
+        json_extract(value, '$.source_identity_key'),
+        json_extract(value, '$.status'),
+        json_extract(value, '$.recommended_status'),
+        CAST(json_extract(value, '$.confidence_score') AS REAL),
+        json_extract(value, '$.confidence_label'),
+        CAST(json_extract(value, '$.allocation_weight') AS REAL),
+        json_extract(value, '$.decision_reason'),
+        json_extract(value, '$.reuse_directives_json'),
+        json_extract(value, '$.stop_directives_json'),
+        json_extract(value, '$.horizon_evidence_json'),
+        CAST(json_extract(value, '$.manual_lock') AS INTEGER),
+        json_extract(value, '$.last_review_id')
+      FROM json_each(?)
+      ON CONFLICT(brand_key, source_card_family_id) DO UPDATE SET
+        source_identity_key = excluded.source_identity_key,
+        status = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.status ELSE excluded.status END,
+        recommended_status = excluded.recommended_status,
+        confidence_score = excluded.confidence_score,
+        confidence_label = excluded.confidence_label,
+        allocation_weight = CASE WHEN operator_content_focus_family_states.manual_lock = 1 THEN operator_content_focus_family_states.allocation_weight ELSE excluded.allocation_weight END,
+        decision_reason = excluded.decision_reason,
+        reuse_directives_json = excluded.reuse_directives_json,
+        stop_directives_json = excluded.stop_directives_json,
+        horizon_evidence_json = excluded.horizon_evidence_json,
+        last_review_id = excluded.last_review_id,
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(normalizeOperatorJson(chunk, [])).run();
+  }
   return {
     version: OPERATOR_CONTENT_FOCUS_VERSION,
     anchor_date: anchorDate,
