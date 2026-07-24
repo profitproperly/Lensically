@@ -11114,16 +11114,28 @@ export function selectManifestDueCheckpointRefreshBatch<T>(
   return { processed: due.slice(0, limit), remaining: due.slice(limit) };
 }
 
-async function refreshManifestAutonomousThreadsSnapshot(
-  env: Env,
-  brand: GptResolvedBrand,
-): Promise<{
-  refreshed: boolean;
-  complete: boolean;
+type ManifestAutonomousThreadsCollectionState = {
   threads_server_time_iso: string | null;
   latest_published_at: string | null;
   published_count: number;
-    list_metrics_available: boolean;
+  list_metrics_available: boolean;
+  list_metrics_complete: boolean;
+  due_checkpoint_post_count: number;
+  processed_due: Array<{ post_id: string; checkpoint: number }>;
+  post_summaries: Array<{ id: string; timestamp: string | null }>;
+  observed_at_ms: number;
+  metric_snapshots: { inserted: number; unchanged: number; anomalous: number; linked: number };
+};
+
+type ManifestAutonomousThreadsSnapshot = {
+  refreshed: boolean;
+  complete: boolean;
+  evaluator_deferred: boolean;
+  collection_state: ManifestAutonomousThreadsCollectionState | null;
+  threads_server_time_iso: string | null;
+  latest_published_at: string | null;
+  published_count: number;
+  list_metrics_available: boolean;
   list_metrics_complete: boolean;
   due_checkpoint_post_count: number;
   due_checkpoint_count: number;
@@ -11134,15 +11146,95 @@ async function refreshManifestAutonomousThreadsSnapshot(
   metric_snapshots: { inserted: number; unchanged: number; anomalous: number; linked: number } | null;
   performance_evaluation: Record<string, unknown> | null;
   error: string | null;
-}> {
+};
+
+async function finalizeManifestAutonomousThreadsCollection(
+  env: Env,
+  brand: GptResolvedBrand,
+  state: ManifestAutonomousThreadsCollectionState,
+): Promise<ManifestAutonomousThreadsSnapshot> {
+  const performanceEvaluation = await refreshOperatorPerformanceEvaluator(
+    env,
+    brand.brand_key,
+    brand.account_id,
+    brand.profile.threads_user_id,
+  );
+  if (state.processed_due.length) {
+    const placeholders = state.processed_due.map(() => "?").join(", ");
+    const verifiedRows = await env.DB.prepare(
+      `SELECT published_post_id, checkpoint_hours
+       FROM operator_post_performance_scores
+       WHERE brand_key = ? AND valid_for_learning = 1
+         AND published_post_id IN (${placeholders})`,
+    ).bind(brand.brand_key, ...state.processed_due.map((item) => item.post_id)).all<Record<string, unknown>>();
+    const verified = new Set((verifiedRows.results ?? []).map((row) => `${String(row.published_post_id)}:${Number(row.checkpoint_hours)}`));
+    const unresolved = state.processed_due.filter((item) => !verified.has(`${item.post_id}:${item.checkpoint}`));
+    if (unresolved.length) throw new Error(`manifest_due_checkpoint_scores_missing:${unresolved.map((item) => `${item.post_id}:${item.checkpoint}`).join(",")}`);
+  }
+  const postIds = state.post_summaries.map((post) => post.id).filter(Boolean);
+  const updatedScoreRows = postIds.length
+    ? await env.DB.prepare(
+        `SELECT published_post_id, checkpoint_hours
+         FROM operator_post_performance_scores
+         WHERE brand_key = ? AND valid_for_learning = 1
+           AND published_post_id IN (${postIds.map(() => "?").join(", ")})`,
+      ).bind(brand.brand_key, ...postIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  const updatedCompletedByPost = new Map<string, number[]>();
+  for (const row of updatedScoreRows.results ?? []) {
+    const postId = String(row.published_post_id ?? "");
+    const checkpoints = updatedCompletedByPost.get(postId) ?? [];
+    checkpoints.push(Number(row.checkpoint_hours));
+    updatedCompletedByPost.set(postId, checkpoints);
+  }
+  const remainingDue = state.post_summaries.filter((post) => resolveOperatorDueMaturityCheckpoint(
+    parseOperatorTimestampMs(post.timestamp) ?? Number.NaN,
+    state.observed_at_ms,
+    updatedCompletedByPost.get(post.id) ?? [],
+  ) !== null);
+  return {
+    refreshed: true,
+    complete: remainingDue.length === 0,
+    evaluator_deferred: false,
+    collection_state: null,
+    threads_server_time_iso: state.threads_server_time_iso,
+    latest_published_at: state.latest_published_at,
+    published_count: state.published_count,
+    list_metrics_available: state.list_metrics_available,
+    list_metrics_complete: state.list_metrics_complete,
+    due_checkpoint_post_count: state.due_checkpoint_post_count,
+    due_checkpoint_count: state.due_checkpoint_post_count,
+    processed_due_checkpoint_count: state.processed_due.length,
+    remaining_due_checkpoint_count: remainingDue.length,
+    continuation_required: remainingDue.length > 0,
+    max_insight_calls_per_invocation: MANIFEST_AUTONOMOUS_MAX_INSIGHT_CALLS_PER_PREPARE,
+    metric_snapshots: state.metric_snapshots,
+    performance_evaluation: performanceEvaluation,
+    error: remainingDue.length > 0 ? "manifest_live_evidence_refresh_continuation_required" : null,
+  };
+}
+
+async function refreshManifestAutonomousThreadsSnapshot(
+  env: Env,
+  brand: GptResolvedBrand,
+  options: {
+    defer_evaluator?: boolean;
+    collection_state?: ManifestAutonomousThreadsCollectionState | null;
+  } = {},
+): Promise<ManifestAutonomousThreadsSnapshot> {
+  if (options.collection_state) {
+    return finalizeManifestAutonomousThreadsCollection(env, brand, options.collection_state);
+  }
   const account = await getThreadsAccountForAppUser(
     env,
     WORKSPACE_APP_USER_ID,
     brand.profile.threads_user_id,
   );
   const failed = (error: string, threadsServerTimeIso: string | null = null) => ({
-    refreshed: false,
+        refreshed: false,
     complete: false,
+    evaluator_deferred: false,
+    collection_state: null,
     threads_server_time_iso: threadsServerTimeIso,
     latest_published_at: null,
     published_count: 0,
@@ -11168,8 +11260,10 @@ async function refreshManifestAutonomousThreadsSnapshot(
         brand.profile.threads_user_id,
       );
       return {
-        refreshed: true,
+                refreshed: true,
         complete: true,
+        evaluator_deferred: false,
+        collection_state: null,
         threads_server_time_iso: null,
         latest_published_at: null,
         published_count: 0,
@@ -11307,67 +11401,46 @@ async function refreshManifestAutonomousThreadsSnapshot(
       "autonomous_prepare",
       duePostIds,
     );
-    const performanceEvaluation = await refreshOperatorPerformanceEvaluator(
-      env,
-      brand.brand_key,
-      brand.account_id,
-      brand.profile.threads_user_id,
-    );
-        if (refreshBatch.processed.length) {
-      const placeholders = refreshBatch.processed.map(() => "?").join(", ");
-      const verifiedRows = await env.DB.prepare(
-        `SELECT published_post_id, checkpoint_hours
-         FROM operator_post_performance_scores
-         WHERE brand_key = ? AND valid_for_learning = 1
-           AND published_post_id IN (${placeholders})`,
-            ).bind(brand.brand_key, ...refreshBatch.processed.map((item) => item.post.id)).all<Record<string, unknown>>();
-      const verified = new Set((verifiedRows.results ?? []).map((row) => `${String(row.published_post_id)}:${Number(row.checkpoint_hours)}`));
-      const unresolved = refreshBatch.processed.filter((item) => !verified.has(`${item.post.id}:${item.checkpoint}`));
-      if (unresolved.length) throw new Error(`manifest_due_checkpoint_scores_missing:${unresolved.map((item) => `${item.post.id}:${item.checkpoint}`).join(",")}`);
-    }
-        const updatedScoreRows = postIds.length
-      ? await env.DB.prepare(
-          `SELECT published_post_id, checkpoint_hours
-           FROM operator_post_performance_scores
-           WHERE brand_key = ? AND valid_for_learning = 1
-             AND published_post_id IN (${postIds.map(() => "?").join(", ")})`,
-        ).bind(brand.brand_key, ...postIds).all<Record<string, unknown>>()
-      : { results: [] as Record<string, unknown>[] };
-    const updatedCompletedByPost = new Map<string, number[]>();
-    for (const row of updatedScoreRows.results ?? []) {
-      const postId = String(row.published_post_id ?? "");
-      const checkpoints = updatedCompletedByPost.get(postId) ?? [];
-      checkpoints.push(Number(row.checkpoint_hours));
-      updatedCompletedByPost.set(postId, checkpoints);
-    }
-    const remainingDue = posts.filter((post) => resolveOperatorDueMaturityCheckpoint(
-      parseOperatorTimestampMs(post.timestamp) ?? Number.NaN,
-      observedAtMs,
-      updatedCompletedByPost.get(post.id) ?? [],
-    ) !== null);
-    const latestPublishedMs = refreshedPosts.reduce<number | null>((latest, post) => {
+        const latestPublishedMs = refreshedPosts.reduce<number | null>((latest, post) => {
       const timestampMs = parseOperatorTimestampMs(post.timestamp);
       if (timestampMs === null) return latest;
       return latest === null || timestampMs > latest ? timestampMs : latest;
     }, null);
-    return {
-      refreshed: true,
-            complete: remainingDue.length === 0,
+    const collectionState: ManifestAutonomousThreadsCollectionState = {
       threads_server_time_iso: threadsServerTimeIso,
       latest_published_at: latestPublishedMs === null ? null : new Date(latestPublishedMs).toISOString(),
       published_count: refreshedPosts.length,
-            list_metrics_available: listMetricsAvailable,
+      list_metrics_available: listMetricsAvailable,
       list_metrics_complete: listMetricsComplete,
       due_checkpoint_post_count: due.length,
-      due_checkpoint_count: due.length,
-      processed_due_checkpoint_count: refreshBatch.processed.length,
-      remaining_due_checkpoint_count: remainingDue.length,
-      continuation_required: remainingDue.length > 0,
-      max_insight_calls_per_invocation: MANIFEST_AUTONOMOUS_MAX_INSIGHT_CALLS_PER_PREPARE,
+      processed_due: refreshBatch.processed.map((item) => ({ post_id: item.post.id, checkpoint: item.checkpoint })),
+      post_summaries: refreshedPosts.map((post) => ({ id: post.id, timestamp: post.timestamp })),
+      observed_at_ms: observedAtMs,
       metric_snapshots: metricSnapshots,
-      performance_evaluation: performanceEvaluation,
-      error: remainingDue.length > 0 ? "manifest_live_evidence_refresh_continuation_required" : null,
     };
+    if (options.defer_evaluator) {
+      return {
+        refreshed: true,
+        complete: false,
+        evaluator_deferred: true,
+        collection_state: collectionState,
+        threads_server_time_iso: collectionState.threads_server_time_iso,
+        latest_published_at: collectionState.latest_published_at,
+        published_count: collectionState.published_count,
+        list_metrics_available: collectionState.list_metrics_available,
+        list_metrics_complete: collectionState.list_metrics_complete,
+        due_checkpoint_post_count: collectionState.due_checkpoint_post_count,
+        due_checkpoint_count: collectionState.due_checkpoint_post_count,
+        processed_due_checkpoint_count: collectionState.processed_due.length,
+        remaining_due_checkpoint_count: Math.max(0, due.length - collectionState.processed_due.length),
+        continuation_required: true,
+        max_insight_calls_per_invocation: MANIFEST_AUTONOMOUS_MAX_INSIGHT_CALLS_PER_PREPARE,
+        metric_snapshots: metricSnapshots,
+        performance_evaluation: null,
+        error: "manifest_live_evaluator_continuation_required",
+      };
+    }
+    return finalizeManifestAutonomousThreadsCollection(env, brand, collectionState);
   } catch (error) {
     return failed(error instanceof Error ? error.message.slice(0, 500) : "threads_reconciliation_failed");
   }
@@ -12612,32 +12685,29 @@ async function prepareManifestAutonomousCycle(
         requested_horizon_hours: horizonHours,
       };
     }
-    if (!checkpoint || String(checkpoint.phase ?? "") === "live_evidence_refresh") {
-      const refreshedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
-      if (!refreshedSnapshot.refreshed || !refreshedSnapshot.complete) {
+        if (!checkpoint || String(checkpoint.phase ?? "") === "live_collection") {
+      const collectedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand, { defer_evaluator: true });
+      if (!collectedSnapshot.refreshed || !collectedSnapshot.evaluator_deferred || !collectedSnapshot.collection_state) {
         return {
           success: false,
-          error: refreshedSnapshot.error ?? "manifest_live_evidence_refresh_incomplete",
-          stage: "live_evidence_refresh",
-          retryable: refreshedSnapshot.continuation_required === true,
-          continuation_required: refreshedSnapshot.continuation_required === true,
-          remaining_due_checkpoint_count: refreshedSnapshot.remaining_due_checkpoint_count,
-          next_action: refreshedSnapshot.continuation_required === true
-            ? "Call prepare_manifest_autonomous_cycle again with the identical operation_id. The prior bounded refresh was persisted; the next invocation advances the remaining due checkpoint batch without replaying completed work."
-            : "Repair the live evidence refresh failure before strategy work.",
-          threads_snapshot: refreshedSnapshot,
+          error: collectedSnapshot.error ?? "manifest_live_collection_incomplete",
+          stage: "live_collection",
+          retryable: collectedSnapshot.continuation_required === true,
+          continuation_required: collectedSnapshot.continuation_required === true,
+          remaining_due_checkpoint_count: collectedSnapshot.remaining_due_checkpoint_count,
+          next_action: "Repair or retry the bounded live Threads collection before evaluator recomputation.",
+          threads_snapshot: compactManifestPrepareThreadsSnapshot(collectedSnapshot as unknown as Record<string, unknown>),
         };
       }
-      threadsSnapshot = compactManifestPrepareThreadsSnapshot(refreshedSnapshot as unknown as Record<string, unknown>) as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
       await writeManifestPrepareCheckpoint(env.DB, {
         brand_key: brand.brand_key,
         operation_id: explicitOperationId,
-        phase: "cycle_construction",
+        phase: "live_evaluator",
         timezone,
         horizon_hours: horizonHours,
         state: {
           runtime_now_iso: runtimeNowIso,
-          threads_snapshot: threadsSnapshot as unknown as Record<string, unknown>,
+          collection_state: collectedSnapshot.collection_state,
         },
       });
       return {
@@ -12646,16 +12716,77 @@ async function prepareManifestAutonomousCycle(
         continuation_required: true,
         operation_id: explicitOperationId,
         checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "live_evidence_refresh",
-        next_stage: "cycle_construction",
-        threads_snapshot: threadsSnapshot,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical operation_id, timezone, and horizon_hours. The live evaluator result is durably checkpointed and will not be recomputed in the next invocation.",
+        stage_completed: "live_collection",
+        next_stage: "live_evaluator",
+        threads_snapshot: compactManifestPrepareThreadsSnapshot(collectedSnapshot as unknown as Record<string, unknown>),
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical operation_id, timezone, and horizon_hours. The Threads collection and due metric snapshots are durably checkpointed; the next invocation runs evaluator recomputation only.",
       };
     }
     const state = checkpoint.state && typeof checkpoint.state === "object" && !Array.isArray(checkpoint.state)
       ? checkpoint.state as Record<string, unknown>
       : {};
     runtimeNowIso = normalizeOperatorText(state.runtime_now_iso, 100, true) ?? runtimeNowIso;
+    if (String(checkpoint.phase ?? "") === "live_evaluator") {
+      const collectionState = state.collection_state && typeof state.collection_state === "object" && !Array.isArray(state.collection_state)
+        ? state.collection_state as ManifestAutonomousThreadsCollectionState
+        : null;
+      if (!collectionState) {
+        await clearManifestPrepareCheckpoint(env.DB, brand.brand_key, explicitOperationId);
+        return {
+          success: false,
+          error: "manifest_live_collection_checkpoint_missing",
+          stage: "live_evaluator",
+          retryable: true,
+          next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs to rebuild the missing live collection checkpoint.",
+        };
+      }
+      const evaluatedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand, { collection_state: collectionState });
+      if (!evaluatedSnapshot.complete) {
+        await writeManifestPrepareCheckpoint(env.DB, {
+          brand_key: brand.brand_key,
+          operation_id: explicitOperationId,
+          phase: "live_collection",
+          timezone,
+          horizon_hours: horizonHours,
+          state: { runtime_now_iso: runtimeNowIso },
+        });
+        return {
+          success: true,
+          preparation_complete: false,
+          continuation_required: true,
+          operation_id: explicitOperationId,
+          checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+          stage_completed: "live_evaluator",
+          next_stage: "live_collection",
+          remaining_due_checkpoint_count: evaluatedSnapshot.remaining_due_checkpoint_count,
+          threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
+          next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. The evaluator pass is persisted; another bounded Threads collection will advance the remaining due checkpoints.",
+        };
+      }
+      threadsSnapshot = evaluatedSnapshot;
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "cycle_construction",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "live_evaluator",
+        next_stage: "cycle_construction",
+        threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Live evidence and evaluator recomputation are complete and durably checkpointed; the next invocation constructs the cycle.",
+      };
+    }
     threadsSnapshot = (state.threads_snapshot && typeof state.threads_snapshot === "object" && !Array.isArray(state.threads_snapshot)
       ? state.threads_snapshot
       : {}) as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
