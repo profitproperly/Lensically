@@ -23198,7 +23198,7 @@ async function handleOperatorMcpAdminTool(
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
       { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
       { name: "schedule_requires_approved", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
-      { name: "static_router_active", passed: OPERATOR_REGISTRY_GENERATION === "static-execution-router-v1" },
+            { name: "static_router_active", passed: OPERATOR_REGISTRY_GENERATION === "static-execution-router-v2" },
       { name: "complete_capability_campaign_passed", passed: campaignFailures.length === 0 },
       { name: "live_read_capability_campaign_passed", passed: liveReadFailures.length === 0 },
       { name: "mutation_preflight_campaign_passed", passed: mutationPreflightFailures.length === 0 },
