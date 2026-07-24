@@ -523,8 +523,7 @@ function buildManifestSourceBackedPersistPayload(
       strategic_purpose: "Execute the exact source-backed plan item without inventing a new premise.",
             preserved_functions: ["Physical contact with the post acts as personal selection."],
       transformed_elements: ["financial payoff wording"],
-      satisfied_time_or_context_requirements: ["A named near-term time boundary is present."],
-      source_context: {
+            source_context: {
         kind: "saved_pattern",
         source_type: "saved_pattern",
         source_card_id: fixture.sourceCardId,
@@ -556,7 +555,8 @@ function buildManifestSourceBackedPersistPayload(
       winner_preservation_assessment: "The candidate preserves the proven recognition mechanism and does not invent a replacement premise.",
       slot_placement_assessment: `The candidate matches the exact locked plan item for ${slot.key}.`,
       recent_exposure_assessment: "The 72-hour published exposure and future runway were reviewed before placement.",
-      intelligence_application_assessment: "The locked likes-first cycle strategy selected this Saved Pattern and exact plan item.",
+            intelligence_application_assessment: "The locked likes-first cycle strategy selected this Saved Pattern and exact plan item.",
+      satisfied_time_or_context_requirements: ["A named near-term time boundary is present."],
       gate_summary: { results: fixture.gateResults },
     },
     operation_id: `test-source-backed-persist-${crypto.randomUUID()}`,
