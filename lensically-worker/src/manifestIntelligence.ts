@@ -868,36 +868,86 @@ export async function createManifestEvidenceSnapshot(db: D1Database, input: {
       db.prepare(`DELETE FROM operator_manifest_evidence_pages WHERE snapshot_id = ?`).bind(snapshotId),
       db.prepare(`DELETE FROM operator_manifest_analysis_page_reads WHERE snapshot_id = ?`).bind(snapshotId),
     ]);
-        for (let offset = 0; offset < pagePlan.length; offset += 50) {
-      const chunk = pagePlan.slice(offset, offset + 50);
-      await db.batch(chunk.map((page) => db.prepare(`INSERT INTO operator_manifest_evidence_pages (
+            const pageWriteRows = pagePlan.map((page) => ({
+      id: crypto.randomUUID(),
+      snapshot_id: snapshotId,
+      cycle_id: input.cycleId,
+      brand_key: input.brandKey,
+      page_index: numeric(page.page_index),
+      page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION,
+      item_count: numeric(page.item_count),
+      byte_count: numeric(page.byte_count),
+      evidence_types_json: stableManifestJson(page.evidence_types ?? []),
+      items_json: stableManifestJson(page.items ?? []),
+    }));
+    for (const chunk of chunkManifestEvidenceWriteRows(pageWriteRows)) {
+      await db.prepare(`INSERT INTO operator_manifest_evidence_pages (
           id, snapshot_id, cycle_id, brand_key, page_index, page_contract_version,
           item_count, byte_count, evidence_types_json, items_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(
-          crypto.randomUUID(), snapshotId, input.cycleId, input.brandKey, numeric(page.page_index),
-          MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, numeric(page.item_count), numeric(page.byte_count),
-          stableManifestJson(page.evidence_types ?? []), stableManifestJson(page.items ?? []),
-        )));
+        )
+        SELECT
+          json_extract(value, '$.id'),
+          json_extract(value, '$.snapshot_id'),
+          json_extract(value, '$.cycle_id'),
+          json_extract(value, '$.brand_key'),
+          CAST(json_extract(value, '$.page_index') AS INTEGER),
+          json_extract(value, '$.page_contract_version'),
+          CAST(json_extract(value, '$.item_count') AS INTEGER),
+          CAST(json_extract(value, '$.byte_count') AS INTEGER),
+          json_extract(value, '$.evidence_types_json'),
+          json_extract(value, '$.items_json')
+        FROM json_each(?)`)
+        .bind(stableManifestJson(chunk)).run();
     }
-    for (let offset = 0; offset < input.posts.length; offset += 75) {
-      const chunk = input.posts.slice(offset, offset + 75);
-      await db.batch(chunk.map((post) => db.prepare(`INSERT INTO operator_manifest_evidence_posts (
+    const postWriteRows = input.posts.map((post) => ({
+      id: crypto.randomUUID(),
+      snapshot_id: snapshotId,
+      brand_key: input.brandKey,
+      published_post_id: String(post.published_post_id ?? post.post_id ?? ""),
+      scheduled_post_id: post.scheduled_post_id === null || post.scheduled_post_id === undefined
+        ? null
+        : numeric(post.scheduled_post_id),
+      text: text(post.text ?? post.post_text, 20000),
+      published_at: text(post.published_at ?? post.post_timestamp, 100),
+      age_hours: numeric(post.age_hours),
+      maturity_state: text(post.maturity_state, 80),
+      primary_likes: post.primary_likes === null || post.primary_likes === undefined
+        ? null
+        : numeric(post.primary_likes),
+      like_rate: post.like_rate === null || post.like_rate === undefined
+        ? null
+        : numeric(post.like_rate),
+      metrics_json: stableManifestJson(post.metrics ?? {}),
+      maturity_snapshots_json: stableManifestJson(post.maturity_snapshots ?? []),
+      lineage_json: stableManifestJson(post.lineage ?? {}),
+      classification_json: stableManifestJson(post.classification ?? {}),
+    }));
+    for (const chunk of chunkManifestEvidenceWriteRows(postWriteRows)) {
+      await db.prepare(`INSERT INTO operator_manifest_evidence_posts (
           id, snapshot_id, brand_key, published_post_id, scheduled_post_id, text, published_at,
           age_hours, maturity_state, primary_likes, like_rate, metrics_json,
           maturity_snapshots_json, lineage_json, classification_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(
-          crypto.randomUUID(), snapshotId, input.brandKey, String(post.published_post_id ?? post.post_id ?? ""),
-          post.scheduled_post_id === null || post.scheduled_post_id === undefined ? null : numeric(post.scheduled_post_id),
-          text(post.text ?? post.post_text, 20000), text(post.published_at ?? post.post_timestamp, 100),
-          numeric(post.age_hours), text(post.maturity_state, 80),
-          post.primary_likes === null || post.primary_likes === undefined ? null : numeric(post.primary_likes),
-          post.like_rate === null || post.like_rate === undefined ? null : numeric(post.like_rate),
-          stableManifestJson(post.metrics ?? {}), stableManifestJson(post.maturity_snapshots ?? []),
-          stableManifestJson(post.lineage ?? {}), stableManifestJson(post.classification ?? {}),
-        )));
+        )
+        SELECT
+          json_extract(value, '$.id'),
+          json_extract(value, '$.snapshot_id'),
+          json_extract(value, '$.brand_key'),
+          json_extract(value, '$.published_post_id'),
+          CAST(json_extract(value, '$.scheduled_post_id') AS INTEGER),
+          json_extract(value, '$.text'),
+          json_extract(value, '$.published_at'),
+          CAST(json_extract(value, '$.age_hours') AS REAL),
+          json_extract(value, '$.maturity_state'),
+          CAST(json_extract(value, '$.primary_likes') AS INTEGER),
+          CAST(json_extract(value, '$.like_rate') AS REAL),
+          json_extract(value, '$.metrics_json'),
+          json_extract(value, '$.maturity_snapshots_json'),
+          json_extract(value, '$.lineage_json'),
+          json_extract(value, '$.classification_json')
+        FROM json_each(?)`)
+        .bind(stableManifestJson(chunk)).run();
     }
+
   }
   const row = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE id = ?`).bind(snapshotId).first<JsonRecord>();
   return { ...serializeEvidenceSnapshot(row ?? { id: snapshotId }), refreshed: Boolean(existing), source_changed: !existing || String(existing.source_hash) !== sourceHash };
