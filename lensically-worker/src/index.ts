@@ -14268,8 +14268,11 @@ async function persistManifestAutonomousPost(
     opening_phrase: extractOpeningPhrase(text),
     hook_style: normalizeOperatorText(postStrategy.hook_style, 120, true),
     lane_key: normalizeOperatorMachineKey(postStrategy.pillar, ""),
-    preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
+        preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
     transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
+    satisfied_time_or_context_requirements: Array.isArray(post.satisfied_time_or_context_requirements)
+      ? post.satisfied_time_or_context_requirements.map(String)
+      : [],
     audience_reward_delivered: true,
   };
   const suppliedGateSummary = modelEvaluation.gate_summary && typeof modelEvaluation.gate_summary === "object" && !Array.isArray(modelEvaluation.gate_summary)
