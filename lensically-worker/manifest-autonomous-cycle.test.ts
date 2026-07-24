@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-    buildManifestRollingHourlySlots,
+  buildManifestCycleMaturitySnapshot,
+  buildManifestRollingHourlySlots,
   normalizeManifestThreadsTimestampForSqlite,
   resolveManifestAutonomousClock,
 } from "./src/index";
@@ -128,11 +129,29 @@ describe("Manifest autonomous clock and horizon", () => {
     ]);
     });
 
-  it("normalizes every Threads UTC timestamp form used by SQLite evidence windows", () => {
+    it("normalizes every Threads UTC timestamp form used by SQLite evidence windows", () => {
     expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14+0000")).toBe("2026-07-23T21:00:14");
     expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14+00:00")).toBe("2026-07-23T21:00:14");
     expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14Z")).toBe("2026-07-23T21:00:14");
     expect(normalizeManifestThreadsTimestampForSqlite("not-a-timestamp")).toBeNull();
+  });
+
+  it("builds cycle maturity evidence directly from persisted checkpoint scores", () => {
+    expect(buildManifestCycleMaturitySnapshot({
+      checkpoint_hours: 24,
+      metrics_json: JSON.stringify({ views: 9948, likes: 1993 }),
+      rates_json: JSON.stringify({ like_rate: 0.200342 }),
+      velocity_json: JSON.stringify({ cumulative_views_per_hour: 342.8851 }),
+      scores_json: JSON.stringify({ overall: 88.39 }),
+      distribution_state: "sustained",
+      updated_at: "2026-07-22 16:02:00",
+    })).toMatchObject({
+      checkpoint_hours: 24,
+      metrics: { views: 9948, likes: 1993 },
+      rates: { like_rate: 0.200342 },
+      scores: { overall: 88.39 },
+      distribution_state: "sustained",
+    });
   });
 });
 
