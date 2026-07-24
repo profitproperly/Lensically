@@ -13,6 +13,9 @@ export const MANIFEST_RECENT_EXPOSURE_HOURS = 72;
 export const MANIFEST_EVIDENCE_PAGE_SIZE = 12;
 export const MANIFEST_EVIDENCE_PAGE_MAX_BYTES = 12000;
 export const MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES = 20000;
+export const MANIFEST_EVIDENCE_WRITE_MAX_ROWS = 100;
+export const MANIFEST_EVIDENCE_WRITE_MAX_BYTES = 240000;
+
 
 export const MANIFEST_NONINTERFERENCE_POLICY = {
   version: "manifest-owner-noninterference-v1",
@@ -105,7 +108,32 @@ export function stableManifestJson(value: unknown): string {
   return JSON.stringify(stableValue(value));
 }
 
+export function chunkManifestEvidenceWriteRows<T>(
+  rows: T[],
+  maxRows = MANIFEST_EVIDENCE_WRITE_MAX_ROWS,
+  maxBytes = MANIFEST_EVIDENCE_WRITE_MAX_BYTES,
+): T[][] {
+  const boundedRows = Math.max(1, Math.trunc(maxRows));
+  const boundedBytes = Math.max(1024, Math.trunc(maxBytes));
+  const chunks: T[][] = [];
+  let current: T[] = [];
+  let currentBytes = 2;
+  for (const row of rows) {
+    const rowBytes = new TextEncoder().encode(stableManifestJson(row)).length + (current.length ? 1 : 0);
+    if (current.length && (current.length >= boundedRows || currentBytes + rowBytes > boundedBytes)) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 2;
+    }
+    current.push(row);
+    currentBytes += rowBytes;
+  }
+  if (current.length) chunks.push(current);
+  return chunks;
+}
+
 async function hash(value: unknown): Promise<string> {
+
   const bytes = new TextEncoder().encode(stableManifestJson(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
