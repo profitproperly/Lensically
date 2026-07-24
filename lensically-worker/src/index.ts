@@ -11152,12 +11152,14 @@ async function finalizeManifestAutonomousThreadsCollection(
   env: Env,
   brand: GptResolvedBrand,
   state: ManifestAutonomousThreadsCollectionState,
+  options: { defer_manifest_layers?: boolean } = {},
 ): Promise<ManifestAutonomousThreadsSnapshot> {
   const performanceEvaluation = await refreshOperatorPerformanceEvaluator(
     env,
     brand.brand_key,
     brand.account_id,
     brand.profile.threads_user_id,
+    { defer_manifest_layers: options.defer_manifest_layers === true },
   );
   if (state.processed_due.length) {
     const placeholders = state.processed_due.map(() => "?").join(", ");
@@ -11217,13 +11219,16 @@ async function finalizeManifestAutonomousThreadsCollection(
 async function refreshManifestAutonomousThreadsSnapshot(
   env: Env,
   brand: GptResolvedBrand,
-  options: {
+    options: {
     defer_evaluator?: boolean;
+    defer_manifest_layers?: boolean;
     collection_state?: ManifestAutonomousThreadsCollectionState | null;
   } = {},
 ): Promise<ManifestAutonomousThreadsSnapshot> {
   if (options.collection_state) {
-    return finalizeManifestAutonomousThreadsCollection(env, brand, options.collection_state);
+    return finalizeManifestAutonomousThreadsCollection(env, brand, options.collection_state, {
+      defer_manifest_layers: options.defer_manifest_layers === true,
+    });
   }
   const account = await getThreadsAccountForAppUser(
     env,
@@ -12644,10 +12649,11 @@ export function compactManifestPrepareThreadsSnapshot(
     continuation_required: snapshot.continuation_required === true,
     max_insight_calls_per_invocation: Number(snapshot.max_insight_calls_per_invocation ?? 0),
     metric_snapshots: snapshot.metric_snapshots ?? null,
-    performance_evaluation: {
+        performance_evaluation: {
       evaluator_version: evaluation.evaluator_version ?? null,
       maturity_scores_upserted: Number(evaluation.maturity_scores_upserted ?? 0),
       evidence_records: Number(evaluation.evidence_records ?? 0),
+      manifest_layers_deferred: evaluation.manifest_layers_deferred === true,
     },
     error: snapshot.error ?? null,
   };
@@ -12740,7 +12746,10 @@ async function prepareManifestAutonomousCycle(
           next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs to rebuild the missing live collection checkpoint.",
         };
       }
-      const evaluatedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand, { collection_state: collectionState });
+            const evaluatedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand, {
+        collection_state: collectionState,
+        defer_manifest_layers: true,
+      });
       if (!evaluatedSnapshot.complete) {
         await writeManifestPrepareCheckpoint(env.DB, {
           brand_key: brand.brand_key,
@@ -12763,11 +12772,11 @@ async function prepareManifestAutonomousCycle(
           next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. The evaluator pass is persisted; another bounded Threads collection will advance the remaining due checkpoints.",
         };
       }
-      threadsSnapshot = evaluatedSnapshot;
+            threadsSnapshot = evaluatedSnapshot;
       await writeManifestPrepareCheckpoint(env.DB, {
         brand_key: brand.brand_key,
         operation_id: explicitOperationId,
-        phase: "cycle_construction",
+        phase: "manifest_intelligence",
         timezone,
         horizon_hours: horizonHours,
         state: {
@@ -12782,9 +12791,137 @@ async function prepareManifestAutonomousCycle(
         operation_id: explicitOperationId,
         checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
         stage_completed: "live_evaluator",
-        next_stage: "cycle_construction",
+        next_stage: "manifest_intelligence",
         threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Live evidence and evaluator recomputation are complete and durably checkpointed; the next invocation constructs the cycle.",
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Core maturity scoring and evidence are complete; the next invocation refreshes Manifest intelligence only.",
+      };
+    }
+        if (String(checkpoint.phase ?? "") === "manifest_intelligence") {
+      const intelligenceEngine = await refreshManifestIntelligenceEngine(env.DB, {
+        brand_key: brand.brand_key,
+        threads_user_id: brand.profile.threads_user_id,
+      });
+      const intelligenceSummary = compactOperatorPayloadValue(intelligenceEngine, "manifest_intelligence", {
+        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
+      }, []);
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "manifest_measurement_audit",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: state.threads_snapshot ?? {},
+          intelligence_engine: intelligenceSummary,
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "manifest_intelligence",
+        next_stage: "manifest_measurement_audit",
+        intelligence_engine: intelligenceSummary,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. The intelligence engine is durably refreshed; the next invocation refreshes the measurement audit only.",
+      };
+    }
+    if (String(checkpoint.phase ?? "") === "manifest_measurement_audit") {
+      const measurementAudit = await refreshManifestMeasurementAudit(env.DB, {
+        brand_key: brand.brand_key,
+        threads_user_id: brand.profile.threads_user_id,
+        account_id: brand.account_id,
+        saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
+      });
+      const measurementSummary = compactOperatorPayloadValue(measurementAudit, "manifest_measurement_audit", {
+        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
+      }, []);
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "manifest_content_focus",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: state.threads_snapshot ?? {},
+          intelligence_engine: state.intelligence_engine ?? {},
+          measurement_audit: measurementSummary,
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "manifest_measurement_audit",
+        next_stage: "manifest_content_focus",
+        measurement_audit: measurementSummary,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Measurement audit state is durably refreshed; the next invocation refreshes Content Focus and finalizes the learning brief.",
+      };
+    }
+    if (String(checkpoint.phase ?? "") === "manifest_content_focus") {
+      const contentFocus = await refreshOperatorContentFocus(env, brand.brand_key);
+      const contentFocusSummary = compactOperatorPayloadValue(contentFocus, "manifest_content_focus", {
+        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
+      }, []);
+      const activeBrief = await env.DB.prepare(
+        `SELECT id, brief_json FROM operator_generation_learning_briefs
+         WHERE brand_key = ? AND active = 1
+         ORDER BY datetime(generated_at) DESC LIMIT 1`,
+      ).bind(brand.brand_key).first<Record<string, unknown>>();
+      if (activeBrief?.id) {
+        const brief = operatorRecord(safeParseJsonString(String(activeBrief.brief_json ?? "{}")));
+        await env.DB.prepare(
+          `UPDATE operator_generation_learning_briefs
+           SET brief_json = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND brand_key = ?`,
+        ).bind(normalizeOperatorJson({
+          ...brief,
+          intelligence_engine: state.intelligence_engine ?? {},
+          measurement_audit: state.measurement_audit ?? {},
+          content_focus: contentFocusSummary,
+          manifest_layers_finalized: true,
+        }, {}), activeBrief.id, brand.brand_key).run();
+      }
+      const storedThreadsSnapshot = state.threads_snapshot && typeof state.threads_snapshot === "object" && !Array.isArray(state.threads_snapshot)
+        ? state.threads_snapshot as Record<string, unknown>
+        : {};
+      const storedEvaluation = storedThreadsSnapshot.performance_evaluation && typeof storedThreadsSnapshot.performance_evaluation === "object" && !Array.isArray(storedThreadsSnapshot.performance_evaluation)
+        ? storedThreadsSnapshot.performance_evaluation as Record<string, unknown>
+        : {};
+      threadsSnapshot = {
+        ...storedThreadsSnapshot,
+        performance_evaluation: {
+          ...storedEvaluation,
+          manifest_layers_deferred: false,
+          manifest_layers_finalized: true,
+        },
+      } as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
+      await writeManifestPrepareCheckpoint(env.DB, {
+        brand_key: brand.brand_key,
+        operation_id: explicitOperationId,
+        phase: "cycle_construction",
+        timezone,
+        horizon_hours: horizonHours,
+        state: {
+          runtime_now_iso: runtimeNowIso,
+          threads_snapshot: threadsSnapshot as unknown as Record<string, unknown>,
+        },
+      });
+      return {
+        success: true,
+        preparation_complete: false,
+        continuation_required: true,
+        operation_id: explicitOperationId,
+        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+        stage_completed: "manifest_content_focus",
+        next_stage: "cycle_construction",
+        content_focus: contentFocusSummary,
+        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. All evaluator layers and the active learning brief are finalized; the next invocation constructs the cycle.",
       };
     }
     threadsSnapshot = (state.threads_snapshot && typeof state.threads_snapshot === "object" && !Array.isArray(state.threads_snapshot)
@@ -32078,6 +32215,7 @@ async function refreshOperatorPerformanceEvaluator(
   brandKey: GptBrandKey,
   accountId: string,
   threadsUserId: string,
+  options: { defer_manifest_layers?: boolean } = {},
 ): Promise<Record<string, unknown>> {
         await ensureOperatorPostMetricSnapshotsTable(env);
     await ensureGptPostStrategyTagsTable(env);
@@ -32579,10 +32717,11 @@ async function refreshOperatorPerformanceEvaluator(
     discovery_requirement: "Use available schedule capacity to develop additional winner families without arbitrarily benching current stars.",
     change_trigger: "Change strategy when evidence, audience response, account position, or opportunity changes—not merely because a day passed.",
   };
-        const intelligenceEngine = brandKey === "manifest_mental"
+          const deferManifestLayers = options.defer_manifest_layers === true;
+  const intelligenceEngine = brandKey === "manifest_mental" && !deferManifestLayers
     ? await refreshManifestIntelligenceEngine(env.DB, { brand_key: brandKey, threads_user_id: threadsUserId })
     : null;
-  const measurementAudit = brandKey === "manifest_mental"
+  const measurementAudit = brandKey === "manifest_mental" && !deferManifestLayers
     ? await refreshManifestMeasurementAudit(env.DB, {
       brand_key: brandKey,
       threads_user_id: threadsUserId,
@@ -32642,10 +32781,11 @@ async function refreshOperatorPerformanceEvaluator(
     briefId, brandKey, selectedCheckpoint?.checkpoint ?? null, matureSampleSize,
     normalizeOperatorJson(brief, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION, generatedAt,
     ).run();
-  const contentFocus = await refreshOperatorContentFocus(env, brandKey);
+    const contentFocus = deferManifestLayers ? null : await refreshOperatorContentFocus(env, brandKey);
   return {
     ok: true,
     evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+    manifest_layers_deferred: deferManifestLayers,
                 content_focus: contentFocus,
     intelligence_engine: intelligenceEngine,
     measurement_audit: measurementAudit,
