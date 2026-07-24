@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildManifestCycleMaturitySnapshot,
+    buildManifestCycleMaturitySnapshot,
   buildManifestRollingHourlySlots,
+  dedupeManifestEvidencePosts,
+
   normalizeManifestThreadsTimestampForSqlite,
   resolveManifestAutonomousClock,
 } from "./src/index";
@@ -136,7 +138,7 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(normalizeManifestThreadsTimestampForSqlite("not-a-timestamp")).toBeNull();
   });
 
-  it("builds cycle maturity evidence directly from persisted checkpoint scores", () => {
+    it("builds cycle maturity evidence directly from persisted checkpoint scores", () => {
     expect(buildManifestCycleMaturitySnapshot({
       checkpoint_hours: 24,
       metrics_json: JSON.stringify({ views: 9948, likes: 1993 }),
@@ -153,6 +155,31 @@ describe("Manifest autonomous clock and horizon", () => {
       distribution_state: "sustained",
     });
   });
+
+  it("collapses duplicate archive join rows to one canonical published-post record", () => {
+    const deduped = dedupeManifestEvidencePosts([
+      {
+        published_post_id: "post-1",
+        scheduled_post_id: 100,
+        lineage: { scheduled_post_id: 100, source_card_id: null, source_selection_id: null },
+        classification: { family_key: null },
+      },
+      {
+        published_post_id: "post-1",
+        scheduled_post_id: 100,
+        lineage: { scheduled_post_id: 100, source_card_id: "card-1", source_selection_id: "selection-1" },
+        classification: { family_key: "universe_direct_wealth", generation_mode: "franchise_deployment" },
+      },
+      { published_post_id: "post-2", scheduled_post_id: null, lineage: {}, classification: {} },
+    ]);
+
+    expect(deduped).toHaveLength(2);
+    expect(deduped.find((post) => post.published_post_id === "post-1")).toMatchObject({
+      lineage: { source_card_id: "card-1", source_selection_id: "selection-1" },
+      classification: { family_key: "universe_direct_wealth" },
+    });
+  });
+
 });
 
 describe("Manifest intelligence foundation", () => {
