@@ -312,7 +312,8 @@ async function prepareManifestSourceBackedCycleForTest(
     transformation_contract: {
       must_preserve_exact: ["If your finger touched this"],
       must_preserve_function: ["Physical contact with the post acts as personal selection."],
-      may_reuse: ["If your finger touched this"],
+            may_reuse: ["If your finger touched this"],
+      time_or_context_requirements: ["A named near-term time boundary is present."],
       audience_reward: "Personal confirmation that favorable financial news is approaching.",
       notes: "Stay close to the Saved Pattern. Do not invent a new premise.",
     },
@@ -520,8 +521,9 @@ function buildManifestSourceBackedPersistPayload(
       source_mechanism: "Physical contact with the post acts as personal selection for a near-term financial outcome.",
       audience_reward: "Personal confirmation that favorable financial news is approaching.",
       strategic_purpose: "Execute the exact source-backed plan item without inventing a new premise.",
-      preserved_functions: ["Physical contact with the post acts as personal selection."],
+            preserved_functions: ["Physical contact with the post acts as personal selection."],
       transformed_elements: ["financial payoff wording"],
+      satisfied_time_or_context_requirements: ["A named near-term time boundary is present."],
       source_context: {
         kind: "saved_pattern",
         source_type: "saved_pattern",

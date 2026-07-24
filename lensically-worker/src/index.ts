@@ -13644,8 +13644,10 @@ async function commitManifestAutonomousRunway(
       hook_style: normalizeOperatorText(strategy.hook_style, 120, true),
       lane_key: normalizeOperatorMachineKey(strategy.pillar, ""),
       preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
-      transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
-      satisfied_time_or_context_requirements: [],
+            transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
+      satisfied_time_or_context_requirements: Array.isArray(post.satisfied_time_or_context_requirements)
+        ? post.satisfied_time_or_context_requirements.map(String)
+        : [],
       audience_reward_delivered: true,
     };
     const generationGates = await runOperatorGates(env, {
@@ -19136,8 +19138,13 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
             strategic_purpose: { type: "string" },
             recommended_direction: { type: "string" },
             intentionally_different_from_prior: { type: "string" },
-            preserved_functions: { type: "array", items: { type: "string" } },
+                        preserved_functions: { type: "array", items: { type: "string" } },
                         transformed_elements: { type: "array", items: { type: "string" } },
+            satisfied_time_or_context_requirements: {
+              type: "array",
+              items: { type: "string" },
+              description: "Exact source-card time or context requirement statements satisfied by this candidate. Persistence replays these into the internal source-fidelity gate.",
+            },
             source_context: {
               type: "object",
                             description: "Identify the real Saved Pattern or canonical source card used for this adaptation. source_card_id is mandatory; autonomous generation may not invent a source or premise.",
