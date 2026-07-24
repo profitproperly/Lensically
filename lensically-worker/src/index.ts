@@ -4587,7 +4587,16 @@ async function getThreadsAccountForAppUser(
     (account): account is ResolvedConfiguredThreadsAccount => account !== null,
   );
 
-  if (resolvedConfiguredAccounts.length > 0) {
+    if (resolvedConfiguredAccounts.length > 0) {
+    if (requestedThreadsUserId) {
+      const storedIdentityMatch = resolvedConfiguredAccounts.find((account) => account.threadsUserId === requestedThreadsUserId);
+      if (storedIdentityMatch) {
+        return {
+          threads_user_id: requestedThreadsUserId,
+          access_token: storedIdentityMatch.accessToken,
+        };
+      }
+    }
     for (let index = 0; index < resolvedConfiguredAccounts.length; index += 1) {
       const configuredAccount = resolvedConfiguredAccounts[index];
       const profile = await fetchConfiguredThreadsProfile(env, configuredAccount, index);
