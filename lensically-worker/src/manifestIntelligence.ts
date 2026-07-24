@@ -1024,7 +1024,6 @@ export async function readManifestEvidencePage(db: D1Database, input: {
 }
 
 export async function getManifestEvidenceConsumptionState(db: D1Database, cycleId: string, brandKey: string): Promise<JsonRecord> {
-  await ensureManifestIntelligenceTables(db);
   const snapshot = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? AND brand_key = ? LIMIT 1`)
     .bind(cycleId, brandKey).first<JsonRecord>();
   if (!snapshot) return { complete: false, error: "manifest_evidence_snapshot_not_found" };
