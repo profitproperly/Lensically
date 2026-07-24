@@ -1072,8 +1072,10 @@ export async function syncManifestHardBans(db: D1Database, brandKey: string, rul
         json_extract(value, '$.fail_examples_json'),
         json_extract(value, '$.source_authority'),
         1
-      FROM json_each(?)
+            FROM json_each(?)
+      WHERE true
       ON CONFLICT(brand_key, rule_key) DO UPDATE SET
+
         description = excluded.description, rule_type = excluded.rule_type, pattern = excluded.pattern,
         scope = excluded.scope, pass_examples_json = excluded.pass_examples_json,
         fail_examples_json = excluded.fail_examples_json, source_authority = excluded.source_authority,
