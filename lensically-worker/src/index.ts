@@ -442,7 +442,7 @@ const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v4";
 const OPERATOR_ENGINEERING_AUTHORITY_VERSION = "operator-engineering-authority-v1";
 const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2";
 const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1";
-const MANIFEST_AUTONOMOUS_MAX_INSIGHT_CALLS_PER_PREPARE = 10;
+const MANIFEST_AUTONOMOUS_MAX_INSIGHT_CALLS_PER_PREPARE = 2;
 const MANIFEST_AUTONOMOUS_RUNWAY_HOURS = 48;
 const MANIFEST_AUTONOMOUS_COMMIT_LIMIT = 1;
 const MANIFEST_AUTONOMY_OBJECTIVE = "Grow Manifest Mental to 1,000,000 followers while protecting audience trust, content quality, account safety, and brand identity.";
@@ -11269,13 +11269,9 @@ async function refreshManifestAutonomousThreadsSnapshot(
       const batch = dueRequiringInsights.slice(index, index + 4);
       const hydrated = await Promise.all(batch.map(async ({ post }) => {
         let metricsResponse: Response | null = null;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          metricsResponse = await fetch(
-            `https://graph.threads.net/v1.0/${post.id}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
-          );
-          if (metricsResponse.ok || (metricsResponse.status !== 429 && metricsResponse.status < 500)) break;
-          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
-        }
+                metricsResponse = await fetch(
+          `https://graph.threads.net/v1.0/${post.id}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
+        );
         if (!metricsResponse?.ok) throw new Error(`manifest_due_checkpoint_metrics_http_${post.id}_${metricsResponse?.status ?? 0}`);
         const metricsPayload = await readJsonSafe(metricsResponse) as { data?: Array<Record<string, unknown>> } | null;
         if (!Array.isArray(metricsPayload?.data)) throw new Error(`manifest_due_checkpoint_metrics_invalid_${post.id}`);
@@ -12476,9 +12472,8 @@ async function prepareManifestAutonomousCycle(
   const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
   const horizonHours = Math.min(Math.max(Math.trunc(Number(payload.horizon_hours ?? MANIFEST_AUTONOMOUS_RUNWAY_HOURS)), 1), 72);
     const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
-  const runtimeNowIso = new Date().toISOString();
-  const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
-    const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+    const runtimeNowIso = new Date().toISOString();
+  const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
   if (!threadsSnapshot.refreshed || !threadsSnapshot.complete) {
     return {
       success: false,
@@ -12494,6 +12489,7 @@ async function prepareManifestAutonomousCycle(
     };
   }
 
+    const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
   const databaseClockRow = await env.DB.prepare(
     `SELECT CURRENT_TIMESTAMP AS current_time`,
   ).first<{ current_time: string }>();

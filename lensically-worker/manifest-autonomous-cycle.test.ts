@@ -211,10 +211,10 @@ describe("Manifest autonomous clock and horizon", () => {
     it("bounds due checkpoint insight hydration while allowing complete list metrics to finish in one pass", () => {
     const due = Array.from({ length: 27 }, (_, index) => ({ post_id: `post-${index}` }));
     const bounded = selectManifestDueCheckpointRefreshBatch(due, false);
-    expect(bounded.processed).toHaveLength(10);
-    expect(bounded.remaining).toHaveLength(17);
+        expect(bounded.processed).toHaveLength(2);
+    expect(bounded.remaining).toHaveLength(25);
     expect(bounded.processed[0]).toEqual({ post_id: "post-0" });
-    expect(bounded.remaining[0]).toEqual({ post_id: "post-10" });
+    expect(bounded.remaining[0]).toEqual({ post_id: "post-2" });
 
     const completeList = selectManifestDueCheckpointRefreshBatch(due, true);
     expect(completeList.processed).toHaveLength(27);
