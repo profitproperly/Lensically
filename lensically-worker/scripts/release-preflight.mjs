@@ -260,10 +260,8 @@ if (!workflow.includes("run-name: Lensically ${{ inputs.task || 'push-validation
     && !workflow.includes("run-name: \"Lensically ${{ inputs.task }} · ${{ inputs.release_id }}\"")) {
   errors.push("workflow_run_name_missing");
 }
-if (!workflow.includes("cancel-in-progress: ${{ inputs.task != 'worker-deploy' }}")
-    && !workflow.includes("cancel-in-progress: \"${{ inputs.task != 'worker-deploy' }}\"")
-    && !workflow.includes("cancel-in-progress: false")) {
-  errors.push("workflow_concurrency_cancellation_missing");
+if (!workflow.includes("cancel-in-progress: true")) {
+  errors.push("workflow_superseded_run_cancellation_missing");
 }
 if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
 if (!workflow.includes("release_id:")) errors.push("workflow_release_id_missing");
