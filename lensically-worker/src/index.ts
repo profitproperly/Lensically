@@ -10951,11 +10951,38 @@ export function buildManifestCycleMaturitySnapshot(row: Record<string, unknown>)
   };
 }
 
-export function normalizeManifestThreadsTimestampForSqlite(value: unknown): string | null {
+export function dedupeManifestEvidencePosts(posts: Record<string, unknown>[]): Record<string, unknown>[] {
+  const selected = new Map<string, { post: Record<string, unknown>; score: number }>();
+  const completenessScore = (post: Record<string, unknown>): number => {
+    const lineage = post.lineage && typeof post.lineage === "object" && !Array.isArray(post.lineage)
+      ? post.lineage as Record<string, unknown>
+      : {};
+    const classification = post.classification && typeof post.classification === "object" && !Array.isArray(post.classification)
+      ? post.classification as Record<string, unknown>
+      : {};
+    return (lineage.source_card_id ? 16 : 0)
+      + (lineage.source_selection_id ? 8 : 0)
+      + (lineage.source_family_id ? 4 : 0)
+      + (lineage.source_identity_key ? 2 : 0)
+      + (post.scheduled_post_id ? 2 : 0)
+      + (classification.family_key ? 1 : 0)
+      + (classification.generation_mode ? 1 : 0);
+  };
+  for (const post of posts) {
+    const publishedPostId = String(post.published_post_id ?? post.post_id ?? "").trim();
+    if (!publishedPostId) continue;
+    const score = completenessScore(post);
+    const existing = selected.get(publishedPostId);
+    if (!existing || score > existing.score) selected.set(publishedPostId, { post, score });
+  }
+  return Array.from(selected.values()).map((entry) => entry.post);
+}
 
+export function normalizeManifestThreadsTimestampForSqlite(value: unknown): string | null {
   const parsed = parseOperatorTimestampMs(value);
   return parsed === null ? null : new Date(parsed).toISOString().slice(0, 19);
 }
+
 
 
 async function refreshManifestTrustedUtcClock(): Promise<string | null> {
@@ -12009,7 +12036,8 @@ async function buildManifestRollingEvidence(
     list.push(buildManifestCycleMaturitySnapshot(row));
     maturityByPost.set(key, list);
   }
-  const maturityRefresh = {
+    const maturityRefresh: Record<string, unknown> = {
+
     source: "operator_post_performance_scores",
     checkpoint_hours: [6, 12, 18, 24],
     record_count: (maturityRows.results ?? []).length,
@@ -12018,7 +12046,8 @@ async function buildManifestRollingEvidence(
     mode: "bounded_persisted_checkpoint_read",
   };
 
-  const evidencePosts = (publishedRows.results ?? []).map((row) => {
+    const rawEvidencePosts = (publishedRows.results ?? []).map((row) => {
+
     const publishedAt = String(row.post_timestamp ?? "");
     const publishedMs = parseOperatorTimestampMs(publishedAt) ?? input.effective_now_ms;
     const ageHours = Math.max(0, (input.effective_now_ms - publishedMs) / (60 * 60 * 1000));
@@ -12081,10 +12110,15 @@ async function buildManifestRollingEvidence(
         emotional_product: strategyRecord.emotional_product ?? strategyRecord.required_product ?? null,
         sentence_architecture: strategyRecord.sentence_architecture ?? null,
       },
-      strategy: strategyRecord,
+            strategy: strategyRecord,
     };
   });
+  const evidencePosts = dedupeManifestEvidencePosts(rawEvidencePosts);
+  maturityRefresh.archive_join_row_count = rawEvidencePosts.length;
+  maturityRefresh.canonical_post_count = evidencePosts.length;
+  maturityRefresh.duplicate_join_rows_collapsed = Math.max(0, rawEvidencePosts.length - evidencePosts.length);
   const benchmarks = buildManifestLikesBenchmarks(evidencePosts);
+
   const previousSnapshot = await env.DB.prepare(
     `SELECT benchmarks_json FROM operator_manifest_evidence_snapshots
      WHERE brand_key = ? AND cycle_id <> ?
