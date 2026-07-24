@@ -8551,6 +8551,17 @@ async function seedDefaultOperatorGates(env: Env): Promise<void> {
 
 const operatorModePreparationByEnv = new WeakMap<object, Promise<void>>();
 
+const MANIFEST_SELF_PREPARING_CYCLE_TOOLS = new Set([
+  "get_manifest_cycle_receipt",
+  "get_manifest_cycle_analysis_page",
+  "commit_manifest_cycle_strategy",
+]);
+
+export function operatorToolRequiresLegacyPreparation(toolName: string): boolean {
+  const normalized = toolName.replace(/^(?:mm_|om_|vx_)/, "");
+  return !MANIFEST_SELF_PREPARING_CYCLE_TOOLS.has(normalized);
+}
+
 async function prepareOperatorMode(env: Env): Promise<void> {
   if (hasTestRuntimeTokens(env)) {
     await ensureGptStrategyMemoryTable(env);
