@@ -11074,9 +11074,15 @@ async function refreshManifestAutonomousThreadsSnapshot(
   brand: GptResolvedBrand,
 ): Promise<{
   refreshed: boolean;
+  complete: boolean;
   threads_server_time_iso: string | null;
   latest_published_at: string | null;
   published_count: number;
+  list_metrics_available: boolean;
+  due_checkpoint_post_count: number;
+  due_checkpoint_count: number;
+  metric_snapshots: { inserted: number; unchanged: number; anomalous: number; linked: number } | null;
+  performance_evaluation: Record<string, unknown> | null;
   error: string | null;
 }> {
   const account = await getThreadsAccountForAppUser(
@@ -11084,75 +11090,169 @@ async function refreshManifestAutonomousThreadsSnapshot(
     WORKSPACE_APP_USER_ID,
     brand.profile.threads_user_id,
   );
-  if (!account?.access_token) {
-    return {
-      refreshed: false,
-      threads_server_time_iso: null,
-      latest_published_at: null,
-      published_count: 0,
-      error: "threads_access_token_missing",
-    };
-  }
+  const failed = (error: string, threadsServerTimeIso: string | null = null) => ({
+    refreshed: false,
+    complete: false,
+    threads_server_time_iso: threadsServerTimeIso,
+    latest_published_at: null,
+    published_count: 0,
+    list_metrics_available: false,
+    due_checkpoint_post_count: 0,
+    due_checkpoint_count: 0,
+    metric_snapshots: null,
+    performance_evaluation: null,
+    error,
+  });
+  if (!account?.access_token) return failed("threads_access_token_missing");
   try {
-    const params = new URLSearchParams({
-      fields: "id,text,permalink,timestamp,username",
-      limit: "40",
+    const baseFields = "id,text,permalink,timestamp,username";
+    const countFields = "view_count,like_count,reply_count,repost_count,quote_count";
+    const buildUrl = (fields: string) => {
+      const params = new URLSearchParams({ fields, limit: "40" });
+      return `https://graph.threads.net/v1.0/${brand.profile.threads_user_id}/threads?${params.toString()}`;
+    };
+    let response = await fetch(buildUrl(`${baseFields},${countFields}`), {
+      headers: { Authorization: `Bearer ${account.access_token}` },
     });
-    const response = await fetch(
-      `https://graph.threads.net/v1.0/${brand.profile.threads_user_id}/threads?${params.toString()}`,
-      { headers: { Authorization: `Bearer ${account.access_token}` } },
-    );
+    let listMetricsAvailable = response.ok;
+    if (!response.ok) {
+      response = await fetch(buildUrl(baseFields), {
+        headers: { Authorization: `Bearer ${account.access_token}` },
+      });
+      listMetricsAvailable = false;
+    }
     const responseDateMs = parseOperatorTimestampMs(response.headers.get("date"));
     const threadsServerTimeIso = responseDateMs === null ? null : new Date(responseDateMs).toISOString();
-    if (!response.ok) {
-      return {
-        refreshed: false,
-        threads_server_time_iso: threadsServerTimeIso,
-        latest_published_at: null,
-        published_count: 0,
-        error: `threads_reconciliation_http_${response.status}`,
-      };
-    }
+    if (!response.ok) return failed(`threads_reconciliation_http_${response.status}`, threadsServerTimeIso);
     const payload = await readJsonSafe(response) as { data?: Array<Record<string, unknown>> } | null;
     const rows = Array.isArray(payload?.data) ? payload.data : [];
-    const posts: CachedThreadsPost[] = rows.map((row) => ({
-      id: typeof row.id === "string" ? row.id : "",
-      text: typeof row.text === "string" ? row.text : null,
-      timestamp: typeof row.timestamp === "string" ? row.timestamp : null,
-      permalink: typeof row.permalink === "string" ? row.permalink : null,
-      username: typeof row.username === "string" ? row.username : null,
-      profile_picture_url: null,
-      views: 0,
-      likes: 0,
-      replies: 0,
-      reposts: 0,
-      quotes: 0,
-      shares: 0,
-      engagement_total: 0,
-    })).filter((post) => Boolean(post.id));
-    await upsertThreadsPostsArchive(env, brand.profile.threads_user_id, posts);
-    const latestPublishedMs = posts.reduce<number | null>((latest, post) => {
+    const posts: CachedThreadsPost[] = rows.map((row) => {
+      const views = normalizeThreadsPostCount(row.view_count ?? row.views_count);
+      const likes = normalizeThreadsPostCount(row.like_count ?? row.likes_count);
+      const replies = normalizeThreadsPostCount(row.reply_count ?? row.replies_count);
+      const reposts = normalizeThreadsPostCount(row.repost_count ?? row.reposts_count);
+      const quotes = normalizeThreadsPostCount(row.quote_count ?? row.quotes_count);
+      return {
+        id: typeof row.id === "string" ? row.id : "",
+        text: typeof row.text === "string" ? row.text : null,
+        timestamp: typeof row.timestamp === "string" ? row.timestamp : null,
+        permalink: typeof row.permalink === "string" ? row.permalink : null,
+        username: typeof row.username === "string" ? row.username : null,
+        profile_picture_url: null,
+        views,
+        likes,
+        replies,
+        reposts,
+        quotes,
+        shares: 0,
+        engagement_total: likes + replies + reposts + quotes,
+      };
+    }).filter((post) => Boolean(post.id));
+    const postIds = posts.map((post) => post.id);
+    const completedByPost = new Map<string, number[]>();
+    if (postIds.length) {
+      const placeholders = postIds.map(() => "?").join(", ");
+      const scoreRows = await env.DB.prepare(
+        `SELECT published_post_id, checkpoint_hours
+         FROM operator_post_performance_scores
+         WHERE brand_key = ? AND valid_for_learning = 1
+           AND published_post_id IN (${placeholders})`,
+      ).bind(brand.brand_key, ...postIds).all<Record<string, unknown>>();
+      for (const row of scoreRows.results ?? []) {
+        const postId = String(row.published_post_id ?? "");
+        const checkpoints = completedByPost.get(postId) ?? [];
+        checkpoints.push(Number(row.checkpoint_hours));
+        completedByPost.set(postId, checkpoints);
+      }
+    }
+    const observedAtMs = responseDateMs ?? Date.now();
+    const due = posts.map((post) => ({
+      post,
+      checkpoint: resolveOperatorDueMaturityCheckpoint(
+        parseOperatorTimestampMs(post.timestamp) ?? Number.NaN,
+        observedAtMs,
+        completedByPost.get(post.id) ?? [],
+      ),
+    })).filter((item): item is { post: CachedThreadsPost; checkpoint: number } => item.checkpoint !== null);
+    const refreshedById = new Map(posts.map((post) => [post.id, post]));
+    for (let index = 0; index < due.length; index += 4) {
+      const batch = due.slice(index, index + 4);
+      const hydrated = await Promise.all(batch.map(async ({ post }) => {
+        let metricsResponse: Response | null = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          metricsResponse = await fetch(
+            `https://graph.threads.net/v1.0/${post.id}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(account.access_token)}`,
+          );
+          if (metricsResponse.ok || (metricsResponse.status !== 429 && metricsResponse.status < 500)) break;
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+        }
+        if (!metricsResponse?.ok) throw new Error(`manifest_due_checkpoint_metrics_http_${post.id}_${metricsResponse?.status ?? 0}`);
+        const metricsPayload = await readJsonSafe(metricsResponse) as { data?: Array<Record<string, unknown>> } | null;
+        if (!Array.isArray(metricsPayload?.data)) throw new Error(`manifest_due_checkpoint_metrics_invalid_${post.id}`);
+        const metricMap = buildThreadsMetricMap(metricsPayload.data);
+        const views = Math.max(post.views, pickThreadsMetricValue(metricMap.views, post.views));
+        const likes = Math.max(post.likes, pickThreadsMetricValue(metricMap.likes, post.likes));
+        const replies = Math.max(post.replies, pickThreadsMetricValue(metricMap.replies, post.replies));
+        const reposts = Math.max(post.reposts, pickThreadsMetricValue(metricMap.reposts, post.reposts));
+        const quotes = Math.max(post.quotes, pickThreadsMetricValue(metricMap.quotes, post.quotes));
+        const shares = Math.max(post.shares, pickThreadsMetricValue(metricMap.shares, post.shares));
+        return { ...post, views, likes, replies, reposts, quotes, shares, engagement_total: likes + replies + reposts + quotes + shares };
+      }));
+      for (const post of hydrated) refreshedById.set(post.id, post);
+    }
+    const refreshedPosts = posts.map((post) => refreshedById.get(post.id) ?? post);
+    await upsertThreadsPostsArchive(env, brand.profile.threads_user_id, refreshedPosts);
+    const duePostIds = new Set(due.map((item) => item.post.id));
+    const metricSnapshots = await appendOperatorMetricSnapshotsForPosts(
+      env,
+      brand.brand_key,
+      brand.account_id,
+      brand.profile.threads_user_id,
+      refreshedPosts.filter((post) => duePostIds.has(post.id)),
+      "autonomous_prepare",
+      duePostIds,
+    );
+    const performanceEvaluation = await refreshOperatorPerformanceEvaluator(
+      env,
+      brand.brand_key,
+      brand.account_id,
+      brand.profile.threads_user_id,
+    );
+    if (due.length) {
+      const placeholders = due.map(() => "?").join(", ");
+      const verifiedRows = await env.DB.prepare(
+        `SELECT published_post_id, checkpoint_hours
+         FROM operator_post_performance_scores
+         WHERE brand_key = ? AND valid_for_learning = 1
+           AND published_post_id IN (${placeholders})`,
+      ).bind(brand.brand_key, ...due.map((item) => item.post.id)).all<Record<string, unknown>>();
+      const verified = new Set((verifiedRows.results ?? []).map((row) => `${String(row.published_post_id)}:${Number(row.checkpoint_hours)}`));
+      const unresolved = due.filter((item) => !verified.has(`${item.post.id}:${item.checkpoint}`));
+      if (unresolved.length) throw new Error(`manifest_due_checkpoint_scores_missing:${unresolved.map((item) => `${item.post.id}:${item.checkpoint}`).join(",")}`);
+    }
+    const latestPublishedMs = refreshedPosts.reduce<number | null>((latest, post) => {
       const timestampMs = parseOperatorTimestampMs(post.timestamp);
       if (timestampMs === null) return latest;
       return latest === null || timestampMs > latest ? timestampMs : latest;
     }, null);
     return {
       refreshed: true,
+      complete: true,
       threads_server_time_iso: threadsServerTimeIso,
       latest_published_at: latestPublishedMs === null ? null : new Date(latestPublishedMs).toISOString(),
-      published_count: posts.length,
+      published_count: refreshedPosts.length,
+      list_metrics_available: listMetricsAvailable,
+      due_checkpoint_post_count: due.length,
+      due_checkpoint_count: due.length,
+      metric_snapshots: metricSnapshots,
+      performance_evaluation: performanceEvaluation,
       error: null,
     };
   } catch (error) {
-    return {
-      refreshed: false,
-      threads_server_time_iso: null,
-      latest_published_at: null,
-      published_count: 0,
-      error: error instanceof Error ? error.message.slice(0, 500) : "threads_reconciliation_failed",
-    };
+    return failed(error instanceof Error ? error.message.slice(0, 500) : "threads_reconciliation_failed");
   }
 }
+
 
 
 function addOperatorIsoDateDays(date: string, days: number): string {
@@ -12263,7 +12363,15 @@ async function prepareManifestAutonomousCycle(
     const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
   const runtimeNowIso = new Date().toISOString();
   const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
-  const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+    const threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
+  if (!threadsSnapshot.refreshed || !threadsSnapshot.complete) {
+    return {
+      success: false,
+      error: threadsSnapshot.error ?? "manifest_live_evidence_refresh_incomplete",
+      stage: "live_evidence_refresh",
+      threads_snapshot: threadsSnapshot,
+    };
+  }
 
   const databaseClockRow = await env.DB.prepare(
     `SELECT CURRENT_TIMESTAMP AS current_time`,
@@ -12302,11 +12410,17 @@ async function prepareManifestAutonomousCycle(
   await ensureOperatorWorkflowTables(env);
   await ensureExternalPatternsTable(env);
   await ensureThreadsFollowerSnapshotsTable(env);
-  const intelligenceEngineRefresh = {
-    mode: "latest_persisted_intelligence_state",
-    recomputed: false,
-    refresh_owner: "performance_evaluator_and_insights_cycle",
-    reason: "Autonomous preparation consumes durable Content Focus, maturity, comparable, semantic, portfolio, experiment, and confidence state without recomputing the intelligence engine inside one scheduled-task invocation.",
+    const intelligenceEngineRefresh = {
+    mode: "autonomous_prepare_live_refresh",
+    recomputed: true,
+    refresh_owner: "autonomous_prepare",
+    due_checkpoint_post_count: threadsSnapshot.due_checkpoint_post_count,
+    due_checkpoint_count: threadsSnapshot.due_checkpoint_count,
+    metric_snapshots: threadsSnapshot.metric_snapshots,
+    evaluator_version: threadsSnapshot.performance_evaluation?.evaluator_version ?? null,
+    maturity_scores_upserted: Number(threadsSnapshot.performance_evaluation?.maturity_scores_upserted ?? 0),
+    evidence_records: Number(threadsSnapshot.performance_evaluation?.evidence_records ?? 0),
+    reason: "Autonomous preparation refreshed bounded live Threads evidence, persisted every currently due maturity checkpoint, and recomputed evaluator intelligence before strategy consumption.",
   };
     await ensureManifestMeasurementAuditTables(env.DB);
   const [qualifiedPatternState, derivedPatternState] = await Promise.all([
@@ -12486,12 +12600,16 @@ async function prepareManifestAutonomousCycle(
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
                                                             data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "scheduled deletion reasons", "operational gates"],
-            maturity_refresh: rollingEvidence.maturity_refresh ?? {
-        source: "operator_post_performance_scores",
-        checkpoint_hours: [6, 12, 18, 24],
-        record_count: 0,
-        mature_24h_record_count: 0,
-        mode: "bounded_persisted_checkpoint_read",
+                  maturity_refresh: {
+        ...((rollingEvidence.maturity_refresh && typeof rollingEvidence.maturity_refresh === "object")
+          ? rollingEvidence.maturity_refresh as Record<string, unknown>
+          : {}),
+        collection_source: "autonomous_prepare",
+        due_checkpoint_post_count: threadsSnapshot.due_checkpoint_post_count,
+        due_checkpoint_count: threadsSnapshot.due_checkpoint_count,
+        metric_snapshots: threadsSnapshot.metric_snapshots,
+        evaluator_version: threadsSnapshot.performance_evaluation?.evaluator_version ?? null,
+        maturity_scores_upserted: Number(threadsSnapshot.performance_evaluation?.maturity_scores_upserted ?? 0),
       },
       intelligence_policy: intelligencePolicy,
       evidence_snapshot_id: evidenceSnapshot.id ?? null,
@@ -31241,12 +31359,25 @@ async function ensureOperatorPerformanceEvaluatorTables(env: Env): Promise<void>
   ).run();
 }
 
+export function resolveOperatorDueMaturityCheckpoint(
+  publishedAtMs: number,
+  observedAtMs: number,
+  completedCheckpoints: readonly number[],
+): number | null {
+  if (!Number.isFinite(publishedAtMs) || !Number.isFinite(observedAtMs) || observedAtMs < publishedAtMs) return null;
+  const ageHours = (observedAtMs - publishedAtMs) / 3600000;
+  const completed = new Set(completedCheckpoints.filter(Number.isFinite));
+  return [...OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS]
+    .filter((checkpoint) => ageHours >= checkpoint && !completed.has(checkpoint))
+    .sort((left, right) => right - left)[0] ?? null;
+}
+
 function chooseOperatorCheckpointSnapshot(
   rows: Array<Record<string, unknown>>,
   publishedAtMs: number,
   checkpointHours: number,
 ): { row: Record<string, unknown>; ageHours: number } | null {
-  const tolerance = checkpointHours >= 48 ? 8 : 7;
+  const tolerance = checkpointHours === 24 ? 12 : 7;
   return rows.map((row) => {
     const capturedMs = Date.parse(String(row.captured_at ?? ""));
     return { row, ageHours: Number.isFinite(capturedMs) ? (capturedMs - publishedAtMs) / 3600000 : Number.NaN };
@@ -31255,6 +31386,7 @@ function chooseOperatorCheckpointSnapshot(
     && candidate.ageHours <= checkpointHours + tolerance)
     .sort((left, right) => left.ageHours - right.ageHours)[0] ?? null;
 }
+
 
 type OperatorContentFocusScoreRow = {
   published_post_id: string;
@@ -31857,7 +31989,7 @@ async function refreshOperatorPerformanceEvaluator(
       checkpoints_hours: [...OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS],
       final_authoritative_checkpoint_hours: 24,
       collection_scope: "existing_latest_40_full_insights_only",
-      targeted_older_post_calls: "forbidden",
+            targeted_older_post_calls: "bounded_to_latest_40_posts_with_due_checkpoints",
       later_metrics: "incidental_archive_context_only",
     },
     follower_attribution_policy: {
@@ -31874,7 +32006,7 @@ async function refreshOperatorPerformanceEvaluator(
     portfolio_policy: portfolioPolicy,
     generation_guidance: [
       "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result.",
-      "Preserve strong winners while developing additional winners through deliberate variations, adjacent experiments, and original discovery.",
+            "Preserve strong winners while developing additional winners through source-card-backed variations and adjacent source-card-backed experiments; original or source-independent premises are forbidden.",
       "Distinguish productive mechanism repetition from weak execution repetition; frequency alone never forces cooling.",
       "Do not infer follower conversion from any post, day, batch, or surrounding time period.",
     ],
@@ -32255,7 +32387,8 @@ async function appendOperatorMetricSnapshotsForPosts(
   accountId: string,
   threadsUserId: string,
   posts: CachedThreadsPost[],
-  collectionSource: string,
+    collectionSource: string,
+  forceInsertPostIds: ReadonlySet<string> = new Set<string>(),
 ): Promise<{ inserted: number; unchanged: number; anomalous: number; linked: number }> {
   await ensureOperatorWorkflowTables(env);
   await ensureOperatorPostMetricSnapshotsTable(env);
@@ -32276,7 +32409,7 @@ async function appendOperatorMetricSnapshotsForPosts(
        ORDER BY datetime(captured_at) DESC, datetime(created_at) DESC
        LIMIT 1`,
     ).bind(brandKey, post.id).first<{ metrics_json: string }>();
-    if (latest?.metrics_json === metricsJson) {
+        if (latest?.metrics_json === metricsJson && !forceInsertPostIds.has(post.id)) {
       unchanged += 1;
       continue;
     }

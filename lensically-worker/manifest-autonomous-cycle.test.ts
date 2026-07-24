@@ -4,8 +4,9 @@ import {
   buildManifestRollingHourlySlots,
   dedupeManifestEvidencePosts,
 
-  normalizeManifestThreadsTimestampForSqlite,
+    normalizeManifestThreadsTimestampForSqlite,
   operatorToolRequiresLegacyPreparation,
+  resolveOperatorDueMaturityCheckpoint,
   resolveManifestAutonomousClock,
 } from "./src/index";
 import {
@@ -139,6 +140,25 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14+00:00")).toBe("2026-07-23T21:00:14");
     expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14Z")).toBe("2026-07-23T21:00:14");
     expect(normalizeManifestThreadsTimestampForSqlite("not-a-timestamp")).toBeNull();
+  });
+
+    it("identifies the latest maturity checkpoint due from live observation time", () => {
+    const publishedAt = Date.parse("2026-07-23T14:00:00.000Z");
+    expect(resolveOperatorDueMaturityCheckpoint(
+      publishedAt,
+      Date.parse("2026-07-24T14:55:00.000Z"),
+      [6, 12, 18],
+    )).toBe(24);
+    expect(resolveOperatorDueMaturityCheckpoint(
+      publishedAt,
+      Date.parse("2026-07-24T14:55:00.000Z"),
+      [6, 12, 18, 24],
+    )).toBeNull();
+    expect(resolveOperatorDueMaturityCheckpoint(
+      publishedAt,
+      Date.parse("2026-07-24T07:00:00.000Z"),
+      [6],
+    )).toBe(12);
   });
 
   it("keeps canonical cycle reads and strategy commit off the legacy workflow bootstrap", () => {
