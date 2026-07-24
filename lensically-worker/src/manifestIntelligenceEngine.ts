@@ -807,7 +807,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     LEFT JOIN operator_source_card_families fam ON fam.id = c.family_id AND fam.brand_key = ?
     LEFT JOIN operator_autonomous_lineup_items l ON l.scheduled_post_id = s.id AND l.brand_key = ?
     WHERE a.threads_user_id = ?
-    ORDER BY datetime(a.post_timestamp) DESC LIMIT 250`).bind(
+        ORDER BY substr(a.post_timestamp, 1, 19) DESC LIMIT 250`).bind(
       input.brand_key, input.brand_key, input.brand_key, input.brand_key, input.threads_user_id,
     ).all<JsonRecord>();
   const publishedRows = published.results ?? [];
@@ -867,7 +867,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     LEFT JOIN operator_autonomous_lineup_items l ON l.scheduled_post_id = f.scheduled_post_id AND l.brand_key = s.brand_key
     LEFT JOIN threads_posts_archive a ON a.post_id = s.published_post_id
     WHERE s.brand_key = ? AND s.valid_for_learning = 1
-    ORDER BY s.checkpoint_hours ASC, datetime(a.post_timestamp) ASC, datetime(s.updated_at) ASC`).bind(input.brand_key).all<JsonRecord>();
+        ORDER BY s.checkpoint_hours ASC, substr(a.post_timestamp, 1, 19) ASC, datetime(s.updated_at) ASC`).bind(input.brand_key).all<JsonRecord>();
   const candidates: ManifestComparableCandidate[] = [];
   const maturityRows: Array<{ row: JsonRecord; maturity: ManifestMaturityEvaluation; fingerprint: JsonRecord; signature: ManifestSemanticSignature; family_key: string; source_identity_key: string; generation_mode: string; placement_key: string }> = [];
   for (const row of scoreRows.results ?? []) {

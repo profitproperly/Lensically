@@ -10933,9 +10933,17 @@ function operatorLocalDateTimeParts(value: Date, timezone: string): { date: stri
 }
 
 function parseOperatorTimestampMs(value: unknown): number | null {
-  const parsed = Date.parse(String(value ?? ""));
+  const raw = String(value ?? "").trim();
+  const normalized = raw.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+  const parsed = Date.parse(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
+
+export function normalizeManifestThreadsTimestampForSqlite(value: unknown): string | null {
+  const parsed = parseOperatorTimestampMs(value);
+  return parsed === null ? null : new Date(parsed).toISOString().slice(0, 19);
+}
+
 
 async function refreshManifestTrustedUtcClock(): Promise<string | null> {
   try {
@@ -11726,10 +11734,13 @@ async function buildManifestAutonomousAccountPosition(
        ON scheduled.threads_user_id = archive.threads_user_id
       AND scheduled.published_post_id = archive.post_id
      LEFT JOIN gpt_post_strategy_tags tags ON tags.scheduled_post_id = scheduled.id
-          WHERE archive.threads_user_id = ?
-       AND datetime(archive.post_timestamp) >= datetime(?, '-72 hours')
-     ORDER BY datetime(archive.post_timestamp) DESC, archive.post_id DESC`,
-  ).bind(brand.profile.threads_user_id, clock.effective_now_iso).all<Record<string, unknown>>();
+                    WHERE archive.threads_user_id = ?
+       AND datetime(substr(archive.post_timestamp, 1, 19)) >= datetime(?, '-72 hours')
+     ORDER BY substr(archive.post_timestamp, 1, 19) DESC, archive.post_id DESC`,
+  ).bind(
+    brand.profile.threads_user_id,
+    normalizeManifestThreadsTimestampForSqlite(clock.effective_now_iso) ?? clock.effective_now_iso.slice(0, 19),
+  ).all<Record<string, unknown>>();
   const recentPublishedPosts = (recentPublishedRows.results ?? []).map((row) => ({
     source_type: "published_post",
     published_post_id: row.post_id,
@@ -11900,9 +11911,12 @@ async function buildManifestRollingEvidence(
 ): Promise<Record<string, unknown>> {
   await ensureManifestIntelligenceEngineTables(env.DB);
   const windowEnd = input.as_of;
-  const windowStart = new Date(
+    const windowStart = new Date(
     input.effective_now_ms - MANIFEST_ANALYSIS_WINDOW_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const windowStartKey = normalizeManifestThreadsTimestampForSqlite(windowStart);
+  const windowEndKey = normalizeManifestThreadsTimestampForSqlite(windowEnd);
+  if (!windowStartKey || !windowEndKey) throw new Error("manifest_evidence_window_timestamp_invalid");
   const publishedRows = await env.DB.prepare(
     `SELECT archive.post_id, archive.post_text, archive.post_timestamp,
             archive.views, archive.likes, archive.replies, archive.reposts,
@@ -11928,34 +11942,48 @@ async function buildManifestRollingEvidence(
       AND card.brand_key = ?
      LEFT JOIN operator_source_card_families family
        ON family.id = card.family_id AND family.brand_key = ?
-     WHERE archive.threads_user_id = ?
-       AND datetime(archive.post_timestamp) >= datetime(?)
-       AND datetime(archive.post_timestamp) <= datetime(?)
-     ORDER BY datetime(archive.post_timestamp) DESC, archive.post_id DESC`,
+          WHERE archive.threads_user_id = ?
+       AND substr(archive.post_timestamp, 1, 19) >= ?
+       AND substr(archive.post_timestamp, 1, 19) <= ?
+     ORDER BY substr(archive.post_timestamp, 1, 19) DESC, archive.post_id DESC`,
   ).bind(
     brand.brand_key,
     brand.account_id,
     brand.brand_key,
     brand.brand_key,
-    brand.profile.threads_user_id,
-    windowStart,
-    windowEnd,
+        brand.profile.threads_user_id,
+    windowStartKey,
+    windowEndKey,
   ).all<Record<string, unknown>>();
+  const latestArchiveRow = await env.DB.prepare(
+    `SELECT post_timestamp
+     FROM threads_posts_archive
+     WHERE threads_user_id = ?
+     ORDER BY substr(post_timestamp, 1, 19) DESC, post_id DESC
+     LIMIT 1`,
+  ).bind(brand.profile.threads_user_id).first<Record<string, unknown>>();
+  const latestArchiveMs = parseOperatorTimestampMs(latestArchiveRow?.post_timestamp);
+  if ((publishedRows.results ?? []).length === 0
+    && latestArchiveMs !== null
+    && latestArchiveMs >= input.effective_now_ms - MANIFEST_ANALYSIS_WINDOW_DAYS * 86400000
+    && latestArchiveMs <= input.effective_now_ms) {
+    throw new Error("manifest_recent_archive_evidence_integrity_failed");
+  }
   const maturityRows = await env.DB.prepare(
     `SELECT maturity.published_post_id, maturity.checkpoint_hours,
             maturity.evaluation_json, maturity.updated_at
      FROM operator_manifest_maturity_evaluations maturity
      JOIN threads_posts_archive archive ON archive.post_id = maturity.published_post_id
-     WHERE maturity.brand_key = ?
+          WHERE maturity.brand_key = ?
        AND archive.threads_user_id = ?
-       AND datetime(archive.post_timestamp) >= datetime(?)
-       AND datetime(archive.post_timestamp) <= datetime(?)
+       AND substr(archive.post_timestamp, 1, 19) >= ?
+       AND substr(archive.post_timestamp, 1, 19) <= ?
      ORDER BY maturity.published_post_id, maturity.checkpoint_hours ASC`,
   ).bind(
-    brand.brand_key,
+        brand.brand_key,
     brand.profile.threads_user_id,
-    windowStart,
-    windowEnd,
+    windowStartKey,
+    windowEndKey,
   ).all<Record<string, unknown>>();
   const maturityByPost = new Map<string, Record<string, unknown>[]>();
   for (const row of maturityRows.results ?? []) {
@@ -12340,6 +12368,12 @@ async function prepareManifestAutonomousCycle(
     ).run();
     }
 
+    const performanceEvidenceRefresh = await refreshOperatorPerformanceEvaluator(
+    env,
+    brand.brand_key,
+    brand.account_id,
+    brand.profile.threads_user_id,
+  );
   const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
     cycle_id: cycleId,
     as_of: clock.effective_now_iso,
@@ -12393,7 +12427,13 @@ async function prepareManifestAutonomousCycle(
     startupState: {
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-                              data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "scheduled deletion reasons", "operational gates"],
+                                                            data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "scheduled deletion reasons", "operational gates"],
+      maturity_refresh: {
+        evaluator_version: performanceEvidenceRefresh.evaluator_version ?? null,
+        fingerprinted_posts: Number(performanceEvidenceRefresh.fingerprinted_posts ?? 0),
+        maturity_scores_upserted: Number(performanceEvidenceRefresh.maturity_scores_upserted ?? 0),
+        evidence_records: Number(performanceEvidenceRefresh.evidence_records ?? 0),
+      },
       intelligence_policy: intelligencePolicy,
       evidence_snapshot_id: evidenceSnapshot.id ?? null,
       evidence_page_count: evidenceSnapshot.page_count ?? 0,
@@ -26240,7 +26280,7 @@ async function listGptRecentInsights(
        WHERE a.threads_user_id = ?
          ${sinceFilterClause}
          ${postFilterClause}
-       ORDER BY datetime(a.post_timestamp) DESC, a.engagement_total DESC, a.likes DESC
+              ORDER BY substr(a.post_timestamp, 1, 19) DESC, a.engagement_total DESC, a.likes DESC
        LIMIT 2500`,
     )
       .bind(...[brand.profile.threads_user_id, ...normalizedPostIds])
@@ -31414,7 +31454,7 @@ async function refreshOperatorPerformanceEvaluator(
       AND c.brand_key = ?
      LEFT JOIN operator_source_selections sel ON sel.id = c.source_selection_id
      WHERE a.threads_user_id = ?
-     ORDER BY datetime(a.post_timestamp) DESC, s.id DESC
+          ORDER BY substr(a.post_timestamp, 1, 19) DESC, s.id DESC
      LIMIT 250`,
   ).bind(brandKey, accountId, brandKey, threadsUserId).all<Record<string, unknown>>();
   const postsById = new Map<string, Record<string, unknown>>();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildManifestRollingHourlySlots,
+    buildManifestRollingHourlySlots,
+  normalizeManifestThreadsTimestampForSqlite,
   resolveManifestAutonomousClock,
 } from "./src/index";
 import {
@@ -116,7 +117,7 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(clock.effective_now_iso).toBe("2026-07-21T19:08:10.000Z");
   });
 
-  it("starts the rolling horizon at the next future hour", () => {
+    it("starts the rolling horizon at the next future hour", () => {
     const slots = buildManifestRollingHourlySlots("2026-07-21", 13, 4);
 
     expect(slots.map((slot) => slot.key)).toEqual([
@@ -126,6 +127,13 @@ describe("Manifest autonomous clock and horizon", () => {
       "2026-07-21T17:00",
     ]);
     });
+
+  it("normalizes every Threads UTC timestamp form used by SQLite evidence windows", () => {
+    expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14+0000")).toBe("2026-07-23T21:00:14");
+    expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14+00:00")).toBe("2026-07-23T21:00:14");
+    expect(normalizeManifestThreadsTimestampForSqlite("2026-07-23T21:00:14Z")).toBe("2026-07-23T21:00:14");
+    expect(normalizeManifestThreadsTimestampForSqlite("not-a-timestamp")).toBeNull();
+  });
 });
 
 describe("Manifest intelligence foundation", () => {
@@ -192,6 +200,19 @@ describe("Manifest intelligence foundation", () => {
         target_followers: 1_000_000,
         followers_remaining: 999_495,
         long_horizon_follower_trajectory: "Account-level checkpoint only.",
+      },
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+    it("allows explicit follower-boundary compliance language", () => {
+    const result = validateManifestFollowerAttributionBoundary({
+      account_conclusion: {
+        account_context: "Follower movement is account-level context only and cannot be attributed to individual posts or posting periods.",
+      },
+      directives: {
+        follower_boundary: "Do not attribute followers to posts, days, families, experiments, or cycles.",
       },
     });
 
