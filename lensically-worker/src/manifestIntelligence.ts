@@ -1188,15 +1188,24 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
   const requiredKeys = new Set(missingSlots.map((slot) => text(slot.key, 40)).filter(Boolean));
   const receivedKeys = new Set<string>();
   const allowedModes = new Set(["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment"]);
+  const sourceCardIds = Array.from(new Set(input.lineup
+    .map((item) => text(item.source_card_id, 160))
+    .filter(Boolean)));
+  const sourceCardRows = sourceCardIds.length
+    ? await db.prepare(`SELECT id, status, source_selection_id FROM operator_source_cards
+        WHERE brand_key = ? AND id IN (SELECT value FROM json_each(?))`)
+      .bind(input.brandKey, stableManifestJson(sourceCardIds)).all<JsonRecord>()
+    : { results: [] as JsonRecord[] };
+  const sourceCardsById = new Map((sourceCardRows.results ?? [])
+    .map((row) => [String(row.id ?? ""), row] as const));
   for (const item of input.lineup) {
     const slotKey = text(item.slot_key, 40);
     const sourceKind = text(item.source_kind, 60);
     if (!slotKey || receivedKeys.has(slotKey) || !requiredKeys.has(slotKey)) throw new Error("manifest_cycle_lineup_slot_invalid");
     if (!["saved_pattern", "source_card"].includes(sourceKind)) throw new Error("manifest_cycle_lineup_source_backed_only");
-        const sourceCardId = text(item.source_card_id, 160);
+    const sourceCardId = text(item.source_card_id, 160);
     if (!sourceCardId) throw new Error("manifest_cycle_lineup_source_card_required");
-    const sourceCard = await db.prepare(`SELECT id, status, source_selection_id FROM operator_source_cards
-      WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sourceCardId, input.brandKey).first<JsonRecord>();
+    const sourceCard = sourceCardsById.get(sourceCardId);
     if (!sourceCard || String(sourceCard.status) !== "locked" || !text(sourceCard.source_selection_id, 160)) {
       throw new Error("manifest_cycle_lineup_locked_source_card_lineage_required");
     }
