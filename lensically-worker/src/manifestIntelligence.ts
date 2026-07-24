@@ -1124,7 +1124,6 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
   strongestExecutions: JsonRecord[]; weakestExecutions: JsonRecord[];
   directives: JsonRecord; experiments: JsonRecord[]; risks: unknown[]; lineup: JsonRecord[];
 }): Promise<JsonRecord> {
-  await ensureManifestIntelligenceTables(db);
   const consumption = await getManifestEvidenceConsumptionState(db, input.cycleId, input.brandKey);
   if (consumption.complete !== true || String(consumption.snapshot_id ?? "") !== input.snapshotId) {
     throw new Error("manifest_analysis_pages_not_fully_consumed");
