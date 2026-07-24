@@ -22760,6 +22760,10 @@ async function readOperatorOperationReceipt(env: Env, key: string): Promise<Reco
   return env.DB.prepare(`SELECT * FROM operator_operation_receipts WHERE idempotency_key = ? LIMIT 1`).bind(key).first<Record<string, unknown>>();
 }
 
+export function operatorOperationLeaseMs(toolName: string): number {
+  return toolName === "persist_manifest_autonomous_post" ? 60000 : 120000;
+}
+
 async function beginOperatorOperationReceipt(
   env: Env,
   key: string,
@@ -22767,14 +22771,15 @@ async function beginOperatorOperationReceipt(
   args: Record<string, unknown>,
 ): Promise<{ existing: Record<string, unknown> | null; fingerprint: string; created: boolean }> {
     const fingerprint = await sha256OperatorText(JSON.stringify(args));
+  const leaseMs = operatorOperationLeaseMs(toolName);
   const existing = await readOperatorOperationReceipt(env, key);
   if (existing) {
     const status = String(existing.status ?? "");
     const sameFingerprint = String(existing.request_fingerprint ?? "") === fingerprint;
     const leaseTimestamp = Date.parse(String(existing.updated_at ?? existing.created_at ?? ""));
-    const staleStarted = status === "started"
+        const staleStarted = status === "started"
       && Number.isFinite(leaseTimestamp)
-      && Date.now() - leaseTimestamp >= 120000;
+      && Date.now() - leaseTimestamp >= leaseMs;
     if (sameFingerprint && (status === "failed" || staleStarted)) {
       const reclaimed = await env.DB.prepare(
         `UPDATE operator_operation_receipts
@@ -26446,12 +26451,13 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         }
                 if (!receipt.created && receipt.existing?.status === "started") {
           const startedAt = Date.parse(String(receipt.existing.updated_at ?? receipt.existing.created_at ?? ""));
-          const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
-          if (ageMs < 120000) {
+                    const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
+          const leaseMs = operatorOperationLeaseMs(toolName);
+          if (ageMs < leaseMs) {
             const resultPayload = {
               ok: false,
               error: "operation_already_in_progress",
-              retryable_after_seconds: Math.max(1, Math.ceil((120000 - ageMs) / 1000)),
+              retryable_after_seconds: Math.max(1, Math.ceil((leaseMs - ageMs) / 1000)),
               idempotency: {
                 version: OPERATOR_IDEMPOTENCY_VERSION,
                 key: idempotencyKey,

@@ -16,7 +16,8 @@ import worker, {
     getScheduledPostPublishLineageStatus,
   isExpectedHardeningControlResult,
   isSixHourInsightsRefreshWindow,
-  OPERATOR_MCP_VERSION,
+    OPERATOR_MCP_VERSION,
+  operatorOperationLeaseMs,
   searchKnownRepositoryFileContent,
   quarantineScheduledPostPublishAttempt,
   recoverStalePostingScheduledPosts,
@@ -4397,6 +4398,11 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(reviewed.operational_effect).toContain("No production change");
   }, 30000);
+
+      it("reclaims stranded exact-slot Manifest persistence sooner than other mutations", () => {
+    expect(operatorOperationLeaseMs("persist_manifest_autonomous_post")).toBe(60000);
+    expect(operatorOperationLeaseMs("schedule_approved_draft")).toBe(120000);
+  });
 
     it("treats exact-head patch conflicts as expected non-destructive engineering control flow", () => {
     expect(isExpectedHardeningControlResult(
