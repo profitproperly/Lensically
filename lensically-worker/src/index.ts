@@ -31721,6 +31721,17 @@ function operatorContentFocusDailyCandidates(families: Array<Record<string, unkn
   });
 }
 
+async function runOperatorD1StatementBatches(
+  db: D1Database,
+  statements: D1PreparedStatement[],
+  chunkSize = 40,
+): Promise<void> {
+  const boundedChunkSize = Math.max(1, Math.min(50, Math.trunc(chunkSize)));
+  for (let offset = 0; offset < statements.length; offset += boundedChunkSize) {
+    await db.batch(statements.slice(offset, offset + boundedChunkSize));
+  }
+}
+
 async function refreshOperatorPerformanceEvaluator(
   env: Env,
   brandKey: GptBrandKey,
@@ -31808,8 +31819,10 @@ async function refreshOperatorPerformanceEvaluator(
     snapshotsByPost.set(postId, rows);
   }
 
-  let fingerprintedPosts = 0;
+    let fingerprintedPosts = 0;
   let maturityScores = 0;
+  const fingerprintStatements: D1PreparedStatement[] = [];
+  const maturityStatements: D1PreparedStatement[] = [];
   for (const [postId, row] of postsById) {
     const text = String(row.post_text ?? "");
     const publishedAtMs = Date.parse(String(row.post_timestamp ?? row.published_at ?? ""));
@@ -31835,7 +31848,7 @@ async function refreshOperatorPerformanceEvaluator(
       sourceSelection: { source_identity_key: row.source_identity_key },
       adaptationPlan: operatorRecord(safeParseJsonString(String(row.adaptation_plan_json ?? ""))),
     });
-    await env.DB.prepare(
+        fingerprintStatements.push(env.DB.prepare(
       `INSERT INTO operator_post_fingerprints (
         id, brand_key, published_post_id, scheduled_post_id, draft_id, source_card_id,
         source_selection_id, text_hash, fingerprint_version, fingerprint_json
@@ -31856,8 +31869,8 @@ async function refreshOperatorPerformanceEvaluator(
       row.source_card_id ? String(row.source_card_id) : null,
       row.source_selection_id ? String(row.source_selection_id) : null,
       String(fingerprint.text_hash ?? ""), OPERATOR_POST_FINGERPRINT_VERSION,
-      normalizeOperatorJson(fingerprint, {}),
-    ).run();
+            normalizeOperatorJson(fingerprint, {}),
+    ));
     fingerprintedPosts += 1;
 
     let previousSelection: { row: Record<string, unknown>; ageHours: number } | null = null;
@@ -31875,7 +31888,7 @@ async function refreshOperatorPerformanceEvaluator(
         previousMetrics,
         previousAgeHours: previousSelection?.ageHours ?? null,
       });
-      await env.DB.prepare(
+            maturityStatements.push(env.DB.prepare(
         `INSERT INTO operator_post_performance_scores (
           id, brand_key, published_post_id, checkpoint_hours, snapshot_id, captured_at,
           post_age_hours, metrics_json, rates_json, velocity_json, scores_json,
@@ -31898,12 +31911,15 @@ async function refreshOperatorPerformanceEvaluator(
         normalizeOperatorJson(observation.metrics, {}), normalizeOperatorJson(observation.rates, {}),
         normalizeOperatorJson(observation.velocity, {}),
         normalizeOperatorJson({ reach: 50, resonance: 50, propagation: 50, conversation: 50, overall: 50 }, {}),
-        observation.distribution_state, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-      ).run();
+                observation.distribution_state, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+      ));
       maturityScores += 1;
       previousSelection = selection;
     }
   }
+
+    await runOperatorD1StatementBatches(env.DB, fingerprintStatements);
+  await runOperatorD1StatementBatches(env.DB, maturityStatements);
 
   const scoreRows = await env.DB.prepare(
     `SELECT id, published_post_id, checkpoint_hours, metrics_json, rates_json, velocity_json, scores_json
@@ -31917,6 +31933,7 @@ async function refreshOperatorPerformanceEvaluator(
     rows.push(row);
     byCheckpoint.set(checkpoint, rows);
   }
+    const scoreUpdateStatements: D1PreparedStatement[] = [];
   for (const rows of byCheckpoint.values()) {
     const parsed = rows.map((row) => ({
       row,
@@ -31946,12 +31963,14 @@ async function refreshOperatorPerformanceEvaluator(
         conversation: Number(conversation.toFixed(2)),
         overall: Number(operatorAverage([reach, resonance, propagation, conversation]).toFixed(2)),
       };
-      await env.DB.prepare(
+            scoreUpdateStatements.push(env.DB.prepare(
         `UPDATE operator_post_performance_scores SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      ).bind(normalizeOperatorJson(scores, {}), item.row.id).run();
+      ).bind(normalizeOperatorJson(scores, {}), item.row.id));
       item.row.scores_json = normalizeOperatorJson(scores, {});
     }
   }
+
+    await runOperatorD1StatementBatches(env.DB, scoreUpdateStatements);
 
   await env.DB.prepare(`UPDATE operator_performance_evidence SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
   await env.DB.prepare(`UPDATE operator_performance_hypotheses SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
@@ -31969,7 +31988,9 @@ async function refreshOperatorPerformanceEvaluator(
     rows.push(row);
     joinedByCheckpoint.set(checkpoint, rows);
   }
-  const evidenceRows: Array<Record<string, unknown>> = [];
+    const evidenceRows: Array<Record<string, unknown>> = [];
+  const evidenceStatements: D1PreparedStatement[] = [];
+  const hypothesisStatements: D1PreparedStatement[] = [];
   for (const [checkpointHours, rows] of joinedByCheckpoint) {
     const baselineOverall = calculateMedian(rows.map((row) => operatorScoreRecord(safeParseJsonString(String(row.scores_json ?? "{}"))).overall));
     const groups = new Map<string, { dimension: string; feature: string; rows: Array<Record<string, unknown>> }>();
@@ -32004,7 +32025,7 @@ async function refreshOperatorPerformanceEvaluator(
         overall_score_vs_cohort: Number(effectValue.toFixed(2)),
         cohort_median_overall_score: Number(baselineOverall.toFixed(2)),
       };
-      await env.DB.prepare(
+            evidenceStatements.push(env.DB.prepare(
         `INSERT INTO operator_performance_evidence (
           id, brand_key, checkpoint_hours, dimension, feature_key, sample_size, cohort_size,
           medians_json, effect_json, confidence_score, confidence_label, direction, status, evaluator_version
@@ -32023,8 +32044,8 @@ async function refreshOperatorPerformanceEvaluator(
       ).bind(
         crypto.randomUUID(), brandKey, checkpointHours, group.dimension, group.feature,
         sampleSize, rows.length, normalizeOperatorJson(medians, {}), normalizeOperatorJson(effect, {}),
-        confidenceScore, confidenceLabel, direction, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-      ).run();
+                confidenceScore, confidenceLabel, direction, OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+      ));
       const evidence = {
         checkpoint_hours: checkpointHours,
         dimension: group.dimension,
@@ -32040,7 +32061,7 @@ async function refreshOperatorPerformanceEvaluator(
       evidenceRows.push(evidence);
       if (sampleSize >= 3 && direction !== "neutral") {
         const hypothesisText = `At the ${checkpointHours}-hour maturity checkpoint, ${group.dimension}=${group.feature} is associated with ${direction === "positive" ? "stronger" : "weaker"} normalized post performance across ${sampleSize} posts.`;
-        await env.DB.prepare(
+                hypothesisStatements.push(env.DB.prepare(
           `INSERT INTO operator_performance_hypotheses (
             id, brand_key, checkpoint_hours, dimension, feature_key, hypothesis_text,
             direction, sample_size, confidence_score, confidence_label, evidence_json, status, evaluator_version
@@ -32058,11 +32079,13 @@ async function refreshOperatorPerformanceEvaluator(
         ).bind(
           crypto.randomUUID(), brandKey, checkpointHours, group.dimension, group.feature,
           hypothesisText, direction, sampleSize, confidenceScore, confidenceLabel,
-          normalizeOperatorJson(evidence, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
-        ).run();
+                    normalizeOperatorJson(evidence, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+        ));
       }
     }
   }
+  await runOperatorD1StatementBatches(env.DB, evidenceStatements);
+  await runOperatorD1StatementBatches(env.DB, hypothesisStatements);
 
   const checkpointCounts = Array.from(joinedByCheckpoint.entries())
     .map(([checkpoint, rows]) => ({ checkpoint, sample_size: rows.length }))
@@ -32231,20 +32254,20 @@ async function upsertOperatorContentFocusReview(
   return reviewId;
 }
 
-async function upsertOperatorContentFocusFamilyState(
+function buildOperatorContentFocusFamilyStateStatement(
   env: Env,
   brandKey: GptBrandKey,
   family: Record<string, unknown>,
   current: Record<string, unknown> | undefined,
   reviewId: string | null,
-  decision: OperatorContentFocusDecision | undefined,
-): Promise<void> {
+    decision: OperatorContentFocusDecision | undefined,
+): D1PreparedStatement {
   const status = family.status as OperatorContentFocusStatus;
   let weight = Number(family.allocation_weight ?? 0);
   if (weight > 0 && decision?.role === "use_more") weight += 0.2;
   if (weight > 0 && decision?.role === "use_less") weight = Math.max(0.05, weight - 0.3);
   if (weight > 0 && decision?.role === "learn_next") weight += 0.05;
-  await env.DB.prepare(
+    return env.DB.prepare(
     `INSERT INTO operator_content_focus_family_states (
       id, brand_key, source_card_family_id, source_identity_key, status,
       recommended_status, confidence_score, confidence_label, allocation_weight,
@@ -32269,8 +32292,8 @@ async function upsertOperatorContentFocusFamilyState(
     family.source_identity_key, status, family.recommended_status,
     family.confidence_score, family.confidence_label, weight, family.decision_reason,
     normalizeOperatorJson(family.reuse_directives, {}), normalizeOperatorJson(family.stop_directives, {}),
-    normalizeOperatorJson(family.horizons, {}), Number(current?.manual_lock ?? 0), reviewId,
-  ).run();
+        normalizeOperatorJson(family.horizons, {}), Number(current?.manual_lock ?? 0), reviewId,
+  );
 }
 
 async function refreshOperatorContentFocus(
@@ -32318,10 +32341,10 @@ async function refreshOperatorContentFocus(
     reviewIds.set(cadence, reviewId);
   }
   const authorityReviewId = reviewIds.get(authority) ?? reviewIds.get("daily") ?? null;
-  const decisionByFamily = new Map(dailyDecisions.map((decision) => [decision.source_card_family_id, decision]));
-  for (const family of families) {
+    const decisionByFamily = new Map(dailyDecisions.map((decision) => [decision.source_card_family_id, decision]));
+  const familyStateStatements = families.map((family) => {
     const familyId = String(family.source_card_family_id);
-    await upsertOperatorContentFocusFamilyState(
+    return buildOperatorContentFocusFamilyStateStatement(
       env,
       brandKey,
       family,
@@ -32329,7 +32352,8 @@ async function refreshOperatorContentFocus(
       authorityReviewId,
       decisionByFamily.get(familyId),
     );
-  }
+  });
+  await runOperatorD1StatementBatches(env.DB, familyStateStatements);
   return {
     version: OPERATOR_CONTENT_FOCUS_VERSION,
     anchor_date: anchorDate,
