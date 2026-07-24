@@ -795,14 +795,15 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
   brand_key: string;
   threads_user_id: string;
 }, options: {
-  phase?: "full" | "semantic_signatures" | "maturity_comparables" | "learning_observations" | "portfolio_experiments";
+    phase?: "full" | "semantic_signatures" | "maturity_comparables" | "maturity_evaluations" | "comparable_analyses" | "learning_observations" | "portfolio_experiments";
   learning_offset?: number;
   learning_limit?: number;
 } = {}): Promise<JsonRecord> {
   await ensureManifestIntelligenceEngineTables(db);
   const phase = options.phase ?? "full";
   const runSemantic = phase === "full" || phase === "semantic_signatures";
-  const runMaturity = phase === "full" || phase === "maturity_comparables";
+    const runMaturityEvaluations = phase === "full" || phase === "maturity_comparables" || phase === "maturity_evaluations";
+  const runComparableAnalyses = phase === "full" || phase === "maturity_comparables" || phase === "comparable_analyses";
   const runLearning = phase === "full" || phase === "learning_observations";
   const runPortfolio = phase === "full" || phase === "portfolio_experiments";
   let publishedRows: JsonRecord[] = [];
@@ -909,7 +910,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       scores: record(parseJson(row.scores_json, {})),
       distribution_state: text(row.distribution_state, 80),
     });
-        if (runMaturity) {
+            if (runMaturityEvaluations) {
     await db.prepare(`INSERT INTO operator_manifest_maturity_evaluations (
       id, brand_key, published_post_id, checkpoint_hours, evaluation_version, evaluation_json, structural_change_allowed
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -943,7 +944,15 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       placement_key: machine(placement, "unknown"),
     });
   }
-    if (runMaturity) {
+      if (phase === "maturity_evaluations") {
+    return {
+      engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
+      phase,
+      maturity_evaluations: maturityRows.length,
+      continuation_required: false,
+    };
+  }
+  if (runComparableAnalyses) {
   for (const target of candidates) {
     const analysis = buildManifestComparableAnalysis(target, candidates);
     await db.prepare(`INSERT INTO operator_manifest_comparable_analyses (
@@ -957,11 +966,11 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     ).run();
   }
   }
-  if (phase === "maturity_comparables") {
+    if (phase === "maturity_comparables" || phase === "comparable_analyses") {
     return {
       engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
       phase,
-      maturity_evaluations: maturityRows.length,
+      maturity_evaluations: phase === "maturity_comparables" ? maturityRows.length : 0,
       comparable_analyses: candidates.length,
       continuation_required: false,
     };
