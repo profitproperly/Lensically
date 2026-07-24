@@ -4365,10 +4365,11 @@ describe("operator mode MCP endpoint", () => {
 
   it("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
     const fixture = await prepareManifestSourceBackedCycleForTest();
-    const persisted = await mcpTool<{ scheduled_post_id: number }>(
+        const persisted = await mcpTool<{ success: boolean; scheduled_post_id: number; error?: string; blocking_failures?: unknown[] }>(
       "persist_manifest_autonomous_post",
       buildManifestSourceBackedPersistPayload(fixture),
     );
+    expect(persisted).toMatchObject({ success: true, scheduled_post_id: expect.any(Number) });
     const reviewed = await mcpTool<{
       success: boolean;
       action: string;
