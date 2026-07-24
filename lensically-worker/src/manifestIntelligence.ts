@@ -956,7 +956,6 @@ export async function createManifestEvidenceSnapshot(db: D1Database, input: {
 export async function readManifestEvidencePage(db: D1Database, input: {
   brandKey: string; cycleId: string; snapshotId?: string | null; pageIndex: number;
 }): Promise<JsonRecord> {
-  await ensureManifestIntelligenceTables(db);
   const snapshot = input.snapshotId
     ? await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE id = ? AND cycle_id = ? AND brand_key = ? LIMIT 1`)
       .bind(input.snapshotId, input.cycleId, input.brandKey).first<JsonRecord>()
