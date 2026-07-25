@@ -1571,6 +1571,36 @@ export async function listManifestCycleDefects(db: D1Database, cycleId: string):
   return (rows.results ?? []).map(serializeManifestCycleDefect);
 }
 
+export async function resolveManifestCycleDefectsByScope(db: D1Database, input: {
+  cycleId: string; brandKey: string; stageKey: string; phase: string;
+  slotKey?: string | null; verification: JsonRecord; resolvedAt?: string;
+}): Promise<JsonRecord[]> {
+  await ensureManifestIntelligenceTables(db);
+  const resolvedAt = input.resolvedAt ?? new Date().toISOString();
+  const rows = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts
+     WHERE cycle_id = ? AND brand_key = ? AND stage_key = ? AND phase = ?
+       AND COALESCE(slot_key, '') = COALESCE(?, '') AND status IN ('open', 'repairing')
+     ORDER BY datetime(first_seen_at) ASC`,
+  ).bind(input.cycleId, input.brandKey, input.stageKey, input.phase, input.slotKey ?? null).all<JsonRecord>();
+  const open = rows.results ?? [];
+  if (!open.length) return [];
+  await db.batch(open.map((row) => db.prepare(
+    `UPDATE operator_manifest_cycle_defect_receipts SET status = 'resolved',
+       root_cause = COALESCE(root_cause, 'Successful retry or authoritative reconciliation resolved the scoped failure.'),
+       verification_json = ?, resolved_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+  ).bind(stableManifestJson(input.verification), resolvedAt, row.id)));
+  await syncManifestCycleUnresolvedIssues(db, input.cycleId);
+  const resolved = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts
+     WHERE cycle_id = ? AND brand_key = ? AND stage_key = ? AND phase = ?
+       AND COALESCE(slot_key, '') = COALESCE(?, '')
+     ORDER BY datetime(first_seen_at) ASC`,
+  ).bind(input.cycleId, input.brandKey, input.stageKey, input.phase, input.slotKey ?? null).all<JsonRecord>();
+  return (resolved.results ?? []).map(serializeManifestCycleDefect);
+}
+
+
 
 function serializeHypothesis(row: JsonRecord): JsonRecord {
   return {
