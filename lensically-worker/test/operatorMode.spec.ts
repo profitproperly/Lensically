@@ -277,8 +277,28 @@ async function prepareManifestSourceBackedCycleForTest(
   const sourceSelectionId = crypto.randomUUID();
   const sourceIdentityKey = `threads:test-source-backed-${crypto.randomUUID().slice(0, 8)}`;
   const sourceText = "If your finger touched this today, expect a financial win within 7 days.";
-  const savedPatternId = 1_000_000 + Math.floor(Math.random() * 1_000_000_000);
+    const savedPatternId = 1_000_000 + Math.floor(Math.random() * 1_000_000_000);
   const sourceUrl = `https://www.threads.com/@fixture/post/${sourceIdentityKey.split(":").pop()}`;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS external_patterns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_user_id TEXT NOT NULL,
+      account_id TEXT NOT NULL DEFAULT 'manifest-mental',
+      platform TEXT NOT NULL DEFAULT 'threads',
+      source_url TEXT NOT NULL,
+      post_id TEXT,
+      post_text TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      views INTEGER,
+      capture_confidence TEXT NOT NULL DEFAULT 'medium',
+      saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(app_user_id, account_id, source_url)
+    )`,
+  ).run();
   await env.DB.prepare(
     `INSERT INTO external_patterns (
       id, app_user_id, account_id, platform, source_url, post_id, post_text,
