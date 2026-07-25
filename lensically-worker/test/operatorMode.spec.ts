@@ -1509,7 +1509,7 @@ describe("operator mode backend spine", () => {
     expect(result.structuredContent).toMatchObject({
       success: true,
       brand_key: "manifest_mental",
-            content_focus: { version: "content-focus-v2" },
+                        content_focus: { version: "content-focus-v3" },
     });
     expect(result.structuredContent.content_focus.reviews).toBeTruthy();
     expect(Array.isArray(result.structuredContent.content_focus.family_states)).toBe(true);
