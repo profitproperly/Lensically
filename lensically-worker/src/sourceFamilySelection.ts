@@ -83,6 +83,15 @@ function median(values: number[]): number | null {
     : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
+async function loadLiveSavedPatternIds(db: D1Database): Promise<Set<string> | null> {
+  const table = await db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'external_patterns' LIMIT 1`,
+  ).first<{ name: string }>();
+  if (!table?.name) return null;
+  const rows = await db.prepare(`SELECT CAST(id AS TEXT) AS id FROM external_patterns`).all<{ id: string }>();
+  return new Set((rows.results ?? []).map((row) => String(row.id)));
+}
+
 function normalizedIndex(value: number, baseline: number): number {
   if (baseline > 0) return Math.max(0, value) / baseline;
   if (value <= 0) return 1;
@@ -335,7 +344,8 @@ export async function refreshSourceFamilyLabels(
 ): Promise<Record<string, unknown>> {
   await ensureSourceFamilySelectionTables(db);
     const familyRows = await db.prepare(
-        `SELECT fam.id AS source_card_family_id, fam.source_identity_key
+                `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
+                sel.internal_source_id AS saved_pattern_id
      FROM operator_source_card_families fam
      JOIN operator_source_cards card
        ON card.id = fam.current_source_card_id
@@ -345,13 +355,15 @@ export async function refreshSourceFamilyLabels(
        ON sel.id = card.source_selection_id
       AND sel.brand_key = card.brand_key
       AND sel.source_type = 'saved_pattern'
-     JOIN external_patterns pattern
-       ON CAST(pattern.id AS TEXT) = sel.internal_source_id
      WHERE fam.brand_key = ?
        AND fam.status = 'active'
        AND card.status = 'locked'
        AND card.source_selection_id IS NOT NULL`,
-  ).bind(brandKey).all<Record<string, unknown>>();
+    ).bind(brandKey).all<Record<string, unknown>>();
+  const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
+  const eligibleFamilyRows = (familyRows.results ?? []).filter((row) =>
+    liveSavedPatternIds === null || liveSavedPatternIds.has(String(row.saved_pattern_id ?? ""))
+  );
 
   const evidenceRows = await db.prepare(
     `SELECT c.family_id AS source_card_family_id, fam.source_identity_key,
@@ -406,7 +418,7 @@ export async function refreshSourceFamilyLabels(
   const stateStatements: D1PreparedStatement[] = [];
   const transitionStatements: D1PreparedStatement[] = [];
   const labelCounts: Record<string, number> = {};
-  for (const family of familyRows.results ?? []) {
+    for (const family of eligibleFamilyRows) {
     const familyId = String(family.source_card_family_id ?? "");
     const sourceIdentityKey = String(family.source_identity_key ?? "");
     if (!familyId || !sourceIdentityKey) continue;
@@ -509,7 +521,7 @@ export async function refreshSourceFamilyLabels(
   }
   return {
     policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
-    family_count: familyRows.results?.length ?? 0,
+        family_count: eligibleFamilyRows.length,
     mature_account_post_count: accountLifetimeLikes.length,
     recent_account_post_count: accountRecentLikes.length,
     account_lifetime_median_likes: accountLifetimeMedian,
@@ -528,9 +540,10 @@ export async function loadLockedSourceCardSelectionCandidates(
   await refreshSourceFamilyLabels(db, brandKey, nowIso);
   const rows = await db.prepare(
 
-        `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
+                `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
             card.id AS source_card_id, card.source_mechanism, card.required_product,
-            card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction
+            card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction,
+            sel.internal_source_id AS saved_pattern_id
      FROM operator_source_card_families fam
      JOIN operator_source_cards card
        ON card.id = fam.current_source_card_id
@@ -540,15 +553,17 @@ export async function loadLockedSourceCardSelectionCandidates(
        ON sel.id = card.source_selection_id
       AND sel.brand_key = card.brand_key
       AND sel.source_type = 'saved_pattern'
-     JOIN external_patterns pattern
-       ON CAST(pattern.id AS TEXT) = sel.internal_source_id
      WHERE fam.brand_key = ?
        AND fam.status = 'active'
        AND card.status = 'locked'
        AND card.source_selection_id IS NOT NULL`,
 
-  ).bind(brandKey).all<Record<string, unknown>>();
-  const candidates = (rows.results ?? []).map((row) => {
+    ).bind(brandKey).all<Record<string, unknown>>();
+  const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
+  const eligibleRows = (rows.results ?? []).filter((row) =>
+    liveSavedPatternIds === null || liveSavedPatternIds.has(String(row.saved_pattern_id ?? ""))
+  );
+  const candidates = eligibleRows.map((row) => {
     let metrics: Record<string, unknown> = {};
     let primarySource: Record<string, unknown> = {};
     try { metrics = JSON.parse(String(row.metrics_snapshot_json ?? "{}")) as Record<string, unknown>; } catch { metrics = {}; }

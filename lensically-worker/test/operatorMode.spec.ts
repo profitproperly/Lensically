@@ -276,35 +276,7 @@ async function prepareManifestSourceBackedCycleForTest(
     const sourceBatchId = crypto.randomUUID();
   const sourceSelectionId = crypto.randomUUID();
   const sourceIdentityKey = `threads:test-source-backed-${crypto.randomUUID().slice(0, 8)}`;
-  const sourceText = "If your finger touched this today, expect a financial win within 7 days.";
-    const savedPatternId = 1_000_000 + Math.floor(Math.random() * 1_000_000_000);
-  const sourceUrl = `https://www.threads.com/@fixture/post/${sourceIdentityKey.split(":").pop()}`;
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS external_patterns (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      app_user_id TEXT NOT NULL,
-      account_id TEXT NOT NULL DEFAULT 'manifest-mental',
-      platform TEXT NOT NULL DEFAULT 'threads',
-      source_url TEXT NOT NULL,
-      post_id TEXT,
-      post_text TEXT NOT NULL,
-      likes INTEGER NOT NULL DEFAULT 0,
-      replies INTEGER NOT NULL DEFAULT 0,
-      reposts INTEGER NOT NULL DEFAULT 0,
-      shares INTEGER NOT NULL DEFAULT 0,
-      views INTEGER,
-      capture_confidence TEXT NOT NULL DEFAULT 'medium',
-      saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(app_user_id, account_id, source_url)
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `INSERT INTO external_patterns (
-      id, app_user_id, account_id, platform, source_url, post_id, post_text,
-      likes, replies, reposts, shares, views, capture_confidence
-    ) VALUES (?, 'lensically', 'manifest-mental', 'threads', ?, ?, ?, 2500, 0, 0, 0, 10000, 'high')`,
-  ).bind(savedPatternId, sourceUrl, sourceIdentityKey, sourceText).run();
+    const sourceText = "If your finger touched this today, expect a financial win within 7 days.";
   await env.DB.prepare(
     `INSERT INTO operator_source_selection_batches (
       id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
@@ -321,16 +293,16 @@ async function prepareManifestSourceBackedCycleForTest(
     sourceSelectionId,
     sourceBatchId,
     session.workflow_session_id,
-        sourceIdentityKey,
-    String(savedPatternId),
+            sourceIdentityKey,
     sourceIdentityKey,
-    sourceUrl,
+    sourceIdentityKey,
+    `https://www.threads.com/@fixture/post/${sourceIdentityKey.split(":").pop()}`,
     sourceText,
     JSON.stringify({ likes: 2500 }),
     JSON.stringify({
       source_identity_key: sourceIdentityKey,
       source_type: "saved_pattern",
-            internal_source_id: String(savedPatternId),
+                  internal_source_id: sourceIdentityKey,
       threads_post_id: sourceIdentityKey,
       text: sourceText,
       metrics: { likes: 2500 },
