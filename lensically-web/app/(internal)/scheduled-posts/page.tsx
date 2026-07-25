@@ -54,23 +54,9 @@ type ScheduledPostStrategy = {
   novelty_level?: string | null;
 };
 
-type ScheduledPostDeletion = {
-  id: string;
-  scheduled_post_id: number;
-  post_text: string;
-  scheduled_time_utc: string;
-  status_before: string;
-  reason: string;
-  deleted_by: "owner" | "model";
-  deletion_source: "ui" | "mcp";
-  operation_id?: string | null;
-  deleted_at: string;
-};
-
 type ScheduledPostsResponse = {
   success?: boolean;
   scheduled_posts?: ScheduledPost[];
-  deleted_posts?: ScheduledPostDeletion[];
   error?: string;
 };
 
@@ -298,8 +284,7 @@ export default function ScheduledPostsPage() {
   const [threadsUserId, setThreadsUserId] = useState<string>("");
   const [loadingConnection, setLoadingConnection] = useState(true);
   const [connectionError, setConnectionError] = useState("");
-    const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [deletedPosts, setDeletedPosts] = useState<ScheduledPostDeletion[]>([]);
+        const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loadingScheduledPosts, setLoadingScheduledPosts] = useState(false);
   const [scheduledPostsError, setScheduledPostsError] = useState("");
   const [deleteScheduledPostError, setDeleteScheduledPostError] = useState("");
@@ -441,8 +426,7 @@ export default function ScheduledPostsPage() {
 
   useEffect(() => {
         if (!threadsUserId) {
-      setScheduledPosts([]);
-      setDeletedPosts([]);
+            setScheduledPosts([]);
       setSelectedScheduledPostIds([]);
       setIsBulkSelectionMode(false);
       setScheduledPostsError("");
@@ -485,9 +469,8 @@ export default function ScheduledPostsPage() {
       );
 
       const data = (await response.json().catch(() => null)) as ScheduledPostsResponse | null;
-            if (Array.isArray(data?.scheduled_posts)) {
+                        if (Array.isArray(data?.scheduled_posts)) {
         setScheduledPosts(data.scheduled_posts);
-        setDeletedPosts(Array.isArray(data.deleted_posts) ? data.deleted_posts : []);
         setScheduledPostsError("");
         return;
       }
@@ -502,9 +485,8 @@ export default function ScheduledPostsPage() {
         return;
       }
 
-            const nextPosts = Array.isArray(data?.scheduled_posts) ? data.scheduled_posts : [];
+                        const nextPosts = Array.isArray(data?.scheduled_posts) ? data.scheduled_posts : [];
       setScheduledPosts(nextPosts);
-      setDeletedPosts(Array.isArray(data?.deleted_posts) ? data.deleted_posts : []);
     } catch {
       setScheduledPostsError("Could not load scheduled posts.");
     } finally {
@@ -546,8 +528,8 @@ export default function ScheduledPostsPage() {
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { success?: boolean; error?: string; deleted?: boolean; deletion?: ScheduledPostDeletion }
+            const data = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; deleted?: boolean }
         | null;
 
       if (!response.ok || data?.success === false || data?.deleted !== true) {
@@ -558,14 +540,6 @@ export default function ScheduledPostsPage() {
       setScheduledPosts((currentPosts) =>
         currentPosts.filter((post) => post.id !== scheduledPostId),
       );
-      if (data.deletion) {
-        setDeletedPosts((currentPosts) => [
-          data.deletion as ScheduledPostDeletion,
-          ...currentPosts.filter((post) => post.id !== data.deletion?.id),
-        ]);
-      } else {
-        void loadScheduledPosts();
-      }
       setDeleteScheduledPostSuccess("Scheduled post deleted and its reason was saved.");
       setScheduledPostsError("");
     } catch {
@@ -612,9 +586,8 @@ export default function ScheduledPostsPage() {
     setDeleteScheduledPostSuccess("");
   }
 
-    async function deleteScheduledPostRequest(scheduledPostId: number, reason: string): Promise<{
+        async function deleteScheduledPostRequest(scheduledPostId: number, reason: string): Promise<{
     success: boolean;
-    deletion?: ScheduledPostDeletion;
     error?: string;
   }> {
     try {
@@ -632,7 +605,7 @@ export default function ScheduledPostsPage() {
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { success?: boolean; error?: string; deleted?: boolean; deletion?: ScheduledPostDeletion }
+        | { success?: boolean; error?: string; deleted?: boolean }
         | null;
 
       if (!response.ok || data?.success === false || data?.deleted !== true) {
@@ -642,7 +615,7 @@ export default function ScheduledPostsPage() {
         };
       }
 
-      return { success: true, deletion: data.deletion };
+      return { success: true };
     } catch {
       return {
         success: false,
