@@ -432,15 +432,37 @@
       "live_verification": "The exact deployed Main tool returns the latest automatic learning brief, benchmark and run comparison, Saved Pattern intelligence, account-level follower checkpoint, strategy transitions, portfolio state, experiments, and explicit evidence gaps through bounded pageable sections without changing content or schedule state.",
       "compatibility_bridge": false
     },
-    {
+        {
       "capability_id": "strategy.read_manifest_cycle_receipt",
       "directory_entry_id": "strategy.manifest_cycle_receipt",
       "canonical_handler": "get_manifest_cycle_receipt",
       "route_intent": "get manifest cycle receipt",
       "implementation_mode": "new_handler",
-                        "focused_regression": "reads a complete cycle receipt after source-backed persistence without mutation",
+      "focused_regression": "reads a complete cycle receipt with pageable defect evidence and accurate open, blocking, and resolved counts without mutation",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool returns available=false before the first new-format run and a complete immutable receipt after a new-format autonomous cycle, without opening a hardening incident for normal absence.",
+      "live_verification": "The exact deployed Main tool returns available=false before the first new-format run and a complete immutable receipt after a new-format autonomous cycle, including attached defect receipts, without opening a hardening incident for normal absence.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "strategy.record_manifest_cycle_defect",
+      "directory_entry_id": "strategy.manifest_cycle_defect_receipt",
+      "canonical_handler": "record_manifest_cycle_defect",
+      "route_intent": "record manifest cycle defect",
+      "implementation_mode": "new_handler",
+      "focused_regression": "records one durable cycle defect with stage, phase, impact, retryability, blocking status, reconciliation, and occurrence count",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool attaches one external-boundary defect to an active Manifest cycle, updates unresolved issue state, and preserves the receipt for canonical reads.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "strategy.resolve_manifest_cycle_defect",
+      "directory_entry_id": "strategy.manifest_cycle_defect_resolution",
+      "canonical_handler": "resolve_manifest_cycle_defect",
+      "route_intent": "resolve manifest cycle defect",
+      "implementation_mode": "new_handler",
+      "focused_regression": "resolves one existing cycle defect with root cause, repair commit, deployed SHA, regression tests, reconciliation, and verification while preserving history",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool resolves an attached defect, removes it from unresolved issues, preserves it in the defect audit trail, and allows completion only when no blocking defect remains open.",
       "compatibility_bridge": false
     }
   ]
