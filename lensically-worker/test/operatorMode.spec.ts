@@ -2433,11 +2433,12 @@ describe("operator mode backend spine", () => {
       compatibility_bridge: string;
     }>("recover_published_post_lineage", {
       brand_key: "manifest_mental",
-      workflow_session_id: "all_missing_manifest_source_cards",
+            workflow_session_id: "live-continuity-session-placeholder",
       saved_pattern_id: 1,
       published_post_ids: ["compatibility-bridge-placeholder"],
       source_card: {
-        title: "Compatibility bridge placeholder",
+        title: "all_missing_manifest_source_cards",
+
         source_mechanism: "Compatibility bridge request.",
         required_product: "Complete source-card backfill.",
         forbidden_surfaces: [],

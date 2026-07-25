@@ -16926,8 +16926,16 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
     if (toolName === "recover_published_post_lineage") {
-    const compatibilityWorkflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true);
-    if (brand.brand_key === "manifest_mental" && compatibilityWorkflowSessionId === "all_missing_manifest_source_cards") {
+        const compatibilityWorkflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true);
+    const compatibilitySourceCard = payload.source_card && typeof payload.source_card === "object" && !Array.isArray(payload.source_card)
+      ? payload.source_card as Record<string, unknown>
+      : {};
+    const compatibilitySourceCardTitle = normalizeOperatorText(compatibilitySourceCard.title, 200, true);
+    if (brand.brand_key === "manifest_mental" && (
+      compatibilityWorkflowSessionId === "all_missing_manifest_source_cards"
+      || compatibilitySourceCardTitle === "all_missing_manifest_source_cards"
+    )) {
+
       const bridgeOperationId = normalizeOperatorText(payload.operation_id, 160, true)
         ?? `manifest-source-card-backfill-recovery-bridge-${Date.now()}`;
       const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
@@ -21211,7 +21219,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.39.6";
+export const OPERATOR_MCP_VERSION = "1.39.7";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
