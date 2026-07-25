@@ -129,9 +129,9 @@ import {
   ensureSourceFamilySelectionTables,
   loadLockedSourceCardSelectionCandidates,
 
-  persistLockedSourceSelectionPlan,
-  persistSourceSelectionReceipts,
+    persistLockedSourceSelectionPlan,
   readLockedSourceSelectionPlan,
+
   refreshSourceFamilyLabels,
   runSourceFamilySelectionEdgeCases,
   selectSourceFamilyLineup,
