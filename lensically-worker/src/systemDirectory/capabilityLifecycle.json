@@ -179,8 +179,20 @@
       "live_verification": "The exact deployed Main tool returns the next bounded set of uncarded Manifest Saved Patterns, create_source_card resolves each Saved Pattern ID into a durable source selection and locked canonical card, and the final preparation read reports complete only when zero Saved Patterns remain uncarded.",
       "compatibility_bridge": false
     },
+        {
+      "capability_id": "content.create_all_missing_manifest_source_cards",
+      "directory_entry_id": "content.manifest_source_card_backfill",
+      "canonical_handler": "create_all_missing_manifest_source_cards",
+      "route_intent": "create all missing manifest source cards",
+      "implementation_mode": "new_handler",
+      "focused_regression": "prepares and completes a bounded Saved Pattern source-card backfill",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool creates and locks bounded batches of uncarded Manifest Saved Patterns with durable source-selection lineage, and repeated calls complete only when remaining_count is zero.",
+      "compatibility_bridge": false
+    },
     {
       "capability_id": "analytics.read_content_focus",
+
       "directory_entry_id": "analytics.content_focus",
       "canonical_handler": "get_content_focus",
       "route_intent": "get content focus",
