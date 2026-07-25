@@ -273,10 +273,18 @@ async function prepareManifestSourceBackedCycleForTest(
     brand_key: "manifest_mental",
     proceed_confirmed: true,
   });
-  const sourceBatchId = crypto.randomUUID();
+    const sourceBatchId = crypto.randomUUID();
   const sourceSelectionId = crypto.randomUUID();
   const sourceIdentityKey = `threads:test-source-backed-${crypto.randomUUID().slice(0, 8)}`;
   const sourceText = "If your finger touched this today, expect a financial win within 7 days.";
+  const savedPatternId = 1_000_000 + Math.floor(Math.random() * 1_000_000_000);
+  const sourceUrl = `https://www.threads.com/@fixture/post/${sourceIdentityKey.split(":").pop()}`;
+  await env.DB.prepare(
+    `INSERT INTO external_patterns (
+      id, app_user_id, account_id, platform, source_url, post_id, post_text,
+      likes, replies, reposts, shares, views, capture_confidence
+    ) VALUES (?, 'lensically', 'manifest-mental', 'threads', ?, ?, ?, 2500, 0, 0, 0, 10000, 'high')`,
+  ).bind(savedPatternId, sourceUrl, sourceIdentityKey, sourceText).run();
   await env.DB.prepare(
     `INSERT INTO operator_source_selection_batches (
       id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
@@ -293,16 +301,16 @@ async function prepareManifestSourceBackedCycleForTest(
     sourceSelectionId,
     sourceBatchId,
     session.workflow_session_id,
+        sourceIdentityKey,
+    String(savedPatternId),
     sourceIdentityKey,
-    sourceIdentityKey,
-    sourceIdentityKey,
-    `https://www.threads.com/@fixture/post/${sourceIdentityKey.split(":").pop()}`,
+    sourceUrl,
     sourceText,
     JSON.stringify({ likes: 2500 }),
     JSON.stringify({
       source_identity_key: sourceIdentityKey,
       source_type: "saved_pattern",
-      internal_source_id: sourceIdentityKey,
+            internal_source_id: String(savedPatternId),
       threads_post_id: sourceIdentityKey,
       text: sourceText,
       metrics: { likes: 2500 },

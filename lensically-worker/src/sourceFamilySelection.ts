@@ -1,5 +1,5 @@
-export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v3";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v3";
+export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v4";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v4";
 
 
 export type SourceFamilyLifetimeLabel =
@@ -335,9 +335,9 @@ export async function refreshSourceFamilyLabels(
 ): Promise<Record<string, unknown>> {
   await ensureSourceFamilySelectionTables(db);
     const familyRows = await db.prepare(
-    `SELECT fam.id AS source_card_family_id, fam.source_identity_key
+        `SELECT fam.id AS source_card_family_id, fam.source_identity_key
      FROM operator_source_card_families fam
-          JOIN operator_source_cards card
+     JOIN operator_source_cards card
        ON card.id = fam.current_source_card_id
       AND card.brand_key = fam.brand_key
       AND card.is_current = 1
@@ -345,6 +345,8 @@ export async function refreshSourceFamilyLabels(
        ON sel.id = card.source_selection_id
       AND sel.brand_key = card.brand_key
       AND sel.source_type = 'saved_pattern'
+     JOIN external_patterns pattern
+       ON CAST(pattern.id AS TEXT) = sel.internal_source_id
      WHERE fam.brand_key = ?
        AND fam.status = 'active'
        AND card.status = 'locked'
@@ -526,11 +528,11 @@ export async function loadLockedSourceCardSelectionCandidates(
   await refreshSourceFamilyLabels(db, brandKey, nowIso);
   const rows = await db.prepare(
 
-    `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
+        `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
             card.id AS source_card_id, card.source_mechanism, card.required_product,
             card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction
      FROM operator_source_card_families fam
-          JOIN operator_source_cards card
+     JOIN operator_source_cards card
        ON card.id = fam.current_source_card_id
       AND card.brand_key = fam.brand_key
       AND card.is_current = 1
@@ -538,6 +540,8 @@ export async function loadLockedSourceCardSelectionCandidates(
        ON sel.id = card.source_selection_id
       AND sel.brand_key = card.brand_key
       AND sel.source_type = 'saved_pattern'
+     JOIN external_patterns pattern
+       ON CAST(pattern.id AS TEXT) = sel.internal_source_id
      WHERE fam.brand_key = ?
        AND fam.status = 'active'
        AND card.status = 'locked'
