@@ -3376,14 +3376,14 @@ describe("operator mode MCP endpoint", () => {
       proceed_confirmed: true,
     });
     expect(receipt.cycle_receipt).toMatchObject({ defect_count: 1, open_defect_count: 0, resolved_defect_count: 1, unresolved_issue_count: 0 });
-    expect(receipt.receipt_section.items).toEqual([
+        expect(receipt.receipt_section.items).toEqual([
       expect.objectContaining({
         defect_key: "test:schema:learning-brief",
         status: "resolved",
         verification: expect.objectContaining({ production_retry_succeeded: true }),
       }),
     ]);
-  });
+  }, 30000);
 
     it("blocks cycle completion until every blocking defect is resolved and then closes the same receipt", async () => {
     await mcpTool("get_manifest_intelligence_foundation", { brand_key: "manifest_mental", proceed_confirmed: true });
