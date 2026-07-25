@@ -11673,14 +11673,11 @@ async function ensureManifestSourceBatchForDate(
     throw new Error(`insufficient_qualified_sources:${eligiblePool.length}`);
   }
 
-    const selectedAt = new Date().toISOString();
+        const selectedAt = new Date().toISOString();
   const batchId = crypto.randomUUID();
-  const sourceSelection = selectSourceFamilyLineup({
-    candidates: eligiblePool,
-    slot_keys: Array.from({ length: MANIFEST_DAILY_SOURCE_DRAW_SIZE }, (_, index) => `${productionDate}T${operatorHourlySlot(index)}`),
-    seed: `${brand.brand_key}:${productionDate}:${batchId}`,
-  });
-  const selectedCandidates = sourceSelection.selected;
+  const focusSelection = selectOperatorContentFocusSources(eligiblePool, MANIFEST_DAILY_SOURCE_DRAW_SIZE);
+  const selectedCandidates = focusSelection.selected;
+
 
   const statements = [
     env.DB.prepare(
@@ -11705,9 +11702,11 @@ async function ensureManifestSourceBatchForDate(
                 same_day_source_claims_enforced: true,
                 performance_weighting_applied: true,
         content_focus_version: OPERATOR_CONTENT_FOCUS_VERSION,
-        source_family_label_policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
-        source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
-        source_selection_summary: sourceSelection.summary,
+                source_family_label_policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
+        guided_review_selection_mode: "pre_card_source_draw",
+        content_focus_allocation: focusSelection.allocation,
+
+
 
       }, {}),
       productionDate,
@@ -11750,14 +11749,9 @@ async function ensureManifestSourceBatchForDate(
       metrics_snapshot: metricsSnapshot,
     };
   });
-    await env.DB.batch(statements);
-  await persistSourceSelectionReceipts(env.DB, {
-    brand_key: brand.brand_key,
-    scope_type: "batch",
-    scope_id: batchId,
-    receipts: sourceSelection.receipts,
-  });
+        await env.DB.batch(statements);
   const batch = await env.DB.prepare(
+
 
     `SELECT * FROM operator_source_selection_batches WHERE id = ? LIMIT 1`,
   ).bind(batchId).first<Record<string, unknown>>();
