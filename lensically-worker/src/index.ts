@@ -16938,9 +16938,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
       const bridgeOperationId = normalizeOperatorText(payload.operation_id, 160, true)
         ?? `manifest-source-card-backfill-recovery-bridge-${Date.now()}`;
-      const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
+            const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
         brand_key: brand.brand_key,
-        limit: 25,
+        limit: 4,
         proceed_confirmed: true,
         operation_id: `${bridgeOperationId}-batch`,
       });
@@ -16960,11 +16960,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(recovered.payload, recovered.status);
   }
 
-      if (toolName === "create_all_missing_manifest_source_cards") {
+        if (toolName === "create_all_missing_manifest_source_cards") {
     if (brand.brand_key !== "manifest_mental") {
       return operatorJsonResponse({ success: false, error: "manifest_mental_required" }, 400);
     }
-    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 25)), 1), 25);
+    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 4)), 1), 4);
     const baseOperationId = normalizeOperatorText(payload.operation_id, 160, true)
       ?? `manifest-source-card-backfill-${Date.now()}`;
     const prepared = await callOperatorToolForMcp(request, env, "prepare_manifest_source_card_backfill", {
@@ -17256,9 +17256,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (brand.brand_key === "manifest_mental" && compatibilitySequenceLabel === "all_missing_manifest_source_cards") {
       const bridgeOperationId = normalizeOperatorText(payload.operation_id, 160, true)
         ?? `manifest-source-card-backfill-bridge-${Date.now()}`;
-      const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
+            const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
         brand_key: brand.brand_key,
-        limit: 25,
+        limit: 4,
         proceed_confirmed: true,
         operation_id: `${bridgeOperationId}-batch`,
       });
@@ -19619,7 +19619,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
-        limit: { type: "integer", minimum: 1, maximum: 25, default: 25 },
+                limit: { type: "integer", minimum: 1, maximum: 4, default: 4 },
       },
       required: ["brand_key"],
       additionalProperties: false,
@@ -21219,7 +21219,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.39.7";
+export const OPERATOR_MCP_VERSION = "1.39.8";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 

@@ -2370,7 +2370,7 @@ describe("operator mode backend spine", () => {
       cards: Array<{ saved_pattern_id: number; status: string }>;
     }>("create_all_missing_manifest_source_cards", {
       brand_key: "manifest_mental",
-      limit: 25,
+            limit: 4,
       operation_id: "test-create-all-missing-manifest-source-cards",
     });
     expect(automated.status).toBe("complete");

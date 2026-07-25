@@ -654,7 +654,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     objects: ["missing Saved Pattern source card", "bounded creation batch", "locked canonical source card"],
     keywords: ["create all missing manifest source cards", "create missing source cards", "card every saved pattern"],
     capabilities: ["create bounded missing source-card batches", "persist Saved Pattern source-selection lineage", "lock canonical source cards", "verify zero remaining cards"],
-    payload: { action_size: "bounded_mutation", max_results: 25, max_response_bytes: 22000, required_inputs: ["brand_key"] },
+    payload: { action_size: "bounded_mutation", max_results: 4, max_response_bytes: 22000, required_inputs: ["brand_key"] },
     route_intent: "create all missing manifest source cards",
     related_entry_ids: ["content.manifest_source_card_backfill", "content.sources", "strategy.manifest_autonomous_cycle"],
     recommended_next_planes: ["content_production"],
