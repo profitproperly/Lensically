@@ -2415,7 +2415,45 @@ describe("operator mode backend spine", () => {
     expect(bridged.total_carded_after).toBe(5);
     expect(bridged.compatibility_bridge).toBe("create_source_card.sequence_label");
 
+        await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, platform, source_url, post_id, post_text,
+        likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+      ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, 3, 0, 0, 0, 30, '2026-07-25T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+    ).bind(
+      'https://www.threads.com/@fixture/post/backfill-6',
+      'backfill-6',
+      'The non-reentrant compatibility bridge must create every remaining source card.',
+    ).run();
+    const recoveryBridge = await operatorTool<{
+      status: string;
+      created_count: number;
+      remaining_count: number;
+      total_carded_after: number;
+      compatibility_bridge: string;
+    }>("recover_published_post_lineage", {
+      brand_key: "manifest_mental",
+      workflow_session_id: "all_missing_manifest_source_cards",
+      saved_pattern_id: 1,
+      published_post_ids: ["compatibility-bridge-placeholder"],
+      source_card: {
+        title: "Compatibility bridge placeholder",
+        source_mechanism: "Compatibility bridge request.",
+        required_product: "Complete source-card backfill.",
+        forbidden_surfaces: [],
+        pass_conditions: ["All missing cards are created."],
+        fail_conditions: ["Any Saved Pattern remains uncarded."],
+      },
+      operation_id: "test-create-all-missing-manifest-source-cards-recovery-bridge",
+    });
+    expect(recoveryBridge.status).toBe("complete");
+    expect(recoveryBridge.created_count).toBe(1);
+    expect(recoveryBridge.remaining_count).toBe(0);
+    expect(recoveryBridge.total_carded_after).toBe(6);
+    expect(recoveryBridge.compatibility_bridge).toBe("recover_published_post_lineage.workflow_session_id");
+
     const linked = await env.DB.prepare(
+
 
 
       `SELECT COUNT(*) AS total
@@ -2425,7 +2463,8 @@ describe("operator mode backend spine", () => {
          AND s.source_type = 'saved_pattern'
          AND c.status = 'locked'`,
     ).first<{ total: number }>();
-            expect(Number(linked?.total ?? 0)).toBe(5);
+                expect(Number(linked?.total ?? 0)).toBe(6);
+
 
 
   }, 30000);
