@@ -17144,6 +17144,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         if (!pattern) {
           return operatorJsonResponse({ success: false, error: "saved_pattern_not_found", saved_pattern_id: savedPatternId }, 404);
         }
+                const backfillSessionId = `${brand.brand_key}-source-card-backfill-session`;
         const batchId = `manifest-source-card-backfill-${savedPatternId}`;
         const selectionId = `manifest-source-card-selection-${savedPatternId}`;
         const selectedAt = new Date().toISOString();
@@ -17181,16 +17182,22 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           source_updated_at: pattern.updated_at ?? null,
           evidence_role: "market_evidence",
         };
-        await env.DB.batch([
+                await env.DB.batch([
+          env.DB.prepare(
+            `INSERT OR IGNORE INTO operator_workflow_sessions (
+              id, brand_key, workflow_template_key, objective, status, current_stage, notes
+            ) VALUES (?, ?, 'source_card_backfill_v1', 'Card every Manifest Saved Pattern', 'preserved', 'source_card_backfill', 'Durable isolated maintenance session for Saved Pattern source-card backfill.')`,
+          ).bind(backfillSessionId, brand.brand_key),
           env.DB.prepare(
             `INSERT OR IGNORE INTO operator_source_selection_batches (
               id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
               qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
               production_date, status
-            ) VALUES (?, ?, NULL, 'saved_pattern_source_card_backfill', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
+            ) VALUES (?, ?, ?, 'saved_pattern_source_card_backfill', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
           ).bind(
             batchId,
             brand.brand_key,
+            backfillSessionId,
             selectedAt,
             normalizeOperatorJson({ saved_pattern_id: savedPatternId, purpose: "source_card_backfill" }, {}),
           ),
@@ -17199,11 +17206,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
               id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
               source_type, internal_source_id, threads_post_id, canonical_source_url,
               post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
-            ) VALUES (?, ?, ?, NULL, 1, ?, 'saved_pattern', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, 1, ?, 'saved_pattern', ?, ?, ?, ?, ?, ?, ?, ?)`,
           ).bind(
             selectionId,
             batchId,
             brand.brand_key,
+            backfillSessionId,
             sourceIdentityKey,
             String(savedPatternId),
             threadsPostId,
