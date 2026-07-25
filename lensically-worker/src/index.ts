@@ -21034,7 +21034,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.39.1";
+export const OPERATOR_MCP_VERSION = "1.39.2";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -24964,10 +24964,12 @@ async function handleOperatorMcpAdminTool(
         liveReadRows.push({ tool_name: name, passed: false, status: 500, error: errorText.slice(0, 500) || "read_execution_failed" });
         continue;
       }
-      const status = Math.trunc(Number(result.status ?? 200));
+            const rawHttpStatus = result.http_status ?? (typeof result.status === "number" ? result.status : 200);
+      const status = Math.trunc(Number(rawHttpStatus));
+      const transportOk = result.transport_ok !== false;
       const errorCode = typeof result.error === "string" ? result.error : null;
       const legitimateEmpty = Boolean(errorCode && legitimateEmptyReadErrors.has(errorCode));
-      const passed = legitimateEmpty || (status < 400 && result.ok !== false && result.success !== false && !result.error);
+      const passed = legitimateEmpty || (status < 400 && transportOk && result.ok !== false && result.success !== false && !result.error);
       liveReadRows.push({
         tool_name: name,
         passed,
@@ -26815,16 +26817,20 @@ async function callOperatorToolForMcp(request: Request, env: Env, toolName: stri
   });
   const response = await handleOperatorTool(toolRequest, env, toolName);
   const payload = await readJsonSafe(response);
-  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    if (payload && typeof payload === "object" && !Array.isArray(payload)) {
     return {
       status: response.status,
       ok: response.status < 400,
       ...(payload as Record<string, unknown>),
+      http_status: response.status,
+      transport_ok: response.status < 400,
     };
   }
   return {
     status: response.status,
     ok: response.status < 400,
+    http_status: response.status,
+    transport_ok: response.status < 400,
     error: response.status < 400 ? null : "operator_tool_failed",
   };
 }
