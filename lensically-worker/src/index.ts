@@ -16935,6 +16935,99 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(recovered.payload, recovered.status);
   }
 
+    if (toolName === "prepare_manifest_source_card_backfill") {
+    if (brand.brand_key !== "manifest_mental") {
+      return operatorJsonResponse({ success: false, error: "manifest_mental_required" }, 400);
+    }
+    await ensureOperatorWorkflowTables(env);
+    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 8)), 1), 25);
+    const totalRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM external_patterns
+       WHERE app_user_id = ? AND account_id = ?`,
+    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total: number | string }>();
+    const cardedRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM external_patterns p
+       WHERE p.app_user_id = ?
+         AND p.account_id = ?
+         AND EXISTS (
+           SELECT 1
+           FROM operator_source_selections s
+           JOIN operator_source_cards c
+             ON c.id = s.source_card_id
+            AND c.brand_key = s.brand_key
+           WHERE s.brand_key = ?
+             AND s.source_type = 'saved_pattern'
+             AND s.internal_source_id = CAST(p.id AS TEXT)
+         )`,
+    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, brand.brand_key).first<{ total: number | string }>();
+    const rows = await env.DB.prepare(
+      `SELECT p.id, p.post_id, p.post_text, p.views, p.likes, p.replies, p.reposts,
+              p.shares, p.source_url, p.posted_at, p.capture_confidence, p.updated_at
+       FROM external_patterns p
+       WHERE p.app_user_id = ?
+         AND p.account_id = ?
+         AND NOT EXISTS (
+           SELECT 1
+           FROM operator_source_selections s
+           JOIN operator_source_cards c
+             ON c.id = s.source_card_id
+            AND c.brand_key = s.brand_key
+           WHERE s.brand_key = ?
+             AND s.source_type = 'saved_pattern'
+             AND s.internal_source_id = CAST(p.id AS TEXT)
+         )
+       ORDER BY p.id ASC
+       LIMIT ?`,
+    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, brand.brand_key, limit).all<Record<string, unknown>>();
+    const savedPatternTotal = Number(totalRow?.total ?? 0);
+    const alreadyCardedCount = Number(cardedRow?.total ?? 0);
+    const uncardedCount = Math.max(0, savedPatternTotal - alreadyCardedCount);
+    const patterns = (rows.results ?? []).map((row) => {
+      const canonicalSourceUrl = canonicalizeThreadsSourceUrl(
+        typeof row.source_url === "string" ? row.source_url : null,
+      );
+      const threadsPostId = String(row.post_id ?? extractThreadsPostIdFromUrl(canonicalSourceUrl) ?? "").trim() || null;
+      const savedPatternId = Number(row.id);
+      return {
+        saved_pattern_id: savedPatternId,
+        source_identity_key: threadsPostId
+          ? `threads:${threadsPostId}`
+          : canonicalSourceUrl
+            ? `url:${canonicalSourceUrl}`
+            : `saved_pattern:${savedPatternId}`,
+        threads_post_id: threadsPostId,
+        canonical_source_url: canonicalSourceUrl,
+        post_text: row.post_text,
+        posted_at: row.posted_at ?? null,
+        capture_confidence: row.capture_confidence ?? null,
+        source_updated_at: row.updated_at ?? null,
+        metrics: {
+          views: Number(row.views ?? 0),
+          likes: Number(row.likes ?? 0),
+          replies: Number(row.replies ?? 0),
+          reposts: Number(row.reposts ?? 0),
+          shares: Number(row.shares ?? 0),
+          engagement_total: Number(row.likes ?? 0) + Number(row.replies ?? 0) + Number(row.reposts ?? 0) + Number(row.shares ?? 0),
+        },
+      };
+    });
+    return operatorJsonResponse({
+      success: true,
+      brand_key: brand.brand_key,
+      status: uncardedCount === 0 ? "complete" : "ready",
+      saved_pattern_total: savedPatternTotal,
+      already_carded_count: alreadyCardedCount,
+      uncarded_count: uncardedCount,
+      batch_limit: limit,
+      returned_count: patterns.length,
+      patterns,
+      completion_rule: "Complete only when every Saved Pattern has a linked source card.",
+      interruption_rule: "Report an uncarded count only when execution is forced to stop before completion.",
+    });
+  }
+
   if (toolName === "get_source_candidate_batch") {
     const batchId = normalizeOperatorText(payload.source_batch_id, 120);
     if (!batchId) {
@@ -17023,9 +17116,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const requiredProduct = normalizeOperatorText(payload.required_product, 4000);
     let workflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true);
     let sequenceLabel = normalizeOperatorText(payload.sequence_label, 120) || `source_card_${Date.now()}`;
-    let primarySource: unknown = payload.primary_source ?? {};
+        let primarySource: unknown = payload.primary_source ?? {};
     let metricsSnapshot: unknown = payload.metrics_snapshot ?? null;
     let sourceSelectionId: string | null = null;
+    const parsedSavedPatternId = Number(payload.saved_pattern_id);
+    const savedPatternId = Number.isInteger(parsedSavedPatternId) && parsedSavedPatternId > 0
+      ? parsedSavedPatternId
+      : null;
 
         let familyId: string | null = null;
     let versionNumber = 1;
@@ -17034,10 +17131,94 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const createNewVersion = payload.create_new_version === true;
     const transformationContract = normalizeSourceTransformationContract(payload.transformation_contract);
 
-    if (brand.brand_key === "manifest_mental") {
+        if (brand.brand_key === "manifest_mental") {
       sourceSelectionId = normalizeOperatorText(payload.source_selection_id, 120);
+      if (!sourceSelectionId && savedPatternId !== null) {
+        const pattern = await env.DB.prepare(
+          `SELECT id, post_id, post_text, views, likes, replies, reposts, shares,
+                  source_url, posted_at, capture_confidence, updated_at
+           FROM external_patterns
+           WHERE id = ? AND app_user_id = ? AND account_id = ?
+           LIMIT 1`,
+        ).bind(savedPatternId, SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<Record<string, unknown>>();
+        if (!pattern) {
+          return operatorJsonResponse({ success: false, error: "saved_pattern_not_found", saved_pattern_id: savedPatternId }, 404);
+        }
+        const batchId = `manifest-source-card-backfill-${savedPatternId}`;
+        const selectionId = `manifest-source-card-selection-${savedPatternId}`;
+        const selectedAt = new Date().toISOString();
+        const canonicalSourceUrl = canonicalizeThreadsSourceUrl(
+          typeof pattern.source_url === "string" ? pattern.source_url : null,
+        );
+        const threadsPostId = String(pattern.post_id ?? extractThreadsPostIdFromUrl(canonicalSourceUrl) ?? "").trim() || null;
+        const sourceIdentityKey = threadsPostId
+          ? `threads:${threadsPostId}`
+          : canonicalSourceUrl
+            ? `url:${canonicalSourceUrl}`
+            : `saved_pattern:${savedPatternId}`;
+        const metrics = {
+          views: Number(pattern.views ?? 0),
+          likes: Number(pattern.likes ?? 0),
+          replies: Number(pattern.replies ?? 0),
+          reposts: Number(pattern.reposts ?? 0),
+          quotes: 0,
+          shares: Number(pattern.shares ?? 0),
+          engagement_total: Number(pattern.likes ?? 0) + Number(pattern.replies ?? 0) + Number(pattern.reposts ?? 0) + Number(pattern.shares ?? 0),
+          captured_at: selectedAt,
+        };
+        const sourceSnapshot = {
+          source_candidate_id: `saved_pattern:${savedPatternId}`,
+          source_identity_key: sourceIdentityKey,
+          source_type: "saved_pattern",
+          source_id: savedPatternId,
+          internal_source_id: String(savedPatternId),
+          threads_post_id: threadsPostId,
+          canonical_source_url: canonicalSourceUrl,
+          text: pattern.post_text,
+          metrics,
+          posted_at: pattern.posted_at ?? null,
+          capture_confidence: pattern.capture_confidence ?? null,
+          source_updated_at: pattern.updated_at ?? null,
+          evidence_role: "market_evidence",
+        };
+        await env.DB.batch([
+          env.DB.prepare(
+            `INSERT OR IGNORE INTO operator_source_selection_batches (
+              id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+              qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+              production_date, status
+            ) VALUES (?, ?, NULL, 'saved_pattern_source_card_backfill', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
+          ).bind(
+            batchId,
+            brand.brand_key,
+            selectedAt,
+            normalizeOperatorJson({ saved_pattern_id: savedPatternId, purpose: "source_card_backfill" }, {}),
+          ),
+          env.DB.prepare(
+            `INSERT OR IGNORE INTO operator_source_selections (
+              id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+              source_type, internal_source_id, threads_post_id, canonical_source_url,
+              post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+            ) VALUES (?, ?, ?, NULL, 1, ?, 'saved_pattern', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ).bind(
+            selectionId,
+            batchId,
+            brand.brand_key,
+            sourceIdentityKey,
+            String(savedPatternId),
+            threadsPostId,
+            canonicalSourceUrl,
+            String(pattern.post_text ?? ""),
+            pattern.posted_at ?? null,
+            normalizeOperatorJson(metrics, {}),
+            normalizeOperatorJson(sourceSnapshot, {}),
+            selectedAt,
+          ),
+        ]);
+        sourceSelectionId = selectionId;
+      }
       if (!sourceSelectionId) {
-        return operatorJsonResponse({ success: false, error: "manifest_source_selection_id_required" }, 400);
+        return operatorJsonResponse({ success: false, error: "manifest_source_selection_id_or_saved_pattern_id_required" }, 400);
       }
       const selection = await env.DB.prepare(
         `SELECT *
@@ -17066,7 +17247,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       if (workflowSessionId && workflowSessionId !== selectionWorkflowSessionId) {
         return operatorJsonResponse({ success: false, error: "source_selection_workflow_mismatch" }, 400);
       }
-      workflowSessionId = selectionWorkflowSessionId;
+            workflowSessionId = selectionWorkflowSessionId || null;
       const sourceSnapshot = safeParseJsonString(String(selection.source_snapshot_json ?? "{}")) ?? {};
       primarySource = {
         ...(sourceSnapshot && typeof sourceSnapshot === "object" && !Array.isArray(sourceSnapshot)
@@ -17161,6 +17342,27 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       return operatorJsonResponse({ success: false, error: "primary_source is required" }, 400);
     }
 
+                const backfillValidation = savedPatternId !== null
+      ? validateSourceCardLockable({
+          brand_key: brand.brand_key,
+          primary_source: primarySource,
+          source_mechanism: sourceMechanism,
+          required_product: requiredProduct,
+          forbidden_surfaces: Array.isArray(payload.forbidden_surfaces) ? payload.forbidden_surfaces : [],
+          pass_conditions: Array.isArray(payload.pass_conditions) ? payload.pass_conditions : [],
+          fail_conditions: Array.isArray(payload.fail_conditions) ? payload.fail_conditions : [],
+          transformation_contract: transformationContract,
+        })
+      : null;
+    if (backfillValidation && !backfillValidation.can_lock) {
+      return operatorJsonResponse({
+        success: false,
+        error: "saved_pattern_source_card_not_lockable",
+        saved_pattern_id: savedPatternId,
+        validation: backfillValidation,
+      }, 400);
+    }
+    const backfillLockedAt = savedPatternId !== null ? new Date().toISOString() : null;
         const sourceCardStatements = [];
     if (supersedesSourceCardId) {
       sourceCardStatements.push(
@@ -17211,6 +17413,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         normalizeOperatorJson(transformationContract, {}),
       ),
     );
+        if (savedPatternId !== null) {
+      sourceCardStatements.push(
+        env.DB.prepare(
+          `UPDATE operator_source_cards
+           SET status = 'locked', locked_at = ?
+           WHERE id = ? AND brand_key = ?`,
+        ).bind(backfillLockedAt, sourceCardId, brand.brand_key),
+      );
+    }
     if (familyId) {
       sourceCardStatements.push(
         env.DB.prepare(
@@ -17261,7 +17472,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       family_id: familyId,
       version_number: versionNumber,
       supersedes_source_card_id: supersedesSourceCardId,
-            status: "draft",
+                        status: savedPatternId !== null ? "locked" : "draft",
+      locked_at: backfillLockedAt,
       reused_existing: false,
       validation: validateSourceCardLockable(card ?? {}),
       owner_presentation: {
@@ -19223,6 +19435,21 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
+    {
+    name: "prepare_manifest_source_card_backfill",
+    title: "Prepare Manifest source-card backfill",
+    description: "Read the next bounded batch of Manifest Mental Saved Patterns that do not yet have linked source cards. Continue calling this after each batch until status=complete. A normal successful run ends only when every Saved Pattern is carded; report an uncarded count only after a forced interruption.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        limit: { type: "integer", minimum: 1, maximum: 25, default: 8 },
+      },
+      required: ["brand_key"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
   {
     name: "get_source_candidate_batch",
     title: "Get source candidate batch",
@@ -19252,7 +19479,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
         sequence_label: { type: "string" },
         lane_key: { type: "string" },
                 title: { type: "string" },
-                source_selection_id: { type: "string", description: "Required for Manifest Mental. Links the source card to one persisted random-draw selection and its immutable metric snapshot." },
+                        source_selection_id: { type: "string", description: "Links the source card to one persisted source selection and its immutable metric snapshot." },
+        saved_pattern_id: { type: "integer", minimum: 1, description: "Manifest source-card backfill mode. Creates the Saved Pattern's durable source selection internally and locks the newly created card so it is immediately usable." },
         create_new_version: { type: "boolean", description: "Default false. Use only when evidence changes the durable interpretation of the source itself; ordinary new payoffs or experiments belong in a new generation run." },
         version_reason: { type: "string", description: "Required when create_new_version=true. Explains why the canonical source interpretation changed." },
         transformation_contract: SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
@@ -19945,7 +20173,8 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "schedule_manifest_review_batch",
   "list_source_candidates",
   "draw_source_candidate_batch",
-  "get_source_candidate_batch",
+    "get_source_candidate_batch",
+  "prepare_manifest_source_card_backfill",
   "create_source_card",
   "lock_source_card",
   "get_source_card",
@@ -20797,7 +21026,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.38.1";
+export const OPERATOR_MCP_VERSION = "1.39.0";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -22931,7 +23160,7 @@ function operatorToolMutatesState(toolName: string): boolean {
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
-    "list_accounts", "get_account_state", "read_lensically_ui_surface", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch",
+        "list_accounts", "get_account_state", "read_lensically_ui_surface", "get_hourly_coverage", "get_manifest_review_batch", "get_production_board", "list_source_candidates", "get_source_candidate_batch", "prepare_manifest_source_card_backfill",
                 "get_source_card", "list_active_gates", "list_strategy_memory", "list_scheduled_posts", "get_post_results", "get_monthly_growth_review", "get_performance_learning", "get_content_focus", "get_manifest_intelligence_foundation", "get_manifest_intelligence_audit", "get_manifest_cycle_receipt", "audit_published_post_lineage",
   ]);
   return !readOnly.has(toolName);
@@ -23237,7 +23466,7 @@ function operatorSemanticOperationIdentity(toolName: string, args: Record<string
   }
     if (toolName === "review_manifest_scheduled_post") return `${brand}:autonomous-review:${String(args.scheduled_post_id ?? "missing")}:${String(args.action ?? "review")}`;
   if (toolName === "delete_scheduled_post") return `${brand}:delete-scheduled:${String(args.scheduled_post_id ?? "missing")}:${String(args.reason ?? "missing-reason")}`;
-  if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? `${session}:${String(args.sequence_label ?? "unlabeled")}`)}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
+    if (toolName === "create_source_card") return `${brand}:${String(args.source_selection_id ?? (args.saved_pattern_id ? `saved-pattern:${String(args.saved_pattern_id)}` : `${session}:${String(args.sequence_label ?? "unlabeled")}`))}:${args.create_new_version === true ? String(args.version_reason ?? "new-version") : "current"}`;
   if (toolName === "lock_source_card") return `${brand}:lock:${String(args.source_card_id ?? "")}`;
   if (toolName === "submit_candidate_draft" || toolName === "submitAndGateDraft") return `${brand}:${String(args.run_id ?? "")}:${String(args.source_card_id ?? "")}:${String(args.text ?? args.draft_text ?? "")}`;
   if (["mark_draft_shown", "approve_draft", "reject_draft", "schedule_approved_draft"].includes(toolName)) return `${brand}:${toolName}:${String(args.draft_id ?? "")}`;
