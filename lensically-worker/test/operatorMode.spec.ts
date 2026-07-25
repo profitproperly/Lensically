@@ -2351,7 +2351,39 @@ describe("operator mode backend spine", () => {
     expect(completed.returned_count).toBe(0);
     expect(completed.patterns).toEqual([]);
 
+        await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, platform, source_url, post_id, post_text,
+        likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+      ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, 1, 0, 0, 0, 10, '2026-07-25T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+    ).bind(
+      'https://www.threads.com/@fixture/post/backfill-4',
+      'backfill-4',
+      'Every Saved Pattern must receive a source card, even when its metrics are low.',
+    ).run();
+    const automated = await operatorTool<{
+      status: string;
+      created_count: number;
+      reused_count: number;
+      remaining_count: number;
+      total_carded_after: number;
+      cards: Array<{ saved_pattern_id: number; status: string }>;
+    }>("create_all_missing_manifest_source_cards", {
+      brand_key: "manifest_mental",
+      limit: 25,
+      operation_id: "test-create-all-missing-manifest-source-cards",
+    });
+    expect(automated.status).toBe("complete");
+    expect(automated.created_count).toBe(1);
+    expect(automated.reused_count).toBe(0);
+    expect(automated.remaining_count).toBe(0);
+    expect(automated.total_carded_after).toBe(4);
+    expect(automated.cards).toEqual([
+      expect.objectContaining({ status: "locked" }),
+    ]);
+
     const linked = await env.DB.prepare(
+
       `SELECT COUNT(*) AS total
        FROM operator_source_selections s
        JOIN operator_source_cards c ON c.id = s.source_card_id
@@ -2359,7 +2391,8 @@ describe("operator mode backend spine", () => {
          AND s.source_type = 'saved_pattern'
          AND c.status = 'locked'`,
     ).first<{ total: number }>();
-    expect(Number(linked?.total ?? 0)).toBe(3);
+        expect(Number(linked?.total ?? 0)).toBe(4);
+
   }, 30000);
 
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
@@ -5516,7 +5549,7 @@ describe("operator mode MCP endpoint", () => {
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 108,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 109,
                         total_read_only_capabilities: 44,
       route_only: true,
       mutations_executed: 0,
@@ -5526,10 +5559,10 @@ describe("operator mode MCP endpoint", () => {
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(108);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(109);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
                                     read_only: 44,
-                                                                                                mutation: 64,
+                                                                                                mutation: 65,
       mutation_without_required_inputs: 0,
     });
     expect(Object.keys(campaign.structuredContent.campaign.failure_classes).sort()).toEqual([
