@@ -5,7 +5,8 @@ import {
       compactManifestAutonomousPreparationPayload,
   compactManifestPrepareThreadsSnapshot,
   dedupeManifestEvidencePosts,
-  isExpectedHardeningControlResult,
+    isExpectedHardeningControlResult,
+  manifestCycleFailureIsDefect,
 
     normalizeManifestThreadsTimestampForSqlite,
   operatorToolRequiresLegacyPreparation,
@@ -461,16 +462,25 @@ describe("Manifest intelligence foundation", () => {
       },
       startup_state: { captured_at: "2026-07-21T00:00:00.000Z", consulted: ["performance", "schedule"] },
       events,
-      hypotheses: [
+            hypotheses: [
         { id: "hypothesis-1", slot_key: "2026-07-21T12:00", status: "scheduled" },
         { id: "hypothesis-2", slot_key: "2026-07-21T13:00", status: "scheduled" },
+      ],
+      defects: [
+        { id: "defect-1", defect_key: "prepare:subrequest", status: "resolved", blocking: true, stage_number: 1 },
+        { id: "defect-2", defect_key: "persist:transport", status: "open", blocking: true, stage_number: 5 },
+        { id: "defect-3", defect_key: "evaluator:historical", status: "irrecoverable_historical_gap", blocking: false, stage_number: 7 },
       ],
     };
 
     const summary = buildManifestCycleReceiptRead(receipt, "summary");
     expect(summary.receipt_read_version).toBe(MANIFEST_CYCLE_RECEIPT_READ_VERSION);
-    expect((summary.summary as Record<string, unknown>).event_count).toBe(7);
+        expect((summary.summary as Record<string, unknown>).event_count).toBe(7);
     expect((summary.summary as Record<string, unknown>).hypothesis_count).toBe(2);
+    expect((summary.summary as Record<string, unknown>).defect_count).toBe(3);
+    expect((summary.summary as Record<string, unknown>).open_defect_count).toBe(1);
+    expect((summary.summary as Record<string, unknown>).blocking_open_defect_count).toBe(1);
+    expect((summary.summary as Record<string, unknown>).resolved_defect_count).toBe(2);
     expect(summary.items).toEqual([]);
 
     const firstPage = buildManifestCycleReceiptRead(receipt, "events", 0, 3);
@@ -497,9 +507,20 @@ describe("Manifest intelligence foundation", () => {
       chunk_count: 1,
     });
 
-    const strategyChunks = buildManifestCycleReceiptRead(receipt, "output_strategy", 0, 10);
+        const strategyChunks = buildManifestCycleReceiptRead(receipt, "output_strategy", 0, 10);
     const reconstructedStrategy = (strategyChunks.items as Array<{ text: string }>).map((item) => item.text).join("");
     expect(JSON.parse(reconstructedStrategy)).toEqual(receipt.output_strategy_version);
+
+    const defectPage = buildManifestCycleReceiptRead(receipt, "defects", 0, 2);
+    expect(defectPage.items).toEqual(receipt.defects.slice(0, 2));
+    expect(defectPage.pagination).toMatchObject({ returned: 2, total: 3, has_more: true, next_offset: 2 });
+  });
+
+  it("separates expected candidate blocks from cycle defects", () => {
+    expect(manifestCycleFailureIsDefect("candidate_gate_suite_failed")).toBe(false);
+    expect(manifestCycleFailureIsDefect("prior_operation_in_progress")).toBe(false);
+    expect(manifestCycleFailureIsDefect("Too many API requests by single Worker invocation")).toBe(true);
+    expect(manifestCycleFailureIsDefect("manifest_learning_brief_schema_column_missing")).toBe(true);
   });
 
       it("rejects model-originated sources and accepts canonical source-card lineage", () => {
