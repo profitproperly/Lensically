@@ -21034,7 +21034,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.39.0";
+export const OPERATOR_MCP_VERSION = "1.39.1";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -24524,11 +24524,12 @@ async function handleOperatorMcpAdminTool(
         "get_hourly_coverage",
         "get_manifest_review_batch",
       ]),
-      account_reads_a: new Set([
+            account_reads_a: new Set([
         "read_lensically_ui_surface",
         "get_production_board",
         "list_source_candidates",
         "audit_published_post_lineage",
+        "prepare_manifest_source_card_backfill",
       ]),
       account_reads_b: new Set([
         "get_source_candidate_batch",
@@ -24899,7 +24900,8 @@ async function handleOperatorMcpAdminTool(
       get_manifest_review_batch: { ...accountBase, production_date: today },
       get_production_board: { ...accountBase },
       list_source_candidates: { ...accountBase, limit: 1, offset: 0 },
-      audit_published_post_lineage: { ...accountBase, minimum_likes: 1, days: 7, limit: 1 },
+            audit_published_post_lineage: { ...accountBase, minimum_likes: 1, days: 7, limit: 1 },
+      prepare_manifest_source_card_backfill: { ...accountBase, limit: 1 },
       get_source_candidate_batch: latestSourceBatch?.id ? { ...accountBase, source_batch_id: latestSourceBatch.id } : null,
       get_source_card: latestSourceCard?.id ? { ...accountBase, source_card_id: latestSourceCard.id, include_history: false } : null,
       list_active_gates: { ...accountBase },
