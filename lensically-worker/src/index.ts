@@ -14808,15 +14808,15 @@ async function persistManifestAutonomousPost(
     },
   });
     const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
-  const targetSlots = Array.isArray(currentCycle.target_slots)
+    const authoritativeTargetSlots = Array.isArray(currentCycle.target_slots)
     ? currentCycle.target_slots as Array<{ key: string; date: string; time: string }>
     : [];
   const cycleTimezone = normalizeOperatorText(currentCycle.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
-  const occupiedAfter = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, cycleTimezone);
+  const occupiedAfter = await manifestAutonomousOccupiedSlots(env, brand, authoritativeTargetSlots, cycleTimezone);
   const localNow = operatorLocalDateTimeParts(new Date(), cycleTimezone);
   const currentLocalHourKey = `${localNow.date}T${operatorHourlySlot(localNow.hour)}`;
   const coverageState = reconcileManifestAutonomousCoverageState(
-    targetSlots,
+        authoritativeTargetSlots,
     occupiedAfter,
     currentLocalHourKey,
     Array.isArray(currentCycle.scheduled_post_ids) ? currentCycle.scheduled_post_ids : [],
@@ -14866,7 +14866,7 @@ async function persistManifestAutonomousPost(
       output_strategy_version_id: outputStrategyVersion.id ?? null,
       elapsed_unfilled_slots_ignored: elapsedUnfilledSlots,
       past_slots_backfilled: false,
-      authoritative_target_slot_count: targetSlots.length,
+            authoritative_target_slot_count: authoritativeTargetSlots.length,
       authoritative_occupied_slot_count: occupiedAfter.size,
       completed_at: new Date().toISOString(),
     };
