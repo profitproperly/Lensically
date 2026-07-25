@@ -19399,7 +19399,8 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         scheduled_post_id: { type: "integer", minimum: 1 },
-        reason: { type: "string", minLength: 1 },
+                reason: { type: "string", minLength: 1 },
+        owner_response: { type: "string", description: "Exact owner authorization for this protected deletion when required by the Execution Kernel." },
       },
       required: ["brand_key", "scheduled_post_id", "reason"],
       additionalProperties: false,
