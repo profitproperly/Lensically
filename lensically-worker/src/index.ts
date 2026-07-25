@@ -122,6 +122,20 @@ import {
   ensureManifestProductIntegrationTables,
   recordManifestDecisionInfluence,
 } from "./manifestProductIntegration";
+import {
+  SOURCE_FAMILY_LABEL_POLICY_VERSION,
+  SOURCE_SELECTION_ENGINE_VERSION,
+  enrichSourceCandidatesForSelection,
+  ensureSourceFamilySelectionTables,
+  persistLockedSourceSelectionPlan,
+  persistSourceSelectionReceipts,
+  readLockedSourceSelectionPlan,
+  refreshSourceFamilyLabels,
+  runSourceFamilySelectionEdgeCases,
+  selectSourceFamilyLineup,
+  validateLineupAgainstLockedSourceSelectionPlan,
+} from "./sourceFamilySelection";
+
 
 const DEFAULT_APP_URL = "https://app.lensically.com";
 const DEFAULT_ROOT_SITE_URL = "https://lensically.com";
@@ -11567,43 +11581,33 @@ async function applyManifestContentFocusToPool(
   brandKey: GptBrandKey,
   candidates: Record<string, unknown>[],
 ): Promise<Record<string, unknown>[]> {
-    await ensureOperatorPerformanceEvaluatorTables(env);
-  await ensureManifestIntelligenceEngineTables(env.DB);
-  const rows = await env.DB.prepare(
-    `SELECT source_card_family_id, source_identity_key, status, allocation_weight,
-            reuse_directives_json, stop_directives_json
-     FROM operator_content_focus_family_states
-     WHERE brand_key = ?`,
-  ).bind(brandKey).all<Record<string, unknown>>();
-  const portfolioRows = await env.DB.prepare(
-    `SELECT family_key, role, recommended_role, confidence_score, confidence_label,
-            allocation_weight, actual_decay, reason
-     FROM operator_manifest_portfolio_states
-     WHERE brand_key = ?`,
-  ).bind(brandKey).all<Record<string, unknown>>();
-  const byIdentity = new Map((rows.results ?? []).map((row) => [String(row.source_identity_key), row]));
-  const portfolioByFamily = new Map((portfolioRows.results ?? []).map((row) => [String(row.family_key), row]));
-    return candidates.map((candidate) => {
-    const focus = byIdentity.get(String(candidate.source_identity_key ?? ""));
-    const focusFamilyId = focus?.source_card_family_id ? String(focus.source_card_family_id) : "";
-        const portfolio = focusFamilyId ? portfolioByFamily.get(normalizeOperatorMachineKey(focusFamilyId, "")) : null;
+  await ensureOperatorPerformanceEvaluatorTables(env);
+  const enriched = await enrichSourceCandidatesForSelection(env.DB, brandKey, candidates);
+  return enriched.map((candidate) => {
+    const lifetimeLabel = String(candidate.lifetime_label ?? "untested");
+    const focusStatus: OperatorContentFocusStatus = lifetimeLabel === "disproven"
+      ? "retire"
+      : lifetimeLabel === "underperforming"
+        ? "hold"
+        : lifetimeLabel === "franchise" || lifetimeLabel === "proven"
+          ? "repeat"
+          : lifetimeLabel === "emerging"
+            ? "expand"
+            : "test";
     return {
       ...candidate,
-      focus_observed: Boolean(focus),
-      focus_family_id: focus?.source_card_family_id ?? null,
-      focus_status: focus?.status ?? "test",
-      focus_weight: portfolio ? Number(portfolio.allocation_weight ?? 1) : focus ? Number(focus.allocation_weight ?? 1) : 1,
-      focus_reuse_directives: focus ? safeParseJsonString(String(focus.reuse_directives_json ?? "{}")) ?? {} : {},
-      focus_stop_directives: focus ? safeParseJsonString(String(focus.stop_directives_json ?? "{}")) ?? {} : {},
-      autonomous_role: portfolio?.role ?? null,
-      autonomous_recommended_role: portfolio?.recommended_role ?? null,
-      confidence_score: portfolio ? Number(portfolio.confidence_score ?? 0) : Number(candidate.confidence_score ?? 0),
-      confidence_label: portfolio?.confidence_label ?? null,
-      actual_decay: Number(portfolio?.actual_decay ?? 0) === 1,
-      portfolio_reason: portfolio?.reason ?? null,
+      focus_observed: Number(candidate.lifetime_sample_size ?? 0) > 0,
+      focus_family_id: candidate.source_card_family_id ?? null,
+      focus_status: focusStatus,
+      focus_weight: focusStatus === "retire" ? 0 : 1,
+      autonomous_role: lifetimeLabel,
+      autonomous_recommended_role: lifetimeLabel,
+      actual_decay: candidate.recent_label === "cooling" || candidate.recent_label === "cold",
+      portfolio_reason: `Deterministic ${SOURCE_FAMILY_LABEL_POLICY_VERSION} lifetime and rolling-28-day evidence state.`,
     };
   });
 }
+
 
 async function ensureManifestSourceBatchForDate(
   env: Env,
@@ -11667,10 +11671,15 @@ async function ensureManifestSourceBatchForDate(
     throw new Error(`insufficient_qualified_sources:${eligiblePool.length}`);
   }
 
-  const selectedAt = new Date().toISOString();
+    const selectedAt = new Date().toISOString();
   const batchId = crypto.randomUUID();
-  const focusSelection = selectOperatorContentFocusSources(eligiblePool, MANIFEST_DAILY_SOURCE_DRAW_SIZE);
-  const selectedCandidates = focusSelection.selected;
+  const sourceSelection = selectSourceFamilyLineup({
+    candidates: eligiblePool,
+    slot_keys: Array.from({ length: MANIFEST_DAILY_SOURCE_DRAW_SIZE }, (_, index) => `${productionDate}T${operatorHourlySlot(index)}`),
+    seed: `${brand.brand_key}:${productionDate}:${batchId}`,
+  });
+  const selectedCandidates = sourceSelection.selected;
+
   const statements = [
     env.DB.prepare(
       `INSERT INTO operator_source_selection_batches (
@@ -11692,9 +11701,12 @@ async function ensureManifestSourceBatchForDate(
         cross_day_cooldown_applied: false,
         cross_day_repetition_allowed: true,
                 same_day_source_claims_enforced: true,
-        performance_weighting_applied: true,
+                performance_weighting_applied: true,
         content_focus_version: OPERATOR_CONTENT_FOCUS_VERSION,
-        content_focus_allocation: focusSelection.allocation,
+        source_family_label_policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
+        source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
+        source_selection_summary: sourceSelection.summary,
+
       }, {}),
       productionDate,
     ),
@@ -11736,8 +11748,15 @@ async function ensureManifestSourceBatchForDate(
       metrics_snapshot: metricsSnapshot,
     };
   });
-  await env.DB.batch(statements);
+    await env.DB.batch(statements);
+  await persistSourceSelectionReceipts(env.DB, {
+    brand_key: brand.brand_key,
+    scope_type: "batch",
+    scope_id: batchId,
+    receipts: sourceSelection.receipts,
+  });
   const batch = await env.DB.prepare(
+
     `SELECT * FROM operator_source_selection_batches WHERE id = ? LIMIT 1`,
   ).bind(batchId).first<Record<string, unknown>>();
   return { batch: batch ?? { id: batchId, production_date: productionDate }, selections, reused_existing: false };
@@ -13303,11 +13322,37 @@ async function prepareManifestAutonomousCycle(
       targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
       normalizeOperatorJson(targetSlots, []),
       normalizeOperatorJson(missingSlots, []),
-            normalizeOperatorJson(accountPosition, {}),
+                  normalizeOperatorJson(accountPosition, {}),
     ).run();
     }
 
+  let lockedSourceSelectionPlan = await readLockedSourceSelectionPlan(env.DB, brand.brand_key, cycleId);
+  if (missingSlots.length > 0 && lockedSourceSelectionPlan.length === 0) {
+    const [qualifiedSources, sourceExclusions] = await Promise.all([
+      buildManifestQualifiedSourcePool(env, brand, ["saved_pattern", "archive_post"]),
+      env.DB.prepare(
+        `SELECT source_identity_key FROM operator_source_exclusions
+         WHERE brand_key = ? AND active = 1`,
+      ).bind(brand.brand_key).all<{ source_identity_key: string }>(),
+    ]);
+    const excludedIdentities = new Set((sourceExclusions.results ?? []).map((row) => String(row.source_identity_key)));
+    const selectionCandidates = (await enrichSourceCandidatesForSelection(env.DB, brand.brand_key, qualifiedSources, clock.effective_now_iso))
+      .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
+      .filter((candidate) => Boolean(candidate.source_card_id) && candidate.lifetime_label !== "disproven");
+    const backendSelection = selectSourceFamilyLineup({
+      candidates: selectionCandidates,
+      slot_keys: missingSlots.map((slot) => slot.key),
+      seed: `${brand.brand_key}:${cycleId}:${operationId}`,
+    });
+    lockedSourceSelectionPlan = await persistLockedSourceSelectionPlan(env.DB, {
+      brand_key: brand.brand_key,
+      cycle_id: cycleId,
+      receipts: backendSelection.receipts,
+    });
+  }
+
       const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
+
     cycle_id: cycleId,
     as_of: clock.effective_now_iso,
     effective_now_ms: effectiveNowMs,
@@ -13383,8 +13428,12 @@ async function prepareManifestAutonomousCycle(
       target_slots: targetSlots,
       authoritative_missing_slots: missingSlots,
       occupied_slots: targetSlots.filter((slot) => coverage.occupied.has(slot.key)).map((slot) => ({ ...slot, evidence: coverage.occupied.get(slot.key) })),
-      full_horizon_lineup_required_before_first_persist: true,
+            full_horizon_lineup_required_before_first_persist: true,
+      backend_source_selection_locked: true,
+      source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
+      locked_source_selection_plan: lockedSourceSelectionPlan,
     },
+
     startedAt: clock.effective_now_iso,
   });
         await appendManifestCycleEvent(env.DB, {
@@ -13434,8 +13483,11 @@ async function prepareManifestAutonomousCycle(
             measurement_audit_refresh: measurementAuditRefresh,
                   decision_intelligence: decisionIntelligenceReceiptReference,
       rolling_evidence: rollingEvidence,
-      strategy_required: missingSlots.length > 0,
+            strategy_required: missingSlots.length > 0,
       source_backed_generation_only: true,
+      locked_source_selection_plan: lockedSourceSelectionPlan,
+      model_source_substitution_allowed: false,
+
       recent_scheduled_deletions: recentScheduledDeletions,
       remaining_missing_count: missingSlots.length,
       next_missing_slot: missingSlots[0] ?? null,
@@ -13461,8 +13513,11 @@ async function prepareManifestAutonomousCycle(
                 measurement_audit_refresh: measurementAuditRefresh,
                                 decision_intelligence: decisionIntelligence,
     rolling_evidence: rollingEvidence,
-    strategy_required: missingSlots.length > 0,
+        strategy_required: missingSlots.length > 0,
     source_backed_generation_only: true,
+    locked_source_selection_plan: lockedSourceSelectionPlan,
+    model_source_substitution_allowed: false,
+
     recent_scheduled_deletions: recentScheduledDeletions,
     remaining_missing_count: missingSlots.length,
     next_missing_slot: missingSlots[0] ?? null,
@@ -15262,8 +15317,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       || !Object.keys(benchmarks).length || !Object.keys(directives).length || !lineup.length) {
       return operatorJsonResponse({ success: false, error: "complete_cycle_strategy_required" }, 400);
     }
-    try {
+        try {
+      const lockedSourceSelectionPlan = await validateLineupAgainstLockedSourceSelectionPlan(env.DB, {
+        brand_key: brand.brand_key,
+        cycle_id: cycleId,
+        lineup,
+      });
       const strategy = await commitManifestCycleStrategy(env.DB, {
+
         cycleId,
         brandKey: brand.brand_key,
         snapshotId,
@@ -15287,8 +15348,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           snapshot_id: snapshotId,
           lineup_count: lineup.length,
           source_backed_generation_only: true,
-          primary_metric: "24_hour_likes",
+                    primary_metric: "24_hour_likes",
+          source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
+          locked_source_selection_count: lockedSourceSelectionPlan.length,
+          model_source_substitution_allowed: false,
         },
+
       });
             const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
         success: true,
@@ -21219,7 +21284,8 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.39.8";
+export const OPERATOR_MCP_VERSION = "1.40.0";
+
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
@@ -32430,10 +32496,12 @@ export function evaluateThreadsPostMetricsForLearning(post: CachedThreadsPost): 
   };
 }
 
-const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v3";
+const OPERATOR_PERFORMANCE_EVALUATOR_VERSION = "performance-evaluator-v4";
+
 const OPERATOR_POST_FINGERPRINT_VERSION = "post-fingerprint-v1";
 export const OPERATOR_PERFORMANCE_MATURITY_CHECKPOINTS = [6, 12, 18, 24] as const;
-const OPERATOR_CONTENT_FOCUS_VERSION = "content-focus-v2";
+const OPERATOR_CONTENT_FOCUS_VERSION = "content-focus-v3";
+
 const OPERATOR_CONTENT_FOCUS_STRONG_SCORE = 65;
 const OPERATOR_CONTENT_FOCUS_WEAK_SCORE = 35;
 const OPERATOR_CONTENT_FOCUS_DEFAULT_ALLOCATION = {
@@ -32972,6 +33040,12 @@ function operatorFingerprintDimensions(fingerprint: Record<string, unknown>): Ar
 
 async function ensureOperatorPerformanceEvaluatorTables(env: Env): Promise<void> {
   await ensureManifestIntelligenceEngineTables(env.DB);
+  await ensureSourceFamilySelectionTables(env.DB);
+  const sourceSelectionEdgeCases = runSourceFamilySelectionEdgeCases();
+  if (sourceSelectionEdgeCases.passed !== true) {
+    throw new Error(`source_family_selection_edge_cases_failed:${JSON.stringify(sourceSelectionEdgeCases.assertions ?? {})}`);
+  }
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_post_fingerprints (
       id TEXT PRIMARY KEY,
@@ -33683,7 +33757,10 @@ async function refreshOperatorPerformanceEvaluator(
     ).bind(normalizeOperatorJson(chunk, [])).run();
   }
 
+    const sourceFamilyLabels = await refreshSourceFamilyLabels(env.DB, brandKey);
+
   await env.DB.prepare(`UPDATE operator_performance_evidence SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
+
   await env.DB.prepare(`UPDATE operator_performance_hypotheses SET status = 'stale', updated_at = CURRENT_TIMESTAMP WHERE brand_key = ?`).bind(brandKey).run();
   const joinedRows = await env.DB.prepare(
     `SELECT s.checkpoint_hours, s.scores_json, s.rates_json, f.fingerprint_json
@@ -33932,8 +34009,12 @@ async function refreshOperatorPerformanceEvaluator(
     weak_features: negative.slice(0, 8),
         fatigue_risks: [],
     recent_exposure_signals: fatigueRisks.map((signal) => ({ ...signal, interpretation: "Exposure signal only; do not infer fatigue without comparable performance decay or degraded execution quality." })),
-    portfolio_policy: portfolioPolicy,
+        portfolio_policy: portfolioPolicy,
+    source_family_labels: sourceFamilyLabels,
+    source_family_label_policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
+    source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
     generation_guidance: [
+
       "Use age-matched 6, 12, 18, and 24-hour evidence; treat 24 hours as the final authoritative learning result.",
             "Preserve strong winners while developing additional winners through source-card-backed variations and adjacent source-card-backed experiments; original or source-independent premises are forbidden.",
       "Distinguish productive mechanism repetition from weak execution repetition; frequency alone never forces cooling.",
@@ -33967,8 +34048,10 @@ async function refreshOperatorPerformanceEvaluator(
     intelligence_engine: intelligenceEngine,
     measurement_audit: measurementAudit,
     fingerprinted_posts: fingerprintedPosts,
-    maturity_scores_upserted: maturityScores,
+        maturity_scores_upserted: maturityScores,
+    source_family_labels: sourceFamilyLabels,
     evidence_records: evidenceRows.length,
+
     active_hypotheses: evidenceRows.filter((row) => Number(row.sample_size) >= 3 && row.direction !== "neutral").length,
     brief_id: briefId,
     checkpoint_hours: selectedCheckpoint?.checkpoint ?? null,
