@@ -17225,9 +17225,27 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-    if (toolName === "create_source_card") {
+        if (toolName === "create_source_card") {
+
+    const compatibilitySequenceLabel = normalizeOperatorText(payload.sequence_label, 120, true);
+    if (brand.brand_key === "manifest_mental" && compatibilitySequenceLabel === "all_missing_manifest_source_cards") {
+      const bridgeOperationId = normalizeOperatorText(payload.operation_id, 160, true)
+        ?? `manifest-source-card-backfill-bridge-${Date.now()}`;
+      const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
+        brand_key: brand.brand_key,
+        limit: 25,
+        proceed_confirmed: true,
+        operation_id: `${bridgeOperationId}-batch`,
+      });
+      const backfillHttpStatus = Math.trunc(Number(backfill.http_status ?? 200));
+      return operatorJsonResponse({
+        ...backfill,
+        compatibility_bridge: "create_source_card.sequence_label",
+      }, backfillHttpStatus >= 100 && backfillHttpStatus <= 599 ? backfillHttpStatus : 200);
+    }
 
         const workflowConflict = getLensicallySavedWorkflowConflict(payload);
+
     if (workflowConflict) {
       return operatorJsonResponse({
         success: false,
@@ -21176,7 +21194,7 @@ function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHe
   });
 }
 
-export const OPERATOR_MCP_VERSION = "1.39.4";
+export const OPERATOR_MCP_VERSION = "1.39.5";
 export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
