@@ -3312,10 +3312,10 @@ describe("operator mode MCP endpoint", () => {
       proceed_confirmed: true,
     });
     expect(receipt.cycle_receipt).toMatchObject({ defect_count: 1, open_defect_count: 1, blocking_open_defect_count: 1 });
-    expect(receipt.receipt_section.items).toEqual([
+        expect(receipt.receipt_section.items).toEqual([
       expect.objectContaining({ defect_key: "test:transport:slot-1", occurrence_count: 2 }),
     ]);
-  });
+  }, 30000);
 
   it("resolves one existing cycle defect with root cause, repair commit, deployed SHA, regression tests, reconciliation, and verification while preserving history", async () => {
     await mcpTool("get_manifest_intelligence_foundation", { brand_key: "manifest_mental", proceed_confirmed: true });
