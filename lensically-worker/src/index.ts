@@ -42139,19 +42139,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         last_attempted_at: row.last_attempted_at ?? null,
         processing_started_at: row.processing_started_at ?? null,
       }));
-            const strategyTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
-      const deletedPosts = selectedThreadsUserId
-        ? await listScheduledPostDeletionsForThreadsAccount(env, selectedThreadsUserId, { limit: 100 })
-        : [];
+                        const strategyTagMap = await listGptPostStrategyTagsForScheduledPosts(env, scheduledPosts.map((post) => post.id));
 
       return new Response(
         JSON.stringify({
           success: true,
-          scheduled_posts: scheduledPosts.map((post) => ({
+                    scheduled_posts: scheduledPosts.map((post) => ({
             ...post,
             strategy: strategyTagMap.get(post.id) ?? null,
           })),
-          deleted_posts: deletedPosts,
         }),
         {
           status: 200,
