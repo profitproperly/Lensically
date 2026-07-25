@@ -1,5 +1,6 @@
-export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v1";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v1";
+export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v2";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v2";
+
 
 export type SourceFamilyLifetimeLabel =
   | "untested"
@@ -333,11 +334,19 @@ export async function refreshSourceFamilyLabels(
   nowIso = new Date().toISOString(),
 ): Promise<Record<string, unknown>> {
   await ensureSourceFamilySelectionTables(db);
-  const familyRows = await db.prepare(
+    const familyRows = await db.prepare(
     `SELECT fam.id AS source_card_family_id, fam.source_identity_key
      FROM operator_source_card_families fam
-     WHERE fam.brand_key = ? AND fam.status = 'active'`,
+     JOIN operator_source_cards card
+       ON card.id = fam.current_source_card_id
+      AND card.brand_key = fam.brand_key
+      AND card.is_current = 1
+     WHERE fam.brand_key = ?
+       AND fam.status = 'active'
+       AND card.status = 'locked'
+       AND card.source_selection_id IS NOT NULL`,
   ).bind(brandKey).all<Record<string, unknown>>();
+
   const evidenceRows = await db.prepare(
     `SELECT c.family_id AS source_card_family_id, fam.source_identity_key,
             s.published_post_id, s.captured_at, s.metrics_json,
@@ -510,7 +519,9 @@ export async function loadLockedSourceCardSelectionCandidates(
   nowIso = new Date().toISOString(),
 ): Promise<SourceSelectionCandidate[]> {
   await ensureSourceFamilySelectionTables(db);
+  await refreshSourceFamilyLabels(db, brandKey, nowIso);
   const rows = await db.prepare(
+
     `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
             card.id AS source_card_id, card.source_mechanism, card.required_product,
             card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction
@@ -519,9 +530,11 @@ export async function loadLockedSourceCardSelectionCandidates(
        ON card.id = fam.current_source_card_id
       AND card.brand_key = fam.brand_key
       AND card.is_current = 1
-     WHERE fam.brand_key = ?
+          WHERE fam.brand_key = ?
        AND fam.status = 'active'
-       AND card.status = 'locked'`,
+       AND card.status = 'locked'
+       AND card.source_selection_id IS NOT NULL`,
+
   ).bind(brandKey).all<Record<string, unknown>>();
   const candidates = (rows.results ?? []).map((row) => {
     let metrics: Record<string, unknown> = {};
@@ -783,8 +796,27 @@ export async function persistLockedSourceSelectionPlan(
     receipts: SourceSelectionReceipt[];
   },
 ): Promise<Record<string, unknown>[]> {
-  await ensureSourceFamilySelectionTables(db);
+    await ensureSourceFamilySelectionTables(db);
+  const anyExistingRows = await db.prepare(
+    `SELECT engine_version FROM operator_source_selection_plans
+     WHERE brand_key = ? AND cycle_id = ? AND status = 'locked'`,
+  ).bind(input.brand_key, input.cycle_id).all<{ engine_version: string }>();
+  const incompatiblePlanExists = (anyExistingRows.results ?? [])
+    .some((row) => String(row.engine_version ?? "") !== SOURCE_SELECTION_ENGINE_VERSION);
+  if (incompatiblePlanExists) {
+    const committedStrategy = await db.prepare(
+      `SELECT COUNT(*) AS total FROM operator_manifest_cycle_strategies
+       WHERE brand_key = ? AND cycle_id = ?`,
+    ).bind(input.brand_key, input.cycle_id).first<{ total: number }>();
+    if (Number(committedStrategy?.total ?? 0) > 0) {
+      throw new Error("locked_source_selection_plan_version_conflict_after_strategy_commit");
+    }
+    await db.prepare(
+      `DELETE FROM operator_source_selection_plans WHERE brand_key = ? AND cycle_id = ?`,
+    ).bind(input.brand_key, input.cycle_id).run();
+  }
   const existing = await readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
+
   if (existing.length) {
     const existingSignature = existing.map((row) => `${row.slot_key}:${row.source_card_id}`).join("|");
     const requestedSignature = input.receipts.map((row) => `${row.slot_key}:${row.source_card_id}`).join("|");
@@ -821,9 +853,10 @@ export async function readLockedSourceSelectionPlan(
     `SELECT slot_key, selection_order, source_identity_key, source_card_family_id,
             source_card_id, engine_version, receipt_json, status
      FROM operator_source_selection_plans
-     WHERE brand_key = ? AND cycle_id = ? AND status = 'locked'
+          WHERE brand_key = ? AND cycle_id = ? AND status = 'locked' AND engine_version = ?
      ORDER BY selection_order ASC`,
-  ).bind(brandKey, cycleId).all<Record<string, unknown>>();
+  ).bind(brandKey, cycleId, SOURCE_SELECTION_ENGINE_VERSION).all<Record<string, unknown>>();
+
   return (rows.results ?? []).map((row) => ({
     slot_key: row.slot_key,
     selection_order: finiteNumber(row.selection_order),
