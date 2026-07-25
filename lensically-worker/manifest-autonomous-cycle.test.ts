@@ -12,7 +12,8 @@ import {
   operatorToolRequiresLegacyPreparation,
     resolveOperatorDueMaturityCheckpoint,
   selectManifestDueCheckpointRefreshBatch,
-  resolveManifestAutonomousClock,
+        resolveManifestAutonomousClock,
+      reconcileManifestAutonomousCoverageState,
 } from "./src/index";
 import {
       MANIFEST_CYCLE_RECEIPT_READ_VERSION,
@@ -47,6 +48,31 @@ import {
   buildManifestRunComparison,
   buildManifestSavedPatternIntelligence,
 } from "./src/manifestMeasurementAudit";
+
+describe("Manifest authoritative coverage reconciliation", () => {
+  it("reconciles occupied interrupted writes and elapsed slots without backfill", () => {
+    const targetSlots = [
+      { key: "2026-07-24T15:00", date: "2026-07-24", time: "15:00" },
+      { key: "2026-07-25T05:00", date: "2026-07-25", time: "05:00" },
+      { key: "2026-07-26T14:00", date: "2026-07-26", time: "14:00" },
+    ];
+    const occupied = new Map<string, Record<string, unknown>>([
+      ["2026-07-25T05:00", { scheduled_post_id: 716 }],
+      ["2026-07-26T14:00", { scheduled_post_id: 748 }],
+    ]);
+    const reconciled = reconcileManifestAutonomousCoverageState(
+      targetSlots,
+      occupied,
+      "2026-07-24T21:00",
+      [705],
+    );
+    expect(reconciled.remaining_missing_slots).toEqual([]);
+    expect(reconciled.elapsed_unfilled_slots).toEqual([
+      { key: "2026-07-24T15:00", date: "2026-07-24", time: "15:00" },
+    ]);
+    expect(reconciled.scheduled_post_ids).toEqual([705, 716, 748]);
+  });
+});
 
 describe("Manifest preparation checkpoints", () => {
   it("persists only the bounded live-evidence fields needed by the next preparation invocation", () => {

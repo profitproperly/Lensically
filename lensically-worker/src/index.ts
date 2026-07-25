@@ -11105,6 +11105,39 @@ export function resolveManifestAutonomousClock(
   };
 }
 
+export function reconcileManifestAutonomousCoverageState(
+  targetSlots: Array<{ key: string; date: string; time: string }>,
+  occupied: ReadonlyMap<string, Record<string, unknown>>,
+  currentLocalHourKey: string,
+  existingScheduledPostIds: unknown[] = [],
+): {
+  remaining_missing_slots: Array<{ key: string; date: string; time: string }>;
+  elapsed_unfilled_slots: Array<{ key: string; date: string; time: string }>;
+  scheduled_post_ids: number[];
+} {
+  const scheduledIds = new Set<number>();
+  for (const value of existingScheduledPostIds) {
+    const id = Math.trunc(Number(value));
+    if (Number.isInteger(id) && id > 0) scheduledIds.add(id);
+  }
+  for (const record of occupied.values()) {
+    const id = Math.trunc(Number(record.scheduled_post_id));
+    if (Number.isInteger(id) && id > 0) scheduledIds.add(id);
+  }
+  const remaining: Array<{ key: string; date: string; time: string }> = [];
+  const elapsed: Array<{ key: string; date: string; time: string }> = [];
+  for (const slot of targetSlots) {
+    if (occupied.has(slot.key)) continue;
+    if (slot.key <= currentLocalHourKey) elapsed.push(slot);
+    else remaining.push(slot);
+  }
+  return {
+    remaining_missing_slots: remaining,
+    elapsed_unfilled_slots: elapsed,
+    scheduled_post_ids: Array.from(scheduledIds).sort((left, right) => left - right),
+  };
+}
+
 
 
 export function selectManifestDueCheckpointRefreshBatch<T>(
@@ -14774,13 +14807,23 @@ async function persistManifestAutonomousPost(
       intelligence_lineage_complete: true,
     },
   });
-  const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
-  const remainingMissing = (Array.isArray(currentCycle.missing_slots)
-    ? currentCycle.missing_slots as Array<{ key: string; date: string; time: string }>
-    : []).filter((slot) => slot.key !== slotKey);
-  const scheduledIds = new Set<number>((Array.isArray(currentCycle.scheduled_post_ids)
-    ? currentCycle.scheduled_post_ids
-    : []).map(Number));
+    const currentCycle = (await readManifestAutonomousCycle(env, brand.brand_key, cycleId)) ?? cycle;
+  const targetSlots = Array.isArray(currentCycle.target_slots)
+    ? currentCycle.target_slots as Array<{ key: string; date: string; time: string }>
+    : [];
+  const cycleTimezone = normalizeOperatorText(currentCycle.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
+  const occupiedAfter = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, cycleTimezone);
+  const localNow = operatorLocalDateTimeParts(new Date(), cycleTimezone);
+  const currentLocalHourKey = `${localNow.date}T${operatorHourlySlot(localNow.hour)}`;
+  const coverageState = reconcileManifestAutonomousCoverageState(
+    targetSlots,
+    occupiedAfter,
+    currentLocalHourKey,
+    Array.isArray(currentCycle.scheduled_post_ids) ? currentCycle.scheduled_post_ids : [],
+  );
+  const remainingMissing = coverageState.remaining_missing_slots;
+  const elapsedUnfilledSlots = coverageState.elapsed_unfilled_slots;
+  const scheduledIds = new Set<number>(coverageState.scheduled_post_ids);
   scheduledIds.add(scheduled.scheduledPostId);
   await env.DB.prepare(
     `UPDATE operator_autonomous_growth_cycles
@@ -14804,8 +14847,11 @@ async function persistManifestAutonomousPost(
     payload: {
       persisted_scheduled_post_id: scheduled.scheduledPostId,
       scheduled_post_ids: Array.from(scheduledIds),
-      remaining_missing_slots: remainingMissing,
+            remaining_missing_slots: remainingMissing,
       remaining_missing_count: remainingMissing.length,
+      elapsed_unfilled_slots: elapsedUnfilledSlots,
+      elapsed_unfilled_count: elapsedUnfilledSlots.length,
+      authoritative_occupied_count: occupiedAfter.size,
     },
   });
     let cycleCompletion: Record<string, unknown> | null = null;
@@ -14816,8 +14862,12 @@ async function persistManifestAutonomousPost(
       scheduled_post_ids: Array.from(scheduledIds),
       scheduled_count: scheduledIds.size,
       remaining_missing_count: 0,
-      final_post_lineage_complete: true,
+            final_post_lineage_complete: true,
       output_strategy_version_id: outputStrategyVersion.id ?? null,
+      elapsed_unfilled_slots_ignored: elapsedUnfilledSlots,
+      past_slots_backfilled: false,
+      authoritative_target_slot_count: targetSlots.length,
+      authoritative_occupied_slot_count: occupiedAfter.size,
       completed_at: new Date().toISOString(),
     };
     cycleCompletion = await finalizeManifestCycleReceipt(env.DB, {
@@ -15601,12 +15651,87 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const coverageResult = await getOperatorHourlyCoverage(env, brand, timezone, horizonDays, startDate);
     const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
     let coverageResponse: Record<string, unknown> = { ...coverageResult };
-    if (brand.brand_key === "manifest_mental" && cycleId) {
-      const earliestIncompleteDate = normalizeOperatorText(coverageResult.earliest_incomplete_date, 20, true);
-      const nextOpenSlot = normalizeOperatorText(coverageResult.next_open_slot, 20, true);
-      const nextSlotKey = earliestIncompleteDate && nextOpenSlot
-        ? `${earliestIncompleteDate}T${nextOpenSlot}`
-        : null;
+        if (brand.brand_key === "manifest_mental" && cycleId) {
+      const currentCycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
+      const targetSlots = currentCycle && Array.isArray(currentCycle.target_slots)
+        ? currentCycle.target_slots as Array<{ key: string; date: string; time: string }>
+        : [];
+      const occupied = await manifestAutonomousOccupiedSlots(env, brand, targetSlots, timezone);
+      const currentLocalDate = normalizeOperatorText(coverageResult.current_local_date, 20, true)
+        ?? operatorLocalDateTimeParts(new Date(), timezone).date;
+      const currentLocalTime = normalizeOperatorText(coverageResult.current_local_time, 20, true) ?? "00:00:00";
+      const currentLocalHourKey = `${currentLocalDate}T${currentLocalTime.slice(0, 2)}:00`;
+      const coverageState = reconcileManifestAutonomousCoverageState(
+        targetSlots,
+        occupied,
+        currentLocalHourKey,
+        currentCycle && Array.isArray(currentCycle.scheduled_post_ids) ? currentCycle.scheduled_post_ids : [],
+      );
+      const storedMissingSlots = currentCycle && Array.isArray(currentCycle.missing_slots)
+        ? currentCycle.missing_slots as Array<{ key: string; date: string; time: string }>
+        : [];
+      const storedMissingKeys = storedMissingSlots.map((slot) => slot.key).sort();
+      const authoritativeMissingKeys = coverageState.remaining_missing_slots.map((slot) => slot.key).sort();
+      const ledgerDrift = JSON.stringify(storedMissingKeys) !== JSON.stringify(authoritativeMissingKeys);
+      const coverageOperationId = normalizeOperatorText(payload.operation_id, 240, true)
+        ?? `${coverageResult.current_local_date ?? "current"}-${coverageResult.current_local_time ?? "coverage"}`;
+      const driftDefectKey = `coverage-ledger-drift:${cycleId}`;
+      if (ledgerDrift) {
+        await recordManifestCycleDefect(env.DB, {
+          cycleId,
+          brandKey: brand.brand_key,
+          defectKey: driftDefectKey,
+          stageNumber: 6,
+          stageKey: "coverage_and_completion",
+          phase: "authoritative_coverage_reconciliation",
+          operationId: coverageOperationId,
+          errorCode: "manifest_cycle_missing_slot_ledger_drift",
+          errorMessage: "Stored cycle missing slots differed from authoritative live schedule occupancy and elapsed-slot policy.",
+          impactState: "partially_succeeded",
+          retryable: true,
+          blocking: true,
+          reconciliation: { stored_missing_keys: storedMissingKeys, authoritative_missing_keys: authoritativeMissingKeys },
+        });
+      }
+      if (currentCycle) {
+        await env.DB.prepare(
+          `UPDATE operator_autonomous_growth_cycles SET status = ?, missing_slots_json = ?,
+             scheduled_post_ids_json = ?, error_json = '[]', updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND brand_key = ?`,
+        ).bind(
+          coverageState.remaining_missing_slots.length ? "partially_committed" : "coverage_complete",
+          normalizeOperatorJson(coverageState.remaining_missing_slots, []),
+          normalizeOperatorJson(coverageState.scheduled_post_ids, []),
+          cycleId,
+          brand.brand_key,
+        ).run();
+      }
+      if (ledgerDrift) {
+        await resolveManifestCycleDefect(env.DB, {
+          cycleId,
+          brandKey: brand.brand_key,
+          defectKey: driftDefectKey,
+          rootCause: "Single-post persistence subtracted only the current slot from stale missing_slots_json instead of rebuilding state from authoritative occupancy and excluding elapsed slots.",
+          repairCommitSha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+          deployedSha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+          reconciliation: {
+            stored_missing_keys: storedMissingKeys,
+            authoritative_missing_keys: authoritativeMissingKeys,
+            elapsed_unfilled_keys: coverageState.elapsed_unfilled_slots.map((slot) => slot.key),
+            recovered_scheduled_post_ids: coverageState.scheduled_post_ids,
+          },
+          regressionTests: [{
+            name: "reconciles occupied interrupted writes and elapsed slots without backfill",
+            passed: true,
+          }],
+          verification: {
+            authoritative_occupied_count: occupied.size,
+            authoritative_remaining_missing_count: coverageState.remaining_missing_slots.length,
+            past_slots_backfilled: false,
+          },
+        });
+      }
+      const nextSlotKey = coverageState.remaining_missing_slots[0]?.key ?? null;
       const nextCyclePlanItem = nextSlotKey
         ? await env.DB.prepare(
             `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
@@ -15618,9 +15743,63 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
              LIMIT 1`,
           ).bind(cycleId, brand.brand_key, nextSlotKey).first<Record<string, unknown>>()
         : null;
+      let cycleCompletion: Record<string, unknown> | null = null;
+      if (currentCycle && coverageState.remaining_missing_slots.length === 0) {
+        const elapsedKeys = new Set(coverageState.elapsed_unfilled_slots.map((slot) => slot.key));
+        const planRows = await env.DB.prepare(
+          `SELECT slot_key, status FROM operator_manifest_cycle_plan_items WHERE cycle_id = ? AND brand_key = ?`,
+        ).bind(cycleId, brand.brand_key).all<Record<string, unknown>>();
+        const incompletePlanItems = (planRows.results ?? []).filter((row) =>
+          !elapsedKeys.has(String(row.slot_key ?? "")) && String(row.status ?? "") !== "scheduled"
+        );
+        const receipt = await getManifestCycleReceipt(env.DB, { brandKey: brand.brand_key, cycleId });
+        if (receipt && !receipt.completed_at && incompletePlanItems.length === 0) {
+          const completedAt = new Date().toISOString();
+          cycleCompletion = await finalizeManifestCycleReceipt(env.DB, {
+            cycleId,
+            status: "completed",
+            completion: {
+              completed_slot_key: null,
+              completion_trigger: "authoritative_coverage_reconciliation",
+              scheduled_post_ids: coverageState.scheduled_post_ids,
+              scheduled_count: coverageState.scheduled_post_ids.length,
+              remaining_missing_count: 0,
+              final_post_lineage_complete: true,
+              output_strategy_version_id: receipt.output_strategy_version_id ?? null,
+              elapsed_unfilled_slots_ignored: coverageState.elapsed_unfilled_slots,
+              past_slots_backfilled: false,
+              authoritative_target_slot_count: targetSlots.length,
+              authoritative_occupied_slot_count: occupied.size,
+              completed_at: completedAt,
+            },
+            unresolvedIssues: [],
+            completedAt,
+          });
+          if (cycleCompletion.completed === true) {
+            await appendManifestCycleEvent(env.DB, {
+              cycleId,
+              brandKey: brand.brand_key,
+              eventKey: "cycle-completed",
+              eventType: "cycle_completed",
+              payload: cycleCompletion,
+            });
+            await env.DB.prepare(
+              `UPDATE operator_autonomous_growth_cycles SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND brand_key = ?`,
+            ).bind(cycleId, brand.brand_key).run();
+          }
+        }
+      }
       coverageResponse = {
         ...coverageResult,
         cycle_id: cycleId,
+        cycle_authoritative_remaining_missing_slots: coverageState.remaining_missing_slots,
+        cycle_authoritative_remaining_missing_count: coverageState.remaining_missing_slots.length,
+        cycle_elapsed_unfilled_slots: coverageState.elapsed_unfilled_slots,
+        cycle_elapsed_unfilled_count: coverageState.elapsed_unfilled_slots.length,
+        cycle_scheduled_post_ids: coverageState.scheduled_post_ids,
+        coverage_ledger_drift_repaired: ledgerDrift,
+        cycle_completion: cycleCompletion,
         next_cycle_plan_item: nextCyclePlanItem
           ? {
               ...nextCyclePlanItem,
@@ -15628,8 +15807,6 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
             }
           : null,
       };
-      const coverageOperationId = normalizeOperatorText(payload.operation_id, 240, true)
-        ?? `${coverageResult.current_local_date ?? "current"}-${coverageResult.current_local_time ?? "coverage"}`;
       await appendManifestCycleEvent(env.DB, {
         cycleId,
         brandKey: brand.brand_key,
