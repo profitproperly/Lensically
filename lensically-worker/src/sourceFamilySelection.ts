@@ -92,6 +92,11 @@ async function loadLiveSavedPatternIds(db: D1Database): Promise<Set<string> | nu
   return new Set((rows.results ?? []).map((row) => String(row.id)));
 }
 
+function isLiveSavedPatternId(liveIds: Set<string> | null, value: unknown): boolean {
+  const id = String(value ?? "");
+  return liveIds === null || !/^\d+$/.test(id) || liveIds.has(id);
+}
+
 function normalizedIndex(value: number, baseline: number): number {
   if (baseline > 0) return Math.max(0, value) / baseline;
   if (value <= 0) return 1;
@@ -361,8 +366,8 @@ export async function refreshSourceFamilyLabels(
        AND card.source_selection_id IS NOT NULL`,
     ).bind(brandKey).all<Record<string, unknown>>();
   const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
-  const eligibleFamilyRows = (familyRows.results ?? []).filter((row) =>
-    liveSavedPatternIds === null || liveSavedPatternIds.has(String(row.saved_pattern_id ?? ""))
+    const eligibleFamilyRows = (familyRows.results ?? []).filter((row) =>
+    isLiveSavedPatternId(liveSavedPatternIds, row.saved_pattern_id)
   );
 
   const evidenceRows = await db.prepare(
@@ -560,8 +565,8 @@ export async function loadLockedSourceCardSelectionCandidates(
 
     ).bind(brandKey).all<Record<string, unknown>>();
   const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
-  const eligibleRows = (rows.results ?? []).filter((row) =>
-    liveSavedPatternIds === null || liveSavedPatternIds.has(String(row.saved_pattern_id ?? ""))
+    const eligibleRows = (rows.results ?? []).filter((row) =>
+    isLiveSavedPatternId(liveSavedPatternIds, row.saved_pattern_id)
   );
   const candidates = eligibleRows.map((row) => {
     let metrics: Record<string, unknown> = {};
