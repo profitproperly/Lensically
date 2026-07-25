@@ -26810,8 +26810,11 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             authority_version: OPERATOR_ENGINEERING_AUTHORITY_VERSION,
           }
         : await beginOperatorAutonomyAuthorization(env, toolName, args);
-      if (!autonomyAuthorization.allowed) {
+            if (!autonomyAuthorization.allowed) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_autonomy_decision_required");
+        if (idempotencyKey) {
+          await failOperatorOperationReceipt(env, idempotencyKey, new Error(String(autonomyAuthorization.error ?? "autonomy_authorization_blocked")));
+        }
                 const resultPayload = { ok: false, ...autonomyAuthorization, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } };
         return mcpJsonResponse({
           jsonrpc: "2.0",
