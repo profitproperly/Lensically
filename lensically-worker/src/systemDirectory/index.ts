@@ -626,6 +626,25 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
     related_entry_ids: ["accounts.continuity", "content.production"],
     recommended_next_planes: ["content_production", "publishing"],
   },
+    {
+    id: "content.manifest_source_card_backfill",
+    title: "Manifest Saved Pattern source-card backfill",
+    plane: "content_production",
+    system_of_record: "Saved Patterns, source selections, canonical source-card families, and locked source cards",
+    primary_surfaces: ["Saved Patterns", "source-card backfill", "source card"],
+    objects: ["uncarded Saved Pattern", "bounded backfill batch", "locked source card"],
+    keywords: ["create missing source cards", "card every saved pattern", "source card backfill", "uncarded saved patterns"],
+    capabilities: ["read the next bounded uncarded batch", "create a source selection from a Saved Pattern ID", "lock each newly created source card", "verify zero-uncarded completion"],
+    payload: { action_size: "bounded_read", max_results: 25, max_response_bytes: 22000, required_inputs: ["brand_key"] },
+    route_intent: "prepare manifest source card backfill",
+    related_entry_ids: ["content.sources", "strategy.manifest_autonomous_cycle"],
+    recommended_next_planes: ["content_production"],
+    hard_gates: [
+      "Every active Saved Pattern without a linked source card must be processed.",
+      "Ambiguity, weak performance, or model discretion cannot skip a Saved Pattern.",
+      "Normal completion requires zero uncarded Saved Patterns; a remaining count is interruption-only evidence."
+    ],
+  },
   {
     id: "content.sources",
     title: "Source candidates, saved patterns, and source cards",

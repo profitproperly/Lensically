@@ -167,7 +167,18 @@
       "reuse_existing_handler"
     ]
   },
-  "declarations": [
+    "declarations": [
+    {
+      "capability_id": "content.prepare_manifest_source_card_backfill",
+      "directory_entry_id": "content.manifest_source_card_backfill",
+      "canonical_handler": "prepare_manifest_source_card_backfill",
+      "route_intent": "prepare manifest source card backfill",
+      "implementation_mode": "new_handler",
+      "focused_regression": "prepares and completes a bounded Saved Pattern source-card backfill",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool returns the next bounded set of uncarded Manifest Saved Patterns, create_source_card resolves each Saved Pattern ID into a durable source selection and locked canonical card, and the final preparation read reports complete only when zero Saved Patterns remain uncarded.",
+      "compatibility_bridge": false
+    },
     {
       "capability_id": "analytics.read_content_focus",
       "directory_entry_id": "analytics.content_focus",

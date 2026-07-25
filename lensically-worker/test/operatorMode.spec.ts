@@ -2210,6 +2210,158 @@ describe("operator mode backend spine", () => {
     expect(new TextEncoder().encode(JSON.stringify(compact)).byteLength).toBeLessThan(8000);
   }, 30000);
 
+        it("prepares and completes a bounded Saved Pattern source-card backfill", async () => {
+    await operatorTool("list_accounts");
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS external_patterns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        app_user_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'threads',
+        source_url TEXT NOT NULL,
+        post_id TEXT,
+        post_text TEXT NOT NULL,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        views INTEGER,
+        posted_at TEXT,
+        capture_confidence TEXT NOT NULL DEFAULT 'high',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await env.DB.prepare(
+      `DELETE FROM external_patterns WHERE app_user_id = 'lensically' AND account_id = 'manifest-mental'`,
+    ).run();
+    for (const fixture of [
+      { postId: "backfill-1", text: "Universe, make the person reading this financially free.", likes: 2500 },
+      { postId: "backfill-2", text: "I bet seeing $80,000 in your account would calm your anxiety.", likes: 1700 },
+      { postId: "backfill-3", text: "A low-metric Saved Pattern still requires a source card.", likes: 5 },
+    ]) {
+      await env.DB.prepare(
+        `INSERT INTO external_patterns (
+          app_user_id, account_id, platform, source_url, post_id, post_text,
+          likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+        ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, ?, 2, 1, 0, 1000, '2026-07-25T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+      ).bind(
+        `https://www.threads.com/@fixture/post/${fixture.postId}`,
+        fixture.postId,
+        fixture.text,
+        fixture.likes,
+      ).run();
+    }
+
+    const first = await operatorTool<{
+      status: string;
+      saved_pattern_total: number;
+      already_carded_count: number;
+      uncarded_count: number;
+      returned_count: number;
+      patterns: Array<{ saved_pattern_id: number; post_text: string; metrics: { likes: number } }>;
+    }>("prepare_manifest_source_card_backfill", {
+      brand_key: "manifest_mental",
+      limit: 2,
+    });
+    expect(first.status).toBe("ready");
+    expect(first.saved_pattern_total).toBe(3);
+    expect(first.already_carded_count).toBe(0);
+    expect(first.uncarded_count).toBe(3);
+    expect(first.returned_count).toBe(2);
+
+    let createdCount = 0;
+    for (const pattern of first.patterns) {
+      const card = await operatorTool<{
+        source_card_id: string;
+        source_selection_id: string;
+        status: string;
+        reused_existing: boolean;
+      }>("create_source_card", {
+        brand_key: "manifest_mental",
+        saved_pattern_id: pattern.saved_pattern_id,
+        title: `Saved Pattern ${pattern.saved_pattern_id}`,
+        source_mechanism: "Preserve the source hook, structure, meaning, tone, and payoff.",
+        required_product: "A close Manifest adaptation of the Saved Pattern.",
+        transformation_contract: {
+          must_preserve_function: ["Preserve the source's central promise and emotional product."],
+          audience_reward: "The same emotional or practical reward delivered by the Saved Pattern.",
+          notes: "Use only slight wording changes and invent no new scene, character, activity, setting, event, metaphor, or premise.",
+        },
+        forbidden_surfaces: [],
+        pass_conditions: ["The source's central promise and payoff remain intact."],
+        fail_conditions: ["The adaptation changes the source into a different premise."],
+      });
+      expect(card.status).toBe("locked");
+      expect(card.source_selection_id).toBe(`manifest-source-card-selection-${pattern.saved_pattern_id}`);
+      expect(card.reused_existing).toBe(false);
+      createdCount += 1;
+    }
+
+    const second = await operatorTool<{
+      status: string;
+      already_carded_count: number;
+      uncarded_count: number;
+      returned_count: number;
+      patterns: Array<{ saved_pattern_id: number }>;
+    }>("prepare_manifest_source_card_backfill", {
+      brand_key: "manifest_mental",
+      limit: 2,
+    });
+    expect(second.status).toBe("ready");
+    expect(second.already_carded_count).toBe(2);
+    expect(second.uncarded_count).toBe(1);
+    expect(second.returned_count).toBe(1);
+
+    const finalPattern = second.patterns[0];
+    const finalCard = await operatorTool<{ status: string; reused_existing: boolean }>("create_source_card", {
+      brand_key: "manifest_mental",
+      saved_pattern_id: finalPattern.saved_pattern_id,
+      title: `Saved Pattern ${finalPattern.saved_pattern_id}`,
+      source_mechanism: "Preserve the source hook, structure, meaning, tone, and payoff.",
+      required_product: "A close Manifest adaptation of the Saved Pattern.",
+      transformation_contract: {
+        must_preserve_function: ["Preserve the source's central promise and emotional product."],
+        audience_reward: "The same emotional or practical reward delivered by the Saved Pattern.",
+        notes: "Use only slight wording changes and invent no new scene, character, activity, setting, event, metaphor, or premise.",
+      },
+      forbidden_surfaces: [],
+      pass_conditions: ["The source's central promise and payoff remain intact."],
+      fail_conditions: ["The adaptation changes the source into a different premise."],
+    });
+    expect(finalCard.status).toBe("locked");
+    expect(finalCard.reused_existing).toBe(false);
+    createdCount += 1;
+
+    const completed = await operatorTool<{
+      status: string;
+      saved_pattern_total: number;
+      already_carded_count: number;
+      uncarded_count: number;
+      returned_count: number;
+      patterns: unknown[];
+    }>("prepare_manifest_source_card_backfill", {
+      brand_key: "manifest_mental",
+      limit: 2,
+    });
+    expect(createdCount).toBe(3);
+    expect(completed.status).toBe("complete");
+    expect(completed.saved_pattern_total).toBe(3);
+    expect(completed.already_carded_count).toBe(3);
+    expect(completed.uncarded_count).toBe(0);
+    expect(completed.returned_count).toBe(0);
+    expect(completed.patterns).toEqual([]);
+
+    const linked = await env.DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM operator_source_selections s
+       JOIN operator_source_cards c ON c.id = s.source_card_id
+       WHERE s.brand_key = 'manifest_mental'
+         AND s.source_type = 'saved_pattern'
+         AND c.status = 'locked'`,
+    ).first<{ total: number }>();
+    expect(Number(linked?.total ?? 0)).toBe(3);
+  }, 30000);
+
       it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
     await operatorTool("list_accounts");
     await env.DB.prepare(
