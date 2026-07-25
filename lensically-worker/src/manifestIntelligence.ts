@@ -7,7 +7,8 @@ export const MANIFEST_EVIDENCE_SNAPSHOT_VERSION = "manifest-evidence-snapshot-v2
 export const MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION = "manifest-evidence-page-v1";
 export const MANIFEST_CANDIDATE_GATE_RECEIPT_VERSION = "manifest-candidate-gate-receipt-v1";
 export const MANIFEST_POST_HYPOTHESIS_VERSION = "manifest-post-hypothesis-v3";
-export const MANIFEST_CYCLE_RECEIPT_READ_VERSION = "manifest-cycle-receipt-read-v2";
+export const MANIFEST_CYCLE_RECEIPT_READ_VERSION = "manifest-cycle-receipt-read-v3";
+export const MANIFEST_CYCLE_DEFECT_RECEIPT_VERSION = "manifest-cycle-defect-receipt-v1";
 export const MANIFEST_ANALYSIS_WINDOW_DAYS = 28;
 export const MANIFEST_RECENT_EXPOSURE_HOURS = 72;
 export const MANIFEST_EVIDENCE_PAGE_SIZE = 12;
@@ -477,10 +478,25 @@ export async function ensureManifestIntelligenceTables(db: D1Database): Promise<
       exposure_snapshot_id TEXT, horizon_plan_json TEXT NOT NULL DEFAULT '{}', completion_json TEXT,
       unresolved_issues_json TEXT NOT NULL DEFAULT '[]', started_at TEXT NOT NULL,
       completed_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_receipt_events (
+        `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_receipt_events (
       id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL, event_key TEXT NOT NULL,
       event_type TEXT NOT NULL, slot_key TEXT, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(cycle_id, event_key))`,
+    `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_defect_receipts (
+      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL, defect_key TEXT NOT NULL,
+      receipt_version TEXT NOT NULL, stage_number INTEGER NOT NULL, stage_key TEXT NOT NULL,
+      phase TEXT NOT NULL, slot_key TEXT, operation_id TEXT, error_code TEXT NOT NULL,
+      error_message TEXT NOT NULL, impact_state TEXT NOT NULL, retryable INTEGER NOT NULL DEFAULT 0,
+      blocking INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'open',
+      occurrence_count INTEGER NOT NULL DEFAULT 1, first_seen_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL, reconciliation_json TEXT NOT NULL DEFAULT '{}',
+      root_cause TEXT, repair_commit_sha TEXT, deployed_sha TEXT,
+      regression_tests_json TEXT NOT NULL DEFAULT '[]', verification_json TEXT NOT NULL DEFAULT '{}',
+      metadata_json TEXT NOT NULL DEFAULT '{}', resolved_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(cycle_id, defect_key))`,
+    `CREATE INDEX IF NOT EXISTS idx_manifest_cycle_defects_status
+      ON operator_manifest_cycle_defect_receipts (cycle_id, status, blocking, first_seen_at ASC)`,
     `CREATE TABLE IF NOT EXISTS operator_manifest_post_hypotheses (
       id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL, slot_key TEXT NOT NULL,
       hypothesis_version TEXT NOT NULL, strategy_version_id TEXT, source_kind TEXT NOT NULL,
@@ -1422,6 +1438,140 @@ export async function appendManifestCycleEvent(db: D1Database, input: {
   ).run();
 }
 
+function serializeManifestCycleDefect(row: JsonRecord): JsonRecord {
+  return {
+    ...row,
+    stage_number: Number(row.stage_number ?? 0),
+    retryable: Number(row.retryable ?? 0) === 1,
+    blocking: Number(row.blocking ?? 1) === 1,
+    occurrence_count: Number(row.occurrence_count ?? 1),
+    reconciliation: parseJson(row.reconciliation_json, {}),
+    regression_tests: parseJson(row.regression_tests_json, []),
+    verification: parseJson(row.verification_json, {}),
+    metadata: parseJson(row.metadata_json, {}),
+  };
+}
+
+function manifestDefectIsOpen(defect: JsonRecord): boolean {
+  return ["open", "repairing"].includes(String(defect.status ?? "open"));
+}
+
+async function syncManifestCycleUnresolvedIssues(db: D1Database, cycleId: string): Promise<void> {
+  const rows = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts
+     WHERE cycle_id = ? AND status IN ('open', 'repairing')
+     ORDER BY blocking DESC, stage_number ASC, datetime(first_seen_at) ASC, defect_key ASC`,
+  ).bind(cycleId).all<JsonRecord>();
+  const unresolved = (rows.results ?? []).map(serializeManifestCycleDefect);
+  await db.prepare(
+    `UPDATE operator_manifest_cycle_receipts SET unresolved_issues_json = ? WHERE cycle_id = ?`,
+  ).bind(stableManifestJson(unresolved), cycleId).run();
+}
+
+export async function recordManifestCycleDefect(db: D1Database, input: {
+  cycleId: string; brandKey: string; defectKey: string; stageNumber: number; stageKey: string;
+  phase: string; slotKey?: string | null; operationId?: string | null; errorCode: string;
+  errorMessage: string; impactState: string; retryable?: boolean; blocking?: boolean;
+  status?: "open" | "repairing"; reconciliation?: JsonRecord; rootCause?: string | null;
+  repairCommitSha?: string | null; deployedSha?: string | null; regressionTests?: JsonRecord[];
+  verification?: JsonRecord; metadata?: JsonRecord; observedAt?: string;
+}): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  const defectKey = text(input.defectKey, 300);
+  if (!defectKey) throw new Error("manifest_cycle_defect_key_required");
+  const observedAt = input.observedAt ?? new Date().toISOString();
+  const status = input.status === "repairing" ? "repairing" : "open";
+  const existing = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts WHERE cycle_id = ? AND defect_key = ? LIMIT 1`,
+  ).bind(input.cycleId, defectKey).first<JsonRecord>();
+  if (existing) {
+    await db.prepare(
+      `UPDATE operator_manifest_cycle_defect_receipts SET
+         stage_number = ?, stage_key = ?, phase = ?, slot_key = COALESCE(?, slot_key),
+         operation_id = COALESCE(?, operation_id), error_code = ?, error_message = ?,
+         impact_state = ?, retryable = ?, blocking = ?, status = ?,
+         occurrence_count = COALESCE(occurrence_count, 1) + 1, last_seen_at = ?,
+         reconciliation_json = ?, root_cause = COALESCE(?, root_cause),
+         repair_commit_sha = COALESCE(?, repair_commit_sha), deployed_sha = COALESCE(?, deployed_sha),
+         regression_tests_json = ?, verification_json = ?, metadata_json = ?,
+         resolved_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(
+      Math.max(1, Math.min(7, Math.trunc(input.stageNumber))), text(input.stageKey, 120), text(input.phase, 160),
+      input.slotKey ?? null, input.operationId ?? null, text(input.errorCode, 300), text(input.errorMessage, 4000),
+      text(input.impactState, 120), input.retryable === true ? 1 : 0, input.blocking === false ? 0 : 1, status,
+      observedAt, stableManifestJson(input.reconciliation ?? {}), input.rootCause ?? null,
+      input.repairCommitSha ?? null, input.deployedSha ?? null,
+      stableManifestJson(input.regressionTests ?? parseJson(existing.regression_tests_json, []) as JsonRecord[]),
+      stableManifestJson(input.verification ?? parseJson(existing.verification_json, {}) as JsonRecord),
+      stableManifestJson(input.metadata ?? parseJson(existing.metadata_json, {}) as JsonRecord), existing.id,
+    ).run();
+  } else {
+    await db.prepare(
+      `INSERT INTO operator_manifest_cycle_defect_receipts (
+        id, cycle_id, brand_key, defect_key, receipt_version, stage_number, stage_key, phase,
+        slot_key, operation_id, error_code, error_message, impact_state, retryable, blocking,
+        status, occurrence_count, first_seen_at, last_seen_at, reconciliation_json, root_cause,
+        repair_commit_sha, deployed_sha, regression_tests_json, verification_json, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), input.cycleId, input.brandKey, defectKey, MANIFEST_CYCLE_DEFECT_RECEIPT_VERSION,
+      Math.max(1, Math.min(7, Math.trunc(input.stageNumber))), text(input.stageKey, 120), text(input.phase, 160),
+      input.slotKey ?? null, input.operationId ?? null, text(input.errorCode, 300), text(input.errorMessage, 4000),
+      text(input.impactState, 120), input.retryable === true ? 1 : 0, input.blocking === false ? 0 : 1,
+      status, observedAt, observedAt, stableManifestJson(input.reconciliation ?? {}), input.rootCause ?? null,
+      input.repairCommitSha ?? null, input.deployedSha ?? null, stableManifestJson(input.regressionTests ?? []),
+      stableManifestJson(input.verification ?? {}), stableManifestJson(input.metadata ?? {}),
+    ).run();
+  }
+  await syncManifestCycleUnresolvedIssues(db, input.cycleId);
+  const row = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts WHERE cycle_id = ? AND defect_key = ? LIMIT 1`,
+  ).bind(input.cycleId, defectKey).first<JsonRecord>();
+  return serializeManifestCycleDefect(row ?? { cycle_id: input.cycleId, defect_key: defectKey });
+}
+
+export async function resolveManifestCycleDefect(db: D1Database, input: {
+  cycleId: string; brandKey: string; defectKey: string;
+  status?: "resolved" | "irrecoverable_historical_gap"; reconciliation?: JsonRecord;
+  rootCause: string; repairCommitSha?: string | null; deployedSha?: string | null;
+  regressionTests?: JsonRecord[]; verification: JsonRecord; resolvedAt?: string;
+}): Promise<JsonRecord> {
+  await ensureManifestIntelligenceTables(db);
+  const existing = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts
+     WHERE cycle_id = ? AND brand_key = ? AND defect_key = ? LIMIT 1`,
+  ).bind(input.cycleId, input.brandKey, input.defectKey).first<JsonRecord>();
+  if (!existing) throw new Error("manifest_cycle_defect_not_found");
+  const status = input.status === "irrecoverable_historical_gap" ? "irrecoverable_historical_gap" : "resolved";
+  const resolvedAt = input.resolvedAt ?? new Date().toISOString();
+  await db.prepare(
+    `UPDATE operator_manifest_cycle_defect_receipts SET status = ?, reconciliation_json = ?,
+       root_cause = ?, repair_commit_sha = COALESCE(?, repair_commit_sha),
+       deployed_sha = COALESCE(?, deployed_sha), regression_tests_json = ?, verification_json = ?,
+       resolved_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+  ).bind(
+    status, stableManifestJson(input.reconciliation ?? parseJson(existing.reconciliation_json, {}) as JsonRecord),
+    text(input.rootCause, 8000), input.repairCommitSha ?? null, input.deployedSha ?? null,
+    stableManifestJson(input.regressionTests ?? parseJson(existing.regression_tests_json, []) as JsonRecord[]),
+    stableManifestJson(input.verification), resolvedAt, existing.id,
+  ).run();
+  await syncManifestCycleUnresolvedIssues(db, input.cycleId);
+  const row = await db.prepare(`SELECT * FROM operator_manifest_cycle_defect_receipts WHERE id = ?`)
+    .bind(existing.id).first<JsonRecord>();
+  return serializeManifestCycleDefect(row ?? existing);
+}
+
+export async function listManifestCycleDefects(db: D1Database, cycleId: string): Promise<JsonRecord[]> {
+  await ensureManifestIntelligenceTables(db);
+  const rows = await db.prepare(
+    `SELECT * FROM operator_manifest_cycle_defect_receipts
+     WHERE cycle_id = ? ORDER BY stage_number ASC, datetime(first_seen_at) ASC, defect_key ASC`,
+  ).bind(cycleId).all<JsonRecord>();
+  return (rows.results ?? []).map(serializeManifestCycleDefect);
+}
+
+
 function serializeHypothesis(row: JsonRecord): JsonRecord {
   return {
     ...row,
@@ -1518,8 +1668,31 @@ export async function finalizeManifestCycleReceipt(db: D1Database, input: {
   cycleId: string; status: string; completion: JsonRecord; unresolvedIssues?: JsonRecord[]; completedAt: string;
 }): Promise<void> {
   await ensureManifestIntelligenceTables(db);
-  const completionJson = stableManifestJson(input.completion);
-  const unresolvedJson = stableManifestJson(input.unresolvedIssues ?? []);
+  const defects = await listManifestCycleDefects(db, input.cycleId);
+  const openDefects = defects.filter(manifestDefectIsOpen);
+  const blockingOpen = openDefects.filter((defect) => defect.blocking === true);
+  if (blockingOpen.length) {
+    throw new Error(`manifest_cycle_blocking_defects_open:${blockingOpen.map((defect) => String(defect.id ?? defect.defect_key)).join(",")}`);
+  }
+  const resolvedDefects = defects.filter((defect) => ["resolved", "irrecoverable_historical_gap"].includes(String(defect.status)));
+  const unresolved = [
+    ...openDefects,
+    ...(input.unresolvedIssues ?? []),
+  ];
+  const enrichedCompletion = {
+    ...input.completion,
+    final_cycle_status: defects.length ? "completed_after_repairs" : "completed_clean",
+    defect_receipt_summary: {
+      receipt_version: MANIFEST_CYCLE_DEFECT_RECEIPT_VERSION,
+      total_defect_count: defects.length,
+      resolved_defect_count: resolvedDefects.length,
+      unresolved_defect_count: openDefects.length,
+      blocking_unresolved_defect_count: blockingOpen.length,
+      defect_receipt_ids: defects.map((defect) => defect.id).filter(Boolean),
+    },
+  };
+  const completionJson = stableManifestJson(enrichedCompletion);
+  const unresolvedJson = stableManifestJson(unresolved);
   const existing = await db.prepare(
     `SELECT status, completion_json, unresolved_issues_json, completed_at
      FROM operator_manifest_cycle_receipts WHERE cycle_id = ? LIMIT 1`,
@@ -1555,9 +1728,10 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
   const events = await db.prepare(
     `SELECT * FROM operator_manifest_cycle_receipt_events WHERE cycle_id = ? ORDER BY datetime(created_at) ASC, event_key ASC`,
   ).bind(String(row.cycle_id)).all<JsonRecord>();
-  const hypotheses = await db.prepare(
+    const hypotheses = await db.prepare(
     `SELECT * FROM operator_manifest_post_hypotheses WHERE cycle_id = ? ORDER BY slot_key ASC`,
   ).bind(String(row.cycle_id)).all<JsonRecord>();
+  const defects = await listManifestCycleDefects(db, String(row.cycle_id));
   const inputStrategy = row.input_strategy_version_id
     ? await db.prepare(`SELECT * FROM operator_manifest_strategy_versions WHERE id = ?`).bind(row.input_strategy_version_id).first<JsonRecord>()
     : null;
@@ -1581,15 +1755,16 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
         ? serializeStrategy(outputLegacyStrategy)
         : null,
     exposure_snapshot: exposure ? serializeExposure(exposure) : null,
-    events: (events.results ?? []).map((event) => ({ ...event, payload: parseJson(event.payload_json, {}) })),
+        events: (events.results ?? []).map((event) => ({ ...event, payload: parseJson(event.payload_json, {}) })),
     hypotheses: (hypotheses.results ?? []).map(serializeHypothesis),
+    defects,
     follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
     noninterference_policy: MANIFEST_NONINTERFERENCE_POLICY,
   };
 }
 
 type ManifestCycleReceiptReadSection =
-  | "summary" | "events" | "hypotheses" | "exposure_published" | "exposure_scheduled"
+  | "summary" | "events" | "hypotheses" | "defects" | "exposure_published" | "exposure_scheduled"
   | "exposure_dimensions" | "startup_state" | "input_strategy" | "output_strategy"
   | "completion" | "unresolved_issues";
 
@@ -1640,7 +1815,7 @@ export function buildManifestCycleReceiptRead(
 ): JsonRecord {
   const source = receipt && typeof receipt === "object" && !Array.isArray(receipt) ? receipt as JsonRecord : {};
   const allowedSections = new Set<ManifestCycleReceiptReadSection>([
-    "summary", "events", "hypotheses", "exposure_published", "exposure_scheduled",
+        "summary", "events", "hypotheses", "defects", "exposure_published", "exposure_scheduled",
     "exposure_dimensions", "startup_state", "input_strategy", "output_strategy",
     "completion", "unresolved_issues",
   ]);
@@ -1650,8 +1825,12 @@ export function buildManifestCycleReceiptRead(
   const limitNumber = Number(requestedLimit);
   const offset = Number.isFinite(offsetNumber) ? Math.max(0, Math.trunc(offsetNumber)) : 0;
   const limit = Number.isFinite(limitNumber) ? Math.min(10, Math.max(1, Math.trunc(limitNumber))) : 10;
-  const events = Array.isArray(source.events) ? source.events : [];
+    const events = Array.isArray(source.events) ? source.events : [];
   const hypotheses = Array.isArray(source.hypotheses) ? source.hypotheses : [];
+  const defects = Array.isArray(source.defects) ? source.defects : [];
+  const openDefects = defects.filter((defect) => defect && typeof defect === "object" && !Array.isArray(defect)
+    && manifestDefectIsOpen(defect as JsonRecord));
+  const blockingOpenDefects = openDefects.filter((defect) => (defect as JsonRecord).blocking === true);
   const startupState = source.startup_state ?? {};
   const inputStrategy = source.input_strategy_version ?? null;
   const outputStrategy = source.output_strategy_version ?? null;
@@ -1708,7 +1887,11 @@ export function buildManifestCycleReceiptRead(
         ? (startupRecord.account_position as JsonRecord).captured_at : null) ?? null,
     },
     completion_present: completion !== null,
-    unresolved_issue_count: unresolvedIssues.length,
+        unresolved_issue_count: unresolvedIssues.length,
+    defect_count: defects.length,
+    open_defect_count: openDefects.length,
+    blocking_open_defect_count: blockingOpenDefects.length,
+    resolved_defect_count: defects.length - openDefects.length,
     event_count: events.length,
     hypothesis_count: hypotheses.length,
     started_at: source.started_at ?? null,
@@ -1729,8 +1912,9 @@ export function buildManifestCycleReceiptRead(
   };
   let items: unknown[] = [];
   let sectionData: JsonRecord | null = null;
-  if (section === "events") items = events;
+    if (section === "events") items = events;
   if (section === "hypotheses") items = hypotheses;
+  if (section === "defects") items = defects;
   if (section === "exposure_published") items = published;
   if (section === "exposure_scheduled") items = scheduled;
   const chunkSource = section === "exposure_dimensions" ? exposureDimensions
