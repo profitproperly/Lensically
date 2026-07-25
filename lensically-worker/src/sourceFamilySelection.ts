@@ -114,7 +114,8 @@ function posteriorThresholdProbability(
   if (!indexes.length) return 0.5;
   const logs = indexes.map((value) => Math.log(clamp(value, 0.05, 20)));
   const priorVariance = 1;
-  const observationVariance = 0.64;
+    const observationVariance = 0.25;
+
   const posteriorPrecision = 1 / priorVariance + logs.length / observationVariance;
   const posteriorMean = (logs.reduce((sum, value) => sum + value, 0) / observationVariance) / posteriorPrecision;
   const posteriorSd = Math.sqrt(1 / posteriorPrecision);
