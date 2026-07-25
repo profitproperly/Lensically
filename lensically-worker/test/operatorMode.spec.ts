@@ -4446,9 +4446,10 @@ describe("operator mode MCP endpoint", () => {
   }, 30000);
 
     it("reads a complete cycle receipt after source-backed persistence without mutation", async () => {
-    const fixture = await prepareManifestSourceBackedCycleForTest();
-    const payload = buildManifestSourceBackedPersistPayload(fixture);
-    const slot = fixture.prepared.cycle.missing_slots[0];
+        const fixture = await prepareManifestSourceBackedCycleForTest();
+    const slotIndex = fixture.prepared.cycle.missing_slots.length - 1;
+    const payload = buildManifestSourceBackedPersistPayload(fixture, slotIndex);
+    const slot = fixture.prepared.cycle.missing_slots[slotIndex];
     const persisted = await mcpTool<{
       success: boolean;
       scheduled_post_id: number;
