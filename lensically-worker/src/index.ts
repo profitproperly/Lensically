@@ -87,9 +87,12 @@ import {
   getManifestCycleStrategy,
   getManifestEvidenceConsumptionState,
   getManifestIntelligenceFoundation,
-  linkManifestCycleStrategy,
+    linkManifestCycleStrategy,
   linkManifestHypothesisResult,
   listManifestHardBans,
+  recordManifestCycleDefect,
+  resolveManifestCycleDefect,
+  resolveManifestCycleDefectsByScope,
   normalizeManifestSourceContext,
   readManifestEvidencePage,
   recordManifestCandidateGateReceipt,
@@ -14993,6 +14996,117 @@ async function reviewManifestScheduledPost(
   };
 }
 
+export function manifestCycleFailureIsDefect(errorCode: unknown): boolean {
+  const code = normalizeOperatorMachineKey(errorCode, "");
+  if (!code) return false;
+  const expected = [
+    "candidate_gate_suite_failed", "complete_cycle_strategy_required", "cycle_id_and_snapshot_id_required",
+    "autonomous_cycle_id_required", "autonomous_cycle_not_found", "autonomous_cycle_strategy_required",
+    "autonomous_cycle_plan_item_required", "cycle_strategy_identity_mismatch", "cycle_plan_item_identity_mismatch",
+    "slot_already_occupied", "exact_duplicate", "duplicate", "hard_ban", "source_fidelity",
+    "operation_already_in_progress", "prior_operation_in_progress", "continuation_required",
+    "retired_monolithic_autonomous_commit", "manifest_only", "brand_key_required",
+  ];
+  return !expected.some((surface) => code.includes(surface));
+}
+
+function manifestCycleToolScope(
+  toolName: string,
+  payload: Record<string, unknown>,
+  result: Record<string, unknown>,
+): { stageNumber: number; stageKey: string; phase: string; slotKey: string | null } | null {
+  const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
+    ? payload.post as Record<string, unknown>
+    : {};
+  const postDate = normalizeOperatorText(post.date, 20, true);
+  const postTime = normalizeOperatorText(post.time, 20, true);
+  const slotKey = normalizeOperatorText(result.slot_key, 40, true)
+    ?? normalizeOperatorText(payload.slot_key, 40, true)
+    ?? (postDate && postTime ? `${postDate}T${postTime}` : null);
+  if (toolName === "get_manifest_cycle_analysis_page") return { stageNumber: 2, stageKey: "evidence_consumption", phase: "analysis_page", slotKey: null };
+  if (toolName === "commit_manifest_cycle_strategy") return { stageNumber: 3, stageKey: "strategy_and_lineup", phase: "strategy_commit", slotKey: null };
+  if (toolName === "persist_manifest_autonomous_post") return { stageNumber: 5, stageKey: "persistence_and_scheduling", phase: "single_slot_persist", slotKey };
+  if (toolName === "get_hourly_coverage") return { stageNumber: 6, stageKey: "coverage_and_completion", phase: "coverage_reconciliation", slotKey };
+  if (toolName === "prepare_manifest_autonomous_cycle") {
+    const phase = normalizeOperatorMachineKey(result.stage ?? result.phase ?? result.checkpoint_phase, "preparation");
+    const evaluatorPhase = ["evaluator", "intelligence", "measurement", "content_focus", "learning"].some((surface) => phase.includes(surface));
+    return {
+      stageNumber: evaluatorPhase ? 7 : 1,
+      stageKey: evaluatorPhase ? "post_publication_evaluator" : "preparation_and_reconciliation",
+      phase,
+      slotKey: null,
+    };
+  }
+  return null;
+}
+
+async function observeManifestCycleToolResult(
+  env: Env,
+  brand: GptResolvedBrand,
+  toolName: string,
+  payload: Record<string, unknown>,
+  result: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (brand.brand_key !== "manifest_mental") return result;
+  const cycleId = normalizeOperatorText(payload.cycle_id ?? result.cycle_id, 160, true);
+  const scope = manifestCycleToolScope(toolName, payload, result);
+  if (!cycleId || !scope) return result;
+  const succeeded = result.success !== false && result.ok !== false;
+  if (succeeded) {
+    const resolved = await resolveManifestCycleDefectsByScope(env.DB, {
+      cycleId,
+      brandKey: brand.brand_key,
+      stageKey: scope.stageKey,
+      phase: scope.phase,
+      slotKey: scope.slotKey,
+      verification: {
+        resolution_mode: "successful_scoped_retry_or_reconciliation",
+        tool_name: toolName,
+        operation_id: normalizeOperatorText(payload.operation_id, 240, true),
+        observed_result: {
+          success: result.success ?? result.ok ?? true,
+          scheduled_post_id: result.scheduled_post_id ?? null,
+          remaining_missing_count: result.remaining_missing_count ?? null,
+        },
+      },
+    });
+    return resolved.length ? { ...result, auto_resolved_defect_count: resolved.length } : result;
+  }
+  const errorCode = normalizeOperatorText(result.error ?? result.code, 300, true) ?? "manifest_cycle_tool_failed";
+  if (!manifestCycleFailureIsDefect(errorCode)) return result;
+  const operationId = normalizeOperatorText(payload.operation_id, 240, true);
+  const impactState = result.scheduled_post_id
+    ? "partially_succeeded"
+    : result.side_effect_state === "unknown"
+      ? "possibly_succeeded"
+      : "definitely_failed";
+  const defect = await recordManifestCycleDefect(env.DB, {
+    cycleId,
+    brandKey: brand.brand_key,
+    defectKey: `${toolName}:${scope.phase}:${scope.slotKey ?? "cycle"}:${normalizeOperatorMachineKey(errorCode, "failure")}`,
+    stageNumber: scope.stageNumber,
+    stageKey: scope.stageKey,
+    phase: scope.phase,
+    slotKey: scope.slotKey,
+    operationId,
+    errorCode,
+    errorMessage: normalizeOperatorText(result.message ?? result.error ?? result.code, 4000, true) ?? errorCode,
+    impactState,
+    retryable: result.retryable === true,
+    blocking: true,
+    reconciliation: result.reconciliation && typeof result.reconciliation === "object" && !Array.isArray(result.reconciliation)
+      ? result.reconciliation as Record<string, unknown>
+      : {},
+    metadata: {
+      tool_name: toolName,
+      result_keys: Object.keys(result).sort(),
+      side_effect_state: result.side_effect_state ?? null,
+      next_action: result.next_action ?? result.required_next_action ?? null,
+    },
+  });
+  return { ...result, defect_receipt_id: defect.id ?? null, defect_key: defect.defect_key ?? null };
+}
+
 async function handleOperatorTool(request: Request, env: Env, toolName: string): Promise<Response> {
   if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
@@ -15028,17 +15142,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const pageIndex = Math.max(0, Math.trunc(Number(payload.page_index ?? 0)));
     if (!cycleId) return operatorJsonResponse({ success: false, error: "autonomous_cycle_id_required" }, 400);
     try {
-      return operatorJsonResponse(await readManifestEvidencePage(env.DB, {
+            const result = await readManifestEvidencePage(env.DB, {
         brandKey: brand.brand_key,
         cycleId,
         snapshotId,
         pageIndex,
-      }));
+      });
+      return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, result));
     } catch (error) {
-      return operatorJsonResponse({
+      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
         success: false,
         error: error instanceof Error ? error.message : "manifest_evidence_page_read_failed",
-      }, 400);
+      });
+      return operatorJsonResponse(result, 400);
     }
   }
 
@@ -15105,21 +15221,36 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           primary_metric: "24_hour_likes",
         },
       });
-      return operatorJsonResponse({
+            const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
         success: true,
+        cycle_id: cycleId,
         strategy,
         next_action: "Generate candidates only from each locked plan item's canonical source card, run every required candidate gate, and persist the first exact planned slot.",
       });
+      return operatorJsonResponse(result);
     } catch (error) {
-      return operatorJsonResponse({
+      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
         success: false,
+        cycle_id: cycleId,
         error: error instanceof Error ? error.message : "manifest_cycle_strategy_commit_failed",
-      }, 400);
+      });
+      return operatorJsonResponse(result, 400);
     }
   }
 
-  if (toolName === "prepare_manifest_autonomous_cycle") {
-    return operatorJsonResponse(await prepareManifestAutonomousCycle(env, brand, payload));
+    if (toolName === "prepare_manifest_autonomous_cycle") {
+    try {
+      const result = await prepareManifestAutonomousCycle(env, brand, payload);
+      return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, result));
+    } catch (error) {
+      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
+        success: false,
+        cycle_id: payload.cycle_id ?? null,
+        stage: "preparation_exception",
+        error: error instanceof Error ? error.message : "manifest_autonomous_prepare_failed",
+      });
+      return operatorJsonResponse(result, 500);
+    }
   }
 
     if (toolName === "commit_manifest_autonomous_runway") {
@@ -15131,8 +15262,20 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     }, 410);
   }
 
-  if (toolName === "persist_manifest_autonomous_post") {
-    return operatorJsonResponse(await persistManifestAutonomousPost(env, brand, payload));
+    if (toolName === "persist_manifest_autonomous_post") {
+    try {
+      const result = await persistManifestAutonomousPost(env, brand, payload);
+      return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, result));
+    } catch (error) {
+      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
+        success: false,
+        cycle_id: payload.cycle_id ?? null,
+        error: error instanceof Error ? error.message : "manifest_autonomous_persist_failed",
+        side_effect_state: "unknown",
+        retryable: true,
+      });
+      return operatorJsonResponse(result, 500);
+    }
   }
 
   if (toolName === "review_manifest_scheduled_post") {
@@ -15387,7 +15530,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         payload: coverageResponse,
       });
     }
-    return operatorJsonResponse(coverageResponse);
+        return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, coverageResponse));
   }
 
   if (toolName === "claim_manifest_review_batch") {
@@ -19045,11 +19188,11 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-  {
+    {
     name: "get_manifest_cycle_receipt",
     title: "Get Manifest autonomous cycle receipt",
-            description: "Read one canonical autonomous-cycle receipt without payload-budget truncation. The response always includes a stable summary. Events, hypotheses, and exposure records are pageable; startup state, strategy versions, exposure dimensions, completion, and unresolved issues are reconstructable from canonical stable-JSON chunks.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" }, receipt_section: { type: "string", enum: ["summary", "events", "hypotheses", "exposure_published", "exposure_scheduled", "exposure_dimensions", "startup_state", "input_strategy", "output_strategy", "completion", "unresolved_issues"], default: "summary" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 10, default: 10 } }, required: ["brand_key"], additionalProperties: false },
+    description: "Read one canonical autonomous-cycle receipt without payload-budget truncation. The response always includes a stable summary. Events, hypotheses, defects, and exposure records are pageable; startup state, strategy versions, exposure dimensions, completion, and unresolved issues are reconstructable from canonical stable-JSON chunks.",
+    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" }, receipt_section: { type: "string", enum: ["summary", "events", "hypotheses", "defects", "exposure_published", "exposure_scheduled", "exposure_dimensions", "startup_state", "input_strategy", "output_strategy", "completion", "unresolved_issues"], default: "summary" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 10, default: 10 } }, required: ["brand_key"], additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
         {
