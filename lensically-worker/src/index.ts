@@ -15236,6 +15236,57 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       });
       return operatorJsonResponse(result, 400);
     }
+    }
+
+  if (toolName === "record_manifest_cycle_defect") {
+    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
+    const defectKey = normalizeOperatorText(payload.defect_key, 300);
+    if (!cycleId || !defectKey) return operatorJsonResponse({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
+    const receipt = await getManifestCycleReceipt(env.DB, { brandKey: brand.brand_key, cycleId });
+    if (!receipt) return operatorJsonResponse({ success: false, error: "manifest_cycle_receipt_not_found" }, 404);
+    const defect = await recordManifestCycleDefect(env.DB, {
+      cycleId,
+      brandKey: brand.brand_key,
+      defectKey,
+      stageNumber: Math.max(1, Math.min(7, Math.trunc(Number(payload.stage_number ?? 1)))),
+      stageKey: normalizeOperatorText(payload.stage_key, 120) || "unknown_stage",
+      phase: normalizeOperatorText(payload.phase, 160) || "external_failure",
+      slotKey: normalizeOperatorText(payload.slot_key, 40, true),
+      operationId: normalizeOperatorText(payload.operation_id, 240, true),
+      errorCode: normalizeOperatorText(payload.error_code, 300) || "external_cycle_failure",
+      errorMessage: normalizeOperatorText(payload.error_message, 4000) || "External cycle failure",
+      impactState: normalizeOperatorText(payload.impact_state, 120) || "definitely_failed",
+      retryable: payload.retryable === true,
+      blocking: payload.blocking !== false,
+      status: payload.status === "repairing" ? "repairing" : "open",
+      reconciliation: payload.reconciliation && typeof payload.reconciliation === "object" && !Array.isArray(payload.reconciliation)
+        ? payload.reconciliation as Record<string, unknown> : {},
+      metadata: payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+        ? payload.metadata as Record<string, unknown> : {},
+    });
+    return operatorJsonResponse({ success: true, defect });
+  }
+
+  if (toolName === "resolve_manifest_cycle_defect") {
+    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
+    const defectKey = normalizeOperatorText(payload.defect_key, 300);
+    if (!cycleId || !defectKey) return operatorJsonResponse({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
+    const defect = await resolveManifestCycleDefect(env.DB, {
+      cycleId,
+      brandKey: brand.brand_key,
+      defectKey,
+      status: payload.status === "irrecoverable_historical_gap" ? "irrecoverable_historical_gap" : "resolved",
+      rootCause: normalizeOperatorText(payload.root_cause, 8000) || "Resolved with verified evidence.",
+      repairCommitSha: normalizeOperatorText(payload.repair_commit_sha, 80, true),
+      deployedSha: normalizeOperatorText(payload.deployed_sha, 80, true),
+      reconciliation: payload.reconciliation && typeof payload.reconciliation === "object" && !Array.isArray(payload.reconciliation)
+        ? payload.reconciliation as Record<string, unknown> : {},
+      regressionTests: Array.isArray(payload.regression_tests)
+        ? payload.regression_tests.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[] : [],
+      verification: payload.verification && typeof payload.verification === "object" && !Array.isArray(payload.verification)
+        ? payload.verification as Record<string, unknown> : {},
+    });
+    return operatorJsonResponse({ success: true, defect });
   }
 
     if (toolName === "prepare_manifest_autonomous_cycle") {
@@ -19193,7 +19244,59 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     title: "Get Manifest autonomous cycle receipt",
     description: "Read one canonical autonomous-cycle receipt without payload-budget truncation. The response always includes a stable summary. Events, hypotheses, defects, and exposure records are pageable; startup state, strategy versions, exposure dimensions, completion, and unresolved issues are reconstructable from canonical stable-JSON chunks.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, cycle_id: { type: "string" }, cycle_operation_id: { type: "string" }, receipt_section: { type: "string", enum: ["summary", "events", "hypotheses", "defects", "exposure_published", "exposure_scheduled", "exposure_dimensions", "startup_state", "input_strategy", "output_strategy", "completion", "unresolved_issues"], default: "summary" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 10, default: 10 } }, required: ["brand_key"], additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "record_manifest_cycle_defect",
+    title: "Record Manifest cycle defect",
+    description: "Attach one durable defect receipt to an active Manifest cycle for a failure observed outside the Worker, such as an OpenAI pre-call block, client schema rejection, transport interruption, or ambiguous response. Internal Worker failures are recorded automatically.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        cycle_id: { type: "string" },
+        defect_key: { type: "string" },
+        stage_number: { type: "integer", minimum: 1, maximum: 7 },
+        stage_key: { type: "string" },
+        phase: { type: "string" },
+        slot_key: { type: "string" },
+        operation_id: { type: "string" },
+        error_code: { type: "string" },
+        error_message: { type: "string" },
+        impact_state: { type: "string", enum: ["definitely_failed", "possibly_succeeded", "partially_succeeded", "succeeded_before_response_failed"] },
+        retryable: { type: "boolean" },
+        blocking: { type: "boolean" },
+        status: { type: "string", enum: ["open", "repairing"] },
+        reconciliation: { type: "object", additionalProperties: true },
+        metadata: { type: "object", additionalProperties: true },
+      },
+      required: ["brand_key", "cycle_id", "defect_key", "stage_number", "stage_key", "phase", "error_code", "error_message", "impact_state"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "resolve_manifest_cycle_defect",
+    title: "Resolve Manifest cycle defect",
+    description: "Resolve or classify one existing Manifest cycle defect with root cause, repair commit, deployed SHA, regression tests, reconciliation, and live verification evidence. The defect remains permanently attached to the cycle receipt.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        cycle_id: { type: "string" },
+        defect_key: { type: "string" },
+        status: { type: "string", enum: ["resolved", "irrecoverable_historical_gap"] },
+        root_cause: { type: "string" },
+        repair_commit_sha: { type: "string" },
+        deployed_sha: { type: "string" },
+        reconciliation: { type: "object", additionalProperties: true },
+        regression_tests: { type: "array", items: { type: "object", additionalProperties: true } },
+        verification: { type: "object", additionalProperties: true },
+      },
+      required: ["brand_key", "cycle_id", "defect_key", "root_cause", "verification"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
         {
     name: "get_manifest_cycle_analysis_page",
