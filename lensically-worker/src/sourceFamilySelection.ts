@@ -504,12 +504,55 @@ export async function refreshSourceFamilyLabels(
   };
 }
 
+export async function loadLockedSourceCardSelectionCandidates(
+  db: D1Database,
+  brandKey: string,
+  nowIso = new Date().toISOString(),
+): Promise<SourceSelectionCandidate[]> {
+  await ensureSourceFamilySelectionTables(db);
+  const rows = await db.prepare(
+    `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
+            card.id AS source_card_id, card.source_mechanism, card.required_product,
+            card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction
+     FROM operator_source_card_families fam
+     JOIN operator_source_cards card
+       ON card.id = fam.current_source_card_id
+      AND card.brand_key = fam.brand_key
+      AND card.is_current = 1
+     WHERE fam.brand_key = ?
+       AND fam.status = 'active'
+       AND card.status = 'locked'`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const candidates = (rows.results ?? []).map((row) => {
+    let metrics: Record<string, unknown> = {};
+    let primarySource: Record<string, unknown> = {};
+    try { metrics = JSON.parse(String(row.metrics_snapshot_json ?? "{}")) as Record<string, unknown>; } catch { metrics = {}; }
+    try { primarySource = JSON.parse(String(row.primary_source_json ?? "{}")) as Record<string, unknown>; } catch { primarySource = {}; }
+    return {
+      source_candidate_id: `source_card:${String(row.source_card_id ?? "")}`,
+      source_identity_key: String(row.source_identity_key ?? ""),
+      source_card_family_id: String(row.source_card_family_id ?? ""),
+      source_card_id: String(row.source_card_id ?? ""),
+      source_type: "source_card",
+      internal_source_id: String(row.source_card_id ?? ""),
+      source_mechanism: row.source_mechanism ?? null,
+      required_product: row.required_product ?? null,
+      recommended_direction: row.recommended_direction ?? null,
+      text: primarySource.post_text ?? primarySource.text ?? null,
+      metrics,
+      primary_source: primarySource,
+    };
+  }).filter((candidate) => candidate.source_identity_key && candidate.source_card_id && candidate.source_card_family_id);
+  return enrichSourceCandidatesForSelection(db, brandKey, candidates, nowIso);
+}
+
 export async function enrichSourceCandidatesForSelection(
   db: D1Database,
   brandKey: string,
   candidates: SourceSelectionCandidate[],
   nowIso = new Date().toISOString(),
 ): Promise<SourceSelectionCandidate[]> {
+
   await ensureSourceFamilySelectionTables(db);
   const stateRows = await db.prepare(
     `SELECT fam.id AS source_card_family_id, fam.source_identity_key, fam.current_source_card_id,

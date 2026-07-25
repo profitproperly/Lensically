@@ -125,8 +125,10 @@ import {
 import {
   SOURCE_FAMILY_LABEL_POLICY_VERSION,
   SOURCE_SELECTION_ENGINE_VERSION,
-  enrichSourceCandidatesForSelection,
+    enrichSourceCandidatesForSelection,
   ensureSourceFamilySelectionTables,
+  loadLockedSourceCardSelectionCandidates,
+
   persistLockedSourceSelectionPlan,
   persistSourceSelectionReceipts,
   readLockedSourceSelectionPlan,
@@ -13326,30 +13328,37 @@ async function prepareManifestAutonomousCycle(
     ).run();
     }
 
-  let lockedSourceSelectionPlan = await readLockedSourceSelectionPlan(env.DB, brand.brand_key, cycleId);
+    let lockedSourceSelectionPlan = await readLockedSourceSelectionPlan(env.DB, brand.brand_key, cycleId);
+  let sourceSelectionPlanStatus = missingSlots.length === 0 ? "not_required" : lockedSourceSelectionPlan.length > 0 ? "locked" : "pending";
   if (missingSlots.length > 0 && lockedSourceSelectionPlan.length === 0) {
-    const [qualifiedSources, sourceExclusions] = await Promise.all([
-      buildManifestQualifiedSourcePool(env, brand, ["saved_pattern", "archive_post"]),
+    const [lockedSourceCards, sourceExclusions] = await Promise.all([
+      loadLockedSourceCardSelectionCandidates(env.DB, brand.brand_key, clock.effective_now_iso),
       env.DB.prepare(
         `SELECT source_identity_key FROM operator_source_exclusions
          WHERE brand_key = ? AND active = 1`,
       ).bind(brand.brand_key).all<{ source_identity_key: string }>(),
     ]);
     const excludedIdentities = new Set((sourceExclusions.results ?? []).map((row) => String(row.source_identity_key)));
-    const selectionCandidates = (await enrichSourceCandidatesForSelection(env.DB, brand.brand_key, qualifiedSources, clock.effective_now_iso))
+    const selectionCandidates = lockedSourceCards
       .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
-      .filter((candidate) => Boolean(candidate.source_card_id) && candidate.lifetime_label !== "disproven");
-    const backendSelection = selectSourceFamilyLineup({
-      candidates: selectionCandidates,
-      slot_keys: missingSlots.map((slot) => slot.key),
-      seed: `${brand.brand_key}:${cycleId}:${operationId}`,
-    });
-    lockedSourceSelectionPlan = await persistLockedSourceSelectionPlan(env.DB, {
-      brand_key: brand.brand_key,
-      cycle_id: cycleId,
-      receipts: backendSelection.receipts,
-    });
+      .filter((candidate) => candidate.lifetime_label !== "disproven");
+    if (selectionCandidates.length > 0) {
+      const backendSelection = selectSourceFamilyLineup({
+        candidates: selectionCandidates,
+        slot_keys: missingSlots.map((slot) => slot.key),
+        seed: `${brand.brand_key}:${cycleId}:${operationId}`,
+      });
+      lockedSourceSelectionPlan = await persistLockedSourceSelectionPlan(env.DB, {
+        brand_key: brand.brand_key,
+        cycle_id: cycleId,
+        receipts: backendSelection.receipts,
+      });
+      sourceSelectionPlanStatus = "locked";
+    } else {
+      sourceSelectionPlanStatus = "pending_locked_source_card_inventory";
+    }
   }
+
 
       const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
 
@@ -13429,9 +13438,11 @@ async function prepareManifestAutonomousCycle(
       authoritative_missing_slots: missingSlots,
       occupied_slots: targetSlots.filter((slot) => coverage.occupied.has(slot.key)).map((slot) => ({ ...slot, evidence: coverage.occupied.get(slot.key) })),
             full_horizon_lineup_required_before_first_persist: true,
-      backend_source_selection_locked: true,
+            backend_source_selection_locked: lockedSourceSelectionPlan.length > 0,
+      source_selection_plan_status: sourceSelectionPlanStatus,
       source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
       locked_source_selection_plan: lockedSourceSelectionPlan,
+
     },
 
     startedAt: clock.effective_now_iso,
@@ -13483,17 +13494,22 @@ async function prepareManifestAutonomousCycle(
             measurement_audit_refresh: measurementAuditRefresh,
                   decision_intelligence: decisionIntelligenceReceiptReference,
       rolling_evidence: rollingEvidence,
-            strategy_required: missingSlots.length > 0,
+                  strategy_required: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0,
       source_backed_generation_only: true,
+      source_selection_plan_status: sourceSelectionPlanStatus,
       locked_source_selection_plan: lockedSourceSelectionPlan,
       model_source_substitution_allowed: false,
+
 
       recent_scheduled_deletions: recentScheduledDeletions,
       remaining_missing_count: missingSlots.length,
       next_missing_slot: missingSlots[0] ?? null,
-      next_action: missingSlots.length > 0
-        ? `Read every remaining analysis page for cycle ${cycleId}, perform the complete model-led account review, then call commit_manifest_cycle_strategy once with a source-card-backed lineup covering all ${missingSlots.length} authoritative missing slots. Do not generate or persist a post before the strategy is locked.`
-        : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
+            next_action: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0
+        ? `Read every remaining analysis page for cycle ${cycleId}, then call commit_manifest_cycle_strategy with the exact locked backend source plan covering all ${missingSlots.length} authoritative missing slots. The model may decide execution wording and placement rationale but may not substitute sources.`
+        : missingSlots.length > 0
+          ? `Create or repair the locked source-card inventory, then call prepare_manifest_autonomous_cycle again with the same operation_id so the backend can lock the source plan.`
+          : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
+
       reconciliation_contract: {
         authoritative_clock_source: clock.source,
         effective_now_iso: clock.effective_now_iso,
@@ -13513,17 +13529,22 @@ async function prepareManifestAutonomousCycle(
                 measurement_audit_refresh: measurementAuditRefresh,
                                 decision_intelligence: decisionIntelligence,
     rolling_evidence: rollingEvidence,
-        strategy_required: missingSlots.length > 0,
+            strategy_required: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0,
     source_backed_generation_only: true,
+    source_selection_plan_status: sourceSelectionPlanStatus,
     locked_source_selection_plan: lockedSourceSelectionPlan,
     model_source_substitution_allowed: false,
+
 
     recent_scheduled_deletions: recentScheduledDeletions,
     remaining_missing_count: missingSlots.length,
     next_missing_slot: missingSlots[0] ?? null,
-    next_action: missingSlots.length > 0
-      ? `Read every remaining analysis page for cycle ${cycleId}, perform the complete model-led account review, then call commit_manifest_cycle_strategy once with a source-card-backed lineup covering all ${missingSlots.length} authoritative missing slots. Do not generate or persist a post before the strategy is locked.`
-      : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
+        next_action: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0
+      ? `Read every remaining analysis page for cycle ${cycleId}, then call commit_manifest_cycle_strategy with the exact locked backend source plan covering all ${missingSlots.length} authoritative missing slots. The model may decide execution wording and placement rationale but may not substitute sources.`
+      : missingSlots.length > 0
+        ? `Create or repair the locked source-card inventory, then call prepare_manifest_autonomous_cycle again with the same operation_id so the backend can lock the source plan.`
+        : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
+
     intelligence_foundation: {
       policy: intelligencePolicy,
             legacy_input_strategy_reference: inputStrategyVersion,
