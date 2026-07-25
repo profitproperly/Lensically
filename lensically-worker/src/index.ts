@@ -24114,12 +24114,28 @@ async function handleOperatorMcpAdminTool(
     if (actions.every((action) => action.action === "retire")) {
       const brand = await resolveOperatorBrandFromPayload(env, args);
       if (!brand) return { ok: false, error: "brand_key_required_for_audited_retirement" };
-      const schedulerState = await readScheduledPostSchedulerHealth(env);
+            const schedulerState = await readScheduledPostSchedulerHealth(env);
       const control = schedulerState.control && typeof schedulerState.control === "object"
         ? schedulerState.control as Record<string, unknown>
         : {};
       if (String(control.mode ?? "") !== "paused") {
-        return { ok: false, error: "scheduler_must_be_paused_for_audited_retirement", scheduler: schedulerState };
+        const selectedIds = actions.map((action) => action.scheduled_post_id);
+        const placeholders = selectedIds.map(() => "?").join(", ");
+        const selectedRows = await env.DB.prepare(
+          `SELECT id, status, scheduled_time, published_post_id
+           FROM scheduled_posts
+           WHERE user_id = ? AND threads_user_id = ? AND id IN (${placeholders})`,
+        ).bind(WORKSPACE_APP_USER_ID, brand.profile.threads_user_id, ...selectedIds).all<Record<string, unknown>>();
+        const rows = selectedRows.results ?? [];
+        const nowMs = Date.now();
+        const safelyFuture = rows.length === selectedIds.length && rows.every((row) =>
+          String(row.status ?? "") === SCHEDULED_POST_STATUS_APPROVED
+          && !row.published_post_id
+          && (parseOperatorTimestampMs(row.scheduled_time) ?? 0) > nowMs
+        );
+        if (!safelyFuture) {
+          return { ok: false, error: "scheduler_must_be_paused_for_due_or_nonapproved_retirement", scheduler: schedulerState };
+        }
       }
             try {
         const deletionBatch = await deleteScheduledPostsForAppUserBatch(
