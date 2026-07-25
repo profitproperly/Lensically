@@ -1696,15 +1696,33 @@ export async function linkManifestCycleStrategy(db: D1Database, cycleId: string,
 
 export async function finalizeManifestCycleReceipt(db: D1Database, input: {
   cycleId: string; status: string; completion: JsonRecord; unresolvedIssues?: JsonRecord[]; completedAt: string;
-}): Promise<void> {
+}): Promise<JsonRecord> {
   await ensureManifestIntelligenceTables(db);
   const defects = await listManifestCycleDefects(db, input.cycleId);
   const openDefects = defects.filter(manifestDefectIsOpen);
   const blockingOpen = openDefects.filter((defect) => defect.blocking === true);
-  if (blockingOpen.length) {
-    throw new Error(`manifest_cycle_blocking_defects_open:${blockingOpen.map((defect) => String(defect.id ?? defect.defect_key)).join(",")}`);
-  }
   const resolvedDefects = defects.filter((defect) => ["resolved", "irrecoverable_historical_gap"].includes(String(defect.status)));
+  const defectReceiptSummary = {
+    receipt_version: MANIFEST_CYCLE_DEFECT_RECEIPT_VERSION,
+    total_defect_count: defects.length,
+    resolved_defect_count: resolvedDefects.length,
+    unresolved_defect_count: openDefects.length,
+    blocking_unresolved_defect_count: blockingOpen.length,
+    defect_receipt_ids: defects.map((defect) => defect.id).filter(Boolean),
+  };
+  if (blockingOpen.length) {
+    await db.prepare(
+      `UPDATE operator_manifest_cycle_receipts SET status = 'completion_blocked', unresolved_issues_json = ?
+       WHERE cycle_id = ? AND completed_at IS NULL`,
+    ).bind(stableManifestJson(openDefects), input.cycleId).run();
+    return {
+      completed: false,
+      status: "completion_blocked",
+      blocking_defect_count: blockingOpen.length,
+      blocking_defect_ids: blockingOpen.map((defect) => defect.id ?? defect.defect_key).filter(Boolean),
+      defect_receipt_summary: defectReceiptSummary,
+    };
+  }
   const unresolved = [
     ...openDefects,
     ...(input.unresolvedIssues ?? []),
@@ -1712,14 +1730,7 @@ export async function finalizeManifestCycleReceipt(db: D1Database, input: {
   const enrichedCompletion = {
     ...input.completion,
     final_cycle_status: defects.length ? "completed_after_repairs" : "completed_clean",
-    defect_receipt_summary: {
-      receipt_version: MANIFEST_CYCLE_DEFECT_RECEIPT_VERSION,
-      total_defect_count: defects.length,
-      resolved_defect_count: resolvedDefects.length,
-      unresolved_defect_count: openDefects.length,
-      blocking_unresolved_defect_count: blockingOpen.length,
-      defect_receipt_ids: defects.map((defect) => defect.id).filter(Boolean),
-    },
+    defect_receipt_summary: defectReceiptSummary,
   };
   const completionJson = stableManifestJson(enrichedCompletion);
   const unresolvedJson = stableManifestJson(unresolved);
@@ -1733,13 +1744,14 @@ export async function finalizeManifestCycleReceipt(db: D1Database, input: {
       && String(existing.completion_json ?? "") === completionJson
       && String(existing.unresolved_issues_json ?? "[]") === unresolvedJson
       && String(existing.completed_at) === input.completedAt;
-    if (replayMatches) return;
+        if (replayMatches) return { completed: true, status: input.status, completion: enrichedCompletion, replayed: true };
     throw new Error("manifest_cycle_receipt_immutable_conflict");
   }
-  await db.prepare(
+    await db.prepare(
     `UPDATE operator_manifest_cycle_receipts SET status = ?, completion_json = ?,
        unresolved_issues_json = ?, completed_at = ? WHERE cycle_id = ? AND completed_at IS NULL`,
   ).bind(input.status, completionJson, unresolvedJson, input.completedAt, input.cycleId).run();
+  return { completed: true, status: input.status, completion: enrichedCompletion, replayed: false };
 }
 
 export async function getManifestCycleReceipt(db: D1Database, input: {

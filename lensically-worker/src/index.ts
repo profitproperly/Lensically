@@ -14788,7 +14788,7 @@ async function persistManifestAutonomousPost(
          scheduled_post_ids_json = ?, error_json = '[]', updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND brand_key = ?`,
   ).bind(
-    remainingMissing.length ? "partially_committed" : "completed",
+        remainingMissing.length ? "partially_committed" : "coverage_complete",
     normalizeOperatorJson(effectiveStrategicThesis, {}),
     normalizeOperatorJson(remainingMissing, []),
     normalizeOperatorJson(Array.from(scheduledIds), []),
@@ -14808,9 +14808,11 @@ async function persistManifestAutonomousPost(
       remaining_missing_count: remainingMissing.length,
     },
   });
+    let cycleCompletion: Record<string, unknown> | null = null;
   if (!remainingMissing.length) {
     const completion = {
       completed_slot_key: slotKey,
+      completion_trigger: "final_post_persisted",
       scheduled_post_ids: Array.from(scheduledIds),
       scheduled_count: scheduledIds.size,
       remaining_missing_count: 0,
@@ -14818,20 +14820,36 @@ async function persistManifestAutonomousPost(
       output_strategy_version_id: outputStrategyVersion.id ?? null,
       completed_at: new Date().toISOString(),
     };
-    await appendManifestCycleEvent(env.DB, {
-      cycleId,
-      brandKey: brand.brand_key,
-      eventKey: "cycle-completed",
-      eventType: "cycle_completed",
-      payload: completion,
-    });
-    await finalizeManifestCycleReceipt(env.DB, {
+    cycleCompletion = await finalizeManifestCycleReceipt(env.DB, {
       cycleId,
       status: "completed",
       completion,
       unresolvedIssues: [],
       completedAt: String(completion.completed_at),
     });
+    if (cycleCompletion.completed === true) {
+      await appendManifestCycleEvent(env.DB, {
+        cycleId,
+        brandKey: brand.brand_key,
+        eventKey: "cycle-completed",
+        eventType: "cycle_completed",
+        payload: cycleCompletion,
+      });
+      await env.DB.prepare(
+        `UPDATE operator_autonomous_growth_cycles SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
+      ).bind(cycleId, brand.brand_key).run();
+    } else {
+      await appendManifestCycleEvent(env.DB, {
+        cycleId,
+        brandKey: brand.brand_key,
+        eventKey: "cycle-completion-blocked",
+        eventType: "cycle_completion_blocked",
+        payload: cycleCompletion,
+      });
+      await env.DB.prepare(
+        `UPDATE operator_autonomous_growth_cycles SET status = 'completion_blocked', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
+      ).bind(cycleId, brand.brand_key).run();
+    }
   }
   return {
     success: true,
@@ -14865,7 +14883,8 @@ async function persistManifestAutonomousPost(
       intelligence_application_assessment: intelligenceApplicationAssessment,
     },
     server_checks: gateSummary.server_checks,
-    remaining_missing_count: remainingMissing.length,
+        remaining_missing_count: remainingMissing.length,
+    cycle_completion: cycleCompletion,
         coverage_reconciliation_required: true,
     reconciliation_tool: "get_hourly_coverage",
     next_action: "After four successfully persisted posts, call get_hourly_coverage once. Do not call prepare_manifest_autonomous_cycle again inside the same run.",
@@ -15271,7 +15290,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const cycleId = normalizeOperatorText(payload.cycle_id, 160);
     const defectKey = normalizeOperatorText(payload.defect_key, 300);
     if (!cycleId || !defectKey) return operatorJsonResponse({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
-    const defect = await resolveManifestCycleDefect(env.DB, {
+        const defect = await resolveManifestCycleDefect(env.DB, {
       cycleId,
       brandKey: brand.brand_key,
       defectKey,
@@ -15286,7 +15305,45 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       verification: payload.verification && typeof payload.verification === "object" && !Array.isArray(payload.verification)
         ? payload.verification as Record<string, unknown> : {},
     });
-    return operatorJsonResponse({ success: true, defect });
+    const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
+    const missingSlots = cycle && Array.isArray(cycle.missing_slots) ? cycle.missing_slots : [];
+    let cycleCompletion: Record<string, unknown> | null = null;
+    if (cycle && missingSlots.length === 0) {
+      const receipt = await getManifestCycleReceipt(env.DB, { brandKey: brand.brand_key, cycleId });
+      if (receipt && !receipt.completed_at) {
+        const scheduledPostIds = Array.isArray(cycle.scheduled_post_ids) ? cycle.scheduled_post_ids.map(Number) : [];
+        const completedAt = new Date().toISOString();
+        cycleCompletion = await finalizeManifestCycleReceipt(env.DB, {
+          cycleId,
+          status: "completed",
+          completion: {
+            completed_slot_key: null,
+            completion_trigger: "last_blocking_defect_resolved",
+            scheduled_post_ids: scheduledPostIds,
+            scheduled_count: scheduledPostIds.length,
+            remaining_missing_count: 0,
+            final_post_lineage_complete: true,
+            output_strategy_version_id: receipt.output_strategy_version_id ?? null,
+            completed_at: completedAt,
+          },
+          unresolvedIssues: [],
+          completedAt,
+        });
+        if (cycleCompletion.completed === true) {
+          await appendManifestCycleEvent(env.DB, {
+            cycleId,
+            brandKey: brand.brand_key,
+            eventKey: "cycle-completed",
+            eventType: "cycle_completed",
+            payload: cycleCompletion,
+          });
+          await env.DB.prepare(
+            `UPDATE operator_autonomous_growth_cycles SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
+          ).bind(cycleId, brand.brand_key).run();
+        }
+      }
+    }
+    return operatorJsonResponse({ success: true, defect, cycle_completion: cycleCompletion });
   }
 
     if (toolName === "prepare_manifest_autonomous_cycle") {
