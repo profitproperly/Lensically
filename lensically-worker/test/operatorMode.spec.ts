@@ -3086,6 +3086,148 @@ describe("operator mode MCP endpoint", () => {
     await resetTables();
   }, 30000);
 
+    it("records one durable cycle defect with stage, phase, impact, retryability, blocking status, reconciliation, and occurrence count", async () => {
+    await mcpTool("get_manifest_intelligence_foundation", { brand_key: "manifest_mental", proceed_confirmed: true });
+    const cycleId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_manifest_cycle_receipts (
+        id, cycle_id, brand_key, operation_id, receipt_version, status, trigger_json,
+        startup_state_json, horizon_plan_json, unresolved_issues_json, started_at
+      ) VALUES (?, ?, 'manifest_mental', ?, 'manifest-cycle-receipt-v3', 'started', '{}', '{}', '{}', '[]', ?)`,
+    ).bind(crypto.randomUUID(), cycleId, `test-${cycleId}`, new Date().toISOString()).run();
+
+    const first = await mcpTool<{
+      success: boolean;
+      defect: { id: string; defect_key: string; stage_number: number; retryable: boolean; blocking: boolean; occurrence_count: number };
+    }>("record_manifest_cycle_defect", {
+      brand_key: "manifest_mental",
+      cycle_id: cycleId,
+      defect_key: "test:transport:slot-1",
+      stage_number: 5,
+      stage_key: "persistence_and_scheduling",
+      phase: "single_slot_persist",
+      slot_key: "2026-07-26T04:00",
+      operation_id: "test-defect-record-1",
+      error_code: "upstream_transport_interrupted",
+      error_message: "The response ended before completion was confirmed.",
+      impact_state: "possibly_succeeded",
+      retryable: true,
+      blocking: true,
+      reconciliation: { coverage_checked: true, slot_open: true },
+      metadata: { provider: "client" },
+      proceed_confirmed: true,
+    });
+    expect(first.success).toBe(true);
+    expect(first.defect).toMatchObject({
+      defect_key: "test:transport:slot-1",
+      stage_number: 5,
+      retryable: true,
+      blocking: true,
+      occurrence_count: 1,
+    });
+
+    const repeated = await mcpTool<typeof first>("record_manifest_cycle_defect", {
+      brand_key: "manifest_mental",
+      cycle_id: cycleId,
+      defect_key: "test:transport:slot-1",
+      stage_number: 5,
+      stage_key: "persistence_and_scheduling",
+      phase: "single_slot_persist",
+      slot_key: "2026-07-26T04:00",
+      operation_id: "test-defect-record-2",
+      error_code: "upstream_transport_interrupted",
+      error_message: "The response ended before completion was confirmed.",
+      impact_state: "possibly_succeeded",
+      retryable: true,
+      blocking: true,
+      reconciliation: { coverage_checked: true, slot_open: true },
+      proceed_confirmed: true,
+    });
+    expect(repeated.defect.occurrence_count).toBe(2);
+
+    const receipt = await mcpTool<{
+      cycle_receipt: { defect_count: number; open_defect_count: number; blocking_open_defect_count: number };
+      receipt_section: { section: string; items: Array<{ defect_key: string; occurrence_count: number }> };
+    }>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: cycleId,
+      receipt_section: "defects",
+      proceed_confirmed: true,
+    });
+    expect(receipt.cycle_receipt).toMatchObject({ defect_count: 1, open_defect_count: 1, blocking_open_defect_count: 1 });
+    expect(receipt.receipt_section.items).toEqual([
+      expect.objectContaining({ defect_key: "test:transport:slot-1", occurrence_count: 2 }),
+    ]);
+  });
+
+  it("resolves one existing cycle defect with root cause, repair commit, deployed SHA, regression tests, reconciliation, and verification while preserving history", async () => {
+    await mcpTool("get_manifest_intelligence_foundation", { brand_key: "manifest_mental", proceed_confirmed: true });
+    const cycleId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO operator_manifest_cycle_receipts (
+        id, cycle_id, brand_key, operation_id, receipt_version, status, trigger_json,
+        startup_state_json, horizon_plan_json, unresolved_issues_json, started_at
+      ) VALUES (?, ?, 'manifest_mental', ?, 'manifest-cycle-receipt-v3', 'started', '{}', '{}', '{}', '[]', ?)`,
+    ).bind(crypto.randomUUID(), cycleId, `test-${cycleId}`, new Date().toISOString()).run();
+    await mcpTool("record_manifest_cycle_defect", {
+      brand_key: "manifest_mental",
+      cycle_id: cycleId,
+      defect_key: "test:schema:learning-brief",
+      stage_number: 7,
+      stage_key: "post_publication_evaluator",
+      phase: "content_focus",
+      error_code: "learning_brief_schema_column_missing",
+      error_message: "The evaluator referenced a missing column.",
+      impact_state: "definitely_failed",
+      retryable: false,
+      blocking: true,
+      proceed_confirmed: true,
+    });
+
+    const resolved = await mcpTool<{
+      success: boolean;
+      defect: { defect_key: string; status: string; root_cause: string; repair_commit_sha: string; deployed_sha: string; resolved_at: string };
+    }>("resolve_manifest_cycle_defect", {
+      brand_key: "manifest_mental",
+      cycle_id: cycleId,
+      defect_key: "test:schema:learning-brief",
+      status: "resolved",
+      root_cause: "The update referenced an updated_at column that does not exist on operator_generation_learning_briefs.",
+      repair_commit_sha: "1111111111111111111111111111111111111111",
+      deployed_sha: "2222222222222222222222222222222222222222",
+      reconciliation: { preserved_checkpoint: "content_focus" },
+      regression_tests: [{ name: "learning brief schema regression", passed: true }],
+      verification: { production_retry_succeeded: true, content_focus_family_count: 74 },
+      proceed_confirmed: true,
+    });
+    expect(resolved.success).toBe(true);
+    expect(resolved.defect).toMatchObject({
+      defect_key: "test:schema:learning-brief",
+      status: "resolved",
+      repair_commit_sha: "1111111111111111111111111111111111111111",
+      deployed_sha: "2222222222222222222222222222222222222222",
+    });
+    expect(resolved.defect.resolved_at).toBeTruthy();
+
+    const receipt = await mcpTool<{
+      cycle_receipt: { defect_count: number; open_defect_count: number; resolved_defect_count: number; unresolved_issue_count: number };
+      receipt_section: { items: Array<{ defect_key: string; status: string; verification: Record<string, unknown> }> };
+    }>("get_manifest_cycle_receipt", {
+      brand_key: "manifest_mental",
+      cycle_id: cycleId,
+      receipt_section: "defects",
+      proceed_confirmed: true,
+    });
+    expect(receipt.cycle_receipt).toMatchObject({ defect_count: 1, open_defect_count: 0, resolved_defect_count: 1, unresolved_issue_count: 0 });
+    expect(receipt.receipt_section.items).toEqual([
+      expect.objectContaining({
+        defect_key: "test:schema:learning-brief",
+        status: "resolved",
+        verification: expect.objectContaining({ production_retry_succeeded: true }),
+      }),
+    ]);
+  });
+
   it("keeps the retired local execution HTTP plane unreachable", async () => {
     for (const path of [
       "/api/operator/local-node/enroll",
