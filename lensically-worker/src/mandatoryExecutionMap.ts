@@ -646,8 +646,10 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   draw_source_candidate_batch: ["draw source candidate batch", "select source candidates", "draw sources"],
   audit_published_post_lineage: ["audit published post lineage", "audit winner lineage", "verify winner lineage", "inspect source to metrics lineage"],
   recover_published_post_lineage: ["recover published post lineage", "restore published post lineage", "backfill winner lineage"],
-  get_source_candidate_batch: ["get source candidate batch", "read source candidate batch"],
+    get_source_candidate_batch: ["get source candidate batch", "read source candidate batch"],
+  create_all_missing_manifest_source_cards: ["create all missing manifest source cards", "create all missing source cards", "card every manifest saved pattern"],
   create_source_card: ["create source card", "build source card"],
+
   create_generation_run: ["create generation run", "start generation run"],
   submit_candidate_draft: ["submit candidate draft", "save generated candidate", "gate draft"],
   mark_draft_shown: ["mark draft shown", "show draft"],

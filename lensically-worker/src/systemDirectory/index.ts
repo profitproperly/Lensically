@@ -645,8 +645,28 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
       "Normal completion requires zero uncarded Saved Patterns; a remaining count is interruption-only evidence."
     ],
   },
+    {
+    id: "content.manifest_source_card_backfill_execution",
+    title: "Manifest Saved Pattern source-card backfill execution",
+    plane: "content_production",
+    system_of_record: "Saved Patterns, durable source selections, canonical source-card families, and locked source cards",
+    primary_surfaces: ["Saved Patterns", "source-card backfill execution", "source card"],
+    objects: ["missing Saved Pattern source card", "bounded creation batch", "locked canonical source card"],
+    keywords: ["create all missing manifest source cards", "create missing source cards", "card every saved pattern"],
+    capabilities: ["create bounded missing source-card batches", "persist Saved Pattern source-selection lineage", "lock canonical source cards", "verify zero remaining cards"],
+    payload: { action_size: "bounded_mutation", max_results: 25, max_response_bytes: 22000, required_inputs: ["brand_key"] },
+    route_intent: "create all missing manifest source cards",
+    related_entry_ids: ["content.manifest_source_card_backfill", "content.sources", "strategy.manifest_autonomous_cycle"],
+    recommended_next_planes: ["content_production"],
+    hard_gates: [
+      "Every returned Saved Pattern must receive a durable linked and locked source card.",
+      "Retries must reuse stable Saved Pattern identities and may not create duplicate canonical cards.",
+      "Completion requires remaining_count=0."
+    ],
+  },
   {
     id: "content.sources",
+
     title: "Source candidates, saved patterns, and source cards",
     plane: "content_production",
     system_of_record: "saved patterns, archive posts, source selections, daily claims, and source cards",

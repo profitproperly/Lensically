@@ -181,8 +181,9 @@
     },
         {
       "capability_id": "content.create_all_missing_manifest_source_cards",
-      "directory_entry_id": "content.manifest_source_card_backfill",
+            "directory_entry_id": "content.manifest_source_card_backfill_execution",
       "canonical_handler": "create_all_missing_manifest_source_cards",
+
       "route_intent": "create all missing manifest source cards",
       "implementation_mode": "new_handler",
       "focused_regression": "prepares and completes a bounded Saved Pattern source-card backfill",
