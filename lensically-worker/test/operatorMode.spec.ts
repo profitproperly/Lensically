@@ -28,6 +28,11 @@ import worker, {
 
 } from "../src";
 import {
+  finalizeManifestCycleReceipt,
+  recordManifestCycleDefect,
+  resolveManifestCycleDefect,
+} from "../src/manifestIntelligence";
+import {
   getManifestIntelligenceEngineState,
   upsertManifestLearningObservation,
   upsertManifestSemanticSignature,
@@ -3226,6 +3231,86 @@ describe("operator mode MCP endpoint", () => {
         verification: expect.objectContaining({ production_retry_succeeded: true }),
       }),
     ]);
+  });
+
+    it("blocks cycle completion until every blocking defect is resolved and then closes the same receipt", async () => {
+    await mcpTool("get_manifest_intelligence_foundation", { brand_key: "manifest_mental", proceed_confirmed: true });
+    const cycleId = crypto.randomUUID();
+    const completedAt = "2026-07-26T12:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO operator_manifest_cycle_receipts (
+        id, cycle_id, brand_key, operation_id, receipt_version, status, trigger_json,
+        startup_state_json, horizon_plan_json, unresolved_issues_json, started_at
+      ) VALUES (?, ?, 'manifest_mental', ?, 'manifest-cycle-receipt-v3', 'started', '{}', '{}', '{}', '[]', ?)`,
+    ).bind(crypto.randomUUID(), cycleId, `test-${cycleId}`, "2026-07-26T10:00:00.000Z").run();
+    await recordManifestCycleDefect(env.DB, {
+      cycleId,
+      brandKey: "manifest_mental",
+      defectKey: "test:blocking:completion",
+      stageNumber: 6,
+      stageKey: "coverage_and_completion",
+      phase: "completion_receipt",
+      errorCode: "lineage_verification_incomplete",
+      errorMessage: "Final lineage verification is incomplete.",
+      impactState: "definitely_failed",
+      retryable: true,
+      blocking: true,
+    });
+    const completion = {
+      completion_trigger: "test",
+      scheduled_post_ids: [1, 2],
+      scheduled_count: 2,
+      remaining_missing_count: 0,
+      final_post_lineage_complete: true,
+      completed_at: completedAt,
+    };
+    const blocked = await finalizeManifestCycleReceipt(env.DB, {
+      cycleId,
+      status: "completed",
+      completion,
+      unresolvedIssues: [],
+      completedAt,
+    });
+    expect(blocked).toMatchObject({ completed: false, status: "completion_blocked", blocking_defect_count: 1 });
+    const blockedReceipt = await env.DB.prepare(
+      `SELECT status, completed_at FROM operator_manifest_cycle_receipts WHERE cycle_id = ?`,
+    ).bind(cycleId).first<{ status: string; completed_at: string | null }>();
+    expect(blockedReceipt).toEqual({ status: "completion_blocked", completed_at: null });
+
+    await resolveManifestCycleDefect(env.DB, {
+      cycleId,
+      brandKey: "manifest_mental",
+      defectKey: "test:blocking:completion",
+      rootCause: "The final lineage verification query had not completed.",
+      repairCommitSha: "3333333333333333333333333333333333333333",
+      deployedSha: "4444444444444444444444444444444444444444",
+      regressionTests: [{ name: "completion blocker regression", passed: true }],
+      verification: { final_lineage_verified: true },
+    });
+    const completed = await finalizeManifestCycleReceipt(env.DB, {
+      cycleId,
+      status: "completed",
+      completion,
+      unresolvedIssues: [],
+      completedAt,
+    });
+    expect(completed).toMatchObject({
+      completed: true,
+      status: "completed",
+      completion: {
+        final_cycle_status: "completed_after_repairs",
+        defect_receipt_summary: {
+          total_defect_count: 1,
+          resolved_defect_count: 1,
+          unresolved_defect_count: 0,
+          blocking_unresolved_defect_count: 0,
+        },
+      },
+    });
+    const completedReceipt = await env.DB.prepare(
+      `SELECT status, completed_at FROM operator_manifest_cycle_receipts WHERE cycle_id = ?`,
+    ).bind(cycleId).first<{ status: string; completed_at: string | null }>();
+    expect(completedReceipt).toEqual({ status: "completed", completed_at: completedAt });
   });
 
   it("keeps the retired local execution HTTP plane unreachable", async () => {
