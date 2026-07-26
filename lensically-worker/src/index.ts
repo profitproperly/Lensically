@@ -24399,7 +24399,9 @@ async function handleOperatorMcpAdminTool(
         : {};
       const required = Array.isArray(schema.required) ? schema.required.map(String) : [];
       const annotations = (tool as OperatorMcpToolDefinition & { annotations?: Record<string, unknown> }).annotations ?? {};
-      const intent = tool.title.trim().toLowerCase();
+            const requiredSafeProfileId = OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(tool.name);
+      const requiredSafeProfile = requiredSafeProfileId ? CLIENT_SAFE_REQUEST_PROFILES[requiredSafeProfileId] : null;
+      const intent = requiredSafeProfile?.intent ?? tool.title.trim().toLowerCase();
       const request = {
         objective: "Run one compact Lensically capability check.",
         intent,
