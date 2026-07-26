@@ -270,8 +270,14 @@ describe("canonical database migrations", () => {
         const archivedPostId = `archived-${suffix}`;
     const metricSnapshotId = `metric-${suffix}`;
     const generationRunId = `run-${suffix}`;
-    const generationDraftId = `draft-${suffix}`;
+        const generationDraftId = `draft-${suffix}`;
     const preflightSnapshotId = `preflight-${suffix}`;
+    const sourceBatchId = `source-batch-${suffix}`;
+    const sourceSelectionId = `source-selection-${suffix}`;
+    const sourceFamilyId = `source-family-${suffix}`;
+    const sourceCardId = `source-card-${suffix}`;
+    const sourceClaimId = `source-claim-${suffix}`;
+    const sourceExclusionId = `source-exclusion-${suffix}`;
 
 
 
@@ -409,12 +415,85 @@ describe("canonical database migrations", () => {
         '{"migration":true}', 'card-migration', 'Preserve lineage',
         '{"passed":true}', 1, ?)`,
     ).bind(generationDraftId, generationRunId, accountId, followerId, scheduledPostId, archivedPostId).run();
-    await testEnv.DB.prepare(
+        await testEnv.DB.prepare(
       `INSERT INTO gpt_preflight_snapshots (
         id, account_id, threads_user_id, objective, sections_json, manifest_json
       ) VALUES (?, ?, ?, 'Migration preflight', '{"strategy":{"ok":true}}',
         '{"complete":true}')`,
     ).bind(preflightSnapshotId, accountId, followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_source_selection_batches (
+        id, brand_key, workflow_session_id, selection_method,
+        eligibility_min_likes, qualified_pool_count, requested_count,
+        selected_count, selected_at, metadata_json, production_date, status,
+        retired_at, retirement_reason
+      ) VALUES (?, 'manifest_mental', 'workflow-migration', 'random_draw',
+        1000, 25, 4, 1, '2099-01-04T12:00:00.000Z', '{"seed":7}',
+        '2099-01-04', 'retired', '2099-01-04T13:00:00.000Z',
+        'migration_complete')`,
+    ).bind(sourceBatchId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_source_selections (
+        id, batch_id, brand_key, workflow_session_id, draw_order,
+        source_identity_key, source_type, internal_source_id, threads_post_id,
+        canonical_source_url, post_text, original_posted_at,
+        metrics_snapshot_json, source_snapshot_json, source_card_id, selected_at,
+        disposition, disposition_reason, disposition_at, workflow_sequence
+      ) VALUES (?, ?, 'manifest_mental', 'workflow-migration', 1,
+        'saved_pattern:migration', 'saved_pattern', 'pattern-migration',
+        'threads-migration', 'https://threads.net/t/source-migration',
+        'Migration source', '2099-01-01T12:00:00.000Z', '{"likes":2000}',
+        '{"text":"Migration source"}', ?, '2099-01-04T12:00:00.000Z',
+        'accepted', 'selected_for_lineup', '2099-01-04T12:05:00.000Z', 3)`,
+    ).bind(sourceSelectionId, sourceBatchId, sourceCardId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_source_exclusions (
+        id, brand_key, source_identity_key, source_type, internal_source_id,
+        reason, active
+      ) VALUES (?, 'manifest_mental', 'saved_pattern:excluded-migration',
+        'saved_pattern', 'excluded-migration', 'permanent_source_exclusion', 1)`,
+    ).bind(sourceExclusionId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_source_card_families (
+        id, brand_key, source_identity_key, source_type, internal_source_id,
+        threads_post_id, canonical_source_url, current_source_card_id, status
+      ) VALUES (?, 'manifest_mental', 'saved_pattern:migration', 'saved_pattern',
+        'pattern-migration', 'threads-migration',
+        'https://threads.net/t/source-migration', ?, 'active')`,
+    ).bind(sourceFamilyId, sourceCardId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_source_cards (
+        id, brand_key, workflow_session_id, sequence_label, lane_key, title,
+        status, primary_source_json, secondary_sources_json, anti_sources_json,
+        metrics_snapshot_json, source_mechanism, required_product,
+        forbidden_surfaces_json, danger_surfaces_json,
+        current_inventory_constraints_json, pass_conditions_json,
+        fail_conditions_json, recommended_direction, context_admission_id,
+        created_by, family_id, source_selection_id, version_number, is_current,
+        supersedes_source_card_id, version_reason, transformation_contract_json,
+        locked_at
+      ) VALUES (?, 'manifest_mental', 'workflow-migration', 'source-1',
+        'intuition', 'Migration source card', 'locked', '{"text":"Migration source"}',
+        '[]', '[]', '{"likes":2000}', 'direct validation',
+        'recognition and reassurance', '[]', '[]', '[]', '["preserve hook"]',
+        '["do not invent premise"]', 'close source mimicry',
+        'context-migration', 'model', ?, ?, 2, 1, 'prior-card-migration',
+        'source interpretation changed', '{"must_preserve_function":["payoff"]}',
+        '2099-01-04T12:10:00.000Z')`,
+    ).bind(sourceCardId, sourceFamilyId, sourceSelectionId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_daily_source_claims (
+        id, brand_key, production_date, timezone, source_identity_key,
+        source_type, internal_source_id, source_batch_id, source_selection_id,
+        workflow_session_id, review_batch_id, review_item_number, source_card_id,
+        generation_run_id, draft_id, scheduled_post_id, status,
+        disposition_reason
+      ) VALUES (?, 'manifest_mental', '2099-01-04', 'America/New_York',
+        'saved_pattern:migration', 'saved_pattern', 'pattern-migration', ?, ?,
+        'workflow-migration', 'review-migration', 1, ?, ?, ?, ?, 'scheduled',
+        'lineage_complete')`,
+    ).bind(sourceClaimId, sourceBatchId, sourceSelectionId, sourceCardId,
+      generationRunId, generationDraftId, scheduledPostId).run();
 
     await applyD1Migrations(
       testEnv.DB,
@@ -443,9 +522,15 @@ describe("canonical database migrations", () => {
       countWhere("SELECT COUNT(*) AS total FROM gpt_post_strategy_tags WHERE scheduled_post_id = ? AND pillar = 'intuition'", scheduledPostId),
       countWhere("SELECT COUNT(*) AS total FROM gpt_generation_runs WHERE id = ? AND source_card_version_number = 3 AND adaptation_plan_json IS NOT NULL", generationRunId),
       countWhere("SELECT COUNT(*) AS total FROM gpt_generation_drafts WHERE id = ? AND showable = 1 AND scheduled_post_id = ? AND published_post_id = ?", generationDraftId, scheduledPostId, archivedPostId),
-            countWhere("SELECT COUNT(*) AS total FROM gpt_preflight_snapshots WHERE id = ? AND manifest_json = ?", preflightSnapshotId, '{"complete":true}'),
+                  countWhere("SELECT COUNT(*) AS total FROM gpt_preflight_snapshots WHERE id = ? AND manifest_json = ?", preflightSnapshotId, '{"complete":true}'),
+      countWhere("SELECT COUNT(*) AS total FROM operator_source_selection_batches WHERE id = ? AND status = 'retired' AND retirement_reason = 'migration_complete'", sourceBatchId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_source_selections WHERE id = ? AND disposition = 'accepted' AND workflow_sequence = 3", sourceSelectionId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_source_exclusions WHERE id = ? AND active = 1", sourceExclusionId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_source_card_families WHERE id = ? AND current_source_card_id = ?", sourceFamilyId, sourceCardId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_source_cards WHERE id = ? AND version_number = 2 AND is_current = 1 AND transformation_contract_json IS NOT NULL", sourceCardId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_daily_source_claims WHERE id = ? AND generation_run_id = ? AND draft_id = ? AND scheduled_post_id = ?", sourceClaimId, generationRunId, generationDraftId, scheduledPostId),
     ]);
-    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 
     it("upgrades the legacy scheduled-deletion schema before backfilling new fields", async () => {
