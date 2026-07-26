@@ -280,9 +280,9 @@ Completed checkpoint — Stage 4N execution routing, checkpoints, and events ext
 - Exact-SHA migration-first release passed in run `30218664436`.
 - Live production independently confirmed exact SHA `8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad`.
 
-Current sub-action — Stage 4O performance learning and content-focus extraction:
+Current sub-action — Stage 4O `index.ts` performance learning and content-focus extraction:
 
-Move the final runtime-owned schema cluster into ordered migrations:
+Move the final `index.ts`-owned schema cluster into ordered migrations:
 
 - `operator_post_fingerprints`
 - `operator_post_performance_scores`
@@ -292,7 +292,14 @@ Move the final runtime-owned schema cluster into ordered migrations:
 - `operator_content_focus_reviews`
 - `operator_content_focus_family_states`
 
-Preserve post and source fingerprints, performance checkpoint scores, evidence provenance, hypothesis confidence and lifecycle, generation learning briefs, content-focus review windows, family-level focus states, indexes, timestamps, uniqueness contracts, and all existing production data. Replace every remaining runtime DDL statement with integrity probes, then run the Stage 4 completion audit proving zero runtime schema mutation remains.
+Preserve post and source fingerprints, performance checkpoint scores, evidence provenance, hypothesis confidence and lifecycle, generation learning briefs, content-focus review windows, family-level focus states, indexes, timestamps, uniqueness contracts, and all existing production data. Replace every remaining `index.ts` DDL statement with integrity probes.
+
+Measured remaining repository-wide schema clusters after Stage 4O:
+
+- Stage 4P — 15 Manifest Intelligence policy, strategy, evidence, cycle-receipt, hard-ban, and hypothesis tables in `manifestIntelligence.ts`.
+- Stage 4Q — 8 semantic, maturity, comparable-analysis, learning, portfolio, transition, and experiment tables in `manifestIntelligenceEngine.ts`.
+- Stage 4R — 5 learning-brief, benchmark, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables in `manifestMeasurementAudit.ts`.
+- Stage 4S — 4 source-family evidence/transition/selection tables plus `operator_manifest_decision_influences`, followed by the repository-wide zero-DDL completion audit.
 
 Remaining Stage 4 work after this cluster:
 
