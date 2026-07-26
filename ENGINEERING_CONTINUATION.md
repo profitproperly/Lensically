@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad
-production_sha: 8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad
+repository_base_sha: 553ebd4e998754655ecbe5facb83a7979ed3c376
+production_sha: 553ebd4e998754655ecbe5facb83a7979ed3c376
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -280,23 +280,51 @@ Completed checkpoint — Stage 4N execution routing, checkpoints, and events ext
 - Exact-SHA migration-first release passed in run `30218664436`.
 - Live production independently confirmed exact SHA `8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad`.
 
-Current sub-action — Stage 4O `index.ts` performance learning and content-focus extraction:
+Completed checkpoint — Stage 4O `index.ts` performance learning and content-focus extraction:
 
-Move the final `index.ts`-owned schema cluster into ordered migrations:
+- Added `0013_performance_learning_and_content_focus.sql`.
+- Moved complete migration ownership for:
+  - `operator_post_fingerprints`
+  - `operator_post_performance_scores`
+  - `operator_performance_evidence`
+  - `operator_performance_hypotheses`
+  - `operator_generation_learning_briefs`
+  - `operator_content_focus_reviews`
+  - `operator_content_focus_family_states`
+- Replaced the final seven `index.ts` schema owners and their indexes with complete `assertDatabaseIntegrity` probes.
+- Added `PERFORMANCE_FOCUS_UPGRADE_DB` to prove replay preservation and live-schema adoption with fingerprint and review uniqueness intact.
+- Added a permanent database-authority gate that rejects any future table, alter, index, trigger, or drop DDL reintroduced into `src/index.ts`.
+- Removed `src/index.ts` from the runtime-DDL source inventory after the gate proved zero runtime schema mutation remains in the monolith.
+- Chunked the schema-object characterization query below D1's bind-variable limit as the canonical object inventory grew.
+- Push validation passed in run `30219306632`.
+- All eight Operator shards passed in run `30219362293`.
+- Exact-SHA migration-first release passed in run `30219411039`.
+- Live production independently confirmed exact SHA `553ebd4e998754655ecbe5facb83a7979ed3c376`.
 
-- `operator_post_fingerprints`
-- `operator_post_performance_scores`
-- `operator_performance_evidence`
-- `operator_performance_hypotheses`
-- `operator_generation_learning_briefs`
-- `operator_content_focus_reviews`
-- `operator_content_focus_family_states`
+Current sub-action — Stage 4P Manifest Intelligence schema extraction:
 
-Preserve post and source fingerprints, performance checkpoint scores, evidence provenance, hypothesis confidence and lifecycle, generation learning briefs, content-focus review windows, family-level focus states, indexes, timestamps, uniqueness contracts, and all existing production data. Replace every remaining `index.ts` DDL statement with integrity probes.
+Move the 15 runtime-owned schema tables in `manifestIntelligence.ts` into ordered migrations:
 
-Measured remaining repository-wide schema clusters after Stage 4O:
+- `operator_manifest_intelligence_policies`
+- `operator_manifest_strategy_versions`
+- `operator_manifest_exposure_snapshots`
+- `operator_manifest_evidence_snapshots`
+- `operator_manifest_evidence_posts`
+- `operator_manifest_evidence_pages`
+- `operator_manifest_analysis_page_reads`
+- `operator_manifest_cycle_strategies`
+- `operator_manifest_cycle_plan_items`
+- `operator_manifest_candidate_gate_receipts`
+- `operator_manifest_hard_bans`
+- `operator_manifest_cycle_receipts`
+- `operator_manifest_cycle_receipt_events`
+- `operator_manifest_cycle_defect_receipts`
+- `operator_manifest_post_hypotheses`
 
-- Stage 4P — 15 Manifest Intelligence policy, strategy, evidence, cycle-receipt, hard-ban, and hypothesis tables in `manifestIntelligence.ts`.
+Preserve policy and strategy versions, exposure and evidence snapshots, paged evidence payloads and reads, cycle strategy and plan lineage, candidate-gate receipts, hard bans, completion and defect receipts, post hypotheses, indexes, constraints, timestamps, and all existing production data. Replace all runtime DDL in `manifestIntelligence.ts` with integrity probes while preserving intelligence writes and evaluation behavior.
+
+Remaining measured Stage 4 clusters after Stage 4P:
+
 - Stage 4Q — 8 semantic, maturity, comparable-analysis, learning, portfolio, transition, and experiment tables in `manifestIntelligenceEngine.ts`.
 - Stage 4R — 5 learning-brief, benchmark, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables in `manifestMeasurementAudit.ts`.
 - Stage 4S — 4 source-family evidence/transition/selection tables plus `operator_manifest_decision_influences`, followed by the repository-wide zero-DDL completion audit.
