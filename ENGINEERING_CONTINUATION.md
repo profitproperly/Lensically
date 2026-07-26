@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 20de5f19afe86fae0f39e87afb762ce60922a6f9
-production_sha: 20de5f19afe86fae0f39e87afb762ce60922a6f9
+repository_base_sha: 77f8e0e12a7260dc6d5c95bb4260fb1bddd47e31
+production_sha: 77f8e0e12a7260dc6d5c95bb4260fb1bddd47e31
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -370,22 +370,33 @@ Completed checkpoint — Stage 5A MCP protocol-surface modularization:
 - Exact-SHA release passed in run `30223295942`.
 - Live production independently confirmed exact SHA `20de5f19afe86fae0f39e87afb762ce60922a6f9`.
 
-Current sub-action — Stage 5B MCP tool-definition construction modularization:
+Completed checkpoint — Stage 5B MCP tool-definition construction modularization:
 
-Extract the reusable tool-definition construction layer from `src/index.ts` before moving the large static registries:
+- Added `src/operatorMcpToolDefinitions.ts` with the canonical `OperatorMcpToolDefinition` type and pure construction helpers.
+- Moved deep cloning, account-scoped wrapper schema rewriting, three-account wrapper generation, execution metadata injection, and deterministic priority ordering out of `src/index.ts`.
+- Preserved every static tool definition, public/internal tool name, title, description, input schema, annotation, wrapper name, tool count, and ordering.
+- Added `test/operatorMcpToolDefinitions.spec.ts` and wired it into push and exact-head release gates.
+- Added release-preflight enforcement preventing the type, clone helper, and scoped-wrapper implementation from returning to `index.ts`.
+- Push validation passed in run `30223634770`.
+- All eight Operator shards passed in run `30223705431`.
+- Exact-SHA release passed in run `30223768020`.
+- Live production independently confirmed exact SHA `77f8e0e12a7260dc6d5c95bb4260fb1bddd47e31`.
 
-- `OperatorMcpToolDefinition` and annotation types
-- safe tool-definition cloning
-- account-scoped schema rewriting
-- scoped wrapper naming/title/description construction
-- deterministic base-tool composition helpers that do not read the database or execute business logic
+Current sub-action — Stage 5C MCP tool-directory modularization:
 
-Preserve every public/internal tool name, title, description, input schema, annotation, scoped wrapper, tool count, ordering, and client-safety characterization. Add focused unit coverage and a release-preflight gate preventing these construction helpers from returning to `index.ts`.
+Extract the static public-directory policy and pure discovery helpers from `src/index.ts`:
+
+- forbidden retired tool names
+- active public direct tool names
+- retired human-guidance suppression
+- public tool filtering and count helpers
+- definition lookup and required-field shaping with explicit handler classification inputs
+
+Preserve the exact 75-tool live public surface, retired-tool suppression, public ordering, annotations, required fields, handler labels, and all client-safety and capability-lifecycle gates. Add focused unit coverage and prevent directory policy/helpers from drifting back into `index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Move the static direct typed MCP registry arrays into the tool-definition module.
-- Extract tool discovery, definition lookup, and client-safe public filtering.
+- Move the static direct typed MCP registry arrays into focused registry modules.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
