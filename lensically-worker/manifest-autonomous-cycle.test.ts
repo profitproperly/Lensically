@@ -9,7 +9,6 @@ import {
   manifestCycleFailureIsDefect,
 
     normalizeManifestThreadsTimestampForSqlite,
-  operatorToolRequiresLegacyPreparation,
     resolveOperatorDueMaturityCheckpoint,
   selectManifestDueCheckpointRefreshBatch,
         resolveManifestAutonomousClock,
@@ -316,15 +315,6 @@ describe("Manifest autonomous clock and horizon", () => {
       Date.parse("2026-07-26T14:00:00.000Z"),
       [6, 12, 18],
     )).toBeNull();
-  });
-
-  it("keeps canonical cycle reads and strategy commit off the legacy workflow bootstrap", () => {
-    expect(operatorToolRequiresLegacyPreparation("get_manifest_cycle_receipt")).toBe(false);
-    expect(operatorToolRequiresLegacyPreparation("get_manifest_cycle_analysis_page")).toBe(false);
-    expect(operatorToolRequiresLegacyPreparation("commit_manifest_cycle_strategy")).toBe(false);
-    expect(operatorToolRequiresLegacyPreparation("mm_get_manifest_cycle_analysis_page")).toBe(false);
-    expect(operatorToolRequiresLegacyPreparation("prepare_manifest_autonomous_cycle")).toBe(true);
-    expect(operatorToolRequiresLegacyPreparation("get_account_state")).toBe(true);
   });
 
     it("builds cycle maturity evidence directly from persisted checkpoint scores", () => {

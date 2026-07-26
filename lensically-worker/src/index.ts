@@ -6700,80 +6700,6 @@ function inferRealmEntranceKey(openingPhrase: string | null): string | null {
 
 async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
   await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_workflow_sessions (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      workflow_template_key TEXT NOT NULL DEFAULT 'content_operator_v1',
-      objective TEXT,
-      status TEXT NOT NULL DEFAULT 'active',
-      current_stage TEXT,
-      active_source_card_id TEXT,
-      active_generation_run_id TEXT,
-      notes TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_workflow_sessions_brand_status
-     ON operator_workflow_sessions (brand_key, status, updated_at DESC)`,
-  ).run();
-  if (!(await doesColumnExist(env, "operator_workflow_sessions", "objective"))) {
-    await env.DB.prepare("ALTER TABLE operator_workflow_sessions ADD COLUMN objective TEXT").run();
-  }
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_operator_workflow_sessions_touch_updated_at
-     AFTER UPDATE ON operator_workflow_sessions
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE operator_workflow_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-     END`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_context_admissions (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      workflow_session_id TEXT,
-      snapshot_id TEXT,
-      admission_scope TEXT NOT NULL,
-      sections_json TEXT NOT NULL,
-      freshness_started_at TEXT,
-      freshness_completed_at TEXT,
-      is_partial INTEGER NOT NULL DEFAULT 0,
-      notes TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_context_admissions_brand_created
-     ON operator_context_admissions (brand_key, created_at DESC)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_production_board_items (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      workflow_session_id TEXT,
-      item_type TEXT NOT NULL,
-      lane_key TEXT,
-      title TEXT NOT NULL,
-      body TEXT NOT NULL,
-      evidence_json TEXT,
-      priority INTEGER,
-      status TEXT NOT NULL DEFAULT 'active',
-      created_from TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-    await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_production_board_brand_status
-     ON operator_production_board_items (brand_key, status, priority ASC, updated_at DESC)`,
-  ).run();
-
-  await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_source_selection_batches (
       id TEXT PRIMARY KEY,
       brand_key TEXT NOT NULL,
@@ -6840,34 +6766,6 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_operator_source_batches_production_date
      ON operator_source_selection_batches (brand_key, production_date, status, created_at DESC)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_review_batches (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      workflow_session_id TEXT,
-      source_batch_id TEXT,
-      production_date TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      batch_size INTEGER NOT NULL DEFAULT 4,
-      status TEXT NOT NULL DEFAULT 'building',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_review_batches_active
-     ON operator_review_batches (brand_key, production_date, status, updated_at DESC)`,
-  ).run();
-    await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_operator_review_batches_touch_updated_at
-     AFTER UPDATE ON operator_review_batches
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE operator_review_batches SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-     END`,
   ).run();
 
   await env.DB.prepare(
@@ -6974,25 +6872,7 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
      ON operator_source_exclusions (brand_key, active, source_type)`,
   ).run();
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_post_metric_snapshots (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      published_post_id TEXT NOT NULL,
-            scheduled_post_id INTEGER,
-      draft_id TEXT,
-      generation_run_id TEXT,
-      source_card_id TEXT,
-      source_selection_id TEXT,
-      metrics_json TEXT NOT NULL,
-      captured_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-    await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_post_metric_snapshots_post_captured
-     ON operator_post_metric_snapshots (brand_key, published_post_id, captured_at DESC)`,
-  ).run();
+  await ensureOperatorPostMetricSnapshotsTable(env);
 
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_source_card_families (
@@ -7191,12 +7071,6 @@ const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
   enforcement_type: string;
 }> = [
   {
-    stage: "context_admission",
-    required_sections: ["operator_precheck"],
-    completion_rule: "key_handshake_complete_before_account_work",
-    enforcement_type: "block",
-  },
-  {
     stage: "source_card",
     required_sections: ["locked_source_card"],
     completion_rule: "active_source_card_locked",
@@ -7206,18 +7080,6 @@ const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
     stage: "generation_run_and_candidates",
     required_sections: ["locked_source_card", "generation_run"],
     completion_rule: "locked_source_card_and_run",
-    enforcement_type: "block",
-  },
-  {
-    stage: "owner_review_and_decision",
-    required_sections: ["showable_draft"],
-    completion_rule: "showable_draft_exists",
-    enforcement_type: "block",
-  },
-  {
-    stage: "scheduling",
-    required_sections: ["approved_draft"],
-    completion_rule: "approved_draft_required",
     enforcement_type: "block",
   },
 ];
@@ -7339,7 +7201,7 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       contract_version TEXT NOT NULL,
       version INTEGER NOT NULL DEFAULT 1,
       status TEXT NOT NULL DEFAULT 'discussion',
-      execution_mode TEXT NOT NULL DEFAULT 'guided_owner_approval',
+      execution_mode TEXT NOT NULL DEFAULT 'autonomous_operator',
       mission_json TEXT NOT NULL,
       diagnostic_json TEXT NOT NULL DEFAULT '{}',
       owner_response TEXT,
@@ -7843,21 +7705,11 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
 
   await env.DB.prepare(
     `UPDATE operator_workflow_requirements
-     SET required_sections_json = ?,
-         completion_rule = ?,
-         enforcement_type = 'block',
-         active = 1,
-         version = version + 1
-     WHERE stage = 'context_admission'
-       AND (
-         completion_rule <> ?
-         OR required_sections_json <> ?
-       )`,
-  ).bind(
-    JSON.stringify(["operator_precheck"]),
-    "key_handshake_complete_before_account_work",
-    "key_handshake_complete_before_account_work",
-    JSON.stringify(["operator_precheck"]),
+     SET active = 0,
+         version = version + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE stage IN ('context_admission', 'owner_review_and_decision', 'scheduling')
+       AND active <> 0`,
   ).run();
 }
 
@@ -8339,8 +8191,6 @@ const DEFAULT_OPERATOR_GATES: Array<{
   order_index: number;
 }> = [
   { gate_key: "account_selected_gate", display_name: "Account Selected", description: "A valid account must be selected.", stage_scope: "account_selection", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
-  { gate_key: "operator_precheck_before_workflow", display_name: "Operator Precheck Before Workflow", description: "A full operator precheck must be loaded before workflow, admin, or engineering actions.", stage_scope: "account_selection", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 15 },
-  { gate_key: "context_admission_gate", display_name: "Context Admission", description: "Relevant data coverage must be recorded and partial data labeled.", stage_scope: "context_admission", gate_type: "hard", severity: "warn", evaluator: "backend", order_index: 20 },
   { gate_key: "source_card_required_gate", display_name: "Source Card Required", description: "Serious generation requires a source card unless explicitly overridden.", stage_scope: "generation_run_and_candidates", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
   { gate_key: "source_lock_gate", display_name: "Source Lock", description: "A source card must be locked before drafts can be shown.", stage_scope: "generation_run_and_candidates", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
     { gate_key: "exact_duplicate_gate", display_name: "Exact Duplicate", description: "Draft text must not exactly match known account inventory.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
@@ -8352,8 +8202,6 @@ const DEFAULT_OPERATOR_GATES: Array<{
 
   { gate_key: "scheduled_collision_gate", display_name: "Scheduled Collision", description: "Scheduled drafts must not collide with account scheduled posts.", stage_scope: "scheduling", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
 
-  { gate_key: "approved_before_schedule_gate", display_name: "Approved Before Schedule", description: "Only approved drafts can be scheduled unless an override is recorded.", stage_scope: "scheduling", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
-  { gate_key: "status_transition_gate", display_name: "Status Transition", description: "Draft status transitions must follow the operator workflow.", stage_scope: "owner_review_and_decision", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
 ];
 
 async function seedDefaultOperatorGates(env: Env): Promise<void> {
@@ -8418,13 +8266,19 @@ async function seedDefaultOperatorGates(env: Env): Promise<void> {
     `UPDATE operator_gates
      SET active = 0,
          updated_at = CURRENT_TIMESTAMP
-     WHERE gate_key = 'historical_owner_rejection_gate'
-        OR created_from = 'strategy_memory'
-        OR gate_key = 'manifest_owner_review_rules_2026_07_16'`,
+     WHERE gate_key IN (
+          'historical_owner_rejection_gate',
+          'operator_precheck_before_workflow',
+          'context_admission_gate',
+          'approved_before_schedule_gate',
+          'status_transition_gate',
+          'manifest_owner_review_rules_2026_07_16'
+        )
+        OR created_from = 'strategy_memory'`,
   ).run();
 }
 
-const LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION = "human-free-retirement-v1";
+const LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION = "human-free-retirement-v2";
 
 async function retireLegacyHumanGuidanceState(env: Env): Promise<void> {
   await env.DB.prepare(
@@ -8439,9 +8293,11 @@ async function retireLegacyHumanGuidanceState(env: Env): Promise<void> {
   if (completed?.retirement_key) return;
 
   const statements = [
-    "DELETE FROM gpt_strategy_memory",
-    "UPDATE operator_workflow_sessions SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE status = 'active'",
-    "UPDATE operator_review_batches SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE status NOT IN ('retired', 'completed')",
+    "DROP TABLE IF EXISTS gpt_strategy_memory",
+    "DROP TABLE IF EXISTS operator_workflow_sessions",
+    "DROP TABLE IF EXISTS operator_context_admissions",
+    "DROP TABLE IF EXISTS operator_production_board_items",
+    "DROP TABLE IF EXISTS operator_review_batches",
     "DROP TABLE IF EXISTS agent_account_controls",
     "DROP TABLE IF EXISTS operator_local_execution_nodes",
     "DROP TABLE IF EXISTS operator_local_execution_jobs",
@@ -8465,40 +8321,22 @@ async function retireLegacyHumanGuidanceState(env: Env): Promise<void> {
 
 const operatorModePreparationByEnv = new WeakMap<object, Promise<void>>();
 
-const MANIFEST_SELF_PREPARING_CYCLE_TOOLS = new Set([
-  "get_manifest_cycle_receipt",
-  "get_manifest_cycle_analysis_page",
-  "commit_manifest_cycle_strategy",
-]);
-
-export function operatorToolRequiresLegacyPreparation(toolName: string): boolean {
-  const normalized = toolName.replace(/^(?:mm_|om_|vx_)/, "");
-  return !MANIFEST_SELF_PREPARING_CYCLE_TOOLS.has(normalized);
-}
-
 async function prepareOperatorMode(env: Env): Promise<void> {
-  if (hasTestRuntimeTokens(env)) {
-    await ensureGptStrategyMemoryTable(env);
+  const prepare = async () => {
     await ensureGptGenerationDraftsTable(env);
     await ensureScheduledPostsTable(env);
     await ensureOperatorWorkflowTables(env);
     await ensureOperatorMcpAdminTables(env);
     await seedDefaultOperatorGates(env);
+    await retireLegacyHumanGuidanceState(env);
+  };
+  if (hasTestRuntimeTokens(env)) {
+    await prepare();
     return;
   }
   const cached = operatorModePreparationByEnv.get(env as object);
-  if (cached) {
-    return cached;
-  }
-  const preparation = (async () => {
-    await ensureGptStrategyMemoryTable(env);
-    await ensureGptGenerationDraftsTable(env);
-    await ensureScheduledPostsTable(env);
-    await ensureOperatorWorkflowTables(env);
-        await ensureOperatorMcpAdminTables(env);
-    await seedDefaultOperatorGates(env);
-    await retireLegacyHumanGuidanceState(env);
-  })();
+  if (cached) return cached;
+  const preparation = prepare();
   operatorModePreparationByEnv.set(env as object, preparation);
   try {
     await preparation;
@@ -9992,210 +9830,80 @@ async function buildOperatorManifestProceedCapsule(
   request: Request,
   env: Env,
   brand: GptResolvedBrand,
-  session: Record<string, unknown> | null,
+  _session: Record<string, unknown> | null,
   choice: OperatorContinuationChoice,
 ): Promise<Record<string, unknown>> {
-  const sessionId = normalizeOperatorText(session?.id, 120, true);
-  const deliveryReconciliation = await inspectOperatorDeliveryIncidents(
-    env,
-    brand,
-    WORKSPACE_DEFAULT_TIMEZONE,
-  );
-  const blockingIncident = deliveryReconciliation.unresolved_incidents[0] ?? null;
-  const calendarCoverage = await getOperatorHourlyCoverage(
-    env,
-    brand,
-    WORKSPACE_DEFAULT_TIMEZONE,
-    3,
-    null,
-  );
-    const activeReviewRow = await env.DB.prepare(
-    `SELECT id FROM operator_review_batches
-     WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
-     ORDER BY CASE WHEN workflow_session_id = ? THEN 0 ELSE 1 END,
-              datetime(updated_at) DESC LIMIT 1`,
-  ).bind(brand.brand_key, sessionId ?? "").first<{ id: string }>();
-  const activeReviewBatch = activeReviewRow?.id
-    ? await serializeManifestReviewBatch(env, brand, activeReviewRow.id)
-    : null;
-  const autonomyProfile = await getOperatorAutonomyProfile(env, brand.brand_key);
-  const pendingDecisions = autonomyProfile
-    ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
-    : [];
-    const tools = await buildOperatorMcpTools(env, false, false);
-  if (String(autonomyProfile?.mode ?? "") === MANIFEST_AUTONOMY_MODE) {
-    const latestCycleRow = await env.DB.prepare(
+  const [deliveryReconciliation, calendarCoverage, autonomyProfile, tools, growthMission, latestCycleRow] = await Promise.all([
+    inspectOperatorDeliveryIncidents(env, brand, WORKSPACE_DEFAULT_TIMEZONE),
+    getOperatorHourlyCoverage(env, brand, WORKSPACE_DEFAULT_TIMEZONE, 3, null),
+    getOperatorAutonomyProfile(env, brand.brand_key),
+    buildOperatorMcpTools(env, false, false),
+    readOperatorGrowthMission(env, brand.brand_key),
+    env.DB.prepare(
       `SELECT id FROM operator_autonomous_growth_cycles
        WHERE brand_key = ?
        ORDER BY datetime(updated_at) DESC LIMIT 1`,
-    ).bind(brand.brand_key).first<{ id: string }>();
-    const latestCycle = latestCycleRow?.id
-      ? await readManifestAutonomousCycle(env, brand.brand_key, latestCycleRow.id)
-      : null;
-    const next = blockingIncident
-      ? {
+    ).bind(brand.brand_key).first<{ id: string }>(),
+  ]);
+  const activeAutonomy = String(autonomyProfile?.mode ?? "") === MANIFEST_AUTONOMY_MODE;
+  const blockingIncident = deliveryReconciliation.unresolved_incidents[0] ?? null;
+  const pendingDecisions = autonomyProfile
+    ? await listOperatorDecisionProposals(env, brand.brand_key, ["proposed", "approved", "executing", "revision_required"], 20)
+    : [];
+  const latestCycle = latestCycleRow?.id
+    ? await readManifestAutonomousCycle(env, brand.brand_key, latestCycleRow.id)
+    : null;
+  const next = blockingIncident
+    ? {
         action: "resolve_delivery_incident",
         canonical_tool: "list_scheduled_posts",
         last_completed_action: "live_delivery_state_reconciled",
       }
-      : {
-        action: "prepare_autonomous_growth_cycle",
-        canonical_tool: "prepare_manifest_autonomous_cycle",
-        last_completed_action: "live_schedule_state_reconciled",
-      };
-    const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${calendarCoverage.current_local_date ?? "current"}`;
-    return {
-      version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
-      choice,
-      brand_key: brand.brand_key,
-      account_data_loaded: true,
-      canonical_state_source: "database_plus_live_reconciliation",
-      continuity_mode: "autonomous_growth_operator",
-      continuity_diagnostics: {
-        live_schedule_inspected: true,
-        live_delivery_state_inspected: true,
-        stale_calendar_summary_authoritative: false,
-        mandatory_owner_discussion_opened: false,
-        four_post_review_dependency: false,
-        calendar_horizon_days: 3,
-      },
-      autonomy_governance: {
-        contract: OPERATOR_AUTONOMY_CONTRACT,
-        profile: autonomyProfile,
-        pending_protected_decisions: pendingDecisions,
-        engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
-        next_behavior: "Resume autonomous Manifest operation. Act on routine strategy, production, scheduling, evaluation, recovery, and engineering without waiting for owner input.",
-      },
-      growth_mission: await readOperatorGrowthMission(env, brand.brand_key),
-      account_execution: {
-        unlocked: true,
-        discussion_required: false,
-        routine_account_operations_autonomous: true,
-        owner_review_optional: true,
-        protected_boundaries_only: true,
-      },
-      calendar_coverage: {
-        ...calendarCoverage,
-        unresolved_delivery_count: deliveryReconciliation.unresolved_incidents.length,
-        unresolved_delivery_slots: deliveryReconciliation.unresolved_incidents.map((incident) => ({
-          incident_id: incident.id,
-          scheduled_post_id: incident.scheduled_post_id,
-          production_date: incident.production_date,
-          scheduled_time: incident.scheduled_time,
-          delivery_state: incident.delivery_state,
-        })),
-      },
-      latest_autonomous_cycle: latestCycle,
-      legacy_review_batch: activeReviewBatch,
-      unresolved_incidents: deliveryReconciliation.unresolved_incidents,
-      required_recovery_actions: deliveryReconciliation.required_recovery_actions,
-      new_scheduling_blocked: Boolean(blockingIncident),
-      scheduling_block_reason: blockingIncident ? "unresolved_delivery_incident" : null,
-      workflow_checkpoint: {
-        workflow_session_id: sessionId,
-        workflow_status: session?.status ?? null,
-        current_stage: session?.current_stage ?? null,
-        last_completed_action: next.last_completed_action,
-        next_pending_action: next.action,
-        next_owner_checkpoint: null,
-        canonical_next_tool: next.canonical_tool,
-        next_operation_id: operationId,
-      },
-      idempotency: {
-        version: OPERATOR_IDEMPOTENCY_VERSION,
-        next_operation_id: operationId,
-        replay_same_operation_id_after_interruption: true,
-      },
-      runtime_identity: {
-        ...operatorRuntimeMetadata(env),
-        live_tool_count: tools.length,
-        request_origin: new URL(request.url).origin,
-      },
-    };
-  }
-  const reviewItems = activeReviewBatch && Array.isArray(activeReviewBatch.items)
-    ? activeReviewBatch.items as Array<Record<string, unknown>>
-    : [];
-  const currentItem = reviewItems.find((item) =>
-    !["scheduled", "published", "skipped", "rejected"].includes(String(item.status ?? ""))
-  ) ?? null;
-  const scheduledCount = reviewItems.filter((item) => ["scheduled", "published"].includes(String(item.status ?? ""))).length;
-  const skippedCount = reviewItems.filter((item) => ["skipped", "rejected"].includes(String(item.status ?? ""))).length;
-  const unresolvedCount = Math.max(reviewItems.length - scheduledCount - skippedCount, 0);
-    const resumableReviewBatch = activeReviewBatch && unresolvedCount > 0 ? activeReviewBatch : null;
-  const operationalNext = blockingIncident
-    ? {
-      action: "resolve_delivery_incident",
-      owner_checkpoint: "production_incident_recovery",
-      canonical_tool: "list_scheduled_posts",
-      last_completed_action: "unresolved_delivery_incident_observed",
-    }
-    : resumableReviewBatch
+    : activeAutonomy
       ? {
-        action: "resume_review_batch",
-        owner_checkpoint: "four_post_review_batch",
-        canonical_tool: "get_manifest_review_batch",
-        last_completed_action: "canonical_review_batch_restored",
-      }
+          action: "prepare_autonomous_growth_cycle",
+          canonical_tool: "prepare_manifest_autonomous_cycle",
+          last_completed_action: "live_schedule_state_reconciled",
+        }
       : {
-        action: "confirm_fill_calendar_day",
-        owner_checkpoint: "calendar_coverage_confirmation",
-        canonical_tool: "get_hourly_coverage",
-        last_completed_action: activeReviewBatch ? "terminal_review_batch_detected" : "calendar_coverage_inspected",
-      };
-  const growthMissionBrief = await openOperatorGrowthMissionDiscussion(env, brand, {
-    calendarCoverage,
-    activeReviewBatch: resumableReviewBatch,
-    workflowSession: session,
-    operationalNext,
-  });
-  const next = {
-    action: "discuss_growth_mission_brief",
-    owner_checkpoint: "growth_mission_brief",
-    canonical_tool: "getGrowthMission",
-    last_completed_action: "growth_diagnostic_prepared",
-  };
-  const nextArtifactId = String(
-    (blockingIncident ? blockingIncident.id : null)
-    ?? (resumableReviewBatch ? activeReviewRow?.id : null)
-    ?? calendarCoverage.earliest_incomplete_date
-    ?? sessionId
-    ?? "none",
-  );
-  const operationId = `${brand.brand_key}:${sessionId ?? "none"}:${next.action}:${nextArtifactId}`;
-  const policy = buildOperatorExecutionPolicy(next.canonical_tool, {
-    brand_key: brand.brand_key,
-    workflow_session_id: sessionId,
-    operation: next.action,
-  });
+          action: "configure_autonomy_profile",
+          canonical_tool: "updateGrowthMission",
+          last_completed_action: "account_configuration_inspected",
+        };
+  const operationId = `${brand.brand_key}:${next.action}:${String(calendarCoverage.current_local_date ?? "current")}`;
   return {
     version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
     choice,
     brand_key: brand.brand_key,
     account_data_loaded: true,
-    canonical_state_source: "database",
-    continuity_mode: "guided_growth_diagnostic",
+    canonical_state_source: "database_plus_live_reconciliation",
+    continuity_mode: activeAutonomy ? "autonomous_growth_operator" : "autonomy_configuration_required",
     continuity_diagnostics: {
-      legacy_source_reconciliation_deferred: true,
-      mutation_free_account_inspection: true,
-      delivery_reconciliation_executed: false,
-      delivery_state_inspected_read_only: true,
-      growth_mission_discussion_opened: true,
+      live_schedule_inspected: true,
+      live_delivery_state_inspected: true,
+      guided_workflow_state_loaded: false,
+      workflow_session_dependency: false,
+      review_batch_dependency: false,
+      owner_taste_dependency: false,
       calendar_horizon_days: 3,
     },
-    autonomy_governance: autonomyProfile ? {
+    autonomy_governance: {
       contract: OPERATOR_AUTONOMY_CONTRACT,
       profile: autonomyProfile,
-      pending_decisions: pendingDecisions,
+      pending_protected_decisions: pendingDecisions,
       engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
-      next_behavior: "Present the Growth Mission Brief, diagnose the current bottleneck, and brainstorm with the owner. Routine engineering remains autonomous; account mutations remain locked until the owner approves the current plan.",
-    } : null,
-    growth_mission_brief: growthMissionBrief,
+      next_behavior: activeAutonomy
+        ? "Resume autonomous Manifest operation from live schedule, cycle, evidence, and incident state."
+        : "Load fixed account configuration before autonomous account mutation. Do not create a guided review or taste-learning cycle.",
+    },
+    growth_mission: growthMission,
     account_execution: {
-      unlocked: false,
-      discussion_required: true,
-      required_next_tool: "updateGrowthMission",
-      approval_scope: "current_guided_growth_cycle",
+      unlocked: activeAutonomy,
+      configuration_required: !activeAutonomy,
+      routine_account_operations_autonomous: activeAutonomy,
+      human_learning_disabled: true,
+      owner_review_dependency: false,
+      protected_boundaries_only: true,
     },
     calendar_coverage: {
       ...calendarCoverage,
@@ -10207,70 +9915,22 @@ async function buildOperatorManifestProceedCapsule(
         scheduled_time: incident.scheduled_time,
         delivery_state: incident.delivery_state,
       })),
-      published_coverage_excludes_unresolved_delivery: true,
     },
-    active_review_batch: resumableReviewBatch,
-    completed_review_batch: activeReviewBatch && !resumableReviewBatch ? activeReviewBatch : null,
+    latest_autonomous_cycle: latestCycle,
     unresolved_incidents: deliveryReconciliation.unresolved_incidents,
     required_recovery_actions: deliveryReconciliation.required_recovery_actions,
-    new_scheduling_blocked: true,
-    scheduling_block_reason: blockingIncident ? "delivery_incident_and_growth_plan_approval_required" : "growth_plan_approval_required",
-    current_engineering_continuation: blockingIncident ? {
-      kind: "delivery_incident",
-      blocking: true,
-      incident: blockingIncident,
-      next_action: blockingIncident.required_recovery_action,
-    } : null,
-    workflow_checkpoint: {
-      workflow_session_id: sessionId,
-      workflow_status: session?.status ?? null,
-      current_stage: session?.current_stage ?? null,
+    new_scheduling_blocked: Boolean(blockingIncident) || !activeAutonomy,
+    scheduling_block_reason: blockingIncident
+      ? "unresolved_delivery_incident"
+      : activeAutonomy
+        ? null
+        : "autonomy_configuration_required",
+    operation_checkpoint: {
       last_completed_action: next.last_completed_action,
       next_pending_action: next.action,
-      next_owner_checkpoint: next.owner_checkpoint,
       canonical_next_tool: next.canonical_tool,
       next_operation_id: operationId,
     },
-    active_artifact_ids: {
-      source_batch_id: currentItem?.source_batch_id ?? null,
-      source_selection_id: currentItem?.source_selection_id ?? null,
-      source_card_id: currentItem?.source_card_id ?? null,
-      generation_run_id: currentItem?.generation_run_id ?? null,
-      draft_id: currentItem?.draft_id ?? null,
-      scheduled_post_id: currentItem?.scheduled_post_id ?? null,
-      published_post_id: null,
-    },
-    source_batch_progress: activeReviewBatch ? {
-      selected_count: reviewItems.length,
-      completed_count: scheduledCount,
-      skipped_count: skippedCount,
-      remaining_count: Math.max(reviewItems.length - scheduledCount - skippedCount, 0),
-      review_batch_id: activeReviewRow?.id ?? null,
-      redraw_forbidden_on_resume: choice === "resume_existing_workflow",
-    } : null,
-    next_artifact: currentItem ? {
-      source_selection_id: currentItem.source_selection_id ?? null,
-      source_type: currentItem.source_type ?? null,
-      internal_source_id: currentItem.internal_source_id ?? null,
-      threads_post_id: currentItem.threads_post_id ?? null,
-      canonical_source_url: currentItem.canonical_source_url ?? null,
-      post_text: currentItem.source_text ?? null,
-      metrics_snapshot: currentItem.source_metrics ?? {},
-    } : null,
-    current_source_card: currentItem?.source_card_id ? { id: currentItem.source_card_id } : null,
-    current_draft: currentItem?.draft_id ? {
-      id: currentItem.draft_id,
-      status: currentItem.draft_status ?? currentItem.status ?? null,
-      text: currentItem.generated_post ?? null,
-      showable: currentItem.showable === true,
-      owner_feedback: null,
-    } : null,
-    current_scheduled_post: currentItem?.scheduled_post_id ? {
-      id: currentItem.scheduled_post_id,
-      scheduled_time: currentItem.scheduled_time ?? null,
-      status: currentItem.scheduled_status ?? currentItem.status ?? null,
-    } : null,
-    execution_policy: policy,
     idempotency: {
       version: OPERATOR_IDEMPOTENCY_VERSION,
       next_operation_id: operationId,
@@ -10291,9 +9951,49 @@ async function buildOperatorProceedCapsule(
   session: Record<string, unknown> | null,
   choice: OperatorContinuationChoice,
 ): Promise<Record<string, unknown>> {
-  return brand.brand_key === "manifest_mental"
-    ? buildOperatorManifestProceedCapsule(request, env, brand, session, choice)
-    : buildOperatorContinuityCapsule(request, env, brand, session, choice);
+  if (brand.brand_key === "manifest_mental") {
+    return buildOperatorManifestProceedCapsule(request, env, brand, session, choice);
+  }
+  const [autonomyProfile, tools] = await Promise.all([
+    getOperatorAutonomyProfile(env, brand.brand_key),
+    buildOperatorMcpTools(env, false, false),
+  ]);
+  const configured = Boolean(autonomyProfile?.active);
+  return {
+    version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
+    choice,
+    brand_key: brand.brand_key,
+    account_data_loaded: true,
+    canonical_state_source: "account_configuration",
+    continuity_mode: configured ? "autonomous_account_operator" : "autonomy_configuration_required",
+    continuity_diagnostics: {
+      guided_workflow_state_loaded: false,
+      workflow_session_dependency: false,
+      review_batch_dependency: false,
+      owner_taste_dependency: false,
+    },
+    autonomy_governance: {
+      contract: OPERATOR_AUTONOMY_CONTRACT,
+      profile: autonomyProfile,
+      engineering_authority: OPERATOR_ENGINEERING_AUTHORITY_CONTRACT,
+    },
+    account_execution: {
+      unlocked: configured,
+      configuration_required: !configured,
+      human_learning_disabled: true,
+      owner_review_dependency: false,
+      protected_boundaries_only: true,
+    },
+    operation_checkpoint: {
+      next_pending_action: configured ? "inspect_account_state" : "configure_autonomy_profile",
+      canonical_next_tool: configured ? "get_account_state" : "updateGrowthMission",
+    },
+    runtime_identity: {
+      ...operatorRuntimeMetadata(env),
+      live_tool_count: tools.length,
+      request_origin: new URL(request.url).origin,
+    },
+  };
 }
 
 async function buildOperatorContinuityCapsule(
@@ -15027,10 +14727,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
   }
-  if (operatorToolRequiresLegacyPreparation(toolName)) {
-    await prepareOperatorMode(env);
+  const canonicalToolName = toolName.replace(/^(?:mm_|om_|vx_)/, "");
+  if (RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)) {
+    return operatorJsonResponse({
+      success: false,
+      error: "human_guidance_tool_retired",
+      tool_name: canonicalToolName,
+      human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+    }, 410);
   }
-    const payload = await readOperatorPayload(request);
+  await prepareOperatorMode(env);
+  const payload = await readOperatorPayload(request);
     if (toolName.startsWith("mm_")) {
     toolName = toolName.slice(3);
     payload.brand_key = "manifestmental";
@@ -15044,7 +14751,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 
   if (toolName === "list_accounts") {
-    return operatorJsonResponse({ accounts: await listOperatorAccounts(env), workflow_template: workflowTemplatePayload() });
+    return operatorJsonResponse({
+      accounts: await listOperatorAccounts(env),
+      operating_mode: "autonomous_operator",
+      human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+    });
   }
 
   const brand = await resolveOperatorBrandFromPayload(env, payload);
@@ -24124,7 +23835,7 @@ async function handleOperatorMcpAdminTool(
     };
   }
 
-        if (toolName === "confirmOperatorProceed") {
+  if (toolName === "confirmOperatorProceed") {
     const brandKey = normalizeGptBrandKey(args.brand_key);
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
@@ -24133,33 +23844,30 @@ async function handleOperatorMcpAdminTool(
     if (!brand) {
       return { ok: false, error: "brand_unavailable", account_data_loaded: false };
     }
-    const session = await resolveOperatorContinuationSession(env, brandKey, "resume_existing_workflow", null);
-    const workflowSessionId = normalizeOperatorText(session?.id, 120, true);
     await createOperatorContinuityReference(env, {
       kind: "continuity_context",
       brandKey,
-      workflowSessionId,
+      workflowSessionId: null,
       continuationChoice: "resume_existing_workflow",
       ttlSeconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       payload: {
         continuity_version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
         execution_policy_version: OPERATOR_EXECUTION_POLICY_VERSION,
-        auto_resolved_after_proceed: true,
+        autonomous_state_only: true,
+        guided_workflow_state_loaded: false,
       },
     });
-    const capsule = await buildOperatorProceedCapsule(request, env, brand, session, "resume_existing_workflow");
-    const growthMissionBrief = capsule.growth_mission_brief && typeof capsule.growth_mission_brief === "object"
-      ? capsule.growth_mission_brief as Record<string, unknown>
-      : null;
-        const discussionContract = growthMissionBrief?.discussion_contract && typeof growthMissionBrief.discussion_contract === "object"
-      ? growthMissionBrief.discussion_contract as Record<string, unknown>
-      : null;
-    const capsuleAccountExecution = capsule.account_execution && typeof capsule.account_execution === "object" && !Array.isArray(capsule.account_execution)
+    const capsule = await buildOperatorProceedCapsule(request, env, brand, null, "resume_existing_workflow");
+    const accountExecution = capsule.account_execution && typeof capsule.account_execution === "object" && !Array.isArray(capsule.account_execution)
       ? capsule.account_execution as Record<string, unknown>
       : null;
-    const accountExecutionLocked = brandKey === "manifest_mental"
-      && capsuleAccountExecution?.unlocked !== true
-      && discussionContract?.execution_locked !== false;
+    const configurationRequired = accountExecution?.configuration_required === true;
+    const checkpoint = capsule.operation_checkpoint && typeof capsule.operation_checkpoint === "object" && !Array.isArray(capsule.operation_checkpoint)
+      ? capsule.operation_checkpoint as Record<string, unknown>
+      : null;
+    const idempotency = capsule.idempotency && typeof capsule.idempotency === "object" && !Array.isArray(capsule.idempotency)
+      ? capsule.idempotency as Record<string, unknown>
+      : null;
     return {
       ok: true,
       selected_key: brandKey,
@@ -24168,16 +23876,15 @@ async function handleOperatorMcpAdminTool(
       account_data_loaded: true,
       continuity_loaded: true,
       continuation_choice_required: false,
-      continuation_choice: "resume_existing_workflow",
+      continuation_choice: "autonomous_state",
       continuity_state_expires_in_seconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       continuity_capsule: capsule,
-      account_execution_locked_until_growth_plan_approval: accountExecutionLocked,
-      required_next_owner_action: accountExecutionLocked
-        ? "Discuss, revise, or approve the Growth Mission Brief."
-        : null,
+      account_execution_locked_until_configuration: configurationRequired,
+      required_next_owner_action: configurationRequired ? "Configure the fixed account mission and protected boundaries." : null,
+      human_learning_disabled: true,
       next_call_requirement: {
         brand_key: operatorClientSafeBrandKey(brandKey),
-        operation_id: (capsule.idempotency as Record<string, unknown> | undefined)?.next_operation_id ?? null,
+        operation_id: idempotency?.next_operation_id ?? checkpoint?.next_operation_id ?? null,
       },
     };
   }
