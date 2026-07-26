@@ -321,13 +321,21 @@ describe("canonical database migrations", () => {
         created_at INTEGER NOT NULL
       )`,
     ).run();
-    await db.prepare(
+        await db.prepare(
       `INSERT INTO app_threads_accounts (
         app_user_id, threads_user_id, connection_active, is_active,
         tombstone_expires_at, created_at
       ) VALUES (
         'legacy-owner', 'legacy-threads', 1, 1, '2099-01-01T00:00:00.000Z', 1
       )`,
+    ).run();
+    await db.prepare(
+      `CREATE TRIGGER trg_app_threads_accounts_user_cleanup
+       AFTER DELETE ON users
+       FOR EACH ROW
+       BEGIN
+         DELETE FROM app_threads_accounts WHERE app_user_id = OLD.id;
+       END`,
     ).run();
     await db.prepare(
       `CREATE TABLE threads_accounts (

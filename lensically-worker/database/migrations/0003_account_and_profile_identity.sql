@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS app_threads_accounts (
   FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+DROP TRIGGER IF EXISTS trg_app_threads_accounts_user_cleanup;
+DROP TRIGGER IF EXISTS trg_app_threads_accounts_user_exists_insert;
+DROP TRIGGER IF EXISTS trg_app_threads_accounts_user_exists_update;
+
 DROP TABLE IF EXISTS app_threads_accounts_multi_rebuild;
 CREATE TABLE app_threads_accounts_multi_rebuild (
   app_user_id TEXT NOT NULL,
