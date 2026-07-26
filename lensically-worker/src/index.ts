@@ -64,7 +64,12 @@ import {
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
 } from "./operatorMcpProtocol";
+import {
+  buildOperatorMcpToolDefinitions,
+  type OperatorMcpToolDefinition,
+} from "./operatorMcpToolDefinitions";
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
+
 
 
 import {
@@ -17198,13 +17203,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   return operatorJsonResponse({ success: false, error: "unknown_operator_tool", tool_name: toolName }, 404);
 }
 
-type OperatorMcpToolDefinition = {
-  name: string;
-  title: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  annotations?: Record<string, unknown>;
-};
+
 
 const BRAND_KEY_SCHEMA = {
   type: "string",
@@ -18648,31 +18647,7 @@ function isOperatorMcpEngineeringToolName(value: string): value is OperatorMcpEn
   return (OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]).includes(value);
 }
 
-function mergeOperatorPlainObjects(base: unknown, patch: unknown): unknown {
-  if (!base || typeof base !== "object" || Array.isArray(base) || !patch || typeof patch !== "object" || Array.isArray(patch)) {
-    return patch === undefined ? base : patch;
-  }
-  const merged: Record<string, unknown> = { ...(base as Record<string, unknown>) };
-  for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
-    if (
-      value
-      && typeof value === "object"
-      && !Array.isArray(value)
-      && merged[key]
-      && typeof merged[key] === "object"
-      && !Array.isArray(merged[key])
-    ) {
-      merged[key] = mergeOperatorPlainObjects(merged[key], value);
-    } else {
-      merged[key] = value;
-    }
-  }
-  return merged;
-}
 
-function cloneOperatorMcpTool(tool: OperatorMcpToolDefinition): OperatorMcpToolDefinition {
-  return JSON.parse(JSON.stringify(tool)) as OperatorMcpToolDefinition;
-}
 
 const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
   "guardLensicallyCall",
@@ -18845,18 +18820,7 @@ function isOperatorPublicDirectToolName(value: string): boolean {
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   assertClientSafetyRegistry();
-  const scopedWrapperTools = includeScopedWrappers ? [
-    ...OPERATOR_MCP_TOOLS
-      .filter((tool) => tool.name !== "list_accounts")
-      .map((tool) => createScopedOperatorWrapperTool(tool, "mm", "Manifest", "Manifest Mental")),
-    ...OPERATOR_MCP_TOOLS
-      .filter((tool) => tool.name !== "list_accounts")
-      .map((tool) => createScopedOperatorWrapperTool(tool, "om", "OPMG", "OPMG Deadman")),
-    ...OPERATOR_MCP_TOOLS
-      .filter((tool) => tool.name !== "list_accounts")
-      .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
-  ] : [];
-        const directPriority = new Map([
+  const directPriority = new Map([
         ["getOperatorStartupContext", 0],
         ["getEngineeringContinuation", 1],
     ["getDatabaseSchemaState", 2],
@@ -18888,71 +18852,17 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["edit_scheduled_post", 15],
     ["skip_manifest_review_source", 16],
   ]);
-  const tools = [
-    ...OPERATOR_MCP_ENGINEERING_TOOLS,
-    ...OPERATOR_MCP_ADMIN_TOOLS,
-    ...OPERATOR_MCP_TOOLS,
-    ...scopedWrapperTools,
-    ].map(cloneOperatorMcpTool).sort((left, right) => {
-    const leftPriority = directPriority.get(left.name) ?? 1000;
-    const rightPriority = directPriority.get(right.name) ?? 1000;
-    return leftPriority - rightPriority;
+    return buildOperatorMcpToolDefinitions({
+    engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
+    adminTools: OPERATOR_MCP_ADMIN_TOOLS,
+    accountTools: OPERATOR_MCP_TOOLS,
+    includeScopedWrappers,
+    directPriorities: directPriority,
+    requiresProceed: operatorMcpToolNameRequiresProceed,
   });
-  for (const tool of tools) {
-    const schema = tool.inputSchema as Record<string, unknown>;
-    const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
-      ? { ...(schema.properties as Record<string, unknown>) }
-      : {};
-        const acceptsBrandContext = Object.prototype.hasOwnProperty.call(properties, "brand_key");
-        if (operatorMcpToolNameRequiresProceed(tool.name) || acceptsBrandContext || tool.name === "updateWorkflowRequirement") {
-      properties.proceed_confirmed = {
-        type: "boolean",
-                description: "Optional compatibility field for guided workflows. Autonomous Manifest cycle tools do not require a Proceed handshake.",
-      };
-      properties.operation_id = {
-        type: "string",
-        description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
-      };
-    }
-    
-    tool.inputSchema = { ...schema, properties };
-  }
-  return tools;
 }
 
-function createScopedOperatorWrapperTool(
-  tool: OperatorMcpToolDefinition,
-  prefix: string,
-  titlePrefix: string,
-  accountLabel: string,
-): OperatorMcpToolDefinition {
-  const cloned = cloneOperatorMcpTool(tool);
-  const schema = cloned.inputSchema as Record<string, unknown>;
-  const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
-    ? { ...(schema.properties as Record<string, unknown>) }
-    : {};
-  delete properties.brand_key;
-  const required = Array.isArray(schema.required)
-    ? (schema.required as unknown[]).filter((value) => value !== "brand_key")
-    : [];
-  const inputSchema: Record<string, unknown> = {
-    ...schema,
-    properties,
-    additionalProperties: false,
-  };
-  if (required.length) {
-    inputSchema.required = required;
-  } else {
-    delete inputSchema.required;
-  }
-  return {
-    ...cloned,
-    name: `${prefix}_${tool.name}`,
-    title: `${titlePrefix} ${tool.title}`,
-    description: `${tool.description} This wrapper automatically scopes the call to ${accountLabel} and does not accept brand_key.`,
-    inputSchema,
-  };
-}
+
 
 
 async function buildOperatorMcpTools(_env: Env, _includeDisabled = false, includeScopedWrappers = true): Promise<OperatorMcpToolDefinition[]> {
