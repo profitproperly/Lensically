@@ -3659,21 +3659,21 @@ describe("operator mode MCP endpoint", () => {
         const listed = await mcpRequest<{ tools: Array<{ name: string; description?: string; inputSchema?: { additionalProperties?: boolean; properties?: Record<string, unknown> } }> }>("tools/list");
     const names = listed.tools.map((tool) => tool.name);
     expect(new Set(names).size).toBe(names.length);
-    expect(names).toEqual(expect.arrayContaining([
+        expect(names).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
       "selectOperatorKey",
       "confirmOperatorProceed",
       "getGrowthMission",
-      "getWorkflowStatus",
       "get_performance_learning",
       "get_content_focus",
-            "get_manifest_review_batch",
-            "prepare_manifest_autonomous_cycle",
+      "get_manifest_intelligence_foundation",
+      "get_manifest_cycle_receipt",
+      "get_manifest_cycle_analysis_page",
+      "commit_manifest_cycle_strategy",
+      "prepare_manifest_autonomous_cycle",
       "persist_manifest_autonomous_post",
-      "review_manifest_scheduled_post",
       "create_source_card",
       "create_generation_run",
-      "schedule_approved_draft",
       "getScheduledPostSchedulerState",
       "getRepoStatus",
       "readRepoFile",
@@ -3683,6 +3683,13 @@ describe("operator mode MCP endpoint", () => {
     ]));
     expect(names).not.toEqual(expect.arrayContaining([
       "executeLensicallyIntent",
+      "getWorkflowStatus",
+      "get_manifest_review_batch",
+      "review_manifest_scheduled_post",
+      "approve_draft",
+      "reject_draft",
+      "schedule_approved_draft",
+      "save_strategy_memory",
       "listMcpTools",
       "readMcpToolDefinition",
       "recordHardeningIncident",
@@ -3690,13 +3697,9 @@ describe("operator mode MCP endpoint", () => {
       "recordOpsMemory",
       "listOpsMemory",
     ]));
-        expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
+    expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
-        const saveStrategyMemoryTool = listed.tools.find((tool) => tool.name === "save_strategy_memory");
-    const saveStrategyMemoryKind = saveStrategyMemoryTool?.inputSchema?.properties?.kind as { enum?: string[] } | undefined;
-    expect(saveStrategyMemoryKind?.enum).toEqual(expect.arrayContaining(["approved_rule", "voice_rule", "rejection_feedback"]));
-    expect(saveStrategyMemoryKind?.enum).not.toContain("generation_rule");
-                const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
+    const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
     const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
     expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");
     expect(autonomousPrepareTool?.description).toContain("no failure may be reported without this tool's returned result");
