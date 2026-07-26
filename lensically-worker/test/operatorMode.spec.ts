@@ -3680,7 +3680,8 @@ describe("operator mode MCP endpoint", () => {
     expect(new Set(names).size).toBe(names.length);
         expect(names).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
-      "getEngineeringContinuation",
+            "getEngineeringContinuation",
+      "getDatabaseSchemaState",
       "selectOperatorKey",
       "confirmOperatorProceed",
       "getGrowthMission",
@@ -3719,7 +3720,10 @@ describe("operator mode MCP endpoint", () => {
     ]));
     expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
         expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
-    const engineeringContinuationTool = listed.tools.find((tool) => tool.name === "getEngineeringContinuation");
+        const engineeringContinuationTool = listed.tools.find((tool) => tool.name === "getEngineeringContinuation");
+    const databaseSchemaTool = listed.tools.find((tool) => tool.name === "getDatabaseSchemaState");
+    expect(databaseSchemaTool?.description).toContain("SQLite schema objects");
+    expect(databaseSchemaTool?.inputSchema?.properties?.limit).toBeTruthy();
     expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
     expect(engineeringContinuationTool?.inputSchema?.properties).toEqual({});
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
@@ -4951,9 +4955,10 @@ describe("operator mode MCP endpoint", () => {
     expect(deployPagesProjectTool.tool?.inputSchema?.properties?.directory?.default).toBe("site");
     expect(deployPagesProjectTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(80);
 
-                expect(toolNames).toEqual(expect.arrayContaining([
+                                expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
       "getEngineeringContinuation",
+      "getDatabaseSchemaState",
       "engineeringPrecheck",
       "getEngineeringAccessState",
       "listRepoFiles",
@@ -5021,9 +5026,10 @@ describe("operator mode MCP endpoint", () => {
       "listImplementationBacklogItems",
             "markImplementationBacklogItemResolved",
     ]));
-                for (const name of [
+                                for (const name of [
       "getOperatorStartupContext",
       "getEngineeringContinuation",
+      "getDatabaseSchemaState",
       "engineeringPrecheck",
       "getEngineeringAccessState",
       "listRepoFiles",
@@ -5587,8 +5593,8 @@ describe("operator mode MCP endpoint", () => {
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 110,
-                        total_read_only_capabilities: 45,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 111,
+                        total_read_only_capabilities: 46,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
@@ -5597,9 +5603,9 @@ describe("operator mode MCP endpoint", () => {
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(110);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(111);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
-                                    read_only: 45,
+                                    read_only: 46,
                                                                                                 mutation: 65,
       mutation_without_required_inputs: 0,
     });
@@ -5612,6 +5618,23 @@ describe("operator mode MCP endpoint", () => {
     ]);
 
       }, 30000);
+
+    it("reads the bounded database schema authority state without mutation", async () => {
+    await operatorTool("getOperatorStartupContext");
+    const result = await operatorTool<{
+      ok: boolean;
+      authority: string;
+      total: number;
+      returned_count: number;
+      objects: Array<{ type: string; name: string; sql?: string | null }>;
+    }>("getDatabaseSchemaState", { object_type: "table", limit: 10, include_sql: true });
+    expect(result.ok).toBe(true);
+    expect(result.authority).toBe("live_d1_sqlite_master");
+    expect(result.total).toBeGreaterThan(0);
+    expect(result.returned_count).toBeGreaterThan(0);
+    expect(result.objects.every((item) => item.type === "table" && typeof item.name === "string")).toBe(true);
+    expect(result.objects.some((item) => typeof item.sql === "string")).toBe(true);
+  }, 30000);
 
   it("executes all bounded Execution Kernel read segments without failures", async () => {
     const readSegments = [
@@ -5640,7 +5663,7 @@ describe("operator mode MCP endpoint", () => {
         JSON.stringify(result.structuredContent.campaign.live_reads.failures),
       ).toBe(0);
     }
-        expect(eligibleReads).toBe(43);
+        expect(eligibleReads).toBe(44);
     expect(failedReads).toBe(0);
   }, 90000);
 

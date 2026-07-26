@@ -565,7 +565,22 @@ describe("System Directory foundation", () => {
     }));
   });
 
-    it("routes fresh-chat engineering continuation directly to the canonical handoff", () => {
+      it("routes database schema inspection to the bounded live authority", () => {
+    expect(resolveLensicallySystemDirectory("Audit the live D1 database schema and migration state.")).toMatchObject({
+      entry_id: "engineering.database_schema",
+      route_intent: "get database schema state",
+    });
+    expect(LENSICALLY_CAPABILITY_LIFECYCLE.declarations).toContainEqual(expect.objectContaining({
+      capability_id: "engineering.read_database_schema",
+      directory_entry_id: "engineering.database_schema",
+      canonical_handler: "getDatabaseSchemaState",
+      implementation_mode: "new_handler",
+      release_scope: "operator-engineering",
+      compatibility_bridge: false,
+    }));
+  });
+
+  it("routes fresh-chat engineering continuation directly to the canonical handoff", () => {
     expect(resolveLensicallySystemDirectory("Continue the Worker monolith refactor from the durable continuation file.")).toMatchObject({
       entry_id: "engineering.continuation",
       route_intent: "get engineering continuation",
