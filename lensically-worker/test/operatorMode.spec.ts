@@ -602,8 +602,7 @@ async function resetTables(): Promise<void> {
   (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_ID: string }).LENSICALLY_MCP_OAUTH_CLIENT_ID = "lensically-operator-mode";
   delete (env as unknown as { LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string }).LENSICALLY_MCP_OAUTH_CLIENT_SECRET;
     for (const table of [
-    "operator_mcp_sessions",
-    "operator_mcp_admin_errors",
+        "operator_mcp_admin_errors",
     "operator_mcp_deployments",
     "operator_mcp_backlog_items",
     "operator_repo_write_sessions",
@@ -613,13 +612,8 @@ async function resetTables(): Promise<void> {
     "operator_execution_map_attempts",
     "operator_execution_map_incidents",
     "operator_execution_map_entries",
-    "operator_decision_execution_events",
+        "operator_decision_execution_events",
     "operator_decision_proposals",
-    "operator_growth_mission_revisions",
-    "operator_growth_missions",
-    "operator_autonomy_profiles",
-    "operator_operation_receipts",
-    "operator_continuity_refs",
         "operator_ops_memory",
     "operator_mcp_tool_overrides",
                                 "operator_operational_incidents",
@@ -634,7 +628,13 @@ async function resetTables(): Promise<void> {
     ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
-            await env.DB.prepare("DELETE FROM operator_gate_results").run();
+              await env.DB.prepare("DELETE FROM operator_growth_mission_revisions").run();
+  await env.DB.prepare("DELETE FROM operator_growth_missions").run();
+  await env.DB.prepare("DELETE FROM operator_autonomy_profiles").run();
+  await env.DB.prepare("DELETE FROM operator_operation_receipts").run();
+  await env.DB.prepare("DELETE FROM operator_continuity_refs").run();
+  await env.DB.prepare("DELETE FROM operator_mcp_sessions").run();
+  await env.DB.prepare("DELETE FROM operator_gate_results").run();
   await env.DB.prepare("DELETE FROM operator_content_inventory").run();
   await env.DB.prepare("DELETE FROM operator_gates").run();
   await env.DB.prepare("DELETE FROM operator_workflow_requirements").run();

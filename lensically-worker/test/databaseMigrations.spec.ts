@@ -111,9 +111,37 @@ const requiredColumns: Record<string, string[]> = {
     "opening_phrase", "realm_entrance_key", "hook_style", "lane_key",
     "source_card_id", "status", "used_at", "metadata_json", "created_at",
   ],
-  operator_workflow_requirements: [
+    operator_workflow_requirements: [
     "id", "brand_key", "stage", "required_sections_json", "completion_rule",
     "enforcement_type", "active", "version", "created_at", "updated_at",
+  ],
+  operator_mcp_sessions: [
+    "id", "selected_brand_key", "proceeded_at", "created_at", "updated_at",
+    "expires_at",
+  ],
+  operator_continuity_refs: [
+    "id", "kind", "brand_key", "workflow_session_id", "continuation_choice",
+    "payload_json", "expires_at", "created_at",
+  ],
+  operator_operation_receipts: [
+    "idempotency_key", "brand_key", "workflow_session_id", "operation_type",
+    "tool_name", "request_fingerprint", "status", "result_json", "created_at",
+    "updated_at",
+  ],
+  operator_growth_missions: [
+    "brand_key", "contract_version", "version", "status", "execution_mode",
+    "mission_json", "diagnostic_json", "owner_response", "change_summary",
+    "approved_at", "last_diagnostic_at", "created_at", "updated_at",
+  ],
+  operator_growth_mission_revisions: [
+    "id", "brand_key", "mission_version", "status", "execution_mode",
+    "mission_json", "diagnostic_json", "owner_response", "change_summary",
+    "created_at",
+  ],
+  operator_autonomy_profiles: [
+    "brand_key", "mode", "objective", "model_role", "owner_role",
+    "approval_policy", "operating_constraints_json", "active", "version",
+    "created_at", "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -219,7 +247,11 @@ const expectedObjects = [
   "idx_operator_gates_lookup",
   "idx_operator_gate_results_draft",
   "idx_operator_content_inventory_brand_used",
-  "idx_operator_workflow_requirements_scope",
+    "idx_operator_workflow_requirements_scope",
+  "idx_operator_mcp_sessions_expires",
+  "idx_operator_continuity_refs_scope",
+  "idx_operator_operation_receipts_scope",
+  "idx_operator_growth_mission_revisions_brand",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
