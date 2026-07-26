@@ -77,8 +77,9 @@ import {
   isOperatorPublicDirectToolName,
 } from "./operatorMcpToolDirectory";
 import {
-  OPERATOR_MCP_ENGINEERING_TOOL_NAMES as EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
-  OPERATOR_MCP_ENGINEERING_TOOLS as EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOLS,
+  OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
+  OPERATOR_MCP_ENGINEERING_TOOLS,
+  type OperatorMcpEngineeringToolName,
 } from "./operatorMcpEngineeringRegistry";
 
 
@@ -17305,57 +17306,7 @@ const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
 
 type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
-const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
-  "getOperatorStartupContext",
-    "getEngineeringContinuation",
-  "getDatabaseSchemaState",
-  "executeLensicallyIntent",
-  "engineeringPrecheck",
-    "getEngineeringAccessState",
-  "recordHardeningIncident",
-  "getHardeningStatus",
-  "advanceHardeningIncident",
-  "recordOperationalObservation",
-  "getOperatorWorkState",
-  "intakeOperatorWork",
-  "advanceOperatorWork",
-  "listRepoFiles",
-  "searchRepoFiles",
-  "readRepoFile",
-  "getRepoStatus",
-  "applyRepoTextPatch",
-  "applyRepoPatchSet",
-  "startRepoFileWrite",
-  "appendRepoFileChunk",
-  "commitRepoFileWrite",
-    "createRepoFile",
-        "createGitHubRepository",
-  "upsertGitHubRepositoryFile",
-  "createCloudflarePagesProject",
-  "deployCloudflarePagesProject",
-  "deleteRepoFile",
-  "listGitHubWorkflowRuns",
-  "runGitHubWorkflow",
-  "getGitHubWorkflowRun",
-    "verifyDeployedMcpVersion",
-  "listEngineeringAudit",
-] as const;
 
-type OperatorMcpEngineeringToolName = typeof OPERATOR_MCP_ENGINEERING_TOOL_NAMES[number];
-
-const REPO_PATH_SCHEMA = {
-  type: "string",
-  description: "Repository-relative path. Keep narrow, for example lensically-worker/src/index.ts.",
-};
-
-const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
-    
-    
-  
-    
-  
-];
-void OPERATOR_MCP_ENGINEERING_TOOLS;
 
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     {
@@ -18583,7 +18534,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
 
 
 const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
-const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
+const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
 
 function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
   return OPERATOR_MCP_ADMIN_TOOL_NAME_SET.has(value);
@@ -18637,7 +18588,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["skip_manifest_review_source", 16],
   ]);
     return buildOperatorMcpToolDefinitions({
-        engineeringTools: EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOLS,
+            engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
     adminTools: OPERATOR_MCP_ADMIN_TOOLS,
     accountTools: OPERATOR_MCP_TOOLS,
     includeScopedWrappers,
