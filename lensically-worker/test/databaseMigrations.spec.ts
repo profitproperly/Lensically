@@ -418,7 +418,10 @@ describe("canonical database migrations", () => {
         app_user_id, threads_user_id, connection_active, is_active, created_at
       ) VALUES ('legacy-owner', 'second-threads', 1, 0, 2)`,
     ).run();
-    expect(await countWhere.call({ DB: db }, "SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = 'legacy-owner'")).toBe(2);
+        const linkedAccountCount = await db.prepare(
+      "SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = 'legacy-owner'",
+    ).first<CountRow>();
+    expect(Number(linkedAccountCount?.total ?? 0)).toBe(2);
 
     await expect(
       db.prepare(
