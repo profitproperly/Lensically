@@ -8,7 +8,8 @@ Complete the audited staged cleanup and modularization of `lensically-worker/src
 
 ## Current production state
 
-- Production and repository head: `a2e5a163dfb864923aa9ac3072154ed162ed5ed3`
+- Deployed production head: `a2e5a163dfb864923aa9ac3072154ed162ed5ed3`
+- The repository branch may be ahead through documentation-only continuation commits; always reconcile with `getRepoStatus` before implementation.
 - Stage 3 release workflow: `30194883392`
 - Final Stage 3 eight-shard validation: `30194807934`
 - No temporary migration workflow, marker, or write permission remains.
