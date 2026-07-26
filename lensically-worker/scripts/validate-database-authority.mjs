@@ -178,8 +178,11 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     if (!migrationTests.includes("adopts the live measurement schema without losing caches, archive history, or learning metadata")) {
     errors.push("measurement_storage_upgrade_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live generation schema without losing adaptation, gate, or preflight lineage")) {
+    if (!migrationTests.includes("adopts the live generation schema without losing adaptation, gate, or preflight lineage")) {
     errors.push("generation_lineage_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live source lineage schema without losing draw, claim, exclusion, or version state")) {
+    errors.push("source_lineage_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");

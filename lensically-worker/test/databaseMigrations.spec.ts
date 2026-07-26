@@ -9,8 +9,9 @@ const testEnv = env as typeof env & {
     TEST_MIGRATIONS: TestMigrationBinding;
     UPGRADE_DB: D1Database;
     IDENTITY_UPGRADE_DB: D1Database;
-  MEASUREMENT_UPGRADE_DB: D1Database;
+    MEASUREMENT_UPGRADE_DB: D1Database;
   GENERATION_UPGRADE_DB: D1Database;
+  SOURCE_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -1039,6 +1040,283 @@ describe("canonical database migrations", () => {
     expect(preflight).toMatchObject({
       sections_json: '{"sources":{"complete":true}}',
       manifest_json: '{"manifest":"preserved"}',
+    });
+  });
+
+    it("adopts the live source lineage schema without losing draw, claim, exclusion, or version state", async () => {
+    const db = testEnv.SOURCE_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_source_selection_batches (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        workflow_session_id TEXT NOT NULL,
+        selection_method TEXT NOT NULL,
+        eligibility_min_likes INTEGER NOT NULL,
+        qualified_pool_count INTEGER NOT NULL,
+        requested_count INTEGER NOT NULL,
+        selected_count INTEGER NOT NULL,
+        selected_at TEXT NOT NULL,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        production_date TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        retired_at TEXT,
+        retirement_reason TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_source_selections (
+        id TEXT PRIMARY KEY,
+        batch_id TEXT NOT NULL,
+        brand_key TEXT NOT NULL,
+        workflow_session_id TEXT NOT NULL,
+        draw_order INTEGER NOT NULL,
+        source_identity_key TEXT NOT NULL,
+        source_type TEXT NOT NULL,
+        internal_source_id TEXT NOT NULL,
+        threads_post_id TEXT,
+        canonical_source_url TEXT,
+        post_text TEXT NOT NULL,
+        original_posted_at TEXT,
+        metrics_snapshot_json TEXT NOT NULL,
+        source_snapshot_json TEXT NOT NULL,
+        source_card_id TEXT,
+        selected_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        disposition TEXT NOT NULL DEFAULT 'pending',
+        disposition_reason TEXT,
+        disposition_at TEXT,
+        workflow_sequence INTEGER
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_daily_source_claims (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        production_date TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        source_identity_key TEXT NOT NULL,
+        source_type TEXT NOT NULL,
+        internal_source_id TEXT NOT NULL,
+        source_batch_id TEXT,
+        source_selection_id TEXT,
+        workflow_session_id TEXT,
+        review_batch_id TEXT,
+        review_item_number INTEGER,
+        source_card_id TEXT,
+        generation_run_id TEXT,
+        draft_id TEXT,
+        scheduled_post_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'claimed',
+        disposition_reason TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_source_exclusions (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        source_identity_key TEXT NOT NULL,
+        source_type TEXT NOT NULL,
+        internal_source_id TEXT NOT NULL,
+        reason TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_source_card_families (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        source_identity_key TEXT NOT NULL,
+        source_type TEXT NOT NULL,
+        internal_source_id TEXT NOT NULL,
+        threads_post_id TEXT,
+        canonical_source_url TEXT,
+        current_source_card_id TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_source_cards (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        workflow_session_id TEXT,
+        sequence_label TEXT NOT NULL,
+        lane_key TEXT,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        primary_source_json TEXT NOT NULL,
+        secondary_sources_json TEXT,
+        anti_sources_json TEXT,
+        metrics_snapshot_json TEXT,
+        source_mechanism TEXT NOT NULL,
+        required_product TEXT NOT NULL,
+        forbidden_surfaces_json TEXT NOT NULL,
+        danger_surfaces_json TEXT,
+        current_inventory_constraints_json TEXT,
+        pass_conditions_json TEXT NOT NULL,
+        fail_conditions_json TEXT NOT NULL,
+        recommended_direction TEXT,
+        context_admission_id TEXT,
+        created_by TEXT,
+        family_id TEXT,
+        source_selection_id TEXT,
+        version_number INTEGER NOT NULL DEFAULT 1,
+        is_current INTEGER NOT NULL DEFAULT 1,
+        supersedes_source_card_id TEXT,
+        version_reason TEXT,
+        transformation_contract_json TEXT,
+        locked_at TEXT,
+        invalidated_at TEXT,
+        invalidation_reason TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_source_selection_batches (
+        id, brand_key, workflow_session_id, selection_method,
+        eligibility_min_likes, qualified_pool_count, requested_count,
+        selected_count, selected_at, production_date, status, retired_at,
+        retirement_reason
+      ) VALUES (
+        'live-source-batch', 'manifest_mental', 'live-workflow', 'random_draw',
+        1000, 50, 4, 1, '2099-04-01T12:00:00.000Z', '2099-04-01',
+        'retired', '2099-04-01T13:00:00.000Z', 'live_retirement'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_source_selections (
+        id, batch_id, brand_key, workflow_session_id, draw_order,
+        source_identity_key, source_type, internal_source_id, post_text,
+        metrics_snapshot_json, source_snapshot_json, source_card_id, selected_at,
+        disposition, disposition_reason, disposition_at, workflow_sequence
+      ) VALUES (
+        'live-source-selection', 'live-source-batch', 'manifest_mental',
+        'live-workflow', 1, 'saved_pattern:live', 'saved_pattern', 'live-pattern',
+        'Live source', '{"likes":5000}', '{"text":"Live source"}',
+        'live-source-card', '2099-04-01T12:00:00.000Z', 'accepted',
+        'live_selection', '2099-04-01T12:05:00.000Z', 4
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_source_exclusions (
+        id, brand_key, source_identity_key, source_type, internal_source_id,
+        reason, active
+      ) VALUES (
+        'live-source-exclusion', 'manifest_mental', 'saved_pattern:excluded-live',
+        'saved_pattern', 'excluded-live', 'permanent', 1
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_source_card_families (
+        id, brand_key, source_identity_key, source_type, internal_source_id,
+        current_source_card_id, status
+      ) VALUES (
+        'live-source-family', 'manifest_mental', 'saved_pattern:live',
+        'saved_pattern', 'live-pattern', 'live-source-card', 'active'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_source_cards (
+        id, brand_key, sequence_label, title, status, primary_source_json,
+        source_mechanism, required_product, forbidden_surfaces_json,
+        pass_conditions_json, fail_conditions_json, family_id,
+        source_selection_id, version_number, is_current,
+        supersedes_source_card_id, version_reason, transformation_contract_json,
+        locked_at
+      ) VALUES (
+        'live-source-card', 'manifest_mental', 'live-1', 'Live source card',
+        'locked', '{"text":"Live source"}', 'direct validation',
+        'recognition', '[]', '["preserve payoff"]', '["no new premise"]',
+        'live-source-family', 'live-source-selection', 5, 1,
+        'live-prior-card', 'live_version_reason',
+        '{"must_preserve_function":["payoff"]}', '2099-04-01T12:10:00.000Z'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_daily_source_claims (
+        id, brand_key, production_date, timezone, source_identity_key,
+        source_type, internal_source_id, source_batch_id, source_selection_id,
+        workflow_session_id, source_card_id, generation_run_id, draft_id,
+        scheduled_post_id, status, disposition_reason
+      ) VALUES (
+        'live-source-claim', 'manifest_mental', '2099-04-01',
+        'America/New_York', 'saved_pattern:live', 'saved_pattern',
+        'live-pattern', 'live-source-batch', 'live-source-selection',
+        'live-workflow', 'live-source-card', 'live-run', 'live-draft', 42,
+        'scheduled', 'live_lineage'
+      )`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_source_upgrade_migrations",
+    );
+
+    const batch = await db.prepare(
+      `SELECT production_date, status, retired_at, retirement_reason
+       FROM operator_source_selection_batches WHERE id = 'live-source-batch'`,
+    ).first<Record<string, unknown>>();
+    const selection = await db.prepare(
+      `SELECT disposition, disposition_reason, disposition_at, workflow_sequence
+       FROM operator_source_selections WHERE id = 'live-source-selection'`,
+    ).first<Record<string, unknown>>();
+    const claim = await db.prepare(
+      `SELECT generation_run_id, draft_id, scheduled_post_id, status
+       FROM operator_daily_source_claims WHERE id = 'live-source-claim'`,
+    ).first<Record<string, unknown>>();
+    const exclusion = await db.prepare(
+      `SELECT reason, active FROM operator_source_exclusions
+       WHERE id = 'live-source-exclusion'`,
+    ).first<Record<string, unknown>>();
+    const family = await db.prepare(
+      `SELECT current_source_card_id, status FROM operator_source_card_families
+       WHERE id = 'live-source-family'`,
+    ).first<Record<string, unknown>>();
+    const card = await db.prepare(
+      `SELECT version_number, is_current, supersedes_source_card_id,
+              version_reason, transformation_contract_json, locked_at
+       FROM operator_source_cards WHERE id = 'live-source-card'`,
+    ).first<Record<string, unknown>>();
+
+    expect(batch).toMatchObject({
+      production_date: "2099-04-01",
+      status: "retired",
+      retired_at: "2099-04-01T13:00:00.000Z",
+      retirement_reason: "live_retirement",
+    });
+    expect(selection).toMatchObject({
+      disposition: "accepted",
+      disposition_reason: "live_selection",
+      disposition_at: "2099-04-01T12:05:00.000Z",
+      workflow_sequence: 4,
+    });
+    expect(claim).toMatchObject({
+      generation_run_id: "live-run",
+      draft_id: "live-draft",
+      scheduled_post_id: 42,
+      status: "scheduled",
+    });
+    expect(exclusion).toMatchObject({ reason: "permanent", active: 1 });
+    expect(family).toMatchObject({
+      current_source_card_id: "live-source-card",
+      status: "active",
+    });
+    expect(card).toMatchObject({
+      version_number: 5,
+      is_current: 1,
+      supersedes_source_card_id: "live-prior-card",
+      version_reason: "live_version_reason",
+      transformation_contract_json: '{"must_preserve_function":["payoff"]}',
+      locked_at: "2099-04-01T12:10:00.000Z",
     });
   });
 
