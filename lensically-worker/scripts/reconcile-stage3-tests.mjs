@@ -202,16 +202,20 @@ tests = replaceExact(
   `      saved_pattern_id: savedPatternId,`,
   "remove retired lineage workflow input",
 );
-tests = replaceExact(
-  tests,
-  `    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });`,
+const retiredShownFixture = `    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });`;
+const retiredShownFixtureCount = tests.split(retiredShownFixture).length - 1;
+if (retiredShownFixtureCount !== 2) {
+  throw new Error(`replace retired draft-shown transition fixtures: expected 2 matches, found ${retiredShownFixtureCount}`);
+}
+tests = tests.replaceAll(
+  retiredShownFixture,
   `    await env.DB.prepare(
       \`UPDATE gpt_generation_drafts
        SET status = 'shown', showable = 1, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND account_id = ?\`,
     ).bind(shown.draft_id, BRAND_KEY).run();`,
-  "replace retired draft-shown transition fixture",
 );
+changes.push("replace retired draft-shown transition fixtures");
 tests = replaceExact(
   tests,
   `      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {`,
