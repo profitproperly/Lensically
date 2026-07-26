@@ -7,8 +7,9 @@ type CountRow = { total: number | string };
 
 const testEnv = env as typeof env & {
     TEST_MIGRATIONS: TestMigrationBinding;
-  UPGRADE_DB: D1Database;
+    UPGRADE_DB: D1Database;
   IDENTITY_UPGRADE_DB: D1Database;
+  MEASUREMENT_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -523,6 +524,152 @@ describe("canonical database migrations", () => {
       "SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = 'legacy-owner'",
     ).first<CountRow>();
     expect(Number(remainingLinks?.total ?? 0)).toBe(0);
+  });
+
+    it("adopts the live measurement schema without losing caches, archive history, or learning metadata", async () => {
+    const db = testEnv.MEASUREMENT_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE threads_user_insights_cache (
+        threads_user_id TEXT PRIMARY KEY,
+        insights_json TEXT NOT NULL,
+        last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE threads_post_insights_cache (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT PRIMARY KEY,
+        post_text TEXT,
+        post_timestamp TEXT,
+        post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        engagement_total INTEGER NOT NULL DEFAULT 0
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE threads_posts_cache_state (
+        threads_user_id TEXT PRIMARY KEY,
+        next_cursor TEXT,
+        has_more INTEGER NOT NULL DEFAULT 0,
+        last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE threads_posts_archive (
+        threads_user_id TEXT NOT NULL,
+        post_id TEXT NOT NULL,
+        post_text TEXT,
+        post_timestamp TEXT,
+        post_permalink TEXT,
+        post_username TEXT,
+        profile_picture_url TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        likes INTEGER NOT NULL DEFAULT 0,
+        replies INTEGER NOT NULL DEFAULT 0,
+        reposts INTEGER NOT NULL DEFAULT 0,
+        quotes INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        engagement_total INTEGER NOT NULL DEFAULT 0,
+        source_rank INTEGER NOT NULL DEFAULT 0,
+        first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (threads_user_id, post_id)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_post_metric_snapshots (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        published_post_id TEXT NOT NULL,
+        scheduled_post_id INTEGER,
+        draft_id TEXT,
+        generation_run_id TEXT,
+        source_card_id TEXT,
+        source_selection_id TEXT,
+        metrics_json TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        valid_for_learning INTEGER NOT NULL DEFAULT 1,
+        anomaly_reason TEXT,
+        collection_source TEXT NOT NULL DEFAULT 'operator',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO threads_user_insights_cache (threads_user_id, insights_json)
+       VALUES ('live-threads', '{"followers_count":777}')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO threads_post_insights_cache (
+        threads_user_id, post_id, post_text, likes, engagement_total
+      ) VALUES ('live-threads', 'live-cached-post', 'Live cached post', 300, 333)`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO threads_posts_cache_state (threads_user_id, next_cursor, has_more)
+       VALUES ('live-threads', 'live-cursor', 1)`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, likes, engagement_total, source_rank
+      ) VALUES ('live-threads', 'live-archived-post', 'Live archived post', 400, 444, 2)`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_post_metric_snapshots (
+        id, brand_key, published_post_id, generation_run_id, metrics_json,
+        captured_at, valid_for_learning, anomaly_reason, collection_source
+      ) VALUES (
+        'live-metric', 'manifest_mental', 'live-archived-post', 'live-run',
+        '{"likes":400}', '2099-03-01T12:00:00.000Z', 0,
+        'live_anomaly', 'insights_refresh'
+      )`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_measurement_upgrade_migrations",
+    );
+
+    const userInsights = await db.prepare(
+      "SELECT insights_json FROM threads_user_insights_cache WHERE threads_user_id = 'live-threads'",
+    ).first<{ insights_json: string }>();
+    const cachedPost = await db.prepare(
+      "SELECT likes, engagement_total FROM threads_post_insights_cache WHERE post_id = 'live-cached-post'",
+    ).first<{ likes: number; engagement_total: number }>();
+    const cacheState = await db.prepare(
+      "SELECT next_cursor, has_more FROM threads_posts_cache_state WHERE threads_user_id = 'live-threads'",
+    ).first<{ next_cursor: string; has_more: number }>();
+    const archivedPost = await db.prepare(
+      "SELECT likes, engagement_total, source_rank FROM threads_posts_archive WHERE post_id = 'live-archived-post'",
+    ).first<{ likes: number; engagement_total: number; source_rank: number }>();
+    const metric = await db.prepare(
+      `SELECT generation_run_id, valid_for_learning, anomaly_reason, collection_source
+       FROM operator_post_metric_snapshots WHERE id = 'live-metric'`,
+    ).first<Record<string, unknown>>();
+
+    expect(userInsights?.insights_json).toBe('{"followers_count":777}');
+    expect(cachedPost).toMatchObject({ likes: 300, engagement_total: 333 });
+    expect(cacheState).toMatchObject({ next_cursor: "live-cursor", has_more: 1 });
+    expect(archivedPost).toMatchObject({ likes: 400, engagement_total: 444, source_rank: 2 });
+    expect(metric).toMatchObject({
+      generation_run_id: "live-run",
+      valid_for_learning: 0,
+      anomaly_reason: "live_anomaly",
+      collection_source: "insights_refresh",
+    });
   });
 
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {

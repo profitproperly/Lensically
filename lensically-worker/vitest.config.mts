@@ -18,7 +18,8 @@ export default defineWorkersConfig({
           bindings: { TEST_MIGRATIONS: migrations },
                                         d1Databases: {
             UPGRADE_DB: { id: "lensically-upgrade-test" },
-            IDENTITY_UPGRADE_DB: { id: "lensically-identity-upgrade-test" },
+                        IDENTITY_UPGRADE_DB: { id: "lensically-identity-upgrade-test" },
+            MEASUREMENT_UPGRADE_DB: { id: "lensically-measurement-upgrade-test" },
           },
         },
         isolatedStorage: false,
