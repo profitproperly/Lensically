@@ -17,17 +17,20 @@
     "_rebuild"
   ],
     "extracted_tables": [
+        "app_threads_accounts",
     "batch_schedule_presets",
     "external_patterns",
     "gpt_strategy_memory",
+    "meta_deletion_requests",
     "scheduled_post_deletions",
     "scheduled_posts",
-        "threads_follower_snapshots",
-    "threads_publish_idempotency"
-  ],
-  "migration_dependency_tables": [
+    "threads_accounts",
+    "threads_follower_snapshots",
+    "threads_profile_cache",
+    "threads_publish_idempotency",
     "users"
   ],
+  "migration_dependency_tables": [],
     "declared_duplicate_owners": {},
     "retired_tables": [
     "operator_workflow_sessions",

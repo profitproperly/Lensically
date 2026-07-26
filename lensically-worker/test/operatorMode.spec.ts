@@ -647,6 +647,10 @@ async function resetTables(): Promise<void> {
     ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
+    await env.DB.prepare("DELETE FROM threads_profile_cache").run();
+  await env.DB.prepare("DELETE FROM app_threads_accounts").run();
+  await env.DB.prepare("DELETE FROM threads_accounts").run();
+  await env.DB.prepare("DELETE FROM meta_deletion_requests").run();
   await env.DB.prepare("DELETE FROM scheduled_post_deletions").run();
   await env.DB.prepare("DELETE FROM threads_publish_idempotency").run();
   await env.DB.prepare("DELETE FROM batch_schedule_presets").run();

@@ -25,10 +25,25 @@ const requiredColumns: Record<string, string[]> = {
     "id", "account_id", "threads_user_id", "kind", "title", "body",
     "metadata_json", "created_at", "updated_at",
   ],
-  users: [
+    users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
     "threads_username", "access_token", "token_expires_at", "is_admin",
     "connection_active", "timezone", "clock_format", "created_at",
+  ],
+  app_threads_accounts: [
+    "app_user_id", "threads_user_id", "connection_active", "is_active",
+    "tombstone_expires_at", "created_at",
+  ],
+  threads_accounts: [
+    "threads_user_id", "access_token", "expires_at", "created_at",
+    "configured_account_id",
+  ],
+  threads_profile_cache: [
+    "threads_user_id", "username", "name", "threads_biography", "is_verified",
+    "threads_profile_picture_url", "last_refreshed_at", "created_at",
+  ],
+  meta_deletion_requests: [
+    "confirmation_code", "platform_user_id", "status", "requested_at", "completed_at",
   ],
   scheduled_posts: [
     "id", "user_id", "threads_user_id", "post_text", "spoiler_all_text",
@@ -80,7 +95,15 @@ const expectedObjects = [
   "trg_batch_schedule_presets_user_cleanup",
   "idx_threads_publish_idempotency_created_at",
   "trg_threads_publish_idempotency_user_exists_insert",
-  "trg_threads_publish_idempotency_user_cleanup",
+    "trg_threads_publish_idempotency_user_cleanup",
+  "idx_app_threads_accounts_app_user_active",
+  "idx_app_threads_accounts_threads_user_id",
+  "idx_app_threads_accounts_one_active_per_user",
+  "trg_app_threads_accounts_user_exists_insert",
+  "trg_app_threads_accounts_user_exists_update",
+  "trg_app_threads_accounts_user_cleanup",
+  "idx_threads_accounts_configured_account_id",
+  "idx_threads_profile_cache_last_refreshed_at",
 ];
 
 async function countWhere(sql: string, ...bindings: unknown[]): Promise<number> {
