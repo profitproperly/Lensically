@@ -22,7 +22,8 @@ on:
           - operator-tests
           - system-directory-tests
           - threads-publish-tests
-          - human-free-tests
+                    - human-free-tests
+          - architecture-baseline
           - worker-deploy
       release_id:
         description: Compact exact-SHA release identity
@@ -92,8 +93,9 @@ jobs:
         working-directory: lensically-worker
         run: |
           set -euo pipefail
-          npx tsc --noEmit
+                    npx tsc --noEmit
           node scripts/release-preflight.mjs --capability-lifecycle-only
+          node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
       - name: Run push smoke validation
         working-directory: lensically-worker
@@ -177,14 +179,24 @@ jobs:
             threads-publish-tests)
               npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
               ;;
-            human-free-tests)
+                        human-free-tests)
               npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+              ;;
+            architecture-baseline)
+              node scripts/worker-architecture-baseline.mjs --live | tee worker-architecture-baseline.json
               ;;
             *)
               echo "Unsupported fast-validation task: ${TASK}"
               exit 2
               ;;
-          esac
+                    esac
+
+      - name: Upload architecture baseline
+        if: inputs.task == 'architecture-baseline'
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-architecture-baseline-${{ inputs.release_sha || github.sha }}
+          path: lensically-worker/worker-architecture-baseline.json
 
   operator-test-shards:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests'

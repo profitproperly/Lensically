@@ -5,7 +5,8 @@
 	"scripts": {
 						"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
-		"start": "wrangler dev",
+				"start": "wrangler dev",
+		"architecture:baseline": "node scripts/worker-architecture-baseline.mjs",
 		"threads:token": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1",
 		"threads:token:vectrix": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1 -AccountSecretName THREADS_TOKEN_VECTRIX",
 		"test": "vitest",
