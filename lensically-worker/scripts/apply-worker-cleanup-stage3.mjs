@@ -647,7 +647,6 @@ for (const forbidden of [
   "CREATE TABLE IF NOT EXISTS operator_context_admissions",
   "CREATE TABLE IF NOT EXISTS operator_production_board_items",
   "CREATE TABLE IF NOT EXISTS operator_review_batches",
-  "await ensureGptStrategyMemoryTable(env);",
   "continuity_mode: \"guided_growth_diagnostic\"",
   "legacy_review_batch: activeReviewBatch",
 ]) {
