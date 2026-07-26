@@ -169,6 +169,9 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     if (!migrationTests.includes("reapplies the canonical migration ledger without losing existing data")) {
     errors.push("migration_idempotency_regression_missing");
   }
+    if (!migrationTests.includes("upgrades the legacy scheduled-deletion schema before backfilling new fields")) {
+    errors.push("existing_database_upgrade_regression_missing");
+  }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
   }

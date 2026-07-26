@@ -5,7 +5,10 @@ type TestMigrationBinding = Parameters<typeof applyD1Migrations>[1];
 type SchemaObjectRow = { name: string; type: string };
 type CountRow = { total: number | string };
 
-const testEnv = env as typeof env & { TEST_MIGRATIONS: TestMigrationBinding };
+const testEnv = env as typeof env & {
+  TEST_MIGRATIONS: TestMigrationBinding;
+  UPGRADE_DB: D1Database;
+};
 
 const requiredColumns: Record<string, string[]> = {
   external_patterns: [
@@ -179,6 +182,56 @@ describe("canonical database migrations", () => {
       countWhere("SELECT COUNT(*) AS total FROM threads_publish_idempotency WHERE request_hash = ?", requestHash),
     ]);
     expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
+  });
+
+    it("upgrades the legacy scheduled-deletion schema before backfilling new fields", async () => {
+    await testEnv.UPGRADE_DB.prepare(
+      `CREATE TABLE scheduled_post_deletions (
+        id TEXT PRIMARY KEY,
+        scheduled_post_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        post_text TEXT NOT NULL,
+        scheduled_time TEXT NOT NULL,
+        status_before TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        deleted_by TEXT NOT NULL,
+        deletion_source TEXT NOT NULL,
+        operation_id TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await testEnv.UPGRADE_DB.prepare(
+      `INSERT INTO scheduled_post_deletions (
+        id, scheduled_post_id, user_id, threads_user_id, post_text, scheduled_time,
+        status_before, reason, deleted_by, deletion_source
+      ) VALUES (
+        'legacy-deletion', 1, 'legacy-user', 'legacy-threads', 'Legacy fixture',
+        '2099-01-01T12:00:00.000Z', 'approved', 'Legacy reason', 'model', 'mcp'
+      )`,
+    ).run();
+
+    await applyD1Migrations(
+      testEnv.UPGRADE_DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_upgrade_migrations",
+    );
+
+    const columns = await testEnv.UPGRADE_DB.prepare(
+      "PRAGMA table_info(scheduled_post_deletions)",
+    ).all<{ name: string }>();
+    expect((columns.results ?? []).map((column) => column.name)).toEqual(
+      expect.arrayContaining(["reason_code", "learning_effect"]),
+    );
+    const upgraded = await testEnv.UPGRADE_DB.prepare(
+      `SELECT reason_code, learning_effect
+       FROM scheduled_post_deletions
+       WHERE id = 'legacy-deletion'`,
+    ).first<{ reason_code: string; learning_effect: string }>();
+    expect(upgraded).toEqual({
+      reason_code: "legacy_unclassified",
+      learning_effect: "unobserved",
+    });
   });
 
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {

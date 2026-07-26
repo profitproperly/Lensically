@@ -14,8 +14,9 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: {
+                miniflare: {
           bindings: { TEST_MIGRATIONS: migrations },
+          d1Databases: { UPGRADE_DB: "lensically-upgrade-test" },
         },
         isolatedStorage: false,
       },
