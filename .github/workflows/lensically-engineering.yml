@@ -68,10 +68,14 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: steps.push_worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
+
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
 
       - name: Restore web dependencies
         id: push_web_cache
@@ -133,10 +137,14 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: steps.worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
+
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
 
       - name: Restore web dependencies
         id: web_cache
@@ -226,10 +234,14 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: steps.operator_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
+
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
 
       - name: Verify lifecycle and run deterministic shard
         working-directory: lensically-worker
@@ -270,10 +282,14 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: steps.release_worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
+
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
 
       - name: Restore web dependencies
         id: release_web_cache
