@@ -8292,8 +8292,7 @@ async function retireLegacyHumanGuidanceState(env: Env): Promise<void> {
   ).bind(LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION).first<{ retirement_key?: string }>();
   if (completed?.retirement_key) return;
 
-  const statements = [
-    "DROP TABLE IF EXISTS gpt_strategy_memory",
+    const statements = [
     "DROP TABLE IF EXISTS operator_workflow_sessions",
     "DROP TABLE IF EXISTS operator_context_admissions",
     "DROP TABLE IF EXISTS operator_production_board_items",

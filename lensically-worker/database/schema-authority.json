@@ -15,8 +15,7 @@
     "_rebuild"
   ],
     "declared_duplicate_owners": {},
-  "retired_tables": [
-    "gpt_strategy_memory",
+    "retired_tables": [
     "operator_workflow_sessions",
     "operator_context_admissions",
     "operator_production_board_items",
@@ -28,9 +27,7 @@
     "operator_validation_plane_events",
     "operator_local_execution_enrollment_tokens"
   ],
-      "temporary_retired_table_recreations": [
-    "gpt_strategy_memory"
-  ],
+        "temporary_retired_table_recreations": [],
   "completion_requirements": [
     "No CREATE TABLE, ALTER TABLE, CREATE INDEX, CREATE TRIGGER, compatibility rebuild, or DROP TABLE remains in request preparation.",
     "Every active table has exactly one migration owner.",
