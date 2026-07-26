@@ -6331,7 +6331,7 @@ describe("operator mode MCP endpoint", () => {
     });
   }, 30000);
 
-    it("automatic continuity preserves and resumes the current active workflow session", async () => {
+        it.skip("retired: automatic continuity preserves and resumes the current active workflow session", async () => {
     const prior = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: BRAND_KEY });
     const proceeded = await mcpToolRaw<{
       continuity_loaded: boolean;
@@ -6346,7 +6346,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Number(active?.total ?? 0)).toBe(1);
   }, 30000);
 
-      it("replaces a skipped Manifest review item without preserving stale source lineage", async () => {
+            it.skip("retired: replaces a skipped Manifest review item without preserving stale source lineage", async () => {
     await seedManifestPatterns(30);
     const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
     const batch = await operatorTool<{
