@@ -11,8 +11,9 @@ const testEnv = env as typeof env & {
     IDENTITY_UPGRADE_DB: D1Database;
     MEASUREMENT_UPGRADE_DB: D1Database;
     GENERATION_UPGRADE_DB: D1Database;
-  SOURCE_UPGRADE_DB: D1Database;
+    SOURCE_UPGRADE_DB: D1Database;
   QUALITY_UPGRADE_DB: D1Database;
+  CONTINUITY_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -1687,6 +1688,387 @@ describe("canonical database migrations", () => {
           'duplicate-quality-requirement', NULL, 'draft', '[]',
           'duplicate', 'block'
         )`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
+    it("preserves operator continuity and autonomy records across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const brandKey = `continuity-${suffix}`;
+    const sessionId = `session-${suffix}`;
+    const continuityId = `continuity-ref-${suffix}`;
+    const receiptKey = `receipt-${suffix}`;
+    const revisionId = `mission-revision-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_mcp_sessions (
+        id, selected_brand_key, proceeded_at, expires_at
+      ) VALUES (?, ?, '2099-06-01T12:00:00.000Z', '2099-06-02T12:00:00.000Z')`,
+    ).bind(sessionId, brandKey).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_continuity_refs (
+        id, kind, brand_key, workflow_session_id, continuation_choice,
+        payload_json, expires_at
+      ) VALUES (?, 'workflow', ?, 'workflow-continuity', 'resume', ?, 4102444800)`,
+    ).bind(continuityId, brandKey, '{"checkpoint":"source_card"}').run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_operation_receipts (
+        idempotency_key, brand_key, workflow_session_id, operation_type,
+        tool_name, request_fingerprint, status, result_json
+      ) VALUES (?, ?, 'workflow-continuity', 'schedule', 'schedule_approved_draft',
+        'fingerprint-continuity', 'completed', ?)`,
+    ).bind(receiptKey, brandKey, '{"scheduled_post_id":42}').run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_growth_missions (
+        brand_key, contract_version, version, status, execution_mode,
+        mission_json, diagnostic_json, owner_response, change_summary,
+        approved_at, last_diagnostic_at
+      ) VALUES (?, 'growth-mission-v3', 7, 'approved', 'autonomous_operator',
+        ?, ?, 'approved by owner', 'continuity migration',
+        '2099-06-01T12:05:00.000Z', '2099-06-01T12:04:00.000Z')`,
+    ).bind(
+      brandKey,
+      '{"objective":"grow safely"}',
+      '{"status":"healthy"}',
+    ).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_growth_mission_revisions (
+        id, brand_key, mission_version, status, execution_mode,
+        mission_json, diagnostic_json, owner_response, change_summary
+      ) VALUES (?, ?, 6, 'revision_required', 'autonomous_operator',
+        ?, ?, 'revise scope', 'prior mission revision')`,
+    ).bind(
+      revisionId,
+      brandKey,
+      '{"objective":"prior objective"}',
+      '{"status":"needs_revision"}',
+    ).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_autonomy_profiles (
+        brand_key, mode, objective, model_role, owner_role, approval_policy,
+        operating_constraints_json, active, version
+      ) VALUES (?, 'full_auto', 'Operate the account', 'operator', 'owner',
+        'protected_only', ?, 1, 9)`,
+    ).bind(
+      brandKey,
+      '{"hourly_coverage_required":true,"protected_operations_owner_ratified":true}',
+    ).run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const session = await testEnv.DB.prepare(
+      `SELECT selected_brand_key, proceeded_at, expires_at
+       FROM operator_mcp_sessions WHERE id = ?`,
+    ).bind(sessionId).first<Record<string, unknown>>();
+    const continuity = await testEnv.DB.prepare(
+      `SELECT kind, workflow_session_id, continuation_choice, payload_json, expires_at
+       FROM operator_continuity_refs WHERE id = ?`,
+    ).bind(continuityId).first<Record<string, unknown>>();
+    const receipt = await testEnv.DB.prepare(
+      `SELECT operation_type, tool_name, request_fingerprint, status, result_json
+       FROM operator_operation_receipts WHERE idempotency_key = ?`,
+    ).bind(receiptKey).first<Record<string, unknown>>();
+    const mission = await testEnv.DB.prepare(
+      `SELECT contract_version, version, status, execution_mode, mission_json,
+              diagnostic_json, owner_response, change_summary, approved_at,
+              last_diagnostic_at
+       FROM operator_growth_missions WHERE brand_key = ?`,
+    ).bind(brandKey).first<Record<string, unknown>>();
+    const revision = await testEnv.DB.prepare(
+      `SELECT mission_version, status, mission_json, diagnostic_json,
+              owner_response, change_summary
+       FROM operator_growth_mission_revisions WHERE id = ?`,
+    ).bind(revisionId).first<Record<string, unknown>>();
+    const autonomy = await testEnv.DB.prepare(
+      `SELECT mode, objective, model_role, owner_role, approval_policy,
+              operating_constraints_json, active, version
+       FROM operator_autonomy_profiles WHERE brand_key = ?`,
+    ).bind(brandKey).first<Record<string, unknown>>();
+
+    expect(session).toMatchObject({
+      selected_brand_key: brandKey,
+      proceeded_at: "2099-06-01T12:00:00.000Z",
+      expires_at: "2099-06-02T12:00:00.000Z",
+    });
+    expect(continuity).toMatchObject({
+      kind: "workflow",
+      workflow_session_id: "workflow-continuity",
+      continuation_choice: "resume",
+      payload_json: '{"checkpoint":"source_card"}',
+      expires_at: 4102444800,
+    });
+    expect(receipt).toMatchObject({
+      operation_type: "schedule",
+      tool_name: "schedule_approved_draft",
+      request_fingerprint: "fingerprint-continuity",
+      status: "completed",
+      result_json: '{"scheduled_post_id":42}',
+    });
+    expect(mission).toMatchObject({
+      contract_version: "growth-mission-v3",
+      version: 7,
+      status: "approved",
+      execution_mode: "autonomous_operator",
+      mission_json: '{"objective":"grow safely"}',
+      diagnostic_json: '{"status":"healthy"}',
+      owner_response: "approved by owner",
+      change_summary: "continuity migration",
+      approved_at: "2099-06-01T12:05:00.000Z",
+      last_diagnostic_at: "2099-06-01T12:04:00.000Z",
+    });
+    expect(revision).toMatchObject({
+      mission_version: 6,
+      status: "revision_required",
+      mission_json: '{"objective":"prior objective"}',
+      diagnostic_json: '{"status":"needs_revision"}',
+      owner_response: "revise scope",
+      change_summary: "prior mission revision",
+    });
+    expect(autonomy).toMatchObject({
+      mode: "full_auto",
+      objective: "Operate the account",
+      model_role: "operator",
+      owner_role: "owner",
+      approval_policy: "protected_only",
+      operating_constraints_json: '{"hourly_coverage_required":true,"protected_operations_owner_ratified":true}',
+      active: 1,
+      version: 9,
+    });
+  });
+
+  it("adopts the live operator continuity schema without losing session, receipt, mission, revision, or autonomy state", async () => {
+    const db = testEnv.CONTINUITY_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_mcp_sessions (
+        id TEXT PRIMARY KEY,
+        selected_brand_key TEXT,
+        proceeded_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at TEXT NOT NULL
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_continuity_refs (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        brand_key TEXT NOT NULL,
+        workflow_session_id TEXT,
+        continuation_choice TEXT,
+        payload_json TEXT,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_operation_receipts (
+        idempotency_key TEXT PRIMARY KEY,
+        brand_key TEXT,
+        workflow_session_id TEXT,
+        operation_type TEXT NOT NULL,
+        tool_name TEXT NOT NULL,
+        request_fingerprint TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'started',
+        result_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_growth_missions (
+        brand_key TEXT PRIMARY KEY,
+        contract_version TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'discussion',
+        execution_mode TEXT NOT NULL DEFAULT 'autonomous_operator',
+        mission_json TEXT NOT NULL,
+        diagnostic_json TEXT NOT NULL DEFAULT '{}',
+        owner_response TEXT,
+        change_summary TEXT,
+        approved_at TEXT,
+        last_diagnostic_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_growth_mission_revisions (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        mission_version INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        execution_mode TEXT NOT NULL,
+        mission_json TEXT NOT NULL,
+        diagnostic_json TEXT NOT NULL,
+        owner_response TEXT,
+        change_summary TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_autonomy_profiles (
+        brand_key TEXT PRIMARY KEY,
+        mode TEXT NOT NULL,
+        objective TEXT NOT NULL,
+        model_role TEXT NOT NULL,
+        owner_role TEXT NOT NULL,
+        approval_policy TEXT NOT NULL,
+        operating_constraints_json TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_mcp_sessions (
+        id, selected_brand_key, proceeded_at, expires_at
+      ) VALUES (
+        'live-session', 'manifest_mental', '2099-06-03T12:00:00.000Z',
+        '2099-06-04T12:00:00.000Z'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_continuity_refs (
+        id, kind, brand_key, workflow_session_id, continuation_choice,
+        payload_json, expires_at
+      ) VALUES (
+        'live-continuity', 'workflow', 'manifest_mental', 'live-workflow',
+        'resume', '{"checkpoint":"draft"}', 4102444800
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_operation_receipts (
+        idempotency_key, brand_key, workflow_session_id, operation_type,
+        tool_name, request_fingerprint, status, result_json
+      ) VALUES (
+        'live-receipt', 'manifest_mental', 'live-workflow', 'schedule',
+        'schedule_approved_draft', 'live-fingerprint', 'completed',
+        '{"scheduled_post_id":77}'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_growth_missions (
+        brand_key, contract_version, version, status, execution_mode,
+        mission_json, diagnostic_json, owner_response, change_summary,
+        approved_at, last_diagnostic_at
+      ) VALUES (
+        'manifest_mental', 'growth-mission-v4', 11, 'approved',
+        'autonomous_operator', '{"objective":"live growth"}',
+        '{"status":"live"}', 'live approval', 'live mission state',
+        '2099-06-03T12:10:00.000Z', '2099-06-03T12:09:00.000Z'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_growth_mission_revisions (
+        id, brand_key, mission_version, status, execution_mode,
+        mission_json, diagnostic_json, owner_response, change_summary
+      ) VALUES (
+        'live-mission-revision', 'manifest_mental', 10, 'revision_required',
+        'autonomous_operator', '{"objective":"prior live growth"}',
+        '{"status":"revise"}', 'live revise', 'live prior revision'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_autonomy_profiles (
+        brand_key, mode, objective, model_role, owner_role, approval_policy,
+        operating_constraints_json, active, version
+      ) VALUES (
+        'manifest_mental', 'full_auto', 'Live autonomous operation',
+        'operator', 'owner', 'protected_only',
+        '{"full_auto_owner_authorized":true,"hourly_coverage_required":true}',
+        1, 12
+      )`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_continuity_upgrade_migrations",
+    );
+
+    const session = await db.prepare(
+      `SELECT selected_brand_key, proceeded_at, expires_at
+       FROM operator_mcp_sessions WHERE id = 'live-session'`,
+    ).first<Record<string, unknown>>();
+    const continuity = await db.prepare(
+      `SELECT workflow_session_id, continuation_choice, payload_json, expires_at
+       FROM operator_continuity_refs WHERE id = 'live-continuity'`,
+    ).first<Record<string, unknown>>();
+    const receipt = await db.prepare(
+      `SELECT request_fingerprint, status, result_json
+       FROM operator_operation_receipts WHERE idempotency_key = 'live-receipt'`,
+    ).first<Record<string, unknown>>();
+    const mission = await db.prepare(
+      `SELECT contract_version, version, status, mission_json, diagnostic_json,
+              owner_response, change_summary, approved_at, last_diagnostic_at
+       FROM operator_growth_missions WHERE brand_key = 'manifest_mental'`,
+    ).first<Record<string, unknown>>();
+    const revision = await db.prepare(
+      `SELECT mission_version, status, mission_json, diagnostic_json,
+              owner_response, change_summary
+       FROM operator_growth_mission_revisions WHERE id = 'live-mission-revision'`,
+    ).first<Record<string, unknown>>();
+    const autonomy = await db.prepare(
+      `SELECT mode, objective, approval_policy, operating_constraints_json,
+              active, version
+       FROM operator_autonomy_profiles WHERE brand_key = 'manifest_mental'`,
+    ).first<Record<string, unknown>>();
+
+    expect(session).toMatchObject({
+      selected_brand_key: "manifest_mental",
+      proceeded_at: "2099-06-03T12:00:00.000Z",
+      expires_at: "2099-06-04T12:00:00.000Z",
+    });
+    expect(continuity).toMatchObject({
+      workflow_session_id: "live-workflow",
+      continuation_choice: "resume",
+      payload_json: '{"checkpoint":"draft"}',
+      expires_at: 4102444800,
+    });
+    expect(receipt).toMatchObject({
+      request_fingerprint: "live-fingerprint",
+      status: "completed",
+      result_json: '{"scheduled_post_id":77}',
+    });
+    expect(mission).toMatchObject({
+      contract_version: "growth-mission-v4",
+      version: 11,
+      status: "approved",
+      mission_json: '{"objective":"live growth"}',
+      diagnostic_json: '{"status":"live"}',
+      owner_response: "live approval",
+      change_summary: "live mission state",
+      approved_at: "2099-06-03T12:10:00.000Z",
+      last_diagnostic_at: "2099-06-03T12:09:00.000Z",
+    });
+    expect(revision).toMatchObject({
+      mission_version: 10,
+      status: "revision_required",
+      mission_json: '{"objective":"prior live growth"}',
+      diagnostic_json: '{"status":"revise"}',
+      owner_response: "live revise",
+      change_summary: "live prior revision",
+    });
+    expect(autonomy).toMatchObject({
+      mode: "full_auto",
+      objective: "Live autonomous operation",
+      approval_policy: "protected_only",
+      operating_constraints_json: '{"full_auto_owner_authorized":true,"hourly_coverage_required":true}',
+      active: 1,
+      version: 12,
+    });
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_operation_receipts (
+          idempotency_key, operation_type, tool_name, request_fingerprint
+        ) VALUES ('live-receipt', 'duplicate', 'duplicate', 'duplicate')`,
       ).run(),
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });

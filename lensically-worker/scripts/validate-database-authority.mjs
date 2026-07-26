@@ -187,8 +187,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves quality enforcement records across migration replay")) {
     errors.push("quality_enforcement_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live quality enforcement schema without losing gate, evidence, inventory, or requirement state")) {
+    if (!migrationTests.includes("adopts the live quality enforcement schema without losing gate, evidence, inventory, or requirement state")) {
     errors.push("quality_enforcement_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves operator continuity and autonomy records across migration replay")) {
+    errors.push("operator_continuity_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live operator continuity schema without losing session, receipt, mission, revision, or autonomy state")) {
+    errors.push("operator_continuity_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
