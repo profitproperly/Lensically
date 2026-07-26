@@ -13,6 +13,8 @@ const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const operatorMcpProtocol = read("src/operatorMcpProtocol.ts");
 const operatorMcpProtocolTests = read("test/operatorMcpProtocol.spec.ts");
+const operatorMcpToolDefinitions = read("src/operatorMcpToolDefinitions.ts");
+const operatorMcpToolDefinitionTests = read("test/operatorMcpToolDefinitions.spec.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
@@ -54,6 +56,9 @@ const errors = [];
 if (!workflow.includes("test/operatorMcpProtocol.spec.ts")) {
   errors.push("operator_mcp_protocol_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpToolDefinitions.spec.ts")) {
+  errors.push("operator_mcp_tool_definition_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -94,6 +99,23 @@ if (!operatorMcpProtocol.includes("buildOperatorMcpInitializeResult")
 if (!operatorMcpProtocolTests.includes("builds the exact default initialize payload")
     || !operatorMcpProtocolTests.includes("builds the exact four-line selected-key handshake")) {
   lifecycleErrors.push("operator_mcp_protocol_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpToolDefinitions"')) {
+  lifecycleErrors.push("operator_mcp_tool_definition_import_missing");
+}
+if (source.includes("type OperatorMcpToolDefinition =")
+    || source.includes("function cloneOperatorMcpTool(")
+    || source.includes("function createScopedOperatorWrapperTool(")) {
+  lifecycleErrors.push("operator_mcp_tool_definition_construction_returned_to_index");
+}
+if (!operatorMcpToolDefinitions.includes("buildOperatorMcpToolDefinitions")
+    || !operatorMcpToolDefinitions.includes("createScopedOperatorWrapperTool")
+    || !operatorMcpToolDefinitions.includes("addOperatorExecutionMetadataSchema")) {
+  lifecycleErrors.push("operator_mcp_tool_definition_module_incomplete");
+}
+if (!operatorMcpToolDefinitionTests.includes("builds account-scoped wrappers without brand_key")
+    || !operatorMcpToolDefinitionTests.includes("builds three scoped account wrappers and preserves priority order")) {
+  lifecycleErrors.push("operator_mcp_tool_definition_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
