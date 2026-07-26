@@ -3966,6 +3966,74 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves final source-family and decision-influence state across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const probes = await seedFinalDatabaseAuthorityFixture(testEnv.DB, suffix);
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhere(
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+  });
+
+  it("adopts the exact final source-family and decision-influence schema without losing evidence, transitions, selections, plans, or lineage", async () => {
+    const db = testEnv.FINAL_AUTHORITY_UPGRADE_DB;
+    await materializeMigrationWithoutLedger(db, "0017_source_family_and_decision_influences.sql");
+    const suffix = crypto.randomUUID();
+    const probes = await seedFinalDatabaseAuthorityFixture(db, suffix);
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_final_authority_upgrade_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhereIn(
+        db,
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_source_family_evidence_states (
+          id, brand_key, source_card_family_id, source_identity_key,
+          label_policy_version, lifetime_label, recent_label, confidence_label
+        ) VALUES ('duplicate-evidence', ?, ?, 'duplicate-identity', 'labels-v1',
+          'proven', 'healthy', 'directional')`,
+      ).bind(`brand-${suffix}`, `family-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_source_selection_receipts (
+          id, brand_key, scope_type, scope_id, slot_key, selection_order,
+          source_identity_key, source_card_family_id, source_card_id,
+          engine_version, receipt_json
+        ) VALUES ('duplicate-receipt', ?, 'cycle', ?, '2099-01-01-01', 2,
+          'duplicate', 'duplicate-family', 'duplicate-card', 'engine-v1', '{}')`,
+      ).bind(`brand-${suffix}`, `scope-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_decision_influences (
+          id, influence_key, brand_key, cycle_id, slot_key, decision_summary,
+          influence_version
+        ) VALUES ('duplicate-influence', ?, ?, 'other-cycle', 'other-slot',
+          'Duplicate', 'influence-v1')`,
+      ).bind(`influence-key-${suffix}`, `brand-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

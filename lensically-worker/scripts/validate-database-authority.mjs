@@ -76,8 +76,19 @@ export function validateDatabaseAuthority(root = defaultRoot) {
 
 
   const records = collectRuntimeDdl(root);
-  const runtimeSources = sortedUnique(records.map((record) => record.source));
+    const runtimeSources = sortedUnique(records.map((record) => record.source));
   const declaredSources = sortedUnique(manifest.runtime_ddl_sources ?? []);
+  if (manifest.status === "migration_authority_complete") {
+    if (manifest.repository_runtime_ddl_complete !== true) {
+      errors.push("repository_runtime_ddl_completion_flag_missing");
+    }
+    if (records.length > 0) {
+      errors.push(`repository_runtime_ddl_present:${records.map((record) => `${record.kind}@${record.source}:${record.table}`).join(",")}`);
+    }
+    if (declaredSources.length > 0) {
+      errors.push(`completed_authority_declares_runtime_sources:${declaredSources.join(",")}`);
+    }
+  }
   const undeclaredSources = runtimeSources.filter((source) => !declaredSources.includes(source));
   const staleDeclaredSources = declaredSources.filter((source) => !runtimeSources.includes(source));
   for (const source of undeclaredSources) errors.push(`undeclared_runtime_ddl_source:${source}`);
@@ -244,8 +255,11 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     if (!migrationTests.includes("adopts the exact live Manifest Intelligence Engine schema without losing semantic, maturity, learning, portfolio, transition, or experiment state")) {
     errors.push("manifest_intelligence_engine_upgrade_regression_missing");
   }
-  if (!migrationTests.includes("adopts the exact live Manifest Measurement Audit schema without losing learning, benchmark, comparison, pattern, or follower state")) {
+    if (!migrationTests.includes("adopts the exact live Manifest Measurement Audit schema without losing learning, benchmark, comparison, pattern, or follower state")) {
     errors.push("manifest_measurement_audit_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the exact final source-family and decision-influence schema without losing evidence, transitions, selections, plans, or lineage")) {
+    errors.push("final_database_authority_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
