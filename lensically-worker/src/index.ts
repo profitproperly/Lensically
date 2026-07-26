@@ -18243,33 +18243,29 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     const items = date && isValidIsoDate(date)
       ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, date, timezone)
       : [];
-    const deletedItems = await listScheduledPostDeletionsForThreadsAccount(env, brand.profile.threads_user_id, {
-      date: date && isValidIsoDate(date) ? date : null,
-      timezone,
-      limit: 100,
-    });
-    return operatorJsonResponse({
+        return operatorJsonResponse({
       items,
-      deleted_items: deletedItems,
       returned_count: items.length,
-      deleted_count: deletedItems.length,
       total_count: items.length,
       has_more: false,
+      deletion_history_exposed_to_model: false,
     });
   }
 
-  if (toolName === "delete_scheduled_post") {
+    if (toolName === "delete_scheduled_post") {
     const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id ?? 0));
-    const reason = normalizeOperatorText(payload.reason, 8000);
+    const reasonCode = normalizeScheduledPostDeletionReasonCode(payload.reason_code);
+    const reasonDetail = normalizeOperatorText(payload.reason_detail, 8000, true);
     if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
       return operatorJsonResponse({ success: false, error: "scheduled_post_id is required" }, 400);
     }
-    if (!reason) {
-      return operatorJsonResponse({ success: false, error: "scheduled_post_deletion_reason_required" }, 400);
+    if (!reasonCode) {
+      return operatorJsonResponse({ success: false, error: "scheduled_post_deletion_reason_code_required", allowed_reason_codes: SCHEDULED_POST_DELETION_REASON_CODES }, 400);
     }
     const deletion = await deleteScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, scheduledPostId, {
       expectedThreadsUserId: brand.profile.threads_user_id,
-      reason,
+      reasonCode,
+      reasonDetail,
       deletedBy: "model",
       deletionSource: "mcp",
       operationId: normalizeOperatorText(payload.operation_id, 240, true),
@@ -19906,17 +19902,18 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   },
     {
     name: "delete_scheduled_post",
-    title: "Delete scheduled post with reason",
-    description: "Delete one approved unpublished scheduled post only when a nonempty reason is supplied. The original text, slot, actor, source, timestamp, and reason are preserved in durable deletion history for UI and future model reads. This action does not write strategy memory.",
+        title: "Delete scheduled post",
+    description: "Delete one approved unpublished scheduled post only for an objective constitutional, safety, duplicate, corruption, account-or-slot, or emergency-withdrawal reason. The receipt is operational and unobserved: it never affects selection, family labels, strategy, or model learning.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         scheduled_post_id: { type: "integer", minimum: 1 },
-                reason: { type: "string", minLength: 1 },
+        reason_code: { type: "string", enum: SCHEDULED_POST_DELETION_REASON_CODES },
+        reason_detail: { type: "string", description: "Optional factual operational detail. Do not include taste feedback or performance predictions." },
         owner_response: { type: "string", description: "Exact owner authorization for this protected deletion when required by the Execution Kernel." },
       },
-      required: ["brand_key", "scheduled_post_id", "reason"],
+      required: ["brand_key", "scheduled_post_id", "reason_code"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
@@ -42322,8 +42319,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       let payload: {
         app_user_id?: string;
         scheduled_post_id?: number | string;
-        threads_user_id?: string;
-        reason?: string;
+                threads_user_id?: string;
+        reason_code?: string;
+        reason_detail?: string;
       };
       try {
         payload = await request.json();
@@ -42337,8 +42335,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
       }
 
-      const scheduledPostId = Number(payload.scheduled_post_id);
-      const reason = normalizeOperatorText(payload.reason, 8000);
+            const scheduledPostId = Number(payload.scheduled_post_id);
+      const reasonCode = normalizeScheduledPostDeletionReasonCode(payload.reason_code);
+      const reasonDetail = normalizeOperatorText(payload.reason_detail, 8000, true);
       if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
         return new Response(
           JSON.stringify({ error: "scheduled_post_id is required" }),
@@ -42348,17 +42347,18 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         );
       }
-      if (!reason) {
+            if (!reasonCode) {
         return new Response(
-          JSON.stringify({ error: "Deletion reason is required." }),
+          JSON.stringify({ error: "A valid deletion reason code is required.", allowed_reason_codes: SCHEDULED_POST_DELETION_REASON_CODES }),
           { status: 400, headers: { "content-type": "application/json; charset=UTF-8" } },
         );
       }
 
       const ownedAppUserId = WORKSPACE_APP_USER_ID;
       const deleted = await deleteScheduledPostForAppUser(env, ownedAppUserId, scheduledPostId, {
-        expectedThreadsUserId: normalizeOperatorText(payload.threads_user_id, 200, true),
-        reason,
+                expectedThreadsUserId: normalizeOperatorText(payload.threads_user_id, 200, true),
+        reasonCode,
+        reasonDetail,
         deletedBy: "owner",
         deletionSource: "ui",
       });
