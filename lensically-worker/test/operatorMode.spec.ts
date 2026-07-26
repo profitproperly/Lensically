@@ -7310,14 +7310,15 @@ describe("operator mode MCP endpoint", () => {
       proceed_confirmed: true,
     });
     expect(missingReason.isError).toBe(true);
-    expect(missingReason.structuredContent).toMatchObject({
+        expect(missingReason.structuredContent).toMatchObject({
       error: "scheduled_post_deletion_reason_code_required",
       allowed_reason_codes: expect.arrayContaining(["technical_corruption", "exact_duplicate"]),
     });
 
-    const memoryBefore = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
-    ).first<{ total: number | string }>();
+    const memoryTableBefore = await env.DB.prepare(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'gpt_strategy_memory' LIMIT 1`,
+    ).first<{ name: string }>();
+    expect(memoryTableBefore).toBeNull();
     const deleted = await mcpTool<{
       success: boolean;
       deleted: boolean;
@@ -7355,22 +7356,22 @@ describe("operator mode MCP endpoint", () => {
     const scheduledRow = await env.DB.prepare(
       `SELECT id FROM scheduled_posts WHERE id = ? LIMIT 1`,
     ).bind(scheduledPostId).first<{ id: number }>();
-    const deletionRow = await env.DB.prepare(
+        const deletionRow = await env.DB.prepare(
       `SELECT scheduled_post_id, reason_code, reason, deleted_by, deletion_source
        FROM scheduled_post_deletions WHERE scheduled_post_id = ? LIMIT 1`,
     ).bind(scheduledPostId).first<Record<string, unknown>>();
-    const memoryAfter = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
-    ).first<{ total: number | string }>();
+    const memoryTableAfter = await env.DB.prepare(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'gpt_strategy_memory' LIMIT 1`,
+    ).first<{ name: string }>();
     expect(scheduledRow).toBeNull();
-    expect(deletionRow).toMatchObject({
+        expect(deletionRow).toMatchObject({
       scheduled_post_id: scheduledPostId,
       reason_code: "technical_corruption",
       reason: "Malformed payload fixture.",
       deleted_by: "model",
       deletion_source: "mcp",
     });
-    expect(Number(memoryAfter?.total ?? 0)).toBe(Number(memoryBefore?.total ?? 0));
+    expect(memoryTableAfter).toBeNull();
 
     const listed = await mcpTool<{ deletion_history_exposed_to_model: boolean; deleted_items?: unknown[] }>("list_scheduled_posts", {
       brand_key: BRAND_KEY,
