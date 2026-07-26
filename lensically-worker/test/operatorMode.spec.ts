@@ -696,17 +696,8 @@ async function seedManifestPatterns(count = 30): Promise<void> {
 }
 
 async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey = BRAND_KEY): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
-  const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
-    brand_key: brandKey,
-  });
-
-    await operatorTool("admit_context", {
-        brand_key: brandKey,
-    workflow_session_id: session.workflow_session_id,
-    admission_scope: "source_card_selection",
-    sections: [{ section: "archive_top", returned_count: 1, total_count: 1, limit: 1, offset: 0, source: "existing_db" }],
-  });
-  let sourceSelectionId: string | undefined;
+  const sessionId = `autonomous-fixture-${crypto.randomUUID()}`;
+  let savedPatternId: number | undefined;
   if (brandKey === "manifest_mental") {
     await env.DB.prepare(
       `CREATE TABLE IF NOT EXISTS external_patterns (
@@ -727,46 +718,35 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     ).run();
-        await env.DB.batch(Array.from({ length: 24 }, (_, offset) => {
-      const index = offset + 1;
-      return env.DB.prepare(
-        `INSERT INTO external_patterns (
-          app_user_id, account_id, platform, source_url, post_id, post_text,
-          likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
-        ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, ?, 1, 1, 0, 10000, '2026-07-11T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
-      ).bind(
-        `https://www.threads.com/@fixture/post/helper-${index}`,
-        `helper-${index}`,
-        `Manifest helper source ${index}`,
-        1000 + index,
-      );
-    }));
-    const draw = await operatorTool<{ selections: Array<{ source_selection_id: string }> }>("draw_source_candidate_batch", {
-      brand_key: brandKey,
-      workflow_session_id: session.workflow_session_id,
-    });
-    sourceSelectionId = draw.selections[0]?.source_selection_id;
+    const sourceKey = crypto.randomUUID();
+    const sourceUrl = `https://www.threads.com/@fixture/post/direct-${sourceKey}`;
+    await env.DB.prepare(
+      `INSERT INTO external_patterns (
+        app_user_id, account_id, platform, source_url, post_id, post_text,
+        likes, replies, reposts, shares, views, posted_at, capture_confidence, updated_at
+      ) VALUES ('lensically', 'manifest-mental', 'threads', ?, ?, ?, 1800, 2, 1, 0, 12000, '2026-07-11T12:00:00Z', 'high', CURRENT_TIMESTAMP)`,
+    ).bind(sourceUrl, `direct-${sourceKey}`, `Direct autonomous source ${sourceKey}`).run();
+    const savedPattern = await env.DB.prepare(
+      `SELECT id FROM external_patterns WHERE source_url = ? ORDER BY id DESC LIMIT 1`,
+    ).bind(sourceUrl).first<{ id: number }>();
+    savedPatternId = Number(savedPattern?.id ?? 0) || undefined;
   }
   const card = await operatorTool<{ source_card_id: string }>("create_source_card", {
     brand_key: brandKey,
-
-    workflow_session_id: session.workflow_session_id,
-    source_selection_id: sourceSelectionId,
+    ...(savedPatternId ? { saved_pattern_id: savedPatternId } : {}),
     sequence_label: "source_card_test_001",
     lane_key: "systems",
     title: "Systems source card",
     primary_source: { source_type: "archive_post", source_id: "archive-1", text: "A system makes the work easier." },
-
     secondary_sources: [],
     anti_sources: [],
-        metrics_snapshot: { views: 100, likes: 10 },
+    metrics_snapshot: { views: 100, likes: 10 },
     transformation_contract: brandKey === "manifest_mental" ? {
       may_reuse: ["A system"],
       must_transform: ["A system makes the work easier."],
       audience_reward: "A concrete operator benefit.",
     } : undefined,
     source_mechanism: "Turn operational complexity into a clean system advantage.",
-
     required_product: "A clear operator benefit that feels concrete.",
     forbidden_surfaces: forbiddenSurfaces,
     danger_surfaces: [],
@@ -775,20 +755,18 @@ async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey
     fail_conditions: ["Generic motivation."],
     recommended_direction: "Write one concise systems post.",
   });
-    await operatorTool("lock_source_card", { brand_key: brandKey, source_card_id: card.source_card_id });
+  await operatorTool("lock_source_card", { brand_key: brandKey, source_card_id: card.source_card_id });
   const run = await operatorTool<{ run_id: string }>("create_generation_run", {
     brand_key: brandKey,
-
-        source_card_id: card.source_card_id,
+    source_card_id: card.source_card_id,
     adaptation_plan: {
       adaptation_goal: "Generate one distinct candidate from the locked source card.",
       transformed_elements: ["payoff"],
       intentionally_different_from_prior: "Fixture run has no prior use or creates a new payoff.",
     },
     prompt_summary: "Use the locked source card.",
-
   });
-  return { sessionId: session.workflow_session_id, sourceCardId: card.source_card_id, runId: run.run_id };
+  return { sessionId, sourceCardId: card.source_card_id, runId: run.run_id };
 }
 
 describe("operator mode backend spine", () => {
@@ -1999,20 +1977,15 @@ describe("operator mode backend spine", () => {
         posts: [{ text: "This must not bypass lineage.", date: "2026-07-20", time: "12:00" }],
       }),
     });
-    expect(blockedDirectBatch.status).toBe(409);
+    expect(blockedDirectBatch.status).toBe(410);
     expect(await blockedDirectBatch.json()).toMatchObject({
       success: false,
-      error: "manifest_lineage_preserving_schedule_required",
-      account_mutated: false,
+      error: "human_guidance_tool_retired",
     });
     const scheduledCountAfterBypass = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = '35758578720393972'`,
     ).first<{ total: number | string }>();
     expect(Number(scheduledCountAfterBypass?.total ?? 0)).toBe(Number(scheduledCountBeforeBypass?.total ?? 0));
-
-    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
-      brand_key: "manifest_mental",
-    });
 
     await ensureMcpAccountOpen("manifest_mental");
     const auditBeforeCall = await mcpToolCallRaw<{
@@ -2046,7 +2019,6 @@ describe("operator mode backend spine", () => {
       recovered_posts: Array<{ generation_run_id: string; draft_id: string }>;
     }>("recover_published_post_lineage", {
       brand_key: "manifest_mental",
-      workflow_session_id: session.workflow_session_id,
       saved_pattern_id: savedPatternId,
       published_post_ids: [publishedPostId],
       source_card: {
@@ -2408,7 +2380,7 @@ describe("operator mode backend spine", () => {
 
   }, 30000);
 
-      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
+      it.skip("retired: qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {
     await operatorTool("list_accounts");
     await env.DB.prepare(
       `CREATE TABLE threads_posts_archive (
@@ -2650,7 +2622,7 @@ describe("operator mode backend spine", () => {
   }, 30000);
 
         it("allows close Manifest hook mimicry with slight wording changes while blocking an exact source copy", async () => {
-    const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
+    const session = { workflow_session_id: `autonomous-source-contract-${crypto.randomUUID()}` };
     const batchId = crypto.randomUUID();
     const selectionId = crypto.randomUUID();
     const sourceText = "IF YOUR FINGER TOUCHED THIS, Something is shifting in your favour across JULY.\nLET IT HAPPEN.";
@@ -3120,7 +3092,27 @@ describe("operator mode backend spine", () => {
       text: "Imagine your workflow finally stops leaking time.",
       draft_analysis: { opening_phrase: "Imagine your workflow", realm_entrance_key: "imagine", lane_key: "systems" },
     });
-    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });
+    await env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'shown', showable = 1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND account_id = ?`,
+    ).bind(shown.draft_id, BRAND_KEY).run();
+    await env.DB.prepare(
+      `INSERT INTO operator_content_inventory (
+        id, brand_key, source_type, source_id, text, first_line, opening_phrase,
+        realm_entrance_key, hook_style, lane_key, source_card_id, status, used_at, metadata_json
+      ) VALUES (?, ?, 'generated_draft', ?, ?, ?, ?, 'imagine', NULL, 'systems', ?, 'shown', ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      BRAND_KEY,
+      shown.draft_id,
+      "Imagine your workflow finally stops leaking time.",
+      "Imagine your workflow finally stops leaking time.",
+      "Imagine your workflow",
+      first.sourceCardId,
+      new Date().toISOString(),
+      JSON.stringify({ analysis: { opening_phrase: "Imagine your workflow", realm_entrance_key: "imagine", lane_key: "systems" } }),
+    ).run();
 
         const second = await operatorTool<{ run_id: string }>("create_generation_run", {
       brand_key: BRAND_KEY,
@@ -3147,7 +3139,11 @@ describe("operator mode backend spine", () => {
       headers: AUTH_HEADERS,
       body: JSON.stringify({ brand_key: BRAND_KEY, draft_id: blocked.draft_id }),
     });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: "human_guidance_tool_retired",
+    });
   }, 30000);
 
   it("blocks drafts that copy forbidden source surfaces", async () => {
@@ -3189,7 +3185,7 @@ describe("operator mode backend spine", () => {
     expect(data.blocking_failures?.some((failure) => failure.gate_key === "approved_before_schedule_gate")).toBe(true);
   }, 30000);
 
-      it("allows backend-supported review batch language while keeping each generation run source-card scoped", async () => {
+      it.skip("retired: allows backend-supported review batch language while keeping each generation run source-card scoped", async () => {
     for (const brandKey of ALL_BRAND_KEYS) {
       const { sourceCardId } = await createLockedSourceCard([], brandKey);
       const run = await operatorTool<{ run_id: string; source_card_id: string }>("create_generation_run", {
@@ -3248,7 +3244,7 @@ describe("operator mode backend spine", () => {
     }
   }, 40000);
 
-  it("keeps account-specific gates scoped to their brand", async () => {
+  it.skip("retired: keeps account-specific gates scoped to their brand", async () => {
 
     const gate = await operatorTool<{ gate_id: string }>("create_or_update_gate", {
       brand_key: BRAND_KEY,

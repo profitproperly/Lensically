@@ -16920,11 +16920,6 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         };
                 await env.DB.batch([
           env.DB.prepare(
-            `INSERT OR IGNORE INTO operator_workflow_sessions (
-              id, brand_key, workflow_template_key, objective, status, current_stage, notes
-            ) VALUES (?, ?, 'source_card_backfill_v1', 'Card every Manifest Saved Pattern', 'preserved', 'source_card_backfill', 'Durable isolated maintenance session for Saved Pattern source-card backfill.')`,
-          ).bind(backfillSessionId, brand.brand_key),
-          env.DB.prepare(
             `INSERT OR IGNORE INTO operator_source_selection_batches (
               id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
               qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
@@ -17051,14 +17046,6 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
              AND brand_key = ?
              AND source_card_id IS NULL`,
         ).bind(currentCard.id, parseOperatorWorkflowSequence(sequenceLabel), sourceSelectionId, brand.brand_key).run();
-        if (workflowSessionId) {
-          await env.DB.prepare(
-            `UPDATE operator_workflow_sessions
-             SET active_source_card_id = ?, current_stage = 'source_card'
-             WHERE id = ?
-               AND brand_key = ?`,
-          ).bind(currentCard.id, workflowSessionId, brand.brand_key).run();
-        }
         return operatorJsonResponse({
           source_card_id: currentCard.id,
           source_selection_id: sourceSelectionId,
@@ -17202,14 +17189,6 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     await env.DB.batch(sourceCardStatements);
 
     const card = await getOperatorSourceCard(env, brand.brand_key, sourceCardId);
-    if (workflowSessionId) {
-      await env.DB.prepare(
-        `UPDATE operator_workflow_sessions
-         SET active_source_card_id = ?, current_stage = 'source_card'
-         WHERE id = ?
-           AND brand_key = ?`,
-      ).bind(sourceCardId, workflowSessionId, brand.brand_key).run();
-    }
         return operatorJsonResponse({
       source_card_id: sourceCardId,
       source_selection_id: sourceSelectionId,
@@ -17353,14 +17332,6 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       )
       .run();
 
-    if (card.workflow_session_id) {
-      await env.DB.prepare(
-        `UPDATE operator_workflow_sessions
-         SET active_generation_run_id = ?, current_stage = 'generation_run_and_candidates'
-         WHERE id = ?
-           AND brand_key = ?`,
-      ).bind(runId, card.workflow_session_id, brand.brand_key).run();
-    }
         return operatorJsonResponse({
       run_id: runId,
       source_card_id: sourceCardId,

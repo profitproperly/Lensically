@@ -94,13 +94,15 @@ export async function recoverPublishedPostLineage(
     return failure("lineage_recovery_not_configured_for_brand");
   }
 
-  const workflowSessionId = text(payload.workflow_session_id, 120);
+  const requestedWorkflowSessionId = text(payload.workflow_session_id, 120);
   const savedPatternId = Math.trunc(Number(payload.saved_pattern_id));
   const publishedPostIds = Array.from(new Set(
     (Array.isArray(payload.published_post_ids) ? payload.published_post_ids : [])
       .map((item) => text(item, 255))
       .filter(Boolean),
   )).slice(0, 10);
+  const lineageScopeId = requestedWorkflowSessionId
+    || `historical-lineage-recovery:${brand.brand_key}:${savedPatternId}`;
   const cardInput = record(payload.source_card);
   const title = text(cardInput.title, 300);
   const laneKey = text(cardInput.lane_key, 120) || null;
@@ -113,18 +115,12 @@ export async function recoverPublishedPostLineage(
   const failConditions = Array.isArray(cardInput.fail_conditions) ? cardInput.fail_conditions.slice(0, 100) : [];
   const recommendedDirection = text(cardInput.recommended_direction, 4000) || null;
 
-  if (!workflowSessionId || !Number.isInteger(savedPatternId) || savedPatternId < 1 || !publishedPostIds.length) {
-    return failure("workflow_session_pattern_and_published_posts_required");
+  if (!Number.isInteger(savedPatternId) || savedPatternId < 1 || !publishedPostIds.length) {
+    return failure("pattern_and_published_posts_required");
   }
   if (!title || !sourceMechanism || !requiredProduct || !passConditions.length || !failConditions.length) {
     return failure("complete_source_card_lesson_required");
   }
-
-  const session = await env.DB.prepare(
-    `SELECT id FROM operator_workflow_sessions
-     WHERE id = ? AND brand_key = ? AND status = 'active' LIMIT 1`,
-  ).bind(workflowSessionId, brand.brand_key).first<{ id: string }>();
-  if (!session?.id) return failure("active_workflow_session_required");
 
   const pattern = await env.DB.prepare(
     `SELECT id, post_id, post_text, source_url, views, likes, replies, reposts, shares,
@@ -238,7 +234,7 @@ export async function recoverPublishedPostLineage(
       ).bind(
         sourceBatchId,
         brand.brand_key,
-        workflowSessionId,
+        lineageScopeId,
         minimumVerifiedLikes,
         selectedAt,
         json({ saved_pattern_id: savedPatternId, published_post_ids: publishedPostIds }),
@@ -256,7 +252,7 @@ export async function recoverPublishedPostLineage(
         sourceSelectionId,
         sourceBatchId,
         brand.brand_key,
-        workflowSessionId,
+        lineageScopeId,
         sourceIdentityKey,
         String(savedPatternId),
         sourceThreadsPostId,
@@ -371,7 +367,7 @@ export async function recoverPublishedPostLineage(
       ).bind(
         sourceCardId,
         brand.brand_key,
-        workflowSessionId,
+        lineageScopeId,
         `historical_recovery_${savedPatternId}`,
         laneKey,
         title,
