@@ -16,7 +16,8 @@ const testEnv = env as typeof env & {
     CONTINUITY_UPGRADE_DB: D1Database;
     CYCLE_DECISION_UPGRADE_DB: D1Database;
     ASSURANCE_UPGRADE_DB: D1Database;
-  WORK_STATE_UPGRADE_DB: D1Database;
+    WORK_STATE_UPGRADE_DB: D1Database;
+  EXECUTION_CONTROL_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -218,8 +219,23 @@ const requiredColumns: Record<string, string[]> = {
     "id", "path", "mode", "message", "summary", "content", "status",
     "created_at", "updated_at",
   ],
-  operator_system_retirements: [
+    operator_system_retirements: [
     "retirement_key", "completed_at",
+  ],
+  operator_manifest_prepare_checkpoints: [
+    "id", "brand_key", "operation_id", "checkpoint_version", "phase", "timezone",
+    "horizon_hours", "state_json", "created_at", "updated_at",
+  ],
+  operator_pre_call_routes: [
+    "id", "route_key", "provider", "tool_name", "operation_key", "match_json",
+    "action", "required_tool", "mandatory_route", "argument_patch_json",
+    "allowed_argument_keys_json", "reason", "verification_summary", "source_memory_id",
+    "priority", "active", "expires_at", "created_at", "updated_at",
+  ],
+  operator_execution_events: [
+    "id", "brand_key", "workflow_session_id", "tool_name", "operation_class",
+    "execution_plane", "policy_version", "decision", "known_failure_prevented",
+    "evidence_json", "created_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -345,7 +361,9 @@ const expectedObjects = [
   "idx_operator_hardening_events_incident",
     "idx_operator_observations_capability_created",
   "trg_operator_hardening_touch_updated_at",
-  "idx_operator_work_ledger_status_order",
+    "idx_operator_work_ledger_status_order",
+  "idx_operator_pre_call_routes_lookup",
+  "idx_operator_execution_events_recent",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
