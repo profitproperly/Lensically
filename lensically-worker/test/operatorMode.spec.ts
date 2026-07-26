@@ -7042,11 +7042,11 @@ describe("operator mode MCP endpoint", () => {
     expect(names).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
       "selectOperatorKey",
-      "confirmOperatorProceed",
+            "confirmOperatorProceed",
       "get_content_focus",
-      "start_workflow_session",
       "getRepoStatus",
     ]));
+    expect(names).not.toContain("start_workflow_session");
     expect(names).not.toContain("executeLensicallyIntent");
     expect(new Set(names).size).toBe(names.length);
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
