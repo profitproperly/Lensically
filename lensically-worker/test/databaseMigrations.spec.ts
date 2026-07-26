@@ -209,8 +209,11 @@ describe("canonical database migrations", () => {
         const configuredAccountId = `configured-${suffix}`;
     const confirmationCode = `confirmation-${suffix}`;
     const cachedPostId = `cached-${suffix}`;
-    const archivedPostId = `archived-${suffix}`;
+        const archivedPostId = `archived-${suffix}`;
     const metricSnapshotId = `metric-${suffix}`;
+    const generationRunId = `run-${suffix}`;
+    const generationDraftId = `draft-${suffix}`;
+    const preflightSnapshotId = `preflight-${suffix}`;
 
 
 
@@ -311,7 +314,7 @@ describe("canonical database migrations", () => {
         'https://threads.net/t/archived', 'migration-user',
         'https://example.com/profile.png', 2000, 200, 10, 6, 4, 2, 222, 1)`,
     ).bind(followerId, archivedPostId).run();
-    await testEnv.DB.prepare(
+        await testEnv.DB.prepare(
       `INSERT INTO operator_post_metric_snapshots (
         id, brand_key, published_post_id, scheduled_post_id, draft_id,
         generation_run_id, source_card_id, source_selection_id, metrics_json,
@@ -320,6 +323,40 @@ describe("canonical database migrations", () => {
         'card-migration', 'selection-migration', '{"likes":200}',
         '2099-01-03T13:00:00.000Z', 0, 'migration_anomaly', 'insights_refresh')`,
     ).bind(metricSnapshotId, archivedPostId, scheduledPostId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO gpt_post_strategy_tags (
+        scheduled_post_id, account_id, threads_user_id, pillar, hook_style,
+        format, intent, experiment, novelty_level, metadata_json
+      ) VALUES (?, ?, ?, 'intuition', 'direct_validation', 'short_text',
+        'reassurance', 'migration_test', 'controlled_variation', '{"lineage":true}')`,
+    ).bind(scheduledPostId, accountId, followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO gpt_generation_runs (
+        id, account_id, threads_user_id, objective, prompt_summary, status,
+        metadata_json, source_card_id, source_card_family_id,
+        source_card_version_number, adaptation_plan_json,
+        prior_adaptation_context_json
+      ) VALUES (?, ?, ?, 'Migration objective', 'Migration prompt', 'completed',
+        '{"migration":true}', 'card-migration', 'family-migration', 3,
+        '{"style":"structure_preserving"}', '{"prior_runs":2}')`,
+    ).bind(generationRunId, accountId, followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO gpt_generation_drafts (
+        id, run_id, account_id, threads_user_id, draft_index, text, status,
+        rejection_reason, score_json, strategy_json, replacement_for_draft_id,
+        scheduled_post_id, metadata_json, source_card_id, owner_feedback,
+        gate_summary_json, showable, published_post_id
+      ) VALUES (?, ?, ?, ?, 1, 'Migration draft', 'scheduled', NULL,
+        '{"overall":9}', '{"pillar":"intuition"}', 'prior-draft', ?,
+        '{"migration":true}', 'card-migration', 'Preserve lineage',
+        '{"passed":true}', 1, ?)`,
+    ).bind(generationDraftId, generationRunId, accountId, followerId, scheduledPostId, archivedPostId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO gpt_preflight_snapshots (
+        id, account_id, threads_user_id, objective, sections_json, manifest_json
+      ) VALUES (?, ?, ?, 'Migration preflight', '{"strategy":{"ok":true}}',
+        '{"complete":true}')`,
+    ).bind(preflightSnapshotId, accountId, followerId).run();
 
     await applyD1Migrations(
       testEnv.DB,
@@ -344,9 +381,13 @@ describe("canonical database migrations", () => {
       countWhere("SELECT COUNT(*) AS total FROM threads_post_insights_cache WHERE post_id = ? AND engagement_total = 111", cachedPostId),
       countWhere("SELECT COUNT(*) AS total FROM threads_posts_cache_state WHERE threads_user_id = ? AND next_cursor = 'cursor-migration'", followerId),
       countWhere("SELECT COUNT(*) AS total FROM threads_posts_archive WHERE post_id = ? AND engagement_total = 222", archivedPostId),
-      countWhere("SELECT COUNT(*) AS total FROM operator_post_metric_snapshots WHERE id = ? AND valid_for_learning = 0 AND anomaly_reason = 'migration_anomaly'", metricSnapshotId),
+            countWhere("SELECT COUNT(*) AS total FROM operator_post_metric_snapshots WHERE id = ? AND valid_for_learning = 0 AND anomaly_reason = 'migration_anomaly'", metricSnapshotId),
+      countWhere("SELECT COUNT(*) AS total FROM gpt_post_strategy_tags WHERE scheduled_post_id = ? AND pillar = 'intuition'", scheduledPostId),
+      countWhere("SELECT COUNT(*) AS total FROM gpt_generation_runs WHERE id = ? AND source_card_version_number = 3 AND adaptation_plan_json IS NOT NULL", generationRunId),
+      countWhere("SELECT COUNT(*) AS total FROM gpt_generation_drafts WHERE id = ? AND showable = 1 AND scheduled_post_id = ? AND published_post_id = ?", generationDraftId, scheduledPostId, archivedPostId),
+      countWhere("SELECT COUNT(*) AS total FROM gpt_preflight_snapshots WHERE id = ? AND manifest_json = '{"complete":true}'", preflightSnapshotId),
     ]);
-    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 
     it("upgrades the legacy scheduled-deletion schema before backfilling new fields", async () => {
