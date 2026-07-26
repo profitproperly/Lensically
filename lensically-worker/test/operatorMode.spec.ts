@@ -625,15 +625,10 @@ async function resetTables(): Promise<void> {
     "operator_mcp_tool_overrides",
         "operator_gate_results",
     "operator_content_inventory",
-                "operator_operational_incidents",
-    "operator_daily_source_claims",
+                                "operator_operational_incidents",
     "operator_review_batches",
-    "operator_source_exclusions",
-    "operator_source_selections",
-    "operator_source_selection_batches",
     "operator_gates",
-    "operator_source_cards",
-    "operator_source_card_families",
+
 
     "operator_production_board_items",
 
@@ -642,7 +637,13 @@ async function resetTables(): Promise<void> {
     ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
-        await env.DB.prepare("DELETE FROM gpt_generation_drafts").run();
+          await env.DB.prepare("DELETE FROM operator_daily_source_claims").run();
+  await env.DB.prepare("DELETE FROM operator_source_selections").run();
+  await env.DB.prepare("DELETE FROM operator_source_selection_batches").run();
+  await env.DB.prepare("DELETE FROM operator_source_cards").run();
+  await env.DB.prepare("DELETE FROM operator_source_card_families").run();
+  await env.DB.prepare("DELETE FROM operator_source_exclusions").run();
+  await env.DB.prepare("DELETE FROM gpt_generation_drafts").run();
   await env.DB.prepare("DELETE FROM gpt_generation_runs").run();
   await env.DB.prepare("DELETE FROM gpt_post_strategy_tags").run();
   await env.DB.prepare("DELETE FROM gpt_preflight_snapshots").run();
