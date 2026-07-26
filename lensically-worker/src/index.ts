@@ -13278,23 +13278,15 @@ async function prepareManifestAutonomousCycle(
     strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
     consumption_contract: decisionIntelligence.consumption_contract ?? {},
   };
-    const recentScheduledDeletions = await listScheduledPostDeletionsForThreadsAccount(
+        const accountPosition: Record<string, unknown> = await buildManifestAutonomousAccountPosition(
     env,
-    brand.profile.threads_user_id,
-    { limit: 100 },
+    brand,
+    targetSlots,
+    coverage,
+    clock,
+    threadsSnapshot as unknown as Record<string, unknown>,
+    deliveryReconciliation,
   );
-    const accountPosition: Record<string, unknown> = {
-    ...(await buildManifestAutonomousAccountPosition(
-      env,
-      brand,
-      targetSlots,
-      coverage,
-      clock,
-      threadsSnapshot as unknown as Record<string, unknown>,
-      deliveryReconciliation,
-    )),
-    recent_scheduled_deletions: recentScheduledDeletions,
-  };
       const existing = await env.DB.prepare(
     `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
   ).bind(brand.brand_key, operationId).first<{ id: string }>();
@@ -13430,7 +13422,7 @@ async function prepareManifestAutonomousCycle(
     startupState: {
       account_position: accountPosition,
       occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-                                                            data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "scheduled deletion reasons", "operational gates"],
+                                                            data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "operational gates"],
                   maturity_refresh: {
         ...((rollingEvidence.maturity_refresh && typeof rollingEvidence.maturity_refresh === "object")
           ? rollingEvidence.maturity_refresh as Record<string, unknown>
@@ -13517,7 +13509,7 @@ async function prepareManifestAutonomousCycle(
       model_source_substitution_allowed: false,
 
 
-      recent_scheduled_deletions: recentScheduledDeletions,
+            human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
       remaining_missing_count: missingSlots.length,
       next_missing_slot: missingSlots[0] ?? null,
             next_action: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0
@@ -13552,7 +13544,7 @@ async function prepareManifestAutonomousCycle(
     model_source_substitution_allowed: false,
 
 
-    recent_scheduled_deletions: recentScheduledDeletions,
+        human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
     remaining_missing_count: missingSlots.length,
     next_missing_slot: missingSlots[0] ?? null,
         next_action: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0
@@ -35468,9 +35460,10 @@ async function deleteScheduledPostForAppUser(
   env: Env,
   appUserId: string,
   scheduledPostId: number,
-  input: {
+    input: {
     expectedThreadsUserId?: string | null;
-    reason: string;
+    reasonCode: ScheduledPostDeletionReasonCode;
+    reasonDetail?: string | null;
     deletedBy: "owner" | "model";
     deletionSource: "ui" | "mcp";
     operationId?: string | null;
@@ -35480,8 +35473,9 @@ async function deleteScheduledPostForAppUser(
   record?: ScheduledPostDeletionRecord;
   replayed?: boolean;
 }> {
-  const reason = input.reason.trim();
-  if (!reason) return { outcome: "reason_required" };
+  const reasonCode = normalizeScheduledPostDeletionReasonCode(input.reasonCode);
+  if (!reasonCode) return { outcome: "reason_required" };
+  const reason = buildScheduledPostDeletionReason(reasonCode, input.reasonDetail);
   await ensureScheduledPostDeletionsTable(env);
   const operationId = normalizeOperatorText(input.operationId, 240, true);
   if (operationId) {
@@ -35518,7 +35512,8 @@ async function deleteScheduledPostForAppUser(
       String(existing.threads_user_id ?? ""),
       String(existing.post_text ?? ""),
       String(existing.scheduled_time ?? ""),
-      String(existing.status ?? ""),
+            String(existing.status ?? ""),
+      reasonCode,
       reason,
       input.deletedBy,
       input.deletionSource,
@@ -35532,17 +35527,17 @@ async function deleteScheduledPostForAppUser(
 
   if (await doesTableExist(env, "gpt_generation_drafts")) {
     await env.DB.prepare(
-      `UPDATE gpt_generation_drafts
-       SET status = 'rejected', rejection_reason = ?, owner_feedback = ?, scheduled_post_id = NULL
+            `UPDATE gpt_generation_drafts
+       SET status = 'retired_unobserved', rejection_reason = NULL, owner_feedback = NULL, scheduled_post_id = NULL
        WHERE scheduled_post_id = ?`,
-    ).bind(reason, reason, scheduledPostId).run();
+    ).bind(scheduledPostId).run();
   }
   if (await doesTableExist(env, "operator_autonomous_lineup_items")) {
     await env.DB.prepare(
-      `UPDATE operator_autonomous_lineup_items
-       SET status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
+            `UPDATE operator_autonomous_lineup_items
+       SET status = 'retired_unobserved', owner_feedback = NULL, updated_at = CURRENT_TIMESTAMP
        WHERE scheduled_post_id = ?`,
-    ).bind(input.deletedBy === "owner" ? "owner_deleted" : "model_deleted", reason, scheduledPostId).run();
+    ).bind(scheduledPostId).run();
   }
 
     return {
@@ -35552,8 +35547,10 @@ async function deleteScheduledPostForAppUser(
       scheduled_post_id: scheduledPostId,
       post_text: String(existing.post_text ?? ""),
       scheduled_time_utc: String(existing.scheduled_time ?? ""),
-      status_before: String(existing.status ?? ""),
+            status_before: String(existing.status ?? ""),
+      reason_code: reasonCode,
       reason,
+      learning_effect: "unobserved",
       deleted_by: input.deletedBy,
       deletion_source: input.deletionSource,
       operation_id: operationId,
@@ -35579,17 +35576,19 @@ async function deleteScheduledPostsForAppUserBatch(
   env: Env,
   appUserId: string,
   scheduledPostIds: number[],
-  input: {
+    input: {
     expectedThreadsUserId: string;
-    reason: string;
+    reasonCode: ScheduledPostDeletionReasonCode;
+    reasonDetail?: string | null;
     deletedBy: "owner" | "model";
     deletionSource: "ui" | "mcp";
     parentOperationId?: string | null;
   },
 ): Promise<{ records: ScheduledPostDeletionRecord[]; replayed_post_ids: number[] }> {
-  const reason = input.reason.trim();
+  const reasonCode = normalizeScheduledPostDeletionReasonCode(input.reasonCode);
+  if (!reasonCode) throw new Error("scheduled_post_deletion_reason_required");
+  const reason = buildScheduledPostDeletionReason(reasonCode, input.reasonDetail);
   const ids = Array.from(new Set(scheduledPostIds.map((id) => Math.trunc(Number(id)))));
-  if (!reason) throw new Error("scheduled_post_deletion_reason_required");
   if (!ids.length || ids.length > 25 || ids.some((id) => !Number.isInteger(id) || id <= 0)) {
     throw new Error("scheduled_post_ids_1_to_25_required");
   }
@@ -35665,8 +35664,10 @@ async function deleteScheduledPostsForAppUserBatch(
       scheduled_post_id: id,
       post_text: String(row.post_text ?? ""),
       scheduled_time_utc: String(row.scheduled_time ?? ""),
-      status_before: String(row.status ?? ""),
+            status_before: String(row.status ?? ""),
+      reason_code: reasonCode,
       reason,
+      learning_effect: "unobserved",
       deleted_by: input.deletedBy,
       deletion_source: input.deletionSource,
       operation_id: operationIdByPostId.get(id) ?? null,
@@ -35685,7 +35686,8 @@ async function deleteScheduledPostsForAppUserBatch(
     input.expectedThreadsUserId,
     record.post_text,
     record.scheduled_time_utc,
-    record.status_before,
+        record.status_before,
+    record.reason_code,
     record.reason,
     record.deleted_by,
     record.deletion_source,
@@ -35695,17 +35697,17 @@ async function deleteScheduledPostsForAppUserBatch(
   const mutationPlaceholders = pendingIds.map(() => "?").join(", ");
   if (await doesTableExist(env, "gpt_generation_drafts")) {
     statements.push(env.DB.prepare(
-      `UPDATE gpt_generation_drafts
-       SET status = 'rejected', rejection_reason = ?, owner_feedback = ?, scheduled_post_id = NULL
+            `UPDATE gpt_generation_drafts
+       SET status = 'retired_unobserved', rejection_reason = NULL, owner_feedback = NULL, scheduled_post_id = NULL
        WHERE scheduled_post_id IN (${mutationPlaceholders})`,
-    ).bind(reason, reason, ...pendingIds));
+    ).bind(...pendingIds));
   }
   if (await doesTableExist(env, "operator_autonomous_lineup_items")) {
     statements.push(env.DB.prepare(
-      `UPDATE operator_autonomous_lineup_items
-       SET status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
+            `UPDATE operator_autonomous_lineup_items
+       SET status = 'retired_unobserved', owner_feedback = NULL, updated_at = CURRENT_TIMESTAMP
        WHERE scheduled_post_id IN (${mutationPlaceholders})`,
-    ).bind(input.deletedBy === "owner" ? "owner_deleted" : "model_deleted", reason, ...pendingIds));
+    ).bind(...pendingIds));
   }
   statements.push(env.DB.prepare(
     `DELETE FROM scheduled_posts
