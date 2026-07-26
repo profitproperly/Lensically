@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 145f01dfe7c6d35c11f34f3165b2e1042864f9bc
-production_sha: 145f01dfe7c6d35c11f34f3165b2e1042864f9bc
+repository_base_sha: 29e388e231e752a791e13cb95d706b88127db2dc
+production_sha: 29e388e231e752a791e13cb95d706b88127db2dc
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -170,16 +170,36 @@ Completed checkpoint — Stage 4H source lineage schema extraction:
 - Exact-SHA migration-first release passed in run `30215081074`.
 - Live production independently confirmed exact SHA `145f01dfe7c6d35c11f34f3165b2e1042864f9bc`.
 
-Current sub-action — Stage 4I quality enforcement schema extraction:
+Completed checkpoint — Stage 4I quality enforcement schema extraction:
 
-Characterize and move the next dependency-complete quality enforcement cluster into ordered migrations:
+- Added `0007_quality_enforcement.sql`.
+- Moved complete migration ownership for:
+  - `operator_gates`
+  - `operator_gate_results`
+  - `operator_content_inventory`
+  - `operator_workflow_requirements`
+- Replaced gate, gate-result, content-inventory, and workflow-requirement runtime DDL with complete `assertDatabaseIntegrity` probes.
+- Preserved global and account-scoped gate uniqueness, stage, lane, and content-type scopes, evaluator and severity configuration, examples and source-memory links, immutable gate evidence, blocking and repair guidance, historical content fingerprints, opening and realm metadata, source-card linkage, workflow requirement enforcement state, indexes, and all existing data.
+- Added `QUALITY_UPGRADE_DB` to prove the ordered migration ledger adopts pre-existing quality enforcement tables without data loss and recreates expression-based uniqueness contracts.
+- Converted the shared reset from dropping quality tables to row cleanup.
+- The first eight-shard run failed in run `30215593977` because one existing long cycle-completion test retained Vitest's default five-second timeout after canonical schema setup increased fixture cost; the test now uses the same 30-second budget as its adjacent long cycle-defect test.
+- Push validation passed in run `30215645053`.
+- All eight Operator shards passed in run `30215704419`.
+- Exact-SHA migration-first release passed in run `30215734189`.
+- Live production independently confirmed exact SHA `29e388e231e752a791e13cb95d706b88127db2dc`.
 
-- `operator_gates`
-- `operator_gate_results`
-- `operator_content_inventory`
-- `operator_workflow_requirements`
+Current sub-action — Stage 4J operator continuity and autonomy state extraction:
 
-Preserve global and account-scoped gate uniqueness, stage and lane scopes, evaluator and severity configuration, examples and source-memory links, immutable gate evidence, blocking and repair guidance, historical content fingerprints, opening and realm metadata, source-card linkage, workflow requirement status and evidence, indexes, and all existing production data. Reduce this part of `ensureOperatorWorkflowTables` to bounded integrity checks.
+Characterize and move the next dependency-complete operator continuity cluster into ordered migrations:
+
+- `operator_mcp_sessions`
+- `operator_continuity_refs`
+- `operator_operation_receipts`
+- `operator_growth_missions`
+- `operator_growth_mission_revisions`
+- `operator_autonomy_profiles`
+
+Preserve session selection and proceed state, continuity payloads and expiration, operation idempotency receipts and replay responses, mission diagnostics and approval state, revision history, active autonomy constraints and permissions, update timestamps, uniqueness contracts, indexes, and all existing production data. Reduce this part of `ensureOperatorMcpAdminTables` to bounded integrity checks.
 
 Remaining Stage 4 work after this cluster:
 
