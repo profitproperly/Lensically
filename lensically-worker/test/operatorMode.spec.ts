@@ -268,12 +268,14 @@ type ManifestSourceBackedCycleTestFixture = {
 async function prepareManifestSourceBackedCycleForTest(
   options: { commitStrategy?: boolean } = {},
 ): Promise<ManifestSourceBackedCycleTestFixture> {
-  await activateManifestAutonomyForTest();
-  const session = await mcpTool<{ workflow_session_id: string }>("start_workflow_session", {
-    brand_key: "manifest_mental",
-    proceed_confirmed: true,
-  });
-    const sourceBatchId = crypto.randomUUID();
+    await activateManifestAutonomyForTest();
+  const workflowSessionId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO operator_workflow_sessions (
+      id, brand_key, workflow_template_key, objective, status, current_stage
+    ) VALUES (?, 'manifest_mental', 'content_operator_v1', 'Autonomous source-backed test fixture', 'active', 'source_intake')`,
+  ).bind(workflowSessionId).run();
+  const sourceBatchId = crypto.randomUUID();
   const sourceSelectionId = crypto.randomUUID();
   const sourceIdentityKey = `threads:test-source-backed-${crypto.randomUUID().slice(0, 8)}`;
     const sourceText = "If your finger touched this today, expect a financial win within 7 days.";
@@ -282,7 +284,7 @@ async function prepareManifestSourceBackedCycleForTest(
       id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
       qualified_pool_count, requested_count, selected_count, selected_at, metadata_json
     ) VALUES (?, 'manifest_mental', ?, 'test_fixture', 1000, 1, 1, 1, CURRENT_TIMESTAMP, '{}')`,
-  ).bind(sourceBatchId, session.workflow_session_id).run();
+    ).bind(sourceBatchId, workflowSessionId).run();
   await env.DB.prepare(
     `INSERT INTO operator_source_selections (
       id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
@@ -290,9 +292,9 @@ async function prepareManifestSourceBackedCycleForTest(
       post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
     ) VALUES (?, ?, 'manifest_mental', ?, 1, ?, 'saved_pattern', ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)`,
   ).bind(
-    sourceSelectionId,
+        sourceSelectionId,
     sourceBatchId,
-    session.workflow_session_id,
+    workflowSessionId,
             sourceIdentityKey,
     sourceIdentityKey,
     sourceIdentityKey,
@@ -308,9 +310,9 @@ async function prepareManifestSourceBackedCycleForTest(
       metrics: { likes: 2500 },
     }),
   ).run();
-  const sourceCard = await mcpTool<{ source_card_id: string }>("create_source_card", {
+    const sourceCard = await mcpTool<{ source_card_id: string }>("create_source_card", {
     brand_key: "manifest_mental",
-    workflow_session_id: session.workflow_session_id,
+    workflow_session_id: workflowSessionId,
     source_selection_id: sourceSelectionId,
     title: "Source-backed finger-touch fixture",
     source_mechanism: "Physical contact with the post acts as personal selection for a near-term financial outcome.",
