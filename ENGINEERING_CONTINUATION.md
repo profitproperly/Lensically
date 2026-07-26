@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 47a14d11b54dbd2da033fd2922dd82128d6cf6ed
-production_sha: 47a14d11b54dbd2da033fd2922dd82128d6cf6ed
+repository_base_sha: 2b715f0fd1bff79fce740ead511070a61bc1b445
+production_sha: 2b715f0fd1bff79fce740ead511070a61bc1b445
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -245,16 +245,35 @@ Completed checkpoint — Stage 4L incidents, hardening, observations, and engine
 - Exact-SHA migration-first release passed in run `30217582227`.
 - Live production independently confirmed exact SHA `47a14d11b54dbd2da033fd2922dd82128d6cf6ed`.
 
-Current sub-action — Stage 4M durable work state, repo-write sessions, and system retirement extraction:
+Completed checkpoint — Stage 4M durable work state, repo-write sessions, and system retirement extraction:
 
-Characterize and move the next durable operator-state cluster into ordered migrations:
+- Added `0011_durable_work_state_and_retirements.sql`.
+- Moved complete migration ownership for:
+  - `operator_work_state`
+  - `operator_work_ledger`
+  - `operator_repo_write_sessions`
+  - `operator_system_retirements`
+- Moved all legacy human-guidance table drops and the `human-free-retirement-v2` marker into the ordered migration.
+- Replaced runtime work-state, ledger, repo-write, and retirement schema mutation with complete `assertDatabaseIntegrity` probes while preserving default work-state and ledger seed/upsert behavior.
+- Runtime retirement now verifies the migration marker and fails closed instead of performing request-time schema mutation.
+- Added `WORK_STATE_UPGRADE_DB` to prove durable data preservation, singleton and work-key constraints, retirement marker persistence, and removal of every retired legacy table.
+- Converted shared tests from dropping durable repo-write state to row cleanup and aligned the human-free retirement test with migration-owned retirement.
+- Push validation passed in run `30218063236`.
+- All eight Operator shards passed in run `30218129927`.
+- Exact-SHA migration-first release passed in run `30218171275`.
+- Live production independently confirmed exact SHA `2b715f0fd1bff79fce740ead511070a61bc1b445`.
 
-- `operator_work_state`
-- `operator_work_ledger`
-- `operator_repo_write_sessions`
-- `operator_system_retirements`
+Current sub-action — Stage 4N execution routing, checkpoints, and events extraction:
 
-Preserve the singleton active-outcome contract, frozen scope and interrupt state, next action and completion evidence, work intake and dependency state, execution order and completion evidence, chunked repository-write sessions and content, system retirement evidence and replacement state, indexes, update timestamps, and all existing production data. Keep default work-state and ledger seeding plus retirement reconciliation as runtime behavior, but move all schema mutation to ordered migrations.
+Move the remaining execution-control schema into ordered migrations:
+
+- `operator_manifest_prepare_checkpoints`
+- `operator_pre_call_routes`
+- `operator_execution_events`
+
+Preserve prepare-operation checkpoints and phases, operation and slot identity, route fingerprints and deterministic tool selection, execution status and result evidence, idempotency and lookup indexes, timestamps, and all existing production data. Replace runtime DDL with integrity checks while preserving checkpoint, routing, and execution-event writes as application behavior.
+
+After Stage 4N, only Stage 4O's seven performance-learning and content-focus tables remain before the Stage 4 completion audit.
 
 Remaining Stage 4 work after this cluster:
 
