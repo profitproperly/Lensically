@@ -730,6 +730,87 @@ async function seedManifestIntelligenceFixture(
   ];
 }
 
+async function seedManifestIntelligenceEngineFixture(
+  db: D1Database,
+  suffix: string,
+): Promise<MigrationFixtureProbe[]> {
+  const brandKey = `brand-${suffix}`;
+  const experimentId = `experiment-${suffix}`;
+
+  await db.prepare(
+    `INSERT INTO operator_manifest_semantic_signatures (
+      id, brand_key, content_type, content_id, text_hash, signature_version, signature_json
+    ) VALUES (?, ?, 'published', ?, ?, 'signature-v1', '{"semantic_key":"fixture"}')`,
+  ).bind(`signature-${suffix}`, brandKey, `content-${suffix}`, `hash-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_maturity_evaluations (
+      id, brand_key, published_post_id, checkpoint_hours, evaluation_version,
+      evaluation_json, structural_change_allowed
+    ) VALUES (?, ?, ?, 24, 'maturity-v1', '{"mature":true}', 1)`,
+  ).bind(`maturity-${suffix}`, brandKey, `post-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_comparable_analyses (
+      id, brand_key, published_post_id, checkpoint_hours, analysis_version,
+      comparable_post_ids_json, analysis_json
+    ) VALUES (?, ?, ?, 24, 'analysis-v1', '["control-post"]', '{"delta":12}')`,
+  ).bind(`analysis-${suffix}`, brandKey, `post-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_learning_observations (
+      id, brand_key, level, feature_key, checkpoint_hours, sample_size,
+      supporting_count, contradicting_count, median_overall, effect_size,
+      confidence_score, confidence_label, state, evidence_json, learning_version
+    ) VALUES (?, ?, 'family', ?, 24, 8, 6, 2, 70, 12, 0.8, 'directional',
+      'active', '{"source":"fixture"}', 'learning-v1')`,
+  ).bind(`learning-${suffix}`, brandKey, `feature-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_portfolio_states (
+      id, brand_key, family_key, role, recommended_role, confidence_score,
+      confidence_label, allocation_weight, reason, evidence_json, portfolio_version
+    ) VALUES (?, ?, ?, 'core', 'franchise', 0.8, 'directional', 1.3,
+      'Fixture evidence', '{"sample":8}', 'portfolio-v1')`,
+  ).bind(`portfolio-${suffix}`, brandKey, `family-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_state_transitions (
+      id, transition_key, brand_key, entity_type, entity_id, from_state, to_state,
+      reason, evidence_json, transitioned_at
+    ) VALUES (?, ?, ?, 'confidence', ?, 'emerging', 'directional',
+      'Fixture transition', '{}', '2099-01-01T00:00:00Z')`,
+  ).bind(`transition-${suffix}`, `transition-key-${suffix}`, brandKey, `entity-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_experiments (
+      id, brand_key, experiment_key, family_key, hypothesis_json,
+      comparison_group_json, maturity_windows_json, result_criteria_json,
+      experiment_version
+    ) VALUES (?, ?, ?, ?, '{"claim":"fixture"}', '{"control":"matched"}',
+      '[24]', '{"win_delta":8}', 'experiment-v1')`,
+  ).bind(experimentId, brandKey, `experiment-key-${suffix}`, `family-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_experiment_assignments (
+      id, experiment_id, brand_key, cycle_id, slot_key, hypothesis_id,
+      scheduled_post_id, published_post_id, variant_key, status
+    ) VALUES (?, ?, ?, ?, '2099-01-01-01', ?, ?, ?, 'variant-a', 'published')`,
+  ).bind(
+    `assignment-${suffix}`,
+    experimentId,
+    brandKey,
+    `cycle-${suffix}`,
+    `hypothesis-${suffix}`,
+    900000,
+    `published-${suffix}`,
+  ).run();
+
+  return [
+    { table: "operator_manifest_semantic_signatures", column: "id", value: `signature-${suffix}` },
+    { table: "operator_manifest_maturity_evaluations", column: "id", value: `maturity-${suffix}` },
+    { table: "operator_manifest_comparable_analyses", column: "id", value: `analysis-${suffix}` },
+    { table: "operator_manifest_learning_observations", column: "id", value: `learning-${suffix}` },
+    { table: "operator_manifest_portfolio_states", column: "id", value: `portfolio-${suffix}` },
+    { table: "operator_manifest_state_transitions", column: "id", value: `transition-${suffix}` },
+    { table: "operator_manifest_experiments", column: "id", value: experimentId },
+    { table: "operator_manifest_experiment_assignments", column: "id", value: `assignment-${suffix}` },
+  ];
+}
+
 
 describe("canonical database migrations", () => {
   it("creates every extracted table with the required columns, indexes, and triggers", async () => {
