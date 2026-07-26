@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 77f8e0e12a7260dc6d5c95bb4260fb1bddd47e31
-production_sha: 77f8e0e12a7260dc6d5c95bb4260fb1bddd47e31
+repository_base_sha: 2a0d66cde231965d5539274086c58518bb60534e
+production_sha: 2a0d66cde231965d5539274086c58518bb60534e
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -382,21 +382,33 @@ Completed checkpoint — Stage 5B MCP tool-definition construction modularizatio
 - Exact-SHA release passed in run `30223768020`.
 - Live production independently confirmed exact SHA `77f8e0e12a7260dc6d5c95bb4260fb1bddd47e31`.
 
-Current sub-action — Stage 5C MCP tool-directory modularization:
+Completed checkpoint — Stage 5C MCP tool-directory modularization:
 
-Extract the static public-directory policy and pure discovery helpers from `src/index.ts`:
+- Added `src/operatorMcpToolDirectory.ts` as the canonical source for forbidden retired names, retired human-guidance names, the active public direct allowlist, public filtering/counting, handler classification, and definition shaping.
+- Removed the duplicated allowlists, retirement mutation loop, public-name predicate, filtering/count logic, and definition-shaping logic from `src/index.ts`.
+- Preserved the exact 75-tool public surface, tool order, retired suppression, required fields, annotations, and engineering/admin/backend handler labels.
+- Added `test/operatorMcpToolDirectory.spec.ts` and wired it into push and exact-head release gates.
+- Added release-preflight enforcement preventing directory policy from returning to `index.ts`.
+- The first release run `30224804127` stopped before migration or deploy because one full-release assertion still read the old `index.ts` location. That assertion was moved to the directory authority and revalidated.
+- Push validation passed in run `30224882306`.
+- All eight Operator shards passed in run `30224946522`.
+- Exact-SHA release passed in run `30224981528`.
+- Live production independently confirmed exact SHA `2a0d66cde231965d5539274086c58518bb60534e`.
 
-- forbidden retired tool names
-- active public direct tool names
-- retired human-guidance suppression
-- public tool filtering and count helpers
-- definition lookup and required-field shaping with explicit handler classification inputs
+Current sub-action — Stage 5D1 engineering tool-registry extraction:
 
-Preserve the exact 75-tool live public surface, retired-tool suppression, public ordering, annotations, required fields, handler labels, and all client-safety and capability-lifecycle gates. Add focused unit coverage and prevent directory policy/helpers from drifting back into `index.ts`.
+Move the static engineering MCP registry from `src/index.ts` into a focused registry module:
+
+- engineering tool-name tuple and union type
+- complete engineering tool definitions
+- exact names, titles, descriptions, schemas, annotations, and declaration order
+
+Preserve all source-defined engineering routing, public filtering, lifecycle declarations, client-safety behavior, exact tool counts, and definition lookup. Add a focused registry characterization test and release-preflight enforcement preventing the engineering registry from returning to `index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Move the static direct typed MCP registry arrays into focused registry modules.
+- Extract the static admin registry.
+- Extract the larger account/content registry in bounded groups if required.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
@@ -410,7 +422,7 @@ Remaining Stage 5 work after this checkpoint:
 
 ## Completion Gates
 
-Every Stage 4 checkpoint must pass:
+Every active implementation checkpoint must pass:
 
 - Database-authority validation.
 - TypeScript and capability-lifecycle validation.
@@ -421,7 +433,7 @@ Every Stage 4 checkpoint must pass:
 - Live production runtime, scheduler, retained website, and retired-surface verification.
 - Independent production commit confirmation.
 
-Stage 4 is complete only when runtime request preparation no longer owns active schema mutation and every active schema object has one ordered migration owner.
+Stage 4 completion is preserved above. Stage 5 closes only when the MCP protocol, registries, discovery, filtering, definition lookup, and transport/routing composition no longer live as monolithic implementations inside `src/index.ts`.
 
 ## Blockers
 
@@ -435,7 +447,7 @@ None currently recorded.
 4. Resume only `Current Action`; do not restart completed checkpoints.
 5. Do not generate, schedule, delete, or publish posts during Worker engineering unless the owner explicitly requests it.
 6. On any block: stop, fix the root cause, add prevention or regression coverage, then resume.
-7. Validate and release each bounded schema cluster independently before moving to the next.
+7. Validate and release each bounded implementation checkpoint independently before moving to the next.
 8. Rewrite this file after every meaningful implementation checkpoint.
 
 ## Rewrite Contract
