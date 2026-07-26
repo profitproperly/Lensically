@@ -6,10 +6,10 @@ const indexPath = resolve(root, "src/index.ts");
 const testPath = resolve(root, "test/operatorMode.spec.ts");
 let source = await readFile(indexPath, "utf8");
 let tests = await readFile(testPath, "utf8");
-const contractNeedle = "async function recoverPublishedPostLineage";
+const contractNeedle = "recoverPublishedPostLineage";
 const contractIndex = source.indexOf(contractNeedle);
-if (contractIndex < 0) throw new Error("lineage recovery handler not found");
-process.stdout.write(`${source.slice(contractIndex, contractIndex + 1600)}\n`);
+if (contractIndex < 0) throw new Error("lineage recovery symbol not found");
+process.stdout.write(`${source.slice(Math.max(0, contractIndex - 800), contractIndex + 2400)}\n`);
 throw new Error("stage3_lineage_contract_context_captured");
 const changes = [];
 
