@@ -2344,6 +2344,183 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves operational assurance records across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const operationalId = `operational-${suffix}`;
+    const auditId = `audit-${suffix}`;
+    const hardeningId = `hardening-${suffix}`;
+    const eventId = `hardening-event-${suffix}`;
+    const observationId = `observation-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_operational_incidents (
+        id, brand_key, incident_key, incident_type, severity, status,
+        required_recovery_action, evidence_json
+      ) VALUES (?, 'manifest_mental', ?, 'delivery_failure', 'critical', 'open',
+        'repair_delivery', '{"post_id":99}')`,
+    ).bind(operationalId, `incident-${suffix}`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_engineering_audit (
+        id, action, files_changed_json, diff_summary, tests_run_json, result,
+        deployment_id, metadata_json
+      ) VALUES (?, 'migration_fixture', '["src/index.ts"]', 'Fixture change',
+        '["databaseMigrations.spec.ts"]', 'passed', 'deployment-1', '{"sha":"abc"}')`,
+    ).bind(auditId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_hardening_incidents (
+        id, signature, boundary, severity, classification, state, affected_scope,
+        blocked_tool_name, request_fingerprint, expected_json, observed_json,
+        side_effect_state, root_cause, generalized_cause, prevention_rule_id,
+        regression_test_ids_json, tested_sha, deployment_id, live_verification_json,
+        resume_capsule_json, resume_result_json, autonomy_dividend_json,
+        efficiency_result_json
+      ) VALUES (?, ?, 'tool_boundary', 'high', 'schema_drift', 'verified', 'objective',
+        'fixture_tool', 'fingerprint-1', '{"expected":true}', '{"observed":true}',
+        'none', 'Fixture cause', 'Fixture generalized cause', 'rule-1', '["test-1"]',
+        'abc123', 'deployment-1', '{"live":true}', '{"resume":"next"}',
+        '{"resumed":true}', '{"calls_saved":2}', '{"duration_ms":10}')`,
+    ).bind(hardeningId, `signature-${suffix}`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_hardening_incident_events (
+        id, incident_id, from_state, to_state, evidence_json
+      ) VALUES (?, ?, 'detected', 'verified', '{"test":"passed"}')`,
+    ).bind(eventId, hardeningId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_operational_observations (
+        id, operation_id, incident_id, profile_id, capability, outcome,
+        duration_ms, call_count, external_requests, repeated_fingerprint_count,
+        progress_checkpoint, metadata_json
+      ) VALUES (?, 'operation-1', ?, 'profile-1', 'fixture_capability', 'success',
+        10, 2, 1, 0, 'verified', '{"bounded":true}')`,
+    ).bind(observationId, hardeningId).run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all([
+      countWhere("SELECT COUNT(*) AS total FROM operator_operational_incidents WHERE id = ?", operationalId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_engineering_audit WHERE id = ?", auditId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_hardening_incidents WHERE id = ?", hardeningId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_hardening_incident_events WHERE id = ?", eventId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_operational_observations WHERE id = ?", observationId),
+    ]);
+    expect(counts).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it("adopts the live assurance schema without losing incidents, audit receipts, events, or observations", async () => {
+    const db = testEnv.ASSURANCE_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_operational_incidents (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, incident_key TEXT NOT NULL,
+        incident_type TEXT NOT NULL, severity TEXT NOT NULL DEFAULT 'critical',
+        status TEXT NOT NULL DEFAULT 'open', scheduled_post_id INTEGER,
+        production_date TEXT, scheduled_time TEXT, observed_status TEXT,
+        delivery_state TEXT, published_post_id TEXT, publish_error_message TEXT,
+        last_attempted_at TEXT, required_recovery_action TEXT NOT NULL,
+        evidence_json TEXT, opened_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_observed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, resolved_at TEXT,
+        resolution_note TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, incident_key)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_engineering_audit (
+        id TEXT PRIMARY KEY, action TEXT NOT NULL, files_changed_json TEXT,
+        diff_summary TEXT, tests_run_json TEXT, result TEXT NOT NULL,
+        deployment_id TEXT, rollback_target TEXT, owner_approval TEXT,
+        metadata_json TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_hardening_incidents (
+        id TEXT PRIMARY KEY, signature TEXT NOT NULL, boundary TEXT NOT NULL,
+        severity TEXT NOT NULL, classification TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT 'detected', affected_scope TEXT NOT NULL DEFAULT 'objective',
+        blocked_profile_id TEXT, blocked_tool_name TEXT, request_fingerprint TEXT,
+        expected_json TEXT, observed_json TEXT,
+        side_effect_state TEXT NOT NULL DEFAULT 'not_applicable', root_cause TEXT,
+        generalized_cause TEXT, prevention_rule_id TEXT, regression_test_ids_json TEXT,
+        tested_sha TEXT, deployment_id TEXT, live_verification_json TEXT,
+        resume_capsule_json TEXT, resume_result_json TEXT, autonomy_dividend_json TEXT,
+        efficiency_result_json TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_hardening_incident_events (
+        id TEXT PRIMARY KEY, incident_id TEXT NOT NULL, from_state TEXT,
+        to_state TEXT NOT NULL, evidence_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_operational_observations (
+        id TEXT PRIMARY KEY, operation_id TEXT, incident_id TEXT, profile_id TEXT,
+        capability TEXT, outcome TEXT NOT NULL, duration_ms INTEGER, call_count INTEGER,
+        external_requests INTEGER, repeated_fingerprint_count INTEGER,
+        progress_checkpoint TEXT, metadata_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_operational_incidents (
+        id, brand_key, incident_key, incident_type, required_recovery_action
+      ) VALUES ('live-operational', 'manifest_mental', 'live-key', 'delivery_failure', 'repair')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_engineering_audit (id, action, result)
+       VALUES ('live-audit', 'deploy', 'passed')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_hardening_incidents (
+        id, signature, boundary, severity, classification, state
+      ) VALUES ('live-hardening', 'live-signature', 'tool_boundary', 'high', 'schema_drift', 'verified')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_hardening_incident_events (id, incident_id, to_state)
+       VALUES ('live-event', 'live-hardening', 'verified')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_operational_observations (id, incident_id, capability, outcome)
+       VALUES ('live-observation', 'live-hardening', 'fixture_capability', 'success')`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_assurance_upgrade_migrations",
+    );
+
+    const preserved = await Promise.all([
+      db.prepare("SELECT COUNT(*) AS total FROM operator_operational_incidents WHERE id = 'live-operational'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_engineering_audit WHERE id = 'live-audit'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_hardening_incidents WHERE id = 'live-hardening'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_hardening_incident_events WHERE id = 'live-event'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_operational_observations WHERE id = 'live-observation'").first<CountRow>(),
+    ]);
+    expect(preserved.map((row) => Number(row?.total ?? 0))).toEqual([1, 1, 1, 1, 1]);
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_operational_incidents (
+          id, brand_key, incident_key, incident_type, required_recovery_action
+        ) VALUES ('duplicate-operational', 'manifest_mental', 'live-key', 'delivery_failure', 'repair')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_hardening_incidents (
+          id, signature, boundary, severity, classification, state
+        ) VALUES ('duplicate-hardening', 'live-signature', 'tool_boundary', 'high', 'schema_drift', 'detected')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

@@ -199,8 +199,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves autonomous cycle and protected decision records across migration replay")) {
     errors.push("autonomous_cycle_decision_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live autonomous cycle and protected decision schema without losing lineage or budgets")) {
+    if (!migrationTests.includes("adopts the live autonomous cycle and protected decision schema without losing lineage or budgets")) {
     errors.push("autonomous_cycle_decision_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves operational assurance records across migration replay")) {
+    errors.push("operational_assurance_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live assurance schema without losing incidents, audit receipts, events, or observations")) {
+    errors.push("operational_assurance_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
