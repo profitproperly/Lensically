@@ -63,6 +63,13 @@ import {
   type LocalExecutionNodeStatus,
   type LocalValidationReceipt,
 } from "./localExecution";
+import {
+  HUMAN_FREE_AUTONOMY_CONTRACT,
+  SCHEDULED_POST_DELETION_REASON_CODES,
+  buildScheduledPostDeletionReason,
+  normalizeScheduledPostDeletionReasonCode,
+  type ScheduledPostDeletionReasonCode,
+} from "./humanFreeAutonomy";
 
 import {
   MANIFEST_ANALYSIS_WINDOW_DAYS,
@@ -4066,12 +4073,27 @@ async function ensureScheduledPostDeletionsTable(env: Env): Promise<void> {
       post_text TEXT NOT NULL,
       scheduled_time TEXT NOT NULL,
       status_before TEXT NOT NULL,
+      reason_code TEXT,
       reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+      learning_effect TEXT NOT NULL DEFAULT 'unobserved' CHECK (learning_effect = 'unobserved'),
       deleted_by TEXT NOT NULL CHECK (deleted_by IN ('owner', 'model')),
       deletion_source TEXT NOT NULL CHECK (deletion_source IN ('ui', 'mcp')),
       operation_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+  ).run();
+  const tableInfo = await env.DB.prepare("PRAGMA table_info(scheduled_post_deletions)").all<{ name?: string }>();
+  const columnNames = new Set((tableInfo.results ?? []).map((row) => String(row.name ?? "")));
+  if (!columnNames.has("reason_code")) {
+    await env.DB.prepare("ALTER TABLE scheduled_post_deletions ADD COLUMN reason_code TEXT").run();
+  }
+  if (!columnNames.has("learning_effect")) {
+    await env.DB.prepare("ALTER TABLE scheduled_post_deletions ADD COLUMN learning_effect TEXT NOT NULL DEFAULT 'unobserved'").run();
+  }
+  await env.DB.prepare(
+    `UPDATE scheduled_post_deletions
+     SET reason_code = COALESCE(NULLIF(trim(reason_code), ''), 'legacy_unclassified'),
+         learning_effect = 'unobserved'`,
   ).run();
   await env.DB.prepare(
     `CREATE INDEX IF NOT EXISTS idx_scheduled_post_deletions_account_time
@@ -35385,7 +35407,9 @@ type ScheduledPostDeletionRecord = {
   post_text: string;
   scheduled_time_utc: string;
   status_before: string;
+  reason_code: ScheduledPostDeletionReasonCode | "legacy_unclassified";
   reason: string;
+  learning_effect: "unobserved";
   deleted_by: "owner" | "model";
   deletion_source: "ui" | "mcp";
   operation_id: string | null;
@@ -35393,13 +35417,16 @@ type ScheduledPostDeletionRecord = {
 };
 
 function mapScheduledPostDeletionRow(row: Record<string, unknown>): ScheduledPostDeletionRecord {
+  const normalizedReasonCode = normalizeScheduledPostDeletionReasonCode(row.reason_code);
   return {
     id: String(row.id ?? ""),
     scheduled_post_id: Number(row.scheduled_post_id ?? 0),
     post_text: String(row.post_text ?? ""),
     scheduled_time_utc: String(row.scheduled_time ?? ""),
     status_before: String(row.status_before ?? ""),
+    reason_code: normalizedReasonCode ?? "legacy_unclassified",
     reason: String(row.reason ?? ""),
+    learning_effect: "unobserved",
     deleted_by: String(row.deleted_by ?? "model") === "owner" ? "owner" : "model",
     deletion_source: String(row.deletion_source ?? "mcp") === "ui" ? "ui" : "mcp",
     operation_id: normalizeOperatorText(row.operation_id, 240, true),
