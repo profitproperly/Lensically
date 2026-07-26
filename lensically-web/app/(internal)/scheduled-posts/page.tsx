@@ -71,6 +71,37 @@ const THREADS_SCHEDULE_STRATEGY_URL = buildWorkerUrl("/api/threads/schedule/stra
 const FALLBACK_TIMEZONE = "America/New_York";
 const FALLBACK_CLOCK_FORMAT = "12h";
 
+const SCHEDULED_POST_DELETION_REASONS = [
+  { code: "constitution_violation", label: "Constitution violation" },
+  { code: "platform_safety", label: "Platform or account safety" },
+  { code: "exact_duplicate", label: "Exact duplicate" },
+  { code: "technical_corruption", label: "Technical corruption" },
+  { code: "wrong_account_or_slot", label: "Wrong account or slot" },
+  { code: "owner_emergency_withdrawal", label: "Emergency withdrawal" },
+] as const;
+
+type ScheduledPostDeletionReasonCode = typeof SCHEDULED_POST_DELETION_REASONS[number]["code"];
+
+function requestScheduledPostDeletionReason(): {
+  reasonCode: ScheduledPostDeletionReasonCode;
+  reasonDetail: string | null;
+} | null {
+  const menu = SCHEDULED_POST_DELETION_REASONS
+    .map((reason, index) => `${index + 1}. ${reason.label}`)
+    .join("\n");
+  const selection = window.prompt(
+    `Choose an objective deletion reason by number:\n\n${menu}\n\nWeakness, repetition, or personal dislike are not deletion reasons.`,
+  )?.trim();
+  if (!selection) return null;
+  const selectedIndex = Number(selection) - 1;
+  const selectedReason = SCHEDULED_POST_DELETION_REASONS[selectedIndex];
+  if (!selectedReason) return null;
+  const reasonDetail = window.prompt(
+    "Optional factual detail. Do not include taste feedback or a performance prediction.",
+  )?.trim() || null;
+  return { reasonCode: selectedReason.code, reasonDetail };
+}
+
 function parseScheduledTimestamp(value: string): number {
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
@@ -494,17 +525,15 @@ export default function ScheduledPostsPage() {
     }
   }
 
-    async function deleteScheduledPost(scheduledPostId: number) {
-    const reason = window.prompt(
-      "Why are you deleting this scheduled post? This reason will be saved for you and the autonomous model.",
-    )?.trim();
-    if (!reason) {
-      setDeleteScheduledPostError("A deletion reason is required.");
+        async function deleteScheduledPost(scheduledPostId: number) {
+    const deletionReason = requestScheduledPostDeletionReason();
+    if (!deletionReason) {
+      setDeleteScheduledPostError("Choose one of the objective deletion reasons.");
       setDeleteScheduledPostSuccess("");
       return;
     }
     const confirmed = window.confirm(
-      "Delete this scheduled post? The post will not publish, but its text, slot, and deletion reason will remain in history.",
+      "Delete this scheduled post? It will not publish. The deletion is recorded as an unobserved operational action and will not affect learning.",
     );
     if (!confirmed) {
       return;
@@ -524,7 +553,8 @@ export default function ScheduledPostsPage() {
         body: JSON.stringify({
           scheduled_post_id: scheduledPostId,
           threads_user_id: threadsUserId,
-          reason,
+          reason_code: deletionReason.reasonCode,
+          reason_detail: deletionReason.reasonDetail,
         }),
       });
 
@@ -540,7 +570,7 @@ export default function ScheduledPostsPage() {
       setScheduledPosts((currentPosts) =>
         currentPosts.filter((post) => post.id !== scheduledPostId),
       );
-      setDeleteScheduledPostSuccess("Scheduled post deleted and its reason was saved.");
+      setDeleteScheduledPostSuccess("Scheduled post deleted as an unobserved operational action.");
       setScheduledPostsError("");
     } catch {
       setDeleteScheduledPostError("Could not delete scheduled post.");
@@ -586,7 +616,10 @@ export default function ScheduledPostsPage() {
     setDeleteScheduledPostSuccess("");
   }
 
-        async function deleteScheduledPostRequest(scheduledPostId: number, reason: string): Promise<{
+                async function deleteScheduledPostRequest(
+    scheduledPostId: number,
+    deletionReason: { reasonCode: ScheduledPostDeletionReasonCode; reasonDetail: string | null },
+  ): Promise<{
     success: boolean;
     error?: string;
   }> {
@@ -600,7 +633,8 @@ export default function ScheduledPostsPage() {
         body: JSON.stringify({
           scheduled_post_id: scheduledPostId,
           threads_user_id: threadsUserId,
-          reason,
+          reason_code: deletionReason.reasonCode,
+          reason_detail: deletionReason.reasonDetail,
         }),
       });
 
@@ -632,16 +666,14 @@ export default function ScheduledPostsPage() {
       return;
     }
 
-    const reason = window.prompt(
-      `Why are you deleting these ${selectedIds.length} scheduled posts? The same reason will be saved with each post.`,
-    )?.trim();
-    if (!reason) {
-      setDeleteScheduledPostError("A deletion reason is required.");
+        const deletionReason = requestScheduledPostDeletionReason();
+    if (!deletionReason) {
+      setDeleteScheduledPostError("Choose one of the objective deletion reasons.");
       setDeleteScheduledPostSuccess("");
       return;
     }
     const confirmed = window.confirm(
-      `Delete ${selectedIds.length} scheduled post${selectedIds.length === 1 ? "" : "s"}? Their text, slots, and deletion reason will remain in history.`,
+      `Delete ${selectedIds.length} scheduled post${selectedIds.length === 1 ? "" : "s"}? They will be recorded as unobserved operational actions and will not affect learning.`,
     );
     if (!confirmed) {
       return;
@@ -656,7 +688,7 @@ export default function ScheduledPostsPage() {
     let lastError = "";
 
     for (const scheduledPostId of selectedIds) {
-      const result = await deleteScheduledPostRequest(scheduledPostId, reason);
+            const result = await deleteScheduledPostRequest(scheduledPostId, deletionReason);
       if (result.success) {
         deletedIds.push(scheduledPostId);
       } else {
@@ -684,7 +716,7 @@ export default function ScheduledPostsPage() {
       setDeleteScheduledPostSuccess("");
     } else {
       setDeleteScheduledPostSuccess(
-        `Deleted ${deletedIds.length} scheduled post${deletedIds.length === 1 ? "" : "s"} and saved the reason.`,
+                `Deleted ${deletedIds.length} scheduled post${deletedIds.length === 1 ? "" : "s"} as unobserved operational actions.`,
       );
       setDeleteScheduledPostError("");
       setIsBulkSelectionMode(false);
