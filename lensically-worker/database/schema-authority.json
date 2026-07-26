@@ -1,0 +1,54 @@
+{
+  "version": "lensically-database-authority-v1",
+  "status": "transitional_runtime_ddl_inventory",
+  "canonical_migration_directory": "migrations",
+  "target_state": "All tables, columns, indexes, triggers, rebuilds, and retirements are owned by ordered versioned migrations. Runtime code performs bounded integrity probes only.",
+  "runtime_ddl_sources": [
+    "src/index.ts",
+    "src/manifestIntelligence.ts",
+    "src/manifestIntelligenceEngine.ts",
+    "src/manifestMeasurementAudit.ts",
+    "src/manifestProductIntegration.ts"
+  ],
+  "temporary_table_suffixes": [
+    "_rebuild"
+  ],
+  "declared_duplicate_owners": {
+    "external_patterns": {
+      "canonical_source": "src/index.ts",
+      "temporary_sources": [
+        "src/index.ts",
+        "src/manifestProductIntegration.ts"
+      ],
+      "retirement_checkpoint": "stage_4_product_integration_extraction"
+    },
+    "threads_follower_snapshots": {
+      "canonical_source": "src/index.ts",
+      "temporary_sources": [
+        "src/index.ts",
+        "src/manifestMeasurementAudit.ts"
+      ],
+      "retirement_checkpoint": "stage_4_measurement_audit_extraction"
+    }
+  },
+  "retired_tables": [
+    "gpt_strategy_memory",
+    "operator_workflow_sessions",
+    "operator_context_admissions",
+    "operator_production_board_items",
+    "operator_review_batches",
+    "agent_account_controls",
+    "operator_local_execution_nodes",
+    "operator_local_execution_jobs",
+    "operator_local_validation_receipts",
+    "operator_validation_plane_events",
+    "operator_local_execution_enrollment_tokens"
+  ],
+  "completion_requirements": [
+    "No CREATE TABLE, ALTER TABLE, CREATE INDEX, CREATE TRIGGER, compatibility rebuild, or DROP TABLE remains in request preparation.",
+    "Every active table has exactly one migration owner.",
+    "The release workflow applies pending migrations before Worker deployment.",
+    "Fresh-database, existing-database upgrade, idempotency, and production-characterization tests pass.",
+    "Retired tables are removed by migration and never recreated by runtime code."
+  ]
+}
