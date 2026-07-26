@@ -6447,49 +6447,47 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     operatorExpectedControlIncidentCleanupApplied = true;
   }
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_work_state (
-      id TEXT PRIMARY KEY CHECK (id = 'singleton'),
-      contract_version TEXT NOT NULL,
-      policy_version TEXT NOT NULL,
-      role TEXT NOT NULL,
-      active_outcome_key TEXT NOT NULL,
-      active_outcome_title TEXT NOT NULL,
-      active_scope_json TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'active',
-      scope_frozen INTEGER NOT NULL DEFAULT 1,
-      active_interrupt_key TEXT,
-      next_action TEXT NOT NULL,
-      completion_evidence_json TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_work_ledger (
-      id TEXT PRIMARY KEY,
-      work_key TEXT NOT NULL UNIQUE,
-      title TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      priority TEXT NOT NULL,
-      status TEXT NOT NULL,
-      intake_decision TEXT NOT NULL,
-      intake_reason TEXT NOT NULL,
-      required_for_active_outcome INTEGER NOT NULL DEFAULT 0,
-      dependencies_json TEXT NOT NULL DEFAULT '[]',
-      completion_condition TEXT NOT NULL,
-      execution_order INTEGER NOT NULL DEFAULT 1000,
-      evidence_json TEXT NOT NULL DEFAULT '[]',
-      merged_into_work_key TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      completed_at TEXT
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_work_ledger_status_order
-     ON operator_work_ledger (status, priority, execution_order, updated_at DESC)`,
-  ).run();
+    await assertDatabaseIntegrity(env.DB, {
+    table: "operator_work_state",
+    columns: [
+      "id",
+      "contract_version",
+      "policy_version",
+      "role",
+      "active_outcome_key",
+      "active_outcome_title",
+      "active_scope_json",
+      "status",
+      "scope_frozen",
+      "active_interrupt_key",
+      "next_action",
+      "completion_evidence_json",
+      "created_at",
+      "updated_at",
+    ],
+  });
+  await assertDatabaseIntegrity(env.DB, {
+    table: "operator_work_ledger",
+    columns: [
+      "id",
+      "work_key",
+      "title",
+      "summary",
+      "priority",
+      "status",
+      "intake_decision",
+      "intake_reason",
+      "required_for_active_outcome",
+      "dependencies_json",
+      "completion_condition",
+      "execution_order",
+      "evidence_json",
+      "merged_into_work_key",
+      "created_at",
+      "updated_at",
+      "completed_at",
+    ],
+  });
   await env.DB.prepare(
     `INSERT INTO operator_work_state (
       id, contract_version, policy_version, role, active_outcome_key, active_outcome_title,
@@ -6534,19 +6532,20 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
     ).run();
   }
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_repo_write_sessions (
-      id TEXT PRIMARY KEY,
-      path TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      message TEXT NOT NULL,
-      summary TEXT,
-      content TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'open',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
+    await assertDatabaseIntegrity(env.DB, {
+    table: "operator_repo_write_sessions",
+    columns: [
+      "id",
+      "path",
+      "mode",
+      "message",
+      "summary",
+      "content",
+      "status",
+      "created_at",
+      "updated_at",
+    ],
+  });
 
   for (const requirement of DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS) {
     const existing = await env.DB.prepare(
@@ -7146,41 +7145,16 @@ async function seedDefaultOperatorGates(env: Env): Promise<void> {
 const LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION = "human-free-retirement-v2";
 
 async function retireLegacyHumanGuidanceState(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_system_retirements (
-      retirement_key TEXT PRIMARY KEY,
-      completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "operator_system_retirements",
+    columns: ["retirement_key", "completed_at"],
+  });
   const completed = await env.DB.prepare(
     `SELECT retirement_key FROM operator_system_retirements WHERE retirement_key = ? LIMIT 1`,
   ).bind(LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION).first<{ retirement_key?: string }>();
-  if (completed?.retirement_key) return;
-
-    const statements = [
-    "DROP TABLE IF EXISTS operator_workflow_sessions",
-    "DROP TABLE IF EXISTS operator_context_admissions",
-    "DROP TABLE IF EXISTS operator_production_board_items",
-    "DROP TABLE IF EXISTS operator_review_batches",
-    "DROP TABLE IF EXISTS agent_account_controls",
-    "DROP TABLE IF EXISTS operator_local_execution_nodes",
-    "DROP TABLE IF EXISTS operator_local_execution_jobs",
-    "DROP TABLE IF EXISTS operator_local_validation_receipts",
-    "DROP TABLE IF EXISTS operator_validation_plane_events",
-    "DROP TABLE IF EXISTS operator_local_execution_enrollment_tokens",
-  ];
-  for (const statement of statements) {
-    try {
-      await env.DB.prepare(statement).run();
-    } catch (error) {
-      const message = getErrorMessage(error);
-      if (!message.includes("no such table") && !message.includes("no such column")) throw error;
-    }
+  if (!completed?.retirement_key) {
+    throw new Error(`database_integrity_missing_retirement:${LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION}`);
   }
-  await env.DB.prepare(
-    `INSERT OR REPLACE INTO operator_system_retirements (retirement_key, completed_at)
-     VALUES (?, CURRENT_TIMESTAMP)`,
-  ).bind(LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION).run();
 }
 
 const operatorModePreparationByEnv = new WeakMap<object, Promise<void>>();
