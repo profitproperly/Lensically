@@ -202,20 +202,46 @@ tests = replaceExact(
   `      saved_pattern_id: savedPatternId,`,
   "remove retired lineage workflow input",
 );
-const retiredShownFixture = `    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });`;
-const retiredShownFixtureCount = tests.split(retiredShownFixture).length - 1;
-if (retiredShownFixtureCount !== 2) {
-  throw new Error(`replace retired draft-shown transition fixtures: expected 2 matches, found ${retiredShownFixtureCount}`);
-}
-tests = tests.replaceAll(
-  retiredShownFixture,
-  `    await env.DB.prepare(
+tests = replaceExact(
+  tests,
+  `    const shown = await operatorTool<{ draft_id: string }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: first.runId,
+      source_card_id: first.sourceCardId,
+      text: "Imagine your workflow finally stops leaking time.",
+      draft_analysis: { opening_phrase: "Imagine your workflow", realm_entrance_key: "imagine", lane_key: "systems" },
+    });
+    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });`,
+  `    const shown = await operatorTool<{ draft_id: string }>("submit_candidate_draft", {
+      brand_key: BRAND_KEY,
+      run_id: first.runId,
+      source_card_id: first.sourceCardId,
+      text: "Imagine your workflow finally stops leaking time.",
+      draft_analysis: { opening_phrase: "Imagine your workflow", realm_entrance_key: "imagine", lane_key: "systems" },
+    });
+    await env.DB.prepare(
       \`UPDATE gpt_generation_drafts
        SET status = 'shown', showable = 1, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND account_id = ?\`,
-    ).bind(shown.draft_id, BRAND_KEY).run();`,
+    ).bind(shown.draft_id, BRAND_KEY).run();
+    await env.DB.prepare(
+      \`INSERT INTO operator_content_inventory (
+        id, brand_key, source_type, source_id, text, first_line, opening_phrase,
+        realm_entrance_key, hook_style, lane_key, source_card_id, status, used_at, metadata_json
+      ) VALUES (?, ?, 'generated_draft', ?, ?, ?, ?, 'imagine', NULL, 'systems', ?, 'shown', ?, ?)\`,
+    ).bind(
+      crypto.randomUUID(),
+      BRAND_KEY,
+      shown.draft_id,
+      "Imagine your workflow finally stops leaking time.",
+      "Imagine your workflow finally stops leaking time.",
+      "Imagine your workflow",
+      first.sourceCardId,
+      new Date().toISOString(),
+      JSON.stringify({ analysis: { opening_phrase: "Imagine your workflow", realm_entrance_key: "imagine", lane_key: "systems" } }),
+    ).run();`,
+  "replace retired draft-shown transition with inventory evidence",
 );
-changes.push("replace retired draft-shown transition fixtures");
 tests = replaceExact(
   tests,
   `      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {`,
