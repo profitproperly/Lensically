@@ -1,3 +1,5 @@
+import { assertDatabaseIntegrity } from "./databaseIntegrity";
+
 export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v4";
 export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v4";
 
@@ -246,100 +248,24 @@ function slotDistanceHours(left: string, right: string): number {
 }
 
 export async function ensureSourceFamilySelectionTables(db: D1Database): Promise<void> {
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_family_evidence_states (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      source_card_family_id TEXT NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      label_policy_version TEXT NOT NULL,
-      lifetime_label TEXT NOT NULL,
-      recent_label TEXT NOT NULL,
-      confidence_label TEXT NOT NULL,
-      lifetime_sample_size INTEGER NOT NULL DEFAULT 0,
-      recent_sample_size INTEGER NOT NULL DEFAULT 0,
-      account_lifetime_median_likes REAL NOT NULL DEFAULT 0,
-      account_28d_median_likes REAL NOT NULL DEFAULT 0,
-      family_lifetime_median_likes REAL,
-      family_28d_median_likes REAL,
-      lifetime_index REAL,
-      recent_index REAL,
-      latest_two_recent_index REAL,
-      probability_above_median REAL NOT NULL DEFAULT 0.5,
-      probability_above_franchise_floor REAL NOT NULL DEFAULT 0.5,
-      probability_below_underperformance_floor REAL NOT NULL DEFAULT 0.5,
-      state_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, source_card_family_id)
-    )`,
-  ).run();
-  await db.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_family_evidence_labels
-     ON operator_source_family_evidence_states (brand_key, lifetime_label, recent_label, updated_at DESC)`,
-  ).run();
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_family_label_transitions (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      source_card_family_id TEXT NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      label_policy_version TEXT NOT NULL,
-      previous_lifetime_label TEXT,
-      lifetime_label TEXT NOT NULL,
-      previous_recent_label TEXT,
-      recent_label TEXT NOT NULL,
-      evidence_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await db.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_family_label_transitions
-     ON operator_source_family_label_transitions (brand_key, source_card_family_id, created_at DESC)`,
-  ).run();
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_selection_receipts (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      scope_type TEXT NOT NULL,
-      scope_id TEXT NOT NULL,
-      slot_key TEXT NOT NULL,
-      selection_order INTEGER NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      source_card_family_id TEXT NOT NULL,
-      source_card_id TEXT NOT NULL,
-      engine_version TEXT NOT NULL,
-      receipt_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, scope_type, scope_id, slot_key)
-    )`,
-  ).run();
-  await db.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_selection_receipts_scope
-     ON operator_source_selection_receipts (brand_key, scope_type, scope_id, selection_order)`,
-  ).run();
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_selection_plans (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      cycle_id TEXT NOT NULL,
-      slot_key TEXT NOT NULL,
-      selection_order INTEGER NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      source_card_family_id TEXT NOT NULL,
-      source_card_id TEXT NOT NULL,
-      engine_version TEXT NOT NULL,
-      receipt_json TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'locked',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, cycle_id, slot_key)
-    )`,
-  ).run();
-  await db.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_selection_plans_cycle
-     ON operator_source_selection_plans (brand_key, cycle_id, selection_order)`,
-  ).run();
+  await Promise.all([
+    assertDatabaseIntegrity(db, {
+      table: "operator_source_family_evidence_states",
+      columns: ["id", "brand_key", "source_card_family_id", "source_identity_key", "label_policy_version", "lifetime_label", "recent_label", "confidence_label", "lifetime_sample_size", "recent_sample_size", "account_lifetime_median_likes", "account_28d_median_likes", "family_lifetime_median_likes", "family_28d_median_likes", "lifetime_index", "recent_index", "latest_two_recent_index", "probability_above_median", "probability_above_franchise_floor", "probability_below_underperformance_floor", "state_json", "created_at", "updated_at"],
+    }),
+    assertDatabaseIntegrity(db, {
+      table: "operator_source_family_label_transitions",
+      columns: ["id", "brand_key", "source_card_family_id", "source_identity_key", "label_policy_version", "previous_lifetime_label", "lifetime_label", "previous_recent_label", "recent_label", "evidence_json", "created_at"],
+    }),
+    assertDatabaseIntegrity(db, {
+      table: "operator_source_selection_receipts",
+      columns: ["id", "brand_key", "scope_type", "scope_id", "slot_key", "selection_order", "source_identity_key", "source_card_family_id", "source_card_id", "engine_version", "receipt_json", "created_at"],
+    }),
+    assertDatabaseIntegrity(db, {
+      table: "operator_source_selection_plans",
+      columns: ["id", "brand_key", "cycle_id", "slot_key", "selection_order", "source_identity_key", "source_card_family_id", "source_card_id", "engine_version", "receipt_json", "status", "created_at", "updated_at"],
+    }),
+  ]);
 }
 
 export async function refreshSourceFamilyLabels(
