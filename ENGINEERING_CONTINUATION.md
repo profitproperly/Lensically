@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 207d0f569c9a24348da6f35ce353eef4d963ce9d
-production_sha: 207d0f569c9a24348da6f35ce353eef4d963ce9d
+repository_base_sha: 87a4490228834ffc3bf88e27ab5cb721418cecd4
+production_sha: 87a4490228834ffc3bf88e27ab5cb721418cecd4
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -73,16 +73,38 @@ Completed checkpoint — first real schema extraction:
 - Exact-SHA migration-first release passed in run `30210532793`.
 - Live production independently confirmed exact SHA `207d0f569c9a24348da6f35ce353eef4d963ce9d`.
 
-Current sub-action — Stage 4D scheduling and publishing schema extraction:
+Completed checkpoint — Stage 4D scheduling and publishing schema extraction:
 
-Move the next coherent schema cluster into ordered migrations and reduce its runtime preparation functions to integrity checks:
+- Added `0002_scheduling_and_publishing.sql`.
+- Moved complete migration ownership for:
+  - `scheduled_posts`
+  - `scheduled_post_deletions`
+  - `batch_schedule_presets`
+  - `threads_publish_idempotency`
+- Added `users` as a canonical migration dependency while its remaining `app_threads_accounts` cleanup trigger stays transitional.
+- Replaced all four runtime DDL functions with complete `assertDatabaseIntegrity` probes.
+- Preserved scheduling status constraints, publication reconciliation fields, idempotency keys, deletion audit history, indexes, update triggers, user-existence guards, and user-cleanup behavior.
+- Converted shared and focused tests from dropping or recreating canonical scheduling tables to ordered row cleanup and canonical row fixtures.
+- Expanded migration characterization for fresh schema objects, migration idempotency, data preservation, parent-user rejection, and cleanup cascades.
+- The first release attempt stopped before deployment because production's legacy `scheduled_post_deletions` table lacked `reason_code`.
+- Reworked the unapplied migration to add and backfill `reason_code` and `learning_effect` explicitly.
+- Added an isolated `UPGRADE_DB` D1 fixture that starts from the production-era schema and applies the complete ordered migration ledger.
+- Push validation passed in run `30211794208`.
+- All eight Operator shards passed in run `30211846866`.
+- Exact-SHA migration-first release passed in run `30211881673`.
+- Live production independently confirmed exact SHA `87a4490228834ffc3bf88e27ab5cb721418cecd4`.
 
-- `scheduled_posts`
-- `scheduled_post_deletions`
-- `batch_schedule_presets`
-- `threads_publish_idempotency`
+Current sub-action — Stage 4E account and Threads-profile schema extraction:
 
-Preserve all current scheduling status constraints, idempotency behavior, publication reconciliation fields, deletion audit history, indexes, triggers, foreign-key enforcement behavior, and existing production data. Resolve compatibility and duplicate-cleanup logic in explicit migrations rather than request paths.
+Characterize and move the next dependency-complete identity cluster into ordered migrations, including compatibility rebuilds and the remaining `users` cleanup-trigger dependency:
+
+- `app_threads_accounts`
+- `threads_accounts`
+- `threads_profile_cache`
+- `meta_deletion_requests`
+- temporary account rebuild tables and associated indexes/triggers
+
+Preserve account routing, canonical account selection, encrypted token storage, connection state, token expiry, profile cache behavior, Meta deletion receipts, user cleanup semantics, and all existing production data. Eliminate request-time rebuilds and schema mutation without weakening account isolation.
 
 Remaining Stage 4 work after this cluster:
 
