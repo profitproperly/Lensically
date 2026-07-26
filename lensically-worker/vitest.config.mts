@@ -16,7 +16,7 @@ export default defineWorkersConfig({
         wrangler: { configPath: "./wrangler.jsonc" },
                 miniflare: {
           bindings: { TEST_MIGRATIONS: migrations },
-          d1Databases: { UPGRADE_DB: "lensically-upgrade-test" },
+                    d1Databases: { UPGRADE_DB: { id: "lensically-upgrade-test" } },
         },
         isolatedStorage: false,
       },
