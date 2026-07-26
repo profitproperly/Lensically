@@ -168,21 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${TASK}" in
-            typecheck)
-              if [ "${RELEASE_ID}" = "apply-worker-cleanup-stage2" ]; then
-                node scripts/apply-worker-cleanup-stage2.mjs
-                rm scripts/apply-worker-cleanup-stage2.mjs
-                git diff --check
-                npx tsc --noEmit
-                npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
-                npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
-                git config user.name "Lensically Operator"
-                git config user.email "operator@lensically.com"
-                git add -A lensically-worker/src lensically-worker/scripts/apply-worker-cleanup-stage2.mjs
-                git commit -m "Physically remove isolated retired Worker systems"
-                git push origin HEAD:main
-              fi
-              ;;
+            typecheck) ;;
             operator-smoke)
               node scripts/run-operator-validation.mjs smoke
               npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
