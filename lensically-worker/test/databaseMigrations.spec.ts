@@ -960,6 +960,95 @@ async function seedManifestMeasurementAuditFixture(
   ];
 }
 
+async function seedFinalDatabaseAuthorityFixture(
+  db: D1Database,
+  suffix: string,
+): Promise<MigrationFixtureProbe[]> {
+  const brandKey = `brand-${suffix}`;
+  const familyId = `family-${suffix}`;
+  const sourceIdentity = `identity-${suffix}`;
+
+  await db.prepare(
+    `INSERT INTO operator_source_family_evidence_states (
+      id, brand_key, source_card_family_id, source_identity_key,
+      label_policy_version, lifetime_label, recent_label, confidence_label,
+      lifetime_sample_size, recent_sample_size, account_lifetime_median_likes,
+      account_28d_median_likes, family_lifetime_median_likes,
+      family_28d_median_likes, lifetime_index, recent_index,
+      latest_two_recent_index, state_json
+    ) VALUES (?, ?, ?, ?, 'labels-v1', 'proven', 'healthy', 'directional',
+      8, 4, 50, 60, 80, 75, 1.6, 1.25, 1.3, '{"fixture":true}')`,
+  ).bind(`evidence-${suffix}`, brandKey, familyId, sourceIdentity).run();
+  await db.prepare(
+    `INSERT INTO operator_source_family_label_transitions (
+      id, brand_key, source_card_family_id, source_identity_key,
+      label_policy_version, previous_lifetime_label, lifetime_label,
+      previous_recent_label, recent_label, evidence_json
+    ) VALUES (?, ?, ?, ?, 'labels-v1', 'emerging', 'proven', 'hot', 'healthy',
+      '{"reason":"fixture"}')`,
+  ).bind(`transition-${suffix}`, brandKey, familyId, sourceIdentity).run();
+  await db.prepare(
+    `INSERT INTO operator_source_selection_receipts (
+      id, brand_key, scope_type, scope_id, slot_key, selection_order,
+      source_identity_key, source_card_family_id, source_card_id,
+      engine_version, receipt_json
+    ) VALUES (?, ?, 'cycle', ?, '2099-01-01-01', 1, ?, ?, ?, 'engine-v1',
+      '{"selected":true}')`,
+  ).bind(
+    `receipt-${suffix}`,
+    brandKey,
+    `scope-${suffix}`,
+    sourceIdentity,
+    familyId,
+    `card-${suffix}`,
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_source_selection_plans (
+      id, brand_key, cycle_id, slot_key, selection_order, source_identity_key,
+      source_card_family_id, source_card_id, engine_version, receipt_json, status
+    ) VALUES (?, ?, ?, '2099-01-01-01', 1, ?, ?, ?, 'engine-v1',
+      '{"locked":true}', 'locked')`,
+  ).bind(
+    `plan-${suffix}`,
+    brandKey,
+    `cycle-${suffix}`,
+    sourceIdentity,
+    familyId,
+    `card-${suffix}`,
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_decision_influences (
+      id, influence_key, brand_key, cycle_id, slot_key, scheduled_post_id,
+      hypothesis_id, strategy_version_id, learning_brief_key,
+      benchmark_snapshot_key, family_key, portfolio_role, experiment_key,
+      saved_pattern_identity_key, decision_changed,
+      decision_change_types_json, decision_summary, evidence_json,
+      influence_version
+    ) VALUES (?, ?, ?, ?, '2099-01-01-01', 900001, ?, ?, ?, ?, ?, 'core', ?, ?, 1,
+      '["source_family"]', 'Fixture decision changed', '{"fixture":true}', 'influence-v1')`,
+  ).bind(
+    `influence-${suffix}`,
+    `influence-key-${suffix}`,
+    brandKey,
+    `cycle-${suffix}`,
+    `hypothesis-${suffix}`,
+    `strategy-${suffix}`,
+    `brief-${suffix}`,
+    `benchmark-${suffix}`,
+    familyId,
+    `experiment-${suffix}`,
+    `pattern-${suffix}`,
+  ).run();
+
+  return [
+    { table: "operator_source_family_evidence_states", column: "id", value: `evidence-${suffix}` },
+    { table: "operator_source_family_label_transitions", column: "id", value: `transition-${suffix}` },
+    { table: "operator_source_selection_receipts", column: "id", value: `receipt-${suffix}` },
+    { table: "operator_source_selection_plans", column: "id", value: `plan-${suffix}` },
+    { table: "operator_manifest_decision_influences", column: "id", value: `influence-${suffix}` },
+  ];
+}
+
 
 describe("canonical database migrations", () => {
   it("creates every extracted table with the required columns, indexes, and triggers", async () => {
