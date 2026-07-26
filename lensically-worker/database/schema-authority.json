@@ -22,8 +22,10 @@
     "gpt_strategy_memory",
     "scheduled_post_deletions",
     "scheduled_posts",
-    "threads_follower_snapshots",
-    "threads_publish_idempotency",
+        "threads_follower_snapshots",
+    "threads_publish_idempotency"
+  ],
+  "migration_dependency_tables": [
     "users"
   ],
     "declared_duplicate_owners": {},

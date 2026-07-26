@@ -141,7 +141,8 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   const migrationSource = migrationFiles
     .map((name) => readFileSync(resolve(migrationDirectory, name), "utf8"))
     .join("\n");
-  const extractedTables = sortedUnique(manifest.extracted_tables ?? []);
+    const extractedTables = sortedUnique(manifest.extracted_tables ?? []);
+  const migrationDependencyTables = sortedUnique(manifest.migration_dependency_tables ?? []);
   for (const table of extractedTables) {
     const runtimeOwnership = records.filter((record) =>
       record.table === table && ["table", "alter_table", "index", "trigger"].includes(record.kind));
@@ -149,7 +150,11 @@ export function validateDatabaseAuthority(root = defaultRoot) {
       errors.push(`extracted_table_runtime_ddl_present:${table}:${runtimeOwnership.map((record) => `${record.kind}@${record.source}`).join(",")}`);
     }
     const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${table}\\b`, "i");
-    if (!tablePattern.test(migrationSource)) errors.push(`extracted_table_migration_owner_missing:${table}`);
+        if (!tablePattern.test(migrationSource)) errors.push(`extracted_table_migration_owner_missing:${table}`);
+  }
+  for (const table of migrationDependencyTables) {
+    const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${table}\\b`, "i");
+    if (!tablePattern.test(migrationSource)) errors.push(`migration_dependency_owner_missing:${table}`);
   }
 
   const vitestConfig = readFileSync(resolve(root, "vitest.config.mts"), "utf8");
@@ -188,7 +193,8 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     temporary_tables: temporary,
     retired_table_recreations: actualRetiredRecreations,
         migration_file_count: migrationFiles.length,
-    extracted_tables: extractedTables,
+        extracted_tables: extractedTables,
+    migration_dependency_tables: migrationDependencyTables,
     errors,
   };
   if (errors.length > 0) {
