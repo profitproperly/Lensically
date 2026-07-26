@@ -139,10 +139,15 @@ tests = replaceExact(
     });
 
     await ensureMcpAccountOpen("manifest_mental");`,
-  `    const session = { workflow_session_id: \`autonomous-lineage-recovery-\${crypto.randomUUID()}\` };
-
-    await ensureMcpAccountOpen("manifest_mental");`,
-  "use autonomous lineage identity",
+  `    await ensureMcpAccountOpen("manifest_mental");`,
+  "remove guided lineage identity",
+);
+tests = replaceExact(
+  tests,
+  `      workflow_session_id: session.workflow_session_id,
+      saved_pattern_id: savedPatternId,`,
+  `      saved_pattern_id: savedPatternId,`,
+  "remove retired lineage workflow input",
 );
 tests = replaceExact(
   tests,
