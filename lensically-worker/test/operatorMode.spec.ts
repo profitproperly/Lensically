@@ -1331,7 +1331,22 @@ describe("operator mode backend spine", () => {
     });
     expect(new TextEncoder().encode(JSON.stringify(patterns.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
 
-        const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, "manifest_mental");
+            await env.DB.prepare(`CREATE TABLE IF NOT EXISTS external_patterns (
+      id INTEGER PRIMARY KEY,
+      app_user_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      source_url TEXT NOT NULL,
+      post_text TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      views INTEGER,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+
+    const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, "manifest_mental");
     expect(decisionIntelligence).toMatchObject({
       version: "manifest-decision-intelligence-v1",
       brand_key: "manifest_mental",
