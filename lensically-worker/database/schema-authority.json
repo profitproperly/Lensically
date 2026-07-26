@@ -78,7 +78,8 @@
     "threads_user_insights_cache",
     "users"
   ],
-  "migration_dependency_tables": [],
+    "migration_dependency_tables": [],
+  "index_runtime_ddl_complete": true,
     "declared_duplicate_owners": {},
     "retired_tables": [
     "operator_workflow_sessions",

@@ -2917,6 +2917,253 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves performance learning and content focus state across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const postId = `post-${suffix}`;
+    const familyId = `family-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_post_fingerprints (
+        id, brand_key, published_post_id, scheduled_post_id, draft_id, source_card_id,
+        source_selection_id, text_hash, fingerprint_version, fingerprint_json
+      ) VALUES (?, 'manifest_mental', ?, 1, 'draft-1', 'source-card-1',
+        'selection-1', 'hash-1', 'fingerprint-v1', '{"hook_style":"question"}')`,
+    ).bind(`fingerprint-${suffix}`, postId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_post_performance_scores (
+        id, brand_key, published_post_id, checkpoint_hours, snapshot_id, captured_at,
+        post_age_hours, metrics_json, rates_json, velocity_json, scores_json,
+        distribution_state, valid_for_learning, evaluator_version
+      ) VALUES (?, 'manifest_mental', ?, 24, 'snapshot-1', '2099-01-01T12:00:00Z',
+        24, '{"likes":1000}', '{"like_rate":0.1}', '{"likes_per_hour":40}',
+        '{"overall":90}', 'distributed', 1, 'evaluator-v1')`,
+    ).bind(`score-${suffix}`, postId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_performance_evidence (
+        id, brand_key, checkpoint_hours, dimension, feature_key, sample_size,
+        cohort_size, medians_json, effect_json, confidence_score, confidence_label,
+        direction, evaluator_version
+      ) VALUES (?, 'manifest_mental', 24, 'hook_style', 'question', 10, 100,
+        '{"feature":90}', '{"delta":15}', 0.9, 'high', 'positive', 'evaluator-v1')`,
+    ).bind(`evidence-${suffix}`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_performance_hypotheses (
+        id, brand_key, checkpoint_hours, dimension, feature_key, hypothesis_text,
+        direction, sample_size, confidence_score, confidence_label, evidence_json,
+        evaluator_version
+      ) VALUES (?, 'manifest_mental', 24, 'hook_style', 'question',
+        'Question hooks outperform', 'positive', 10, 0.9, 'high',
+        '{"evidence_id":"evidence-1"}', 'evaluator-v1')`,
+    ).bind(`hypothesis-${suffix}`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_generation_learning_briefs (
+        id, brand_key, checkpoint_hours, sample_size, brief_json, active,
+        evaluator_version, generated_at
+      ) VALUES (?, 'manifest_mental', 24, 10, '{"directive":"use questions"}', 1,
+        'evaluator-v1', '2099-01-01T13:00:00Z')`,
+    ).bind(`brief-${suffix}`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_content_focus_reviews (
+        id, brand_key, cadence, period_key, anchor_date, windows_json,
+        decisions_json, allocation_json, generated_at, evaluator_version
+      ) VALUES (?, 'manifest_mental', 'weekly', '2099-01-01', '2099-01-01',
+        '{"7d":{}}', '[{"family":"family-1"}]', '{"family-1":1}',
+        '2099-01-01T14:00:00Z', 'evaluator-v1')`,
+    ).bind(`review-${suffix}`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_content_focus_family_states (
+        id, brand_key, source_card_family_id, source_identity_key, status,
+        recommended_status, confidence_score, confidence_label, allocation_weight,
+        decision_reason, reuse_directives_json, stop_directives_json,
+        horizon_evidence_json, manual_lock, last_review_id
+      ) VALUES (?, 'manifest_mental', ?, 'identity-1', 'healthy', 'healthy', 0.9,
+        'high', 1.5, 'Strong evidence', '{"reuse":true}', '{"stop":false}',
+        '{"7d":{}}', 0, ?)`,
+    ).bind(`focus-${suffix}`, familyId, `review-${suffix}`).run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all([
+      countWhere("SELECT COUNT(*) AS total FROM operator_post_fingerprints WHERE published_post_id = ?", postId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_post_performance_scores WHERE published_post_id = ? AND checkpoint_hours = 24", postId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_performance_evidence WHERE id = ?", `evidence-${suffix}`),
+      countWhere("SELECT COUNT(*) AS total FROM operator_performance_hypotheses WHERE id = ?", `hypothesis-${suffix}`),
+      countWhere("SELECT COUNT(*) AS total FROM operator_generation_learning_briefs WHERE id = ?", `brief-${suffix}`),
+      countWhere("SELECT COUNT(*) AS total FROM operator_content_focus_reviews WHERE id = ?", `review-${suffix}`),
+      countWhere("SELECT COUNT(*) AS total FROM operator_content_focus_family_states WHERE source_card_family_id = ?", familyId),
+    ]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1]);
+  });
+
+  it("adopts the live performance learning and content focus schema without data loss", async () => {
+    const db = testEnv.PERFORMANCE_FOCUS_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_post_fingerprints (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, published_post_id TEXT NOT NULL,
+        scheduled_post_id INTEGER, draft_id TEXT, source_card_id TEXT,
+        source_selection_id TEXT, text_hash TEXT, fingerprint_version TEXT NOT NULL,
+        fingerprint_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, published_post_id)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_post_performance_scores (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, published_post_id TEXT NOT NULL,
+        checkpoint_hours INTEGER NOT NULL, snapshot_id TEXT NOT NULL, captured_at TEXT NOT NULL,
+        post_age_hours REAL NOT NULL, metrics_json TEXT NOT NULL, rates_json TEXT NOT NULL,
+        velocity_json TEXT NOT NULL, scores_json TEXT NOT NULL, distribution_state TEXT NOT NULL,
+        valid_for_learning INTEGER NOT NULL DEFAULT 1, evaluator_version TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, published_post_id, checkpoint_hours)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_performance_evidence (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, checkpoint_hours INTEGER NOT NULL,
+        dimension TEXT NOT NULL, feature_key TEXT NOT NULL, sample_size INTEGER NOT NULL,
+        cohort_size INTEGER NOT NULL, medians_json TEXT NOT NULL, effect_json TEXT NOT NULL,
+        confidence_score REAL NOT NULL, confidence_label TEXT NOT NULL, direction TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active', evaluator_version TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, checkpoint_hours, dimension, feature_key)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_performance_hypotheses (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, checkpoint_hours INTEGER NOT NULL,
+        dimension TEXT NOT NULL, feature_key TEXT NOT NULL, hypothesis_text TEXT NOT NULL,
+        direction TEXT NOT NULL, sample_size INTEGER NOT NULL, confidence_score REAL NOT NULL,
+        confidence_label TEXT NOT NULL, evidence_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active', evaluator_version TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, checkpoint_hours, dimension, feature_key)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_generation_learning_briefs (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, checkpoint_hours INTEGER,
+        sample_size INTEGER NOT NULL DEFAULT 0, brief_json TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1, evaluator_version TEXT NOT NULL,
+        generated_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_content_focus_reviews (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, cadence TEXT NOT NULL,
+        period_key TEXT NOT NULL, anchor_date TEXT NOT NULL, windows_json TEXT NOT NULL,
+        decisions_json TEXT NOT NULL, allocation_json TEXT NOT NULL, generated_at TEXT NOT NULL,
+        evaluator_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, cadence, period_key)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_content_focus_family_states (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, source_card_family_id TEXT NOT NULL,
+        source_identity_key TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'test',
+        recommended_status TEXT NOT NULL DEFAULT 'test', confidence_score REAL NOT NULL DEFAULT 0,
+        confidence_label TEXT NOT NULL DEFAULT 'insufficient', allocation_weight REAL NOT NULL DEFAULT 1,
+        decision_reason TEXT NOT NULL, reuse_directives_json TEXT NOT NULL DEFAULT '{}',
+        stop_directives_json TEXT NOT NULL DEFAULT '{}', horizon_evidence_json TEXT NOT NULL DEFAULT '{}',
+        manual_lock INTEGER NOT NULL DEFAULT 0, last_review_id TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, source_card_family_id)
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_post_fingerprints (
+        id, brand_key, published_post_id, fingerprint_version, fingerprint_json
+      ) VALUES ('live-fingerprint', 'manifest_mental', 'live-post', 'v1', '{}')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_post_performance_scores (
+        id, brand_key, published_post_id, checkpoint_hours, snapshot_id, captured_at,
+        post_age_hours, metrics_json, rates_json, velocity_json, scores_json,
+        distribution_state, evaluator_version
+      ) VALUES ('live-score', 'manifest_mental', 'live-post', 24, 'snapshot',
+        '2099-01-01T12:00:00Z', 24, '{}', '{}', '{}', '{"overall":88}',
+        'distributed', 'v1')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_performance_evidence (
+        id, brand_key, checkpoint_hours, dimension, feature_key, sample_size,
+        cohort_size, medians_json, effect_json, confidence_score, confidence_label,
+        direction, evaluator_version
+      ) VALUES ('live-evidence', 'manifest_mental', 24, 'hook', 'question', 10, 100,
+        '{}', '{}', 0.8, 'high', 'positive', 'v1')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_performance_hypotheses (
+        id, brand_key, checkpoint_hours, dimension, feature_key, hypothesis_text,
+        direction, sample_size, confidence_score, confidence_label, evidence_json,
+        evaluator_version
+      ) VALUES ('live-hypothesis', 'manifest_mental', 24, 'hook', 'question',
+        'Questions win', 'positive', 10, 0.8, 'high', '{}', 'v1')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_generation_learning_briefs (
+        id, brand_key, brief_json, evaluator_version, generated_at
+      ) VALUES ('live-brief', 'manifest_mental', '{}', 'v1', '2099-01-01T13:00:00Z')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_content_focus_reviews (
+        id, brand_key, cadence, period_key, anchor_date, windows_json,
+        decisions_json, allocation_json, generated_at, evaluator_version
+      ) VALUES ('live-review', 'manifest_mental', 'weekly', '2099-01-01',
+        '2099-01-01', '{}', '[]', '{}', '2099-01-01T14:00:00Z', 'v1')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_content_focus_family_states (
+        id, brand_key, source_card_family_id, source_identity_key, decision_reason
+      ) VALUES ('live-focus', 'manifest_mental', 'live-family', 'live-identity',
+        'Preserve focus')`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_performance_focus_upgrade_migrations",
+    );
+
+    const preserved = await Promise.all([
+      db.prepare("SELECT COUNT(*) AS total FROM operator_post_fingerprints WHERE id = 'live-fingerprint'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_post_performance_scores WHERE id = 'live-score'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_performance_evidence WHERE id = 'live-evidence'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_performance_hypotheses WHERE id = 'live-hypothesis'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_generation_learning_briefs WHERE id = 'live-brief'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_content_focus_reviews WHERE id = 'live-review'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_content_focus_family_states WHERE id = 'live-focus'").first<CountRow>(),
+    ]);
+    expect(preserved.map((row) => Number(row?.total ?? 0))).toEqual([1, 1, 1, 1, 1, 1, 1]);
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_post_fingerprints (
+          id, brand_key, published_post_id, fingerprint_version, fingerprint_json
+        ) VALUES ('duplicate-fingerprint', 'manifest_mental', 'live-post', 'v1', '{}')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_content_focus_reviews (
+          id, brand_key, cadence, period_key, anchor_date, windows_json,
+          decisions_json, allocation_json, generated_at, evaluator_version
+        ) VALUES ('duplicate-review', 'manifest_mental', 'weekly', '2099-01-01',
+          '2099-01-01', '{}', '[]', '{}', '2099-01-01T15:00:00Z', 'v1')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

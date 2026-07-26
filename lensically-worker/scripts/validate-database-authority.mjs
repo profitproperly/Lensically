@@ -152,9 +152,16 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${table}\\b`, "i");
         if (!tablePattern.test(migrationSource)) errors.push(`extracted_table_migration_owner_missing:${table}`);
   }
-  for (const table of migrationDependencyTables) {
+    for (const table of migrationDependencyTables) {
     const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${table}\\b`, "i");
     if (!tablePattern.test(migrationSource)) errors.push(`migration_dependency_owner_missing:${table}`);
+  }
+  if (manifest.index_runtime_ddl_complete === true) {
+    const indexRuntimeDdl = records.filter((record) =>
+      record.source === "src/index.ts" && ["table", "alter_table", "index", "trigger", "drop"].includes(record.kind));
+    if (indexRuntimeDdl.length > 0) {
+      errors.push(`index_runtime_ddl_present:${indexRuntimeDdl.map((record) => `${record.kind}:${record.table}`).join(",")}`);
+    }
   }
 
   const vitestConfig = readFileSync(resolve(root, "vitest.config.mts"), "utf8");
@@ -217,8 +224,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves execution checkpoints, persistent routes, and decision events across migration replay")) {
     errors.push("execution_control_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live execution-control schema without losing checkpoints, routes, or events")) {
+    if (!migrationTests.includes("adopts the live execution-control schema without losing checkpoints, routes, or events")) {
     errors.push("execution_control_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves performance learning and content focus state across migration replay")) {
+    errors.push("performance_focus_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live performance learning and content focus schema without data loss")) {
+    errors.push("performance_focus_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
