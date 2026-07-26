@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 391d0aeb35d3fe64f6fb57c86b165116a7ff1c8d
-production_sha: 391d0aeb35d3fe64f6fb57c86b165116a7ff1c8d
+repository_base_sha: 20de5f19afe86fae0f39e87afb762ce60922a6f9
+production_sha: 20de5f19afe86fae0f39e87afb762ce60922a6f9
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -358,20 +358,33 @@ Completed checkpoint — Stage 4S final source-family and decision-influence ext
 
 Every active schema object is owned by ordered migrations. Request preparation owns no `CREATE TABLE`, `ALTER TABLE`, `CREATE INDEX`, `CREATE TRIGGER`, compatibility rebuild, or retirement drop. The repository-wide zero-DDL assertion is permanent release-preflight evidence.
 
-Current sub-action — Stage 5A MCP protocol-surface modularization:
+Completed checkpoint — Stage 5A MCP protocol-surface modularization:
 
-Extract the pure MCP protocol contract from `src/index.ts` into a focused module before moving the larger tool registry and dispatcher:
+- Added `src/operatorMcpProtocol.ts` as the single source for `OPERATOR_MCP_VERSION`, default protocol negotiation, initialize payload construction, public MCP instructions, and selected-key handshake lines.
+- Removed the duplicated version, instructions builder, initialize construction, and handshake implementation from `src/index.ts` while retaining a thin tool-count wrapper.
+- Updated release preflight and `CURRENT_STATE.md` so the extracted protocol module is authoritative and protocol logic cannot drift back into the monolith.
+- Added `test/operatorMcpProtocol.spec.ts` and wired it into push and exact-head release gates.
+- Preserved the exact live initialize payload, MCP version `1.40.3`, 75-tool interpolation, direct-typed instructions, and four-line selected-key handshake.
+- Push validation passed in run `30223180899`.
+- All eight Operator shards passed in run `30223238289`.
+- Exact-SHA release passed in run `30223295942`.
+- Live production independently confirmed exact SHA `20de5f19afe86fae0f39e87afb762ce60922a6f9`.
 
-- server instructions text
-- initialize response construction and protocol-version negotiation
-- selected-key handshake lines
-- associated protocol constants and types that do not perform account or domain execution
+Current sub-action — Stage 5B MCP tool-definition construction modularization:
 
-Preserve the exact public initialize payload, server name/title/version, advertised tool-count interpolation, four-line selected-key handshake, direct-typed-tool instructions, and all existing MCP boundary tests. Add focused characterization and prevent the protocol contract from drifting back into `index.ts`.
+Extract the reusable tool-definition construction layer from `src/index.ts` before moving the large static registries:
+
+- `OperatorMcpToolDefinition` and annotation types
+- safe tool-definition cloning
+- account-scoped schema rewriting
+- scoped wrapper naming/title/description construction
+- deterministic base-tool composition helpers that do not read the database or execute business logic
+
+Preserve every public/internal tool name, title, description, input schema, annotation, scoped wrapper, tool count, ordering, and client-safety characterization. Add focused unit coverage and a release-preflight gate preventing these construction helpers from returning to `index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract the direct typed MCP tool-definition registry and scoped-wrapper construction.
+- Move the static direct typed MCP registry arrays into the tool-definition module.
 - Extract tool discovery, definition lookup, and client-safe public filtering.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
