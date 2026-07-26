@@ -463,11 +463,16 @@ describe("canonical database migrations", () => {
       );
     }
 
-    const objects = await testEnv.DB.prepare(
-      `SELECT name, type FROM sqlite_master
-       WHERE name IN (${expectedObjects.map(() => "?").join(", ")})`,
-    ).bind(...expectedObjects).all<SchemaObjectRow>();
-    expect((objects.results ?? []).map((row) => row.name).sort()).toEqual(
+        const objectRows: SchemaObjectRow[] = [];
+    for (let offset = 0; offset < expectedObjects.length; offset += 50) {
+      const chunk = expectedObjects.slice(offset, offset + 50);
+      const objects = await testEnv.DB.prepare(
+        `SELECT name, type FROM sqlite_master
+         WHERE name IN (${chunk.map(() => "?").join(", ")})`,
+      ).bind(...chunk).all<SchemaObjectRow>();
+      objectRows.push(...(objects.results ?? []));
+    }
+    expect(objectRows.map((row) => row.name).sort()).toEqual(
       [...expectedObjects].sort(),
     );
   });
