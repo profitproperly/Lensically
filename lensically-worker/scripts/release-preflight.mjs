@@ -344,8 +344,9 @@ if (!workflow.includes("release_sha:")
     || !workflow.includes('test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"')
     || !workflow.includes("Run exact-head release gates")
         || !workflow.includes("Deploy exact validated Worker head")
-    || (!workflow.includes("Verify production runtime and scheduler")
-      && !workflow.includes("Verify production runtime, scheduler, and intelligence product"))) {
+        || (!workflow.includes("Verify production runtime and scheduler")
+      && !workflow.includes("Verify production runtime, scheduler, and intelligence product")
+      && !workflow.includes("Verify production runtime, scheduler, retained website, and retired legacy surfaces"))) {
   errors.push("explicit_exact_sha_release_contract_missing");
 }
 
