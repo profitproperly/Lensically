@@ -72,17 +72,10 @@ describe("human-free autonomy contract", () => {
 
     it("retires guided workflow tables while preserving active backend strategy memory", async () => {
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT, email_verified INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, timezone TEXT, clock_format TEXT)").run();
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS operator_system_retirements (retirement_key TEXT PRIMARY KEY, completed_at TEXT)").run();
-    await env.DB.prepare("DELETE FROM operator_system_retirements WHERE retirement_key = 'human-free-retirement-v2'").run();
-        for (const table of [
-      "operator_workflow_sessions",
-      "operator_context_admissions",
-      "operator_production_board_items",
-      "operator_review_batches",
-    ]) {
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS ${table} (id TEXT)`).run();
-    }
+        const retirement = await env.DB.prepare(
+      "SELECT retirement_key FROM operator_system_retirements WHERE retirement_key = 'human-free-retirement-v2'",
+    ).first<{ retirement_key?: string }>();
+    expect(retirement).toEqual({ retirement_key: "human-free-retirement-v2" });
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS gpt_strategy_memory (id TEXT)").run();
     const response = await fetchFromWorker("/api/operator/tools/list_accounts", {
       headers: { authorization: "Bearer test-gpt-key" },
