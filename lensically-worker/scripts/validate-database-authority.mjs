@@ -161,8 +161,11 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationSetup.includes("applyD1Migrations") || !migrationSetup.includes("lensically_test_migrations")) {
     errors.push("test_migration_bootstrap_missing");
   }
-  if (!migrationTests.includes("reapplies the canonical migration ledger without losing existing data")) {
+    if (!migrationTests.includes("reapplies the canonical migration ledger without losing existing data")) {
     errors.push("migration_idempotency_regression_missing");
+  }
+  if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
+    errors.push("scheduling_migration_behavior_regression_missing");
   }
   if (!releaseWorkflow.includes("test/databaseMigrations.spec.ts")) {
     errors.push("migration_regression_release_gate_missing");
