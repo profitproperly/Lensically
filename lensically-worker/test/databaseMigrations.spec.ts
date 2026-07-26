@@ -20,7 +20,8 @@ const testEnv = env as typeof env & {
     EXECUTION_CONTROL_UPGRADE_DB: D1Database;
     PERFORMANCE_FOCUS_UPGRADE_DB: D1Database;
       MANIFEST_INTELLIGENCE_UPGRADE_DB: D1Database;
-    MANIFEST_ENGINE_UPGRADE_DB: D1Database;
+        MANIFEST_ENGINE_UPGRADE_DB: D1Database;
+    MANIFEST_MEASUREMENT_AUDIT_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -394,10 +395,35 @@ const requiredColumns: Record<string, string[]> = {
     "latest_result_json", "follow_up_decision", "experiment_version", "created_at",
     "updated_at",
   ],
-  operator_manifest_experiment_assignments: [
+    operator_manifest_experiment_assignments: [
     "id", "experiment_id", "brand_key", "cycle_id", "slot_key", "hypothesis_id",
     "scheduled_post_id", "published_post_id", "variant_key", "status", "created_at",
     "updated_at",
+  ],
+  operator_manifest_learning_briefs: [
+    "id", "brand_key", "brief_key", "brief_version", "source_fingerprint",
+    "evidence_window_start", "evidence_window_end", "authoritative_post_count",
+    "brief_json", "strategy_change_json", "strategy_version_id", "created_at", "updated_at",
+  ],
+  operator_manifest_benchmark_snapshots: [
+    "id", "brand_key", "snapshot_key", "cycle_id", "benchmark_version", "window_start",
+    "window_end", "metrics_json", "source_fingerprint", "created_at", "updated_at",
+  ],
+  operator_manifest_run_comparisons: [
+    "id", "brand_key", "cycle_id", "previous_cycle_id", "comparison_version",
+    "comparison_json", "source_fingerprint", "created_at", "updated_at",
+  ],
+  operator_manifest_saved_pattern_intelligence: [
+    "id", "brand_key", "pattern_identity_key", "external_pattern_id",
+    "source_identity_key", "verified_metrics_json", "semantic_json", "mechanism_json",
+    "adaptation_options_json", "similarity_json", "usage_json", "results_json",
+    "confidence_json", "reuse_state", "exclusion_state", "source_updated_at",
+    "intelligence_version", "created_at", "updated_at",
+  ],
+  operator_manifest_follower_checkpoints: [
+    "id", "brand_key", "checkpoint_key", "threads_user_id", "checkpoint_version",
+    "snapshot_date", "followers_count", "follower_goal", "distance_to_goal",
+    "trajectory_json", "attribution_policy", "created_at", "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -540,7 +566,13 @@ const expectedObjects = [
   "idx_manifest_receipt_events_cycle",
   "idx_manifest_cycle_defects_status",
     "idx_manifest_hypotheses_cycle",
-  "idx_manifest_semantic_signatures_recent",
+    "idx_manifest_semantic_signatures_recent",
+  "idx_manifest_learning_briefs_brand_created",
+  "idx_manifest_benchmarks_brand_created",
+  "idx_manifest_run_comparisons_brand_created",
+  "idx_manifest_pattern_intelligence_reuse",
+  "idx_manifest_follower_checkpoints_brand_created",
+
 
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
