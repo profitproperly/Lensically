@@ -301,31 +301,26 @@ Completed checkpoint — Stage 4O `index.ts` performance learning and content-fo
 - Exact-SHA migration-first release passed in run `30219411039`.
 - Live production independently confirmed exact SHA `553ebd4e998754655ecbe5facb83a7979ed3c376`.
 
-Current sub-action — Stage 4P Manifest Intelligence schema extraction:
+Completed checkpoint — Stage 4P Manifest Intelligence schema extraction:
 
-Move the 15 runtime-owned schema tables in `manifestIntelligence.ts` into ordered migrations:
+- Added `0014_manifest_intelligence.sql`.
+- Moved complete migration ownership for 15 Manifest Intelligence policy, strategy, exposure, evidence, cycle-planning, gate, hard-ban, receipt, defect, and post-hypothesis tables.
+- Removed all runtime `CREATE TABLE`, `CREATE INDEX`, and compatibility `ALTER TABLE` behavior from `manifestIntelligence.ts` and replaced it with complete integrity probes.
+- Preserved policy and strategy versions, exposure and evidence snapshots, paged evidence payloads and read receipts, cycle strategy and plan lineage, candidate-gate receipts, hard bans, completion and defect receipts, post hypotheses, uniqueness contracts, indexes, timestamps, and existing data.
+- Added representative replay and live-shape adoption coverage across all 15 tables.
+- Modernized release-preflight assertions to require migration ownership and runtime integrity probes.
+- Added permanent zero-DDL enforcement for `manifestIntelligence.ts`.
+- Push validation passed in run `30220098434`.
+- All eight Operator shards passed in run `30220152047`.
+- Exact-SHA migration-first release passed in run `30220222162`.
+- Live production independently confirmed exact SHA `552dd0230221324b48e21fc1357dcd25f7ec08c0`.
 
-- `operator_manifest_intelligence_policies`
-- `operator_manifest_strategy_versions`
-- `operator_manifest_exposure_snapshots`
-- `operator_manifest_evidence_snapshots`
-- `operator_manifest_evidence_posts`
-- `operator_manifest_evidence_pages`
-- `operator_manifest_analysis_page_reads`
-- `operator_manifest_cycle_strategies`
-- `operator_manifest_cycle_plan_items`
-- `operator_manifest_candidate_gate_receipts`
-- `operator_manifest_hard_bans`
-- `operator_manifest_cycle_receipts`
-- `operator_manifest_cycle_receipt_events`
-- `operator_manifest_cycle_defect_receipts`
-- `operator_manifest_post_hypotheses`
+Current sub-action — Stage 4Q Manifest Intelligence Engine schema extraction:
 
-Preserve policy and strategy versions, exposure and evidence snapshots, paged evidence payloads and reads, cycle strategy and plan lineage, candidate-gate receipts, hard bans, completion and defect receipts, post hypotheses, indexes, constraints, timestamps, and all existing production data. Replace all runtime DDL in `manifestIntelligence.ts` with integrity probes while preserving intelligence writes and evaluation behavior.
+Move the eight runtime-owned semantic, maturity, comparable-analysis, learning, portfolio, transition, and experiment tables in `manifestIntelligenceEngine.ts` into ordered migrations. Preserve every current column, index, uniqueness contract, confidence and maturity field, lineage relationship, transition record, experiment state, and all existing production data. Replace all runtime DDL in `manifestIntelligenceEngine.ts` with integrity probes while preserving engine evaluation and mutation behavior.
 
-Remaining measured Stage 4 clusters after Stage 4P:
+Remaining measured Stage 4 clusters after Stage 4Q:
 
-- Stage 4Q — 8 semantic, maturity, comparable-analysis, learning, portfolio, transition, and experiment tables in `manifestIntelligenceEngine.ts`.
 - Stage 4R — 5 learning-brief, benchmark, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables in `manifestMeasurementAudit.ts`.
 - Stage 4S — 4 source-family evidence/transition/selection tables plus `operator_manifest_decision_influences`, followed by the repository-wide zero-DDL completion audit.
 
