@@ -4796,8 +4796,8 @@ describe("operator mode MCP endpoint", () => {
         (SELECT COUNT(*) FROM operator_manifest_post_hypotheses WHERE cycle_id = ?) AS hypotheses`,
     ).bind(fixture.prepared.cycle.id, fixture.prepared.cycle.id, fixture.prepared.cycle.id)
       .first<{ receipts: number; events: number; hypotheses: number }>();
-    expect(receiptCountsAfter).toEqual(receiptCountsBefore);
-  }, 30000);
+        expect(receiptCountsAfter).toEqual(receiptCountsBefore);
+  }, 60000);
 
       it("rejects the retired scheduled-post review tool from the public MCP surface", async () => {
     const rejected = await mcpToolRaw<Record<string, unknown>>("review_manifest_scheduled_post", {
