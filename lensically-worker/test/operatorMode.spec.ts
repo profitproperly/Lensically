@@ -2884,7 +2884,7 @@ describe("operator mode backend spine", () => {
         expect(approved.gate_results.find((result) => result.gate_key === "historical_owner_rejection_gate")?.result).toBe("pass");
   }, 30000);
 
-  it("persists complete rejection coverage in a compact generation-run context", async () => {
+    it("excludes owner rejection history from compact generation-run context", async () => {
     const first = await createLockedSourceCard();
     const runOwner = await env.DB.prepare(
       `SELECT account_id, threads_user_id FROM gpt_generation_runs WHERE id = ? LIMIT 1`,
@@ -2949,11 +2949,11 @@ describe("operator mode backend spine", () => {
       };
     };
     const rejectionContext = persistedContext.account_rejection_context;
-    expect(rejectionContext?.coverage_complete).toBe(true);
-    expect(rejectionContext?.required_review_count).toBe(120);
-    expect(rejectionContext?.explicit_banned_surfaces).toContain("oversized_token");
-    expect(rejectionContext?.rejected_drafts?.[0]).not.toHaveProperty("strategy");
-        expect(persistedContext.prior_runs?.length).toBe(6);
+        expect(rejectionContext?.coverage_complete).toBe(true);
+    expect(rejectionContext?.required_review_count).toBe(0);
+    expect(rejectionContext?.explicit_banned_surfaces ?? []).toEqual([]);
+    expect(rejectionContext?.rejected_drafts ?? []).toEqual([]);
+    expect(persistedContext.prior_runs?.length).toBe(6);
     expect(persistedContext.prior_runs?.every((run) => !("prior_adaptation_context" in run))).toBe(true);
     expect(serialized.length).toBeLessThan(500000);
   }, 60000);
