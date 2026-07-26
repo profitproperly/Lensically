@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 2a0d66cde231965d5539274086c58518bb60534e
-production_sha: 2a0d66cde231965d5539274086c58518bb60534e
+repository_base_sha: 218dea184e4787b9729235446d5042fca6df0657
+production_sha: 218dea184e4787b9729235446d5042fca6df0657
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -395,19 +395,31 @@ Completed checkpoint — Stage 5C MCP tool-directory modularization:
 - Exact-SHA release passed in run `30224981528`.
 - Live production independently confirmed exact SHA `2a0d66cde231965d5539274086c58518bb60534e`.
 
-Current sub-action — Stage 5D1 engineering tool-registry extraction:
+Completed checkpoint — Stage 5D1 engineering tool-registry extraction:
 
-Move the static engineering MCP registry from `src/index.ts` into a focused registry module:
+- Added `src/operatorMcpEngineeringRegistry.ts` with the exact 33-name engineering tuple, union type, shared repository/brand schemas, and all static engineering definitions.
+- Moved runtime composition and engineering classification to the extracted registry before physically deleting the inert monolith definitions.
+- Removed the engineering tuple, union type, repository path schema, and all 33 definitions from `src/index.ts`.
+- Added `test/operatorMcpEngineeringRegistry.spec.ts` covering exact count/name parity, uniqueness, source-defined routing schemas, destructive annotations, workflow task enums, SHA validation, and deployment controls.
+- Updated capability lifecycle parsing and full release preflight to scan the engineering registry authority and prevent the registry from returning to `index.ts`.
+- Push validation passed in run `30225751425`.
+- All eight Operator shards passed in run `30225817071`.
+- Exact-SHA release passed in run `30225856357`.
+- Live production independently confirmed exact SHA `218dea184e4787b9729235446d5042fca6df0657`.
 
-- engineering tool-name tuple and union type
-- complete engineering tool definitions
+Current sub-action — Stage 5D2 admin tool-registry extraction:
+
+Move the static admin MCP registry from `src/index.ts` into a focused registry module:
+
+- admin tool-name tuple and union type
+- complete admin tool definitions
 - exact names, titles, descriptions, schemas, annotations, and declaration order
+- shared brand-key schema ownership required by the admin definitions
 
-Preserve all source-defined engineering routing, public filtering, lifecycle declarations, client-safety behavior, exact tool counts, and definition lookup. Add a focused registry characterization test and release-preflight enforcement preventing the engineering registry from returning to `index.ts`.
+Preserve Proceed handshake behavior, Growth Mission and decision tools, scheduler/admin controls, workflow compatibility, public filtering, exact tool counts, lifecycle declarations, and definition lookup. Add focused registry characterization and release-preflight enforcement preventing the admin registry from returning to `index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract the static admin registry.
 - Extract the larger account/content registry in bounded groups if required.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
