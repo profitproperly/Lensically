@@ -17280,35 +17280,7 @@ const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
   additionalProperties: true,
 };
 
-const OPERATOR_MCP_ADMIN_TOOL_NAMES = [
-  "get_monthly_growth_review",
-  "selectOperatorKey",
-  "confirmOperatorProceed",
-  "getGrowthMission",
-  "updateGrowthMission",
-  "getOperatorDecisionState",
-  "proposeOperatorDecision",
-  "resolveOperatorDecision",
-  "markOperatorDecisionExecuted",
-  "getScheduledPostSchedulerState",
-  "setScheduledPostSchedulerMode",
-  "recoverOverdueScheduledPosts",
-  "runApprovedPostCanary",
-  "auditScheduledPost",
-  "inspectMcpFailure",
-  "listMcpTools",
-  "readMcpToolDefinition",
-  "runMcpTests",
-  "getWorkflowStatus",
-  "updateWorkflowRequirement",
-  "advanceWorkflowStage",
-  "prepareFullPreflight",
-  "updateGate",
-  "runGateSuite",
-  "submitAndGateDraft",
-] as const;
 
-type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
 
 
