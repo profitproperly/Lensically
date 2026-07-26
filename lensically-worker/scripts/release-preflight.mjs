@@ -13,6 +13,7 @@ const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
+const operatorContinuityMigration = read("database/migrations/0008_operator_continuity_and_autonomy.sql");
 const router = read("src/mandatoryExecutionMap.ts");
 const clientSafety = read("src/systemDirectory/clientSafeRequests.ts");
 const systemDirectorySource = read("src/systemDirectory/index.ts");
@@ -367,7 +368,10 @@ const manifestAutonomousGrowthChecks = [
   ["growth_mission_version", source.includes('const OPERATOR_GROWTH_MISSION_VERSION = "autonomous-growth-mission-v2"')],
   ["growth_engine_version", source.includes('const MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION = "manifest-autonomous-growth-engine-v1"')],
   ["autonomy_contract_version", source.includes('const OPERATOR_AUTONOMY_CONTRACT_VERSION = "operator-autonomy-governance-v4"')],
-  ["growth_mission_tables", source.includes("CREATE TABLE IF NOT EXISTS operator_growth_missions") && source.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")],
+    ["growth_mission_tables", operatorContinuityMigration.includes("CREATE TABLE IF NOT EXISTS operator_growth_missions")
+    && operatorContinuityMigration.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")
+    && source.includes('table: "operator_growth_missions"')
+    && source.includes('table: "operator_growth_mission_revisions"')],
   ["autonomous_cycle_tables", source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles") && source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items")],
   ["prepare_tool", source.includes('name: "prepare_manifest_autonomous_cycle"')],
   ["analysis_page_tool", source.includes('name: "get_manifest_cycle_analysis_page"')],
