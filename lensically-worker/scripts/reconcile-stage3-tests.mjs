@@ -3,14 +3,11 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const indexPath = resolve(root, "src/index.ts");
+const lineagePath = resolve(root, "src/utils/recoverPublishedPostLineage.ts");
 const testPath = resolve(root, "test/operatorMode.spec.ts");
 let source = await readFile(indexPath, "utf8");
+let lineage = await readFile(lineagePath, "utf8");
 let tests = await readFile(testPath, "utf8");
-const contractNeedle = "recoverPublishedPostLineage";
-const contractIndex = source.indexOf(contractNeedle);
-if (contractIndex < 0) throw new Error("lineage recovery symbol not found");
-process.stdout.write(`${source.slice(Math.max(0, contractIndex - 800), contractIndex + 2400)}\n`);
-throw new Error("stage3_lineage_contract_context_captured");
 const changes = [];
 
 function replaceExact(target, find, replace, label) {
