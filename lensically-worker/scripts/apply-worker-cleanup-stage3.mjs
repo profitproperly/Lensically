@@ -644,6 +644,19 @@ const testInsertion = `
 const testEnd = tests.lastIndexOf("\n});");
 if (testEnd < 0) throw new Error("human-free test insertion marker missing");
 tests = `${tests.slice(0, testEnd)}${testInsertion}${tests.slice(testEnd)}`;
+manifestTests = manifestTests.replace("  operatorToolRequiresLegacyPreparation,\n", "");
+const retiredPreparationTest = `  it("keeps canonical cycle reads and strategy commit off the legacy workflow bootstrap", () => {
+    expect(operatorToolRequiresLegacyPreparation("get_manifest_cycle_receipt")).toBe(false);
+    expect(operatorToolRequiresLegacyPreparation("get_manifest_cycle_analysis_page")).toBe(false);
+    expect(operatorToolRequiresLegacyPreparation("commit_manifest_cycle_strategy")).toBe(false);
+    expect(operatorToolRequiresLegacyPreparation("mm_get_manifest_cycle_analysis_page")).toBe(false);
+    expect(operatorToolRequiresLegacyPreparation("prepare_manifest_autonomous_cycle")).toBe(true);
+    expect(operatorToolRequiresLegacyPreparation("get_account_state")).toBe(true);
+  });
+
+`;
+if (!manifestTests.includes(retiredPreparationTest)) throw new Error("legacy preparation regression marker missing");
+manifestTests = manifestTests.replace(retiredPreparationTest, "");
 
 for (const forbidden of [
   "CREATE TABLE IF NOT EXISTS operator_workflow_sessions",
