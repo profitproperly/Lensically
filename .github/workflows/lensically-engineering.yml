@@ -77,7 +77,6 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      
 
       - name: Restore web dependencies
         id: push_web_cache
