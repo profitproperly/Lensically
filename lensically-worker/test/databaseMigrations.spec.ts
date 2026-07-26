@@ -6,8 +6,9 @@ type SchemaObjectRow = { name: string; type: string };
 type CountRow = { total: number | string };
 
 const testEnv = env as typeof env & {
-  TEST_MIGRATIONS: TestMigrationBinding;
+    TEST_MIGRATIONS: TestMigrationBinding;
   UPGRADE_DB: D1Database;
+  IDENTITY_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
