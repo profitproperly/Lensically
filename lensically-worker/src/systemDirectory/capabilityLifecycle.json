@@ -226,7 +226,7 @@
       "implementation_mode": "new_handler",
       "focused_regression": "reads the bounded database schema authority state without mutation",
       "release_scope": "operator-engineering",
-      "live_verification": "The exact deployed Main MCP returns bounded sqlite_master tables, indexes, triggers, or views with pagination and optional SQL without changing D1 schema or data.",
+            "live_verification": "The exact deployed Main MCP returns bounded D1 table, column, and index metadata through read-only PRAGMA introspection; trigger authority remains versioned migration plus behavior-test verified.",
       "compatibility_bridge": false
     },
     {
