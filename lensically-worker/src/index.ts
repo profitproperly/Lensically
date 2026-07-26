@@ -3615,7 +3615,9 @@ async function upsertAppThreadsAccountLink(
   threadsUserId: string,
   createdAt: number,
 ): Promise<void> {
-  const upsertSql = `INSERT INTO app_threads_accounts (
+  await ensureAppThreadsTable(env);
+  await env.DB.prepare(
+    `INSERT INTO app_threads_accounts (
       app_user_id,
       threads_user_id,
       connection_active,
@@ -3627,27 +3629,10 @@ async function upsertAppThreadsAccountLink(
     ON CONFLICT(app_user_id, threads_user_id) DO UPDATE SET
       connection_active = 1,
       is_active = 0,
-      tombstone_expires_at = NULL`;
-
-  try {
-    await ensureAppThreadsTable(env);
-    await env.DB.prepare(upsertSql)
-      .bind(appUserId, threadsUserId, createdAt)
-      .run();
-  } catch (error) {
-    const message = getErrorMessage(error);
-    const shouldForceRebuild = message.includes("ON CONFLICT clause does not match")
-      || message.includes("no such column")
-      || message.includes("UNIQUE constraint failed: app_threads_accounts.app_user_id");
-    if (!shouldForceRebuild) {
-      throw error;
-    }
-
-    await rebuildAppThreadsTableForMultiAccount(env);
-    await env.DB.prepare(upsertSql)
-      .bind(appUserId, threadsUserId, createdAt)
-      .run();
-  }
+      tombstone_expires_at = NULL`,
+  )
+    .bind(appUserId, threadsUserId, createdAt)
+    .run();
 }
 
 async function linkThreadsAccountWithSchemaFallback(
