@@ -1,6 +1,6 @@
 {
   "version": "lensically-database-authority-v1",
-  "status": "transitional_runtime_ddl_inventory",
+    "status": "incremental_migration_extraction",
     "canonical_migration_directory": "database/migrations",
   "legacy_migration_directory": "migrations",
 
@@ -13,8 +13,13 @@
     "src/manifestProductIntegration.ts",
     "src/sourceFamilySelection.ts"
   ],
-  "temporary_table_suffixes": [
+    "temporary_table_suffixes": [
     "_rebuild"
+  ],
+  "extracted_tables": [
+    "external_patterns",
+    "gpt_strategy_memory",
+    "threads_follower_snapshots"
   ],
     "declared_duplicate_owners": {},
     "retired_tables": [

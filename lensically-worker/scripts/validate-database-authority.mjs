@@ -136,7 +136,37 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   const migrationFiles = existsSync(migrationDirectory)
     ? readdirSync(migrationDirectory).filter((name) => name.endsWith(".sql")).sort()
     : [];
-  if (migrationFiles.length === 0) errors.push("versioned_migrations_missing");
+    if (migrationFiles.length === 0) errors.push("versioned_migrations_missing");
+
+  const migrationSource = migrationFiles
+    .map((name) => readFileSync(resolve(migrationDirectory, name), "utf8"))
+    .join("\n");
+  const extractedTables = sortedUnique(manifest.extracted_tables ?? []);
+  for (const table of extractedTables) {
+    const runtimeOwnership = records.filter((record) =>
+      record.table === table && ["table", "alter_table", "index", "trigger"].includes(record.kind));
+    if (runtimeOwnership.length > 0) {
+      errors.push(`extracted_table_runtime_ddl_present:${table}:${runtimeOwnership.map((record) => `${record.kind}@${record.source}`).join(",")}`);
+    }
+    const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${table}\\b`, "i");
+    if (!tablePattern.test(migrationSource)) errors.push(`extracted_table_migration_owner_missing:${table}`);
+  }
+
+  const vitestConfig = readFileSync(resolve(root, "vitest.config.mts"), "utf8");
+  const migrationSetup = readFileSync(resolve(root, "test/apply-migrations.ts"), "utf8");
+  const migrationTests = readFileSync(resolve(root, "test/databaseMigrations.spec.ts"), "utf8");
+  if (!vitestConfig.includes("readD1Migrations") || !vitestConfig.includes("TEST_MIGRATIONS")) {
+    errors.push("test_migration_binding_missing");
+  }
+  if (!migrationSetup.includes("applyD1Migrations") || !migrationSetup.includes("lensically_test_migrations")) {
+    errors.push("test_migration_bootstrap_missing");
+  }
+  if (!migrationTests.includes("reapplies the canonical migration ledger without losing existing data")) {
+    errors.push("migration_idempotency_regression_missing");
+  }
+  if (!releaseWorkflow.includes("test/databaseMigrations.spec.ts")) {
+    errors.push("migration_regression_release_gate_missing");
+  }
 
   const receipt = {
     ok: errors.length === 0,
@@ -154,7 +184,8 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     ),
     temporary_tables: temporary,
     retired_table_recreations: actualRetiredRecreations,
-    migration_file_count: migrationFiles.length,
+        migration_file_count: migrationFiles.length,
+    extracted_tables: extractedTables,
     errors,
   };
   if (errors.length > 0) {
