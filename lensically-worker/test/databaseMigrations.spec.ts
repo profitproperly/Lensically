@@ -2542,6 +2542,181 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves durable work state, ledger, and repo-write sessions across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const workKey = `work-${suffix}`;
+    const writeSessionId = `write-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT OR REPLACE INTO operator_work_state (
+        id, contract_version, policy_version, role, active_outcome_key,
+        active_outcome_title, active_scope_json, status, scope_frozen,
+        active_interrupt_key, next_action, completion_evidence_json
+      ) VALUES ('singleton', 'contract-v1', 'policy-v1', 'Autonomous Operator',
+        'outcome-1', 'Complete migration', '{"scope":["database"]}', 'active', 1,
+        'interrupt-1', 'Run validation', '["migration preserved"]')`,
+    ).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_work_ledger (
+        id, work_key, title, summary, priority, status, intake_decision,
+        intake_reason, required_for_active_outcome, dependencies_json,
+        completion_condition, execution_order, evidence_json
+      ) VALUES (?, ?, 'Fixture work', 'Preserve durable work', 'P1', 'executing',
+        'activate', 'required_prerequisite', 1, '["dependency-1"]',
+        'Migration passes', 10, '["evidence-1"]')`,
+    ).bind(`ledger-${suffix}`, workKey).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_repo_write_sessions (
+        id, path, mode, message, summary, content, status
+      ) VALUES (?, 'ENGINEERING_CONTINUATION.md', 'replace', 'Fixture write',
+        'Preserve session', 'fixture content', 'open')`,
+    ).bind(writeSessionId).run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all([
+      countWhere("SELECT COUNT(*) AS total FROM operator_work_state WHERE id = 'singleton' AND next_action = 'Run validation'"),
+      countWhere("SELECT COUNT(*) AS total FROM operator_work_ledger WHERE work_key = ?", workKey),
+      countWhere("SELECT COUNT(*) AS total FROM operator_repo_write_sessions WHERE id = ? AND content = 'fixture content'", writeSessionId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_system_retirements WHERE retirement_key = 'human-free-retirement-v2'"),
+    ]);
+    expect(counts).toEqual([1, 1, 1, 1]);
+  });
+
+  it("adopts the live durable work schema and completes legacy retirements without data loss", async () => {
+    const db = testEnv.WORK_STATE_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_work_state (
+        id TEXT PRIMARY KEY CHECK (id = 'singleton'), contract_version TEXT NOT NULL,
+        policy_version TEXT NOT NULL, role TEXT NOT NULL, active_outcome_key TEXT NOT NULL,
+        active_outcome_title TEXT NOT NULL, active_scope_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active', scope_frozen INTEGER NOT NULL DEFAULT 1,
+        active_interrupt_key TEXT, next_action TEXT NOT NULL,
+        completion_evidence_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_work_ledger (
+        id TEXT PRIMARY KEY, work_key TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
+        summary TEXT NOT NULL, priority TEXT NOT NULL, status TEXT NOT NULL,
+        intake_decision TEXT NOT NULL, intake_reason TEXT NOT NULL,
+        required_for_active_outcome INTEGER NOT NULL DEFAULT 0,
+        dependencies_json TEXT NOT NULL DEFAULT '[]', completion_condition TEXT NOT NULL,
+        execution_order INTEGER NOT NULL DEFAULT 1000, evidence_json TEXT NOT NULL DEFAULT '[]',
+        merged_into_work_key TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_repo_write_sessions (
+        id TEXT PRIMARY KEY, path TEXT NOT NULL, mode TEXT NOT NULL,
+        message TEXT NOT NULL, summary TEXT, content TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_system_retirements (
+        retirement_key TEXT PRIMARY KEY,
+        completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    for (const table of [
+      "operator_workflow_sessions",
+      "operator_context_admissions",
+      "operator_production_board_items",
+      "operator_review_batches",
+      "agent_account_controls",
+      "operator_local_execution_nodes",
+      "operator_local_execution_jobs",
+      "operator_local_validation_receipts",
+      "operator_validation_plane_events",
+      "operator_local_execution_enrollment_tokens",
+    ]) {
+      await db.prepare(`CREATE TABLE ${table} (id TEXT PRIMARY KEY)`).run();
+    }
+
+    await db.prepare(
+      `INSERT INTO operator_work_state (
+        id, contract_version, policy_version, role, active_outcome_key,
+        active_outcome_title, active_scope_json, next_action, completion_evidence_json
+      ) VALUES ('singleton', 'live-contract', 'live-policy', 'Live Operator',
+        'live-outcome', 'Live outcome', '{"live":true}', 'Continue live work', '["live-evidence"]')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_work_ledger (
+        id, work_key, title, summary, priority, status, intake_decision,
+        intake_reason, required_for_active_outcome, dependencies_json,
+        completion_condition, execution_order, evidence_json
+      ) VALUES ('live-ledger', 'live-work', 'Live work', 'Preserve this row', 'P1',
+        'executing', 'activate', 'required', 1, '["live-dependency"]',
+        'Complete safely', 5, '["live-evidence"]')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_repo_write_sessions (
+        id, path, mode, message, summary, content, status
+      ) VALUES ('live-write', 'src/index.ts', 'replace', 'Live write',
+        'Preserve write session', 'live-content', 'open')`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_work_state_upgrade_migrations",
+    );
+
+    const preserved = await Promise.all([
+      db.prepare("SELECT COUNT(*) AS total FROM operator_work_state WHERE id = 'singleton' AND next_action = 'Continue live work'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_work_ledger WHERE work_key = 'live-work'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_repo_write_sessions WHERE id = 'live-write' AND content = 'live-content'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_system_retirements WHERE retirement_key = 'human-free-retirement-v2'").first<CountRow>(),
+    ]);
+    expect(preserved.map((row) => Number(row?.total ?? 0))).toEqual([1, 1, 1, 1]);
+
+    for (const table of [
+      "operator_workflow_sessions",
+      "operator_context_admissions",
+      "operator_production_board_items",
+      "operator_review_batches",
+      "agent_account_controls",
+      "operator_local_execution_nodes",
+      "operator_local_execution_jobs",
+      "operator_local_validation_receipts",
+      "operator_validation_plane_events",
+      "operator_local_execution_enrollment_tokens",
+    ]) {
+      const retired = await db.prepare(
+        "SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table' AND name = ?",
+      ).bind(table).first<CountRow>();
+      expect(Number(retired?.total ?? 0)).toBe(0);
+    }
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_work_ledger (
+          id, work_key, title, summary, priority, status, intake_decision,
+          intake_reason, completion_condition
+        ) VALUES ('duplicate-ledger', 'live-work', 'Duplicate', 'Duplicate', 'P2',
+          'queued', 'defer', 'duplicate', 'Never inserts')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_work_state (
+          id, contract_version, policy_version, role, active_outcome_key,
+          active_outcome_title, active_scope_json, next_action
+        ) VALUES ('not-singleton', 'v1', 'v1', 'Operator', 'outcome',
+          'Outcome', '{}', 'Next')`,
+      ).run(),
+    ).rejects.toThrow(/CHECK constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

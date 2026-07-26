@@ -205,8 +205,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves operational assurance records across migration replay")) {
     errors.push("operational_assurance_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live assurance schema without losing incidents, audit receipts, events, or observations")) {
+    if (!migrationTests.includes("adopts the live assurance schema without losing incidents, audit receipts, events, or observations")) {
     errors.push("operational_assurance_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves durable work state, ledger, and repo-write sessions across migration replay")) {
+    errors.push("durable_work_state_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live durable work schema and completes legacy retirements without data loss")) {
+    errors.push("durable_work_state_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");

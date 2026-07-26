@@ -15,6 +15,7 @@ const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
 const operatorContinuityMigration = read("database/migrations/0008_operator_continuity_and_autonomy.sql");
 const cycleDecisionMigration = read("database/migrations/0009_autonomous_cycles_and_decisions.sql");
+const workStateMigration = read("database/migrations/0011_durable_work_state_and_retirements.sql");
 const router = read("src/mandatoryExecutionMap.ts");
 const clientSafety = read("src/systemDirectory/clientSafeRequests.ts");
 const systemDirectorySource = read("src/systemDirectory/index.ts");
@@ -170,8 +171,16 @@ if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-op
     || !router.includes('AUTONOMOUS_BUSINESS_OPERATOR_ROLE = "Lensically Autonomous Business Operator"')
     || !router.includes("classifyOperatorWorkIntake")
     || !router.includes("validateOperatorActionClosure")
-    || !source.includes("CREATE TABLE IF NOT EXISTS operator_work_state")
-    || !source.includes("CREATE TABLE IF NOT EXISTS operator_work_ledger")
+        || !workStateMigration.includes("CREATE TABLE IF NOT EXISTS operator_work_state")
+    || !workStateMigration.includes("CREATE TABLE IF NOT EXISTS operator_work_ledger")
+    || !workStateMigration.includes("CREATE TABLE IF NOT EXISTS operator_repo_write_sessions")
+    || !workStateMigration.includes("CREATE TABLE IF NOT EXISTS operator_system_retirements")
+    || !workStateMigration.includes("DROP TABLE IF EXISTS operator_workflow_sessions")
+    || !workStateMigration.includes("human-free-retirement-v2")
+    || !source.includes('table: "operator_work_state"')
+    || !source.includes('table: "operator_work_ledger"')
+    || !source.includes('table: "operator_repo_write_sessions"')
+    || !source.includes('table: "operator_system_retirements"')
     || !source.includes('name: "getOperatorWorkState"')
     || !source.includes('name: "intakeOperatorWork"')
     || !source.includes('name: "advanceOperatorWork"')
