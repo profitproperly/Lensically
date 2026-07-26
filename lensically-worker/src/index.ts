@@ -3750,15 +3750,16 @@ function getThreadsConnectionTombstoneExpiresAt(nowMs = Date.now()): string {
 }
 
 async function ensureMetaDeletionRequestsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS meta_deletion_requests (
-      confirmation_code TEXT PRIMARY KEY,
-      platform_user_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      completed_at TEXT
-    )`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "meta_deletion_requests",
+    columns: [
+      "confirmation_code",
+      "platform_user_id",
+      "status",
+      "requested_at",
+      "completed_at",
+    ],
+  });
 }
 
 async function ensureThreadsProfileCacheTable(env: Env): Promise<void> {
