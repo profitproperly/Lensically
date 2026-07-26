@@ -386,7 +386,7 @@ describe("canonical database migrations", () => {
       countWhere("SELECT COUNT(*) AS total FROM gpt_post_strategy_tags WHERE scheduled_post_id = ? AND pillar = 'intuition'", scheduledPostId),
       countWhere("SELECT COUNT(*) AS total FROM gpt_generation_runs WHERE id = ? AND source_card_version_number = 3 AND adaptation_plan_json IS NOT NULL", generationRunId),
       countWhere("SELECT COUNT(*) AS total FROM gpt_generation_drafts WHERE id = ? AND showable = 1 AND scheduled_post_id = ? AND published_post_id = ?", generationDraftId, scheduledPostId, archivedPostId),
-      countWhere("SELECT COUNT(*) AS total FROM gpt_preflight_snapshots WHERE id = ? AND manifest_json = '{"complete":true}'", preflightSnapshotId),
+            countWhere("SELECT COUNT(*) AS total FROM gpt_preflight_snapshots WHERE id = ? AND manifest_json = ?", preflightSnapshotId, '{"complete":true}'),
     ]);
     expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
