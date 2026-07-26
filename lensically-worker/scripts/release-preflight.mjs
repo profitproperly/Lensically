@@ -12,6 +12,7 @@ const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
+const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
 const operatorContinuityMigration = read("database/migrations/0008_operator_continuity_and_autonomy.sql");
 const cycleDecisionMigration = read("database/migrations/0009_autonomous_cycles_and_decisions.sql");
@@ -416,16 +417,25 @@ const manifestAutonomousGrowthChecks = [
     && manifestIntelligence.includes('MANIFEST_EVIDENCE_PAGE_MAX_BYTES = 12000')
     && manifestIntelligence.includes('MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES = 20000')
     && manifestIntelligence.includes('MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION = "manifest-evidence-page-v1"')
-    && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_snapshots")
-    && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts")
-    && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_pages")
+        && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_snapshots")
+    && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts")
+    && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_evidence_pages")
+    && manifestIntelligence.includes('table: "operator_manifest_evidence_snapshots"')
+    && manifestIntelligence.includes('table: "operator_manifest_evidence_posts"')
+    && manifestIntelligence.includes('table: "operator_manifest_evidence_pages"')
     && manifestIntelligence.includes('response_bytes_estimated: true')
     && manifestIntelligence.includes('Math.min(MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES, storedPageBytes + 2048)')],
   ["likes_first", manifestIntelligence.includes('primary_metric: "24_hour_likes"')],
   ["single_cycle_strategy_writer", !source.includes("ensureManifestStrategyVersion")
     && !manifestMeasurementAudit.includes("ensureManifestStrategyVersion")],
-  ["one_cycle_strategy", manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies") && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items")],
-  ["gate_receipts_and_bans", manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_candidate_gate_receipts") && manifestIntelligence.includes("CREATE TABLE IF NOT EXISTS operator_manifest_hard_bans")],
+    ["one_cycle_strategy", manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies")
+    && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items")
+    && manifestIntelligence.includes('table: "operator_manifest_cycle_strategies"')
+    && manifestIntelligence.includes('table: "operator_manifest_cycle_plan_items"')],
+  ["gate_receipts_and_bans", manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_candidate_gate_receipts")
+    && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_hard_bans")
+    && manifestIntelligence.includes('table: "operator_manifest_candidate_gate_receipts"')
+    && manifestIntelligence.includes('table: "operator_manifest_hard_bans"')],
   ["workflow_regression", workflow.includes('manifest-autonomous-cycle.test.ts')],
   ["clock_regressions", manifestAutonomousTests.includes("uses Threads server time when the runtime clock is behind") && manifestAutonomousTests.includes("uses the newest verified publication as a hard lower bound") && manifestAutonomousTests.includes("starts the rolling horizon at the next future hour")],
     ["source_only_regression", manifestAutonomousTests.includes("rejects model-originated sources and accepts canonical source-card lineage")],

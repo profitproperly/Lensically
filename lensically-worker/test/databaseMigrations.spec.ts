@@ -3405,6 +3405,72 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves Manifest Intelligence policy, evidence, strategy, receipt, ban, and hypothesis state across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const probes = await seedManifestIntelligenceFixture(testEnv.DB, suffix);
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhere(
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+  });
+
+  it("adopts the exact live Manifest Intelligence schema without losing policy, evidence, strategy, receipt, ban, or hypothesis state", async () => {
+    const db = testEnv.MANIFEST_INTELLIGENCE_UPGRADE_DB;
+    await materializeMigrationWithoutLedger(db, "0014_manifest_intelligence.sql");
+    const suffix = crypto.randomUUID();
+    const probes = await seedManifestIntelligenceFixture(db, suffix);
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_manifest_intelligence_upgrade_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhereIn(
+        db,
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_strategy_versions (
+          id, brand_key, version, contract_version, strategy_hash, strategy_json
+        ) VALUES ('duplicate-strategy', ?, 2, 'strategy-v1', ?, '{}')`,
+      ).bind(`brand-${suffix}`, `strategy-hash-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_cycle_receipt_events (
+          id, cycle_id, brand_key, event_key, event_type, payload_json
+        ) VALUES ('duplicate-event', ?, ?, ?, 'duplicate', '{}')`,
+      ).bind(`cycle-${suffix}`, `brand-${suffix}`, `event-key-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_post_hypotheses (
+          id, cycle_id, brand_key, slot_key, hypothesis_version, source_kind,
+          source_type, expected_response_type, expected_audience_reward,
+          hook_rationale, premise_rationale, exploration_mode,
+          expected_performance_range_json, uncertainty
+        ) VALUES ('duplicate-hypothesis', ?, ?, '2099-01-01-01', 'hypothesis-v1',
+          'internal', 'source_card', 'engagement', 'recognition', 'Question hook',
+          'Proven premise', 'controlled', '{}', 'medium')`,
+      ).bind(`cycle-${suffix}`, `brand-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

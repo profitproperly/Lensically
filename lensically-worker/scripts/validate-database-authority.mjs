@@ -156,11 +156,13 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${table}\\b`, "i");
     if (!tablePattern.test(migrationSource)) errors.push(`migration_dependency_owner_missing:${table}`);
   }
-  if (manifest.index_runtime_ddl_complete === true) {
-    const indexRuntimeDdl = records.filter((record) =>
-      record.source === "src/index.ts" && ["table", "alter_table", "index", "trigger", "drop"].includes(record.kind));
-    if (indexRuntimeDdl.length > 0) {
-      errors.push(`index_runtime_ddl_present:${indexRuntimeDdl.map((record) => `${record.kind}:${record.table}`).join(",")}`);
+    const runtimeDdlCompleteSources = sortedUnique(manifest.runtime_ddl_complete_sources ?? []);
+  for (const completedSource of runtimeDdlCompleteSources) {
+    const completedSourceDdl = records.filter((record) =>
+      record.source === completedSource
+      && ["table", "alter_table", "index", "trigger", "drop_table"].includes(record.kind));
+    if (completedSourceDdl.length > 0) {
+      errors.push(`completed_runtime_ddl_source_has_mutation:${completedSource}:${completedSourceDdl.map((record) => `${record.kind}:${record.table}`).join(",")}`);
     }
   }
 
@@ -230,8 +232,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves performance learning and content focus state across migration replay")) {
     errors.push("performance_focus_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live performance learning and content focus schema without data loss")) {
+    if (!migrationTests.includes("adopts the live performance learning and content focus schema without data loss")) {
     errors.push("performance_focus_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves Manifest Intelligence policy, evidence, strategy, receipt, ban, and hypothesis state across migration replay")) {
+    errors.push("manifest_intelligence_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the exact live Manifest Intelligence schema without losing policy, evidence, strategy, receipt, ban, or hypothesis state")) {
+    errors.push("manifest_intelligence_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
