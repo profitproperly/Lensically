@@ -3955,50 +3955,20 @@ async function ensureWorkspaceUserRecord(
 }
 
 async function ensureImmediatePublishIdempotencyTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS threads_publish_idempotency (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      scope TEXT NOT NULL,
-      app_user_id TEXT NOT NULL,
-      threads_user_id TEXT NOT NULL,
-      request_hash TEXT NOT NULL,
-      request_bucket TEXT NOT NULL,
-      response_status INTEGER,
-      response_body TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(scope, app_user_id, threads_user_id, request_hash, request_bucket),
-      FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_threads_publish_idempotency_created_at
-     ON threads_publish_idempotency (created_at)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_threads_publish_idempotency_user_exists_insert
-     BEFORE INSERT ON threads_publish_idempotency
-     FOR EACH ROW
-     WHEN NOT EXISTS (
-       SELECT 1
-       FROM users
-       WHERE id = NEW.app_user_id
-     )
-     BEGIN
-       SELECT RAISE(ABORT, 'foreign_key_violation:threads_publish_idempotency.app_user_id');
-     END`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_threads_publish_idempotency_user_cleanup
-     AFTER DELETE ON users
-     FOR EACH ROW
-     BEGIN
-       DELETE FROM threads_publish_idempotency
-       WHERE app_user_id = OLD.id;
-     END`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "threads_publish_idempotency",
+    columns: [
+      "id",
+      "scope",
+      "app_user_id",
+      "threads_user_id",
+      "request_hash",
+      "request_bucket",
+      "response_status",
+      "response_body",
+      "created_at",
+    ],
+  });
 }
 
 async function ensureThreadsAccountsTable(env: Env): Promise<void> {
