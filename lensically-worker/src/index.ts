@@ -24791,10 +24791,15 @@ async function handleOperatorMcpAdminTool(
   if (!brand) {
     return { ok: false, error: "brand_key is required or unavailable" };
   }
-  const sessionId = normalizeOperatorText(args.workflow_session_id, 120, true);
-  let session = sessionId
-    ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sessionId, brand.brand_key).first<Record<string, unknown>>()
-    : await getActiveOperatorSession(env, brand.brand_key);
+  const sessionRequired = toolName !== "get_monthly_growth_review";
+  const sessionId = sessionRequired
+    ? normalizeOperatorText(args.workflow_session_id, 120, true)
+    : null;
+  let session = sessionRequired
+    ? sessionId
+      ? await env.DB.prepare(`SELECT * FROM operator_workflow_sessions WHERE id = ? AND brand_key = ? LIMIT 1`).bind(sessionId, brand.brand_key).first<Record<string, unknown>>()
+      : await getActiveOperatorSession(env, brand.brand_key)
+    : null;
 
   if (toolName === "get_monthly_growth_review") {
     const dateFrom = normalizeOperatorText(args.date_from, 10);
