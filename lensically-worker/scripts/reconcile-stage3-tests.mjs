@@ -240,7 +240,11 @@ for (const forbidden of [
 if (source.includes("INSERT OR IGNORE INTO operator_workflow_sessions")) {
   throw new Error("Stage 3 source-card reconciliation still writes workflow sessions");
 }
+if (lineage.includes("operator_workflow_sessions") || lineage.includes("active_workflow_session_required")) {
+  throw new Error("Stage 3 lineage recovery still depends on workflow sessions");
+}
 
 await writeFile(indexPath, source);
+await writeFile(lineagePath, lineage);
 await writeFile(testPath, tests);
-process.stdout.write(`${JSON.stringify({ ok: true, changes, index_bytes: Buffer.byteLength(source), test_bytes: Buffer.byteLength(tests) }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ ok: true, changes, index_bytes: Buffer.byteLength(source), lineage_bytes: Buffer.byteLength(lineage), test_bytes: Buffer.byteLength(tests) }, null, 2)}\n`);
