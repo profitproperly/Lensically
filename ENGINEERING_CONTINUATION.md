@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: c5be8c5c249e38ca228cd5a8dd4b092eff892d39
-production_sha: c5be8c5c249e38ca228cd5a8dd4b092eff892d39
+repository_base_sha: 145f01dfe7c6d35c11f34f3165b2e1042864f9bc
+production_sha: 145f01dfe7c6d35c11f34f3165b2e1042864f9bc
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -151,18 +151,35 @@ Completed checkpoint — Stage 4G generation lineage schema extraction:
 - Exact-SHA migration-first release passed in run `30214502352`.
 - Live production independently confirmed exact SHA `c5be8c5c249e38ca228cd5a8dd4b092eff892d39`.
 
-Current sub-action — Stage 4H source lineage schema extraction:
+Completed checkpoint — Stage 4H source lineage schema extraction:
 
-Characterize and move the next dependency-complete source lineage cluster into ordered migrations:
+- Added `0006_source_lineage.sql`.
+- Moved complete migration ownership for:
+  - `operator_source_selection_batches`
+  - `operator_source_selections`
+  - `operator_daily_source_claims`
+  - `operator_source_exclusions`
+  - `operator_source_card_families`
+  - `operator_source_cards`
+- Replaced source-lineage table creation, compatibility columns, indexes, and update triggers inside `ensureOperatorWorkflowTables` with complete `assertDatabaseIntegrity` probes.
+- Preserved random-draw batch evidence, production dates, retirement state, immutable source snapshots, disposition and workflow sequence, daily claims, review-item uniqueness, permanent exclusions, family identity, source-card version history, current-version uniqueness, transformation contracts, lock state, and lineage links.
+- Added `SOURCE_UPGRADE_DB` to prove the ordered migration ledger adopts the full pre-existing source-lineage schema without data loss.
+- Converted shared tests from dropping source lineage tables to ordered row cleanup.
+- Push validation passed in run `30214989865`.
+- All eight Operator shards passed in run `30215045245`.
+- Exact-SHA migration-first release passed in run `30215081074`.
+- Live production independently confirmed exact SHA `145f01dfe7c6d35c11f34f3165b2e1042864f9bc`.
 
-- `operator_source_selection_batches`
-- `operator_source_selections`
-- `operator_daily_source_claims`
-- `operator_source_exclusions`
-- `operator_source_card_families`
-- `operator_source_cards`
+Current sub-action — Stage 4I quality enforcement schema extraction:
 
-Preserve random-draw batch evidence, production dates and retirement state, immutable source snapshots, selection disposition and workflow sequence, one-source-per-day claims, review-item uniqueness, permanent source exclusions, canonical source-card family identity, source-card version history, current-version uniqueness, transformation contracts, lock and invalidation state, indexes, update triggers, and all existing production data. Move every compatibility column into explicit migration ownership and reduce this part of `ensureOperatorWorkflowTables` to bounded integrity checks.
+Characterize and move the next dependency-complete quality enforcement cluster into ordered migrations:
+
+- `operator_gates`
+- `operator_gate_results`
+- `operator_content_inventory`
+- `operator_workflow_requirements`
+
+Preserve global and account-scoped gate uniqueness, stage and lane scopes, evaluator and severity configuration, examples and source-memory links, immutable gate evidence, blocking and repair guidance, historical content fingerprints, opening and realm metadata, source-card linkage, workflow requirement status and evidence, indexes, and all existing production data. Reduce this part of `ensureOperatorWorkflowTables` to bounded integrity checks.
 
 Remaining Stage 4 work after this cluster:
 
