@@ -19,7 +19,8 @@ const testEnv = env as typeof env & {
     WORK_STATE_UPGRADE_DB: D1Database;
     EXECUTION_CONTROL_UPGRADE_DB: D1Database;
     PERFORMANCE_FOCUS_UPGRADE_DB: D1Database;
-  MANIFEST_INTELLIGENCE_UPGRADE_DB: D1Database;
+      MANIFEST_INTELLIGENCE_UPGRADE_DB: D1Database;
+    MANIFEST_ENGINE_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -350,7 +351,7 @@ const requiredColumns: Record<string, string[]> = {
     "regression_tests_json", "verification_json", "metadata_json", "resolved_at", "created_at",
     "updated_at",
   ],
-  operator_manifest_post_hypotheses: [
+    operator_manifest_post_hypotheses: [
     "id", "cycle_id", "brand_key", "slot_key", "hypothesis_version", "strategy_version_id",
     "source_kind", "source_type", "source_identity_key", "source_card_id",
     "source_selection_id", "internal_source_id", "expected_response_type",
@@ -358,6 +359,45 @@ const requiredColumns: Record<string, string[]> = {
     "comparable_post_ids_json", "expected_performance_range_json", "uncertainty",
     "falsification_conditions_json", "candidate_trace_json", "model_evaluation_json",
     "scheduled_post_id", "status", "revision", "locked_at", "created_at", "updated_at",
+  ],
+  operator_manifest_semantic_signatures: [
+    "id", "brand_key", "content_type", "content_id", "scheduled_post_id",
+    "published_post_id", "observed_at", "text_hash", "signature_version",
+    "signature_json", "created_at", "updated_at",
+  ],
+  operator_manifest_maturity_evaluations: [
+    "id", "brand_key", "published_post_id", "checkpoint_hours", "evaluation_version",
+    "evaluation_json", "structural_change_allowed", "created_at", "updated_at",
+  ],
+  operator_manifest_comparable_analyses: [
+    "id", "brand_key", "published_post_id", "checkpoint_hours", "analysis_version",
+    "comparable_post_ids_json", "analysis_json", "created_at", "updated_at",
+  ],
+  operator_manifest_learning_observations: [
+    "id", "brand_key", "level", "feature_key", "checkpoint_hours", "sample_size",
+    "supporting_count", "contradicting_count", "median_overall", "effect_size",
+    "confidence_score", "confidence_label", "state", "evidence_json", "active",
+    "learning_version", "created_at", "updated_at",
+  ],
+  operator_manifest_portfolio_states: [
+    "id", "brand_key", "family_key", "role", "recommended_role", "previous_role",
+    "confidence_score", "confidence_label", "allocation_weight", "actual_decay",
+    "reason", "evidence_json", "portfolio_version", "created_at", "updated_at",
+  ],
+  operator_manifest_state_transitions: [
+    "id", "transition_key", "brand_key", "entity_type", "entity_id", "from_state",
+    "to_state", "reason", "evidence_json", "transitioned_at", "created_at",
+  ],
+  operator_manifest_experiments: [
+    "id", "brand_key", "experiment_key", "family_key", "hypothesis_json",
+    "comparison_group_json", "maturity_windows_json", "result_criteria_json", "status",
+    "latest_result_json", "follow_up_decision", "experiment_version", "created_at",
+    "updated_at",
+  ],
+  operator_manifest_experiment_assignments: [
+    "id", "experiment_id", "brand_key", "cycle_id", "slot_key", "hypothesis_id",
+    "scheduled_post_id", "published_post_id", "variant_key", "status", "created_at",
+    "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -499,7 +539,9 @@ const expectedObjects = [
   "idx_manifest_cycle_plan_items_strategy",
   "idx_manifest_receipt_events_cycle",
   "idx_manifest_cycle_defects_status",
-  "idx_manifest_hypotheses_cycle",
+    "idx_manifest_hypotheses_cycle",
+  "idx_manifest_semantic_signatures_recent",
+
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",

@@ -622,7 +622,15 @@ async function resetTables(): Promise<void> {
     ]) {
         await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
-            await env.DB.prepare("DELETE FROM operator_manifest_post_hypotheses").run();
+              await env.DB.prepare("DELETE FROM operator_manifest_experiment_assignments").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_experiments").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_state_transitions").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_portfolio_states").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_learning_observations").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_comparable_analyses").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_maturity_evaluations").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_semantic_signatures").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_post_hypotheses").run();
   await env.DB.prepare("DELETE FROM operator_manifest_cycle_defect_receipts").run();
   await env.DB.prepare("DELETE FROM operator_manifest_cycle_receipt_events").run();
   await env.DB.prepare("DELETE FROM operator_manifest_cycle_receipts").run();

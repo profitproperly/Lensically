@@ -5,8 +5,7 @@
   "legacy_migration_directory": "migrations",
 
   "target_state": "All tables, columns, indexes, triggers, rebuilds, and retirements are owned by ordered versioned migrations. Runtime code performs bounded integrity probes only.",
-        "runtime_ddl_sources": [
-    "src/manifestIntelligenceEngine.ts",
+                "runtime_ddl_sources": [
         "src/manifestMeasurementAudit.ts",
     "src/manifestProductIntegration.ts",
     "src/sourceFamilySelection.ts"
@@ -68,7 +67,15 @@
     "operator_manifest_cycle_receipts",
     "operator_manifest_cycle_receipt_events",
     "operator_manifest_cycle_defect_receipts",
-    "operator_manifest_post_hypotheses",
+        "operator_manifest_post_hypotheses",
+    "operator_manifest_semantic_signatures",
+    "operator_manifest_maturity_evaluations",
+    "operator_manifest_comparable_analyses",
+    "operator_manifest_learning_observations",
+    "operator_manifest_portfolio_states",
+    "operator_manifest_state_transitions",
+    "operator_manifest_experiments",
+    "operator_manifest_experiment_assignments",
     "operator_operational_incidents",
     "operator_operational_observations",
     "operator_post_metric_snapshots",
@@ -92,9 +99,10 @@
     "users"
   ],
         "migration_dependency_tables": [],
-  "runtime_ddl_complete_sources": [
+    "runtime_ddl_complete_sources": [
     "src/index.ts",
-    "src/manifestIntelligence.ts"
+    "src/manifestIntelligence.ts",
+    "src/manifestIntelligenceEngine.ts"
   ],
     "declared_duplicate_owners": {},
     "retired_tables": [
