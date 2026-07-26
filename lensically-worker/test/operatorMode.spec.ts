@@ -640,17 +640,18 @@ async function resetTables(): Promise<void> {
 
     "operator_context_admissions",
     "operator_workflow_sessions",
-    "gpt_generation_drafts",
+        "gpt_generation_drafts",
     "gpt_generation_runs",
-    "gpt_strategy_memory",
     "gpt_post_strategy_tags",
-    "scheduled_posts",
+        "scheduled_posts",
     "users",
-    "external_patterns",
     "threads_posts_archive",
-  ]) {
+    ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
   }
+  await env.DB.prepare("DELETE FROM external_patterns").run();
+  await env.DB.prepare("DELETE FROM gpt_strategy_memory").run();
+  await env.DB.prepare("DELETE FROM threads_follower_snapshots").run();
   await env.DB.prepare(
     `CREATE TABLE users (
       id TEXT PRIMARY KEY,
@@ -928,18 +929,8 @@ describe("operator mode backend spine", () => {
   });
 
   it("routes the exact monthly growth question to one bounded analytics response", async () => {
-    await env.DB.prepare(`DROP TABLE IF EXISTS threads_follower_snapshots`).run();
+        await env.DB.prepare("DELETE FROM threads_follower_snapshots").run();
     await env.DB.prepare(
-      `CREATE TABLE threads_follower_snapshots (
-        threads_user_id TEXT NOT NULL,
-        snapshot_date TEXT NOT NULL,
-        followers_count INTEGER NOT NULL,
-        baseline_followers_count INTEGER,
-        captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (threads_user_id, snapshot_date)
-      )`,
-    ).run();
-        await env.DB.prepare(
       `INSERT INTO threads_follower_snapshots (
         threads_user_id, snapshot_date, followers_count, baseline_followers_count, captured_at
       ) VALUES
@@ -7363,10 +7354,9 @@ describe("operator mode MCP endpoint", () => {
       allowed_reason_codes: expect.arrayContaining(["technical_corruption", "exact_duplicate"]),
     });
 
-    const memoryTableBefore = await env.DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'gpt_strategy_memory' LIMIT 1`,
-    ).first<{ name: string }>();
-    expect(memoryTableBefore).toBeNull();
+        const memoryCountBefore = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
+    ).first<{ total: number }>();
     const deleted = await mcpTool<{
       success: boolean;
       deleted: boolean;
@@ -7408,9 +7398,9 @@ describe("operator mode MCP endpoint", () => {
       `SELECT scheduled_post_id, reason_code, reason, deleted_by, deletion_source
        FROM scheduled_post_deletions WHERE scheduled_post_id = ? LIMIT 1`,
     ).bind(scheduledPostId).first<Record<string, unknown>>();
-    const memoryTableAfter = await env.DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'gpt_strategy_memory' LIMIT 1`,
-    ).first<{ name: string }>();
+        const memoryCountAfter = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
+    ).first<{ total: number }>();
     expect(scheduledRow).toBeNull();
         expect(deletionRow).toMatchObject({
       scheduled_post_id: scheduledPostId,
@@ -7419,7 +7409,7 @@ describe("operator mode MCP endpoint", () => {
       deleted_by: "model",
       deletion_source: "mcp",
     });
-    expect(memoryTableAfter).toBeNull();
+        expect(Number(memoryCountAfter?.total ?? 0)).toBe(Number(memoryCountBefore?.total ?? 0));
 
     const listed = await mcpTool<{ deletion_history_exposed_to_model: boolean; deleted_items?: unknown[] }>("list_scheduled_posts", {
       brand_key: BRAND_KEY,
