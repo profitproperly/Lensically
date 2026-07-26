@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 553ebd4e998754655ecbe5facb83a7979ed3c376
-production_sha: 553ebd4e998754655ecbe5facb83a7979ed3c376
+repository_base_sha: 391d0aeb35d3fe64f6fb57c86b165116a7ff1c8d
+production_sha: 391d0aeb35d3fe64f6fb57c86b165116a7ff1c8d
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -341,27 +341,44 @@ Completed checkpoint — Stage 4R Manifest Measurement Audit schema extraction:
 - Exact-SHA migration-first release passed in run `30221985894`.
 - Live production independently confirmed exact SHA `6abb91621ddb775f0136b5f419de5ad6c5f2917f`.
 
-Current sub-action — Stage 4S final source-family and decision-influence extraction:
+Completed checkpoint — Stage 4S final source-family and decision-influence extraction:
 
-Move the final five runtime-owned tables into ordered migrations:
+- Added `0017_source_family_and_decision_influences.sql`.
+- Moved complete migration ownership for four source-family evidence, label-transition, selection-receipt, and selection-plan tables plus `operator_manifest_decision_influences`.
+- Replaced the final runtime table and index creation in `sourceFamilySelection.ts` and `manifestProductIntegration.ts` with complete integrity probes.
+- Preserved source-family evidence state, transition history, selection decisions, decision-influence lineage, uniqueness contracts, indexes, timestamps, and existing data.
+- Added replay and exact live-shape adoption coverage across all five tables with family, selection, and influence uniqueness checks.
+- Converted the database-authority manifest to `migration_authority_complete`, set `runtime_ddl_sources` to an empty list, and added a validator that fails if any runtime DDL exists anywhere under `src`.
+- Push validation passed in run `30222569368`.
+- All eight Operator shards passed in run `30222630631`.
+- Exact-SHA migration-first release passed in run `30222666022`.
+- Live production independently confirmed exact SHA `391d0aeb35d3fe64f6fb57c86b165116a7ff1c8d`.
 
-- the four source-family evidence, transition, and selection tables in `sourceFamilySelection.ts`
-- `operator_manifest_decision_influences` in `manifestProductIntegration.ts`
+### Stage 4 — Database authority: COMPLETE AND DEPLOYED
 
-Preserve every column, index, uniqueness contract, source-family evidence state, transition history, selection decisions, decision influence lineage, timestamps, and all existing production data. Replace all remaining runtime DDL with integrity probes, remove both files from the runtime-DDL source inventory, and run the repository-wide zero-DDL completion audit. Stage 4 closes only after the authority manifest reports zero runtime DDL sources and all completion gates pass.
+Every active schema object is owned by ordered migrations. Request preparation owns no `CREATE TABLE`, `ALTER TABLE`, `CREATE INDEX`, `CREATE TRIGGER`, compatibility rebuild, or retirement drop. The repository-wide zero-DDL assertion is permanent release-preflight evidence.
 
-Remaining Stage 4 work after this cluster:
+Current sub-action — Stage 5A MCP protocol-surface modularization:
 
-- Extract account, profile, archive, Insights-cache, post-metric, source-card, gate, workflow, cycle-receipt, decision, hardening, and operator-state schema clusters.
-- Resolve `operator_post_metric_snapshots` and every other remaining runtime schema owner.
-- Move compatibility rebuilds and column additions into ordered migrations.
-- Remove runtime `CREATE TABLE`, `ALTER TABLE`, `CREATE INDEX`, `CREATE TRIGGER`, rebuild, and retirement operations from request preparation.
-- Preserve all active scheduling, publishing, archive, Insights, Saved Patterns, source-card, lineage, intelligence, gate, incident, decision, and cycle-receipt data.
-- Finish fresh-database, existing-database upgrade, idempotency, and production-characterization coverage for every extracted cluster.
+Extract the pure MCP protocol contract from `src/index.ts` into a focused module before moving the larger tool registry and dispatcher:
+
+- server instructions text
+- initialize response construction and protocol-version negotiation
+- selected-key handshake lines
+- associated protocol constants and types that do not perform account or domain execution
+
+Preserve the exact public initialize payload, server name/title/version, advertised tool-count interpolation, four-line selected-key handshake, direct-typed-tool instructions, and all existing MCP boundary tests. Add focused characterization and prevent the protocol contract from drifting back into `index.ts`.
+
+Remaining Stage 5 work after this checkpoint:
+
+- Extract the direct typed MCP tool-definition registry and scoped-wrapper construction.
+- Extract tool discovery, definition lookup, and client-safe public filtering.
+- Extract MCP call routing, protocol error shaping, and transport response helpers.
+- Leave business/domain tool execution for Stage 6 product-service extraction.
 
 ## Remaining
 
-5. MCP modularization
+5. MCP modularization — ACTIVE
 6. Product-service extraction
 7. Router and runtime composition
 8. Test and release modernization
