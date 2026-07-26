@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 29e388e231e752a791e13cb95d706b88127db2dc
-production_sha: 29e388e231e752a791e13cb95d706b88127db2dc
+repository_base_sha: ee8d15e335eb0970706b23a22901100ea4229a53
+production_sha: ee8d15e335eb0970706b23a22901100ea4229a53
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -188,18 +188,37 @@ Completed checkpoint — Stage 4I quality enforcement schema extraction:
 - Exact-SHA migration-first release passed in run `30215734189`.
 - Live production independently confirmed exact SHA `29e388e231e752a791e13cb95d706b88127db2dc`.
 
-Current sub-action — Stage 4J operator continuity and autonomy state extraction:
+Completed checkpoint — Stage 4J operator continuity and autonomy state extraction:
 
-Characterize and move the next dependency-complete operator continuity cluster into ordered migrations:
+- Added `0008_operator_continuity_and_autonomy.sql`.
+- Moved complete migration ownership for:
+  - `operator_mcp_sessions`
+  - `operator_continuity_refs`
+  - `operator_operation_receipts`
+  - `operator_growth_missions`
+  - `operator_growth_mission_revisions`
+  - `operator_autonomy_profiles`
+- Replaced all six runtime schema owners and indexes with complete `assertDatabaseIntegrity` probes while preserving the active runtime autonomy seed and normalization behavior.
+- Preserved selected-account sessions, Proceed timestamps, continuity payloads and expiration, operation idempotency receipts and replay responses, mission diagnostics and approval state, revision history, autonomy permissions and constraints, indexes, and uniqueness contracts.
+- Added `CONTINUITY_UPGRADE_DB` to prove the ordered migration ledger adopts pre-existing continuity and autonomy tables without data loss.
+- Converted the shared reset from dropping continuity and autonomy tables to row cleanup.
+- The first release attempt stopped safely before migration or deployment in run `30216193770` because release preflight still expected growth-mission tables to be created in runtime source.
+- Updated release preflight to require migration ownership plus runtime integrity probes instead of request-time DDL.
+- Corrected push validation passed in run `30216278813`.
+- All eight Operator shards passed in run `30216340515`.
+- Exact-SHA migration-first release passed in run `30216375018`.
+- Live production independently confirmed exact SHA `ee8d15e335eb0970706b23a22901100ea4229a53`.
 
-- `operator_mcp_sessions`
-- `operator_continuity_refs`
-- `operator_operation_receipts`
-- `operator_growth_missions`
-- `operator_growth_mission_revisions`
-- `operator_autonomy_profiles`
+Current sub-action — Stage 4K autonomous cycle and protected decision state extraction:
 
-Preserve session selection and proceed state, continuity payloads and expiration, operation idempotency receipts and replay responses, mission diagnostics and approval state, revision history, active autonomy constraints and permissions, update timestamps, uniqueness contracts, indexes, and all existing production data. Reduce this part of `ensureOperatorMcpAdminTables` to bounded integrity checks.
+Characterize and move the next dependency-complete autonomous execution cluster into ordered migrations:
+
+- `operator_autonomous_growth_cycles`
+- `operator_autonomous_lineup_items`
+- `operator_decision_proposals`
+- `operator_decision_execution_events`
+
+Preserve cycle horizons and missing-slot receipts, account position and strategic thesis, strategy, exposure, evidence and receipt IDs, lineup slot uniqueness, source-card, source-selection, strategy-plan and gate lineage, generation and schedule links, decision evidence, risk, reversibility, authorized tools, execution budgets, owner resolution, outcome evidence, execution-event budgets, indexes, compatibility columns, and all existing production data. Reduce this part of `ensureOperatorMcpAdminTables` to bounded integrity checks and update release preflight to recognize migration-owned autonomous cycle tables.
 
 Remaining Stage 4 work after this cluster:
 
