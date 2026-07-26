@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 126dd1621c67dc3d730b0c72ade00157fb169855
-production_sha: 126dd1621c67dc3d730b0c72ade00157fb169855
+repository_base_sha: 47a14d11b54dbd2da033fd2922dd82128d6cf6ed
+production_sha: 47a14d11b54dbd2da033fd2922dd82128d6cf6ed
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -227,17 +227,34 @@ Completed checkpoint — Stage 4K autonomous cycle and protected decision state 
 - Exact-SHA migration-first release passed in run `30217083912`.
 - Live production independently confirmed exact SHA `126dd1621c67dc3d730b0c72ade00157fb169855`.
 
-Current sub-action — Stage 4L incidents, hardening, observations, and engineering audit extraction:
+Completed checkpoint — Stage 4L incidents, hardening, observations, and engineering audit extraction:
 
-Characterize and move the next operational assurance cluster into ordered migrations:
+- Added `0010_incidents_hardening_and_audit.sql`.
+- Moved complete migration ownership for:
+  - `operator_operational_incidents`
+  - `operator_engineering_audit`
+  - `operator_hardening_incidents`
+  - `operator_hardening_incident_events`
+  - `operator_operational_observations`
+- Replaced all five runtime schema owners, indexes, and update triggers with complete `assertDatabaseIntegrity` probes while preserving expected-control incident reconciliation as runtime behavior.
+- Preserved operational incident keys and recovery evidence, engineering change receipts, hardening signatures, root causes and prevention records, tested SHA and deployment evidence, live verification, resume and autonomy outcomes, incident events, operational timing and call counts, update triggers, and uniqueness contracts.
+- Added `ASSURANCE_UPGRADE_DB` to prove replay preservation and live-schema adoption with incident and open-signature uniqueness intact.
+- Converted shared tests from dropping assurance tables to ordered row cleanup.
+- Push validation passed in run `30217475543`.
+- All eight Operator shards passed in run `30217533388`.
+- Exact-SHA migration-first release passed in run `30217582227`.
+- Live production independently confirmed exact SHA `47a14d11b54dbd2da033fd2922dd82128d6cf6ed`.
 
-- `operator_operational_incidents`
-- `operator_engineering_audit`
-- `operator_hardening_incidents`
-- `operator_hardening_incident_events`
-- `operator_operational_observations`
+Current sub-action — Stage 4M durable work state, repo-write sessions, and system retirement extraction:
 
-Preserve incident signatures, severity, state, scope, blocked capability evidence, side-effect classification, root cause and prevention records, regression and tested-SHA evidence, deployment and live verification, resume capsules and results, autonomy and efficiency outcomes, incident event history, operational timing and request counts, engineering change receipts, indexes, update triggers, and all existing production data. Keep runtime incident reconciliation and expected-control cleanup behavior, but move all schema mutation to ordered migrations.
+Characterize and move the next durable operator-state cluster into ordered migrations:
+
+- `operator_work_state`
+- `operator_work_ledger`
+- `operator_repo_write_sessions`
+- `operator_system_retirements`
+
+Preserve the singleton active-outcome contract, frozen scope and interrupt state, next action and completion evidence, work intake and dependency state, execution order and completion evidence, chunked repository-write sessions and content, system retirement evidence and replacement state, indexes, update timestamps, and all existing production data. Keep default work-state and ledger seeding plus retirement reconciliation as runtime behavior, but move all schema mutation to ordered migrations.
 
 Remaining Stage 4 work after this cluster:
 
