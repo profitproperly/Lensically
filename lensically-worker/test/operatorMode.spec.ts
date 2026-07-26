@@ -785,23 +785,13 @@ describe("operator mode backend spine", () => {
     expect(shouldAutoArmScheduledPostAlarm(new Request(`${workerOrigin}/api/operator/health`), env)).toBe(true);
   });
 
-  it("never reopens stale posting rows after an external publish attempt", async () => {
+    it("never reopens stale posting rows after an external publish attempt", async () => {
     await env.DB.prepare(
-      `CREATE TABLE scheduled_posts (
-        id INTEGER PRIMARY KEY,
-        status TEXT NOT NULL,
-        publish_request_id TEXT,
-        published_post_id TEXT,
-        publish_error_message TEXT,
-        published_at TEXT,
-        processing_started_at TEXT
-      )`,
-    ).run();
-    await env.DB.prepare(
-      `INSERT INTO scheduled_posts (id, status, processing_started_at)
-       VALUES
-         (1, 'posting', datetime('now', '-10 minutes')),
-         (2, 'posting', CURRENT_TIMESTAMP)`,
+      `INSERT INTO scheduled_posts (
+        id, user_id, threads_user_id, post_text, status, scheduled_time, processing_started_at
+      ) VALUES
+        (1, 'workspace-owner', 'vectrix', 'Stale posting fixture', 'posting', '2099-01-01T12:00:00.000Z', datetime('now', '-10 minutes')),
+        (2, 'workspace-owner', 'vectrix', 'Fresh posting fixture', 'posting', '2099-01-01T13:00:00.000Z', CURRENT_TIMESTAMP)`,
     ).run();
 
     await recoverStalePostingScheduledPosts(env);
@@ -819,21 +809,11 @@ describe("operator mode backend spine", () => {
     expect(fresh).toMatchObject({ status: "posting", publish_error_message: null });
   });
 
-  it("quarantines uncertain attempts and treats returned Threads ids as authoritative", async () => {
+    it("quarantines uncertain attempts and treats returned Threads ids as authoritative", async () => {
     await env.DB.prepare(
-      `CREATE TABLE scheduled_posts (
-        id INTEGER PRIMARY KEY,
-        status TEXT NOT NULL,
-        publish_request_id TEXT,
-        published_post_id TEXT,
-        publish_error_message TEXT,
-        published_at TEXT,
-        processing_started_at TEXT
-      )`,
-    ).run();
-    await env.DB.prepare(
-      `INSERT INTO scheduled_posts (id, status, processing_started_at)
-       VALUES (3, 'posting', CURRENT_TIMESTAMP)`,
+      `INSERT INTO scheduled_posts (
+        id, user_id, threads_user_id, post_text, status, scheduled_time, processing_started_at
+      ) VALUES (3, 'workspace-owner', 'vectrix', 'Publish state fixture', 'posting', '2099-01-01T14:00:00.000Z', CURRENT_TIMESTAMP)`,
     ).run();
 
     expect(await quarantineScheduledPostPublishAttempt(env, 3, "threads_publish_commit_exception")).toBe(true);
