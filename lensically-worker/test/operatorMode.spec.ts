@@ -911,33 +911,11 @@ describe("operator mode backend spine", () => {
         ('35758578720393972', '2026-07-17', 145, 140, '2026-07-17T12:00:00Z')`,
     ).run();
         await env.DB.prepare("DELETE FROM threads_accounts").run();
-    await env.DB.prepare(
+        await env.DB.prepare(
       `INSERT INTO threads_accounts (threads_user_id, access_token, expires_at, created_at, configured_account_id)
        VALUES ('35758578720393972', 'test-token-manifest', 0, 0, 'manifest-mental')`,
     ).run();
-    await env.DB.prepare(
-      `CREATE TABLE threads_posts_archive (
-        threads_user_id TEXT NOT NULL,
-        post_id TEXT NOT NULL,
-        post_text TEXT,
-        post_timestamp TEXT,
-        post_permalink TEXT,
-        post_username TEXT,
-        profile_picture_url TEXT,
-        views INTEGER NOT NULL DEFAULT 0,
-        likes INTEGER NOT NULL DEFAULT 0,
-        replies INTEGER NOT NULL DEFAULT 0,
-        reposts INTEGER NOT NULL DEFAULT 0,
-        quotes INTEGER NOT NULL DEFAULT 0,
-        shares INTEGER NOT NULL DEFAULT 0,
-        engagement_total INTEGER NOT NULL DEFAULT 0,
-        source_rank INTEGER NOT NULL DEFAULT 0,
-        first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (threads_user_id, post_id)
-      )`,
-    ).run();
+    await env.DB.prepare("DELETE FROM threads_posts_archive").run();
     await env.DB.prepare(
       `INSERT INTO threads_posts_archive (
         threads_user_id, post_id, post_text, post_timestamp, post_permalink,
