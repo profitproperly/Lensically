@@ -73,25 +73,6 @@ jobs:
         working-directory: lensically-worker
         run: npm ci
 
-      - name: Reconcile Stage 3 autonomous tests
-        if: hashFiles('lensically-worker/.reconcile-stage3-tests') != ''
-        working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node --check scripts/reconcile-stage3-tests.mjs
-          node scripts/reconcile-stage3-tests.mjs
-          rm scripts/reconcile-stage3-tests.mjs .reconcile-stage3-tests
-          git diff --check
-          npx tsc --noEmit
-          npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
-          npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorMode.spec.ts --reporter=dot --bail=1 --testNamePattern='(?:blocks showing a draft that repeats the latest realm entrance|recovers a known Saved Pattern into complete published-post lineage|qualifies, randomly draws, persists, and source-card-links Manifest sources|caps each source-card generation run for every brand|allows backend-supported review batch language while keeping each generation run source-card scoped|keeps account-specific gates scoped to their brand)'
-          git config user.name "Lensically Operator"
-          git config user.email "operator@lensically.com"
-          git add -A src test/operatorMode.spec.ts scripts/reconcile-stage3-tests.mjs .reconcile-stage3-tests
-          git commit -m "Reconcile autonomous workflow regressions"
-          git push origin HEAD:main
-
       - name: Restore web dependencies
         id: push_web_cache
         uses: actions/cache@v4
