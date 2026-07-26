@@ -5619,21 +5619,23 @@ describe("operator mode MCP endpoint", () => {
 
       }, 30000);
 
-    it("reads the bounded database schema authority state without mutation", async () => {
-    await operatorTool("getOperatorStartupContext");
-    const result = await operatorTool<{
+      it("reads the bounded database schema authority state without mutation", async () => {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS schema_audit_fixture (id INTEGER PRIMARY KEY)").run();
+    const response = await mcpToolRaw<{
       ok: boolean;
       authority: string;
       total: number;
       returned_count: number;
       objects: Array<{ type: string; name: string; sql?: string | null }>;
     }>("getDatabaseSchemaState", { object_type: "table", limit: 10, include_sql: true });
+    expect(response.isError).not.toBe(true);
+    const result = response.structuredContent;
     expect(result.ok).toBe(true);
     expect(result.authority).toBe("live_d1_sqlite_master");
     expect(result.total).toBeGreaterThan(0);
     expect(result.returned_count).toBeGreaterThan(0);
     expect(result.objects.every((item) => item.type === "table" && typeof item.name === "string")).toBe(true);
-    expect(result.objects.some((item) => typeof item.sql === "string")).toBe(true);
+    expect(result.objects.some((item) => item.name === "schema_audit_fixture" && typeof item.sql === "string")).toBe(true);
   }, 30000);
 
   it("executes all bounded Execution Kernel read segments without failures", async () => {
