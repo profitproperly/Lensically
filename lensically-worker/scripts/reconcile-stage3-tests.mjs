@@ -6,6 +6,11 @@ const indexPath = resolve(root, "src/index.ts");
 const testPath = resolve(root, "test/operatorMode.spec.ts");
 let source = await readFile(indexPath, "utf8");
 let tests = await readFile(testPath, "utf8");
+const diagnosticNeedle = 'if (toolName === "recover_published_post_lineage")';
+const diagnosticIndex = source.indexOf(diagnosticNeedle);
+if (diagnosticIndex < 0) throw new Error("lineage recovery handler not found");
+process.stdout.write(`${source.slice(diagnosticIndex, diagnosticIndex + 12000)}\n`);
+throw new Error("stage3_lineage_handler_context_captured");
 const changes = [];
 
 function replaceExact(target, find, replace, label) {
