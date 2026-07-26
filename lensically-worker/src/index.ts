@@ -64,8 +64,9 @@ import {
   type LocalValidationReceipt,
 } from "./localExecution";
 import {
-  HUMAN_FREE_AUTONOMY_CONTRACT,
+    HUMAN_FREE_AUTONOMY_CONTRACT,
   SCHEDULED_POST_DELETION_REASON_CODES,
+  isHumanLearningApiRetired,
   buildScheduledPostDeletionReason,
   normalizeScheduledPostDeletionReasonCode,
   type ScheduledPostDeletionReasonCode,
@@ -37466,18 +37467,20 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
     }
 
-        if (normalizedPath.startsWith("/api/gpt/")) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "legacy_gpt_api_retired",
-        replacement: "Lensically Operator Mode direct typed tools",
-        human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
-      }), {
-        status: 410,
-        headers: { "content-type": "application/json; charset=UTF-8" },
-      });
+            if (normalizedPath.startsWith("/api/gpt/")) {
       if (!isGptRequestAuthorized(request, env)) {
         return unauthorizedGptResponse();
+      }
+      if (isHumanLearningApiRetired()) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "legacy_gpt_api_retired",
+          replacement: "Lensically Operator Mode direct typed tools",
+          human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+        }), {
+          status: 410,
+          headers: { "content-type": "application/json; charset=UTF-8" },
+        });
       }
 
       if (normalizedPath === "/api/gpt/operator-playbook" && request.method === "GET") {

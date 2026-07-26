@@ -2,6 +2,11 @@ export const HUMAN_FREE_AUTONOMY_POLICY_VERSION = "human-free-autonomy-v1";
 
 export const HUMAN_LEARNING_DISABLED = true as const;
 
+export function isHumanLearningApiRetired(): boolean {
+  return HUMAN_LEARNING_DISABLED === true;
+}
+
+
 export const SCHEDULED_POST_DELETION_REASON_CODES = [
   "constitution_violation",
   "platform_safety",
