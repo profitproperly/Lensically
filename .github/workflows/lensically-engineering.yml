@@ -41,7 +41,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
   actions: write
 
 jobs:
@@ -77,55 +77,7 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Reconcile final Stage 3 acceptance inventory
-        if: hashFiles('lensically-worker/.stage3-final-reconcile') != ''
-        working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('node:fs');
-
-          const sourcePath = 'src/index.ts';
-          let source = fs.readFileSync(sourcePath, 'utf8');
-          const campaignStartMarker = 'const liveReadSegments: Record<string, Set<string>> = {';
-          const campaignEndMarker = '    const liveReadRows: Array<Record<string, unknown>> = [];';
-          const campaignStart = source.indexOf(campaignStartMarker);
-          const campaignEnd = source.indexOf(campaignEndMarker, campaignStart);
-          if (campaignStart < 0 || campaignEnd < 0 || campaignEnd <= campaignStart) {
-            throw new Error('Stage 3 campaign inventory boundary not found');
-          }
-                    const campaignBlock = source.slice(campaignStart, campaignEnd);
-          const retiredLinePattern = /^.*(?:get_manifest_review_batch|list_strategy_memory).*\r?\n/gm;
-          const retiredLines = campaignBlock.match(retiredLinePattern) ?? [];
-          if (retiredLines.length < 2 || retiredLines.length > 4) {
-            throw new Error(`Expected 2-4 retired human-guidance campaign lines, found ${retiredLines.length}`);
-          }
-          const cleanedCampaignBlock = campaignBlock.replace(retiredLinePattern, '');
-          source = source.slice(0, campaignStart) + cleanedCampaignBlock + source.slice(campaignEnd);
-          fs.writeFileSync(sourcePath, source);
-
-          const testPath = 'test/operatorMode.spec.ts';
-          let tests = fs.readFileSync(testPath, 'utf8');
-          const oldCount = 'expect(eligibleReads).toBe(44);';
-                    const newCount = 'expect(eligibleReads).toBe(42);';
-          const countMatches = tests.split(oldCount).length - 1;
-          if (countMatches !== 1) {
-            throw new Error(`Expected one eligible read count assertion, found ${countMatches}`);
-          }
-          tests = tests.replace(oldCount, newCount);
-          fs.writeFileSync(testPath, tests);
-          NODE
-          rm -rf node_modules/.vite node_modules/.cache
-          git diff --check
-          npx tsc --noEmit
-          node scripts/release-preflight.mjs --capability-lifecycle-only
-          npm run test -- --run test/operatorMode.spec.ts --reporter=dot --bail=1 --testNamePattern='executes all bounded Execution Kernel read segments without failures'
-          rm .stage3-final-reconcile
-          git config user.name "Lensically Operator"
-          git config user.email "operator@lensically.com"
-          git add src/index.ts test/operatorMode.spec.ts .stage3-final-reconcile
-          git commit -m "Remove retired review read from acceptance campaign"
-          git push origin HEAD:main
+      
 
       - name: Restore web dependencies
         id: push_web_cache
