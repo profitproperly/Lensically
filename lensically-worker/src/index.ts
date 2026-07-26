@@ -8633,6 +8633,45 @@ async function seedDefaultOperatorGates(env: Env): Promise<void> {
   ).run();
 }
 
+const LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION = "human-free-retirement-v1";
+
+async function retireLegacyHumanGuidanceState(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS operator_system_retirements (
+      retirement_key TEXT PRIMARY KEY,
+      completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ).run();
+  const completed = await env.DB.prepare(
+    `SELECT retirement_key FROM operator_system_retirements WHERE retirement_key = ? LIMIT 1`,
+  ).bind(LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION).first<{ retirement_key?: string }>();
+  if (completed?.retirement_key) return;
+
+  const statements = [
+    "DELETE FROM gpt_strategy_memory",
+    "UPDATE operator_workflow_sessions SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE status = 'active'",
+    "UPDATE operator_review_batches SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE status NOT IN ('retired', 'completed')",
+    "DROP TABLE IF EXISTS agent_account_controls",
+    "DROP TABLE IF EXISTS operator_local_execution_nodes",
+    "DROP TABLE IF EXISTS operator_local_execution_jobs",
+    "DROP TABLE IF EXISTS operator_local_validation_receipts",
+    "DROP TABLE IF EXISTS operator_validation_plane_events",
+    "DROP TABLE IF EXISTS operator_local_execution_enrollment_tokens",
+  ];
+  for (const statement of statements) {
+    try {
+      await env.DB.prepare(statement).run();
+    } catch (error) {
+      const message = getErrorMessage(error);
+      if (!message.includes("no such table") && !message.includes("no such column")) throw error;
+    }
+  }
+  await env.DB.prepare(
+    `INSERT OR REPLACE INTO operator_system_retirements (retirement_key, completed_at)
+     VALUES (?, CURRENT_TIMESTAMP)`,
+  ).bind(LEGACY_HUMAN_GUIDANCE_RETIREMENT_VERSION).run();
+}
+
 const operatorModePreparationByEnv = new WeakMap<object, Promise<void>>();
 
 const MANIFEST_SELF_PREPARING_CYCLE_TOOLS = new Set([
@@ -8665,8 +8704,9 @@ async function prepareOperatorMode(env: Env): Promise<void> {
     await ensureGptGenerationDraftsTable(env);
     await ensureScheduledPostsTable(env);
     await ensureOperatorWorkflowTables(env);
-    await ensureOperatorMcpAdminTables(env);
+        await ensureOperatorMcpAdminTables(env);
     await seedDefaultOperatorGates(env);
+    await retireLegacyHumanGuidanceState(env);
   })();
   operatorModePreparationByEnv.set(env as object, preparation);
   try {
