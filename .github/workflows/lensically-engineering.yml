@@ -87,7 +87,7 @@ jobs:
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           git config user.name "Lensically Operator"
           git config user.email "operator@lensically.com"
-          git add -A src test/humanFreeAutonomy.spec.ts scripts/apply-worker-cleanup-stage3.mjs .apply-stage3-cleanup
+          git add -A
           git commit -m "Consolidate autonomous workflow runtime"
           git push origin HEAD:main
 
