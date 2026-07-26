@@ -28,6 +28,57 @@ function replaceRange(target, start, end, replacement, label) {
   return `${target.slice(0, from)}${replacement}${target.slice(to)}`;
 }
 
+lineage = replaceExact(
+  lineage,
+  `  const workflowSessionId = text(payload.workflow_session_id, 120);`,
+  `  const requestedWorkflowSessionId = text(payload.workflow_session_id, 120);`,
+  "rename optional recovery scope input",
+);
+lineage = replaceExact(
+  lineage,
+  `  const publishedPostIds = Array.from(new Set(
+    (Array.isArray(payload.published_post_ids) ? payload.published_post_ids : [])
+      .map((item) => text(item, 255))
+      .filter(Boolean),
+  )).slice(0, 10);`,
+  `  const publishedPostIds = Array.from(new Set(
+    (Array.isArray(payload.published_post_ids) ? payload.published_post_ids : [])
+      .map((item) => text(item, 255))
+      .filter(Boolean),
+  )).slice(0, 10);
+  const lineageScopeId = requestedWorkflowSessionId
+    || \`historical-lineage-recovery:\${brand.brand_key}:\${savedPatternId}\`;`,
+  "create autonomous lineage recovery scope",
+);
+lineage = replaceExact(
+  lineage,
+  `  if (!workflowSessionId || !Number.isInteger(savedPatternId) || savedPatternId < 1 || !publishedPostIds.length) {
+    return failure("workflow_session_pattern_and_published_posts_required");
+  }
+  if (!title || !sourceMechanism || !requiredProduct || !passConditions.length || !failConditions.length) {
+    return failure("complete_source_card_lesson_required");
+  }
+
+  const session = await env.DB.prepare(
+    \`SELECT id FROM operator_workflow_sessions
+     WHERE id = ? AND brand_key = ? AND status = 'active' LIMIT 1\`,
+  ).bind(workflowSessionId, brand.brand_key).first<{ id: string }>();
+  if (!session?.id) return failure("active_workflow_session_required");`,
+  `  if (!Number.isInteger(savedPatternId) || savedPatternId < 1 || !publishedPostIds.length) {
+    return failure("pattern_and_published_posts_required");
+  }
+  if (!title || !sourceMechanism || !requiredProduct || !passConditions.length || !failConditions.length) {
+    return failure("complete_source_card_lesson_required");
+  }`,
+  "remove active workflow session requirement",
+);
+const remainingWorkflowScopeReferences = lineage.split("workflowSessionId").length - 1;
+if (remainingWorkflowScopeReferences !== 3) {
+  throw new Error(`lineage scope replacement expected 3 references, found ${remainingWorkflowScopeReferences}`);
+}
+lineage = lineage.replaceAll("workflowSessionId", "lineageScopeId");
+changes.push("apply autonomous lineage scope to persisted lineage");
+
 source = replaceRange(
   source,
   `                await env.DB.batch([\n          env.DB.prepare(\n            \`INSERT OR IGNORE INTO operator_workflow_sessions (`,
