@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: e750cab51e9d1facff97b96a18fd4a396418dec1
-production_sha: e750cab51e9d1facff97b96a18fd4a396418dec1
+repository_base_sha: ef8a8c9e0f850191250d2d21e9a4197591b75a93
+production_sha: ef8a8c9e0f850191250d2d21e9a4197591b75a93
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -114,17 +114,35 @@ Completed checkpoint — Stage 4E account and Threads-profile schema extraction:
 - Exact-SHA migration-first release passed in run `30213157810`.
 - Live production independently confirmed exact SHA `e750cab51e9d1facff97b96a18fd4a396418dec1`.
 
-Current sub-action — Stage 4F Threads measurement cache and archive schema extraction:
+Completed checkpoint — Stage 4F Threads measurement cache and archive schema extraction:
 
-Characterize and move the next coherent measurement-storage cluster into ordered migrations:
+- Added `0004_threads_measurement_storage.sql`.
+- Moved complete migration ownership for:
+  - `threads_user_insights_cache`
+  - `threads_post_insights_cache`
+  - `threads_posts_cache_state`
+  - `threads_posts_archive`
+  - `operator_post_metric_snapshots`
+- Replaced all five request-time schema owners and compatibility-column additions with complete `assertDatabaseIntegrity` probes.
+- Preserved account Insights payloads, post caches, pagination cursors, archive history, engagement totals, source ranks, lineage IDs, learning-validity flags, anomaly reasons, collection sources, indexes, and refresh timestamps.
+- Added `MEASUREMENT_UPGRADE_DB` to prove the ordered migration ledger adopts the full pre-existing production schema without data loss.
+- Converted active and retired tests from dropping or recreating canonical archive and account tables to row cleanup and canonical fixtures.
+- The first eight-shard run failed in run `30213701102` because the monthly-growth fixture recreated `threads_posts_archive`; that fixture debt and the equivalent skipped-test debt were removed.
+- Push validation passed in run `30213823012`.
+- All eight Operator shards passed in run `30213889153`.
+- Exact-SHA migration-first release passed in run `30213949029`.
+- Live production independently confirmed exact SHA `ef8a8c9e0f850191250d2d21e9a4197591b75a93`.
 
-- `threads_user_insights_cache`
-- `threads_post_insights_cache`
-- `threads_posts_cache_state`
-- `threads_posts_archive`
-- `operator_post_metric_snapshots`
+Current sub-action — Stage 4G generation lineage schema extraction:
 
-Preserve all cached account insights, post metrics, archive history, pagination cursor state, engagement totals, lineage identifiers, anomaly quarantine fields, learning-validity flags, collection sources, indexes, refresh timestamps, and existing production data. Move the `engagement_total` and metric-snapshot compatibility columns into explicit upgrade migrations and reduce runtime preparation functions to bounded integrity checks.
+Characterize and move the next dependency-complete generation lineage cluster into ordered migrations:
+
+- `gpt_post_strategy_tags`
+- `gpt_generation_runs`
+- `gpt_generation_drafts`
+- `gpt_preflight_snapshots`
+
+Preserve scheduled-post strategy metadata, source-card and source-family lineage, immutable adaptation context, draft scores and strategies, gate summaries, showability, replacement lineage, scheduling and publication links, preflight sections and manifests, update triggers, indexes, and all existing production data. Move every compatibility column into explicit migration ownership and reduce runtime preparation functions to bounded integrity checks.
 
 Remaining Stage 4 work after this cluster:
 
