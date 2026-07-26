@@ -87,15 +87,16 @@ CREATE TABLE IF NOT EXISTS scheduled_post_deletions (
   threads_user_id TEXT NOT NULL,
   post_text TEXT NOT NULL,
   scheduled_time TEXT NOT NULL,
-  status_before TEXT NOT NULL,
-  reason_code TEXT,
+    status_before TEXT NOT NULL,
   reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
-  learning_effect TEXT NOT NULL DEFAULT 'unobserved' CHECK (learning_effect = 'unobserved'),
   deleted_by TEXT NOT NULL CHECK (deleted_by IN ('owner', 'model')),
   deletion_source TEXT NOT NULL CHECK (deletion_source IN ('ui', 'mcp')),
   operation_id TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE scheduled_post_deletions ADD COLUMN reason_code TEXT;
+ALTER TABLE scheduled_post_deletions ADD COLUMN learning_effect TEXT NOT NULL DEFAULT 'unobserved';
 
 UPDATE scheduled_post_deletions
 SET reason_code = COALESCE(NULLIF(trim(reason_code), ''), 'legacy_unclassified'),
