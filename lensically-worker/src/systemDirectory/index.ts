@@ -284,7 +284,7 @@ export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES: readonly SystemDirectoryEntry[
             system_of_record: "Versioned repository migrations reconciled with explicit live D1 existence probes",
     primary_surfaces: ["expected D1 tables", "expected columns", "versioned migrations", "trigger behavior tests"],
     objects: ["database schema", "D1 schema", "migration authority", "schema object"],
-    keywords: ["database schema", "D1 schema", "schema audit", "migration state", "tables indexes triggers", "database authority"],
+    keywords: ["database schema", "D1 schema", "schema audit", "migration state", "tables indexes triggers", "database authority", "verify storage object", "expected D1 table", "storage authority"],
     capabilities: ["read bounded live schema state", "reconcile production schema with migrations", "verify schema integrity"],
     payload: { action_size: "bounded_read", max_response_bytes: 30000 },
     route_intent: "get database schema state",
