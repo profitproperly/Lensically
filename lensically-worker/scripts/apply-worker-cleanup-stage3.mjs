@@ -4,8 +4,10 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const indexPath = resolve(root, "src/index.ts");
 const testPath = resolve(root, "test/humanFreeAutonomy.spec.ts");
+const manifestTestPath = resolve(root, "manifest-autonomous-cycle.test.ts");
 let source = await readFile(indexPath, "utf8");
 let tests = await readFile(testPath, "utf8");
+let manifestTests = await readFile(manifestTestPath, "utf8");
 const changes = [];
 const count = (text, needle) => text.split(needle).length - 1;
 
