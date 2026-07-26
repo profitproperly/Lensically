@@ -4796,7 +4796,24 @@ describe("operator mode MCP endpoint", () => {
     expect(receiptCountsAfter).toEqual(receiptCountsBefore);
   }, 30000);
 
-    it.skip("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
+      it("rejects the retired scheduled-post review tool from the public MCP surface", async () => {
+    const rejected = await mcpToolRaw<Record<string, unknown>>("review_manifest_scheduled_post", {
+      brand_key: "manifest_mental",
+      scheduled_post_id: 1,
+      action: "keep",
+      feedback: "Retired public review fixture.",
+      lesson_scope: "post_specific",
+      proceed_confirmed: true,
+    });
+    expect(rejected.isError).toBe(true);
+    expect(rejected.structuredContent).toMatchObject({
+      error: "public_direct_tool_required",
+      requested_tool: "review_manifest_scheduled_post",
+      account_data_loaded: false,
+    });
+  });
+
+  it.skip("reviews a scheduled autonomous post without making the owner an operational dependency", async () => {
     const fixture = await prepareManifestSourceBackedCycleForTest();
             const persisted = await mcpTool<{ success: boolean; scheduled_post_id: number; error?: string; blocking_failures?: unknown[] }>(
       "persist_manifest_autonomous_post",
