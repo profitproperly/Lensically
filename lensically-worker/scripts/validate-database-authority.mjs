@@ -122,9 +122,13 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!wranglerConfig.includes('"migrations_dir": "database/migrations"')) errors.push("wrangler_migration_directory_missing");
   if (!wranglerConfig.includes('"migrations_table": "lensically_d1_migrations"')) errors.push("wrangler_migration_ledger_missing");
   const releaseWorkflow = readFileSync(resolve(root, "../.github/workflows/lensically-engineering.yml"), "utf8");
-  if (!releaseWorkflow.includes("wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc")) {
+    if (!releaseWorkflow.includes("wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc")) {
     errors.push("release_migration_apply_missing");
   }
+  if (!releaseWorkflow.includes("\n      - name: Apply exact-head database migrations\n        working-directory: lensically-worker")) {
+    errors.push("release_migration_step_indentation_invalid");
+  }
+
 
   const migrationDirectory = resolve(root, manifest.canonical_migration_directory);
 
