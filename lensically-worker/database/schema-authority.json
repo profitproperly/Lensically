@@ -14,24 +14,7 @@
   "temporary_table_suffixes": [
     "_rebuild"
   ],
-  "declared_duplicate_owners": {
-    "external_patterns": {
-      "canonical_source": "src/index.ts",
-      "temporary_sources": [
-        "src/index.ts",
-        "src/manifestProductIntegration.ts"
-      ],
-      "retirement_checkpoint": "stage_4_product_integration_extraction"
-    },
-    "threads_follower_snapshots": {
-      "canonical_source": "src/index.ts",
-      "temporary_sources": [
-        "src/index.ts",
-        "src/manifestMeasurementAudit.ts"
-      ],
-      "retirement_checkpoint": "stage_4_measurement_audit_extraction"
-    }
-  },
+    "declared_duplicate_owners": {},
   "retired_tables": [
     "gpt_strategy_memory",
     "operator_workflow_sessions",

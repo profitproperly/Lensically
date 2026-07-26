@@ -9,6 +9,8 @@ import {
   ensureManifestIntelligenceEngineTables,
   type ManifestSemanticSignature,
 } from "./manifestIntelligenceEngine";
+import { assertDatabaseIntegrity } from "./databaseIntegrity";
+
 
 export const MANIFEST_MEASUREMENT_AUDIT_VERSION = "manifest-measurement-audit-v1";
 export const MANIFEST_LEARNING_BRIEF_VERSION = "manifest-learning-brief-v1";
@@ -1051,10 +1053,17 @@ async function refreshManifestFollowerCheckpoint(db: D1Database, input: {
   brand_key: string;
   threads_user_id: string;
 }): Promise<JsonRecord> {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS threads_follower_snapshots (
-    threads_user_id TEXT NOT NULL, snapshot_date TEXT NOT NULL, followers_count INTEGER NOT NULL DEFAULT 0,
-    baseline_followers_count INTEGER, captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (threads_user_id, snapshot_date))`).run();
+    await assertDatabaseIntegrity(db, {
+    table: "threads_follower_snapshots",
+    columns: [
+      "threads_user_id",
+      "snapshot_date",
+      "followers_count",
+      "baseline_followers_count",
+      "captured_at",
+      "created_at",
+    ],
+  });
   const rows = await db.prepare(`SELECT snapshot_date, followers_count, baseline_followers_count, captured_at
     FROM threads_follower_snapshots WHERE threads_user_id = ?
     ORDER BY snapshot_date ASC LIMIT 365`).bind(input.threads_user_id).all<JsonRecord>();
