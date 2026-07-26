@@ -25175,8 +25175,8 @@ async function handleOperatorMcpEngineeringTool(
     const filterSql = objectType === "all"
       ? "name NOT LIKE 'sqlite_%'"
       : "type = ? AND name NOT LIKE 'sqlite_%'";
-    const countStatement = env.DB.prepare(`SELECT COUNT(*) AS total FROM sqlite_master WHERE ${filterSql}`);
-    const pageStatement = env.DB.prepare(`SELECT type, name, tbl_name, sql FROM sqlite_master WHERE ${filterSql} ORDER BY type, name LIMIT ? OFFSET ?`);
+        const countStatement = env.DB.prepare(`SELECT COUNT(*) AS total FROM sqlite_schema WHERE ${filterSql}`);
+    const pageStatement = env.DB.prepare(`SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE ${filterSql} ORDER BY type, name LIMIT ? OFFSET ?`);
     const countRow = objectType === "all"
       ? await countStatement.first<{ total?: number }>()
       : await countStatement.bind(objectType).first<{ total?: number }>();
