@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: ee8d15e335eb0970706b23a22901100ea4229a53
-production_sha: ee8d15e335eb0970706b23a22901100ea4229a53
+repository_base_sha: 126dd1621c67dc3d730b0c72ade00157fb169855
+production_sha: 126dd1621c67dc3d730b0c72ade00157fb169855
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -209,16 +209,35 @@ Completed checkpoint — Stage 4J operator continuity and autonomy state extract
 - Exact-SHA migration-first release passed in run `30216375018`.
 - Live production independently confirmed exact SHA `ee8d15e335eb0970706b23a22901100ea4229a53`.
 
-Current sub-action — Stage 4K autonomous cycle and protected decision state extraction:
+Completed checkpoint — Stage 4K autonomous cycle and protected decision state extraction:
 
-Characterize and move the next dependency-complete autonomous execution cluster into ordered migrations:
+- Added `0009_autonomous_cycles_and_decisions.sql`.
+- Moved complete migration ownership for:
+  - `operator_autonomous_growth_cycles`
+  - `operator_autonomous_lineup_items`
+  - `operator_decision_proposals`
+  - `operator_decision_execution_events`
+- Replaced all four runtime schema owners, indexes, and lineup compatibility-column mutation with complete `assertDatabaseIntegrity` probes.
+- Preserved cycle horizons, missing-slot and account-position receipts, strategy, exposure, evidence and receipt IDs, lineup slot uniqueness, source, strategy-plan, gate, generation and schedule lineage, protected decision evidence, risks, reversibility, authorized tools, execution budgets, owner resolution, outcome evidence, and execution-event budgets.
+- Added `CYCLE_DECISION_UPGRADE_DB` to prove replay preservation and adoption of pre-existing cycle and decision tables with uniqueness contracts intact.
+- Converted the shared reset from dropping protected decision tables to ordered row cleanup and added cleanup for cycle and lineup state.
+- Updated release preflight to recognize migration-owned autonomous cycle and protected decision tables.
+- Push validation passed in run `30216964948`.
+- All eight Operator shards passed in run `30217033815`.
+- Exact-SHA migration-first release passed in run `30217083912`.
+- Live production independently confirmed exact SHA `126dd1621c67dc3d730b0c72ade00157fb169855`.
 
-- `operator_autonomous_growth_cycles`
-- `operator_autonomous_lineup_items`
-- `operator_decision_proposals`
-- `operator_decision_execution_events`
+Current sub-action — Stage 4L incidents, hardening, observations, and engineering audit extraction:
 
-Preserve cycle horizons and missing-slot receipts, account position and strategic thesis, strategy, exposure, evidence and receipt IDs, lineup slot uniqueness, source-card, source-selection, strategy-plan and gate lineage, generation and schedule links, decision evidence, risk, reversibility, authorized tools, execution budgets, owner resolution, outcome evidence, execution-event budgets, indexes, compatibility columns, and all existing production data. Reduce this part of `ensureOperatorMcpAdminTables` to bounded integrity checks and update release preflight to recognize migration-owned autonomous cycle tables.
+Characterize and move the next operational assurance cluster into ordered migrations:
+
+- `operator_operational_incidents`
+- `operator_engineering_audit`
+- `operator_hardening_incidents`
+- `operator_hardening_incident_events`
+- `operator_operational_observations`
+
+Preserve incident signatures, severity, state, scope, blocked capability evidence, side-effect classification, root cause and prevention records, regression and tested-SHA evidence, deployment and live verification, resume capsules and results, autonomy and efficiency outcomes, incident event history, operational timing and request counts, engineering change receipts, indexes, update triggers, and all existing production data. Keep runtime incident reconciliation and expected-control cleanup behavior, but move all schema mutation to ordered migrations.
 
 Remaining Stage 4 work after this cluster:
 
