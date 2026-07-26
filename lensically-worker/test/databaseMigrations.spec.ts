@@ -2109,6 +2109,205 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves autonomous cycle and protected decision records across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const cycleId = `cycle-${suffix}`;
+    const operationId = `operation-${suffix}`;
+    const lineupId = `lineup-${suffix}`;
+    const decisionId = `decision-${suffix}`;
+    const decisionKey = `decision-key-${suffix}`;
+    const eventId = `decision-event-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_autonomous_growth_cycles (
+        id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
+        horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+        account_position_json, strategic_thesis_json, scheduled_post_ids_json,
+        receipt_id, strategy_version_id, exposure_snapshot_id, evidence_snapshot_id,
+        cycle_strategy_id
+      ) VALUES (?, 'manifest_mental', ?, 'engine-v1', 'prepared', 'America/New_York', 24,
+        '2099-01-01T00:00', '2099-01-02T00:00', '["2099-01-01-01"]',
+        '["2099-01-01-01"]', '{"followers":1000}', '{"focus":"quality"}', '[]',
+        'receipt-1', 'strategy-1', 'exposure-1', 'evidence-1', 'cycle-strategy-1')`,
+    ).bind(cycleId, operationId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_autonomous_lineup_items (
+        id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+        generation_mode, family_key, strategic_purpose, strategy_json,
+        cycle_strategy_id, cycle_plan_item_id, gate_receipt_id, source_card_id,
+        source_selection_id, hypothesis_id, generation_run_id, draft_id,
+        scheduled_post_id, status
+      ) VALUES (?, ?, 'manifest_mental', '2099-01-01-01', '2099-01-01', '01:00',
+        'Cycle fixture', 'source_backed', 'family-1', 'coverage', '{"lane":"primary"}',
+        'cycle-strategy-1', 'plan-1', 'gate-1', 'source-card-1', 'selection-1',
+        'hypothesis-1', 'run-1', 'draft-1', 99, 'scheduled')`,
+    ).bind(lineupId, cycleId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_decision_proposals (
+        id, brand_key, decision_key, category, title, decision_text, rationale,
+        evidence_json, expected_outcome, risks_json, reversibility, execution_plan,
+        authorized_tools_json, execution_budget_json, status, proposed_by,
+        owner_response, outcome_summary, result_evidence_json
+      ) VALUES (?, 'manifest_mental', ?, 'routine_operation', 'Fixture decision',
+        'Execute fixture', 'Evidence supports it', '["evidence-1"]', 'Safe result',
+        '["low-risk"]', 'reversible', 'Run one tool', '["fixture_tool"]',
+        '{"fixture_tool":1}', 'executed', 'model', 'approved', 'Completed',
+        '["result-1"]')`,
+    ).bind(decisionId, decisionKey).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_decision_execution_events (
+        id, decision_id, brand_key, tool_name, operation_id, request_fingerprint,
+        status, result_summary, completed_at
+      ) VALUES (?, ?, 'manifest_mental', 'fixture_tool', ?, 'fingerprint-1',
+        'completed', 'Fixture completed', CURRENT_TIMESTAMP)`,
+    ).bind(eventId, decisionId, operationId).run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all([
+      countWhere("SELECT COUNT(*) AS total FROM operator_autonomous_growth_cycles WHERE id = ?", cycleId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_autonomous_lineup_items WHERE id = ?", lineupId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_decision_proposals WHERE id = ?", decisionId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_decision_execution_events WHERE id = ?", eventId),
+    ]);
+    expect(counts).toEqual([1, 1, 1, 1]);
+  });
+
+  it("adopts the live autonomous cycle and protected decision schema without losing lineage or budgets", async () => {
+    const db = testEnv.CYCLE_DECISION_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_autonomous_growth_cycles (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, operation_id TEXT NOT NULL,
+        engine_version TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'prepared',
+        timezone TEXT NOT NULL, horizon_hours INTEGER NOT NULL,
+        horizon_start_local TEXT NOT NULL, horizon_end_local TEXT NOT NULL,
+        target_slots_json TEXT NOT NULL, missing_slots_json TEXT NOT NULL,
+        account_position_json TEXT NOT NULL, strategic_thesis_json TEXT,
+        scheduled_post_ids_json TEXT NOT NULL DEFAULT '[]', error_json TEXT,
+        receipt_id TEXT, strategy_version_id TEXT, exposure_snapshot_id TEXT,
+        evidence_snapshot_id TEXT, cycle_strategy_id TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, operation_id)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_autonomous_lineup_items (
+        id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL,
+        slot_key TEXT NOT NULL, slot_date TEXT NOT NULL, slot_time TEXT NOT NULL,
+        text TEXT NOT NULL, generation_mode TEXT NOT NULL, family_key TEXT NOT NULL,
+        strategic_purpose TEXT NOT NULL, strategy_json TEXT NOT NULL,
+        cycle_strategy_id TEXT, cycle_plan_item_id TEXT, gate_receipt_id TEXT,
+        source_card_id TEXT, source_selection_id TEXT, hypothesis_id TEXT,
+        generation_run_id TEXT, draft_id TEXT, scheduled_post_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'planned', owner_feedback TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(cycle_id, slot_key)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_decision_proposals (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, decision_key TEXT NOT NULL,
+        category TEXT NOT NULL, title TEXT NOT NULL, decision_text TEXT NOT NULL,
+        rationale TEXT NOT NULL, evidence_json TEXT NOT NULL,
+        expected_outcome TEXT NOT NULL, risks_json TEXT NOT NULL,
+        reversibility TEXT NOT NULL, execution_plan TEXT NOT NULL,
+        authorized_tools_json TEXT NOT NULL, execution_budget_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'proposed', proposed_by TEXT NOT NULL DEFAULT 'model',
+        owner_response TEXT, revision_request TEXT, outcome_summary TEXT,
+        result_evidence_json TEXT, supersedes_decision_id TEXT, approved_at TEXT,
+        rejected_at TEXT, executed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_decision_execution_events (
+        id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, brand_key TEXT NOT NULL,
+        tool_name TEXT NOT NULL, operation_id TEXT, request_fingerprint TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'started', result_summary TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TEXT
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_autonomous_growth_cycles (
+        id, brand_key, operation_id, engine_version, timezone, horizon_hours,
+        horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+        account_position_json, cycle_strategy_id
+      ) VALUES ('live-cycle', 'manifest_mental', 'live-operation', 'engine-v1',
+        'America/New_York', 24, '2099-02-01T00:00', '2099-02-02T00:00', '[]', '[]',
+        '{"followers":2000}', 'live-cycle-strategy')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_autonomous_lineup_items (
+        id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+        generation_mode, family_key, strategic_purpose, strategy_json,
+        cycle_strategy_id, cycle_plan_item_id, gate_receipt_id, source_selection_id,
+        hypothesis_id
+      ) VALUES ('live-lineup', 'live-cycle', 'manifest_mental', '2099-02-01-01',
+        '2099-02-01', '01:00', 'Live lineup', 'source_backed', 'family-live',
+        'coverage', '{"lane":"primary"}', 'live-cycle-strategy', 'live-plan',
+        'live-gate', 'live-selection', 'live-hypothesis')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_decision_proposals (
+        id, brand_key, decision_key, category, title, decision_text, rationale,
+        evidence_json, expected_outcome, risks_json, reversibility, execution_plan,
+        authorized_tools_json, execution_budget_json
+      ) VALUES ('live-decision', 'manifest_mental', 'live-decision-key',
+        'routine_operation', 'Live decision', 'Execute', 'Evidence', '[]', 'Result',
+        '[]', 'reversible', 'Plan', '["fixture_tool"]', '{"fixture_tool":1}')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_decision_execution_events (
+        id, decision_id, brand_key, tool_name, operation_id, request_fingerprint
+      ) VALUES ('live-event', 'live-decision', 'manifest_mental', 'fixture_tool',
+        'live-operation', 'live-fingerprint')`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_cycle_decision_upgrade_migrations",
+    );
+
+    const preserved = await Promise.all([
+      db.prepare("SELECT COUNT(*) AS total FROM operator_autonomous_growth_cycles WHERE id = 'live-cycle'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_autonomous_lineup_items WHERE id = 'live-lineup'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_decision_proposals WHERE id = 'live-decision'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_decision_execution_events WHERE id = 'live-event'").first<CountRow>(),
+    ]);
+    expect(preserved.map((row) => Number(row?.total ?? 0))).toEqual([1, 1, 1, 1]);
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_autonomous_growth_cycles (
+          id, brand_key, operation_id, engine_version, timezone, horizon_hours,
+          horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+          account_position_json
+        ) VALUES ('duplicate-cycle', 'manifest_mental', 'live-operation', 'engine-v1',
+          'America/New_York', 24, '2099-02-01T00:00', '2099-02-02T00:00', '[]', '[]', '{}')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_decision_proposals (
+          id, brand_key, decision_key, category, title, decision_text, rationale,
+          evidence_json, expected_outcome, risks_json, reversibility, execution_plan,
+          authorized_tools_json, execution_budget_json
+        ) VALUES ('duplicate-decision', 'manifest_mental', 'live-decision-key',
+          'routine_operation', 'Duplicate', 'Execute', 'Evidence', '[]', 'Result',
+          '[]', 'reversible', 'Plan', '[]', '{}')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;
