@@ -315,13 +315,25 @@ Completed checkpoint — Stage 4P Manifest Intelligence schema extraction:
 - Exact-SHA migration-first release passed in run `30220222162`.
 - Live production independently confirmed exact SHA `552dd0230221324b48e21fc1357dcd25f7ec08c0`.
 
-Current sub-action — Stage 4Q Manifest Intelligence Engine schema extraction:
+Completed checkpoint — Stage 4Q Manifest Intelligence Engine schema extraction:
 
-Move the eight runtime-owned semantic, maturity, comparable-analysis, learning, portfolio, transition, and experiment tables in `manifestIntelligenceEngine.ts` into ordered migrations. Preserve every current column, index, uniqueness contract, confidence and maturity field, lineage relationship, transition record, experiment state, and all existing production data. Replace all runtime DDL in `manifestIntelligenceEngine.ts` with integrity probes while preserving engine evaluation and mutation behavior.
+- Added `0015_manifest_intelligence_engine.sql`.
+- Moved complete migration ownership for eight semantic-signature, maturity-evaluation, comparable-analysis, learning-observation, portfolio-state, state-transition, experiment, and experiment-assignment tables.
+- Replaced all runtime table and index creation in `manifestIntelligenceEngine.ts` with complete integrity probes while preserving evaluation and mutation behavior.
+- Preserved confidence and maturity fields, semantic fingerprints, comparable cohorts, portfolio allocation, transition history, experiment state, assignments, uniqueness contracts, timestamps, and existing data.
+- Added replay and exact live-shape adoption coverage across all eight tables with semantic, learning, and assignment uniqueness checks.
+- Added permanent zero-DDL enforcement for `manifestIntelligenceEngine.ts`.
+- Push validation passed in run `30221519355`.
+- All eight Operator shards passed in run `30221586300`.
+- Exact-SHA migration-first release passed in run `30221627687`.
+- Live production independently confirmed exact SHA `882da806e320d8827c5004b12e39b2db2ed89d72`.
 
-Remaining measured Stage 4 clusters after Stage 4Q:
+Current sub-action — Stage 4R Manifest Measurement Audit schema extraction:
 
-- Stage 4R — 5 learning-brief, benchmark, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables in `manifestMeasurementAudit.ts`.
+Move the five runtime-owned learning-brief, benchmark, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables in `manifestMeasurementAudit.ts` into ordered migrations. Preserve every current column, index, uniqueness contract, measurement window, evidence payload, comparison result, Saved Pattern intelligence state, follower checkpoint, timestamp, and all existing production data. Replace all runtime DDL in `manifestMeasurementAudit.ts` with integrity probes while preserving audit computation and writes.
+
+Remaining measured Stage 4 cluster after Stage 4R:
+
 - Stage 4S — 4 source-family evidence/transition/selection tables plus `operator_manifest_decision_influences`, followed by the repository-wide zero-DDL completion audit.
 
 Remaining Stage 4 work after this cluster:
