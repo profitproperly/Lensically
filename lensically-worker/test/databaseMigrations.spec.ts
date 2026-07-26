@@ -138,8 +138,11 @@ describe("canonical database migrations", () => {
     const accountId = `migration-account-${suffix}`;
     const scheduledKey = `migration-scheduled-${suffix}`;
     const operationId = `migration-delete-${suffix}`;
-    const presetId = `migration-preset-${suffix}`;
+        const presetId = `migration-preset-${suffix}`;
     const requestHash = `migration-hash-${suffix}`;
+    const configuredAccountId = `configured-${suffix}`;
+    const confirmationCode = `confirmation-${suffix}`;
+
 
     await testEnv.DB.prepare(
       `INSERT INTO users (id, email, email_verified, timezone, clock_format)
@@ -181,12 +184,35 @@ describe("canonical database migrations", () => {
         id, user_id, threads_user_id, name, times_json, is_favorite
       ) VALUES (?, ?, ?, 'Migration preset', '["09:00"]', 1)`,
     ).bind(presetId, userId, followerId).run();
-    await testEnv.DB.prepare(
+        await testEnv.DB.prepare(
       `INSERT INTO threads_publish_idempotency (
         scope, app_user_id, threads_user_id, request_hash, request_bucket,
         response_status, response_body
       ) VALUES ('immediate', ?, ?, ?, '2099-01-02T12', 200, '{"ok":true}')`,
     ).bind(userId, followerId, requestHash).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO threads_accounts (
+        threads_user_id, access_token, expires_at, created_at, configured_account_id
+      ) VALUES (?, 'migration-token', 4102444800, 1, ?)`,
+    ).bind(followerId, configuredAccountId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO threads_profile_cache (
+        threads_user_id, username, name, threads_biography, is_verified,
+        threads_profile_picture_url
+      ) VALUES (?, 'migration-user', 'Migration User', 'Migration profile', 1,
+        'https://example.com/profile.png')`,
+    ).bind(followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO app_threads_accounts (
+        app_user_id, threads_user_id, connection_active, is_active,
+        tombstone_expires_at, created_at
+      ) VALUES (?, ?, 1, 1, NULL, 1)`,
+    ).bind(userId, followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO meta_deletion_requests (
+        confirmation_code, platform_user_id, status
+      ) VALUES (?, ?, 'pending')`,
+    ).bind(confirmationCode, followerId).run();
 
     await applyD1Migrations(
       testEnv.DB,
@@ -202,9 +228,13 @@ describe("canonical database migrations", () => {
       countWhere("SELECT COUNT(*) AS total FROM scheduled_posts WHERE idempotency_key = ?", scheduledKey),
       countWhere("SELECT COUNT(*) AS total FROM scheduled_post_deletions WHERE operation_id = ?", operationId),
       countWhere("SELECT COUNT(*) AS total FROM batch_schedule_presets WHERE id = ?", presetId),
-      countWhere("SELECT COUNT(*) AS total FROM threads_publish_idempotency WHERE request_hash = ?", requestHash),
+            countWhere("SELECT COUNT(*) AS total FROM threads_publish_idempotency WHERE request_hash = ?", requestHash),
+      countWhere("SELECT COUNT(*) AS total FROM threads_accounts WHERE configured_account_id = ?", configuredAccountId),
+      countWhere("SELECT COUNT(*) AS total FROM threads_profile_cache WHERE threads_user_id = ?", followerId),
+      countWhere("SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = ? AND threads_user_id = ?", userId, followerId),
+      countWhere("SELECT COUNT(*) AS total FROM meta_deletion_requests WHERE confirmation_code = ?", confirmationCode),
     ]);
-    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 
     it("upgrades the legacy scheduled-deletion schema before backfilling new fields", async () => {
