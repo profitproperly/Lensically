@@ -1,3 +1,5 @@
+import { assertDatabaseIntegrity } from "./databaseIntegrity";
+
 export const MANIFEST_INTELLIGENCE_FOUNDATION_VERSION = "manifest-intelligence-foundation-v3";
 export const MANIFEST_CYCLE_RECEIPT_VERSION = "manifest-cycle-receipt-v3";
 export const MANIFEST_STRATEGY_VERSION_CONTRACT = "manifest-strategy-version-v1";
@@ -366,171 +368,69 @@ export function buildManifestExposureDimensions(records: JsonRecord[]): JsonReco
   };
 }
 
-async function ensureColumns(db: D1Database, columns: Array<{
-  table: string;
-  column: string;
-  definition: string;
-}>): Promise<void> {
-  const tableInfo = await db.batch(columns.map(({ table }) => db.prepare(`PRAGMA table_info(${table})`)));
-    const missing = columns.filter(({ column }, index) => {
-    const rows = (tableInfo[index]?.results ?? []) as Array<{ name?: string }>;
-    return rows.length > 0 && !rows.some((row) => row.name === column);
-  });
-  if (missing.length > 0) {
-    await db.batch(missing.map(({ table, column, definition }) =>
-      db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)));
-  }
-}
+
 
 export async function ensureManifestIntelligenceTables(db: D1Database): Promise<void> {
-  const statements = [
-    `CREATE TABLE IF NOT EXISTS operator_manifest_intelligence_policies (
-      brand_key TEXT PRIMARY KEY, policy_version TEXT NOT NULL, policy_json TEXT NOT NULL,
-      active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_strategy_versions (
-      id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, version INTEGER NOT NULL,
-      contract_version TEXT NOT NULL, parent_version_id TEXT, status TEXT NOT NULL DEFAULT 'active',
-      strategy_hash TEXT NOT NULL, strategy_json TEXT NOT NULL, evidence_json TEXT NOT NULL DEFAULT '{}',
-      change_summary TEXT, reversal_conditions_json TEXT NOT NULL DEFAULT '[]', source_cycle_id TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(brand_key, version), UNIQUE(brand_key, strategy_hash))`,
-        `CREATE TABLE IF NOT EXISTS operator_manifest_exposure_snapshots (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL UNIQUE, brand_key TEXT NOT NULL,
-      ledger_version TEXT NOT NULL, as_of TEXT NOT NULL, timezone TEXT NOT NULL,
-      horizon_start_local TEXT, horizon_end_local TEXT, published_json TEXT NOT NULL DEFAULT '[]',
-      scheduled_json TEXT NOT NULL DEFAULT '[]', dimensions_json TEXT NOT NULL DEFAULT '{}',
-      source_hash TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`, 
-        `CREATE TABLE IF NOT EXISTS operator_manifest_evidence_snapshots (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL UNIQUE, brand_key TEXT NOT NULL,
-      snapshot_version TEXT NOT NULL, as_of TEXT NOT NULL, timezone TEXT NOT NULL,
-      window_days INTEGER NOT NULL DEFAULT 28, window_start TEXT NOT NULL, window_end TEXT NOT NULL,
-      post_count INTEGER NOT NULL DEFAULT 0, mature_count INTEGER NOT NULL DEFAULT 0,
-      immature_count INTEGER NOT NULL DEFAULT 0, incomplete_count INTEGER NOT NULL DEFAULT 0,
-            page_size INTEGER NOT NULL DEFAULT 12, page_count INTEGER NOT NULL DEFAULT 0,
-      page_byte_budget INTEGER NOT NULL DEFAULT 12000,
-      benchmarks_json TEXT NOT NULL DEFAULT '{}', previous_benchmarks_json TEXT NOT NULL DEFAULT '{}',
-      recent_exposure_json TEXT NOT NULL DEFAULT '{}', future_schedule_json TEXT NOT NULL DEFAULT '[]',
-      hard_bans_json TEXT NOT NULL DEFAULT '[]', experiments_json TEXT NOT NULL DEFAULT '[]',
-      source_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-        `CREATE TABLE IF NOT EXISTS operator_manifest_evidence_posts (
-      id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, brand_key TEXT NOT NULL,
-      published_post_id TEXT NOT NULL, scheduled_post_id INTEGER, text TEXT NOT NULL,
-      published_at TEXT NOT NULL, age_hours REAL NOT NULL, maturity_state TEXT NOT NULL,
-      primary_likes INTEGER, like_rate REAL, metrics_json TEXT NOT NULL DEFAULT '{}',
-      maturity_snapshots_json TEXT NOT NULL DEFAULT '[]', lineage_json TEXT NOT NULL DEFAULT '{}',
-      classification_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(snapshot_id, published_post_id))`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_evidence_pages (
-      id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL,
-      page_index INTEGER NOT NULL, page_contract_version TEXT NOT NULL, item_count INTEGER NOT NULL,
-      byte_count INTEGER NOT NULL, evidence_types_json TEXT NOT NULL DEFAULT '[]',
-      items_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(snapshot_id, page_index))`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_evidence_pages_snapshot
-      ON operator_manifest_evidence_pages (snapshot_id, page_index ASC)`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_evidence_posts_page
-      ON operator_manifest_evidence_posts (snapshot_id, published_at DESC, published_post_id DESC)`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_analysis_page_reads (
-      id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL,
-      page_index INTEGER NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(snapshot_id, page_index))`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL UNIQUE, brand_key TEXT NOT NULL, snapshot_id TEXT NOT NULL,
-      contract_version TEXT NOT NULL, account_conclusion_json TEXT NOT NULL,
-      content_focus_json TEXT NOT NULL, benchmarks_json TEXT NOT NULL,
-      strongest_json TEXT NOT NULL DEFAULT '[]', weakest_json TEXT NOT NULL DEFAULT '[]',
-      directives_json TEXT NOT NULL, experiments_json TEXT NOT NULL DEFAULT '[]',
-      risks_json TEXT NOT NULL DEFAULT '[]', lineup_json TEXT NOT NULL,
-      strategy_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'locked',
-      locked_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, strategy_hash))`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items (
-      id TEXT PRIMARY KEY, strategy_id TEXT NOT NULL, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL,
-      slot_key TEXT NOT NULL, slot_date TEXT NOT NULL, slot_time TEXT NOT NULL,
-      family_key TEXT NOT NULL, strategic_role TEXT NOT NULL, generation_mode TEXT NOT NULL,
-      source_kind TEXT NOT NULL, source_card_id TEXT, source_selection_id TEXT,
-      audience_reward TEXT NOT NULL, hook_direction TEXT NOT NULL, placement_reason TEXT NOT NULL,
-      nearby_avoid_json TEXT NOT NULL DEFAULT '[]', exploration_mode TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'planned', revision INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(cycle_id, slot_key))`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_cycle_plan_items_strategy
-      ON operator_manifest_cycle_plan_items (strategy_id, slot_key ASC)`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_candidate_gate_receipts (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, strategy_id TEXT NOT NULL,
-      plan_item_id TEXT NOT NULL, brand_key TEXT NOT NULL, slot_key TEXT NOT NULL,
-      candidate_hash TEXT NOT NULL, receipt_version TEXT NOT NULL, results_json TEXT NOT NULL,
-      passed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(cycle_id, slot_key, candidate_hash))`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_hard_bans (
-      id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, rule_key TEXT NOT NULL,
-      description TEXT NOT NULL, rule_type TEXT NOT NULL, pattern TEXT NOT NULL,
-      scope TEXT NOT NULL DEFAULT 'manifest_generation', pass_examples_json TEXT NOT NULL DEFAULT '[]',
-      fail_examples_json TEXT NOT NULL DEFAULT '[]', source_authority TEXT NOT NULL,
-      active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(brand_key, rule_key))`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_receipts (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL UNIQUE, brand_key TEXT NOT NULL, operation_id TEXT NOT NULL,
-      receipt_version TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'started', trigger_json TEXT NOT NULL,
-      startup_state_json TEXT NOT NULL, input_strategy_version_id TEXT, output_strategy_version_id TEXT,
-      exposure_snapshot_id TEXT, horizon_plan_json TEXT NOT NULL DEFAULT '{}', completion_json TEXT,
-      unresolved_issues_json TEXT NOT NULL DEFAULT '[]', started_at TEXT NOT NULL,
-      completed_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-        `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_receipt_events (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL, event_key TEXT NOT NULL,
-      event_type TEXT NOT NULL, slot_key TEXT, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(cycle_id, event_key))`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_cycle_defect_receipts (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL, defect_key TEXT NOT NULL,
-      receipt_version TEXT NOT NULL, stage_number INTEGER NOT NULL, stage_key TEXT NOT NULL,
-      phase TEXT NOT NULL, slot_key TEXT, operation_id TEXT, error_code TEXT NOT NULL,
-      error_message TEXT NOT NULL, impact_state TEXT NOT NULL, retryable INTEGER NOT NULL DEFAULT 0,
-      blocking INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'open',
-      occurrence_count INTEGER NOT NULL DEFAULT 1, first_seen_at TEXT NOT NULL,
-      last_seen_at TEXT NOT NULL, reconciliation_json TEXT NOT NULL DEFAULT '{}',
-      root_cause TEXT, repair_commit_sha TEXT, deployed_sha TEXT,
-      regression_tests_json TEXT NOT NULL DEFAULT '[]', verification_json TEXT NOT NULL DEFAULT '{}',
-      metadata_json TEXT NOT NULL DEFAULT '{}', resolved_at TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(cycle_id, defect_key))`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_cycle_defects_status
-      ON operator_manifest_cycle_defect_receipts (cycle_id, status, blocking, first_seen_at ASC)`,
-    `CREATE TABLE IF NOT EXISTS operator_manifest_post_hypotheses (
-      id TEXT PRIMARY KEY, cycle_id TEXT NOT NULL, brand_key TEXT NOT NULL, slot_key TEXT NOT NULL,
-      hypothesis_version TEXT NOT NULL, strategy_version_id TEXT, source_kind TEXT NOT NULL,
-      source_type TEXT NOT NULL, source_identity_key TEXT, source_card_id TEXT, source_selection_id TEXT,
-      internal_source_id TEXT, expected_response_type TEXT NOT NULL, expected_audience_reward TEXT NOT NULL,
-      hook_rationale TEXT NOT NULL, premise_rationale TEXT NOT NULL, exploration_mode TEXT NOT NULL,
-      comparable_post_ids_json TEXT NOT NULL DEFAULT '[]', expected_performance_range_json TEXT NOT NULL,
-      uncertainty TEXT NOT NULL, falsification_conditions_json TEXT NOT NULL DEFAULT '[]',
-            candidate_trace_json TEXT NOT NULL DEFAULT '[]', model_evaluation_json TEXT NOT NULL DEFAULT '{}',
-      scheduled_post_id INTEGER, status TEXT NOT NULL DEFAULT 'proposed', revision INTEGER NOT NULL DEFAULT 1,
-      locked_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(cycle_id, slot_key))`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_strategy_versions_brand ON operator_manifest_strategy_versions (brand_key, version DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_receipt_events_cycle ON operator_manifest_cycle_receipt_events (cycle_id, created_at ASC)`,
-    `CREATE INDEX IF NOT EXISTS idx_manifest_hypotheses_cycle ON operator_manifest_post_hypotheses (cycle_id, slot_key ASC)`,
-  ];
-    await db.batch(statements.map((sql) => db.prepare(sql)));
-  await ensureColumns(db, [
-    { table: "operator_autonomous_growth_cycles", column: "receipt_id", definition: "TEXT" },
-    { table: "operator_autonomous_growth_cycles", column: "strategy_version_id", definition: "TEXT" },
-        { table: "operator_autonomous_growth_cycles", column: "exposure_snapshot_id", definition: "TEXT" },
-    { table: "operator_autonomous_growth_cycles", column: "evidence_snapshot_id", definition: "TEXT" },
-    { table: "operator_autonomous_growth_cycles", column: "cycle_strategy_id", definition: "TEXT" },
-        { table: "operator_autonomous_lineup_items", column: "hypothesis_id", definition: "TEXT" },
-    { table: "operator_autonomous_lineup_items", column: "cycle_strategy_id", definition: "TEXT" },
-    { table: "operator_autonomous_lineup_items", column: "cycle_plan_item_id", definition: "TEXT" },
-    { table: "operator_autonomous_lineup_items", column: "gate_receipt_id", definition: "TEXT" },
-        { table: "operator_autonomous_lineup_items", column: "source_selection_id", definition: "TEXT" },
-    { table: "operator_manifest_evidence_snapshots", column: "page_byte_budget", definition: "INTEGER NOT NULL DEFAULT 12000" },
-    { table: "operator_manifest_exposure_snapshots", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
-    { table: "operator_manifest_exposure_snapshots", column: "updated_at", definition: "TEXT" },
-    { table: "operator_manifest_post_hypotheses", column: "revision", definition: "INTEGER NOT NULL DEFAULT 1" },
-    { table: "operator_manifest_post_hypotheses", column: "locked_at", definition: "TEXT" },
-  ]);
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_intelligence_policies",
+    columns: ["brand_key", "policy_version", "policy_json", "active", "created_at", "updated_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_strategy_versions",
+    columns: ["id", "brand_key", "version", "contract_version", "parent_version_id", "status", "strategy_hash", "strategy_json", "evidence_json", "change_summary", "reversal_conditions_json", "source_cycle_id", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_exposure_snapshots",
+    columns: ["id", "cycle_id", "brand_key", "ledger_version", "as_of", "timezone", "horizon_start_local", "horizon_end_local", "published_json", "scheduled_json", "dimensions_json", "source_hash", "revision", "created_at", "updated_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_evidence_snapshots",
+    columns: ["id", "cycle_id", "brand_key", "snapshot_version", "as_of", "timezone", "window_days", "window_start", "window_end", "post_count", "mature_count", "immature_count", "incomplete_count", "page_size", "page_count", "page_byte_budget", "benchmarks_json", "previous_benchmarks_json", "recent_exposure_json", "future_schedule_json", "hard_bans_json", "experiments_json", "source_hash", "created_at", "updated_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_evidence_posts",
+    columns: ["id", "snapshot_id", "brand_key", "published_post_id", "scheduled_post_id", "text", "published_at", "age_hours", "maturity_state", "primary_likes", "like_rate", "metrics_json", "maturity_snapshots_json", "lineage_json", "classification_json", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_evidence_pages",
+    columns: ["id", "snapshot_id", "cycle_id", "brand_key", "page_index", "page_contract_version", "item_count", "byte_count", "evidence_types_json", "items_json", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_analysis_page_reads",
+    columns: ["id", "snapshot_id", "cycle_id", "brand_key", "page_index", "read_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_cycle_strategies",
+    columns: ["id", "cycle_id", "brand_key", "snapshot_id", "contract_version", "account_conclusion_json", "content_focus_json", "benchmarks_json", "strongest_json", "weakest_json", "directives_json", "experiments_json", "risks_json", "lineup_json", "strategy_hash", "status", "locked_at", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_cycle_plan_items",
+    columns: ["id", "strategy_id", "cycle_id", "brand_key", "slot_key", "slot_date", "slot_time", "family_key", "strategic_role", "generation_mode", "source_kind", "source_card_id", "source_selection_id", "audience_reward", "hook_direction", "placement_reason", "nearby_avoid_json", "exploration_mode", "status", "revision", "created_at", "updated_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_candidate_gate_receipts",
+    columns: ["id", "cycle_id", "strategy_id", "plan_item_id", "brand_key", "slot_key", "candidate_hash", "receipt_version", "results_json", "passed", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_hard_bans",
+    columns: ["id", "brand_key", "rule_key", "description", "rule_type", "pattern", "scope", "pass_examples_json", "fail_examples_json", "source_authority", "active", "created_at", "updated_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_cycle_receipts",
+    columns: ["id", "cycle_id", "brand_key", "operation_id", "receipt_version", "status", "trigger_json", "startup_state_json", "input_strategy_version_id", "output_strategy_version_id", "exposure_snapshot_id", "horizon_plan_json", "completion_json", "unresolved_issues_json", "started_at", "completed_at", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_cycle_receipt_events",
+    columns: ["id", "cycle_id", "brand_key", "event_key", "event_type", "slot_key", "payload_json", "created_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_cycle_defect_receipts",
+    columns: ["id", "cycle_id", "brand_key", "defect_key", "receipt_version", "stage_number", "stage_key", "phase", "slot_key", "operation_id", "error_code", "error_message", "impact_state", "retryable", "blocking", "status", "occurrence_count", "first_seen_at", "last_seen_at", "reconciliation_json", "root_cause", "repair_commit_sha", "deployed_sha", "regression_tests_json", "verification_json", "metadata_json", "resolved_at", "created_at", "updated_at"],
+  });
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_post_hypotheses",
+    columns: ["id", "cycle_id", "brand_key", "slot_key", "hypothesis_version", "strategy_version_id", "source_kind", "source_type", "source_identity_key", "source_card_id", "source_selection_id", "internal_source_id", "expected_response_type", "expected_audience_reward", "hook_rationale", "premise_rationale", "exploration_mode", "comparable_post_ids_json", "expected_performance_range_json", "uncertainty", "falsification_conditions_json", "candidate_trace_json", "model_evaluation_json", "scheduled_post_id", "status", "revision", "locked_at", "created_at", "updated_at"],
+  });
 }
 
 export async function ensureManifestIntelligencePolicy(db: D1Database, brandKey: string): Promise<JsonRecord> {
