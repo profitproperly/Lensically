@@ -211,7 +211,7 @@
       "canonical_handler": "getEngineeringContinuation",
       "route_intent": "get engineering continuation",
       "implementation_mode": "new_handler",
-      "focused_regression": "advertises a fixed-path no-input continuation tool and routes fresh-chat engineering continuation requests directly to it",
+            "focused_regression": "routes fresh-chat engineering continuation directly to the canonical handoff",
       "release_scope": "operator-engineering",
       "live_verification": "The exact deployed Main MCP exposes getEngineeringContinuation and returns the root ENGINEERING_CONTINUATION.md content, status, file identity, and startup reconciliation rule without repository search inputs.",
       "compatibility_bridge": false
