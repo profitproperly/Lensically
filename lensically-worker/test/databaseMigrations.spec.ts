@@ -2735,6 +2735,142 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/CHECK constraint failed/);
   });
 
+    it("preserves execution checkpoints, persistent routes, and decision events across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const checkpointId = `checkpoint-${suffix}`;
+    const operationId = `operation-${suffix}`;
+    const routeId = `route-${suffix}`;
+    const routeKey = `route-key-${suffix}`;
+    const eventId = `execution-event-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_manifest_prepare_checkpoints (
+        id, brand_key, operation_id, checkpoint_version, phase, timezone,
+        horizon_hours, state_json
+      ) VALUES (?, 'manifest_mental', ?, 'checkpoint-v1', 'evidence_ready',
+        'America/New_York', 24, '{"page":2}')`,
+    ).bind(checkpointId, operationId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_pre_call_routes (
+        id, route_key, provider, tool_name, operation_key, match_json, action,
+        required_tool, mandatory_route, argument_patch_json,
+        allowed_argument_keys_json, reason, verification_summary, priority, active
+      ) VALUES (?, ?, 'lensically', 'searchRepoFiles', 'repository_search',
+        '{"prefix":{"$exists":true}}', 'apply', 'searchRepoFiles', 'main_gateway',
+        '{"limit":20}', '["query","prefix","limit"]', 'Use bounded search',
+        'Route verified', 10, 1)`,
+    ).bind(routeId, routeKey).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_execution_events (
+        id, brand_key, tool_name, operation_class, execution_plane,
+        policy_version, decision, known_failure_prevented, evidence_json
+      ) VALUES (?, 'manifest_mental', 'searchRepoFiles', 'read', 'main',
+        'policy-v1', 'allowed', 1, '{"canonical_fingerprint":"fingerprint-1"}')`,
+    ).bind(eventId).run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all([
+      countWhere("SELECT COUNT(*) AS total FROM operator_manifest_prepare_checkpoints WHERE id = ? AND state_json = '{\"page\":2}'", checkpointId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_pre_call_routes WHERE route_key = ? AND priority = 10", routeKey),
+      countWhere("SELECT COUNT(*) AS total FROM operator_execution_events WHERE id = ? AND known_failure_prevented = 1", eventId),
+    ]);
+    expect(counts).toEqual([1, 1, 1]);
+  });
+
+  it("adopts the live execution-control schema without losing checkpoints, routes, or events", async () => {
+    const db = testEnv.EXECUTION_CONTROL_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_manifest_prepare_checkpoints (
+        id TEXT PRIMARY KEY, brand_key TEXT NOT NULL, operation_id TEXT NOT NULL,
+        checkpoint_version TEXT NOT NULL, phase TEXT NOT NULL, timezone TEXT NOT NULL,
+        horizon_hours INTEGER NOT NULL, state_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(brand_key, operation_id)
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_pre_call_routes (
+        id TEXT PRIMARY KEY, route_key TEXT NOT NULL UNIQUE,
+        provider TEXT NOT NULL DEFAULT 'lensically', tool_name TEXT NOT NULL,
+        operation_key TEXT NOT NULL DEFAULT '*', match_json TEXT NOT NULL DEFAULT '{}',
+        action TEXT NOT NULL DEFAULT 'apply', required_tool TEXT,
+        mandatory_route TEXT NOT NULL, argument_patch_json TEXT NOT NULL DEFAULT '{}',
+        allowed_argument_keys_json TEXT, reason TEXT NOT NULL,
+        verification_summary TEXT NOT NULL, source_memory_id TEXT,
+        priority INTEGER NOT NULL DEFAULT 100, active INTEGER NOT NULL DEFAULT 1,
+        expires_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_execution_events (
+        id TEXT PRIMARY KEY, brand_key TEXT, workflow_session_id TEXT,
+        tool_name TEXT NOT NULL, operation_class TEXT NOT NULL,
+        execution_plane TEXT NOT NULL, policy_version TEXT NOT NULL,
+        decision TEXT NOT NULL, known_failure_prevented INTEGER NOT NULL DEFAULT 0,
+        evidence_json TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_manifest_prepare_checkpoints (
+        id, brand_key, operation_id, checkpoint_version, phase, timezone,
+        horizon_hours, state_json
+      ) VALUES ('live-checkpoint', 'manifest_mental', 'live-operation', 'checkpoint-v1',
+        'coverage_ready', 'America/New_York', 48, '{"slots":48}')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_pre_call_routes (
+        id, route_key, tool_name, mandatory_route, reason, verification_summary
+      ) VALUES ('live-route', 'live-route-key', 'readRepoFile', 'main_gateway',
+        'Use canonical reader', 'Live route verified')`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_execution_events (
+        id, tool_name, operation_class, execution_plane, policy_version,
+        decision, evidence_json
+      ) VALUES ('live-event', 'readRepoFile', 'read', 'main', 'policy-v1',
+        'allowed', '{"runtime_commit_sha":"live-sha"}')`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_execution_control_upgrade_migrations",
+    );
+
+    const preserved = await Promise.all([
+      db.prepare("SELECT COUNT(*) AS total FROM operator_manifest_prepare_checkpoints WHERE id = 'live-checkpoint' AND state_json = '{\"slots\":48}'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_pre_call_routes WHERE route_key = 'live-route-key'").first<CountRow>(),
+      db.prepare("SELECT COUNT(*) AS total FROM operator_execution_events WHERE id = 'live-event'").first<CountRow>(),
+    ]);
+    expect(preserved.map((row) => Number(row?.total ?? 0))).toEqual([1, 1, 1]);
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_prepare_checkpoints (
+          id, brand_key, operation_id, checkpoint_version, phase, timezone,
+          horizon_hours
+        ) VALUES ('duplicate-checkpoint', 'manifest_mental', 'live-operation',
+          'checkpoint-v1', 'duplicate', 'America/New_York', 24)`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_pre_call_routes (
+          id, route_key, tool_name, mandatory_route, reason, verification_summary
+        ) VALUES ('duplicate-route', 'live-route-key', 'searchRepoFiles',
+          'main_gateway', 'Duplicate', 'Duplicate')`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

@@ -211,8 +211,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves durable work state, ledger, and repo-write sessions across migration replay")) {
     errors.push("durable_work_state_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live durable work schema and completes legacy retirements without data loss")) {
+    if (!migrationTests.includes("adopts the live durable work schema and completes legacy retirements without data loss")) {
     errors.push("durable_work_state_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves execution checkpoints, persistent routes, and decision events across migration replay")) {
+    errors.push("execution_control_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live execution-control schema without losing checkpoints, routes, or events")) {
+    errors.push("execution_control_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
