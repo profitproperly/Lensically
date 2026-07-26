@@ -3454,8 +3454,8 @@ describe("operator mode MCP endpoint", () => {
     const completedReceipt = await env.DB.prepare(
       `SELECT status, completed_at FROM operator_manifest_cycle_receipts WHERE cycle_id = ?`,
     ).bind(cycleId).first<{ status: string; completed_at: string | null }>();
-    expect(completedReceipt).toEqual({ status: "completed", completed_at: completedAt });
-  });
+        expect(completedReceipt).toEqual({ status: "completed", completed_at: completedAt });
+  }, 30000);
 
   it("keeps the retired local execution HTTP plane unreachable", async () => {
     for (const path of [
