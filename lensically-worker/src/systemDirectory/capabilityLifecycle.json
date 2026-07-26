@@ -226,7 +226,7 @@
       "implementation_mode": "new_handler",
       "focused_regression": "reads the bounded database schema authority state without mutation",
       "release_scope": "operator-engineering",
-            "live_verification": "The exact deployed Main MCP returns bounded D1 table, column, and index metadata through read-only PRAGMA introspection; trigger authority remains versioned migration plus behavior-test verified.",
+                  "live_verification": "The exact deployed Main MCP verifies one expected D1 table and up to 50 expected columns through read-only probes; canonical enumeration remains versioned migration owned.",
       "compatibility_bridge": false
     },
     {

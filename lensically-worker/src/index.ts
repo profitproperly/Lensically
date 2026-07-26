@@ -18493,7 +18493,7 @@ const REPO_PATH_SCHEMA = {
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
     { name: "getEngineeringContinuation", title: "Get engineering continuation", description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-    { name: "getDatabaseSchemaState", title: "Get database schema state", description: "Read bounded live D1 table, column, and index metadata through read-only PRAGMA introspection for migration reconciliation and integrity verification. This never changes schema or data.", inputSchema: { type: "object", properties: { table_name: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 50, default: 25 }, include_columns: { type: "boolean", default: false }, include_indexes: { type: "boolean", default: false } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+      { name: "getDatabaseSchemaState", title: "Get database schema state", description: "Verify one expected D1 table and a bounded set of expected columns through read-only existence probes. Canonical enumeration belongs to versioned repository migrations, not runtime catalog access.", inputSchema: { type: "object", properties: { table_name: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }, column_names: { type: "array", maxItems: 50, items: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }, default: [] } }, required: ["table_name"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
       {
     name: "recordHardeningIncident",
@@ -24638,7 +24638,7 @@ async function handleOperatorMcpAdminTool(
         const readFixtures: Record<string, Record<string, unknown> | null> = {
       getOperatorStartupContext: {},
             getEngineeringContinuation: {},
-            getDatabaseSchemaState: { limit: 1, include_columns: false, include_indexes: false },
+                        getDatabaseSchemaState: null,
       engineeringPrecheck: {},
       getEngineeringAccessState: {},
       getHardeningStatus: {},
@@ -25165,58 +25165,48 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-              if (toolName === "getDatabaseSchemaState") {
-    const requestedTable = typeof args.table_name === "string" ? args.table_name.trim() : "";
-    if (requestedTable && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(requestedTable)) {
-      return { ok: false, error: "invalid_schema_table_name" };
+                if (toolName === "getDatabaseSchemaState") {
+    const tableName = typeof args.table_name === "string" ? args.table_name.trim() : "";
+    const rawColumns = Array.isArray(args.column_names) ? args.column_names : [];
+    const columnNames = [...new Set(rawColumns.map((value) => String(value).trim()))].slice(0, 50);
+    const validIdentifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    if (!validIdentifier.test(tableName) || columnNames.some((name) => !validIdentifier.test(name))) {
+      return { ok: false, error: "invalid_schema_identifier" };
     }
-    const offset = Math.max(0, Math.floor(Number(args.offset ?? 0)));
-    const limit = Math.min(50, Math.max(1, Math.floor(Number(args.limit ?? 25))));
-    const includeColumns = args.include_columns === true;
-    const includeIndexes = args.include_indexes === true;
-    const tableListResult = await env.DB.prepare("PRAGMA table_list").all<Record<string, unknown>>();
-    const allTables = (tableListResult.results ?? [])
-      .filter((row) => String(row.schema ?? "main") === "main")
-      .filter((row) => !String(row.name ?? "").startsWith("sqlite_"))
-      .filter((row) => !requestedTable || String(row.name ?? "") === requestedTable)
-      .sort((left, right) => String(left.name ?? "").localeCompare(String(right.name ?? "")));
-    const page = allTables.slice(offset, offset + limit);
-    const tables: Record<string, unknown>[] = [];
-    for (const row of page) {
-      const name = String(row.name ?? "");
-      const table: Record<string, unknown> = {
-        schema: row.schema ?? "main",
-        name,
-        type: row.type ?? "table",
-        column_count: Number(row.ncol ?? 0),
-        without_rowid: Number(row.wr ?? 0) === 1,
-        strict: Number(row.strict ?? 0) === 1,
-      };
-      if (includeColumns) {
-        const columns = await env.DB.prepare(`PRAGMA table_info("${name}")`).all<Record<string, unknown>>();
-        table.columns = columns.results ?? [];
-      }
-      if (includeIndexes) {
-        const indexes = await env.DB.prepare(`PRAGMA index_list("${name}")`).all<Record<string, unknown>>();
-        table.indexes = indexes.results ?? [];
-      }
-      tables.push(table);
+    const quoteIdentifier = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    let tableExists = true;
+    try {
+      await env.DB.prepare(`SELECT 1 FROM ${quoteIdentifier(tableName)} LIMIT 0`).all();
+    } catch (error) {
+      const message = getErrorMessage(error).toLowerCase();
+      if (message.includes("no such table")) tableExists = false;
+      else throw error;
     }
-    const userVersion = await env.DB.prepare("PRAGMA user_version").first<Record<string, unknown>>();
+    const columns: Array<{ name: string; exists: boolean }> = [];
+    if (tableExists) {
+      for (const columnName of columnNames) {
+        let exists = true;
+        try {
+          await env.DB.prepare(`SELECT ${quoteIdentifier(columnName)} FROM ${quoteIdentifier(tableName)} LIMIT 0`).all();
+        } catch (error) {
+          const message = getErrorMessage(error).toLowerCase();
+          if (message.includes("no such column")) exists = false;
+          else throw error;
+        }
+        columns.push({ name: columnName, exists });
+      }
+    } else {
+      columns.push(...columnNames.map((name) => ({ name, exists: false })));
+    }
     return {
       ok: true,
       status_kind: "database_schema_state",
-      authority: "live_d1_pragma",
-      table_name: requestedTable || null,
-      include_columns: includeColumns,
-      include_indexes: includeIndexes,
-      offset,
-      limit,
-      total: allTables.length,
-      returned_count: tables.length,
-      next_offset: offset + tables.length < allTables.length ? offset + tables.length : null,
-      user_version: Number(userVersion?.user_version ?? 0),
-      tables,
+      authority: "versioned_migration_manifest_with_live_d1_probes",
+      table_name: tableName,
+      table_exists: tableExists,
+      columns,
+      all_expected_columns_exist: tableExists && columns.every((column) => column.exists),
+      schema_enumeration: "versioned_repository_migrations",
       trigger_verification: "versioned_migration_and_behavior_tests",
     };
   }

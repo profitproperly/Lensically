@@ -3722,8 +3722,8 @@ describe("operator mode MCP endpoint", () => {
         expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
         const engineeringContinuationTool = listed.tools.find((tool) => tool.name === "getEngineeringContinuation");
     const databaseSchemaTool = listed.tools.find((tool) => tool.name === "getDatabaseSchemaState");
-        expect(databaseSchemaTool?.description).toContain("D1 table, column, and index metadata");
-    expect(databaseSchemaTool?.inputSchema?.properties?.limit).toBeTruthy();
+            expect(databaseSchemaTool?.description).toContain("expected D1 table");
+    expect(databaseSchemaTool?.inputSchema?.required).toContain("table_name");
     expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
     expect(engineeringContinuationTool?.inputSchema?.properties).toEqual({});
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
@@ -5621,22 +5621,23 @@ describe("operator mode MCP endpoint", () => {
 
       it("reads the bounded database schema authority state without mutation", async () => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS schema_audit_fixture (id INTEGER PRIMARY KEY)").run();
-        const response = await mcpToolRaw<{
+            const response = await mcpToolRaw<{
       ok: boolean;
       authority: string;
-      total: number;
-      returned_count: number;
-      tables: Array<{ type: string; name: string; columns?: Array<Record<string, unknown>>; indexes?: Array<Record<string, unknown>> }>;
-    }>("getDatabaseSchemaState", { table_name: "schema_audit_fixture", limit: 10, include_columns: true, include_indexes: true });
+      table_exists: boolean;
+      columns: Array<{ name: string; exists: boolean }>;
+      all_expected_columns_exist: boolean;
+    }>("getDatabaseSchemaState", { table_name: "schema_audit_fixture", column_names: ["id", "missing_column"] });
     expect(response.isError).not.toBe(true);
     const result = response.structuredContent;
     expect(result.ok).toBe(true);
-    expect(result.authority).toBe("live_d1_pragma");
-    expect(result.total).toBe(1);
-    expect(result.returned_count).toBe(1);
-    expect(result.tables[0]?.name).toBe("schema_audit_fixture");
-    expect(result.tables[0]?.columns?.some((column) => column.name === "id")).toBe(true);
-    expect(Array.isArray(result.tables[0]?.indexes)).toBe(true);
+    expect(result.authority).toBe("versioned_migration_manifest_with_live_d1_probes");
+    expect(result.table_exists).toBe(true);
+    expect(result.columns).toEqual([
+      { name: "id", exists: true },
+      { name: "missing_column", exists: false },
+    ]);
+    expect(result.all_expected_columns_exist).toBe(false);
   }, 30000);
 
   it("executes all bounded Execution Kernel read segments without failures", async () => {
