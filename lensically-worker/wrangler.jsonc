@@ -46,8 +46,11 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "lensically-db",
-			"database_id": "98f48396-a972-4cc7-955a-fdbf51e889b2"
+						"database_name": "lensically-db",
+			"database_id": "98f48396-a972-4cc7-955a-fdbf51e889b2",
+			"migrations_dir": "database/migrations",
+			"migrations_table": "lensically_d1_migrations"
+
 		}
 	],
 	"vars": {

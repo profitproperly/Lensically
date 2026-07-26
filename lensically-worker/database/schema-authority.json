@@ -1,7 +1,9 @@
 {
   "version": "lensically-database-authority-v1",
   "status": "transitional_runtime_ddl_inventory",
-  "canonical_migration_directory": "migrations",
+    "canonical_migration_directory": "database/migrations",
+  "legacy_migration_directory": "migrations",
+
   "target_state": "All tables, columns, indexes, triggers, rebuilds, and retirements are owned by ordered versioned migrations. Runtime code performs bounded integrity probes only.",
   "runtime_ddl_sources": [
     "src/index.ts",

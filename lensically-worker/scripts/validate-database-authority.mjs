@@ -72,7 +72,8 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   const manifest = readJson(manifestPath);
   const errors = [];
   if (manifest.version !== "lensically-database-authority-v1") errors.push("database_authority_version_invalid");
-  if (manifest.canonical_migration_directory !== "migrations") errors.push("canonical_migration_directory_invalid");
+    if (manifest.canonical_migration_directory !== "database/migrations") errors.push("canonical_migration_directory_invalid");
+
 
   const records = collectRuntimeDdl(root);
   const runtimeSources = sortedUnique(records.map((record) => record.source));
@@ -117,7 +118,16 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   const unexpectedDrops = explicitDrops.filter((table) => !retiredTables.includes(table));
   for (const table of unexpectedDrops) errors.push(`undeclared_runtime_table_drop:${table}`);
 
+    const wranglerConfig = readFileSync(resolve(root, "wrangler.jsonc"), "utf8");
+  if (!wranglerConfig.includes('"migrations_dir": "database/migrations"')) errors.push("wrangler_migration_directory_missing");
+  if (!wranglerConfig.includes('"migrations_table": "lensically_d1_migrations"')) errors.push("wrangler_migration_ledger_missing");
+  const releaseWorkflow = readFileSync(resolve(root, "../.github/workflows/lensically-engineering.yml"), "utf8");
+  if (!releaseWorkflow.includes("wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc")) {
+    errors.push("release_migration_apply_missing");
+  }
+
   const migrationDirectory = resolve(root, manifest.canonical_migration_directory);
+
   if (!existsSync(migrationDirectory)) errors.push("canonical_migration_directory_missing");
   const migrationFiles = existsSync(migrationDirectory)
     ? readdirSync(migrationDirectory).filter((name) => name.endsWith(".sql")).sort()
