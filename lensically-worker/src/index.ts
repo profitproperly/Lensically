@@ -3780,50 +3780,25 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
 
 async function ensureScheduledPostDeletionsTable(env: Env): Promise<void> {
   await ensureScheduledPostsTable(env);
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS scheduled_post_deletions (
-      id TEXT PRIMARY KEY,
-      scheduled_post_id INTEGER NOT NULL,
-      user_id TEXT NOT NULL,
-      threads_user_id TEXT NOT NULL,
-      post_text TEXT NOT NULL,
-      scheduled_time TEXT NOT NULL,
-      status_before TEXT NOT NULL,
-      reason_code TEXT,
-      reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
-      learning_effect TEXT NOT NULL DEFAULT 'unobserved' CHECK (learning_effect = 'unobserved'),
-      deleted_by TEXT NOT NULL CHECK (deleted_by IN ('owner', 'model')),
-      deletion_source TEXT NOT NULL CHECK (deletion_source IN ('ui', 'mcp')),
-      operation_id TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  const tableInfo = await env.DB.prepare("PRAGMA table_info(scheduled_post_deletions)").all<{ name?: string }>();
-  const columnNames = new Set((tableInfo.results ?? []).map((row) => String(row.name ?? "")));
-  if (!columnNames.has("reason_code")) {
-    await env.DB.prepare("ALTER TABLE scheduled_post_deletions ADD COLUMN reason_code TEXT").run();
-  }
-  if (!columnNames.has("learning_effect")) {
-    await env.DB.prepare("ALTER TABLE scheduled_post_deletions ADD COLUMN learning_effect TEXT NOT NULL DEFAULT 'unobserved'").run();
-  }
-  await env.DB.prepare(
-    `UPDATE scheduled_post_deletions
-     SET reason_code = COALESCE(NULLIF(trim(reason_code), ''), 'legacy_unclassified'),
-         learning_effect = 'unobserved'`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_scheduled_post_deletions_account_time
-     ON scheduled_post_deletions (threads_user_id, scheduled_time DESC, created_at DESC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_scheduled_post_deletions_scheduled_post
-     ON scheduled_post_deletions (scheduled_post_id, created_at DESC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_post_deletions_operation
-     ON scheduled_post_deletions (operation_id)
-     WHERE operation_id IS NOT NULL`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "scheduled_post_deletions",
+    columns: [
+      "id",
+      "scheduled_post_id",
+      "user_id",
+      "threads_user_id",
+      "post_text",
+      "scheduled_time",
+      "status_before",
+      "reason_code",
+      "reason",
+      "learning_effect",
+      "deleted_by",
+      "deletion_source",
+      "operation_id",
+      "created_at",
+    ],
+  });
 }
 
 function normalizeBatchSchedulePresetName(value: unknown): string | null {
@@ -3860,69 +3835,19 @@ function normalizeBatchSchedulePresetTimes(value: unknown): string[] | null {
 }
 
 async function ensureBatchSchedulePresetsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS batch_schedule_presets (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      threads_user_id TEXT,
-      name TEXT NOT NULL,
-      times_json TEXT NOT NULL,
-      is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0, 1)),
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`,
-  ).run();
-
-  const columnResult = await env.DB.prepare("PRAGMA table_info(batch_schedule_presets)").all<{ name?: string }>();
-  const columnNames = new Set(
-    (columnResult.results ?? [])
-      .map((row) => (typeof row?.name === "string" ? row.name : ""))
-      .filter(Boolean),
-  );
-  if (!columnNames.has("threads_user_id")) {
-    await env.DB.prepare("ALTER TABLE batch_schedule_presets ADD COLUMN threads_user_id TEXT").run();
-  }
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_id
-     ON batch_schedule_presets (user_id, is_favorite DESC, updated_at DESC)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_batch_schedule_presets_user_threads
-     ON batch_schedule_presets (user_id, threads_user_id, is_favorite DESC, updated_at DESC)`,
-  ).run();
-
-  await env.DB.prepare("DROP INDEX IF EXISTS idx_batch_schedule_presets_favorite_per_user").run();
-
-  await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_batch_schedule_presets_favorite_per_user_threads
-     ON batch_schedule_presets (user_id, threads_user_id)
-     WHERE is_favorite = 1 AND threads_user_id IS NOT NULL`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_batch_schedule_presets_touch_updated_at
-     AFTER UPDATE ON batch_schedule_presets
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE batch_schedule_presets
-       SET updated_at = CURRENT_TIMESTAMP
-       WHERE id = NEW.id;
-     END`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_batch_schedule_presets_user_cleanup
-     AFTER DELETE ON users
-     FOR EACH ROW
-     BEGIN
-       DELETE FROM batch_schedule_presets
-       WHERE user_id = OLD.id;
-     END`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "batch_schedule_presets",
+    columns: [
+      "id",
+      "user_id",
+      "threads_user_id",
+      "name",
+      "times_json",
+      "is_favorite",
+      "created_at",
+      "updated_at",
+    ],
+  });
 }
 
 async function listBatchSchedulePresetsForUser(
