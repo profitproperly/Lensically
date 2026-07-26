@@ -13,7 +13,8 @@ const testEnv = env as typeof env & {
     GENERATION_UPGRADE_DB: D1Database;
     SOURCE_UPGRADE_DB: D1Database;
   QUALITY_UPGRADE_DB: D1Database;
-  CONTINUITY_UPGRADE_DB: D1Database;
+    CONTINUITY_UPGRADE_DB: D1Database;
+  CYCLE_DECISION_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -139,10 +140,37 @@ const requiredColumns: Record<string, string[]> = {
     "mission_json", "diagnostic_json", "owner_response", "change_summary",
     "created_at",
   ],
-  operator_autonomy_profiles: [
+    operator_autonomy_profiles: [
     "brand_key", "mode", "objective", "model_role", "owner_role",
     "approval_policy", "operating_constraints_json", "active", "version",
     "created_at", "updated_at",
+  ],
+  operator_autonomous_growth_cycles: [
+    "id", "brand_key", "operation_id", "engine_version", "status", "timezone",
+    "horizon_hours", "horizon_start_local", "horizon_end_local",
+    "target_slots_json", "missing_slots_json", "account_position_json",
+    "strategic_thesis_json", "scheduled_post_ids_json", "error_json", "receipt_id",
+    "strategy_version_id", "exposure_snapshot_id", "evidence_snapshot_id",
+    "cycle_strategy_id", "created_at", "updated_at",
+  ],
+  operator_autonomous_lineup_items: [
+    "id", "cycle_id", "brand_key", "slot_key", "slot_date", "slot_time", "text",
+    "generation_mode", "family_key", "strategic_purpose", "strategy_json",
+    "cycle_strategy_id", "cycle_plan_item_id", "gate_receipt_id", "source_card_id",
+    "source_selection_id", "hypothesis_id", "generation_run_id", "draft_id",
+    "scheduled_post_id", "status", "owner_feedback", "created_at", "updated_at",
+  ],
+  operator_decision_proposals: [
+    "id", "brand_key", "decision_key", "category", "title", "decision_text",
+    "rationale", "evidence_json", "expected_outcome", "risks_json", "reversibility",
+    "execution_plan", "authorized_tools_json", "execution_budget_json", "status",
+    "proposed_by", "owner_response", "revision_request", "outcome_summary",
+    "result_evidence_json", "supersedes_decision_id", "approved_at", "rejected_at",
+    "executed_at", "created_at", "updated_at",
+  ],
+  operator_decision_execution_events: [
+    "id", "decision_id", "brand_key", "tool_name", "operation_id",
+    "request_fingerprint", "status", "result_summary", "created_at", "completed_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -252,7 +280,15 @@ const expectedObjects = [
   "idx_operator_mcp_sessions_expires",
   "idx_operator_continuity_refs_scope",
   "idx_operator_operation_receipts_scope",
-  "idx_operator_growth_mission_revisions_brand",
+    "idx_operator_growth_mission_revisions_brand",
+  "idx_operator_autonomous_cycles_brand_status",
+  "idx_operator_autonomous_lineup_schedule",
+  "idx_operator_autonomous_lineup_strategy",
+  "idx_operator_autonomous_lineup_plan",
+  "idx_operator_autonomous_lineup_gate",
+  "idx_operator_decision_proposals_key",
+  "idx_operator_decision_proposals_status",
+  "idx_operator_decision_execution_events_budget",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
