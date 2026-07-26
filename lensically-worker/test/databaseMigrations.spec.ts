@@ -8,8 +8,9 @@ type CountRow = { total: number | string };
 const testEnv = env as typeof env & {
     TEST_MIGRATIONS: TestMigrationBinding;
     UPGRADE_DB: D1Database;
-  IDENTITY_UPGRADE_DB: D1Database;
+    IDENTITY_UPGRADE_DB: D1Database;
   MEASUREMENT_UPGRADE_DB: D1Database;
+  GENERATION_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -741,6 +742,161 @@ describe("canonical database migrations", () => {
       valid_for_learning: 0,
       anomaly_reason: "live_anomaly",
       collection_source: "insights_refresh",
+    });
+  });
+
+    it("adopts the live generation schema without losing adaptation, gate, or preflight lineage", async () => {
+    const db = testEnv.GENERATION_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE gpt_generation_runs (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        objective TEXT,
+        prompt_summary TEXT,
+        status TEXT NOT NULL DEFAULT 'drafted',
+        metadata_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        source_card_id TEXT,
+        source_card_family_id TEXT,
+        source_card_version_number INTEGER,
+        adaptation_plan_json TEXT,
+        prior_adaptation_context_json TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE gpt_generation_drafts (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        draft_index INTEGER NOT NULL DEFAULT 0,
+        text TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'drafted',
+        rejection_reason TEXT,
+        score_json TEXT,
+        strategy_json TEXT,
+        replacement_for_draft_id TEXT,
+        scheduled_post_id INTEGER,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        source_card_id TEXT,
+        owner_feedback TEXT,
+        gate_summary_json TEXT,
+        showable INTEGER NOT NULL DEFAULT 0,
+        published_post_id TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE gpt_preflight_snapshots (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        objective TEXT,
+        sections_json TEXT NOT NULL,
+        manifest_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE gpt_post_strategy_tags (
+        scheduled_post_id INTEGER PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        threads_user_id TEXT NOT NULL,
+        pillar TEXT,
+        hook_style TEXT,
+        format TEXT,
+        intent TEXT,
+        experiment TEXT,
+        novelty_level TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO gpt_generation_runs (
+        id, account_id, threads_user_id, objective, prompt_summary, status,
+        metadata_json, source_card_id, source_card_family_id,
+        source_card_version_number, adaptation_plan_json,
+        prior_adaptation_context_json
+      ) VALUES (
+        'live-generation-run', 'manifest-mental', 'live-threads',
+        'Live objective', 'Live prompt', 'completed', '{"live":true}',
+        'live-card', 'live-family', 4, '{"style":"close_mimicry"}',
+        '{"prior":"preserved"}'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO gpt_generation_drafts (
+        id, run_id, account_id, threads_user_id, draft_index, text, status,
+        score_json, strategy_json, replacement_for_draft_id, scheduled_post_id,
+        metadata_json, source_card_id, owner_feedback, gate_summary_json,
+        showable, published_post_id
+      ) VALUES (
+        'live-generation-draft', 'live-generation-run', 'manifest-mental',
+        'live-threads', 2, 'Live draft', 'scheduled', '{"overall":10}',
+        '{"pillar":"intuition"}', 'live-prior-draft', 42, '{"live":true}',
+        'live-card', 'Live feedback', '{"passed":true}', 1,
+        'live-published-post'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO gpt_preflight_snapshots (
+        id, account_id, threads_user_id, objective, sections_json, manifest_json
+      ) VALUES (
+        'live-preflight', 'manifest-mental', 'live-threads', 'Live preflight',
+        '{"sources":{"complete":true}}', '{"manifest":"preserved"}'
+      )`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_generation_upgrade_migrations",
+    );
+
+    const run = await db.prepare(
+      `SELECT source_card_id, source_card_family_id, source_card_version_number,
+              adaptation_plan_json, prior_adaptation_context_json
+       FROM gpt_generation_runs WHERE id = 'live-generation-run'`,
+    ).first<Record<string, unknown>>();
+    const draft = await db.prepare(
+      `SELECT score_json, strategy_json, replacement_for_draft_id,
+              scheduled_post_id, source_card_id, owner_feedback,
+              gate_summary_json, showable, published_post_id
+       FROM gpt_generation_drafts WHERE id = 'live-generation-draft'`,
+    ).first<Record<string, unknown>>();
+    const preflight = await db.prepare(
+      `SELECT sections_json, manifest_json
+       FROM gpt_preflight_snapshots WHERE id = 'live-preflight'`,
+    ).first<Record<string, unknown>>();
+
+    expect(run).toMatchObject({
+      source_card_id: "live-card",
+      source_card_family_id: "live-family",
+      source_card_version_number: 4,
+      adaptation_plan_json: '{"style":"close_mimicry"}',
+      prior_adaptation_context_json: '{"prior":"preserved"}',
+    });
+    expect(draft).toMatchObject({
+      score_json: '{"overall":10}',
+      strategy_json: '{"pillar":"intuition"}',
+      replacement_for_draft_id: "live-prior-draft",
+      scheduled_post_id: 42,
+      source_card_id: "live-card",
+      owner_feedback: "Live feedback",
+      gate_summary_json: '{"passed":true}',
+      showable: 1,
+      published_post_id: "live-published-post",
+    });
+    expect(preflight).toMatchObject({
+      sections_json: '{"sources":{"complete":true}}',
+      manifest_json: '{"manifest":"preserved"}',
     });
   });
 
