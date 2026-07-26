@@ -843,6 +843,83 @@ async function seedManifestIntelligenceEngineFixture(
   ];
 }
 
+async function seedManifestMeasurementAuditFixture(
+  db: D1Database,
+  suffix: string,
+): Promise<MigrationFixtureProbe[]> {
+  const brandKey = `brand-${suffix}`;
+
+  await db.prepare(
+    `INSERT INTO operator_manifest_learning_briefs (
+      id, brand_key, brief_key, brief_version, source_fingerprint,
+      evidence_window_start, evidence_window_end, authoritative_post_count,
+      brief_json, strategy_change_json
+    ) VALUES (?, ?, ?, 'brief-v1', ?, '2099-01-01', '2099-01-28', 12,
+      '{"improvements":["fixture"]}', '{"changed":true}')`,
+  ).bind(`brief-${suffix}`, brandKey, `brief-key-${suffix}`, `brief-source-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_benchmark_snapshots (
+      id, brand_key, snapshot_key, cycle_id, benchmark_version, window_start,
+      window_end, metrics_json, source_fingerprint
+    ) VALUES (?, ?, ?, ?, 'benchmark-v1', '2099-01-01', '2099-01-28',
+      '{"median_likes":70}', ?)`,
+  ).bind(
+    `benchmark-${suffix}`,
+    brandKey,
+    `snapshot-key-${suffix}`,
+    `cycle-${suffix}`,
+    `benchmark-source-${suffix}`,
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_run_comparisons (
+      id, brand_key, cycle_id, previous_cycle_id, comparison_version,
+      comparison_json, source_fingerprint
+    ) VALUES (?, ?, ?, ?, 'comparison-v1', '{"delta":12}', ?)`,
+  ).bind(
+    `comparison-${suffix}`,
+    brandKey,
+    `cycle-${suffix}`,
+    `previous-cycle-${suffix}`,
+    `comparison-source-${suffix}`,
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_saved_pattern_intelligence (
+      id, brand_key, pattern_identity_key, external_pattern_id, source_identity_key,
+      verified_metrics_json, semantic_json, mechanism_json, adaptation_options_json,
+      similarity_json, usage_json, results_json, confidence_json, reuse_state,
+      exclusion_state, intelligence_version
+    ) VALUES (?, ?, ?, 101, ?, '{"likes":1000}', '{"premise":"fixture"}',
+      '{"mechanism":"question"}', '["adapt"]', '{}', '{}', '{}',
+      '{"label":"high"}', 'eligible', 'active', 'pattern-v1')`,
+  ).bind(
+    `pattern-intelligence-${suffix}`,
+    brandKey,
+    `pattern-${suffix}`,
+    `source-${suffix}`,
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_follower_checkpoints (
+      id, brand_key, checkpoint_key, threads_user_id, checkpoint_version,
+      snapshot_date, followers_count, follower_goal, distance_to_goal,
+      trajectory_json, attribution_policy
+    ) VALUES (?, ?, ?, ?, 'follower-v1', '2099-01-28', 700, 1000000, 999300,
+      '{"direction":"up"}', 'account_level_only')`,
+  ).bind(
+    `follower-${suffix}`,
+    brandKey,
+    `checkpoint-${suffix}`,
+    `threads-${suffix}`,
+  ).run();
+
+  return [
+    { table: "operator_manifest_learning_briefs", column: "id", value: `brief-${suffix}` },
+    { table: "operator_manifest_benchmark_snapshots", column: "id", value: `benchmark-${suffix}` },
+    { table: "operator_manifest_run_comparisons", column: "id", value: `comparison-${suffix}` },
+    { table: "operator_manifest_saved_pattern_intelligence", column: "id", value: `pattern-intelligence-${suffix}` },
+    { table: "operator_manifest_follower_checkpoints", column: "id", value: `follower-${suffix}` },
+  ];
+}
+
 
 describe("canonical database migrations", () => {
   it("creates every extracted table with the required columns, indexes, and triggers", async () => {
