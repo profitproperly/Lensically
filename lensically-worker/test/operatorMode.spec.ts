@@ -5587,7 +5587,7 @@ describe("operator mode MCP endpoint", () => {
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 109,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 110,
                         total_read_only_capabilities: 44,
       route_only: true,
       mutations_executed: 0,
@@ -5597,9 +5597,9 @@ describe("operator mode MCP endpoint", () => {
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(109);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                expect(campaign.structuredContent.campaign.passed).toBe(110);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
-                                    read_only: 44,
+                                    read_only: 45,
                                                                                                 mutation: 65,
       mutation_without_required_inputs: 0,
     });
