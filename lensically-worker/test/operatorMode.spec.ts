@@ -146,6 +146,29 @@ async function ensureMcpAccountOpen(brandKey: CanonicalBrandKey): Promise<void> 
 }
 
 async function activateManifestAutonomyForTest(): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS threads_posts_archive (
+      threads_user_id TEXT NOT NULL,
+      post_id TEXT NOT NULL,
+      post_text TEXT,
+      post_timestamp TEXT,
+      post_permalink TEXT,
+      post_username TEXT,
+      profile_picture_url TEXT,
+      views INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      replies INTEGER NOT NULL DEFAULT 0,
+      reposts INTEGER NOT NULL DEFAULT 0,
+      quotes INTEGER NOT NULL DEFAULT 0,
+      shares INTEGER NOT NULL DEFAULT 0,
+      engagement_total INTEGER NOT NULL DEFAULT 0,
+      source_rank INTEGER NOT NULL DEFAULT 0,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (threads_user_id, post_id)
+    )`,
+  ).run();
   await ensureMcpAccountOpen("manifest_mental");
   const activated = await mcpToolRaw<{
     growth_mission?: { execution_mode?: string; status?: string };
@@ -268,13 +291,8 @@ type ManifestSourceBackedCycleTestFixture = {
 async function prepareManifestSourceBackedCycleForTest(
   options: { commitStrategy?: boolean } = {},
 ): Promise<ManifestSourceBackedCycleTestFixture> {
-    await activateManifestAutonomyForTest();
-  const workflowSessionId = crypto.randomUUID();
-  await env.DB.prepare(
-    `INSERT INTO operator_workflow_sessions (
-      id, brand_key, workflow_template_key, objective, status, current_stage
-    ) VALUES (?, 'manifest_mental', 'content_operator_v1', 'Autonomous source-backed test fixture', 'active', 'source_intake')`,
-  ).bind(workflowSessionId).run();
+        await activateManifestAutonomyForTest();
+  const lineageScopeId = `autonomous-source-backed:${crypto.randomUUID()}`;
   const sourceBatchId = crypto.randomUUID();
   const sourceSelectionId = crypto.randomUUID();
   const sourceIdentityKey = `threads:test-source-backed-${crypto.randomUUID().slice(0, 8)}`;
@@ -284,7 +302,7 @@ async function prepareManifestSourceBackedCycleForTest(
       id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
       qualified_pool_count, requested_count, selected_count, selected_at, metadata_json
     ) VALUES (?, 'manifest_mental', ?, 'test_fixture', 1000, 1, 1, 1, CURRENT_TIMESTAMP, '{}')`,
-    ).bind(sourceBatchId, workflowSessionId).run();
+        ).bind(sourceBatchId, lineageScopeId).run();
   await env.DB.prepare(
     `INSERT INTO operator_source_selections (
       id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
@@ -294,7 +312,7 @@ async function prepareManifestSourceBackedCycleForTest(
   ).bind(
         sourceSelectionId,
     sourceBatchId,
-    workflowSessionId,
+        lineageScopeId,
             sourceIdentityKey,
     sourceIdentityKey,
     sourceIdentityKey,
@@ -311,8 +329,7 @@ async function prepareManifestSourceBackedCycleForTest(
     }),
   ).run();
     const sourceCard = await mcpTool<{ source_card_id: string }>("create_source_card", {
-    brand_key: "manifest_mental",
-    workflow_session_id: workflowSessionId,
+        brand_key: "manifest_mental",
     source_selection_id: sourceSelectionId,
     title: "Source-backed finger-touch fixture",
     source_mechanism: "Physical contact with the post acts as personal selection for a near-term financial outcome.",
@@ -2621,7 +2638,8 @@ describe("operator mode backend spine", () => {
 
   }, 30000);
 
-        it("allows close Manifest hook mimicry with slight wording changes while blocking an exact source copy", async () => {
+                it("allows close Manifest hook mimicry with slight wording changes while blocking an exact source copy", async () => {
+    await operatorTool("list_accounts");
     const session = { workflow_session_id: `autonomous-source-contract-${crypto.randomUUID()}` };
     const batchId = crypto.randomUUID();
     const selectionId = crypto.randomUUID();
