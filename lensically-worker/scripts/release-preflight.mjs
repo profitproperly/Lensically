@@ -11,6 +11,8 @@ const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
+const operatorMcpProtocol = read("src/operatorMcpProtocol.ts");
+const operatorMcpProtocolTests = read("test/operatorMcpProtocol.spec.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
@@ -49,6 +51,9 @@ if (process.argv.includes("--print-crons")) {
 }
 
 const errors = [];
+if (!workflow.includes("test/operatorMcpProtocol.spec.ts")) {
+  errors.push("operator_mcp_protocol_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -66,7 +71,7 @@ const directoryEntryIds = Array.from(new Set(Array.from(directorySection.matchAl
 const declaredCapabilityIds = new Set();
 const declaredDirectoryIds = new Set();
 const declaredNewHandlers = new Set();
-const version = source.match(/(?:export\s+)?const OPERATOR_MCP_VERSION = "([^"]+)";/)?.[1] ?? null;
+const version = operatorMcpProtocol.match(/export\s+const OPERATOR_MCP_VERSION = "([^"]+)";/)?.[1] ?? null;
 const versionAssertionEntries = tests
   .split(/\r?\n/)
   .map((line, index) => ({ line, line_number: index + 1 }))
@@ -75,6 +80,21 @@ const literalVersionAssertionEntries = versionAssertionEntries.filter((entry) =>
 const canonicalVersionAssertionEntries = versionAssertionEntries.filter((entry) => entry.line.includes("OPERATOR_MCP_VERSION"));
 
 if (!version) lifecycleErrors.push("operator_mcp_version_missing");
+if (!source.includes('from "./operatorMcpProtocol"')) lifecycleErrors.push("operator_mcp_protocol_import_missing");
+if (source.includes("function operatorMcpInstructions(")
+    || source.includes("function operatorKeyHandshakeLines(")
+    || source.includes('export const OPERATOR_MCP_VERSION = "')) {
+  lifecycleErrors.push("operator_mcp_protocol_contract_returned_to_index");
+}
+if (!operatorMcpProtocol.includes("buildOperatorMcpInitializeResult")
+    || !operatorMcpProtocol.includes("buildOperatorMcpInstructions")
+    || !operatorMcpProtocol.includes("buildOperatorKeyHandshakeLines")) {
+  lifecycleErrors.push("operator_mcp_protocol_module_incomplete");
+}
+if (!operatorMcpProtocolTests.includes("builds the exact default initialize payload")
+    || !operatorMcpProtocolTests.includes("builds the exact four-line selected-key handshake")) {
+  lifecycleErrors.push("operator_mcp_protocol_tests_incomplete");
+}
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
 }
@@ -141,7 +161,7 @@ if (process.argv.includes("--capability-lifecycle-only")) {
   process.exit(0);
 }
 
-if (!currentState.includes("Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/index.ts`")) {
+if (!currentState.includes("Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/operatorMcpProtocol.ts`")) {
   errors.push("current_state_canonical_version_reference_missing");
 }
 if (/Operator MCP v\d+\.\d+\.\d+/.test(currentState)) {

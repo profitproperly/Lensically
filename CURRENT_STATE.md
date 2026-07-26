@@ -9,7 +9,7 @@
 
 ## Operator MCP
 
-- Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/index.ts`; architecture documentation does not duplicate the writable semantic version. It is exposed at `/api/operator/mcp` with OAuth and a curated public surface of direct typed tools.
+- Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/operatorMcpProtocol.ts`; architecture documentation does not duplicate the writable semantic version. It is exposed at `/api/operator/mcp` with OAuth and a curated public surface of direct typed tools.
 - Engineering failures and explicit contradictions pass through `defect-generalization-gate-v1`. Successful known paths bypass it; duplicated assumptions, contract drift, architectural drift, and known recurrences require a targeted sibling scan and prevention disposition before the interrupted objective resumes.
 - `winning-path-promotion-v1` converts proven resolutions into source-controlled matching conditions, prohibited losing paths, mandatory winning procedures, enforcement points, regressions, and supersession rules. Matching known work follows the promoted winner before action; unknown terrain remains available for bounded discovery, and preventable incidents cannot close before promotion and enforcement.
 - Operator UI parity reads use one canonical paginated handler for the same Dashboard, Followers, live Insights, Post Archive, and Saved Patterns services used by the web UI. Stale Manifest review batches have a separate canonical retirement action that preserves all underlying sources, analytics, and lineage.
