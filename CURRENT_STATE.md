@@ -107,6 +107,8 @@
 
 - GitHub `main` is the repository source of truth.
 - `ENGINEERING_CONTINUATION.md` is the single root-level authority for active implementation state. The fixed-path `getEngineeringContinuation` tool exposes it directly to fresh chats; it is rewritten after each checkpoint and explicitly reports idle when no implementation is active.
+- Stage 4 database authority is enforced by `lensically-worker/database/schema-authority.json` and `scripts/validate-database-authority.mjs`. Release preflight now inventories runtime DDL owners, blocks undeclared sources or duplicate owners, and freezes retired-table recreation debt until migration extraction removes it.
+
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
 - Normal implementation flow is bounded inspection, one coherent change set, focused exact-head validation, one gated release, and live health and smoke verification.
 - Main validation and deployment run through GitHub Actions. Routine pushes use fast validation, complete Operator coverage uses eight deterministic parallel shards, and production uses one explicit exact-SHA release workflow.

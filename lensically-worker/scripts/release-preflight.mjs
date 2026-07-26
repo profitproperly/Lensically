@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { validateDatabaseAuthority } from "./validate-database-authority.mjs";
+
 
 // Validates the verified release marker, capability lifecycle, Guided Growth Mission, and client-safety registry before deployment.
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const databaseAuthorityReceipt = validateDatabaseAuthority(root);
+
 
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
@@ -437,4 +441,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`[release-preflight] ok version=${version} crons=${crons.length} static_router=true canonical_version_assertions=${canonicalVersionAssertionEntries.length}`);
+console.log(`[release-preflight] ok version=${version} crons=${crons.length} static_router=true canonical_version_assertions=${canonicalVersionAssertionEntries.length} database_tables=${databaseAuthorityReceipt.active_table_count} database_ddl_sources=${databaseAuthorityReceipt.runtime_ddl_source_count}`);
