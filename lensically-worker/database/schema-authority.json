@@ -7,8 +7,9 @@
     "src/index.ts",
     "src/manifestIntelligence.ts",
     "src/manifestIntelligenceEngine.ts",
-    "src/manifestMeasurementAudit.ts",
-    "src/manifestProductIntegration.ts"
+        "src/manifestMeasurementAudit.ts",
+    "src/manifestProductIntegration.ts",
+    "src/sourceFamilySelection.ts"
   ],
   "temporary_table_suffixes": [
     "_rebuild"
@@ -44,18 +45,8 @@
     "operator_validation_plane_events",
     "operator_local_execution_enrollment_tokens"
   ],
-    "temporary_retired_table_recreations": [
-    "gpt_strategy_memory",
-    "operator_workflow_sessions",
-    "operator_context_admissions",
-    "operator_production_board_items",
-    "operator_review_batches",
-    "agent_account_controls",
-    "operator_local_execution_nodes",
-    "operator_local_execution_jobs",
-    "operator_local_validation_receipts",
-    "operator_validation_plane_events",
-    "operator_local_execution_enrollment_tokens"
+      "temporary_retired_table_recreations": [
+    "gpt_strategy_memory"
   ],
   "completion_requirements": [
     "No CREATE TABLE, ALTER TABLE, CREATE INDEX, CREATE TRIGGER, compatibility rebuild, or DROP TABLE remains in request preparation.",
