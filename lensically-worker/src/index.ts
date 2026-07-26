@@ -3752,122 +3752,30 @@ async function linkThreadsAccountWithSchemaFallback(
 }
 
 async function ensureScheduledPostsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS scheduled_posts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      threads_user_id TEXT NOT NULL CHECK (length(trim(threads_user_id)) > 0),
-      post_text TEXT NOT NULL,
-      spoiler_all_text INTEGER NOT NULL DEFAULT 0,
-      spoiler_phrases_json TEXT,
-      status TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('approved', 'posting', 'posted')),
-      scheduled_time TEXT NOT NULL,
-      publish_request_id TEXT,
-      published_post_id TEXT,
-      publish_error_message TEXT,
-      idempotency_key TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      processing_started_at TEXT,
-      published_at TEXT,
-      failed_at TEXT,
-      cancelled_at TEXT,
-      last_attempted_at TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_due
-     ON scheduled_posts (status, scheduled_time)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_user_id
-     ON scheduled_posts (user_id)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_scheduled_posts_threads_user_id
-     ON scheduled_posts (threads_user_id)`,
-  ).run();
-
-  const schemaAlignmentColumns: Array<{ name: string; definition: string }> = [
-    { name: "spoiler_all_text", definition: "INTEGER NOT NULL DEFAULT 0" },
-    { name: "spoiler_phrases_json", definition: "TEXT" },
-    { name: "publish_request_id", definition: "TEXT" },
-    { name: "published_post_id", definition: "TEXT" },
-    { name: "idempotency_key", definition: "TEXT" },
-    { name: "published_at", definition: "TEXT" },
-    { name: "failed_at", definition: "TEXT" },
-    { name: "cancelled_at", definition: "TEXT" },
-    { name: "last_attempted_at", definition: "TEXT" },
-  ];
-  for (const column of schemaAlignmentColumns) {
-    const columnExists = await doesColumnExist(env, "scheduled_posts", column.name);
-    if (columnExists) {
-      continue;
-    }
-    await env.DB.prepare(
-      `ALTER TABLE scheduled_posts ADD COLUMN ${column.name} ${column.definition}`,
-    ).run();
-  }
-
-  await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_posts_idempotency_key
-     ON scheduled_posts (idempotency_key)
-     WHERE idempotency_key IS NOT NULL`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_user_exists_insert
-     BEFORE INSERT ON scheduled_posts
-     FOR EACH ROW
-     WHEN NOT EXISTS (
-       SELECT 1
-       FROM users
-       WHERE id = NEW.user_id
-     )
-     BEGIN
-       SELECT RAISE(ABORT, 'foreign_key_violation:scheduled_posts.user_id');
-     END`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_user_exists_update
-     BEFORE UPDATE OF user_id ON scheduled_posts
-     FOR EACH ROW
-     WHEN NOT EXISTS (
-       SELECT 1
-       FROM users
-       WHERE id = NEW.user_id
-     )
-     BEGIN
-       SELECT RAISE(ABORT, 'foreign_key_violation:scheduled_posts.user_id');
-     END`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_user_cleanup
-     AFTER DELETE ON users
-     FOR EACH ROW
-     BEGIN
-       DELETE FROM scheduled_posts
-       WHERE user_id = OLD.id;
-     END`,
-  ).run();
-
-    await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_scheduled_posts_touch_updated_at
-     AFTER UPDATE ON scheduled_posts
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE scheduled_posts
-       SET updated_at = CURRENT_TIMESTAMP
-       WHERE id = NEW.id;
-     END`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "scheduled_posts",
+    columns: [
+      "id",
+      "user_id",
+      "threads_user_id",
+      "post_text",
+      "spoiler_all_text",
+      "spoiler_phrases_json",
+      "status",
+      "scheduled_time",
+      "publish_request_id",
+      "published_post_id",
+      "publish_error_message",
+      "idempotency_key",
+      "created_at",
+      "updated_at",
+      "processing_started_at",
+      "published_at",
+      "failed_at",
+      "cancelled_at",
+      "last_attempted_at",
+    ],
+  });
 }
 
 async function ensureScheduledPostDeletionsTable(env: Env): Promise<void> {
