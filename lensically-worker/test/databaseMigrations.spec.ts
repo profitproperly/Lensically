@@ -43,8 +43,32 @@ const requiredColumns: Record<string, string[]> = {
     "threads_user_id", "username", "name", "threads_biography", "is_verified",
     "threads_profile_picture_url", "last_refreshed_at", "created_at",
   ],
-  meta_deletion_requests: [
+    meta_deletion_requests: [
     "confirmation_code", "platform_user_id", "status", "requested_at", "completed_at",
+  ],
+  threads_user_insights_cache: [
+    "threads_user_id", "insights_json", "last_refreshed_at", "created_at",
+  ],
+  threads_post_insights_cache: [
+    "threads_user_id", "post_id", "post_text", "post_timestamp", "post_permalink",
+    "post_username", "profile_picture_url", "views", "likes", "replies", "reposts",
+    "quotes", "shares", "sort_order", "last_refreshed_at", "created_at",
+    "engagement_total",
+  ],
+  threads_posts_cache_state: [
+    "threads_user_id", "next_cursor", "has_more", "last_refreshed_at", "created_at",
+  ],
+  threads_posts_archive: [
+    "threads_user_id", "post_id", "post_text", "post_timestamp", "post_permalink",
+    "post_username", "profile_picture_url", "views", "likes", "replies", "reposts",
+    "quotes", "shares", "engagement_total", "source_rank", "first_seen_at",
+    "last_seen_at", "last_synced_at",
+  ],
+  operator_post_metric_snapshots: [
+    "id", "brand_key", "published_post_id", "scheduled_post_id", "draft_id",
+    "generation_run_id", "source_card_id", "source_selection_id", "metrics_json",
+    "captured_at", "valid_for_learning", "anomaly_reason", "collection_source",
+    "created_at",
   ],
   scheduled_posts: [
     "id", "user_id", "threads_user_id", "post_text", "spoiler_all_text",
@@ -104,7 +128,16 @@ const expectedObjects = [
   "trg_app_threads_accounts_user_exists_update",
   "trg_app_threads_accounts_user_cleanup",
   "idx_threads_accounts_configured_account_id",
-  "idx_threads_profile_cache_last_refreshed_at",
+    "idx_threads_profile_cache_last_refreshed_at",
+  "idx_threads_user_insights_cache_last_refreshed_at",
+  "idx_threads_post_insights_cache_user_refresh",
+  "idx_threads_post_insights_cache_user_sort_order",
+  "idx_threads_posts_cache_state_last_refreshed_at",
+  "idx_threads_posts_archive_user_timestamp",
+  "idx_threads_posts_archive_user_engagement",
+  "idx_threads_posts_archive_user_synced",
+  "idx_operator_post_metric_snapshots_post_captured",
+  "idx_operator_post_metric_snapshots_learning",
 ];
 
 async function countWhere(sql: string, ...bindings: unknown[]): Promise<number> {

@@ -625,8 +625,7 @@ async function resetTables(): Promise<void> {
     "operator_mcp_tool_overrides",
         "operator_gate_results",
     "operator_content_inventory",
-            "operator_post_metric_snapshots",
-    "operator_operational_incidents",
+                "operator_operational_incidents",
     "operator_daily_source_claims",
     "operator_review_batches",
     "operator_source_exclusions",
@@ -642,12 +641,16 @@ async function resetTables(): Promise<void> {
     "operator_workflow_sessions",
                 "gpt_generation_drafts",
     "gpt_generation_runs",
-    "gpt_post_strategy_tags",
-    "threads_posts_archive",
+        "gpt_post_strategy_tags",
     ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
-    await env.DB.prepare("DELETE FROM threads_profile_cache").run();
+      await env.DB.prepare("DELETE FROM operator_post_metric_snapshots").run();
+  await env.DB.prepare("DELETE FROM threads_posts_archive").run();
+  await env.DB.prepare("DELETE FROM threads_posts_cache_state").run();
+  await env.DB.prepare("DELETE FROM threads_post_insights_cache").run();
+  await env.DB.prepare("DELETE FROM threads_user_insights_cache").run();
+  await env.DB.prepare("DELETE FROM threads_profile_cache").run();
   await env.DB.prepare("DELETE FROM app_threads_accounts").run();
   await env.DB.prepare("DELETE FROM threads_accounts").run();
   await env.DB.prepare("DELETE FROM meta_deletion_requests").run();
