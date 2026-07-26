@@ -13,7 +13,7 @@ const router = read("src/mandatoryExecutionMap.ts");
 const clientSafety = read("src/systemDirectory/clientSafeRequests.ts");
 const systemDirectorySource = read("src/systemDirectory/index.ts");
 const systemDirectoryTests = read("test/systemDirectory.spec.ts");
-const gptMemoryTests = read("test/gptMemoryRoutes.spec.ts");
+const humanFreeAutonomyTests = read("test/humanFreeAutonomy.spec.ts");
 const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifecycle.json"));
 const tests = read("test/operatorMode.spec.ts");
 const manifestAutonomousTests = read("manifest-autonomous-cycle.test.ts");
@@ -48,7 +48,7 @@ const lifecycleBaselineTools = new Set(capabilityLifecycle?.baseline?.active_too
 const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.directory_entry_ids ?? []);
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
-const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${gptMemoryTests}`;
+const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(source.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
