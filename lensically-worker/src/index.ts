@@ -17349,64 +17349,8 @@ const REPO_PATH_SCHEMA = {
 };
 
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
-    { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-    { name: "getEngineeringContinuation", title: "Get engineering continuation", description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-      { name: "getDatabaseSchemaState", title: "Get database schema state", description: "Verify one expected D1 table and a bounded set of expected columns through read-only existence probes. Canonical enumeration belongs to versioned repository migrations, not runtime catalog access.", inputSchema: { type: "object", properties: { table_name: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }, column_names: { type: "array", maxItems: 50, items: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }, default: [] } }, required: ["table_name"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  
-      {
-    name: "recordHardeningIncident",
-    title: "Record hardening incident",
-    description: "Open or reuse one continuous-hardening incident for a blocked or contradictory operation.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        boundary: { type: "string", enum: ["client", "gateway", "routing", "server", "database", "deployment", "quality", "efficiency", "external"] },
-        blocked_profile_id: { type: "string" }, field_names: { type: "array", items: { type: "string" } }, request_fingerprint: { type: "string" },
-        error_category: { type: "string" }, payload_size: { type: "integer", minimum: 0 }, operation_class: { type: "string" },
-        expected_outcome: {}, observed_outcome: {}, resume_capsule: { type: "object", additionalProperties: true },
-      },
-      required: ["boundary", "blocked_profile_id", "error_category"], additionalProperties: false,
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-      { name: "getHardeningStatus", title: "Get hardening status", description: "Read continuous-hardening incidents and transition evidence.", inputSchema: { type: "object", properties: { incident_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 50 } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
-      { name: "advanceHardeningIncident", title: "Advance hardening incident", description: "Advance exactly one incident state with required proof.", inputSchema: { type: "object", properties: { incident_id: { type: "string" }, target_state: { type: "string", enum: ["next", "contained", "classified", "reproduced", "generalized", "repaired", "prevention_locked", "validated", "released", "live_verified", "resumed", "closed"] }, evidence: { type: "object", additionalProperties: true }, root_cause: { type: "string" }, generalized_cause: { type: "string" }, prevention_rule_id: { type: "string" }, regression_test_ids: { type: "array", items: { type: "string" } }, tested_sha: { type: "string" }, deployment_id: { type: "string" }, live_verification: { type: "object", additionalProperties: true }, resume_result: { type: "object", additionalProperties: true }, autonomy_dividend: { type: "object", additionalProperties: true }, efficiency_result: { type: "object", additionalProperties: true } }, required: ["incident_id", "target_state"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-      { name: "recordOperationalObservation", title: "Record operational observation", description: "Record compact execution cost and progress evidence for autonomous efficiency detection.", inputSchema: { type: "object", properties: { operation_id: { type: "string" }, incident_id: { type: "string" }, profile_id: { type: "string" }, capability: { type: "string" }, outcome: { type: "string" }, duration_ms: { type: "integer", minimum: 0 }, call_count: { type: "integer", minimum: 0 }, external_requests: { type: "integer", minimum: 0 }, repeated_fingerprint_count: { type: "integer", minimum: 0 }, progress_checkpoint: { type: "string" }, metadata: { type: "object", additionalProperties: true } }, required: ["capability", "outcome"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-      { name: "getOperatorWorkState", title: "Get operator work state", description: "Read the frozen active outcome, interrupt state, queued prerequisites, and deferred-work ledger.", inputSchema: { type: "object", properties: { status: { type: "string", enum: ["queued", "deferred", "interrupting", "completed", "merged", "rejected"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } },
-      { name: "intakeOperatorWork", title: "Intake operator work", description: "Classify one proposed work item against the single-active-outcome guard and persist the resulting activate, defer, merge, or reject decision.", inputSchema: { type: "object", properties: { work_key: { type: "string" }, title: { type: "string" }, summary: { type: "string" }, severity: { type: "string", enum: ["P0", "P1", "P2", "P3"] }, prerequisite_for_active_outcome: { type: "boolean" }, irreversible_rework_if_deferred: { type: "boolean" }, duplicate_of: { type: "string" }, conflicts_with_mission: { type: "boolean" }, dependencies: { type: "array", items: { type: "string" } }, completion_condition: { type: "string" }, execution_order: { type: "integer", minimum: 1 } }, required: ["work_key", "title", "summary", "completion_condition"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-      { name: "advanceOperatorWork", title: "Advance operator work", description: "Update one persisted work item, clear a completed interrupt, checkpoint the next action, or close the active outcome with evidence.", inputSchema: { type: "object", properties: { work_key: { type: "string" }, status: { type: "string", enum: ["queued", "deferred", "interrupting", "completed", "merged", "rejected"] }, evidence: { type: "array", items: { type: "string" } }, next_action: { type: "string" }, complete_active_outcome: { type: "boolean" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["work_key", "status"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
-    {
-    name: "executeLensicallyIntent",
-    title: "Execute Lensically intent",
-    // legacy_freehand_compatibility: true remains server-side only for cached clients; the advertised public schema stays profile_id plus inputs.
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Submit one registered profile ID and bounded variable inputs. Lensically compiles the canonical objective and intent server-side, then the Execution Kernel applies routing, safety, continuity, and execution controls.`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        profile_id: {
-          type: "string",
-          minLength: 1,
-          maxLength: 160,
-          pattern: "^[a-z0-9_]+$",
-          description: "Registered semantic request profile. Objective, intent, routing, and handler selection are compiled server-side.",
-        },
-        inputs: { type: "object", description: "Bounded variable fields allowed by the registered profile.", additionalProperties: true },
-        continuation_id: { type: "string" },
-        incident_id: { type: "string" },
-        permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." },
-      },
-      required: ["profile_id", "inputs"],
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  { name: "engineeringPrecheck", title: "Engineering precheck", description: "Load compact source-control, MCP, ops-memory, failure-pattern, gate, requirement, and runtime state before engineering work.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "getEngineeringAccessState", title: "Get engineering access state", description: "Report GitHub/Cloudflare engineering access status without exposing secret values.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "listRepoFiles", title: "List repo files", description: "List GitHub repository files from the default branch with optional prefix filtering.", inputSchema: { type: "object", properties: { prefix: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "searchRepoFiles", title: "Search repo files", description: "Search one known repository file using a bounded case-insensitive line scan. Returns verified complete matches for that file without GitHub code-search dependence.", inputSchema: { type: "object", properties: { query: { type: "string", minLength: 1, maxLength: 500 }, prefix: REPO_PATH_SCHEMA, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query", "prefix"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "readRepoFile", title: "Read repo file", description: "Read one GitHub repository file from the default branch, with optional line bounds.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, start_line: { type: "integer", minimum: 1 }, max_lines: { type: "integer", minimum: 1, maximum: 400 } }, required: ["path"], additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  
-  { name: "getRepoStatus", title: "Get repo status", description: "Read the configured GitHub repo, branch, latest commit SHA, bounded check runs, commit statuses, and Cloudflare validation state.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    
+    
   
     { name: "applyRepoTextPatch", title: "Apply repo text patch", description: "Apply one exact find/replace patch to a GitHub repo file and commit directly to the configured branch.", inputSchema: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" }, message: { type: "string" }, summary: { type: "string" } }, required: ["path", "find", "replace", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   { name: "applyRepoPatchSet", title: "Apply atomic repo patch set", description: "Apply up to 20 exact replacements across multiple GitHub repo files and create one commit only after every replacement validates.", inputSchema: { type: "object", properties: { patches: { type: "array", minItems: 1, maxItems: 20, items: { type: "object", properties: { path: REPO_PATH_SCHEMA, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"], additionalProperties: false } }, message: { type: "string" }, summary: { type: "string" }, expected_head_sha: { type: "string" }, dry_run: { type: "boolean" } }, required: ["patches", "message"], additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
