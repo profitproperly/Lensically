@@ -18493,7 +18493,7 @@ const REPO_PATH_SCHEMA = {
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
     { name: "getEngineeringContinuation", title: "Get engineering continuation", description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "getDatabaseSchemaState", title: "Get database schema state", description: "Read a bounded page of canonical SQLite schema objects from the live D1 database for migration reconciliation and integrity verification. This never changes schema or data.", inputSchema: { type: "object", properties: { object_type: { type: "string", enum: ["all", "table", "index", "trigger", "view"], default: "all" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 50, default: 25 }, include_sql: { type: "boolean", default: false } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    { name: "getDatabaseSchemaState", title: "Get database schema state", description: "Read bounded live D1 table, column, and index metadata through read-only PRAGMA introspection for migration reconciliation and integrity verification. This never changes schema or data.", inputSchema: { type: "object", properties: { table_name: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 50, default: 25 }, include_columns: { type: "boolean", default: false }, include_indexes: { type: "boolean", default: false } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
       {
     name: "recordHardeningIncident",
@@ -24638,7 +24638,7 @@ async function handleOperatorMcpAdminTool(
         const readFixtures: Record<string, Record<string, unknown> | null> = {
       getOperatorStartupContext: {},
             getEngineeringContinuation: {},
-      getDatabaseSchemaState: { limit: 1, include_sql: false },
+            getDatabaseSchemaState: { limit: 1, include_columns: false, include_indexes: false },
       engineeringPrecheck: {},
       getEngineeringAccessState: {},
       getHardeningStatus: {},
@@ -25165,45 +25165,59 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-            if (toolName === "getDatabaseSchemaState") {
-    const allowedTypes = new Set(["all", "table", "index", "trigger", "view"]);
-    const objectType = String(args.object_type ?? "all").trim().toLowerCase();
-    if (!allowedTypes.has(objectType)) return { ok: false, error: "invalid_schema_object_type" };
+              if (toolName === "getDatabaseSchemaState") {
+    const requestedTable = typeof args.table_name === "string" ? args.table_name.trim() : "";
+    if (requestedTable && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(requestedTable)) {
+      return { ok: false, error: "invalid_schema_table_name" };
+    }
     const offset = Math.max(0, Math.floor(Number(args.offset ?? 0)));
     const limit = Math.min(50, Math.max(1, Math.floor(Number(args.limit ?? 25))));
-    const includeSql = args.include_sql === true;
-    const filterSql = objectType === "all"
-      ? "name NOT LIKE 'sqlite_%'"
-      : "type = ? AND name NOT LIKE 'sqlite_%'";
-        const countStatement = env.DB.prepare(`SELECT COUNT(*) AS total FROM sqlite_schema WHERE ${filterSql}`);
-    const pageStatement = env.DB.prepare(`SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE ${filterSql} ORDER BY type, name LIMIT ? OFFSET ?`);
-    const countRow = objectType === "all"
-      ? await countStatement.first<{ total?: number }>()
-      : await countStatement.bind(objectType).first<{ total?: number }>();
-    const pageResult = objectType === "all"
-      ? await pageStatement.bind(limit, offset).all<Record<string, unknown>>()
-      : await pageStatement.bind(objectType, limit, offset).all<Record<string, unknown>>();
-    const objects = (pageResult.results ?? []).map((row) => ({
-      type: row.type,
-      name: row.name,
-      table_name: row.tbl_name,
-      ...(includeSql ? { sql: row.sql ?? null } : {}),
-    }));
-    const total = Number(countRow?.total ?? 0);
+    const includeColumns = args.include_columns === true;
+    const includeIndexes = args.include_indexes === true;
+    const tableListResult = await env.DB.prepare("PRAGMA table_list").all<Record<string, unknown>>();
+    const allTables = (tableListResult.results ?? [])
+      .filter((row) => String(row.schema ?? "main") === "main")
+      .filter((row) => !String(row.name ?? "").startsWith("sqlite_"))
+      .filter((row) => !requestedTable || String(row.name ?? "") === requestedTable)
+      .sort((left, right) => String(left.name ?? "").localeCompare(String(right.name ?? "")));
+    const page = allTables.slice(offset, offset + limit);
+    const tables: Record<string, unknown>[] = [];
+    for (const row of page) {
+      const name = String(row.name ?? "");
+      const table: Record<string, unknown> = {
+        schema: row.schema ?? "main",
+        name,
+        type: row.type ?? "table",
+        column_count: Number(row.ncol ?? 0),
+        without_rowid: Number(row.wr ?? 0) === 1,
+        strict: Number(row.strict ?? 0) === 1,
+      };
+      if (includeColumns) {
+        const columns = await env.DB.prepare(`PRAGMA table_info("${name}")`).all<Record<string, unknown>>();
+        table.columns = columns.results ?? [];
+      }
+      if (includeIndexes) {
+        const indexes = await env.DB.prepare(`PRAGMA index_list("${name}")`).all<Record<string, unknown>>();
+        table.indexes = indexes.results ?? [];
+      }
+      tables.push(table);
+    }
     const userVersion = await env.DB.prepare("PRAGMA user_version").first<Record<string, unknown>>();
     return {
       ok: true,
       status_kind: "database_schema_state",
-      authority: "live_d1_sqlite_master",
-      object_type: objectType,
-      include_sql: includeSql,
+      authority: "live_d1_pragma",
+      table_name: requestedTable || null,
+      include_columns: includeColumns,
+      include_indexes: includeIndexes,
       offset,
       limit,
-      total,
-      returned_count: objects.length,
-      next_offset: offset + objects.length < total ? offset + objects.length : null,
+      total: allTables.length,
+      returned_count: tables.length,
+      next_offset: offset + tables.length < allTables.length ? offset + tables.length : null,
       user_version: Number(userVersion?.user_version ?? 0),
-      objects,
+      tables,
+      trigger_verification: "versioned_migration_and_behavior_tests",
     };
   }
 
