@@ -94,11 +94,11 @@ jobs:
           if (campaignStart < 0 || campaignEnd < 0 || campaignEnd <= campaignStart) {
             throw new Error('Stage 3 campaign inventory boundary not found');
           }
-          const campaignBlock = source.slice(campaignStart, campaignEnd);
-          const retiredLinePattern = /^.*get_manifest_review_batch.*\r?\n/gm;
+                    const campaignBlock = source.slice(campaignStart, campaignEnd);
+          const retiredLinePattern = /^.*(?:get_manifest_review_batch|list_strategy_memory).*\r?\n/gm;
           const retiredLines = campaignBlock.match(retiredLinePattern) ?? [];
-          if (retiredLines.length < 1 || retiredLines.length > 2) {
-            throw new Error(`Expected 1-2 retired review campaign lines, found ${retiredLines.length}`);
+          if (retiredLines.length < 2 || retiredLines.length > 4) {
+            throw new Error(`Expected 2-4 retired human-guidance campaign lines, found ${retiredLines.length}`);
           }
           const cleanedCampaignBlock = campaignBlock.replace(retiredLinePattern, '');
           source = source.slice(0, campaignStart) + cleanedCampaignBlock + source.slice(campaignEnd);
@@ -107,7 +107,7 @@ jobs:
           const testPath = 'test/operatorMode.spec.ts';
           let tests = fs.readFileSync(testPath, 'utf8');
           const oldCount = 'expect(eligibleReads).toBe(44);';
-          const newCount = 'expect(eligibleReads).toBe(43);';
+                    const newCount = 'expect(eligibleReads).toBe(42);';
           const countMatches = tests.split(oldCount).length - 1;
           if (countMatches !== 1) {
             throw new Error(`Expected one eligible read count assertion, found ${countMatches}`);
