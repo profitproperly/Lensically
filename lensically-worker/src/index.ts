@@ -24276,7 +24276,6 @@ async function handleOperatorMcpAdminTool(
         "list_accounts",
         "get_account_state",
         "get_hourly_coverage",
-        "get_manifest_review_batch",
       ]),
             account_reads_a: new Set([
         "read_lensically_ui_surface",
@@ -24289,7 +24288,6 @@ async function handleOperatorMcpAdminTool(
         "get_source_candidate_batch",
         "get_source_card",
         "list_active_gates",
-        "list_strategy_memory",
         "list_scheduled_posts",
         "get_post_results",
         "get_monthly_growth_review",
@@ -24651,7 +24649,6 @@ async function handleOperatorMcpAdminTool(
       get_account_state: { ...accountBase },
       read_lensically_ui_surface: { ...accountBase, surface: "dashboard", limit: 1 },
       get_hourly_coverage: { ...accountBase, horizon_days: 1 },
-      get_manifest_review_batch: { ...accountBase, production_date: today },
       get_production_board: { ...accountBase },
       list_source_candidates: { ...accountBase, limit: 1, offset: 0 },
             audit_published_post_lineage: { ...accountBase, minimum_likes: 1, days: 7, limit: 1 },
@@ -24659,7 +24656,6 @@ async function handleOperatorMcpAdminTool(
       get_source_candidate_batch: latestSourceBatch?.id ? { ...accountBase, source_batch_id: latestSourceBatch.id } : null,
       get_source_card: latestSourceCard?.id ? { ...accountBase, source_card_id: latestSourceCard.id, include_history: false } : null,
       list_active_gates: { ...accountBase },
-      list_strategy_memory: { ...accountBase, limit: 1, offset: 0 },
       list_scheduled_posts: { ...accountBase, date: today, timezone: WORKSPACE_DEFAULT_TIMEZONE, limit: 1, offset: 0 },
       get_post_results: latestPublished?.published_post_id
         ? { ...accountBase, published_post_id: latestPublished.published_post_id, compact: true }
