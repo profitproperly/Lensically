@@ -3541,113 +3541,16 @@ async function ensureImmediatePublishIdempotencyTable(env: Env): Promise<void> {
 }
 
 async function ensureThreadsAccountsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS threads_accounts (
-      threads_user_id TEXT PRIMARY KEY,
-      access_token TEXT NOT NULL,
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      configured_account_id TEXT
-    )`,
-  ).run();
-
-  const tableInfo = await env.DB.prepare("PRAGMA table_info(threads_accounts)").all<{
-    name: string;
-    pk: number;
-  }>();
-  const tableColumns = tableInfo.results ?? [];
-  const columnNames = new Set(tableColumns.map((column) => column.name));
-  const hasThreadsUserId = columnNames.has("threads_user_id");
-  const threadsUserIdPkOrdinal = tableColumns.find((column) => column.name === "threads_user_id")?.pk ?? 0;
-  const needsPrimaryKeyRebuild = !hasThreadsUserId || Number(threadsUserIdPkOrdinal) === 0;
-
-  if (needsPrimaryKeyRebuild) {
-    const hasUserId = columnNames.has("user_id");
-    const hasAppUserId = columnNames.has("app_user_id");
-    const hasAccessToken = columnNames.has("access_token");
-    const hasExpiresAt = columnNames.has("expires_at");
-    const hasCreatedAt = columnNames.has("created_at");
-    const hasConfiguredAccountId = columnNames.has("configured_account_id");
-
-    const threadsUserIdExpr = hasThreadsUserId
-      ? "threads_user_id"
-      : hasUserId
-        ? "user_id"
-        : hasAppUserId
-          ? "app_user_id"
-          : "NULL";
-    const accessTokenExpr = hasAccessToken ? "access_token" : "''";
-    const expiresAtExpr = hasExpiresAt ? "expires_at" : "0";
-    const createdAtExpr = hasCreatedAt ? "created_at" : "CAST(strftime('%s','now') AS INTEGER)";
-    const configuredAccountIdExpr = hasConfiguredAccountId ? "configured_account_id" : "NULL";
-
-    const dbSession = env.DB.withSession("first-primary");
-    let transactionStarted = false;
-    try {
-      await dbSession.prepare("BEGIN TRANSACTION").run();
-      transactionStarted = true;
-
-      await dbSession.prepare(
-        `CREATE TABLE IF NOT EXISTS threads_accounts_rebuild (
-          threads_user_id TEXT PRIMARY KEY,
-          access_token TEXT NOT NULL,
-          expires_at INTEGER NOT NULL,
-          created_at INTEGER NOT NULL,
-          configured_account_id TEXT
-        )`,
-      ).run();
-
-      await dbSession.prepare(
-        `INSERT OR REPLACE INTO threads_accounts_rebuild (
-          threads_user_id,
-          access_token,
-          expires_at,
-          created_at,
-          configured_account_id
-        )
-        SELECT
-          ${threadsUserIdExpr},
-          ${accessTokenExpr},
-          ${expiresAtExpr},
-          ${createdAtExpr},
-          ${configuredAccountIdExpr}
-        FROM threads_accounts
-        WHERE ${threadsUserIdExpr} IS NOT NULL
-          AND length(trim(${threadsUserIdExpr})) > 0`,
-      ).run();
-
-      await dbSession.prepare("DROP TABLE threads_accounts").run();
-      await dbSession.prepare("ALTER TABLE threads_accounts_rebuild RENAME TO threads_accounts").run();
-
-      await dbSession.prepare("COMMIT").run();
-      transactionStarted = false;
-    } catch (error) {
-      if (transactionStarted) {
-        await dbSession.prepare("ROLLBACK").run();
-      }
-      throw error;
-    }
-  }
-
-  const requiredColumns: Array<{ name: string; definition: string }> = [
-    { name: "access_token", definition: "TEXT NOT NULL DEFAULT ''" },
-    { name: "expires_at", definition: "INTEGER NOT NULL DEFAULT 0" },
-    { name: "created_at", definition: "INTEGER NOT NULL DEFAULT 0" },
-    { name: "configured_account_id", definition: "TEXT" },
-  ];
-
-  for (const column of requiredColumns) {
-    const exists = await doesColumnExist(env, "threads_accounts", column.name);
-    if (exists) {
-      continue;
-    }
-    await env.DB.prepare(`ALTER TABLE threads_accounts ADD COLUMN ${column.name} ${column.definition}`).run();
-  }
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_threads_accounts_configured_account_id
-     ON threads_accounts (configured_account_id)`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "threads_accounts",
+    columns: [
+      "threads_user_id",
+      "access_token",
+      "expires_at",
+      "created_at",
+      "configured_account_id",
+    ],
+  });
 }
 
 type ThreadsAccount = {
