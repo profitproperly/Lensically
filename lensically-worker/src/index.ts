@@ -1593,16 +1593,15 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
 } as const;
 
 const OPERATOR_REJECTION_MEMORY_CONTRACT = {
-  version: OPERATOR_REJECTION_CONTEXT_VERSION,
+  version: HUMAN_FREE_AUTONOMY_CONTRACT.version,
   infrastructure_scope: "universal",
-  evidence_scope: "selected_account",
+  evidence_scope: "disabled",
   required_generation_behavior: [
-    "Persist a compact selected-account rejection context with each generation run so fresh chats retain explicit hard bans.",
-    "For manifest_mental, enforce only words, phrases, surfaces, or patterns the owner explicitly marked as banned; do not treat every rejected draft as a semantic constraint.",
-        "Manifest generation should preserve the approved source mechanism, strongest structure, meaning, tone, and payoff while materially rewriting distinctive surface language. Do not lightly rearrange the source or invent unrelated scenes or premises.",
+    "Do not read owner approvals, rejections, edits, taste feedback, guided-review history, or deletion history during generation.",
+    "Use only fixed account configuration, the locked source card, objective market evidence, and operational state.",
   ],
-  required_gate_keys: ["historical_owner_rejection_gate", "required_gate_execution_gate"],
-  showability_rule: "For manifest_mental, a draft is blocked by exact or near-verbatim source copying, an explicit owner hard ban, or a missing required gate. Mechanism and structure may be reused; distinctive language must be independently written unless the owner explicitly approves an exact reusable hook.",
+  required_gate_keys: ["required_gate_execution_gate"],
+  showability_rule: "A draft is blocked only by fixed account configuration, platform safety, exact duplication or copying, source-contract failure, inventory collision, or missing required gate execution.",
 } as const;
 
 
@@ -8556,7 +8555,7 @@ const DEFAULT_OPERATOR_GATES: Array<{
     { gate_key: "source_transformation_contract_gate", display_name: "Source Fidelity Contract", description: "Manifest drafts should preserve the source hook, structure, meaning, tone, and payoff while changing only enough wording to avoid an exact source copy. Other accounts retain their active transformation contract.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 15 },
   { gate_key: "source_surface_copy_gate", display_name: "Source Copy Boundary", description: "Manifest blocks only an exact source copy; close hook and structure mimicry is allowed. Other accounts retain role-aware source-surface rules.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 20 },
     { gate_key: "current_inventory_repeat_gate", display_name: "Current Inventory Repeat", description: "Draft must not repeat the latest account opening unless the active source explicitly authorizes that reusable hook.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 30 },
-  { gate_key: "historical_owner_rejection_gate", display_name: "Historical Owner Rejection", description: "For Manifest, block only explicit owner hard bans; do not block close source mimicry or require semantic review of every rejected draft. Other accounts retain their configured behavior.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "hybrid", order_index: 40 },
+  
   { gate_key: "required_gate_execution_gate", display_name: "Required Gate Execution", description: "Every active blocking gate for this stage must execute and return an auditable result before a draft can become showable.", stage_scope: "gate_evaluation", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10000 },
 
   { gate_key: "scheduled_collision_gate", display_name: "Scheduled Collision", description: "Scheduled drafts must not collide with account scheduled posts.", stage_scope: "scheduling", gate_type: "hard", severity: "block", evaluator: "backend", order_index: 10 },
@@ -8621,8 +8620,16 @@ async function seedDefaultOperatorGates(env: Env): Promise<void> {
         gate.evaluator,
         gate.order_index,
       )
-      .run();
+            .run();
   }
+  await env.DB.prepare(
+    `UPDATE operator_gates
+     SET active = 0,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE gate_key = 'historical_owner_rejection_gate'
+        OR created_from = 'strategy_memory'
+        OR gate_key = 'manifest_owner_review_rules_2026_07_16'`,
+  ).run();
 }
 
 const operatorModePreparationByEnv = new WeakMap<object, Promise<void>>();
@@ -9102,7 +9109,27 @@ function operatorRejectionContextFingerprint(ids: string[]): string {
   return `${OPERATOR_REJECTION_CONTEXT_VERSION}:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
-async function buildOperatorRejectionContext(env: Env, brand: GptResolvedBrand): Promise<Record<string, unknown>> {
+async function buildOperatorRejectionContext(_env: Env, brand: GptResolvedBrand): Promise<Record<string, unknown>> {
+  return {
+    version: HUMAN_FREE_AUTONOMY_CONTRACT.version,
+    brand_key: brand.brand_key,
+    evidence_scope: "disabled",
+    enforcement_mode: "human_history_excluded",
+    coverage_status: "not_applicable",
+    coverage_complete: true,
+    source_rejection_record_count: 0,
+    rejected_draft_count: 0,
+    rejection_memory_count: 0,
+    required_review_count: 0,
+    required_review_ids: [],
+    context_fingerprint: `${HUMAN_FREE_AUTONOMY_CONTRACT.version}:none`,
+    explicit_banned_surfaces: [],
+    generation_instruction: "Do not use owner approvals, rejections, edits, taste feedback, guided-review history, or deletion history as generation inputs.",
+    gate_instruction: "Evaluate only fixed account configuration, platform safety, source fidelity, exact duplication, inventory collision, and required gate execution.",
+  };
+}
+
+async function buildOperatorRejectionContextLegacyUnused(env: Env, brand: GptResolvedBrand): Promise<Record<string, unknown>> {
   await ensureGptStrategyMemoryTable(env);
   await ensureGptGenerationDraftsTable(env);
   const rowLimit = OPERATOR_REJECTION_CONTEXT_LIMIT + 1;
@@ -20509,6 +20536,39 @@ const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "runMcpTests",
   "listEngineeringAudit",
 ]);
+
+const RETIRED_HUMAN_GUIDANCE_TOOL_NAMES = new Set<string>([
+  "start_workflow_session",
+  "admit_context",
+  "getWorkflowStatus",
+  "updateWorkflowRequirement",
+  "advanceWorkflowStage",
+  "prepareFullPreflight",
+  "updateGate",
+  "runGateSuite",
+  "submitAndGateDraft",
+  "review_manifest_scheduled_post",
+  "claim_manifest_review_batch",
+  "get_manifest_review_batch",
+  "attach_manifest_review_draft",
+  "skip_manifest_review_source",
+  "discard_manifest_review_batch",
+  "schedule_manifest_review_batch",
+  "draw_source_candidate_batch",
+  "get_source_candidate_batch",
+  "mark_draft_shown",
+  "approve_draft",
+  "reject_draft",
+  "create_or_update_gate",
+  "promote_memory_to_gate",
+  "list_strategy_memory",
+  "save_strategy_memory",
+  "schedule_owner_approved_batch",
+  "schedule_approved_draft",
+]);
+for (const retiredToolName of RETIRED_HUMAN_GUIDANCE_TOOL_NAMES) {
+  OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.delete(retiredToolName);
+}
 
 function isOperatorPublicDirectToolName(value: string): boolean {
   return OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.has(value);
