@@ -174,8 +174,12 @@ describe("canonical database migrations", () => {
     const operationId = `migration-delete-${suffix}`;
         const presetId = `migration-preset-${suffix}`;
     const requestHash = `migration-hash-${suffix}`;
-    const configuredAccountId = `configured-${suffix}`;
+        const configuredAccountId = `configured-${suffix}`;
     const confirmationCode = `confirmation-${suffix}`;
+    const cachedPostId = `cached-${suffix}`;
+    const archivedPostId = `archived-${suffix}`;
+    const metricSnapshotId = `metric-${suffix}`;
+
 
 
     await testEnv.DB.prepare(
@@ -242,11 +246,48 @@ describe("canonical database migrations", () => {
         tombstone_expires_at, created_at
       ) VALUES (?, ?, 1, 1, NULL, 1)`,
     ).bind(userId, followerId).run();
-    await testEnv.DB.prepare(
+        await testEnv.DB.prepare(
       `INSERT INTO meta_deletion_requests (
         confirmation_code, platform_user_id, status
       ) VALUES (?, ?, 'pending')`,
     ).bind(confirmationCode, followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO threads_user_insights_cache (
+        threads_user_id, insights_json
+      ) VALUES (?, '{"followers_count":42}')`,
+    ).bind(followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO threads_post_insights_cache (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink,
+        post_username, profile_picture_url, views, likes, replies, reposts,
+        quotes, shares, sort_order, engagement_total
+      ) VALUES (?, ?, 'Cached migration fixture', '2099-01-03T12:00:00.000Z',
+        'https://threads.net/t/cached', 'migration-user',
+        'https://example.com/profile.png', 1000, 100, 5, 3, 2, 1, 7, 111)`,
+    ).bind(followerId, cachedPostId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO threads_posts_cache_state (
+        threads_user_id, next_cursor, has_more
+      ) VALUES (?, 'cursor-migration', 1)`,
+    ).bind(followerId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO threads_posts_archive (
+        threads_user_id, post_id, post_text, post_timestamp, post_permalink,
+        post_username, profile_picture_url, views, likes, replies, reposts,
+        quotes, shares, engagement_total, source_rank
+      ) VALUES (?, ?, 'Archived migration fixture', '2099-01-03T12:00:00.000Z',
+        'https://threads.net/t/archived', 'migration-user',
+        'https://example.com/profile.png', 2000, 200, 10, 6, 4, 2, 222, 1)`,
+    ).bind(followerId, archivedPostId).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_post_metric_snapshots (
+        id, brand_key, published_post_id, scheduled_post_id, draft_id,
+        generation_run_id, source_card_id, source_selection_id, metrics_json,
+        captured_at, valid_for_learning, anomaly_reason, collection_source
+      ) VALUES (?, 'manifest_mental', ?, ?, 'draft-migration', 'run-migration',
+        'card-migration', 'selection-migration', '{"likes":200}',
+        '2099-01-03T13:00:00.000Z', 0, 'migration_anomaly', 'insights_refresh')`,
+    ).bind(metricSnapshotId, archivedPostId, scheduledPostId).run();
 
     await applyD1Migrations(
       testEnv.DB,
@@ -266,9 +307,14 @@ describe("canonical database migrations", () => {
       countWhere("SELECT COUNT(*) AS total FROM threads_accounts WHERE configured_account_id = ?", configuredAccountId),
       countWhere("SELECT COUNT(*) AS total FROM threads_profile_cache WHERE threads_user_id = ?", followerId),
       countWhere("SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = ? AND threads_user_id = ?", userId, followerId),
-      countWhere("SELECT COUNT(*) AS total FROM meta_deletion_requests WHERE confirmation_code = ?", confirmationCode),
+            countWhere("SELECT COUNT(*) AS total FROM meta_deletion_requests WHERE confirmation_code = ?", confirmationCode),
+      countWhere("SELECT COUNT(*) AS total FROM threads_user_insights_cache WHERE threads_user_id = ?", followerId),
+      countWhere("SELECT COUNT(*) AS total FROM threads_post_insights_cache WHERE post_id = ? AND engagement_total = 111", cachedPostId),
+      countWhere("SELECT COUNT(*) AS total FROM threads_posts_cache_state WHERE threads_user_id = ? AND next_cursor = 'cursor-migration'", followerId),
+      countWhere("SELECT COUNT(*) AS total FROM threads_posts_archive WHERE post_id = ? AND engagement_total = 222", archivedPostId),
+      countWhere("SELECT COUNT(*) AS total FROM operator_post_metric_snapshots WHERE id = ? AND valid_for_learning = 0 AND anomaly_reason = 'migration_anomaly'", metricSnapshotId),
     ]);
-    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 
     it("upgrades the legacy scheduled-deletion schema before backfilling new fields", async () => {
