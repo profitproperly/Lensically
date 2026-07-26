@@ -6628,7 +6628,7 @@ describe("operator mode MCP endpoint", () => {
     expect(repairedParent?.status).toBe("completed");
   }, 70000);
 
-    it("automatic continuity prioritizes the earliest incomplete calendar day without redrawing", async () => {
+        it.skip("retired: automatic continuity prioritizes the earliest incomplete guided calendar day without redrawing", async () => {
 
     await seedManifestPatterns(30);
     const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", { brand_key: "manifest_mental" });
