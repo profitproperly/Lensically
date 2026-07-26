@@ -670,4 +670,5 @@ for (const forbidden of [
 }
 await writeFile(indexPath, source);
 await writeFile(testPath, tests);
+await writeFile(manifestTestPath, manifestTests);
 process.stdout.write(`${JSON.stringify({ ok: true, changes, index_bytes: Buffer.byteLength(source) }, null, 2)}\n`);
