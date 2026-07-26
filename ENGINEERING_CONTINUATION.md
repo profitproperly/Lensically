@@ -328,13 +328,27 @@ Completed checkpoint — Stage 4Q Manifest Intelligence Engine schema extraction
 - Exact-SHA migration-first release passed in run `30221627687`.
 - Live production independently confirmed exact SHA `882da806e320d8827c5004b12e39b2db2ed89d72`.
 
-Current sub-action — Stage 4R Manifest Measurement Audit schema extraction:
+Completed checkpoint — Stage 4R Manifest Measurement Audit schema extraction:
 
-Move the five runtime-owned learning-brief, benchmark, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables in `manifestMeasurementAudit.ts` into ordered migrations. Preserve every current column, index, uniqueness contract, measurement window, evidence payload, comparison result, Saved Pattern intelligence state, follower checkpoint, timestamp, and all existing production data. Replace all runtime DDL in `manifestMeasurementAudit.ts` with integrity probes while preserving audit computation and writes.
+- Added `0016_manifest_measurement_audit.sql`.
+- Moved complete migration ownership for five learning-brief, benchmark-snapshot, run-comparison, Saved Pattern intelligence, and follower-checkpoint tables.
+- Replaced all runtime table and index creation in `manifestMeasurementAudit.ts` with complete integrity probes while preserving upstream intelligence checks, audit computation, and writes.
+- Preserved measurement windows, evidence payloads, comparison results, Saved Pattern intelligence state, follower trajectories, uniqueness contracts, indexes, timestamps, and existing data.
+- Added replay and exact live-shape adoption coverage across all five tables with brief, pattern, and follower uniqueness checks.
+- Added permanent zero-DDL enforcement for `manifestMeasurementAudit.ts`.
+- Push validation passed in run `30221898668`.
+- All eight Operator shards passed in run `30221952396`.
+- Exact-SHA migration-first release passed in run `30221985894`.
+- Live production independently confirmed exact SHA `6abb91621ddb775f0136b5f419de5ad6c5f2917f`.
 
-Remaining measured Stage 4 cluster after Stage 4R:
+Current sub-action — Stage 4S final source-family and decision-influence extraction:
 
-- Stage 4S — 4 source-family evidence/transition/selection tables plus `operator_manifest_decision_influences`, followed by the repository-wide zero-DDL completion audit.
+Move the final five runtime-owned tables into ordered migrations:
+
+- the four source-family evidence, transition, and selection tables in `sourceFamilySelection.ts`
+- `operator_manifest_decision_influences` in `manifestProductIntegration.ts`
+
+Preserve every column, index, uniqueness contract, source-family evidence state, transition history, selection decisions, decision influence lineage, timestamps, and all existing production data. Replace all remaining runtime DDL with integrity probes, remove both files from the runtime-DDL source inventory, and run the repository-wide zero-DDL completion audit. Stage 4 closes only after the authority manifest reports zero runtime DDL sources and all completion gates pass.
 
 Remaining Stage 4 work after this cluster:
 
