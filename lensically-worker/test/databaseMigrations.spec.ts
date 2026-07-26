@@ -10,8 +10,9 @@ const testEnv = env as typeof env & {
     UPGRADE_DB: D1Database;
     IDENTITY_UPGRADE_DB: D1Database;
     MEASUREMENT_UPGRADE_DB: D1Database;
-  GENERATION_UPGRADE_DB: D1Database;
+    GENERATION_UPGRADE_DB: D1Database;
   SOURCE_UPGRADE_DB: D1Database;
+  QUALITY_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -1344,6 +1345,318 @@ describe("canonical database migrations", () => {
       transformation_contract_json: '{"must_preserve_function":["payoff"]}',
       locked_at: "2099-04-01T12:10:00.000Z",
     });
+  });
+
+    it("preserves quality enforcement records across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const gateId = `quality-gate-${suffix}`;
+    const gateKey = `quality_gate_${suffix}`;
+    const gateResultId = `quality-result-${suffix}`;
+    const inventoryId = `quality-inventory-${suffix}`;
+    const requirementId = `quality-requirement-${suffix}`;
+    const requirementStage = `quality-stage-${suffix}`;
+
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_gates (
+        id, brand_key, gate_key, display_name, description, stage_scope,
+        lane_scope, content_type_scope, gate_type, severity, evaluator,
+        active, order_index, applies_when_json, pass_examples_json,
+        fail_examples_json, source_memory_ids_json, created_from
+      ) VALUES (?, 'manifest_mental', ?, 'Migration quality gate',
+        'Preserve quality enforcement', 'draft', 'intuition', 'short_text',
+        'model', 'blocking', 'model', 1, 25, ?, ?, ?, ?, 'migration_test')`,
+    ).bind(
+      gateId,
+      gateKey,
+      '{"requires_source_card":true}',
+      '["preserves source payoff"]',
+      '["invents a new premise"]',
+      '["memory-quality-1"]',
+    ).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_gate_results (
+        id, brand_key, draft_id, source_card_id, gate_id, gate_key,
+        result, blocking, rationale, evaluated_by, evidence_json,
+        repair_guidance
+      ) VALUES (?, 'manifest_mental', 'draft-quality', 'card-quality', ?, ?,
+        'fail', 1, 'Migration rationale', 'model', ?, 'Restore source payoff')`,
+    ).bind(gateResultId, gateId, gateKey, '{"missing":["payoff"]}').run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_content_inventory (
+        id, brand_key, source_type, source_id, text, first_line,
+        opening_phrase, realm_entrance_key, hook_style, lane_key,
+        source_card_id, status, used_at, metadata_json
+      ) VALUES (?, 'manifest_mental', 'scheduled_post', 'scheduled-quality',
+        'Read this when your intuition feels loud.', 'Read this when your intuition feels loud.',
+        'Read this when', 'read_this', 'direct_validation', 'intuition',
+        'card-quality', 'scheduled', '2099-05-01T12:00:00.000Z', ?)`,
+    ).bind(inventoryId, '{"fingerprint":"quality-migration"}').run();
+    await testEnv.DB.prepare(
+      `INSERT INTO operator_workflow_requirements (
+        id, brand_key, stage, required_sections_json, completion_rule,
+        enforcement_type, active, version
+      ) VALUES (?, 'manifest_mental', ?, ?, 'quality_complete', 'block', 1, 3)`,
+    ).bind(requirementId, requirementStage, '["gate_results","content_inventory"]').run();
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const gate = await testEnv.DB.prepare(
+      `SELECT lane_scope, content_type_scope, severity, applies_when_json,
+              pass_examples_json, fail_examples_json, source_memory_ids_json
+       FROM operator_gates WHERE id = ?`,
+    ).bind(gateId).first<Record<string, unknown>>();
+    const result = await testEnv.DB.prepare(
+      `SELECT blocking, evidence_json, repair_guidance
+       FROM operator_gate_results WHERE id = ?`,
+    ).bind(gateResultId).first<Record<string, unknown>>();
+    const inventory = await testEnv.DB.prepare(
+      `SELECT opening_phrase, realm_entrance_key, hook_style, lane_key,
+              source_card_id, metadata_json
+       FROM operator_content_inventory WHERE id = ?`,
+    ).bind(inventoryId).first<Record<string, unknown>>();
+    const requirement = await testEnv.DB.prepare(
+      `SELECT required_sections_json, completion_rule, enforcement_type,
+              active, version
+       FROM operator_workflow_requirements WHERE id = ?`,
+    ).bind(requirementId).first<Record<string, unknown>>();
+
+    expect(gate).toMatchObject({
+      lane_scope: "intuition",
+      content_type_scope: "short_text",
+      severity: "blocking",
+      applies_when_json: '{"requires_source_card":true}',
+      pass_examples_json: '["preserves source payoff"]',
+      fail_examples_json: '["invents a new premise"]',
+      source_memory_ids_json: '["memory-quality-1"]',
+    });
+    expect(result).toMatchObject({
+      blocking: 1,
+      evidence_json: '{"missing":["payoff"]}',
+      repair_guidance: "Restore source payoff",
+    });
+    expect(inventory).toMatchObject({
+      opening_phrase: "Read this when",
+      realm_entrance_key: "read_this",
+      hook_style: "direct_validation",
+      lane_key: "intuition",
+      source_card_id: "card-quality",
+      metadata_json: '{"fingerprint":"quality-migration"}',
+    });
+    expect(requirement).toMatchObject({
+      required_sections_json: '["gate_results","content_inventory"]',
+      completion_rule: "quality_complete",
+      enforcement_type: "block",
+      active: 1,
+      version: 3,
+    });
+  });
+
+  it("adopts the live quality enforcement schema without losing gate, evidence, inventory, or requirement state", async () => {
+    const db = testEnv.QUALITY_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE operator_gates (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT,
+        gate_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        stage_scope TEXT NOT NULL,
+        lane_scope TEXT,
+        content_type_scope TEXT,
+        gate_type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        evaluator TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        order_index INTEGER NOT NULL DEFAULT 100,
+        applies_when_json TEXT,
+        pass_examples_json TEXT,
+        fail_examples_json TEXT,
+        source_memory_ids_json TEXT,
+        created_from TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_gate_results (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        draft_id TEXT,
+        source_card_id TEXT,
+        gate_id TEXT NOT NULL,
+        gate_key TEXT NOT NULL,
+        result TEXT NOT NULL,
+        blocking INTEGER NOT NULL DEFAULT 0,
+        rationale TEXT NOT NULL,
+        evaluated_by TEXT NOT NULL,
+        evidence_json TEXT,
+        repair_guidance TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_content_inventory (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT NOT NULL,
+        source_type TEXT NOT NULL,
+        source_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        first_line TEXT,
+        opening_phrase TEXT,
+        realm_entrance_key TEXT,
+        hook_style TEXT,
+        lane_key TEXT,
+        source_card_id TEXT,
+        status TEXT NOT NULL,
+        used_at TEXT NOT NULL,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE operator_workflow_requirements (
+        id TEXT PRIMARY KEY,
+        brand_key TEXT,
+        stage TEXT NOT NULL,
+        required_sections_json TEXT NOT NULL,
+        completion_rule TEXT NOT NULL,
+        enforcement_type TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+
+    await db.prepare(
+      `INSERT INTO operator_gates (
+        id, brand_key, gate_key, display_name, description, stage_scope,
+        lane_scope, content_type_scope, gate_type, severity, evaluator,
+        active, order_index, applies_when_json, pass_examples_json,
+        fail_examples_json, source_memory_ids_json, created_from
+      ) VALUES (
+        'live-quality-gate', NULL, 'source_fidelity', 'Source Fidelity',
+        'Preserve the source contract', 'draft', NULL, NULL, 'model',
+        'blocking', 'model', 1, 10, '{"source_card_required":true}',
+        '["same payoff"]', '["new premise"]', '["memory-live"]', 'live_seed'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_gate_results (
+        id, brand_key, draft_id, source_card_id, gate_id, gate_key,
+        result, blocking, rationale, evaluated_by, evidence_json,
+        repair_guidance
+      ) VALUES (
+        'live-quality-result', 'manifest_mental', 'live-draft', 'live-card',
+        'live-quality-gate', 'source_fidelity', 'fail', 1,
+        'Live quality failure', 'model', '{"distance":0.9}',
+        'Return to the source structure'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_content_inventory (
+        id, brand_key, source_type, source_id, text, first_line,
+        opening_phrase, realm_entrance_key, hook_style, lane_key,
+        source_card_id, status, used_at, metadata_json
+      ) VALUES (
+        'live-quality-inventory', 'manifest_mental', 'published_post',
+        'live-post', 'Read this when your mind gets loud.',
+        'Read this when your mind gets loud.', 'Read this when', 'read_this',
+        'direct_validation', 'intuition', 'live-card', 'published',
+        '2099-05-02T12:00:00.000Z', '{"fingerprint":"live-quality"}'
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO operator_workflow_requirements (
+        id, brand_key, stage, required_sections_json, completion_rule,
+        enforcement_type, active, version
+      ) VALUES (
+        'live-quality-requirement', NULL, 'draft', '["gate_suite"]',
+        'all_blocking_gates_pass', 'block', 1, 4
+      )`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_quality_upgrade_migrations",
+    );
+
+    const gate = await db.prepare(
+      `SELECT applies_when_json, pass_examples_json, fail_examples_json,
+              source_memory_ids_json, order_index
+       FROM operator_gates WHERE id = 'live-quality-gate'`,
+    ).first<Record<string, unknown>>();
+    const result = await db.prepare(
+      `SELECT blocking, evidence_json, repair_guidance
+       FROM operator_gate_results WHERE id = 'live-quality-result'`,
+    ).first<Record<string, unknown>>();
+    const inventory = await db.prepare(
+      `SELECT opening_phrase, realm_entrance_key, hook_style, lane_key,
+              source_card_id, metadata_json
+       FROM operator_content_inventory WHERE id = 'live-quality-inventory'`,
+    ).first<Record<string, unknown>>();
+    const requirement = await db.prepare(
+      `SELECT required_sections_json, completion_rule, enforcement_type,
+              active, version
+       FROM operator_workflow_requirements
+       WHERE id = 'live-quality-requirement'`,
+    ).first<Record<string, unknown>>();
+
+    expect(gate).toMatchObject({
+      applies_when_json: '{"source_card_required":true}',
+      pass_examples_json: '["same payoff"]',
+      fail_examples_json: '["new premise"]',
+      source_memory_ids_json: '["memory-live"]',
+      order_index: 10,
+    });
+    expect(result).toMatchObject({
+      blocking: 1,
+      evidence_json: '{"distance":0.9}',
+      repair_guidance: "Return to the source structure",
+    });
+    expect(inventory).toMatchObject({
+      opening_phrase: "Read this when",
+      realm_entrance_key: "read_this",
+      hook_style: "direct_validation",
+      lane_key: "intuition",
+      source_card_id: "live-card",
+      metadata_json: '{"fingerprint":"live-quality"}',
+    });
+    expect(requirement).toMatchObject({
+      required_sections_json: '["gate_suite"]',
+      completion_rule: "all_blocking_gates_pass",
+      enforcement_type: "block",
+      active: 1,
+      version: 4,
+    });
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_gates (
+          id, brand_key, gate_key, display_name, description, stage_scope,
+          gate_type, severity, evaluator
+        ) VALUES (
+          'duplicate-quality-gate', NULL, 'source_fidelity', 'Duplicate',
+          'Duplicate global scope', 'draft', 'model', 'blocking', 'model'
+        )`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_workflow_requirements (
+          id, brand_key, stage, required_sections_json, completion_rule,
+          enforcement_type
+        ) VALUES (
+          'duplicate-quality-requirement', NULL, 'draft', '[]',
+          'duplicate', 'block'
+        )`,
+      ).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {

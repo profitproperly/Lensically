@@ -181,8 +181,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     if (!migrationTests.includes("adopts the live generation schema without losing adaptation, gate, or preflight lineage")) {
     errors.push("generation_lineage_upgrade_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live source lineage schema without losing draw, claim, exclusion, or version state")) {
+    if (!migrationTests.includes("adopts the live source lineage schema without losing draw, claim, exclusion, or version state")) {
     errors.push("source_lineage_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves quality enforcement records across migration replay")) {
+    errors.push("quality_enforcement_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live quality enforcement schema without losing gate, evidence, inventory, or requirement state")) {
+    errors.push("quality_enforcement_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
