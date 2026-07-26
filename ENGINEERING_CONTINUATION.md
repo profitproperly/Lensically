@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: ef8a8c9e0f850191250d2d21e9a4197591b75a93
-production_sha: ef8a8c9e0f850191250d2d21e9a4197591b75a93
+repository_base_sha: c5be8c5c249e38ca228cd5a8dd4b092eff892d39
+production_sha: c5be8c5c249e38ca228cd5a8dd4b092eff892d39
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -133,16 +133,36 @@ Completed checkpoint — Stage 4F Threads measurement cache and archive schema e
 - Exact-SHA migration-first release passed in run `30213949029`.
 - Live production independently confirmed exact SHA `ef8a8c9e0f850191250d2d21e9a4197591b75a93`.
 
-Current sub-action — Stage 4G generation lineage schema extraction:
+Completed checkpoint — Stage 4G generation lineage schema extraction:
 
-Characterize and move the next dependency-complete generation lineage cluster into ordered migrations:
+- Added `0005_generation_lineage.sql`.
+- Moved complete migration ownership for:
+  - `gpt_post_strategy_tags`
+  - `gpt_generation_runs`
+  - `gpt_generation_drafts`
+  - `gpt_preflight_snapshots`
+- Replaced all four request-time schema owners and compatibility-column additions with complete `assertDatabaseIntegrity` probes.
+- Preserved scheduled-post strategy metadata, source-card family and version lineage, adaptation plans, prior adaptation context, draft scores and strategies, replacement lineage, gate summaries, showability, scheduling and publication links, preflight sections and manifests, indexes, and update triggers.
+- Added `GENERATION_UPGRADE_DB` to prove the ordered migration ledger adopts the full pre-existing generation schema without losing lineage.
+- Converted the shared reset from dropping generation tables to ordered row cleanup.
+- A test-only nested JSON string caused push validation failures in runs `30214288803` and `30214360703`; the assertion was parameterized to remove the parser hazard.
+- Push validation passed in run `30214412644`.
+- All eight Operator shards passed in run `30214463886`.
+- Exact-SHA migration-first release passed in run `30214502352`.
+- Live production independently confirmed exact SHA `c5be8c5c249e38ca228cd5a8dd4b092eff892d39`.
 
-- `gpt_post_strategy_tags`
-- `gpt_generation_runs`
-- `gpt_generation_drafts`
-- `gpt_preflight_snapshots`
+Current sub-action — Stage 4H source lineage schema extraction:
 
-Preserve scheduled-post strategy metadata, source-card and source-family lineage, immutable adaptation context, draft scores and strategies, gate summaries, showability, replacement lineage, scheduling and publication links, preflight sections and manifests, update triggers, indexes, and all existing production data. Move every compatibility column into explicit migration ownership and reduce runtime preparation functions to bounded integrity checks.
+Characterize and move the next dependency-complete source lineage cluster into ordered migrations:
+
+- `operator_source_selection_batches`
+- `operator_source_selections`
+- `operator_daily_source_claims`
+- `operator_source_exclusions`
+- `operator_source_card_families`
+- `operator_source_cards`
+
+Preserve random-draw batch evidence, production dates and retirement state, immutable source snapshots, selection disposition and workflow sequence, one-source-per-day claims, review-item uniqueness, permanent source exclusions, canonical source-card family identity, source-card version history, current-version uniqueness, transformation contracts, lock and invalidation state, indexes, update triggers, and all existing production data. Move every compatibility column into explicit migration ownership and reduce this part of `ensureOperatorWorkflowTables` to bounded integrity checks.
 
 Remaining Stage 4 work after this cluster:
 
