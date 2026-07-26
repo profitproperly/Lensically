@@ -19290,7 +19290,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "recoverOverdueScheduledPosts",
     title: "Recover or retire scheduled posts while paused",
-    description: "While the universal scheduler is paused, retire up to 25 approved unpublished future or overdue rows through the audited deletion ledger, or move overdue rows to explicit future timestamps. Every retirement requires and preserves the supplied reason. Normal activation remains blocked until no overdue rows remain.",
+        description: "While the universal scheduler is paused, retire up to 25 approved unpublished future or overdue rows through unobserved operational receipts, or move overdue rows to explicit future timestamps. Recovery requires an objective structured reason code and never creates model-learning evidence.";
     inputSchema: {
       type: "object",
       properties: {
@@ -19310,10 +19310,11 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
             additionalProperties: false,
           },
         },
-        reason: { type: "string" },
+                reason_code: { type: "string", enum: SCHEDULED_POST_DELETION_REASON_CODES },
+        reason_detail: { type: "string", description: "Optional factual recovery detail. Do not include taste feedback or performance predictions." },
         owner_response: { type: "string", description: "Exact owner approval from the current conversation for this bounded protected recovery." },
       },
-      required: ["actions", "reason"],
+      required: ["actions", "reason_code"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -24608,8 +24609,10 @@ async function handleOperatorMcpAdminTool(
         return { ok: true, scheduler: result };
   }
 
-    if (toolName === "recoverOverdueScheduledPosts") {
-    const reason = normalizeOperatorText(args.reason, 500);
+        if (toolName === "recoverOverdueScheduledPosts") {
+    const reasonCode = normalizeScheduledPostDeletionReasonCode(args.reason_code);
+    const reasonDetail = normalizeOperatorText(args.reason_detail, 500, true);
+    const reason = reasonCode ? buildScheduledPostDeletionReason(reasonCode, reasonDetail) : null;
     const actions = Array.isArray(args.actions)
       ? args.actions.map((entry) => {
           const action = entry && typeof entry === "object" && !Array.isArray(entry) ? entry as Record<string, unknown> : {};
@@ -24620,8 +24623,8 @@ async function handleOperatorMcpAdminTool(
           } satisfies ScheduledPostRecoveryAction;
         })
       : [];
-    if (!reason || !actions.length) {
-      return { ok: false, error: "recovery_actions_and_reason_required" };
+        if (!reasonCode || !reason || !actions.length) {
+      return { ok: false, error: "recovery_actions_and_reason_code_required", allowed_reason_codes: SCHEDULED_POST_DELETION_REASON_CODES };
     }
     if (actions.length > 25 || actions.some((action) => !Number.isInteger(action.scheduled_post_id) || action.scheduled_post_id <= 0 || !["retire", "reschedule"].includes(action.action))) {
       return { ok: false, error: "valid_recovery_actions_1_to_25_required" };
@@ -24658,8 +24661,9 @@ async function handleOperatorMcpAdminTool(
           WORKSPACE_APP_USER_ID,
           actions.map((action) => action.scheduled_post_id),
           {
-            expectedThreadsUserId: brand.profile.threads_user_id,
-            reason,
+                        expectedThreadsUserId: brand.profile.threads_user_id,
+            reasonCode,
+            reasonDetail,
             deletedBy: "model",
             deletionSource: "mcp",
             parentOperationId: normalizeOperatorText(args.operation_id, 180, true),
