@@ -244,6 +244,22 @@ tests = replaceExact(
 );
 tests = replaceExact(
   tests,
+  `    expect(response.status).toBe(400);
+  }, 30000);
+
+  it("blocks drafts that copy forbidden source surfaces", async () => {`,
+  `    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: "human_guidance_tool_retired",
+    });
+  }, 30000);
+
+  it("blocks drafts that copy forbidden source surfaces", async () => {`,
+  "update retired mark-draft-shown boundary",
+);
+tests = replaceExact(
+  tests,
   `      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {`,
   `      it.skip("retired: qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {`,
   "retire random draw regression",
