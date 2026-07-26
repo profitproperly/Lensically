@@ -640,35 +640,21 @@ async function resetTables(): Promise<void> {
 
     "operator_context_admissions",
     "operator_workflow_sessions",
-        "gpt_generation_drafts",
+                "gpt_generation_drafts",
     "gpt_generation_runs",
     "gpt_post_strategy_tags",
-        "scheduled_posts",
-    "users",
     "threads_posts_archive",
     ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
-  }
+    }
+  await env.DB.prepare("DELETE FROM scheduled_post_deletions").run();
+  await env.DB.prepare("DELETE FROM threads_publish_idempotency").run();
+  await env.DB.prepare("DELETE FROM batch_schedule_presets").run();
+  await env.DB.prepare("DELETE FROM scheduled_posts").run();
+  await env.DB.prepare("DELETE FROM users").run();
   await env.DB.prepare("DELETE FROM external_patterns").run();
   await env.DB.prepare("DELETE FROM gpt_strategy_memory").run();
   await env.DB.prepare("DELETE FROM threads_follower_snapshots").run();
-  await env.DB.prepare(
-    `CREATE TABLE users (
-      id TEXT PRIMARY KEY,
-      email TEXT,
-      password_hash TEXT,
-      email_verified INTEGER NOT NULL DEFAULT 1,
-      threads_user_id TEXT,
-      threads_username TEXT,
-      access_token TEXT,
-      token_expires_at INTEGER,
-      is_admin INTEGER NOT NULL DEFAULT 0,
-      connection_active INTEGER NOT NULL DEFAULT 1,
-      timezone TEXT,
-      clock_format TEXT,
-      created_at INTEGER NOT NULL DEFAULT 0
-    )`,
-  ).run();
   await env.DB.prepare(
     `INSERT INTO users (
       id, email, password_hash, email_verified, threads_user_id, threads_username,
