@@ -3594,6 +3594,72 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves Manifest Intelligence Engine semantic, maturity, learning, portfolio, transition, and experiment state across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const probes = await seedManifestIntelligenceEngineFixture(testEnv.DB, suffix);
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhere(
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+  });
+
+  it("adopts the exact live Manifest Intelligence Engine schema without losing semantic, maturity, learning, portfolio, transition, or experiment state", async () => {
+    const db = testEnv.MANIFEST_ENGINE_UPGRADE_DB;
+    await materializeMigrationWithoutLedger(db, "0015_manifest_intelligence_engine.sql");
+    const suffix = crypto.randomUUID();
+    const probes = await seedManifestIntelligenceEngineFixture(db, suffix);
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_manifest_engine_upgrade_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhereIn(
+        db,
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_semantic_signatures (
+          id, brand_key, content_type, content_id, text_hash, signature_version,
+          signature_json
+        ) VALUES ('duplicate-signature', ?, 'published', ?, 'duplicate-hash',
+          'signature-v1', '{}')`,
+      ).bind(`brand-${suffix}`, `content-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_learning_observations (
+          id, brand_key, level, feature_key, checkpoint_hours, sample_size,
+          supporting_count, contradicting_count, median_overall, effect_size,
+          confidence_score, confidence_label, state, evidence_json, learning_version
+        ) VALUES ('duplicate-learning', ?, 'family', ?, 24, 1, 1, 0, 1, 1,
+          0.5, 'emerging', 'active', '{}', 'learning-v1')`,
+      ).bind(`brand-${suffix}`, `feature-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_experiment_assignments (
+          id, experiment_id, brand_key, scheduled_post_id
+        ) VALUES ('duplicate-assignment', ?, ?, 900000)`,
+      ).bind(`experiment-${suffix}`, `brand-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;
