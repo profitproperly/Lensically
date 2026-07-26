@@ -600,6 +600,7 @@ const testInsertion = `
 
   it("prepares active operator state without recreating guided workflow tables", async () => {
     (env as unknown as { LENSICALLY_GPT_API_KEY: string }).LENSICALLY_GPT_API_KEY = "test-gpt-key";
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT, email_verified INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, timezone TEXT, clock_format TEXT)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS operator_system_retirements (retirement_key TEXT PRIMARY KEY, completed_at TEXT)").run();
     await env.DB.prepare("DELETE FROM operator_system_retirements WHERE retirement_key = 'human-free-retirement-v2'").run();
     for (const table of [
