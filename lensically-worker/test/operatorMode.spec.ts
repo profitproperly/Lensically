@@ -7292,7 +7292,93 @@ describe("operator mode MCP endpoint", () => {
     expect(publishedRetry.structuredContent.error).toBe("scheduled_post_already_published");
   }, 40000);
 
-      it("requires and preserves scheduled-post deletion reasons without writing strategy memory", async () => {
+        it("requires and preserves scheduled-post deletion reasons without writing strategy memory", async () => {
+    await operatorTool("list_accounts");
+    await ensureMcpAccountOpen(BRAND_KEY);
+    const inserted = await env.DB.prepare(
+      `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
+       VALUES ('workspace-owner', 'vectrix', 'Deletion reason-code fixture', 'approved', '2099-01-03T14:00:00.000Z')`,
+    ).run();
+    const scheduledPostId = Number(inserted.meta?.last_row_id ?? 0);
+
+    const missingReason = await mcpToolRaw<{ error?: string; allowed_reason_codes?: string[] }>("delete_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduledPostId,
+      proceed_confirmed: true,
+    });
+    expect(missingReason.isError).toBe(true);
+    expect(missingReason.structuredContent).toMatchObject({
+      error: "scheduled_post_deletion_reason_code_required",
+      allowed_reason_codes: expect.arrayContaining(["technical_corruption", "exact_duplicate"]),
+    });
+
+    const memoryBefore = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
+    ).first<{ total: number | string }>();
+    const deleted = await mcpTool<{
+      success: boolean;
+      deleted: boolean;
+      deletion: {
+        scheduled_post_id: number;
+        reason_code: string;
+        reason: string;
+        learning_effect: string;
+        deleted_by: string;
+        deletion_source: string;
+      };
+      strategy_memory_written: boolean;
+    }>("delete_scheduled_post", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: scheduledPostId,
+      reason_code: "technical_corruption",
+      reason_detail: "Malformed payload fixture.",
+      operation_id: "delete-reason-code-fixture",
+      proceed_confirmed: true,
+    });
+    expect(deleted).toMatchObject({
+      success: true,
+      deleted: true,
+      deletion: {
+        scheduled_post_id: scheduledPostId,
+        reason_code: "technical_corruption",
+        reason: "Malformed payload fixture.",
+        learning_effect: "unobserved",
+        deleted_by: "model",
+        deletion_source: "mcp",
+      },
+      strategy_memory_written: false,
+    });
+
+    const scheduledRow = await env.DB.prepare(
+      `SELECT id FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    ).bind(scheduledPostId).first<{ id: number }>();
+    const deletionRow = await env.DB.prepare(
+      `SELECT scheduled_post_id, reason_code, reason, deleted_by, deletion_source
+       FROM scheduled_post_deletions WHERE scheduled_post_id = ? LIMIT 1`,
+    ).bind(scheduledPostId).first<Record<string, unknown>>();
+    const memoryAfter = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM gpt_strategy_memory WHERE account_id = 'vectrix'`,
+    ).first<{ total: number | string }>();
+    expect(scheduledRow).toBeNull();
+    expect(deletionRow).toMatchObject({
+      scheduled_post_id: scheduledPostId,
+      reason_code: "technical_corruption",
+      reason: "Malformed payload fixture.",
+      deleted_by: "model",
+      deletion_source: "mcp",
+    });
+    expect(Number(memoryAfter?.total ?? 0)).toBe(Number(memoryBefore?.total ?? 0));
+
+    const listed = await mcpTool<{ deletion_history_exposed_to_model: boolean; deleted_items?: unknown[] }>("list_scheduled_posts", {
+      brand_key: BRAND_KEY,
+      date: "2099-01-03",
+      timezone: "America/New_York",
+    });
+    expect(listed.deletion_history_exposed_to_model).toBe(false);
+    expect(listed.deleted_items).toBeUndefined();
+  }, 30000);
+
+  it.skip("retired: free-text bulk scheduled-post deletion and recovery history", async () => {
     await operatorTool("list_accounts");
     await ensureMcpAccountOpen(BRAND_KEY);
     const inserted = await env.DB.prepare(
