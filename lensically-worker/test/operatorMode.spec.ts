@@ -1472,18 +1472,14 @@ describe("operator mode backend spine", () => {
       `SELECT updated_at, source_fingerprint FROM operator_manifest_benchmark_snapshots
        WHERE brand_key = 'manifest_mental' ORDER BY datetime(updated_at) DESC LIMIT 1`,
     ).first<{ updated_at: string; source_fingerprint: string }>();
-    const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
+        const productResponse = await fetchFromWorker("/api/threads/intelligence-dashboard?threads_user_id=35758578720393972&limit=10");
     const productBody = await productResponse.text();
-    expect(productResponse.status, productBody).toBe(200);
-    expect(productResponse.headers.get("Cache-Control")).toBe("no-store");
+    expect(productResponse.status, productBody).toBe(410);
     const productPayload = JSON.parse(productBody) as Record<string, unknown>;
-        expect(productPayload).toMatchObject({
-      version: "manifest-intelligence-dashboard-v1",
-      product_proof: {
-        dashboard_complete: true,
-        scheduled_task_contract_available: true,
-        automatic_operator_decision_change_proven: true,
-      },
+    expect(productPayload).toMatchObject({
+      success: false,
+      error: "intelligence_dashboard_retired",
+      intelligence_backend_active: true,
     });
     const measurementAfterDashboardRead = await env.DB.prepare(
       `SELECT updated_at, source_fingerprint FROM operator_manifest_benchmark_snapshots
