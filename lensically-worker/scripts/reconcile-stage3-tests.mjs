@@ -7,9 +7,16 @@ const testPath = resolve(root, "test/operatorMode.spec.ts");
 let source = await readFile(indexPath, "utf8");
 let tests = await readFile(testPath, "utf8");
 const diagnosticNeedle = 'if (toolName === "recover_published_post_lineage")';
+const diagnosticEndNeedle = 'if (toolName === "prepare_manifest_source_card_backfill")';
 const diagnosticIndex = source.indexOf(diagnosticNeedle);
-if (diagnosticIndex < 0) throw new Error("lineage recovery handler not found");
-process.stdout.write(`${source.slice(diagnosticIndex, diagnosticIndex + 12000)}\n`);
+const diagnosticEnd = source.indexOf(diagnosticEndNeedle, diagnosticIndex + diagnosticNeedle.length);
+if (diagnosticIndex < 0 || diagnosticEnd < 0) throw new Error("lineage recovery handler not found");
+const diagnosticSegment = source.slice(diagnosticIndex, diagnosticEnd);
+let diagnosticCursor = 0;
+while ((diagnosticCursor = diagnosticSegment.indexOf("operator_workflow_sessions", diagnosticCursor)) >= 0) {
+  process.stdout.write(`${diagnosticSegment.slice(Math.max(0, diagnosticCursor - 2200), Math.min(diagnosticSegment.length, diagnosticCursor + 3200))}\n---WORKFLOW-SESSION-REFERENCE---\n`);
+  diagnosticCursor += "operator_workflow_sessions".length;
+}
 throw new Error("stage3_lineage_handler_context_captured");
 const changes = [];
 
