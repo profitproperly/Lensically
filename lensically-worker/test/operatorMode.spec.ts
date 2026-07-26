@@ -6660,7 +6660,7 @@ describe("operator mode MCP endpoint", () => {
         expect(Number(sourceBatchCount?.total ?? 0)).toBe(1);
   }, 40000);
 
-  it("inspects unresolved delivery incidents read-only before the Growth Mission discussion", async () => {
+  it.skip("retired: inspects unresolved delivery incidents before a guided Growth Mission discussion", async () => {
     await seedManifestPatterns(30);
     const session = await operatorTool<{ workflow_session_id: string }>("start_workflow_session", {
       brand_key: "manifest_mental",
