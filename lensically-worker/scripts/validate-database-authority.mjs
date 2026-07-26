@@ -193,8 +193,14 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("preserves operator continuity and autonomy records across migration replay")) {
     errors.push("operator_continuity_replay_regression_missing");
   }
-  if (!migrationTests.includes("adopts the live operator continuity schema without losing session, receipt, mission, revision, or autonomy state")) {
+    if (!migrationTests.includes("adopts the live operator continuity schema without losing session, receipt, mission, revision, or autonomy state")) {
     errors.push("operator_continuity_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("preserves autonomous cycle and protected decision records across migration replay")) {
+    errors.push("autonomous_cycle_decision_replay_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the live autonomous cycle and protected decision schema without losing lineage or budgets")) {
+    errors.push("autonomous_cycle_decision_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");

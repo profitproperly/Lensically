@@ -14,6 +14,7 @@ const source = read("src/index.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
 const operatorContinuityMigration = read("database/migrations/0008_operator_continuity_and_autonomy.sql");
+const cycleDecisionMigration = read("database/migrations/0009_autonomous_cycles_and_decisions.sql");
 const router = read("src/mandatoryExecutionMap.ts");
 const clientSafety = read("src/systemDirectory/clientSafeRequests.ts");
 const systemDirectorySource = read("src/systemDirectory/index.ts");
@@ -372,7 +373,14 @@ const manifestAutonomousGrowthChecks = [
     && operatorContinuityMigration.includes("CREATE TABLE IF NOT EXISTS operator_growth_mission_revisions")
     && source.includes('table: "operator_growth_missions"')
     && source.includes('table: "operator_growth_mission_revisions"')],
-  ["autonomous_cycle_tables", source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles") && source.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items")],
+    ["autonomous_cycle_tables", cycleDecisionMigration.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_growth_cycles")
+    && cycleDecisionMigration.includes("CREATE TABLE IF NOT EXISTS operator_autonomous_lineup_items")
+    && source.includes('table: "operator_autonomous_growth_cycles"')
+    && source.includes('table: "operator_autonomous_lineup_items"')],
+  ["protected_decision_tables", cycleDecisionMigration.includes("CREATE TABLE IF NOT EXISTS operator_decision_proposals")
+    && cycleDecisionMigration.includes("CREATE TABLE IF NOT EXISTS operator_decision_execution_events")
+    && source.includes('table: "operator_decision_proposals"')
+    && source.includes('table: "operator_decision_execution_events"')],
   ["prepare_tool", source.includes('name: "prepare_manifest_autonomous_cycle"')],
   ["analysis_page_tool", source.includes('name: "get_manifest_cycle_analysis_page"')],
   ["cycle_strategy_tool", source.includes('name: "commit_manifest_cycle_strategy"')],
