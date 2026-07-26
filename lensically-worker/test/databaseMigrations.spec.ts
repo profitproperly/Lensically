@@ -15,7 +15,8 @@ const testEnv = env as typeof env & {
   QUALITY_UPGRADE_DB: D1Database;
     CONTINUITY_UPGRADE_DB: D1Database;
     CYCLE_DECISION_UPGRADE_DB: D1Database;
-  ASSURANCE_UPGRADE_DB: D1Database;
+    ASSURANCE_UPGRADE_DB: D1Database;
+  WORK_STATE_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -196,10 +197,29 @@ const requiredColumns: Record<string, string[]> = {
   operator_hardening_incident_events: [
     "id", "incident_id", "from_state", "to_state", "evidence_json", "created_at",
   ],
-  operator_operational_observations: [
+    operator_operational_observations: [
     "id", "operation_id", "incident_id", "profile_id", "capability", "outcome",
     "duration_ms", "call_count", "external_requests", "repeated_fingerprint_count",
     "progress_checkpoint", "metadata_json", "created_at",
+  ],
+  operator_work_state: [
+    "id", "contract_version", "policy_version", "role", "active_outcome_key",
+    "active_outcome_title", "active_scope_json", "status", "scope_frozen",
+    "active_interrupt_key", "next_action", "completion_evidence_json", "created_at",
+    "updated_at",
+  ],
+  operator_work_ledger: [
+    "id", "work_key", "title", "summary", "priority", "status", "intake_decision",
+    "intake_reason", "required_for_active_outcome", "dependencies_json",
+    "completion_condition", "execution_order", "evidence_json", "merged_into_work_key",
+    "created_at", "updated_at", "completed_at",
+  ],
+  operator_repo_write_sessions: [
+    "id", "path", "mode", "message", "summary", "content", "status",
+    "created_at", "updated_at",
+  ],
+  operator_system_retirements: [
+    "retirement_key", "completed_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -323,8 +343,9 @@ const expectedObjects = [
   "idx_operator_hardening_open_signature",
   "idx_operator_hardening_state_severity",
   "idx_operator_hardening_events_incident",
-  "idx_operator_observations_capability_created",
+    "idx_operator_observations_capability_created",
   "trg_operator_hardening_touch_updated_at",
+  "idx_operator_work_ledger_status_order",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",

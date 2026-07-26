@@ -604,8 +604,7 @@ async function resetTables(): Promise<void> {
     for (const table of [
         "operator_mcp_admin_errors",
     "operator_mcp_deployments",
-    "operator_mcp_backlog_items",
-        "operator_repo_write_sessions",
+        "operator_mcp_backlog_items",
                 "operator_execution_events",
     "operator_execution_map_promotions",
     "operator_execution_map_attempts",
@@ -624,7 +623,10 @@ async function resetTables(): Promise<void> {
     ]) {
         await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
-    await env.DB.prepare("DELETE FROM operator_operational_observations").run();
+      await env.DB.prepare("DELETE FROM operator_repo_write_sessions").run();
+  await env.DB.prepare("DELETE FROM operator_work_ledger").run();
+  await env.DB.prepare("DELETE FROM operator_work_state").run();
+  await env.DB.prepare("DELETE FROM operator_operational_observations").run();
   await env.DB.prepare("DELETE FROM operator_hardening_incident_events").run();
   await env.DB.prepare("DELETE FROM operator_hardening_incidents").run();
   await env.DB.prepare("DELETE FROM operator_engineering_audit").run();
