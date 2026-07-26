@@ -17,7 +17,8 @@ const testEnv = env as typeof env & {
     CYCLE_DECISION_UPGRADE_DB: D1Database;
     ASSURANCE_UPGRADE_DB: D1Database;
     WORK_STATE_UPGRADE_DB: D1Database;
-  EXECUTION_CONTROL_UPGRADE_DB: D1Database;
+    EXECUTION_CONTROL_UPGRADE_DB: D1Database;
+  PERFORMANCE_FOCUS_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -232,10 +233,48 @@ const requiredColumns: Record<string, string[]> = {
     "allowed_argument_keys_json", "reason", "verification_summary", "source_memory_id",
     "priority", "active", "expires_at", "created_at", "updated_at",
   ],
-  operator_execution_events: [
+    operator_execution_events: [
     "id", "brand_key", "workflow_session_id", "tool_name", "operation_class",
     "execution_plane", "policy_version", "decision", "known_failure_prevented",
     "evidence_json", "created_at",
+  ],
+  operator_post_fingerprints: [
+    "id", "brand_key", "published_post_id", "scheduled_post_id", "draft_id",
+    "source_card_id", "source_selection_id", "text_hash", "fingerprint_version",
+    "fingerprint_json", "created_at", "updated_at",
+  ],
+  operator_post_performance_scores: [
+    "id", "brand_key", "published_post_id", "checkpoint_hours", "snapshot_id",
+    "captured_at", "post_age_hours", "metrics_json", "rates_json", "velocity_json",
+    "scores_json", "distribution_state", "valid_for_learning", "evaluator_version",
+    "created_at", "updated_at",
+  ],
+  operator_performance_evidence: [
+    "id", "brand_key", "checkpoint_hours", "dimension", "feature_key", "sample_size",
+    "cohort_size", "medians_json", "effect_json", "confidence_score",
+    "confidence_label", "direction", "status", "evaluator_version", "created_at",
+    "updated_at",
+  ],
+  operator_performance_hypotheses: [
+    "id", "brand_key", "checkpoint_hours", "dimension", "feature_key",
+    "hypothesis_text", "direction", "sample_size", "confidence_score",
+    "confidence_label", "evidence_json", "status", "evaluator_version", "created_at",
+    "updated_at",
+  ],
+  operator_generation_learning_briefs: [
+    "id", "brand_key", "checkpoint_hours", "sample_size", "brief_json", "active",
+    "evaluator_version", "generated_at", "created_at",
+  ],
+  operator_content_focus_reviews: [
+    "id", "brand_key", "cadence", "period_key", "anchor_date", "windows_json",
+    "decisions_json", "allocation_json", "generated_at", "evaluator_version",
+    "created_at", "updated_at",
+  ],
+  operator_content_focus_family_states: [
+    "id", "brand_key", "source_card_family_id", "source_identity_key", "status",
+    "recommended_status", "confidence_score", "confidence_label", "allocation_weight",
+    "decision_reason", "reuse_directives_json", "stop_directives_json",
+    "horizon_evidence_json", "manual_lock", "last_review_id", "created_at", "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -363,7 +402,14 @@ const expectedObjects = [
   "trg_operator_hardening_touch_updated_at",
     "idx_operator_work_ledger_status_order",
   "idx_operator_pre_call_routes_lookup",
-  "idx_operator_execution_events_recent",
+    "idx_operator_execution_events_recent",
+  "idx_operator_post_fingerprints_brand_updated",
+  "idx_operator_post_performance_scores_cohort",
+  "idx_operator_performance_evidence_lookup",
+  "idx_operator_performance_hypotheses_lookup",
+  "idx_operator_generation_learning_briefs_active",
+  "idx_operator_content_focus_reviews_latest",
+  "idx_operator_content_focus_family_selection",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
