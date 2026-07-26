@@ -25173,7 +25173,7 @@ async function handleOperatorMcpEngineeringTool(
     if (!validIdentifier.test(tableName) || columnNames.some((name) => !validIdentifier.test(name))) {
       return { ok: false, error: "invalid_schema_identifier" };
     }
-    const quoteIdentifier = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const quoteIdentifier = (value: string) => `[${value}]`;
     let tableExists = true;
     try {
       await env.DB.prepare(`SELECT 1 FROM ${quoteIdentifier(tableName)} LIMIT 0`).all();
