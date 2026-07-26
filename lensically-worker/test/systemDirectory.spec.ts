@@ -565,6 +565,21 @@ describe("System Directory foundation", () => {
     }));
   });
 
+    it("routes fresh-chat engineering continuation directly to the canonical handoff", () => {
+    expect(resolveLensicallySystemDirectory("Continue the Worker monolith refactor from the durable continuation file.")).toMatchObject({
+      entry_id: "engineering.continuation",
+      route_intent: "get engineering continuation",
+    });
+    expect(LENSICALLY_CAPABILITY_LIFECYCLE.declarations).toContainEqual(expect.objectContaining({
+      capability_id: "engineering.read_continuation",
+      directory_entry_id: "engineering.continuation",
+      canonical_handler: "getEngineeringContinuation",
+      implementation_mode: "new_handler",
+      release_scope: "operator-engineering",
+      compatibility_bridge: false,
+    }));
+  });
+
   it("routes missing capability requests to the autonomous capability lifecycle", () => {
     expect(resolveLensicallySystemDirectory("Create and register a missing capability.")).toMatchObject({
       entry_id: "engineering.capability_lifecycle",

@@ -3676,10 +3676,11 @@ describe("operator mode MCP endpoint", () => {
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
         const listed = await mcpRequest<{ tools: Array<{ name: string; description?: string; inputSchema?: { additionalProperties?: boolean; properties?: Record<string, unknown> } }> }>("tools/list");
-    const names = listed.tools.map((tool) => tool.name);
+        const names = listed.tools.map((tool) => tool.name);
     expect(new Set(names).size).toBe(names.length);
         expect(names).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
+      "getEngineeringContinuation",
       "selectOperatorKey",
       "confirmOperatorProceed",
       "getGrowthMission",
@@ -3717,7 +3718,10 @@ describe("operator mode MCP endpoint", () => {
       "listOpsMemory",
     ]));
     expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
-    expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
+        expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
+    const engineeringContinuationTool = listed.tools.find((tool) => tool.name === "getEngineeringContinuation");
+    expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
+    expect(engineeringContinuationTool?.inputSchema?.properties).toEqual({});
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
     const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
     expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");
@@ -4947,8 +4951,9 @@ describe("operator mode MCP endpoint", () => {
     expect(deployPagesProjectTool.tool?.inputSchema?.properties?.directory?.default).toBe("site");
     expect(deployPagesProjectTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(80);
 
-        expect(toolNames).toEqual(expect.arrayContaining([
+                expect(toolNames).toEqual(expect.arrayContaining([
       "getOperatorStartupContext",
+      "getEngineeringContinuation",
       "engineeringPrecheck",
       "getEngineeringAccessState",
       "listRepoFiles",
@@ -5016,8 +5021,9 @@ describe("operator mode MCP endpoint", () => {
       "listImplementationBacklogItems",
             "markImplementationBacklogItemResolved",
     ]));
-        for (const name of [
+                for (const name of [
       "getOperatorStartupContext",
+      "getEngineeringContinuation",
       "engineeringPrecheck",
       "getEngineeringAccessState",
       "listRepoFiles",
