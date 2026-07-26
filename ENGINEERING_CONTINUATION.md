@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 2b715f0fd1bff79fce740ead511070a61bc1b445
-production_sha: 2b715f0fd1bff79fce740ead511070a61bc1b445
+repository_base_sha: 8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad
+production_sha: 8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -263,17 +263,36 @@ Completed checkpoint — Stage 4M durable work state, repo-write sessions, and s
 - Exact-SHA migration-first release passed in run `30218171275`.
 - Live production independently confirmed exact SHA `2b715f0fd1bff79fce740ead511070a61bc1b445`.
 
-Current sub-action — Stage 4N execution routing, checkpoints, and events extraction:
+Completed checkpoint — Stage 4N execution routing, checkpoints, and events extraction:
 
-Move the remaining execution-control schema into ordered migrations:
+- Added `0012_execution_routing_checkpoints_and_events.sql`.
+- Moved complete migration ownership for:
+  - `operator_manifest_prepare_checkpoints`
+  - `operator_pre_call_routes`
+  - `operator_execution_events`
+- Replaced all three runtime schema owners and indexes with complete `assertDatabaseIntegrity` probes.
+- Removed pre-call route and execution-event catch-and-create fallback paths so missing schema fails closed instead of mutating request-time database state.
+- Preserved checkpoint phases and state, operation uniqueness, persistent route matching and argument patches, deterministic lookup priority, execution policy and evidence, recent-event lookup indexes, and all existing data.
+- Added `EXECUTION_CONTROL_UPGRADE_DB` to prove replay preservation and live-schema adoption with checkpoint and route uniqueness intact.
+- Converted shared tests from dropping execution events to ordered row cleanup and added cleanup for routes and checkpoints.
+- Push validation passed in run `30218567893`.
+- All eight Operator shards passed in run `30218632326`.
+- Exact-SHA migration-first release passed in run `30218664436`.
+- Live production independently confirmed exact SHA `8d0f7c9dfa3cb6b5135b8a653944e5389b7de3ad`.
 
-- `operator_manifest_prepare_checkpoints`
-- `operator_pre_call_routes`
-- `operator_execution_events`
+Current sub-action — Stage 4O performance learning and content-focus extraction:
 
-Preserve prepare-operation checkpoints and phases, operation and slot identity, route fingerprints and deterministic tool selection, execution status and result evidence, idempotency and lookup indexes, timestamps, and all existing production data. Replace runtime DDL with integrity checks while preserving checkpoint, routing, and execution-event writes as application behavior.
+Move the final runtime-owned schema cluster into ordered migrations:
 
-After Stage 4N, only Stage 4O's seven performance-learning and content-focus tables remain before the Stage 4 completion audit.
+- `operator_post_fingerprints`
+- `operator_post_performance_scores`
+- `operator_performance_evidence`
+- `operator_performance_hypotheses`
+- `operator_generation_learning_briefs`
+- `operator_content_focus_reviews`
+- `operator_content_focus_family_states`
+
+Preserve post and source fingerprints, performance checkpoint scores, evidence provenance, hypothesis confidence and lifecycle, generation learning briefs, content-focus review windows, family-level focus states, indexes, timestamps, uniqueness contracts, and all existing production data. Replace every remaining runtime DDL statement with integrity probes, then run the Stage 4 completion audit proving zero runtime schema mutation remains.
 
 Remaining Stage 4 work after this cluster:
 
