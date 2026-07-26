@@ -61,7 +61,7 @@ jobs:
             lensically-worker/package-lock.json
             lensically-web/package-lock.json
 
-            - name: Restore worker dependencies
+      - name: Restore worker dependencies
         id: push_worker_cache
         uses: actions/cache@v4
         with:
