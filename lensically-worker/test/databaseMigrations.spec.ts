@@ -81,7 +81,7 @@ const requiredColumns: Record<string, string[]> = {
     "threads_post_id", "canonical_source_url", "current_source_card_id", "status",
     "created_at", "updated_at",
   ],
-  operator_source_cards: [
+    operator_source_cards: [
     "id", "brand_key", "workflow_session_id", "sequence_label", "lane_key",
     "title", "status", "primary_source_json", "secondary_sources_json",
     "anti_sources_json", "metrics_snapshot_json", "source_mechanism",
@@ -92,6 +92,27 @@ const requiredColumns: Record<string, string[]> = {
     "is_current", "supersedes_source_card_id", "version_reason",
     "transformation_contract_json", "locked_at", "invalidated_at",
     "invalidation_reason", "created_at", "updated_at",
+  ],
+  operator_gates: [
+    "id", "brand_key", "gate_key", "display_name", "description", "stage_scope",
+    "lane_scope", "content_type_scope", "gate_type", "severity", "evaluator",
+    "active", "order_index", "applies_when_json", "pass_examples_json",
+    "fail_examples_json", "source_memory_ids_json", "created_from", "created_at",
+    "updated_at",
+  ],
+  operator_gate_results: [
+    "id", "brand_key", "draft_id", "source_card_id", "gate_id", "gate_key",
+    "result", "blocking", "rationale", "evaluated_by", "evidence_json",
+    "repair_guidance", "created_at",
+  ],
+  operator_content_inventory: [
+    "id", "brand_key", "source_type", "source_id", "text", "first_line",
+    "opening_phrase", "realm_entrance_key", "hook_style", "lane_key",
+    "source_card_id", "status", "used_at", "metadata_json", "created_at",
+  ],
+  operator_workflow_requirements: [
+    "id", "brand_key", "stage", "required_sections_json", "completion_rule",
+    "enforcement_type", "active", "version", "created_at", "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -192,7 +213,12 @@ const expectedObjects = [
   "idx_operator_source_cards_brand_status",
   "idx_operator_source_cards_family_version",
   "idx_operator_source_cards_family_current",
-  "trg_operator_source_cards_touch_updated_at",
+    "trg_operator_source_cards_touch_updated_at",
+  "idx_operator_gates_scope_unique",
+  "idx_operator_gates_lookup",
+  "idx_operator_gate_results_draft",
+  "idx_operator_content_inventory_brand_used",
+  "idx_operator_workflow_requirements_scope",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
