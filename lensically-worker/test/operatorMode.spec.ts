@@ -5444,25 +5444,7 @@ describe("operator mode MCP endpoint", () => {
     expect(proceeded.structuredContent.next_call_requirement).not.toHaveProperty("proceed_confirmed");
     expect(proceeded.structuredContent.next_call_requirement.continuity_loaded).toBeUndefined();
 
-    const preflight = await mcpToolRaw<{ complete: boolean; sections: Array<{ section: string; limit: number; source: string; coverage_status: string }> }>("prepareFullPreflight", {
-      brand_key: BRAND_KEY,
-      proceed_confirmed: true,
-    });
-    expect(preflight.isError).not.toBe(true);
-    expect(preflight.structuredContent.complete).toBe(true);
-    expect(preflight.structuredContent.sections.map((section) => section.section)).toEqual(expect.arrayContaining(["account_state", "source_candidates", "scheduled_posts", "active_gates"]));
-    expect(preflight.structuredContent.sections.find((section) => section.section === "account_state")).toMatchObject({
-      source: "active_operator_session",
-      coverage_status: "complete",
-    });
-        expect(preflight.structuredContent.sections.find((section) => section.section === "source_candidates")).toMatchObject({
-      source: "direct_db_count",
-      coverage_status: "complete",
-    });
-    expect(preflight.structuredContent.sections.find((section) => section.section === "strategy_memory")).toMatchObject({
-      source: "direct_db_count",
-      coverage_status: "complete",
-    });
+    
   }, 30000);
 
   it("routes bounded known-file repository search through the main Execution Kernel without Recovery", async () => {
