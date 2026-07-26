@@ -15,6 +15,8 @@ const operatorMcpProtocol = read("src/operatorMcpProtocol.ts");
 const operatorMcpProtocolTests = read("test/operatorMcpProtocol.spec.ts");
 const operatorMcpToolDefinitions = read("src/operatorMcpToolDefinitions.ts");
 const operatorMcpToolDefinitionTests = read("test/operatorMcpToolDefinitions.spec.ts");
+const operatorMcpToolDirectory = read("src/operatorMcpToolDirectory.ts");
+const operatorMcpToolDirectoryTests = read("test/operatorMcpToolDirectory.spec.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
@@ -58,6 +60,9 @@ if (!workflow.includes("test/operatorMcpProtocol.spec.ts")) {
 }
 if (!workflow.includes("test/operatorMcpToolDefinitions.spec.ts")) {
   errors.push("operator_mcp_tool_definition_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorMcpToolDirectory.spec.ts")) {
+  errors.push("operator_mcp_tool_directory_workflow_gate_missing");
 }
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
@@ -116,6 +121,25 @@ if (!operatorMcpToolDefinitions.includes("buildOperatorMcpToolDefinitions")
 if (!operatorMcpToolDefinitionTests.includes("builds account-scoped wrappers without brand_key")
     || !operatorMcpToolDefinitionTests.includes("builds three scoped account wrappers and preserves priority order")) {
   lifecycleErrors.push("operator_mcp_tool_definition_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpToolDirectory"')) {
+  lifecycleErrors.push("operator_mcp_tool_directory_import_missing");
+}
+if (source.includes("const FORBIDDEN_RETIRED_TOOL_NAMES =")
+    || source.includes("const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES =")
+    || source.includes("const RETIRED_HUMAN_GUIDANCE_TOOL_NAMES =")
+    || source.includes("function isOperatorPublicDirectToolName(")) {
+  lifecycleErrors.push("operator_mcp_tool_directory_policy_returned_to_index");
+}
+if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
+    || !operatorMcpToolDirectory.includes("RETIRED_HUMAN_GUIDANCE_TOOL_NAMES")
+    || !operatorMcpToolDirectory.includes("filterOperatorPublicMcpTools")
+    || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
+  lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
+}
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact 75-tool public surface and retirement policy")
+    || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
+  lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
