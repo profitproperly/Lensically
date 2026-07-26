@@ -30,7 +30,7 @@ source = replaceRange(
   source,
   `                await env.DB.batch([\n          env.DB.prepare(\n            \`INSERT OR IGNORE INTO operator_workflow_sessions (`,
   `          env.DB.prepare(\n            \`INSERT OR IGNORE INTO operator_source_selection_batches (`,
-  `                await env.DB.batch([\n          env.DB.prepare(\n            \`INSERT OR IGNORE INTO operator_source_selection_batches (`,
+  `                await env.DB.batch([\n`,
   "remove source-card workflow-session persistence",
 );
 
