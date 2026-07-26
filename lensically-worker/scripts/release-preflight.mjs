@@ -17,6 +17,8 @@ const operatorMcpToolDefinitions = read("src/operatorMcpToolDefinitions.ts");
 const operatorMcpToolDefinitionTests = read("test/operatorMcpToolDefinitions.spec.ts");
 const operatorMcpToolDirectory = read("src/operatorMcpToolDirectory.ts");
 const operatorMcpToolDirectoryTests = read("test/operatorMcpToolDirectory.spec.ts");
+const operatorMcpEngineeringRegistry = read("src/operatorMcpEngineeringRegistry.ts");
+const operatorMcpEngineeringRegistryTests = read("test/operatorMcpEngineeringRegistry.spec.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
@@ -64,6 +66,9 @@ if (!workflow.includes("test/operatorMcpToolDefinitions.spec.ts")) {
 if (!workflow.includes("test/operatorMcpToolDirectory.spec.ts")) {
   errors.push("operator_mcp_tool_directory_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpEngineeringRegistry.spec.ts")) {
+  errors.push("operator_mcp_engineering_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -72,7 +77,8 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const toolDefinitionNames = Array.from(new Set(Array.from(source.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}`;
+const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_INDEX"),
@@ -140,6 +146,24 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
 if (!operatorMcpToolDirectoryTests.includes("preserves the exact 75-tool public surface and retirement policy")
     || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
   lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpEngineeringRegistry"')) {
+  lifecycleErrors.push("operator_mcp_engineering_registry_import_missing");
+}
+if (source.includes("const OPERATOR_MCP_ENGINEERING_TOOL_NAMES =")
+    || source.includes("const OPERATOR_MCP_ENGINEERING_TOOLS:")
+    || source.includes("type OperatorMcpEngineeringToolName =")
+    || source.includes('{ name: "engineeringPrecheck"')) {
+  lifecycleErrors.push("operator_mcp_engineering_registry_returned_to_index");
+}
+if (!operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEERING_TOOL_NAMES")
+    || !operatorMcpEngineeringRegistry.includes("export type OperatorMcpEngineeringToolName")
+    || !operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEERING_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_engineering_registry_module_incomplete");
+}
+if (!operatorMcpEngineeringRegistryTests.includes("preserves the exact 33-tool engineering registry without duplicates")
+    || !operatorMcpEngineeringRegistryTests.includes("preserves exact workflow and deployment controls")) {
+  lifecycleErrors.push("operator_mcp_engineering_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
@@ -248,9 +272,9 @@ if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-op
     || !source.includes('table: "operator_work_ledger"')
     || !source.includes('table: "operator_repo_write_sessions"')
     || !source.includes('table: "operator_system_retirements"')
-    || !source.includes('name: "getOperatorWorkState"')
-    || !source.includes('name: "intakeOperatorWork"')
-    || !source.includes('name: "advanceOperatorWork"')
+        || !operatorMcpEngineeringRegistry.includes('name: "getOperatorWorkState"')
+    || !operatorMcpEngineeringRegistry.includes('name: "intakeOperatorWork"')
+    || !operatorMcpEngineeringRegistry.includes('name: "advanceOperatorWork"')
     || !source.includes("active_outcome_requirements_incomplete")
     || !source.includes("operator_work_self_merge_forbidden")
     || source.includes("active_outcome_key = CASE WHEN operator_work_state.status")
