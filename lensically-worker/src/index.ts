@@ -81,6 +81,10 @@ import {
   OPERATOR_MCP_ENGINEERING_TOOLS,
   type OperatorMcpEngineeringToolName,
 } from "./operatorMcpEngineeringRegistry";
+import {
+  OPERATOR_MCP_ADMIN_TOOL_NAMES as EXTRACTED_OPERATOR_MCP_ADMIN_TOOL_NAMES,
+  OPERATOR_MCP_ADMIN_TOOLS as EXTRACTED_OPERATOR_MCP_ADMIN_TOOLS,
+} from "./operatorMcpAdminRegistry";
 
 
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
@@ -17650,6 +17654,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
 ];
+void OPERATOR_MCP_ADMIN_TOOLS;
 
 const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
@@ -18533,7 +18538,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
 ];
 
 
-const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
+const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(EXTRACTED_OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
 const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
 
 function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
@@ -18589,7 +18594,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   ]);
     return buildOperatorMcpToolDefinitions({
             engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
-    adminTools: OPERATOR_MCP_ADMIN_TOOLS,
+        adminTools: EXTRACTED_OPERATOR_MCP_ADMIN_TOOLS,
     accountTools: OPERATOR_MCP_TOOLS,
     includeScopedWrappers,
     directPriorities: directPriority,
