@@ -10923,21 +10923,21 @@ async function buildManifestRollingEvidence(
 const MANIFEST_PREPARE_CHECKPOINT_VERSION = "manifest-prepare-checkpoint-v1";
 
 async function ensureManifestPrepareCheckpointTable(db: D1Database): Promise<void> {
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_manifest_prepare_checkpoints (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      operation_id TEXT NOT NULL,
-      checkpoint_version TEXT NOT NULL,
-      phase TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      horizon_hours INTEGER NOT NULL,
-      state_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, operation_id)
-    )`,
-  ).run();
+  await assertDatabaseIntegrity(db, {
+    table: "operator_manifest_prepare_checkpoints",
+    columns: [
+      "id",
+      "brand_key",
+      "operation_id",
+      "checkpoint_version",
+      "phase",
+      "timezone",
+      "horizon_hours",
+      "state_json",
+      "created_at",
+      "updated_at",
+    ],
+  });
 }
 
 async function readManifestPrepareCheckpoint(
@@ -20723,16 +20723,30 @@ function operatorPreCallValueMatches(actual: unknown, expected: unknown): boolea
 }
 
 async function ensureOperatorPreCallRoutesTable(env: Env): Promise<void> {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS operator_pre_call_routes (
-    id TEXT PRIMARY KEY, route_key TEXT NOT NULL UNIQUE, provider TEXT NOT NULL DEFAULT 'lensically',
-    tool_name TEXT NOT NULL, operation_key TEXT NOT NULL DEFAULT '*', match_json TEXT NOT NULL DEFAULT '{}',
-    action TEXT NOT NULL DEFAULT 'apply', required_tool TEXT, mandatory_route TEXT NOT NULL,
-    argument_patch_json TEXT NOT NULL DEFAULT '{}', allowed_argument_keys_json TEXT, reason TEXT NOT NULL,
-    verification_summary TEXT NOT NULL, source_memory_id TEXT, priority INTEGER NOT NULL DEFAULT 100,
-    active INTEGER NOT NULL DEFAULT 1, expires_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
-  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_operator_pre_call_routes_lookup
-    ON operator_pre_call_routes (active, provider, tool_name, operation_key, priority DESC, updated_at DESC)`).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "operator_pre_call_routes",
+    columns: [
+      "id",
+      "route_key",
+      "provider",
+      "tool_name",
+      "operation_key",
+      "match_json",
+      "action",
+      "required_tool",
+      "mandatory_route",
+      "argument_patch_json",
+      "allowed_argument_keys_json",
+      "reason",
+      "verification_summary",
+      "source_memory_id",
+      "priority",
+      "active",
+      "expires_at",
+      "created_at",
+      "updated_at",
+    ],
+  });
 }
 
 function serializeOperatorPreCallRoute(row: Record<string, unknown>): Record<string, unknown> {
@@ -20751,20 +20765,14 @@ function serializeOperatorPreCallRoute(row: Record<string, unknown>): Record<str
 async function findOperatorPreCallRoute(env: Env, toolName: string, args: Record<string, unknown>, operationHint?: unknown): Promise<Record<string, unknown> | null> {
   const provider = operatorPreCallProvider(toolName);
   const operationKey = operatorPreCallOperationKey(toolName, args, operationHint);
-  const query = () => env.DB.prepare(`SELECT * FROM operator_pre_call_routes
+    await ensureOperatorPreCallRoutesTable(env);
+  const rows = await env.DB.prepare(`SELECT * FROM operator_pre_call_routes
     WHERE active = 1 AND (expires_at IS NULL OR datetime(expires_at) > CURRENT_TIMESTAMP)
       AND (provider = ? OR provider = '*') AND (tool_name = ? OR tool_name = '*')
       AND (operation_key = ? OR operation_key = '*')
     ORDER BY priority DESC, CASE WHEN provider = ? THEN 0 ELSE 1 END,
       CASE WHEN tool_name = ? THEN 0 ELSE 1 END, CASE WHEN operation_key = ? THEN 0 ELSE 1 END,
       datetime(updated_at) DESC LIMIT 50`).bind(provider, toolName, operationKey, provider, toolName, operationKey).all<Record<string, unknown>>();
-  let rows;
-  try { rows = await query(); }
-  catch (error) {
-    if (!getErrorMessage(error).includes("no such table: operator_pre_call_routes")) throw error;
-    await ensureOperatorPreCallRoutesTable(env);
-    rows = await query();
-  }
   const matched = (rows.results ?? []).find((row) => operatorPreCallValueMatches(args, safeParseJsonString(String(row.match_json ?? "{}")) ?? {}));
   return matched ? serializeOperatorPreCallRoute(matched) : null;
 }
@@ -21663,25 +21671,22 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
 }
 
 async function ensureOperatorExecutionEventsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_execution_events (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT,
-      workflow_session_id TEXT,
-      tool_name TEXT NOT NULL,
-      operation_class TEXT NOT NULL,
-      execution_plane TEXT NOT NULL,
-      policy_version TEXT NOT NULL,
-      decision TEXT NOT NULL,
-      known_failure_prevented INTEGER NOT NULL DEFAULT 0,
-      evidence_json TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_execution_events_recent
-     ON operator_execution_events (created_at DESC, tool_name)`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "operator_execution_events",
+    columns: [
+      "id",
+      "brand_key",
+      "workflow_session_id",
+      "tool_name",
+      "operation_class",
+      "execution_plane",
+      "policy_version",
+      "decision",
+      "known_failure_prevented",
+      "evidence_json",
+      "created_at",
+    ],
+  });
 }
 
 async function getKnownAliasRetryBlock(
@@ -21759,15 +21764,8 @@ async function recordOperatorExecutionDecision(
     policy.known_failure_prevented === true ? 1 : 0,
     normalizeOperatorJson(evidence, {}),
   ).run();
-  try {
-    await insertExecutionEvent();
-  } catch (error) {
-    if (!getErrorMessage(error).includes("no such table: operator_execution_events")) {
-      throw error;
-    }
-        await ensureOperatorExecutionEventsTable(env);
-    await insertExecutionEvent();
-  }
+    await ensureOperatorExecutionEventsTable(env);
+  await insertExecutionEvent();
 }
 
 function operatorToolMutatesState(toolName: string): boolean {
