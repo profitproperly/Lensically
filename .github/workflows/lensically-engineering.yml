@@ -21,8 +21,8 @@ on:
           - operator-smoke
           - operator-tests
           - system-directory-tests
-          - threads-publish-tests
-                    - human-free-tests
+                    - threads-publish-tests
+          - human-free-tests
           - worker-deploy
       release_id:
         description: Compact exact-SHA release identity
@@ -95,11 +95,11 @@ jobs:
           npx tsc --noEmit
           node scripts/release-preflight.mjs --capability-lifecycle-only
 
-      - name: Run push smoke validation
+            - name: Run push smoke validation
         working-directory: lensically-worker
         run: |
           set -euo pipefail
-                    node scripts/run-operator-validation.mjs smoke
+          node scripts/run-operator-validation.mjs smoke
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
 
@@ -174,10 +174,10 @@ jobs:
             system-directory-tests)
               npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
               ;;
-            threads-publish-tests)
+                        threads-publish-tests)
               npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
               ;;
-                        human-free-tests)
+            human-free-tests)
               npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
               ;;
             *)
@@ -287,8 +287,8 @@ jobs:
           npx tsc --noEmit
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
           npm run test -- --run test/operatorMode.spec.ts --testNamePattern="advertises the curated direct typed Main surface and concise instructions|makes the static router the only public action path|routes operational status and engineering intents deterministically away from content procedures|routes bounded known-file repository search through the main Execution Kernel without Recovery|validates complete Execution Kernel routes without mutations|rejects an MCP session created by a previous Worker deployment before routing|lists only the active static MCP registry and concise instructions|arms, executes, and re-arms the independent scheduled-post alarm with shared cron health|recovers a known Saved Pattern into complete published-post lineage|reconciles prepare_manifest_autonomous_cycle again with the same durable operation id" --reporter=dot --bail=1
 
       - name: Deploy exact validated Worker head
@@ -317,16 +317,16 @@ jobs:
           jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
           expected_crons=$(node scripts/release-preflight.mjs --print-crons | sort)
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
-          test "${actual_crons}" = "${expected_crons}"
+                    test "${actual_crons}" = "${expected_crons}"
 
-            - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
+      - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
         run: |
           set -euo pipefail
           expected_sha="$(git rev-parse HEAD)"
           verified=false
           for attempt in $(seq 1 12); do
-            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
-                            && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and (.live_tool_count >= 60)' /tmp/lensically-runtime-health.json > /dev/null \
+                        if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
+              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and (.live_tool_count >= 60)' /tmp/lensically-runtime-health.json > /dev/null \
               && curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
               && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null \
               && curl --fail-with-body --silent --show-error "https://lensically.com/dashboard" > /tmp/lensically-dashboard.html \
@@ -341,8 +341,8 @@ jobs:
           done
           if [ "${verified}" != "true" ]; then
             cat /tmp/lensically-runtime-health.json || true
-            cat /tmp/lensically-scheduler-health.json || true
-                        head -c 2000 /tmp/lensically-dashboard.html || true
+                        cat /tmp/lensically-scheduler-health.json || true
+            head -c 2000 /tmp/lensically-dashboard.html || true
             cat /tmp/gpt-memory-retired.json || true
             cat /tmp/agent-retired.json || true
             cat /tmp/intelligence-retired.json || true
