@@ -6,7 +6,7 @@ const indexPath = resolve(root, "src/index.ts");
 const testPath = resolve(root, "test/operatorMode.spec.ts");
 let source = await readFile(indexPath, "utf8");
 let tests = await readFile(testPath, "utf8");
-const contractNeedle = 'if (toolName === "recover_published_post_lineage")';
+const contractNeedle = "async function recoverPublishedPostLineage";
 const contractIndex = source.indexOf(contractNeedle);
 if (contractIndex < 0) throw new Error("lineage recovery handler not found");
 process.stdout.write(`${source.slice(contractIndex, contractIndex + 1600)}\n`);
