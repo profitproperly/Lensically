@@ -86,6 +86,34 @@ source = replaceRange(
   `                await env.DB.batch([\n`,
   "remove source-card workflow-session persistence",
 );
+source = replaceExact(
+  source,
+  `        if (workflowSessionId) {
+          await env.DB.prepare(
+            \`UPDATE operator_workflow_sessions
+             SET active_source_card_id = ?, current_stage = 'source_card'
+             WHERE id = ?
+               AND brand_key = ?\`,
+          ).bind(currentCard.id, workflowSessionId, brand.brand_key).run();
+        }
+`,
+  ``,
+  "remove reused-card workflow-session update",
+);
+source = replaceExact(
+  source,
+  `    if (workflowSessionId) {
+      await env.DB.prepare(
+        \`UPDATE operator_workflow_sessions
+         SET active_source_card_id = ?, current_stage = 'source_card'
+         WHERE id = ?
+           AND brand_key = ?\`,
+      ).bind(sourceCardId, workflowSessionId, brand.brand_key).run();
+    }
+`,
+  ``,
+  "remove created-card workflow-session update",
+);
 
 const helper = `async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey = BRAND_KEY): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
   const sessionId = \`autonomous-fixture-\${crypto.randomUUID()}\`;
