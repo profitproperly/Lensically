@@ -24403,7 +24403,7 @@ async function handleOperatorMcpAdminTool(
       const requiredSafeProfile = requiredSafeProfileId ? CLIENT_SAFE_REQUEST_PROFILES[requiredSafeProfileId] : null;
       const intent = requiredSafeProfile?.intent ?? tool.title.trim().toLowerCase();
       const request = {
-        objective: "Run one compact Lensically capability check.",
+                objective: requiredSafeProfile?.objective ?? "Run one compact Lensically capability check.",
         intent,
         inputs: {},
       };
