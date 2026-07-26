@@ -546,7 +546,7 @@ replaceRange(
       kind: "continuity_context",
       brandKey,
       workflowSessionId: null,
-      continuationChoice: "autonomous_state",
+      continuationChoice: "resume_existing_workflow",
       ttlSeconds: OPERATOR_CONTINUITY_TOKEN_TTL_SECONDS,
       payload: {
         continuity_version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
