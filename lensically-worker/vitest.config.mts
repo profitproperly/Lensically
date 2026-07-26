@@ -1,12 +1,25 @@
-import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import {
+  defineWorkersConfig,
+  readD1Migrations,
+} from "@cloudflare/vitest-pool-workers/config";
+
+const root = dirname(fileURLToPath(import.meta.url));
+const migrations = await readD1Migrations(join(root, "database/migrations"));
 
 export default defineWorkersConfig({
-	test: {
-		poolOptions: {
-						workers: {
-				wrangler: { configPath: './wrangler.jsonc' },
-				isolatedStorage: false,
-			},
-		},
-	},
+  test: {
+    setupFiles: ["./test/apply-migrations.ts"],
+    poolOptions: {
+      workers: {
+        wrangler: { configPath: "./wrangler.jsonc" },
+        miniflare: {
+          bindings: { TEST_MIGRATIONS: migrations },
+        },
+        isolatedStorage: false,
+      },
+    },
+  },
 });
+
