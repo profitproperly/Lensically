@@ -68,6 +68,15 @@ import {
   buildOperatorMcpToolDefinitions,
   type OperatorMcpToolDefinition,
 } from "./operatorMcpToolDefinitions";
+import {
+  FORBIDDEN_RETIRED_TOOL_NAMES,
+  RETIRED_HUMAN_GUIDANCE_TOOL_NAMES,
+  countOperatorPublicMcpTools,
+  filterOperatorPublicMcpTools,
+  findOperatorMcpToolDefinition,
+  isOperatorPublicDirectToolName,
+} from "./operatorMcpToolDirectory";
+
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
 
 
@@ -18639,184 +18648,25 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
 ];
 
 
+const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
+const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
+
 function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
-  return (OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]).includes(value);
+  return OPERATOR_MCP_ADMIN_TOOL_NAME_SET.has(value);
 }
 
 function isOperatorMcpEngineeringToolName(value: string): value is OperatorMcpEngineeringToolName {
-  return (OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]).includes(value);
+  return OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET.has(value);
 }
 
 
 
-const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
-  "guardLensicallyCall",
-  "routeAndExecuteLensicallyCall",
-  "executeMappedIntent",
-  "runEngineeringTool",
-  "listPreCallRoutes",
-  "recordPreCallRoute",
-  "recordOpsMemory",
-  "listOpsMemory",
-  "searchOpsMemory",
-  "readOpsMemory",
-  "updateOpsMemory",
-  "createMcpTool",
-  "updateMcpToolSchema",
-  "updateMcpToolBehavior",
-  "disableMcpTool",
-  "deployMcpChanges",
-  "rollbackMcpChanges",
-  "createImplementationBacklogItem",
-  "listImplementationBacklogItems",
-  "markImplementationBacklogItemResolved",
-  "planOperatorExecution",
-  "getMcpAdminState",
-  "resolveContinuationContext",
-]);
 
-const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
-  "getOperatorStartupContext",
-    "getEngineeringContinuation",
-  "getDatabaseSchemaState",
-  "engineeringPrecheck",
-  "getEngineeringAccessState",
-  "listRepoFiles",
-  "selectOperatorKey",
-  "confirmOperatorProceed",
-  "getGrowthMission",
-  "updateGrowthMission",
-  "getOperatorDecisionState",
-  "proposeOperatorDecision",
-  "resolveOperatorDecision",
-  "markOperatorDecisionExecuted",
-  "list_accounts",
-  "get_account_state",
-  "start_workflow_session",
-  "admit_context",
-  "read_lensically_ui_surface",
-  "get_hourly_coverage",
-  "get_production_board",
-  "audit_published_post_lineage",
-  "recover_published_post_lineage",
-  "delete_saved_pattern_source",
-  "getWorkflowStatus",
-  "updateWorkflowRequirement",
-  "advanceWorkflowStage",
-  "prepareFullPreflight",
-  "updateGate",
-  "runGateSuite",
-  "submitAndGateDraft",
-  "get_monthly_growth_review",
-        "get_performance_learning",
-    "get_manifest_intelligence_audit",
-    "get_content_focus",
-      "get_manifest_intelligence_foundation",
-  "get_manifest_cycle_receipt",
-  "record_manifest_cycle_defect",
-  "resolve_manifest_cycle_defect",
-  "get_manifest_cycle_analysis_page",
-  "commit_manifest_cycle_strategy",
-    "prepare_manifest_autonomous_cycle",
-  "persist_manifest_autonomous_post",
-  "review_manifest_scheduled_post",
-  "claim_manifest_review_batch",
-  "get_manifest_review_batch",
-  "attach_manifest_review_draft",
-  "skip_manifest_review_source",
-  "discard_manifest_review_batch",
-  "schedule_manifest_review_batch",
-  "list_source_candidates",
-  "draw_source_candidate_batch",
-      "get_source_candidate_batch",
-  "create_all_missing_manifest_source_cards",
-  "create_source_card",
 
-  "lock_source_card",
-  "get_source_card",
-  "create_generation_run",
-  "run_gates",
-  "submit_candidate_draft",
-  "mark_draft_shown",
-  "save_self_rejected_draft",
-  "approve_draft",
-  "reject_draft",
-  "list_active_gates",
-  "create_or_update_gate",
-  "promote_memory_to_gate",
-  "list_strategy_memory",
-  "save_strategy_memory",
-    "list_scheduled_posts",
-  "delete_scheduled_post",
-  "edit_scheduled_post",
-  "schedule_owner_approved_batch",
-  "schedule_approved_draft",
-  "get_post_results",
-  "getScheduledPostSchedulerState",
-  "auditScheduledPost",
-  "setScheduledPostSchedulerMode",
-  "recoverOverdueScheduledPosts",
-  "runApprovedPostCanary",
-  "getRepoStatus",
-  "readRepoFile",
-  "searchRepoFiles",
-  "applyRepoTextPatch",
-  "applyRepoPatchSet",
-  "startRepoFileWrite",
-  "appendRepoFileChunk",
-    "commitRepoFileWrite",
-  "createRepoFile",
-        "createGitHubRepository",
-  "upsertGitHubRepositoryFile",
-  "createCloudflarePagesProject",
-  "deployCloudflarePagesProject",
-  "deleteRepoFile",
-  "listGitHubWorkflowRuns",
-  "getGitHubWorkflowRun",
-  "runGitHubWorkflow",
-  "verifyDeployedMcpVersion",
-  "listMcpTools",
-  "readMcpToolDefinition",
-  "runMcpTests",
-  "listEngineeringAudit",
-]);
 
-const RETIRED_HUMAN_GUIDANCE_TOOL_NAMES = new Set<string>([
-  "start_workflow_session",
-  "admit_context",
-  "getWorkflowStatus",
-  "updateWorkflowRequirement",
-  "advanceWorkflowStage",
-  "prepareFullPreflight",
-  "updateGate",
-  "runGateSuite",
-  "submitAndGateDraft",
-  "review_manifest_scheduled_post",
-  "claim_manifest_review_batch",
-  "get_manifest_review_batch",
-  "attach_manifest_review_draft",
-  "skip_manifest_review_source",
-  "discard_manifest_review_batch",
-  "schedule_manifest_review_batch",
-  "draw_source_candidate_batch",
-  "get_source_candidate_batch",
-  "mark_draft_shown",
-  "approve_draft",
-  "reject_draft",
-  "create_or_update_gate",
-  "promote_memory_to_gate",
-  "list_strategy_memory",
-  "save_strategy_memory",
-  "schedule_owner_approved_batch",
-  "schedule_approved_draft",
-]);
-for (const retiredToolName of RETIRED_HUMAN_GUIDANCE_TOOL_NAMES) {
-  OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.delete(retiredToolName);
-}
 
-function isOperatorPublicDirectToolName(value: string): boolean {
-  return OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.has(value);
-}
+
+
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   assertClientSafetyRegistry();
@@ -18870,28 +18720,24 @@ async function buildOperatorMcpTools(_env: Env, _includeDisabled = false, includ
 }
 
 async function buildOperatorPublicMcpTools(env: Env): Promise<OperatorMcpToolDefinition[]> {
-  return (await buildOperatorMcpTools(env, false, false)).filter((tool) => isOperatorPublicDirectToolName(tool.name));
+  return filterOperatorPublicMcpTools(await buildOperatorMcpTools(env, false, false));
 }
 
 async function operatorPublicMcpToolCount(env: Env): Promise<number> {
-  return (await buildOperatorPublicMcpTools(env)).length;
+  return countOperatorPublicMcpTools(await buildOperatorMcpTools(env, false, false));
 }
 
 async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<Record<string, unknown> | null> {
-  const tools = await buildOperatorMcpTools(env, true);
-  const tool = tools.find((item) => item.name === toolName);
-  if (!tool) {
-    return null;
-  }
-  const required = Array.isArray((tool.inputSchema as Record<string, unknown>).required)
-    ? (tool.inputSchema as Record<string, unknown>).required
-    : [];
-  return {
-    ...tool,
-    handler: isOperatorMcpEngineeringToolName(tool.name) ? "operator_mcp_engineering_runtime" : isOperatorMcpAdminToolName(tool.name) ? "operator_mcp_admin_runtime" : "operator_tool_backend",
-    required_fields: required,
-  };
+  return findOperatorMcpToolDefinition(
+    await buildOperatorMcpTools(env, true),
+    toolName,
+    {
+      engineeringToolNames: OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET,
+      adminToolNames: OPERATOR_MCP_ADMIN_TOOL_NAME_SET,
+    },
+  );
 }
+
 
 async function listOperatorWorkflowRequirements(env: Env, brandKey: GptBrandKey | null = null): Promise<Array<Record<string, unknown>>> {
   await ensureOperatorMcpAdminTables(env);
