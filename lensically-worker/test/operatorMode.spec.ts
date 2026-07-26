@@ -622,6 +622,21 @@ async function resetTables(): Promise<void> {
     ]) {
         await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
+            await env.DB.prepare("DELETE FROM operator_manifest_post_hypotheses").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_cycle_defect_receipts").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_cycle_receipt_events").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_cycle_receipts").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_hard_bans").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_candidate_gate_receipts").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_cycle_plan_items").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_cycle_strategies").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_analysis_page_reads").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_evidence_pages").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_evidence_posts").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_evidence_snapshots").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_exposure_snapshots").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_strategy_versions").run();
+  await env.DB.prepare("DELETE FROM operator_manifest_intelligence_policies").run();
           await env.DB.prepare("DELETE FROM operator_content_focus_family_states").run();
   await env.DB.prepare("DELETE FROM operator_content_focus_reviews").run();
   await env.DB.prepare("DELETE FROM operator_generation_learning_briefs").run();

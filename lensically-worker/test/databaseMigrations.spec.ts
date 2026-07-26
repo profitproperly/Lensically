@@ -18,7 +18,8 @@ const testEnv = env as typeof env & {
     ASSURANCE_UPGRADE_DB: D1Database;
     WORK_STATE_UPGRADE_DB: D1Database;
     EXECUTION_CONTROL_UPGRADE_DB: D1Database;
-  PERFORMANCE_FOCUS_UPGRADE_DB: D1Database;
+    PERFORMANCE_FOCUS_UPGRADE_DB: D1Database;
+  MANIFEST_INTELLIGENCE_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -270,11 +271,93 @@ const requiredColumns: Record<string, string[]> = {
     "decisions_json", "allocation_json", "generated_at", "evaluator_version",
     "created_at", "updated_at",
   ],
-  operator_content_focus_family_states: [
+    operator_content_focus_family_states: [
     "id", "brand_key", "source_card_family_id", "source_identity_key", "status",
     "recommended_status", "confidence_score", "confidence_label", "allocation_weight",
     "decision_reason", "reuse_directives_json", "stop_directives_json",
     "horizon_evidence_json", "manual_lock", "last_review_id", "created_at", "updated_at",
+  ],
+  operator_manifest_intelligence_policies: [
+    "brand_key", "policy_version", "policy_json", "active", "created_at", "updated_at",
+  ],
+  operator_manifest_strategy_versions: [
+    "id", "brand_key", "version", "contract_version", "parent_version_id", "status",
+    "strategy_hash", "strategy_json", "evidence_json", "change_summary",
+    "reversal_conditions_json", "source_cycle_id", "created_at",
+  ],
+  operator_manifest_exposure_snapshots: [
+    "id", "cycle_id", "brand_key", "ledger_version", "as_of", "timezone",
+    "horizon_start_local", "horizon_end_local", "published_json", "scheduled_json",
+    "dimensions_json", "source_hash", "revision", "created_at", "updated_at",
+  ],
+  operator_manifest_evidence_snapshots: [
+    "id", "cycle_id", "brand_key", "snapshot_version", "as_of", "timezone",
+    "window_days", "window_start", "window_end", "post_count", "mature_count",
+    "immature_count", "incomplete_count", "page_size", "page_count", "page_byte_budget",
+    "benchmarks_json", "previous_benchmarks_json", "recent_exposure_json",
+    "future_schedule_json", "hard_bans_json", "experiments_json", "source_hash",
+    "created_at", "updated_at",
+  ],
+  operator_manifest_evidence_posts: [
+    "id", "snapshot_id", "brand_key", "published_post_id", "scheduled_post_id", "text",
+    "published_at", "age_hours", "maturity_state", "primary_likes", "like_rate",
+    "metrics_json", "maturity_snapshots_json", "lineage_json", "classification_json",
+    "created_at",
+  ],
+  operator_manifest_evidence_pages: [
+    "id", "snapshot_id", "cycle_id", "brand_key", "page_index", "page_contract_version",
+    "item_count", "byte_count", "evidence_types_json", "items_json", "created_at",
+  ],
+  operator_manifest_analysis_page_reads: [
+    "id", "snapshot_id", "cycle_id", "brand_key", "page_index", "read_at",
+  ],
+  operator_manifest_cycle_strategies: [
+    "id", "cycle_id", "brand_key", "snapshot_id", "contract_version",
+    "account_conclusion_json", "content_focus_json", "benchmarks_json", "strongest_json",
+    "weakest_json", "directives_json", "experiments_json", "risks_json", "lineup_json",
+    "strategy_hash", "status", "locked_at", "created_at",
+  ],
+  operator_manifest_cycle_plan_items: [
+    "id", "strategy_id", "cycle_id", "brand_key", "slot_key", "slot_date", "slot_time",
+    "family_key", "strategic_role", "generation_mode", "source_kind", "source_card_id",
+    "source_selection_id", "audience_reward", "hook_direction", "placement_reason",
+    "nearby_avoid_json", "exploration_mode", "status", "revision", "created_at", "updated_at",
+  ],
+  operator_manifest_candidate_gate_receipts: [
+    "id", "cycle_id", "strategy_id", "plan_item_id", "brand_key", "slot_key",
+    "candidate_hash", "receipt_version", "results_json", "passed", "created_at",
+  ],
+  operator_manifest_hard_bans: [
+    "id", "brand_key", "rule_key", "description", "rule_type", "pattern", "scope",
+    "pass_examples_json", "fail_examples_json", "source_authority", "active", "created_at",
+    "updated_at",
+  ],
+  operator_manifest_cycle_receipts: [
+    "id", "cycle_id", "brand_key", "operation_id", "receipt_version", "status",
+    "trigger_json", "startup_state_json", "input_strategy_version_id",
+    "output_strategy_version_id", "exposure_snapshot_id", "horizon_plan_json",
+    "completion_json", "unresolved_issues_json", "started_at", "completed_at", "created_at",
+  ],
+  operator_manifest_cycle_receipt_events: [
+    "id", "cycle_id", "brand_key", "event_key", "event_type", "slot_key", "payload_json",
+    "created_at",
+  ],
+  operator_manifest_cycle_defect_receipts: [
+    "id", "cycle_id", "brand_key", "defect_key", "receipt_version", "stage_number",
+    "stage_key", "phase", "slot_key", "operation_id", "error_code", "error_message",
+    "impact_state", "retryable", "blocking", "status", "occurrence_count", "first_seen_at",
+    "last_seen_at", "reconciliation_json", "root_cause", "repair_commit_sha", "deployed_sha",
+    "regression_tests_json", "verification_json", "metadata_json", "resolved_at", "created_at",
+    "updated_at",
+  ],
+  operator_manifest_post_hypotheses: [
+    "id", "cycle_id", "brand_key", "slot_key", "hypothesis_version", "strategy_version_id",
+    "source_kind", "source_type", "source_identity_key", "source_card_id",
+    "source_selection_id", "internal_source_id", "expected_response_type",
+    "expected_audience_reward", "hook_rationale", "premise_rationale", "exploration_mode",
+    "comparable_post_ids_json", "expected_performance_range_json", "uncertainty",
+    "falsification_conditions_json", "candidate_trace_json", "model_evaluation_json",
+    "scheduled_post_id", "status", "revision", "locked_at", "created_at", "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -409,7 +492,14 @@ const expectedObjects = [
   "idx_operator_performance_hypotheses_lookup",
   "idx_operator_generation_learning_briefs_active",
   "idx_operator_content_focus_reviews_latest",
-  "idx_operator_content_focus_family_selection",
+    "idx_operator_content_focus_family_selection",
+  "idx_manifest_strategy_versions_brand",
+  "idx_manifest_evidence_posts_page",
+  "idx_manifest_evidence_pages_snapshot",
+  "idx_manifest_cycle_plan_items_strategy",
+  "idx_manifest_receipt_events_cycle",
+  "idx_manifest_cycle_defects_status",
+  "idx_manifest_hypotheses_cycle",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
