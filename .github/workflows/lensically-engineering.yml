@@ -182,24 +182,24 @@ jobs:
               npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
               ;;
                         human-free-tests)
-              npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+              if [ "${RELEASE_ID}" = "apply-worker-cleanup-stage2" ]; then
+                node scripts/apply-worker-cleanup-stage2.mjs
+                rm scripts/apply-worker-cleanup-stage2.mjs
+                git diff --check
+                npx tsc --noEmit
+                npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+                npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
+                git config user.name "Lensically Operator"
+                git config user.email "operator@lensically.com"
+                git add -A lensically-worker/src lensically-worker/scripts/apply-worker-cleanup-stage2.mjs
+                git commit -m "Physically remove isolated retired Worker systems"
+                git push origin HEAD:main
+              else
+                npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+              fi
               ;;
             architecture-baseline)
               node scripts/worker-architecture-baseline.mjs --live | tee worker-architecture-baseline.json
-              ;;
-            gpt-memory-tests)
-              test "${RELEASE_ID}" = "apply-worker-cleanup-stage2"
-              node scripts/apply-worker-cleanup-stage2.mjs
-              rm scripts/apply-worker-cleanup-stage2.mjs
-              git diff --check
-              npx tsc --noEmit
-              npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
-              npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
-              git config user.name "Lensically Operator"
-              git config user.email "operator@lensically.com"
-              git add -A lensically-worker/src lensically-worker/scripts/apply-worker-cleanup-stage2.mjs
-              git commit -m "Physically remove isolated retired Worker systems"
-              git push origin HEAD:main
               ;;
             *)
               echo "Unsupported fast-validation task: ${TASK}"
