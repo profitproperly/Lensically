@@ -5825,175 +5825,116 @@ async function ensureOperatorWorkflowTables(env: Env): Promise<void> {
      END`,
   ).run();
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_daily_source_claims (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      production_date TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      internal_source_id TEXT NOT NULL,
-      source_batch_id TEXT,
-      source_selection_id TEXT,
-      workflow_session_id TEXT,
-      review_batch_id TEXT,
-      review_item_number INTEGER,
-      source_card_id TEXT,
-      generation_run_id TEXT,
-      draft_id TEXT,
-      scheduled_post_id INTEGER,
-      status TEXT NOT NULL DEFAULT 'claimed',
-      disposition_reason TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, production_date, source_identity_key),
-      UNIQUE(review_batch_id, review_item_number)
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_daily_source_claims_batch
-     ON operator_daily_source_claims (review_batch_id, review_item_number ASC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_daily_source_claims_day
-     ON operator_daily_source_claims (brand_key, production_date, status, created_at ASC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_operator_daily_source_claims_touch_updated_at
-     AFTER UPDATE ON operator_daily_source_claims
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE operator_daily_source_claims SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-     END`,
-  ).run();
+    await assertDatabaseIntegrity(env.DB, {
+    table: "operator_daily_source_claims",
+    columns: [
+      "id",
+      "brand_key",
+      "production_date",
+      "timezone",
+      "source_identity_key",
+      "source_type",
+      "internal_source_id",
+      "source_batch_id",
+      "source_selection_id",
+      "workflow_session_id",
+      "review_batch_id",
+      "review_item_number",
+      "source_card_id",
+      "generation_run_id",
+      "draft_id",
+      "scheduled_post_id",
+      "status",
+      "disposition_reason",
+      "created_at",
+      "updated_at",
+    ],
+  });
+  
+  
+  
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_exclusions (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      internal_source_id TEXT NOT NULL,
-      reason TEXT,
-      active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, source_identity_key)
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_exclusions_active
-     ON operator_source_exclusions (brand_key, active, source_type)`,
-  ).run();
+    await assertDatabaseIntegrity(env.DB, {
+    table: "operator_source_exclusions",
+    columns: [
+      "id",
+      "brand_key",
+      "source_identity_key",
+      "source_type",
+      "internal_source_id",
+      "reason",
+      "active",
+      "created_at",
+      "updated_at",
+    ],
+  });
+  
 
   await ensureOperatorPostMetricSnapshotsTable(env);
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_card_families (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL,
-      source_identity_key TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      internal_source_id TEXT NOT NULL,
-      threads_post_id TEXT,
-      canonical_source_url TEXT,
-      current_source_card_id TEXT,
-      status TEXT NOT NULL DEFAULT 'active',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(brand_key, source_identity_key)
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_card_families_brand_current
-     ON operator_source_card_families (brand_key, status, updated_at DESC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_operator_source_card_families_touch_updated_at
-     AFTER UPDATE ON operator_source_card_families
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE operator_source_card_families SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-     END`,
-  ).run();
+    await assertDatabaseIntegrity(env.DB, {
+    table: "operator_source_card_families",
+    columns: [
+      "id",
+      "brand_key",
+      "source_identity_key",
+      "source_type",
+      "internal_source_id",
+      "threads_post_id",
+      "canonical_source_url",
+      "current_source_card_id",
+      "status",
+      "created_at",
+      "updated_at",
+    ],
+  });
+  
+  
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_source_cards (
+    await assertDatabaseIntegrity(env.DB, {
+    table: "operator_source_cards",
+    columns: [
+      "id",
+      "brand_key",
+      "workflow_session_id",
+      "sequence_label",
+      "lane_key",
+      "title",
+      "status",
+      "primary_source_json",
+      "secondary_sources_json",
+      "anti_sources_json",
+      "metrics_snapshot_json",
+      "source_mechanism",
+      "required_product",
+      "forbidden_surfaces_json",
+      "danger_surfaces_json",
+      "current_inventory_constraints_json",
+      "pass_conditions_json",
+      "fail_conditions_json",
+      "recommended_direction",
+      "context_admission_id",
+      "created_by",
+      "family_id",
+      "source_selection_id",
+      "version_number",
+      "is_current",
+      "supersedes_source_card_id",
+      "version_reason",
+      "transformation_contract_json",
+      "locked_at",
+      "invalidated_at",
+      "invalidation_reason",
+      "created_at",
+      "updated_at",
+    ],
+  });
+    
+  
+  
+  
 
-      id TEXT PRIMARY KEY,
-
-      brand_key TEXT NOT NULL,
-      workflow_session_id TEXT,
-      sequence_label TEXT NOT NULL,
-      lane_key TEXT,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'draft',
-      primary_source_json TEXT NOT NULL,
-      secondary_sources_json TEXT,
-      anti_sources_json TEXT,
-      metrics_snapshot_json TEXT,
-      source_mechanism TEXT NOT NULL,
-      required_product TEXT NOT NULL,
-      forbidden_surfaces_json TEXT NOT NULL,
-      danger_surfaces_json TEXT,
-      current_inventory_constraints_json TEXT,
-      pass_conditions_json TEXT NOT NULL,
-      fail_conditions_json TEXT NOT NULL,
-      recommended_direction TEXT,
-            context_admission_id TEXT,
-      created_by TEXT,
-      family_id TEXT,
-      source_selection_id TEXT,
-      version_number INTEGER NOT NULL DEFAULT 1,
-      is_current INTEGER NOT NULL DEFAULT 1,
-      supersedes_source_card_id TEXT,
-      version_reason TEXT,
-      transformation_contract_json TEXT,
-      locked_at TEXT,
-      invalidated_at TEXT,
-      invalidation_reason TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-    for (const column of [
-    { name: "family_id", definition: "TEXT" },
-    { name: "source_selection_id", definition: "TEXT" },
-    { name: "version_number", definition: "INTEGER NOT NULL DEFAULT 1" },
-    { name: "is_current", definition: "INTEGER NOT NULL DEFAULT 1" },
-    { name: "supersedes_source_card_id", definition: "TEXT" },
-    { name: "version_reason", definition: "TEXT" },
-    { name: "transformation_contract_json", definition: "TEXT" },
-  ]) {
-    await addColumnIfMissing(env, "operator_source_cards", column.name, column.definition);
-  }
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_cards_brand_status
-     ON operator_source_cards (brand_key, status, updated_at DESC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_source_cards_family_version
-     ON operator_source_cards (family_id, version_number DESC, created_at DESC)`,
-  ).run();
-  await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_operator_source_cards_family_current
-     ON operator_source_cards (family_id)
-     WHERE family_id IS NOT NULL AND is_current = 1`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_operator_source_cards_touch_updated_at
-     AFTER UPDATE ON operator_source_cards
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE operator_source_cards SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-     END`,
-  ).run();
+  
 
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS operator_gates (
