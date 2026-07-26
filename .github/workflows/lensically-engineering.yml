@@ -21,7 +21,7 @@ on:
           - operator-smoke
           - operator-tests
           - system-directory-tests
-                    - threads-publish-tests
+          - threads-publish-tests
           - human-free-tests
           - architecture-baseline
           - worker-deploy
