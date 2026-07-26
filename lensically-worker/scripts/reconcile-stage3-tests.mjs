@@ -114,6 +114,20 @@ source = replaceExact(
   ``,
   "remove created-card workflow-session update",
 );
+source = replaceExact(
+  source,
+  `    if (card.workflow_session_id) {
+      await env.DB.prepare(
+        \`UPDATE operator_workflow_sessions
+         SET active_generation_run_id = ?, current_stage = 'generation_run_and_candidates'
+         WHERE id = ?
+           AND brand_key = ?\`,
+      ).bind(runId, card.workflow_session_id, brand.brand_key).run();
+    }
+`,
+  ``,
+  "remove generation-run workflow-session update",
+);
 
 const helper = `async function createLockedSourceCard(forbiddenSurfaces: string[] = [], brandKey = BRAND_KEY): Promise<{ sessionId: string; sourceCardId: string; runId: string }> {
   const sessionId = \`autonomous-fixture-\${crypto.randomUUID()}\`;
