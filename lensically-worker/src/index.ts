@@ -3531,83 +3531,8 @@ async function ensureAppThreadsTable(env: Env): Promise<void> {
   ).run();
 }
 
-async function rebuildAppThreadsTableForMultiAccount(env: Env): Promise<void> {
-  const legacyTableInfo = await env.DB.prepare("PRAGMA table_info(app_threads_accounts)").all<{ name: string }>();
-  const legacyColumnNames = new Set((legacyTableInfo.results ?? []).map((column) => column.name));
-  const hasLegacyConnectionActive = legacyColumnNames.has("connection_active");
-  const hasLegacyIsActive = legacyColumnNames.has("is_active");
-  const hasLegacyTombstoneExpiresAt = legacyColumnNames.has("tombstone_expires_at");
-  const hasLegacyCreatedAt = legacyColumnNames.has("created_at");
-  const legacyConnectionActiveExpr = hasLegacyConnectionActive && hasLegacyIsActive
-    ? "COALESCE(connection_active, is_active, 1)"
-    : hasLegacyConnectionActive
-      ? "COALESCE(connection_active, 1)"
-      : hasLegacyIsActive
-        ? "COALESCE(is_active, 1)"
-        : "1";
-  const legacyIsActiveExpr = hasLegacyIsActive && hasLegacyConnectionActive
-    ? "COALESCE(is_active, connection_active, 1)"
-    : hasLegacyIsActive
-      ? "COALESCE(is_active, 1)"
-      : hasLegacyConnectionActive
-        ? "COALESCE(connection_active, 1)"
-        : "1";
-  const legacyTombstoneExpr = hasLegacyTombstoneExpiresAt ? "tombstone_expires_at" : "NULL";
-  const legacyCreatedAtExpr = hasLegacyCreatedAt
-    ? "created_at"
-    : "CAST(strftime('%s','now') AS INTEGER)";
 
-  const dbSession = env.DB.withSession("first-primary");
-  let transactionStarted = false;
-  try {
-    await dbSession.prepare("BEGIN TRANSACTION").run();
-    transactionStarted = true;
 
-    await dbSession.prepare(
-      `CREATE TABLE IF NOT EXISTS app_threads_accounts_multi_rebuild (
-        app_user_id TEXT NOT NULL,
-        threads_user_id TEXT NOT NULL,
-        connection_active INTEGER NOT NULL DEFAULT 1,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        tombstone_expires_at TEXT,
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (app_user_id, threads_user_id),
-        FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
-      )`,
-    ).run();
-
-    await dbSession.prepare(
-      `INSERT OR REPLACE INTO app_threads_accounts_multi_rebuild (
-        app_user_id,
-        threads_user_id,
-        connection_active,
-        is_active,
-        tombstone_expires_at,
-        created_at
-      )
-      SELECT
-        app_user_id,
-        threads_user_id,
-        ${legacyConnectionActiveExpr},
-        ${legacyIsActiveExpr},
-        ${legacyTombstoneExpr},
-        ${legacyCreatedAtExpr}
-      FROM app_threads_accounts`,
-    ).run();
-
-    await dbSession.prepare("DROP TABLE app_threads_accounts").run();
-    await dbSession.prepare("ALTER TABLE app_threads_accounts_multi_rebuild RENAME TO app_threads_accounts").run();
-    await dbSession.prepare("COMMIT").run();
-    transactionStarted = false;
-  } catch (error) {
-    if (transactionStarted) {
-      await dbSession.prepare("ROLLBACK").run();
-    }
-    throw error;
-  }
-
-  await ensureAppThreadsTable(env);
-}
 
 async function upsertAppThreadsAccountLink(
   env: Env,
