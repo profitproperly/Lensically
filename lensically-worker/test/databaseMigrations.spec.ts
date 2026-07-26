@@ -21,7 +21,8 @@ const testEnv = env as typeof env & {
     PERFORMANCE_FOCUS_UPGRADE_DB: D1Database;
       MANIFEST_INTELLIGENCE_UPGRADE_DB: D1Database;
         MANIFEST_ENGINE_UPGRADE_DB: D1Database;
-    MANIFEST_MEASUREMENT_AUDIT_UPGRADE_DB: D1Database;
+        MANIFEST_MEASUREMENT_AUDIT_UPGRADE_DB: D1Database;
+    FINAL_AUTHORITY_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -420,10 +421,42 @@ const requiredColumns: Record<string, string[]> = {
     "confidence_json", "reuse_state", "exclusion_state", "source_updated_at",
     "intelligence_version", "created_at", "updated_at",
   ],
-  operator_manifest_follower_checkpoints: [
+    operator_manifest_follower_checkpoints: [
     "id", "brand_key", "checkpoint_key", "threads_user_id", "checkpoint_version",
     "snapshot_date", "followers_count", "follower_goal", "distance_to_goal",
     "trajectory_json", "attribution_policy", "created_at", "updated_at",
+  ],
+  operator_source_family_evidence_states: [
+    "id", "brand_key", "source_card_family_id", "source_identity_key",
+    "label_policy_version", "lifetime_label", "recent_label", "confidence_label",
+    "lifetime_sample_size", "recent_sample_size", "account_lifetime_median_likes",
+    "account_28d_median_likes", "family_lifetime_median_likes",
+    "family_28d_median_likes", "lifetime_index", "recent_index",
+    "latest_two_recent_index", "probability_above_median",
+    "probability_above_franchise_floor", "probability_below_underperformance_floor",
+    "state_json", "created_at", "updated_at",
+  ],
+  operator_source_family_label_transitions: [
+    "id", "brand_key", "source_card_family_id", "source_identity_key",
+    "label_policy_version", "previous_lifetime_label", "lifetime_label",
+    "previous_recent_label", "recent_label", "evidence_json", "created_at",
+  ],
+  operator_source_selection_receipts: [
+    "id", "brand_key", "scope_type", "scope_id", "slot_key", "selection_order",
+    "source_identity_key", "source_card_family_id", "source_card_id", "engine_version",
+    "receipt_json", "created_at",
+  ],
+  operator_source_selection_plans: [
+    "id", "brand_key", "cycle_id", "slot_key", "selection_order",
+    "source_identity_key", "source_card_family_id", "source_card_id", "engine_version",
+    "receipt_json", "status", "created_at", "updated_at",
+  ],
+  operator_manifest_decision_influences: [
+    "id", "influence_key", "brand_key", "cycle_id", "slot_key", "scheduled_post_id",
+    "hypothesis_id", "strategy_version_id", "learning_brief_key",
+    "benchmark_snapshot_key", "family_key", "portfolio_role", "experiment_key",
+    "saved_pattern_identity_key", "decision_changed", "decision_change_types_json",
+    "decision_summary", "evidence_json", "influence_version", "created_at", "updated_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -571,7 +604,14 @@ const expectedObjects = [
   "idx_manifest_benchmarks_brand_created",
   "idx_manifest_run_comparisons_brand_created",
   "idx_manifest_pattern_intelligence_reuse",
-  "idx_manifest_follower_checkpoints_brand_created",
+    "idx_manifest_follower_checkpoints_brand_created",
+  "idx_operator_source_family_evidence_labels",
+  "idx_operator_source_family_label_transitions",
+  "idx_operator_source_selection_receipts_scope",
+  "idx_operator_source_selection_plans_cycle",
+  "idx_manifest_decision_influences_brand_created",
+  "idx_manifest_decision_influences_scheduled",
+
 
 
   "idx_scheduled_posts_due",

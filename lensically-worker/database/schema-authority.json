@@ -1,14 +1,11 @@
 {
   "version": "lensically-database-authority-v1",
-    "status": "incremental_migration_extraction",
+        "status": "migration_authority_complete",
     "canonical_migration_directory": "database/migrations",
   "legacy_migration_directory": "migrations",
 
   "target_state": "All tables, columns, indexes, triggers, rebuilds, and retirements are owned by ordered versioned migrations. Runtime code performs bounded integrity probes only.",
-                        "runtime_ddl_sources": [
-    "src/manifestProductIntegration.ts",
-    "src/sourceFamilySelection.ts"
-  ],
+                                                "runtime_ddl_sources": [],
     "temporary_table_suffixes": [
     "_rebuild"
   ],
@@ -79,7 +76,12 @@
     "operator_manifest_benchmark_snapshots",
     "operator_manifest_run_comparisons",
     "operator_manifest_saved_pattern_intelligence",
-    "operator_manifest_follower_checkpoints",
+        "operator_manifest_follower_checkpoints",
+    "operator_source_family_evidence_states",
+    "operator_source_family_label_transitions",
+    "operator_source_selection_receipts",
+    "operator_source_selection_plans",
+    "operator_manifest_decision_influences",
     "operator_operational_incidents",
     "operator_operational_observations",
     "operator_post_metric_snapshots",
@@ -107,8 +109,11 @@
     "src/index.ts",
     "src/manifestIntelligence.ts",
         "src/manifestIntelligenceEngine.ts",
-    "src/manifestMeasurementAudit.ts"
+        "src/manifestMeasurementAudit.ts",
+    "src/manifestProductIntegration.ts",
+    "src/sourceFamilySelection.ts"
   ],
+  "repository_runtime_ddl_complete": true,
     "declared_duplicate_owners": {},
     "retired_tables": [
     "operator_workflow_sessions",
