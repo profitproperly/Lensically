@@ -18449,6 +18449,7 @@ type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
 const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "getOperatorStartupContext",
+  "getEngineeringContinuation",
   "executeLensicallyIntent",
   "engineeringPrecheck",
     "getEngineeringAccessState",
@@ -18489,7 +18490,8 @@ const REPO_PATH_SCHEMA = {
 };
 
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
-  { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "getEngineeringContinuation", title: "Get engineering continuation", description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
       {
     name: "recordHardeningIncident",
@@ -19853,6 +19855,7 @@ const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
 
 const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "getOperatorStartupContext",
+  "getEngineeringContinuation",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
@@ -20005,8 +20008,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       .filter((tool) => tool.name !== "list_accounts")
       .map((tool) => createScopedOperatorWrapperTool(tool, "vx", "Vectrix", "Vectrix")),
   ] : [];
-    const directPriority = new Map([
+        const directPriority = new Map([
         ["getOperatorStartupContext", 0],
+    ["getEngineeringContinuation", 1],
     ["selectOperatorKey", 1],
     ["confirmOperatorProceed", 2],
                 ["getScheduledPostSchedulerState", 6],
@@ -21278,7 +21282,9 @@ function resolveExactCapabilityToolName(value: unknown): string | null {
     repository_file_listing: "listRepoFiles",
     list_repository_files: "listRepoFiles",
     list_repo_files: "listRepoFiles",
-    repository_file_read: "readRepoFile",
+        repository_file_read: "readRepoFile",
+    engineering_continuation: "getEngineeringContinuation",
+    get_engineering_continuation: "getEngineeringContinuation",
     search_repository_files: "searchRepoFiles",
     repository_symbol_search: "searchRepoFiles",
   };
@@ -21822,7 +21828,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 ] as const;
 
 function operatorPreCallProvider(toolName: string): string {
-        if (["listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
+                if (["getEngineeringContinuation", "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
         if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
     if (["schedule_approved_draft", "schedule_manifest_review_batch", "delete_scheduled_post", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
@@ -22209,7 +22215,7 @@ export function isExpectedHardeningControlResult(
 }
 
 const HARDENING_REPAIR_TOOLS = new Set<string>([
-  "getOperatorStartupContext", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
+    "getOperatorStartupContext", "getEngineeringContinuation", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
             "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "createCloudflarePagesProject", "deployCloudflarePagesProject", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
@@ -22921,7 +22927,7 @@ async function recordOperatorExecutionDecision(
 
 function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
-    "getOperatorStartupContext", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
+        "getOperatorStartupContext", "getEngineeringContinuation", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
@@ -24245,8 +24251,9 @@ async function handleOperatorMcpAdminTool(
     };
     const campaignSegment = campaignSegmentAliases[rawCampaignSegment] ?? rawCampaignSegment;
     const liveReadSegments: Record<string, Set<string>> = {
-      engineering_reads: new Set([
+            engineering_reads: new Set([
         "getOperatorStartupContext",
+        "getEngineeringContinuation",
         "engineeringPrecheck",
         "getEngineeringAccessState",
         "getHardeningStatus",
@@ -24621,8 +24628,9 @@ async function handleOperatorMcpAdminTool(
       [campaignBrandKey],
     );
     const accountBase = { brand_key: campaignBrandKey, proceed_confirmed: true };
-    const readFixtures: Record<string, Record<string, unknown> | null> = {
+        const readFixtures: Record<string, Record<string, unknown> | null> = {
       getOperatorStartupContext: {},
+      getEngineeringContinuation: {},
       engineeringPrecheck: {},
       getEngineeringAccessState: {},
       getHardeningStatus: {},
@@ -24668,7 +24676,8 @@ async function handleOperatorMcpAdminTool(
     };
     const liveReadRows: Array<Record<string, unknown>> = [];
     const canonicalLiveHost = new URL(request.url).hostname === new URL(DEFAULT_WORKER_ORIGIN).hostname;
-    const externalLiveReadTools = new Set([
+        const externalLiveReadTools = new Set([
+      "getEngineeringContinuation",
       "listRepoFiles",
       "searchRepoFiles",
       "readRepoFile",
@@ -25148,6 +25157,26 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
+          if (toolName === "getEngineeringContinuation") {
+    const path = "ENGINEERING_CONTINUATION.md";
+    const file = await getGithubFile(env, path);
+    if (!file.ok || file.content === null) {
+      return { ok: false, error: "engineering_continuation_unavailable", status: file.status, path };
+    }
+    const status = file.content.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown";
+    return {
+      ok: true,
+      status_kind: "engineering_continuation",
+      authority: "canonical_repository_file",
+      path,
+      status,
+      file_sha: file.sha,
+      size: file.size,
+      content: file.content,
+      startup_rule: "Reconcile with getRepoStatus, then continue only the Current Action recorded in this file.",
+    };
+  }
+
         if (toolName === "getOperatorStartupContext") {
         return buildOperatorStartupContext(request, env);
   }
@@ -25185,7 +25214,8 @@ async function handleOperatorMcpEngineeringTool(
         admin_public_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
             tool_block_prevention: [
-        "Use getOperatorStartupContext only for deliberate non-account bootstrap; engineeringPrecheck is sufficient for routine engineering.",
+                "Use getOperatorStartupContext only for deliberate non-account bootstrap; engineeringPrecheck is sufficient for routine engineering.",
+        "Call getEngineeringContinuation before starting or resuming an implementation; never reconstruct active engineering state from chat memory.",
         "Call one advertised direct typed Main tool for each external operation.",
         "Use readRepoFile with line bounds for known files.",
         "Use applyRepoTextPatch only for one isolated replacement.",

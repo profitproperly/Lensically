@@ -106,6 +106,7 @@
 ## Engineering and Release
 
 - GitHub `main` is the repository source of truth.
+- `ENGINEERING_CONTINUATION.md` is the single root-level authority for active implementation state. The fixed-path `getEngineeringContinuation` tool exposes it directly to fresh chats; it is rewritten after each checkpoint and explicitly reports idle when no implementation is active.
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
 - Normal implementation flow is bounded inspection, one coherent change set, focused exact-head validation, one gated release, and live health and smoke verification.
 - Main validation and deployment run through GitHub Actions. Routine pushes use fast validation, complete Operator coverage uses eight deterministic parallel shards, and production uses one explicit exact-SHA release workflow.
