@@ -76,6 +76,11 @@ import {
   findOperatorMcpToolDefinition,
   isOperatorPublicDirectToolName,
 } from "./operatorMcpToolDirectory";
+import {
+  OPERATOR_MCP_ENGINEERING_TOOL_NAMES as EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
+  OPERATOR_MCP_ENGINEERING_TOOLS as EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOLS,
+} from "./operatorMcpEngineeringRegistry";
+
 
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
 
@@ -17422,6 +17427,7 @@ const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   { name: "listEngineeringAudit", title: "List engineering audit", description: "List compact audit entries for source edits, workflow dispatches, deploys, and memory updates.", inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 }, action: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
 ];
+void OPERATOR_MCP_ENGINEERING_TOOLS;
 
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
     {
@@ -18649,7 +18655,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
 
 
 const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
-const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
+const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
 
 function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
   return OPERATOR_MCP_ADMIN_TOOL_NAME_SET.has(value);
@@ -18703,7 +18709,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     ["skip_manifest_review_source", 16],
   ]);
     return buildOperatorMcpToolDefinitions({
-    engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
+        engineeringTools: EXTRACTED_OPERATOR_MCP_ENGINEERING_TOOLS,
     adminTools: OPERATOR_MCP_ADMIN_TOOLS,
     accountTools: OPERATOR_MCP_TOOLS,
     includeScopedWrappers,
