@@ -138,6 +138,24 @@ jobs:
         working-directory: lensically-worker
         run: npm ci
 
+      - name: Apply Stage 3 autonomous workflow consolidation
+        if: hashFiles('lensically-worker/.apply-stage3-cleanup') != ''
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+          node --check scripts/apply-worker-cleanup-stage3.mjs
+          node scripts/apply-worker-cleanup-stage3.mjs
+          rm scripts/apply-worker-cleanup-stage3.mjs .apply-stage3-cleanup
+          git diff --check
+          npx tsc --noEmit
+          npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+          npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
+          git config user.name "Lensically Operator"
+          git config user.email "operator@lensically.com"
+          git add -A src test/humanFreeAutonomy.spec.ts scripts/apply-worker-cleanup-stage3.mjs .apply-stage3-cleanup
+          git commit -m "Consolidate autonomous workflow runtime"
+          git push origin HEAD:main
+
       - name: Restore web dependencies
         id: web_cache
         uses: actions/cache@v4
