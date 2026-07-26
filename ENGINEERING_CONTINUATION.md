@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 87a4490228834ffc3bf88e27ab5cb721418cecd4
-production_sha: 87a4490228834ffc3bf88e27ab5cb721418cecd4
+repository_base_sha: e750cab51e9d1facff97b96a18fd4a396418dec1
+production_sha: e750cab51e9d1facff97b96a18fd4a396418dec1
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -94,17 +94,37 @@ Completed checkpoint — Stage 4D scheduling and publishing schema extraction:
 - Exact-SHA migration-first release passed in run `30211881673`.
 - Live production independently confirmed exact SHA `87a4490228834ffc3bf88e27ab5cb721418cecd4`.
 
-Current sub-action — Stage 4E account and Threads-profile schema extraction:
+Completed checkpoint — Stage 4E account and Threads-profile schema extraction:
 
-Characterize and move the next dependency-complete identity cluster into ordered migrations, including compatibility rebuilds and the remaining `users` cleanup-trigger dependency:
+- Added `0003_account_and_profile_identity.sql`.
+- Moved complete migration ownership for:
+  - `users`
+  - `app_threads_accounts`
+  - `threads_accounts`
+  - `threads_profile_cache`
+  - `meta_deletion_requests`
+- Removed request-time account-table creation, column additions, indexes, triggers, composite-key rebuilds, token-table primary-key rebuilds, rebuild retries, and the unused multi-shape account write fallback.
+- Preserved composite app-account identity, one active connected account per user, connection tombstones, admin tombstone cleanup, configured account routing, stored access tokens and expiry, Threads profile cache data, Meta deletion receipts, user-existence guards, and user cleanup.
+- Added an isolated `IDENTITY_UPGRADE_DB` fixture covering the legacy single-account primary key, malformed token table, profile restoration, deletion-receipt preservation, guard triggers, and cleanup behavior.
+- Converted shared tests to preserve the newly migration-owned identity tables.
+- The first release attempt stopped before deployment in run `30212929692` because the existing `users` cleanup trigger still referenced `app_threads_accounts` during its rebuild.
+- Fixed migration `0003` to remove legacy account triggers before rebuilding and added that exact production trigger state to the upgrade regression.
+- Push validation passed in run `30213039560`.
+- All eight Operator shards passed in run `30213096930`.
+- Exact-SHA migration-first release passed in run `30213157810`.
+- Live production independently confirmed exact SHA `e750cab51e9d1facff97b96a18fd4a396418dec1`.
 
-- `app_threads_accounts`
-- `threads_accounts`
-- `threads_profile_cache`
-- `meta_deletion_requests`
-- temporary account rebuild tables and associated indexes/triggers
+Current sub-action — Stage 4F Threads measurement cache and archive schema extraction:
 
-Preserve account routing, canonical account selection, encrypted token storage, connection state, token expiry, profile cache behavior, Meta deletion receipts, user cleanup semantics, and all existing production data. Eliminate request-time rebuilds and schema mutation without weakening account isolation.
+Characterize and move the next coherent measurement-storage cluster into ordered migrations:
+
+- `threads_user_insights_cache`
+- `threads_post_insights_cache`
+- `threads_posts_cache_state`
+- `threads_posts_archive`
+- `operator_post_metric_snapshots`
+
+Preserve all cached account insights, post metrics, archive history, pagination cursor state, engagement totals, lineage identifiers, anomaly quarantine fields, learning-validity flags, collection sources, indexes, refresh timestamps, and existing production data. Move the `engagement_total` and metric-snapshot compatibility columns into explicit upgrade migrations and reduce runtime preparation functions to bounded integrity checks.
 
 Remaining Stage 4 work after this cluster:
 
