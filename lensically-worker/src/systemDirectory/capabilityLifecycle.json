@@ -6,7 +6,8 @@
     "captured_on": "2026-07-18",
     "active_tool_names": [
             "getOperatorStartupContext",
-      "getEngineeringContinuation",
+            "getEngineeringContinuation",
+      "getDatabaseSchemaState",
       "executeLensicallyIntent",
       "engineeringPrecheck",
       "getEngineeringAccessState",
@@ -97,7 +98,8 @@
       "operating.startup",
       "operating.current_state",
             "operating.rules",
-      "engineering.continuation",
+            "engineering.continuation",
+      "engineering.database_schema",
       "engineering.repository",
       "engineering.operator_validation",
       "analytics.monthly_growth",
@@ -214,6 +216,17 @@
             "focused_regression": "routes fresh-chat engineering continuation directly to the canonical handoff",
       "release_scope": "operator-engineering",
       "live_verification": "The exact deployed Main MCP exposes getEngineeringContinuation and returns the root ENGINEERING_CONTINUATION.md content, status, file identity, and startup reconciliation rule without repository search inputs.",
+      "compatibility_bridge": false
+    },
+        {
+      "capability_id": "engineering.read_database_schema",
+      "directory_entry_id": "engineering.database_schema",
+      "canonical_handler": "getDatabaseSchemaState",
+      "route_intent": "get database schema state",
+      "implementation_mode": "new_handler",
+      "focused_regression": "reads the bounded database schema authority state without mutation",
+      "release_scope": "operator-engineering",
+      "live_verification": "The exact deployed Main MCP returns bounded sqlite_master tables, indexes, triggers, or views with pagination and optional SQL without changing D1 schema or data.",
       "compatibility_bridge": false
     },
     {

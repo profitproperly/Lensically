@@ -18449,7 +18449,8 @@ type OperatorMcpAdminToolName = typeof OPERATOR_MCP_ADMIN_TOOL_NAMES[number];
 
 const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "getOperatorStartupContext",
-  "getEngineeringContinuation",
+    "getEngineeringContinuation",
+  "getDatabaseSchemaState",
   "executeLensicallyIntent",
   "engineeringPrecheck",
     "getEngineeringAccessState",
@@ -18491,7 +18492,8 @@ const REPO_PATH_SCHEMA = {
 
 const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     { name: "getOperatorStartupContext", title: "Get operator startup context", description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: "getEngineeringContinuation", title: "Get engineering continuation", description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    { name: "getEngineeringContinuation", title: "Get engineering continuation", description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "getDatabaseSchemaState", title: "Get database schema state", description: "Read a bounded page of canonical SQLite schema objects from the live D1 database for migration reconciliation and integrity verification. This never changes schema or data.", inputSchema: { type: "object", properties: { object_type: { type: "string", enum: ["all", "table", "index", "trigger", "view"], default: "all" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 50, default: 25 }, include_sql: { type: "boolean", default: false } }, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: false } },
   
       {
     name: "recordHardeningIncident",
@@ -19855,7 +19857,8 @@ const FORBIDDEN_RETIRED_TOOL_NAMES = new Set([
 
 const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>([
   "getOperatorStartupContext",
-  "getEngineeringContinuation",
+    "getEngineeringContinuation",
+  "getDatabaseSchemaState",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "listRepoFiles",
@@ -20010,7 +20013,8 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   ] : [];
         const directPriority = new Map([
         ["getOperatorStartupContext", 0],
-    ["getEngineeringContinuation", 1],
+        ["getEngineeringContinuation", 1],
+    ["getDatabaseSchemaState", 2],
     ["selectOperatorKey", 1],
     ["confirmOperatorProceed", 2],
                 ["getScheduledPostSchedulerState", 6],
@@ -21283,8 +21287,10 @@ function resolveExactCapabilityToolName(value: unknown): string | null {
     list_repository_files: "listRepoFiles",
     list_repo_files: "listRepoFiles",
         repository_file_read: "readRepoFile",
-    engineering_continuation: "getEngineeringContinuation",
+        engineering_continuation: "getEngineeringContinuation",
     get_engineering_continuation: "getEngineeringContinuation",
+    database_schema_state: "getDatabaseSchemaState",
+    get_database_schema_state: "getDatabaseSchemaState",
     search_repository_files: "searchRepoFiles",
     repository_symbol_search: "searchRepoFiles",
   };
@@ -21828,7 +21834,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 ] as const;
 
 function operatorPreCallProvider(toolName: string): string {
-                if (["getEngineeringContinuation", "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
+                        if (["getEngineeringContinuation", "getDatabaseSchemaState", "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
         if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
     if (["schedule_approved_draft", "schedule_manifest_review_batch", "delete_scheduled_post", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
@@ -22215,7 +22221,7 @@ export function isExpectedHardeningControlResult(
 }
 
 const HARDENING_REPAIR_TOOLS = new Set<string>([
-    "getOperatorStartupContext", "getEngineeringContinuation", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
+      "getOperatorStartupContext", "getEngineeringContinuation", "getDatabaseSchemaState", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
             "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "createCloudflarePagesProject", "deployCloudflarePagesProject", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
@@ -22927,7 +22933,7 @@ async function recordOperatorExecutionDecision(
 
 function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
-        "getOperatorStartupContext", "getEngineeringContinuation", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
+            "getOperatorStartupContext", "getEngineeringContinuation", "getDatabaseSchemaState", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
@@ -24253,7 +24259,8 @@ async function handleOperatorMcpAdminTool(
     const liveReadSegments: Record<string, Set<string>> = {
             engineering_reads: new Set([
         "getOperatorStartupContext",
-        "getEngineeringContinuation",
+                "getEngineeringContinuation",
+        "getDatabaseSchemaState",
         "engineeringPrecheck",
         "getEngineeringAccessState",
         "getHardeningStatus",
@@ -24630,7 +24637,8 @@ async function handleOperatorMcpAdminTool(
     const accountBase = { brand_key: campaignBrandKey, proceed_confirmed: true };
         const readFixtures: Record<string, Record<string, unknown> | null> = {
       getOperatorStartupContext: {},
-      getEngineeringContinuation: {},
+            getEngineeringContinuation: {},
+      getDatabaseSchemaState: { limit: 1, include_sql: false },
       engineeringPrecheck: {},
       getEngineeringAccessState: {},
       getHardeningStatus: {},
@@ -25157,7 +25165,49 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-          if (toolName === "getEngineeringContinuation") {
+            if (toolName === "getDatabaseSchemaState") {
+    const allowedTypes = new Set(["all", "table", "index", "trigger", "view"]);
+    const objectType = String(args.object_type ?? "all").trim().toLowerCase();
+    if (!allowedTypes.has(objectType)) return { ok: false, error: "invalid_schema_object_type" };
+    const offset = Math.max(0, Math.floor(Number(args.offset ?? 0)));
+    const limit = Math.min(50, Math.max(1, Math.floor(Number(args.limit ?? 25))));
+    const includeSql = args.include_sql === true;
+    const filterSql = objectType === "all"
+      ? "name NOT LIKE 'sqlite_%'"
+      : "type = ? AND name NOT LIKE 'sqlite_%'";
+    const countStatement = env.DB.prepare(`SELECT COUNT(*) AS total FROM sqlite_master WHERE ${filterSql}`);
+    const pageStatement = env.DB.prepare(`SELECT type, name, tbl_name, sql FROM sqlite_master WHERE ${filterSql} ORDER BY type, name LIMIT ? OFFSET ?`);
+    const countRow = objectType === "all"
+      ? await countStatement.first<{ total?: number }>()
+      : await countStatement.bind(objectType).first<{ total?: number }>();
+    const pageResult = objectType === "all"
+      ? await pageStatement.bind(limit, offset).all<Record<string, unknown>>()
+      : await pageStatement.bind(objectType, limit, offset).all<Record<string, unknown>>();
+    const objects = (pageResult.results ?? []).map((row) => ({
+      type: row.type,
+      name: row.name,
+      table_name: row.tbl_name,
+      ...(includeSql ? { sql: row.sql ?? null } : {}),
+    }));
+    const total = Number(countRow?.total ?? 0);
+    const userVersion = await env.DB.prepare("PRAGMA user_version").first<Record<string, unknown>>();
+    return {
+      ok: true,
+      status_kind: "database_schema_state",
+      authority: "live_d1_sqlite_master",
+      object_type: objectType,
+      include_sql: includeSql,
+      offset,
+      limit,
+      total,
+      returned_count: objects.length,
+      next_offset: offset + objects.length < total ? offset + objects.length : null,
+      user_version: Number(userVersion?.user_version ?? 0),
+      objects,
+    };
+  }
+
+  if (toolName === "getEngineeringContinuation") {
     const path = "ENGINEERING_CONTINUATION.md";
     const file = await getGithubFile(env, path);
     if (!file.ok || file.content === null) {
