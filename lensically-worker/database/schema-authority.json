@@ -19,7 +19,11 @@
     "extracted_tables": [
         "app_threads_accounts",
     "batch_schedule_presets",
-    "external_patterns",
+        "external_patterns",
+    "gpt_generation_drafts",
+    "gpt_generation_runs",
+    "gpt_post_strategy_tags",
+    "gpt_preflight_snapshots",
     "gpt_strategy_memory",
     "meta_deletion_requests",
     "scheduled_post_deletions",

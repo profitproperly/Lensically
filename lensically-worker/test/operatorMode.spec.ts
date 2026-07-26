@@ -637,15 +637,16 @@ async function resetTables(): Promise<void> {
 
     "operator_production_board_items",
 
-    "operator_context_admissions",
+        "operator_context_admissions",
     "operator_workflow_sessions",
-                "gpt_generation_drafts",
-    "gpt_generation_runs",
-        "gpt_post_strategy_tags",
     ]) {
     await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
-      await env.DB.prepare("DELETE FROM operator_post_metric_snapshots").run();
+        await env.DB.prepare("DELETE FROM gpt_generation_drafts").run();
+  await env.DB.prepare("DELETE FROM gpt_generation_runs").run();
+  await env.DB.prepare("DELETE FROM gpt_post_strategy_tags").run();
+  await env.DB.prepare("DELETE FROM gpt_preflight_snapshots").run();
+  await env.DB.prepare("DELETE FROM operator_post_metric_snapshots").run();
   await env.DB.prepare("DELETE FROM threads_posts_archive").run();
   await env.DB.prepare("DELETE FROM threads_posts_cache_state").run();
   await env.DB.prepare("DELETE FROM threads_post_insights_cache").run();
