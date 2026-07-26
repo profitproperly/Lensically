@@ -24,6 +24,7 @@ on:
           - threads-publish-tests
                     - human-free-tests
           - architecture-baseline
+          - gpt-memory-tests
           - worker-deploy
       release_id:
         description: Compact exact-SHA release identity
