@@ -37466,7 +37466,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
     }
 
-    if (normalizedPath.startsWith("/api/gpt/")) {
+        if (normalizedPath.startsWith("/api/gpt/")) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "legacy_gpt_api_retired",
+        replacement: "Lensically Operator Mode direct typed tools",
+        human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+      }), {
+        status: 410,
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
       if (!isGptRequestAuthorized(request, env)) {
         return unauthorizedGptResponse();
       }
@@ -39331,6 +39340,20 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+        if (normalizedPath.startsWith("/api/gpt-memory/")) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "gpt_memory_retired",
+        human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+      }), {
+        status: 410,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
     if (normalizedPath === "/api/gpt-memory/dashboard" && request.method === "GET") {
       const brand = await resolveGptBrandForThreadsUserId(env, url.searchParams.get("threads_user_id"));
       if (!brand) {
@@ -40982,30 +41005,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
-        if (url.pathname === "/api/threads/intelligence-dashboard" && request.method === "GET") {
-      const selectedThreadsUserId = url.searchParams.get("threads_user_id")?.trim() || null;
-      const brand = await resolveGptBrandForThreadsUserId(env, selectedThreadsUserId);
-            if (!brand) {
-        return new Response(JSON.stringify({ error: "Manifest account not connected" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json", ...requestCorsHeaders },
-        });
-      }
-            await ensureOperatorPostMetricSnapshotsTable(env);
-      await ensureGptPostStrategyTagsTable(env);
-      await ensureOperatorWorkflowTables(env);
-      await ensureExternalPatternsTable(env);
-      await ensureThreadsFollowerSnapshotsTable(env);
-      await ensureOperatorPerformanceEvaluatorTables(env);
-            await ensureManifestMeasurementAuditTables(env.DB);
-      await ensureManifestProductIntegrationTables(env.DB);
-      const rawLimit = Number(url.searchParams.get("limit") ?? "20");
-      const dashboard = await buildManifestIntelligenceDashboard(env.DB, {
-        brand_key: brand.brand_key,
-        limit: Number.isFinite(rawLimit) ? rawLimit : 20,
-      });
-      return new Response(JSON.stringify(dashboard), {
-        status: 200,
+            if (url.pathname === "/api/threads/intelligence-dashboard") {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "intelligence_dashboard_retired",
+        intelligence_backend_active: true,
+      }), {
+        status: 410,
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
@@ -41210,6 +41216,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           },
         },
       );
+    }
+
+        if (url.pathname.startsWith("/api/agent/")) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "legacy_agent_mode_retired",
+        local_execution_active: false,
+      }), {
+        status: 410,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
     }
 
     if (url.pathname === "/api/agent/accounts" && request.method === "GET") {
@@ -42792,6 +42813,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           headers: { "content-type": "application/json; charset=UTF-8" },
         },
       );
+    }
+
+        if (url.pathname.startsWith("/api/automation/") || url.pathname.startsWith("/internal/automation/")) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "legacy_automation_api_retired",
+        replacement: "autonomous cycle MCP tools",
+      }), {
+        status: 410,
+        headers: { "content-type": "application/json; charset=UTF-8" },
+      });
     }
 
     if (url.pathname === "/api/automation/claim-daily-run" && request.method === "POST") {
