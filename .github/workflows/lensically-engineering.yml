@@ -73,23 +73,6 @@ jobs:
         working-directory: lensically-worker
         run: npm ci
 
-      - name: Apply staged Worker cleanup
-        if: hashFiles('lensically-worker/.apply-stage2-cleanup') != ''
-        working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node scripts/apply-worker-cleanup-stage2.mjs
-          rm scripts/apply-worker-cleanup-stage2.mjs .apply-stage2-cleanup
-          git diff --check
-          npx tsc --noEmit
-          npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
-          npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
-          git config user.name "Lensically Operator"
-          git config user.email "operator@lensically.com"
-          git add -A src scripts/apply-worker-cleanup-stage2.mjs .apply-stage2-cleanup
-          git commit -m "Physically remove isolated retired Worker systems"
-          git push origin HEAD:main
-
       - name: Restore web dependencies
         id: push_web_cache
         uses: actions/cache@v4
