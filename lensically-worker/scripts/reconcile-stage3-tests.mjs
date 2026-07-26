@@ -6,10 +6,10 @@ const indexPath = resolve(root, "src/index.ts");
 const testPath = resolve(root, "test/operatorMode.spec.ts");
 let source = await readFile(indexPath, "utf8");
 let tests = await readFile(testPath, "utf8");
-const contractNeedle = "workflow_session_pattern_and_published_posts_required";
+const contractNeedle = 'if (toolName === "recover_published_post_lineage")';
 const contractIndex = source.indexOf(contractNeedle);
-if (contractIndex < 0) throw new Error("lineage recovery contract not found");
-process.stdout.write(`${source.slice(Math.max(0, contractIndex - 2600), contractIndex + 3600)}\n`);
+if (contractIndex < 0) throw new Error("lineage recovery handler not found");
+process.stdout.write(`${source.slice(contractIndex, contractIndex + 6000)}\n`);
 throw new Error("stage3_lineage_contract_context_captured");
 const changes = [];
 
