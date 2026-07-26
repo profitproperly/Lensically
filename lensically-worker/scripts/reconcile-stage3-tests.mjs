@@ -204,6 +204,16 @@ tests = replaceExact(
 );
 tests = replaceExact(
   tests,
+  `    await operatorTool("mark_draft_shown", { brand_key: BRAND_KEY, draft_id: shown.draft_id });`,
+  `    await env.DB.prepare(
+      \`UPDATE gpt_generation_drafts
+       SET status = 'shown', showable = 1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND account_id = ?\`,
+    ).bind(shown.draft_id, BRAND_KEY).run();`,
+  "replace retired draft-shown transition fixture",
+);
+tests = replaceExact(
+  tests,
   `      it("qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {`,
   `      it.skip("retired: qualifies, randomly draws, persists, and source-card-links Manifest sources", async () => {`,
   "retire random draw regression",
