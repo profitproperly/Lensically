@@ -605,16 +605,14 @@ async function resetTables(): Promise<void> {
         "operator_mcp_admin_errors",
     "operator_mcp_deployments",
     "operator_mcp_backlog_items",
-    "operator_repo_write_sessions",
-    "operator_engineering_audit",
+        "operator_repo_write_sessions",
                 "operator_execution_events",
     "operator_execution_map_promotions",
     "operator_execution_map_attempts",
     "operator_execution_map_incidents",
         "operator_execution_map_entries",
-        "operator_ops_memory",
+                "operator_ops_memory",
     "operator_mcp_tool_overrides",
-                                "operator_operational_incidents",
     "operator_review_batches",
 
 
@@ -626,6 +624,11 @@ async function resetTables(): Promise<void> {
     ]) {
         await env.DB.prepare(`DROP TABLE IF EXISTS ${table}`).run();
     }
+    await env.DB.prepare("DELETE FROM operator_operational_observations").run();
+  await env.DB.prepare("DELETE FROM operator_hardening_incident_events").run();
+  await env.DB.prepare("DELETE FROM operator_hardening_incidents").run();
+  await env.DB.prepare("DELETE FROM operator_engineering_audit").run();
+  await env.DB.prepare("DELETE FROM operator_operational_incidents").run();
   await env.DB.prepare("DELETE FROM operator_decision_execution_events").run();
   await env.DB.prepare("DELETE FROM operator_decision_proposals").run();
   await env.DB.prepare("DELETE FROM operator_autonomous_lineup_items").run();

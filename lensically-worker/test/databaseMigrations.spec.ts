@@ -14,7 +14,8 @@ const testEnv = env as typeof env & {
     SOURCE_UPGRADE_DB: D1Database;
   QUALITY_UPGRADE_DB: D1Database;
     CONTINUITY_UPGRADE_DB: D1Database;
-  CYCLE_DECISION_UPGRADE_DB: D1Database;
+    CYCLE_DECISION_UPGRADE_DB: D1Database;
+  ASSURANCE_UPGRADE_DB: D1Database;
 };
 
 const requiredColumns: Record<string, string[]> = {
@@ -168,9 +169,37 @@ const requiredColumns: Record<string, string[]> = {
     "result_evidence_json", "supersedes_decision_id", "approved_at", "rejected_at",
     "executed_at", "created_at", "updated_at",
   ],
-  operator_decision_execution_events: [
+    operator_decision_execution_events: [
     "id", "decision_id", "brand_key", "tool_name", "operation_id",
     "request_fingerprint", "status", "result_summary", "created_at", "completed_at",
+  ],
+  operator_operational_incidents: [
+    "id", "brand_key", "incident_key", "incident_type", "severity", "status",
+    "scheduled_post_id", "production_date", "scheduled_time", "observed_status",
+    "delivery_state", "published_post_id", "publish_error_message", "last_attempted_at",
+    "required_recovery_action", "evidence_json", "opened_at", "last_observed_at",
+    "resolved_at", "resolution_note", "created_at", "updated_at",
+  ],
+  operator_engineering_audit: [
+    "id", "action", "files_changed_json", "diff_summary", "tests_run_json", "result",
+    "deployment_id", "rollback_target", "owner_approval", "metadata_json", "created_at",
+  ],
+  operator_hardening_incidents: [
+    "id", "signature", "boundary", "severity", "classification", "state",
+    "affected_scope", "blocked_profile_id", "blocked_tool_name", "request_fingerprint",
+    "expected_json", "observed_json", "side_effect_state", "root_cause",
+    "generalized_cause", "prevention_rule_id", "regression_test_ids_json", "tested_sha",
+    "deployment_id", "live_verification_json", "resume_capsule_json", "resume_result_json",
+    "autonomy_dividend_json", "efficiency_result_json", "created_at", "updated_at",
+    "closed_at",
+  ],
+  operator_hardening_incident_events: [
+    "id", "incident_id", "from_state", "to_state", "evidence_json", "created_at",
+  ],
+  operator_operational_observations: [
+    "id", "operation_id", "incident_id", "profile_id", "capability", "outcome",
+    "duration_ms", "call_count", "external_requests", "repeated_fingerprint_count",
+    "progress_checkpoint", "metadata_json", "created_at",
   ],
     users: [
     "id", "email", "password_hash", "email_verified", "threads_user_id",
@@ -288,7 +317,14 @@ const expectedObjects = [
   "idx_operator_autonomous_lineup_gate",
   "idx_operator_decision_proposals_key",
   "idx_operator_decision_proposals_status",
-  "idx_operator_decision_execution_events_budget",
+    "idx_operator_decision_execution_events_budget",
+  "idx_operator_operational_incidents_open",
+  "trg_operator_operational_incidents_touch_updated_at",
+  "idx_operator_hardening_open_signature",
+  "idx_operator_hardening_state_severity",
+  "idx_operator_hardening_events_incident",
+  "idx_operator_observations_capability_created",
+  "trg_operator_hardening_touch_updated_at",
   "idx_scheduled_posts_due",
   "idx_scheduled_posts_user_id",
   "idx_scheduled_posts_threads_user_id",
