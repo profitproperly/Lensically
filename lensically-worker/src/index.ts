@@ -58,8 +58,11 @@ import {
   type ScheduledPostDeletionReasonCode,
 } from "./humanFreeAutonomy";
 
+import { assertDatabaseIntegrity } from "./databaseIntegrity";
+
 import {
   MANIFEST_ANALYSIS_WINDOW_DAYS,
+
   MANIFEST_EVIDENCE_PAGE_SIZE,
   MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
   MANIFEST_NONINTERFERENCE_POLICY,
