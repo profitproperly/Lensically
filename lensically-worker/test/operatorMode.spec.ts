@@ -3198,9 +3198,12 @@ describe("operator mode backend spine", () => {
         timezone: "America/New_York",
       }),
     });
-    const data = await response.json() as { blocking_failures?: Array<{ gate_key: string }> };
-    expect(response.status).toBe(400);
-    expect(data.blocking_failures?.some((failure) => failure.gate_key === "approved_before_schedule_gate")).toBe(true);
+    const data = await response.json() as { success?: boolean; error?: string };
+    expect(response.status).toBe(410);
+    expect(data).toMatchObject({
+      success: false,
+      error: "human_guidance_tool_retired",
+    });
   }, 30000);
 
       it.skip("retired: allows backend-supported review batch language while keeping each generation run source-card scoped", async () => {
