@@ -3769,6 +3769,74 @@ describe("canonical database migrations", () => {
     ).rejects.toThrow(/UNIQUE constraint failed/);
   });
 
+    it("preserves Manifest Measurement Audit learning, benchmark, comparison, pattern, and follower state across migration replay", async () => {
+    const suffix = crypto.randomUUID();
+    const probes = await seedManifestMeasurementAuditFixture(testEnv.DB, suffix);
+
+    await applyD1Migrations(
+      testEnv.DB,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_test_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhere(
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+  });
+
+  it("adopts the exact live Manifest Measurement Audit schema without losing learning, benchmark, comparison, pattern, or follower state", async () => {
+    const db = testEnv.MANIFEST_MEASUREMENT_AUDIT_UPGRADE_DB;
+    await materializeMigrationWithoutLedger(db, "0016_manifest_measurement_audit.sql");
+    const suffix = crypto.randomUUID();
+    const probes = await seedManifestMeasurementAuditFixture(db, suffix);
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_manifest_measurement_audit_upgrade_migrations",
+    );
+
+    const counts = await Promise.all(probes.map((probe) =>
+      countWhereIn(
+        db,
+        `SELECT COUNT(*) AS total FROM ${probe.table} WHERE ${probe.column} = ?`,
+        probe.value,
+      )));
+    expect(counts).toEqual(probes.map(() => 1));
+
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_learning_briefs (
+          id, brand_key, brief_key, brief_version, source_fingerprint, brief_json
+        ) VALUES ('duplicate-brief', ?, ?, 'brief-v1', 'duplicate', '{}')`,
+      ).bind(`brand-${suffix}`, `brief-key-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_saved_pattern_intelligence (
+          id, brand_key, pattern_identity_key, source_identity_key,
+          verified_metrics_json, semantic_json, mechanism_json,
+          adaptation_options_json, similarity_json, usage_json, results_json,
+          confidence_json, reuse_state, intelligence_version
+        ) VALUES ('duplicate-pattern', ?, ?, 'duplicate-source', '{}', '{}', '{}',
+          '[]', '{}', '{}', '{}', '{}', 'eligible', 'pattern-v1')`,
+      ).bind(`brand-${suffix}`, `pattern-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(
+      db.prepare(
+        `INSERT INTO operator_manifest_follower_checkpoints (
+          id, brand_key, checkpoint_key, threads_user_id, checkpoint_version,
+          followers_count, follower_goal, distance_to_goal, trajectory_json,
+          attribution_policy
+        ) VALUES ('duplicate-follower', ?, ?, 'threads', 'follower-v1', 1, 1000000,
+          999999, '{}', 'account_level_only')`,
+      ).bind(`brand-${suffix}`, `checkpoint-${suffix}`).run(),
+    ).rejects.toThrow(/UNIQUE constraint failed/);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;

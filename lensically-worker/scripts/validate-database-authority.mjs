@@ -241,8 +241,11 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     if (!migrationTests.includes("adopts the exact live Manifest Intelligence schema without losing policy, evidence, strategy, receipt, ban, or hypothesis state")) {
     errors.push("manifest_intelligence_upgrade_regression_missing");
   }
-  if (!migrationTests.includes("adopts the exact live Manifest Intelligence Engine schema without losing semantic, maturity, learning, portfolio, transition, or experiment state")) {
+    if (!migrationTests.includes("adopts the exact live Manifest Intelligence Engine schema without losing semantic, maturity, learning, portfolio, transition, or experiment state")) {
     errors.push("manifest_intelligence_engine_upgrade_regression_missing");
+  }
+  if (!migrationTests.includes("adopts the exact live Manifest Measurement Audit schema without losing learning, benchmark, comparison, pattern, or follower state")) {
+    errors.push("manifest_measurement_audit_upgrade_regression_missing");
   }
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
