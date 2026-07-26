@@ -288,6 +288,153 @@ describe("canonical database migrations", () => {
     });
   });
 
+    it("upgrades legacy account keys while preserving tokens, profiles, and deletion receipts", async () => {
+    const db = testEnv.IDENTITY_UPGRADE_DB;
+    await db.prepare(
+      `CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT,
+        email_verified INTEGER NOT NULL DEFAULT 0,
+        threads_user_id TEXT,
+        threads_username TEXT,
+        access_token TEXT,
+        token_expires_at INTEGER,
+        is_admin INTEGER NOT NULL DEFAULT 0,
+        connection_active INTEGER NOT NULL DEFAULT 1,
+        timezone TEXT NOT NULL DEFAULT 'UTC',
+        clock_format TEXT NOT NULL DEFAULT '12h',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO users (id, email, email_verified, is_admin)
+       VALUES ('legacy-owner', 'legacy-owner@example.com', 1, 1)`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE app_threads_accounts (
+        app_user_id TEXT PRIMARY KEY,
+        threads_user_id TEXT NOT NULL,
+        connection_active INTEGER NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        tombstone_expires_at TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO app_threads_accounts (
+        app_user_id, threads_user_id, connection_active, is_active,
+        tombstone_expires_at, created_at
+      ) VALUES (
+        'legacy-owner', 'legacy-threads', 1, 1, '2099-01-01T00:00:00.000Z', 1
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE threads_accounts (
+        threads_user_id TEXT NOT NULL,
+        access_token TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        configured_account_id TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO threads_accounts (
+        threads_user_id, access_token, expires_at, created_at, configured_account_id
+      ) VALUES ('legacy-threads', 'legacy-token', 4102444800, 1, 'manifest-mental')`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE threads_profile_cache (
+        threads_user_id TEXT PRIMARY KEY,
+        username TEXT,
+        name TEXT,
+        threads_biography TEXT,
+        is_verified INTEGER NOT NULL DEFAULT 0,
+        threads_profile_picture_url TEXT,
+        last_refreshed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO threads_profile_cache (
+        threads_user_id, username, name, threads_biography, is_verified,
+        threads_profile_picture_url
+      ) VALUES (
+        'legacy-threads', 'legacyuser', 'Legacy User', 'Legacy profile', 1,
+        'https://example.com/legacy.png'
+      )`,
+    ).run();
+    await db.prepare(
+      `CREATE TABLE meta_deletion_requests (
+        confirmation_code TEXT PRIMARY KEY,
+        platform_user_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT
+      )`,
+    ).run();
+    await db.prepare(
+      `INSERT INTO meta_deletion_requests (
+        confirmation_code, platform_user_id, status
+      ) VALUES ('legacy-confirmation', 'legacy-threads', 'pending')`,
+    ).run();
+
+    await applyD1Migrations(
+      db,
+      testEnv.TEST_MIGRATIONS,
+      "lensically_identity_upgrade_migrations",
+    );
+
+    const appColumns = await db.prepare("PRAGMA table_info(app_threads_accounts)")
+      .all<{ name: string; pk: number }>();
+    const appPrimaryKey = new Map((appColumns.results ?? []).map((column) => [column.name, Number(column.pk)]));
+    expect(appPrimaryKey.get("app_user_id")).toBe(1);
+    expect(appPrimaryKey.get("threads_user_id")).toBe(2);
+
+    const tokenColumns = await db.prepare("PRAGMA table_info(threads_accounts)")
+      .all<{ name: string; pk: number }>();
+    expect((tokenColumns.results ?? []).find((column) => column.name === "threads_user_id")?.pk).toBe(1);
+
+    const identity = await db.prepare(
+      `SELECT a.tombstone_expires_at, t.access_token, t.configured_account_id,
+              p.username, p.threads_profile_picture_url, d.status
+       FROM app_threads_accounts a
+       JOIN threads_accounts t ON t.threads_user_id = a.threads_user_id
+       JOIN threads_profile_cache p ON p.threads_user_id = t.threads_user_id
+       JOIN meta_deletion_requests d ON d.platform_user_id = t.threads_user_id
+       WHERE a.app_user_id = 'legacy-owner'`,
+    ).first<Record<string, unknown>>();
+    expect(identity).toMatchObject({
+      tombstone_expires_at: null,
+      access_token: "legacy-token",
+      configured_account_id: "manifest-mental",
+      username: "legacyuser",
+      threads_profile_picture_url: "https://example.com/legacy.png",
+      status: "pending",
+    });
+
+    await db.prepare(
+      `INSERT INTO app_threads_accounts (
+        app_user_id, threads_user_id, connection_active, is_active, created_at
+      ) VALUES ('legacy-owner', 'second-threads', 1, 0, 2)`,
+    ).run();
+    expect(await countWhere.call({ DB: db }, "SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = 'legacy-owner'")).toBe(2);
+
+    await expect(
+      db.prepare(
+        `INSERT INTO app_threads_accounts (
+          app_user_id, threads_user_id, connection_active, is_active, created_at
+        ) VALUES ('missing-owner', 'missing-threads', 1, 1, 1)`,
+      ).run(),
+    ).rejects.toThrow(/foreign_key_violation:app_threads_accounts\.app_user_id/);
+
+    await db.prepare("DELETE FROM users WHERE id = 'legacy-owner'").run();
+    const remainingLinks = await db.prepare(
+      "SELECT COUNT(*) AS total FROM app_threads_accounts WHERE app_user_id = 'legacy-owner'",
+    ).first<CountRow>();
+    expect(Number(remainingLinks?.total ?? 0)).toBe(0);
+  });
+
   it("enforces parent-user guards and cascades cleanup through scheduling tables", async () => {
     const suffix = crypto.randomUUID();
     const missingUserId = `missing-${suffix}`;
