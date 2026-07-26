@@ -4612,34 +4612,17 @@ async function getFreshThreadsUserInsightsCache(
 }
 
 async function ensureThreadsFollowerSnapshotsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS threads_follower_snapshots (
-      threads_user_id TEXT NOT NULL CHECK (length(trim(threads_user_id)) > 0),
-      snapshot_date TEXT NOT NULL CHECK (length(trim(snapshot_date)) = 10),
-      followers_count INTEGER NOT NULL DEFAULT 0,
-      baseline_followers_count INTEGER,
-      captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (threads_user_id, snapshot_date)
-    )`,
-  ).run();
-
-  const tableInfo = await env.DB.prepare(
-    `PRAGMA table_info(threads_follower_snapshots)`,
-  ).all<{ name: string }>();
-
-  const columnNames = new Set((tableInfo.results ?? []).map((column) => column.name));
-  if (!columnNames.has("baseline_followers_count")) {
-    await env.DB.prepare(
-      `ALTER TABLE threads_follower_snapshots
-       ADD COLUMN baseline_followers_count INTEGER`,
-    ).run();
-  }
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_threads_follower_snapshots_captured_at
-     ON threads_follower_snapshots (captured_at)`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "threads_follower_snapshots",
+    columns: [
+      "threads_user_id",
+      "snapshot_date",
+      "followers_count",
+      "baseline_followers_count",
+      "captured_at",
+      "created_at",
+    ],
+  });
 }
 
 async function upsertThreadsFollowerSnapshot(
@@ -5414,154 +5397,48 @@ async function ensureOperatorPostMetricSnapshotsTable(env: Env): Promise<void> {
 }
 
 async function ensureExternalPatternsTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS external_patterns (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      app_user_id TEXT NOT NULL,
-      account_id TEXT NOT NULL DEFAULT 'manifest-mental',
-      platform TEXT NOT NULL DEFAULT 'threads',
-      source_url TEXT NOT NULL,
-      post_id TEXT,
-      author_handle TEXT,
-      author_display_name TEXT,
-      post_text TEXT NOT NULL,
-      likes INTEGER NOT NULL DEFAULT 0,
-      replies INTEGER NOT NULL DEFAULT 0,
-      reposts INTEGER NOT NULL DEFAULT 0,
-      shares INTEGER NOT NULL DEFAULT 0,
-      views INTEGER,
-      posted_at TEXT,
-      capture_confidence TEXT NOT NULL DEFAULT 'medium',
-      raw_payload TEXT,
-      saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(app_user_id, account_id, source_url)
-    )`,
-  ).run();
-
-    const tableInfo = await env.DB.prepare("PRAGMA table_info(external_patterns)").all<{ name: string }>();
-  const hasAccountId = (tableInfo.results ?? []).some((column) => column.name === "account_id");
-  if (!hasAccountId) {
-    await env.DB.prepare(
-      `ALTER TABLE external_patterns
-       ADD COLUMN account_id TEXT NOT NULL DEFAULT 'manifest-mental'`,
-    ).run();
-  }
-  await addColumnIfMissing(env, "external_patterns", "post_id", "TEXT");
-
-  const duplicatePostIds = await env.DB.prepare(
-    `SELECT app_user_id, account_id, platform, post_id, MIN(id) AS stable_id, MAX(id) AS latest_id, COUNT(*) AS total
-     FROM external_patterns
-     WHERE post_id IS NOT NULL
-       AND trim(post_id) <> ''
-     GROUP BY app_user_id, account_id, platform, post_id
-     HAVING COUNT(*) > 1`,
-  ).all<Record<string, unknown>>();
-  for (const duplicate of duplicatePostIds.results ?? []) {
-    const stableId = Number(duplicate.stable_id ?? 0);
-    const latestId = Number(duplicate.latest_id ?? 0);
-    if (!stableId || !latestId) {
-      continue;
-    }
-    if (stableId !== latestId) {
-      await env.DB.prepare(
-        `UPDATE external_patterns
-         SET platform = latest.platform,
-             source_url = latest.source_url,
-             post_id = latest.post_id,
-             author_handle = latest.author_handle,
-             author_display_name = latest.author_display_name,
-             post_text = latest.post_text,
-             likes = latest.likes,
-             replies = latest.replies,
-             reposts = latest.reposts,
-             shares = latest.shares,
-             views = latest.views,
-             posted_at = latest.posted_at,
-             capture_confidence = latest.capture_confidence,
-             raw_payload = latest.raw_payload,
-             updated_at = latest.updated_at
-         FROM external_patterns AS latest
-         WHERE external_patterns.id = ?
-           AND latest.id = ?`,
-      ).bind(stableId, latestId).run();
-    }
-    await env.DB.prepare(
-      `DELETE FROM external_patterns
-       WHERE app_user_id = ?
-         AND account_id = ?
-         AND platform = ?
-         AND post_id = ?
-         AND id <> ?`,
-    ).bind(
-      String(duplicate.app_user_id ?? ""),
-      String(duplicate.account_id ?? ""),
-      String(duplicate.platform ?? "threads"),
-      String(duplicate.post_id ?? ""),
-      stableId,
-    ).run();
-  }
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_updated
-
-     ON external_patterns (app_user_id, account_id, updated_at DESC, id DESC)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_external_patterns_user_likes
-     ON external_patterns (app_user_id, account_id, likes DESC, views DESC, updated_at DESC, id DESC)`,
-  ).run();
-
-    await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_external_patterns_user_account_source
-     ON external_patterns (app_user_id, account_id, source_url)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_external_patterns_user_account_post
-     ON external_patterns (app_user_id, account_id, platform, post_id)
-     WHERE post_id IS NOT NULL AND trim(post_id) <> ''`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "external_patterns",
+    columns: [
+      "id",
+      "app_user_id",
+      "account_id",
+      "platform",
+      "source_url",
+      "post_id",
+      "author_handle",
+      "author_display_name",
+      "post_text",
+      "likes",
+      "replies",
+      "reposts",
+      "shares",
+      "views",
+      "posted_at",
+      "capture_confidence",
+      "raw_payload",
+      "saved_at",
+      "updated_at",
+    ],
+  });
 }
 
 
 async function ensureGptStrategyMemoryTable(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS gpt_strategy_memory (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      account_id TEXT NOT NULL,
-      threads_user_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      title TEXT,
-      body TEXT NOT NULL,
-      metadata_json TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_gpt_strategy_memory_account_kind_updated
-     ON gpt_strategy_memory (account_id, kind, updated_at DESC, id DESC)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_gpt_strategy_memory_threads_updated
-     ON gpt_strategy_memory (threads_user_id, updated_at DESC, id DESC)`,
-  ).run();
-
-  await env.DB.prepare(
-    `CREATE TRIGGER IF NOT EXISTS trg_gpt_strategy_memory_touch_updated_at
-     AFTER UPDATE ON gpt_strategy_memory
-     FOR EACH ROW
-     WHEN NEW.updated_at = OLD.updated_at
-     BEGIN
-       UPDATE gpt_strategy_memory
-       SET updated_at = CURRENT_TIMESTAMP
-       WHERE id = NEW.id;
-     END`,
-  ).run();
+  await assertDatabaseIntegrity(env.DB, {
+    table: "gpt_strategy_memory",
+    columns: [
+      "id",
+      "account_id",
+      "threads_user_id",
+      "kind",
+      "title",
+      "body",
+      "metadata_json",
+      "created_at",
+      "updated_at",
+    ],
+  });
 }
 
 function normalizeGptStrategyMemoryKind(value: unknown): GptStrategyMemoryKind | null {
