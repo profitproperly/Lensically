@@ -166,6 +166,7 @@ jobs:
         working-directory: lensically-worker
         env:
           TASK: ${{ inputs.task }}
+          RELEASE_ID: ${{ inputs.release_id }}
         run: |
           set -euo pipefail
           case "${TASK}" in
