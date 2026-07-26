@@ -388,7 +388,7 @@ replaceRange(
           canonical_tool: "updateGrowthMission",
           last_completed_action: "account_configuration_inspected",
         };
-  const operationId = `${brand.brand_key}:${next.action}:${String(calendarCoverage.current_local_date ?? "current")}`;
+  const operationId = \`\${brand.brand_key}:\${next.action}:\${String(calendarCoverage.current_local_date ?? "current")}\`;
   return {
     version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
     choice,
