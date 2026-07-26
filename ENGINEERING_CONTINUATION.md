@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: b1ec3495732289fd64c69df57ab762f37d7ab590
-production_sha: a2e5a163dfb864923aa9ac3072154ed162ed5ed3
+repository_base_sha: da5388288a6283a0d819490f948580a2cb904a36
+production_sha: 49112210f6ce97b9a3b71b610a7c068c05614607
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -34,7 +34,22 @@ Stage 3 evidence:
 
 Establish one canonical, versioned database migration authority with one schema owner per table.
 
-Required work:
+Completed checkpoint — Stage 4A authority inventory:
+
+- Added `lensically-worker/database/schema-authority.json` as the canonical ownership contract.
+- Added `scripts/validate-database-authority.mjs` and wired it into release preflight.
+- Measured 93 active tables, six runtime DDL sources, 98 table-creation statements, 13 runtime alters, 101 indexes, 20 triggers, two rebuild tables, two duplicate table owners, and one retired-table recreation.
+- Typecheck/lifecycle validation passed in run `30208354969`.
+- Push validation passed in run `30208346869`.
+
+Current sub-action — Stage 4B duplicate ownership and retirement cleanup:
+
+- Remove duplicate runtime ownership for `external_patterns` and `threads_follower_snapshots`.
+- Reconcile the `gpt_strategy_memory` retirement conflict against its remaining consumers before any destructive migration.
+- Keep the authority receipt green while shrinking declared transitional debt.
+
+Remaining Stage 4 work:
+
 
 - Inventory every active runtime `ensure*`, inline `CREATE TABLE`, `ALTER TABLE`, trigger, compatibility rebuild, and retirement operation still executed from application code.
 - Map each active table to its canonical migration and runtime consumers.
