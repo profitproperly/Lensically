@@ -35605,8 +35605,8 @@ async function deleteScheduledPostForAppUser(
     env.DB.prepare(
       `INSERT INTO scheduled_post_deletions (
         id, scheduled_post_id, user_id, threads_user_id, post_text, scheduled_time,
-        status_before, reason, deleted_by, deletion_source, operation_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                status_before, reason_code, reason, deleted_by, deletion_source, operation_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       deletionId,
       scheduledPostId,
@@ -35779,8 +35779,8 @@ async function deleteScheduledPostsForAppUserBatch(
   const statements = newRecords.map((record) => env.DB.prepare(
     `INSERT INTO scheduled_post_deletions (
       id, scheduled_post_id, user_id, threads_user_id, post_text, scheduled_time,
-      status_before, reason, deleted_by, deletion_source, operation_id, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            status_before, reason_code, reason, deleted_by, deletion_source, operation_id, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     record.id,
     record.scheduled_post_id,
