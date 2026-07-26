@@ -19290,7 +19290,7 @@ const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
         name: "recoverOverdueScheduledPosts",
     title: "Recover or retire scheduled posts while paused",
-        description: "While the universal scheduler is paused, retire up to 25 approved unpublished future or overdue rows through unobserved operational receipts, or move overdue rows to explicit future timestamps. Recovery requires an objective structured reason code and never creates model-learning evidence.";
+            description: "While the universal scheduler is paused, retire up to 25 approved unpublished future or overdue rows through unobserved operational receipts, or move overdue rows to explicit future timestamps. Recovery requires an objective structured reason code and never creates model-learning evidence.",
     inputSchema: {
       type: "object",
       properties: {
