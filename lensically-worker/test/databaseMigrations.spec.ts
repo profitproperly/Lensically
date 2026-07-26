@@ -543,6 +543,152 @@ async function countWhere(sql: string, ...bindings: unknown[]): Promise<number> 
   return Number(row?.total ?? 0);
 }
 
+async function countWhereIn(db: D1Database, sql: string, ...bindings: unknown[]): Promise<number> {
+  const row = await db.prepare(sql).bind(...bindings).first<CountRow>();
+  return Number(row?.total ?? 0);
+}
+
+async function materializeMigrationWithoutLedger(db: D1Database, migrationName: string): Promise<void> {
+  const migrations = testEnv.TEST_MIGRATIONS as Array<{ name: string; queries: string[] }>;
+  const migration = migrations.find((candidate) => candidate.name === migrationName);
+  expect(migration, `Missing test migration ${migrationName}`).toBeDefined();
+  for (const query of migration?.queries ?? []) {
+    await db.prepare(query).run();
+  }
+}
+
+type MigrationFixtureProbe = {
+  table: string;
+  column: string;
+  value: string;
+};
+
+async function seedManifestIntelligenceFixture(
+  db: D1Database,
+  suffix: string,
+): Promise<MigrationFixtureProbe[]> {
+  const cycleId = `cycle-${suffix}`;
+  const snapshotId = `snapshot-${suffix}`;
+  const strategyId = `strategy-${suffix}`;
+  const planItemId = `plan-${suffix}`;
+
+  await db.prepare(
+    `INSERT INTO operator_manifest_intelligence_policies (
+      brand_key, policy_version, policy_json
+    ) VALUES (?, 'policy-v1', '{"analysis_window_days":28}')`,
+  ).bind(`brand-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_strategy_versions (
+      id, brand_key, version, contract_version, strategy_hash, strategy_json
+    ) VALUES (?, ?, 1, 'strategy-v1', ?, '{"focus":"quality"}')`,
+  ).bind(`strategy-version-${suffix}`, `brand-${suffix}`, `strategy-hash-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_exposure_snapshots (
+      id, cycle_id, brand_key, ledger_version, as_of, timezone, source_hash
+    ) VALUES (?, ?, ?, 'ledger-v1', '2099-01-01T00:00:00Z', 'America/New_York', ?)`,
+  ).bind(`exposure-${suffix}`, cycleId, `brand-${suffix}`, `exposure-hash-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_evidence_snapshots (
+      id, cycle_id, brand_key, snapshot_version, as_of, timezone, window_start,
+      window_end, source_hash
+    ) VALUES (?, ?, ?, 'snapshot-v1', '2099-01-01T00:00:00Z', 'America/New_York',
+      '2098-12-04T00:00:00Z', '2099-01-01T00:00:00Z', ?)`,
+  ).bind(snapshotId, cycleId, `brand-${suffix}`, `evidence-hash-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_evidence_posts (
+      id, snapshot_id, brand_key, published_post_id, text, published_at,
+      age_hours, maturity_state
+    ) VALUES (?, ?, ?, ?, 'Evidence fixture', '2098-12-31T00:00:00Z', 24, 'mature')`,
+  ).bind(`evidence-post-${suffix}`, snapshotId, `brand-${suffix}`, `published-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_evidence_pages (
+      id, snapshot_id, cycle_id, brand_key, page_index, page_contract_version,
+      item_count, byte_count, items_json
+    ) VALUES (?, ?, ?, ?, 0, 'page-v1', 1, 100, '[{"id":"post-1"}]')`,
+  ).bind(`page-${suffix}`, snapshotId, cycleId, `brand-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_analysis_page_reads (
+      id, snapshot_id, cycle_id, brand_key, page_index
+    ) VALUES (?, ?, ?, ?, 0)`,
+  ).bind(`page-read-${suffix}`, snapshotId, cycleId, `brand-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_cycle_strategies (
+      id, cycle_id, brand_key, snapshot_id, contract_version,
+      account_conclusion_json, content_focus_json, benchmarks_json, directives_json,
+      lineup_json, strategy_hash, locked_at
+    ) VALUES (?, ?, ?, ?, 'cycle-strategy-v1', '{}', '{}', '{}', '{}', '[]', ?,
+      '2099-01-01T01:00:00Z')`,
+  ).bind(strategyId, cycleId, `brand-${suffix}`, snapshotId, `cycle-strategy-hash-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_cycle_plan_items (
+      id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+      family_key, strategic_role, generation_mode, source_kind, audience_reward,
+      hook_direction, placement_reason, exploration_mode
+    ) VALUES (?, ?, ?, ?, '2099-01-01-01', '2099-01-01', '01:00', 'family-1',
+      'coverage', 'source_backed', 'source_card', 'recognition', 'question',
+      'Preserve quality', 'controlled')`,
+  ).bind(planItemId, strategyId, cycleId, `brand-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_candidate_gate_receipts (
+      id, cycle_id, strategy_id, plan_item_id, brand_key, slot_key,
+      candidate_hash, receipt_version, results_json, passed
+    ) VALUES (?, ?, ?, ?, ?, '2099-01-01-01', ?, 'gate-v1', '{"all_passed":true}', 1)`,
+  ).bind(`gate-${suffix}`, cycleId, strategyId, planItemId, `brand-${suffix}`, `candidate-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_hard_bans (
+      id, brand_key, rule_key, description, rule_type, pattern, source_authority
+    ) VALUES (?, ?, ?, 'Fixture ban', 'literal', 'forbidden phrase', 'owner')`,
+  ).bind(`ban-${suffix}`, `brand-${suffix}`, `ban-key-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_cycle_receipts (
+      id, cycle_id, brand_key, operation_id, receipt_version, trigger_json,
+      startup_state_json, started_at
+    ) VALUES (?, ?, ?, ?, 'receipt-v1', '{"trigger":"scheduled"}', '{}',
+      '2099-01-01T00:00:00Z')`,
+  ).bind(`receipt-${suffix}`, cycleId, `brand-${suffix}`, `operation-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_cycle_receipt_events (
+      id, cycle_id, brand_key, event_key, event_type, payload_json
+    ) VALUES (?, ?, ?, ?, 'checkpoint', '{"phase":"evidence"}')`,
+  ).bind(`receipt-event-${suffix}`, cycleId, `brand-${suffix}`, `event-key-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_cycle_defect_receipts (
+      id, cycle_id, brand_key, defect_key, receipt_version, stage_number, stage_key,
+      phase, error_code, error_message, impact_state, first_seen_at, last_seen_at
+    ) VALUES (?, ?, ?, ?, 'defect-v1', 4, 'schema', 'validation', 'fixture_error',
+      'Fixture defect', 'contained', '2099-01-01T00:00:00Z', '2099-01-01T00:00:00Z')`,
+  ).bind(`defect-${suffix}`, cycleId, `brand-${suffix}`, `defect-key-${suffix}`).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_post_hypotheses (
+      id, cycle_id, brand_key, slot_key, hypothesis_version, source_kind, source_type,
+      expected_response_type, expected_audience_reward, hook_rationale,
+      premise_rationale, exploration_mode, expected_performance_range_json,
+      uncertainty
+    ) VALUES (?, ?, ?, '2099-01-01-01', 'hypothesis-v1', 'internal', 'source_card',
+      'engagement', 'recognition', 'Question hook', 'Proven premise', 'controlled',
+      '{"likes_min":100}', 'medium')`,
+  ).bind(`hypothesis-${suffix}`, cycleId, `brand-${suffix}`).run();
+
+  return [
+    { table: "operator_manifest_intelligence_policies", column: "brand_key", value: `brand-${suffix}` },
+    { table: "operator_manifest_strategy_versions", column: "id", value: `strategy-version-${suffix}` },
+    { table: "operator_manifest_exposure_snapshots", column: "id", value: `exposure-${suffix}` },
+    { table: "operator_manifest_evidence_snapshots", column: "id", value: snapshotId },
+    { table: "operator_manifest_evidence_posts", column: "id", value: `evidence-post-${suffix}` },
+    { table: "operator_manifest_evidence_pages", column: "id", value: `page-${suffix}` },
+    { table: "operator_manifest_analysis_page_reads", column: "id", value: `page-read-${suffix}` },
+    { table: "operator_manifest_cycle_strategies", column: "id", value: strategyId },
+    { table: "operator_manifest_cycle_plan_items", column: "id", value: planItemId },
+    { table: "operator_manifest_candidate_gate_receipts", column: "id", value: `gate-${suffix}` },
+    { table: "operator_manifest_hard_bans", column: "id", value: `ban-${suffix}` },
+    { table: "operator_manifest_cycle_receipts", column: "id", value: `receipt-${suffix}` },
+    { table: "operator_manifest_cycle_receipt_events", column: "id", value: `receipt-event-${suffix}` },
+    { table: "operator_manifest_cycle_defect_receipts", column: "id", value: `defect-${suffix}` },
+    { table: "operator_manifest_post_hypotheses", column: "id", value: `hypothesis-${suffix}` },
+  ];
+}
+
+
 describe("canonical database migrations", () => {
   it("creates every extracted table with the required columns, indexes, and triggers", async () => {
     for (const [table, expectedColumns] of Object.entries(requiredColumns)) {
