@@ -29,6 +29,8 @@ const operatorMcpStrategyScheduleRegistry = read("src/operatorMcpStrategySchedul
 const operatorMcpStrategyScheduleRegistryTests = read("test/operatorMcpStrategyScheduleRegistry.spec.ts");
 const operatorMcpManifestCycleRegistry = read("src/operatorMcpManifestCycleRegistry.ts");
 const operatorMcpManifestCycleRegistryTests = read("test/operatorMcpManifestCycleRegistry.spec.ts");
+const operatorMcpAutonomousExecutionRegistry = read("src/operatorMcpAutonomousExecutionRegistry.ts");
+const operatorMcpAutonomousExecutionRegistryTests = read("test/operatorMcpAutonomousExecutionRegistry.spec.ts");
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
@@ -96,6 +98,9 @@ if (!workflow.includes("test/operatorMcpStrategyScheduleRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpManifestCycleRegistry.spec.ts")) {
   errors.push("operator_mcp_manifest_cycle_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpAutonomousExecutionRegistry.spec.ts")) {
+  errors.push("operator_mcp_autonomous_execution_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -104,7 +109,7 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpAutonomousExecutionRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
@@ -312,6 +317,26 @@ if (!operatorMcpManifestCycleRegistryTests.includes("preserves the exact ordered
     || !operatorMcpManifestCycleRegistryTests.includes("preserves seven-stage defect evidence and durable repair verification")
     || !operatorMcpManifestCycleRegistryTests.includes("preserves complete analysis consumption and source-backed strategy locking")) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpAutonomousExecutionRegistry"')) {
+  lifecycleErrors.push("operator_mcp_autonomous_execution_registry_import_missing");
+}
+if (source.includes('{ name: "prepare_manifest_autonomous_cycle"')
+    || source.includes('{ name: "persist_manifest_autonomous_post"')
+    || source.includes('{ name: "review_manifest_scheduled_post"')) {
+  lifecycleErrors.push("operator_mcp_autonomous_execution_registry_returned_to_index");
+}
+if (!operatorMcpAutonomousExecutionRegistry.includes("export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOL_NAMES")
+    || !operatorMcpAutonomousExecutionRegistry.includes("export type OperatorMcpAutonomousExecutionToolName")
+    || !operatorMcpAutonomousExecutionRegistry.includes("export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_autonomous_execution_registry_module_incomplete");
+}
+if (!operatorMcpAutonomousExecutionRegistryTests.includes("preserves the exact ordered three-tool autonomous execution registry")
+    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves immediate prepare invocation and rolling runway bounds")
+    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves one-post source lineage, hypothesis, and idempotency contracts")
+    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves complete model evaluation and nonempty gate evidence")
+    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves optional owner review and slot-preserving replacement")) {
+  lifecycleErrors.push("operator_mcp_autonomous_execution_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
@@ -629,10 +654,10 @@ const manifestAutonomousGrowthChecks = [
     && cycleDecisionMigration.includes("CREATE TABLE IF NOT EXISTS operator_decision_execution_events")
     && source.includes('table: "operator_decision_proposals"')
     && source.includes('table: "operator_decision_execution_events"')],
-  ["prepare_tool", source.includes('name: "prepare_manifest_autonomous_cycle"')],
+    ["prepare_tool", operatorMcpAutonomousExecutionRegistry.includes('name: "prepare_manifest_autonomous_cycle"')],
     ["analysis_page_tool", operatorMcpManifestCycleRegistry.includes('name: "get_manifest_cycle_analysis_page"')],
   ["cycle_strategy_tool", operatorMcpManifestCycleRegistry.includes('name: "commit_manifest_cycle_strategy"')],
-  ["persist_tool", source.includes('name: "persist_manifest_autonomous_post"')],
+  ["persist_tool", operatorMcpAutonomousExecutionRegistry.includes('name: "persist_manifest_autonomous_post"')],
   ["retired_monolithic_commit", source.includes('error: "retired_monolithic_autonomous_commit"')],
     ["source_backed_only", source.includes('source_backed_generation_only: true')
     && source.includes('canonical_source_card_required')
@@ -647,7 +672,7 @@ const manifestAutonomousGrowthChecks = [
     && source.includes('manifest_cycle_plan_item_mismatch')],
   ["hard_ban_enforcement", source.includes('canonical_hard_ban_evaluation_incomplete')],
   ["nonempty_gate_execution", source.includes('required_candidate_gate_execution_empty') && source.includes('candidate_gate_receipt_failed')],
-  ["placement_and_exposure_assessment", source.includes('slot_placement_assessment: { type: "string"') && source.includes('recent_exposure_assessment: { type: "string"')],
+    ["placement_and_exposure_assessment", operatorMcpAutonomousExecutionRegistry.includes('slot_placement_assessment: { type: "string"') && operatorMcpAutonomousExecutionRegistry.includes('recent_exposure_assessment: { type: "string"')],
   ["live_reconciliation", source.includes('refreshManifestAutonomousThreadsSnapshot') && source.includes('buildManifestAutonomousCoverageLedger')],
   ["intelligence_v3", manifestIntelligence.includes('MANIFEST_INTELLIGENCE_FOUNDATION_VERSION = "manifest-intelligence-foundation-v3"')],
   ["rolling_windows", manifestIntelligence.includes('MANIFEST_ANALYSIS_WINDOW_DAYS = 28') && manifestIntelligence.includes('MANIFEST_RECENT_EXPOSURE_HOURS = 72')],
