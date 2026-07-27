@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: bb39b0ca018e4305231ba92649572430db58302b
-production_sha: bb39b0ca018e4305231ba92649572430db58302b
+repository_base_sha: c2d99cec386503aafbc402d6307ed003905f8ae1
+production_sha: c2d99cec386503aafbc402d6307ed003905f8ae1
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -516,23 +516,40 @@ Completed checkpoint — Stage 5E MCP routing-policy extraction:
 - Exact-SHA release passed in run `30278227698`.
 - Live production independently confirmed exact SHA `bb39b0ca018e4305231ba92649572430db58302b` with 75/75 public tools.
 
-Current sub-action — Stage 5F MCP transport and error-shaping extraction:
+Completed checkpoint — Stage 5F MCP transport and error-shaping extraction:
 
-Extract pure MCP response construction from `src/index.ts` into a focused module:
+- Added `src/operatorMcpTransport.ts` as the pure authority for JSON responses, cache/content headers, JSON-RPC errors, tool-result envelopes, canonical success/failure completion text, runtime identity headers, and bounded transport-failure responses.
+- Removed local `mcpJsonResponse` and `mcpErrorResponse` implementations from `src/index.ts`; retained only env-dependent adapters for runtime metadata and deployment identity.
+- Replaced the final tool completion envelope and twelve direct-tool error, replay, idempotency, boundary, and autonomy envelopes with extracted transport helpers.
+- Confirmed `src/index.ts` contains zero hand-built `structuredContent/content/isError` envelopes.
+- Added `test/operatorMcpTransport.spec.ts` covering exact status codes, headers, JSON-RPC IDs/errors/data, tool envelopes, completion language, deployment/session headers, runtime evidence, and 500-character failure-message bounds.
+- Added release-preflight enforcement preventing response shaping from returning to `index.ts` and requiring focused tests in both push and exact-release gates.
+- Push validation passed in run `30279777650`.
+- All eight Operator shards passed in run `30279998668`.
+- Exact-SHA release passed in run `30280096298`.
+- Live production independently confirmed exact SHA `c2d99cec386503aafbc402d6307ed003905f8ae1` with 75/75 public tools.
 
-- JSON transport responses and shared response headers
-- JSON-RPC success envelopes
-- JSON-RPC error envelopes and optional structured error data
-- standard direct-tool success/failure text content construction
-- unsupported-method, invalid-tool, boundary-block, and internal-error result shaping that does not perform routing or domain execution
+Current sub-action — Stage 5G MCP dispatcher-shell extraction and Stage 5 completion audit:
 
-Preserve exact status codes, JSON-RPC IDs, `structuredContent`, text content, `isError`, CORS/cache headers, tool failure language, required-next-action closure text, and existing client compatibility. Add focused tests and release-preflight enforcement before exact-SHA release.
+Extract the remaining protocol dispatcher shell from `src/index.ts` into a focused dependency-injected module:
 
-Remaining Stage 5 work after this checkpoint:
+- request-method and authorization admission
+- JSON-RPC parsing and method validation
+- initialize, session validation, initialized notification, ping, and tools/list dispatch
+- direct-tool versus registered-gateway admission
+- tools/call orchestration through injected guards, routing, authorization, handlers, receipts, hardening, and action-closure callbacks
+- unsupported method and internal-error termination
 
-- Extract the remaining protocol request/response dispatcher shell.
-- Run the Stage 5 completion audit proving protocol, registries, directory, routing policy, transport, and dispatcher composition no longer live as monolithic implementations in `src/index.ts`.
-- Leave business/domain tool execution for Stage 6 product-service extraction.
+Do not move domain/business implementations, database queries, OAuth handlers, authorization storage, execution guards, autonomy controllers, or account services. Preserve exact request methods, status codes, session headers, runtime metadata, public direct-tool contract, all error texts, handler order, idempotency, hardening behavior, and 75 public tools.
+
+After release, run the Stage 5 completion audit proving protocol metadata, tool construction, registries, directory, composition, routing policy, response transport, and dispatcher composition no longer live as monolithic implementations in `src/index.ts`.
+
+Remaining work after this checkpoint:
+
+- Stage 6 product-service extraction.
+- Stage 7 router and runtime composition.
+- Stage 8 test and release modernization.
+- Stage 9 final comparison, cleanup, validation, and production release.
 
 ## Remaining
 
