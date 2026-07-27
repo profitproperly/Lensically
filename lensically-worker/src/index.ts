@@ -100,6 +100,11 @@ import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycl
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
 import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
 import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
+import {
+  manifestCycleFailureIsDefect as manifestCycleFailureIsDefectService,
+  observeOperatorManifestCycleToolResult,
+} from "./operatorManifestCycleObservationService";
+
 
 
 
@@ -12307,47 +12312,7 @@ async function reviewManifestScheduledPost(
 
 
 export function manifestCycleFailureIsDefect(errorCode: unknown): boolean {
-  const code = normalizeOperatorMachineKey(errorCode, "");
-  if (!code) return false;
-  const expected = [
-    "candidate_gate_suite_failed", "complete_cycle_strategy_required", "cycle_id_and_snapshot_id_required",
-    "autonomous_cycle_id_required", "autonomous_cycle_not_found", "autonomous_cycle_strategy_required",
-    "autonomous_cycle_plan_item_required", "cycle_strategy_identity_mismatch", "cycle_plan_item_identity_mismatch",
-    "slot_already_occupied", "exact_duplicate", "duplicate", "hard_ban", "source_fidelity",
-    "operation_already_in_progress", "prior_operation_in_progress", "continuation_required",
-    "retired_monolithic_autonomous_commit", "manifest_only", "brand_key_required",
-  ];
-  return !expected.some((surface) => code.includes(surface));
-}
-
-function manifestCycleToolScope(
-  toolName: string,
-  payload: Record<string, unknown>,
-  result: Record<string, unknown>,
-): { stageNumber: number; stageKey: string; phase: string; slotKey: string | null } | null {
-  const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
-    ? payload.post as Record<string, unknown>
-    : {};
-  const postDate = normalizeOperatorText(post.date, 20, true);
-  const postTime = normalizeOperatorText(post.time, 20, true);
-  const slotKey = normalizeOperatorText(result.slot_key, 40, true)
-    ?? normalizeOperatorText(payload.slot_key, 40, true)
-    ?? (postDate && postTime ? `${postDate}T${postTime}` : null);
-  if (toolName === "get_manifest_cycle_analysis_page") return { stageNumber: 2, stageKey: "evidence_consumption", phase: "analysis_page", slotKey: null };
-  if (toolName === "commit_manifest_cycle_strategy") return { stageNumber: 3, stageKey: "strategy_and_lineup", phase: "strategy_commit", slotKey: null };
-  if (toolName === "persist_manifest_autonomous_post") return { stageNumber: 5, stageKey: "persistence_and_scheduling", phase: "single_slot_persist", slotKey };
-  if (toolName === "get_hourly_coverage") return { stageNumber: 6, stageKey: "coverage_and_completion", phase: "coverage_reconciliation", slotKey };
-  if (toolName === "prepare_manifest_autonomous_cycle") {
-    const phase = normalizeOperatorMachineKey(result.stage ?? result.phase ?? result.checkpoint_phase, "preparation");
-    const evaluatorPhase = ["evaluator", "intelligence", "measurement", "content_focus", "learning"].some((surface) => phase.includes(surface));
-    return {
-      stageNumber: evaluatorPhase ? 7 : 1,
-      stageKey: evaluatorPhase ? "post_publication_evaluator" : "preparation_and_reconciliation",
-      phase,
-      slotKey: null,
-    };
-  }
-  return null;
+  return manifestCycleFailureIsDefectService(errorCode);
 }
 
 async function observeManifestCycleToolResult(
@@ -12357,65 +12322,25 @@ async function observeManifestCycleToolResult(
   payload: Record<string, unknown>,
   result: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  if (brand.brand_key !== "manifest_mental") return result;
-  const cycleId = normalizeOperatorText(payload.cycle_id ?? result.cycle_id, 160, true);
-  const scope = manifestCycleToolScope(toolName, payload, result);
-  if (!cycleId || !scope) return result;
-  const succeeded = result.success !== false && result.ok !== false;
-  if (succeeded) {
-    const resolved = await resolveManifestCycleDefectsByScope(env.DB, {
-      cycleId,
-      brandKey: brand.brand_key,
-      stageKey: scope.stageKey,
-      phase: scope.phase,
-      slotKey: scope.slotKey,
-      verification: {
-        resolution_mode: "successful_scoped_retry_or_reconciliation",
-        tool_name: toolName,
-        operation_id: normalizeOperatorText(payload.operation_id, 240, true),
-        observed_result: {
-          success: result.success ?? result.ok ?? true,
-          scheduled_post_id: result.scheduled_post_id ?? null,
-          remaining_missing_count: result.remaining_missing_count ?? null,
-        },
-      },
-    });
-    return resolved.length ? { ...result, auto_resolved_defect_count: resolved.length } : result;
-  }
-  const errorCode = normalizeOperatorText(result.error ?? result.code, 300, true) ?? "manifest_cycle_tool_failed";
-  if (!manifestCycleFailureIsDefect(errorCode)) return result;
-  const operationId = normalizeOperatorText(payload.operation_id, 240, true);
-  const impactState = result.scheduled_post_id
-    ? "partially_succeeded"
-    : result.side_effect_state === "unknown"
-      ? "possibly_succeeded"
-      : "definitely_failed";
-  const defect = await recordManifestCycleDefect(env.DB, {
-    cycleId,
+  return observeOperatorManifestCycleToolResult({
     brandKey: brand.brand_key,
-    defectKey: `${toolName}:${scope.phase}:${scope.slotKey ?? "cycle"}:${normalizeOperatorMachineKey(errorCode, "failure")}`,
-    stageNumber: scope.stageNumber,
-    stageKey: scope.stageKey,
-    phase: scope.phase,
-    slotKey: scope.slotKey,
-    operationId,
-    errorCode,
-    errorMessage: normalizeOperatorText(result.message ?? result.error ?? result.code, 4000, true) ?? errorCode,
-    impactState,
-    retryable: result.retryable === true,
-    blocking: true,
-    reconciliation: result.reconciliation && typeof result.reconciliation === "object" && !Array.isArray(result.reconciliation)
-      ? result.reconciliation as Record<string, unknown>
-      : {},
-    metadata: {
-      tool_name: toolName,
-      result_keys: Object.keys(result).sort(),
-      side_effect_state: result.side_effect_state ?? null,
-      next_action: result.next_action ?? result.required_next_action ?? null,
-    },
+    toolName,
+    payload,
+    result,
+  }, {
+    normalizeText: normalizeOperatorText,
+    normalizeMachineKey: normalizeOperatorMachineKey,
+    resolveDefectsByScope: (input) => resolveManifestCycleDefectsByScope(
+      env.DB,
+      input as Parameters<typeof resolveManifestCycleDefectsByScope>[1],
+    ),
+    recordDefect: (input) => recordManifestCycleDefect(
+      env.DB,
+      input as Parameters<typeof recordManifestCycleDefect>[1],
+    ),
   });
-  return { ...result, defect_receipt_id: defect.id ?? null, defect_key: defect.defect_key ?? null };
 }
+
 
 async function handleOperatorTool(request: Request, env: Env, toolName: string): Promise<Response> {
   if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
