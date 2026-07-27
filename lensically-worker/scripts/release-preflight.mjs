@@ -51,6 +51,9 @@ const operatorManifestPrepareCheckpointService = read("src/operatorManifestPrepa
 const operatorManifestPrepareCheckpointServiceTests = read("test/operatorManifestPrepareCheckpointService.spec.ts");
 const operatorManifestCycleConstructionService = read("src/operatorManifestCycleConstructionService.ts");
 const operatorManifestCycleConstructionServiceTests = read("test/operatorManifestCycleConstructionService.spec.ts");
+const operatorManifestPersistenceAdmissionService = read("src/operatorManifestPersistenceAdmissionService.ts");
+const operatorManifestPersistenceAdmissionServiceTests = read("test/operatorManifestPersistenceAdmissionService.spec.ts");
+
 
 
 
@@ -158,6 +161,10 @@ if (!workflow.includes("test/operatorManifestPrepareCheckpointService.spec.ts"))
 if (!workflow.includes("test/operatorManifestCycleConstructionService.spec.ts")) {
   errors.push("operator_manifest_cycle_construction_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestPersistenceAdmissionService.spec.ts")) {
+  errors.push("operator_manifest_persistence_admission_service_workflow_gate_missing");
+}
+
 
 
 
@@ -710,6 +717,34 @@ if (!operatorManifestCycleConstructionServiceTests.includes("constructs a new au
     || !operatorManifestCycleConstructionServiceTests.includes("completes a fully occupied horizon without source-plan work")) {
   lifecycleErrors.push("operator_manifest_cycle_construction_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestPersistenceAdmissionService"')
+    || !source.includes("admitOperatorManifestPersistence({")
+    || !source.includes("registerExperimentAssignment: (input)")) {
+  lifecycleErrors.push("operator_manifest_persistence_admission_service_import_or_binding_missing");
+}
+if (source.includes("replayed_persist_event: true")
+    || source.includes("candidate_requires_reslot: liveMissing.length > 0")
+    || source.includes('eventType: "post_reused"')) {
+  lifecycleErrors.push("operator_manifest_persistence_admission_service_returned_to_index");
+}
+if (!operatorManifestPersistenceAdmissionService.includes("export async function admitOperatorManifestPersistence")
+    || !operatorManifestPersistenceAdmissionService.includes("dependencies.getCycleStrategy")
+    || !operatorManifestPersistenceAdmissionService.includes("dependencies.getEvidenceConsumption")
+    || !operatorManifestPersistenceAdmissionService.includes("dependencies.getCyclePlanItem")
+    || !operatorManifestPersistenceAdmissionService.includes("dependencies.buildCoverage")
+    || !operatorManifestPersistenceAdmissionService.includes("dependencies.getPublishLineage")
+    || !operatorManifestPersistenceAdmissionService.includes("replayed_persist_event: true")
+    || !operatorManifestPersistenceAdmissionService.includes('eventType: "post_reused"')) {
+  lifecycleErrors.push("operator_manifest_persistence_admission_service_module_incomplete");
+}
+if (!operatorManifestPersistenceAdmissionServiceTests.includes("rejects candidates that do not match the locked cycle plan")
+    || !operatorManifestPersistenceAdmissionServiceTests.includes("returns a typed continuation only after every admission check passes")
+    || !operatorManifestPersistenceAdmissionServiceTests.includes("reconciles an elapsed slot without treating it as a fatal persistence failure")
+    || !operatorManifestPersistenceAdmissionServiceTests.includes("replays an exact prior persistence receipt without duplicating lineage mutations")
+    || !operatorManifestPersistenceAdmissionServiceTests.includes("repairs and receipts an existing complete scheduled lineage")) {
+  lifecycleErrors.push("operator_manifest_persistence_admission_service_tests_incomplete");
+}
+
 
 
 
