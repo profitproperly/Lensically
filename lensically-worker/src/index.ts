@@ -106,6 +106,8 @@ import {
 } from "./operatorManifestCycleObservationService";
 import { readOperatorAccountState } from "./operatorAccountStateService";
 import { readOperatorLensicallyUiSurface } from "./operatorLensicallyUiSurfaceService";
+import { retireOperatorManifestReviewBatch } from "./operatorManifestReviewBatchRetirementService";
+
 
 
 
@@ -12600,50 +12602,30 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-  if (toolName === "discard_manifest_review_batch") {
-    if (brand.brand_key !== "manifest_mental") {
-      return operatorJsonResponse({ success: false, error: "review_batch_not_configured_for_brand" }, 400);
-    }
-    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120, true);
-    const reason = normalizeOperatorText(payload.reason, 2000);
-    if (!reason) {
-      return operatorJsonResponse({ success: false, error: "discard_reason_required" }, 400);
-    }
-    const batch = reviewBatchId
-      ? await env.DB.prepare(
+    if (toolName === "discard_manifest_review_batch") {
+    const retirement = await retireOperatorManifestReviewBatch({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      findBatch: (brandKey, reviewBatchId) => reviewBatchId
+        ? env.DB.prepare(
           `SELECT id, workflow_session_id, source_batch_id, production_date, status
            FROM operator_review_batches WHERE id = ? AND brand_key = ? LIMIT 1`,
-        ).bind(reviewBatchId, brand.brand_key).first<Record<string, unknown>>()
-      : await env.DB.prepare(
+        ).bind(reviewBatchId, brandKey).first<Record<string, unknown>>()
+        : env.DB.prepare(
           `SELECT id, workflow_session_id, source_batch_id, production_date, status
            FROM operator_review_batches
            WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
            ORDER BY datetime(updated_at) DESC LIMIT 1`,
-        ).bind(brand.brand_key).first<Record<string, unknown>>();
-    if (!batch) {
-      return operatorJsonResponse({ success: true, brand_key: brand.brand_key, retired: false, reason: "no_active_review_batch", source_records_preserved: true });
-    }
-    const priorStatus = String(batch.status ?? "");
-    if (!["retired", "completed"].includes(priorStatus)) {
-      await env.DB.prepare(
+        ).bind(brandKey).first<Record<string, unknown>>(),
+      retireBatch: (reviewBatchId, brandKey) => env.DB.prepare(
         `UPDATE operator_review_batches SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
-      ).bind(String(batch.id), brand.brand_key).run();
-    }
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      review_batch_id: batch.id,
-      workflow_session_id: batch.workflow_session_id ?? null,
-      source_batch_id: batch.source_batch_id ?? null,
-      production_date: batch.production_date ?? null,
-      previous_status: priorStatus,
-      status: "retired",
-      retired: priorStatus !== "retired",
-      source_records_preserved: true,
-      source_lineage_preserved: true,
-      reason,
+      ).bind(reviewBatchId, brandKey).run(),
     });
+    return operatorJsonResponse(retirement.body, retirement.status);
   }
+
 
                   if (toolName === "get_hourly_coverage") {
     const coverageResponse = await handleOperatorHourlyCoverageService({
