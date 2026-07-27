@@ -1079,10 +1079,10 @@ const manifestAutonomousGrowthChecks = [
   ["original_generation_modes_removed", !source.includes('"operator_hypothesis"')
     && !source.includes('"original_discovery"')
     && !source.includes('"market_response"')],
-  ["strategy_and_plan_required", source.includes('manifest_cycle_strategy_required_before_persist')
-    && source.includes('manifest_cycle_plan_item_required')
-    && source.includes('manifest_cycle_strategy_mismatch')
-    && source.includes('manifest_cycle_plan_item_mismatch')],
+    ["strategy_and_plan_required", operatorManifestPersistenceAdmissionService.includes('manifest_cycle_strategy_required_before_persist')
+    && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_plan_item_required')
+    && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_strategy_mismatch')
+    && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_plan_item_mismatch')],
   ["hard_ban_enforcement", source.includes('canonical_hard_ban_evaluation_incomplete')],
   ["nonempty_gate_execution", source.includes('required_candidate_gate_execution_empty') && source.includes('candidate_gate_receipt_failed')],
     ["placement_and_exposure_assessment", operatorMcpAutonomousExecutionRegistry.includes('slot_placement_assessment: { type: "string"') && operatorMcpAutonomousExecutionRegistry.includes('recent_exposure_assessment: { type: "string"')],
