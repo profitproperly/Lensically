@@ -89,11 +89,9 @@ import {
 } from "./operatorMcpRegistryComposition";
 import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
 import { dispatchOperatorMcpRequest } from "./operatorMcpDispatcher";
+import { dispatchOperatorMcpToolCall } from "./operatorMcpToolCallDispatcher";
 import {
   buildOperatorMcpRuntimeHeaders,
-  mcpErrorResponse,
-  mcpToolCompletionResponse,
-  mcpToolResultResponse,
   operatorTransportFailureResponse,
   type OperatorMcpJsonRpcId,
 } from "./operatorMcpTransport";
@@ -23080,436 +23078,114 @@ async function handleOperatorMcpToolCall(
   id: OperatorMcpJsonRpcId,
   params: Record<string, unknown>,
 ): Promise<Response> {
-  const requestedToolName = typeof params.name === "string" ? params.name : "";
-  const requestedArgs = params.arguments && typeof params.arguments === "object" && !Array.isArray(params.arguments)
-    ? params.arguments as Record<string, unknown>
-    : {};
-
-      const directPublicEntry = isOperatorPublicDirectToolName(requestedToolName);
-      const legacyGatewayEntry = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
-      const gatewayAccountDataLoaded = directPublicEntry || legacyGatewayEntry
-        ? await operatorGatewayAccountDataLoaded(env, requestedArgs)
-        : false;
-      if (!directPublicEntry && !legacyGatewayEntry) {
-                return mcpToolResultResponse(id, {
-          ok: false,
-          error: "public_direct_tool_required",
-          requested_tool: requestedToolName,
-          account_data_loaded: false,
-        }, "Lensically accepts only advertised direct typed Main tools.", true);
-      }
-      let toolName = requestedToolName;
-      let rawArgs = directPublicEntry
-        ? {
-            ...requestedArgs,
-            execution_guard: await createOperatorExecutionGuard(env, requestedToolName, requestedArgs),
-          }
-        : requestedArgs;
-      let routedGatewayMetadata: Record<string, unknown> | null = null;
-      if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
-        const compiledProfile = compileOperatorPublicProfileRequest(requestedArgs);
-        if (!compiledProfile.ok) {
-                    return mcpToolResultResponse(id, {
-            ...compiledProfile,
-            required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-            account_data_loaded: gatewayAccountDataLoaded,
-            freehand_gateway_payload_allowed: false,
-          }, `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.`, true);
-        }
-        const prepared = await prepareOperatorRoutedGatewayCall(env, compiledProfile.request);
-        if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
-                    return mcpToolResultResponse(id, {
-            ...prepared,
-            profile_id: compiledProfile.profile_id,
-            required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-            account_data_loaded: gatewayAccountDataLoaded,
-          }, `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.`, true);
-        }
-        toolName = prepared.tool_name;
-        rawArgs = {
-          ...prepared.arguments,
-          execution_guard: await createOperatorExecutionGuard(env, toolName, prepared.arguments),
-        };
-        routedGatewayMetadata = {
-          version: MANDATORY_EXECUTION_MAP_VERSION,
-          profile_id: compiledProfile.profile_id,
-          action_intent: compiledProfile.request.intent ?? null,
-          action_key: prepared.map_execution?.action_key ?? null,
-          map_state: prepared.map_state ?? null,
-          map_entry: prepared.map_entry ?? null,
-          incident: prepared.incident ?? null,
-          map_execution: prepared.map_execution ?? null,
-          execution_library: prepared.execution_library ?? null,
-          executed_tool: toolName,
-          corrections: prepared.corrections ?? [],
-          route_trail: prepared.route_trail ?? [],
-          model_tool_choice_allowed: false,
-        };
-      }
-      const canonicalTool = buildOperatorMcpBaseTools(false).find((item) => item.name === toolName);
-      const tool = canonicalTool ?? (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === toolName);
-      if (!tool) {
-        return mcpErrorResponse(id, -32602, "Unknown tool");
-      }
-      const guardCheck = await verifyOperatorExecutionGuard(env, toolName, rawArgs);
-            if (!guardCheck.ok) {
-                return mcpToolResultResponse(id, {
-          ok: false,
-          error: guardCheck.error ?? "execution_guard_required",
-          intended_tool: toolName,
-          required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-          account_data_loaded: gatewayAccountDataLoaded,
-        }, "Lensically rejected an operation that was not prepared by the routed execution gateway.", true);
-      }
-            let args: Record<string, unknown> = { ...rawArgs };
-      delete args.execution_guard;
-      const routedMapExecution = routedGatewayMetadata?.map_execution
-        && typeof routedGatewayMetadata.map_execution === "object"
-        && !Array.isArray(routedGatewayMetadata.map_execution)
-        ? routedGatewayMetadata.map_execution as Record<string, unknown>
-        : null;
-      const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;
-      const sourceDefinedDirectEngineering = (directPublicEntry && isOperatorMcpEngineeringToolName(toolName))
-        || routedMapExecution?.mode === "source_defined_direct_engineering";
-      const sourceDefinedProtectedOperation = sourceDefinedDirectEngineering
-                && MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(OPERATOR_MCP_ROUTING_POLICY.canonicalAutonomyToolName(toolName));
-      const preCallRouting = sourceDefinedStaticRoute
-        ? { arguments: args, corrections: [], route: null, redirect: false }
-        : await resolveOperatorPreCallRouting(env, toolName, args);
-      if (preCallRouting.redirect) {
-        const requiredTool = normalizeOperatorText(preCallRouting.route?.required_tool, 160, true) ?? toolName;
-        const resultPayload = {
-          ok: false,
-          error: normalizeOperatorText(preCallRouting.route?.error, 160, true) ?? "pre_call_route_required",
-          intended_tool: toolName,
-          normalized_arguments: preCallRouting.arguments,
-          corrections: preCallRouting.corrections,
-          pre_call_route: preCallRouting.route,
-          pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
-          required_tool: requiredTool,
-          required_route: preCallRouting.route?.mandatory_route ?? null,
-          suggested_tools: [requiredTool],
-          account_data_loaded: gatewayAccountDataLoaded,
-        };
-                return mcpToolResultResponse(
-          id,
-          resultPayload,
-          `Lensically requires the proven pre-call route for ${toolName} before execution.`,
-          true,
-        );
-      }
-      args = preCallRouting.arguments;
-      if (sourceDefinedProtectedOperation && !normalizeOperatorText(args.owner_response, 8000, true)) {
-        const route = {
-          route_key: "explicit_owner_ratification_handoff",
-          source: "source_defined_static_guard",
-          required_tool: toolName,
-          mandatory_route: "Include brand_key and the owner's exact approval in owner_response before the protected operation executes.",
-        };
-                return mcpToolResultResponse(id, {
-          ok: false,
-          error: "known_blocker_prevented",
-          intended_tool: toolName,
-          required_tool: toolName,
-          required_route: route.mandatory_route,
-          route_trail: [route],
-          account_data_loaded: gatewayAccountDataLoaded,
-        }, `Lensically blocked protected operation ${toolName} until explicit owner ratification is supplied.`, true);
-      }
-      const boundaryBlock = sourceDefinedDirectEngineering
-        ? null
-        : await getOperatorMcpBoundaryBlock(request, env, toolName, args);
-      if (boundaryBlock) {
-                return mcpToolResultResponse(
-          id,
-          boundaryBlock,
-          `Lensically Operator Mode blocked ${toolName}: ${String(boundaryBlock.error ?? "account_boundary_block")}`,
-          true,
-        );
-      }
-                              const routedRouteTrail = Array.isArray(routedGatewayMetadata?.route_trail)
-        ? routedGatewayMetadata.route_trail as Array<Record<string, unknown>>
-        : [];
-      const effectivePreCallRoute = preCallRouting.route ?? routedRouteTrail[routedRouteTrail.length - 1] ?? null;
-      const executionPolicy: Record<string, unknown> = sourceDefinedDirectEngineering
-        ? {
-            version: OPERATOR_EXECUTION_POLICY_VERSION,
-            canonical_tool: toolName,
-            execution_plane: "engineering_control",
-            operation_class: "engineering",
-            mandatory_path_applied: true,
-            source_defined_direct: true,
-            compact_receipt_only: true,
-            model_tool_choice_allowed: false,
-            protected_operation: sourceDefinedProtectedOperation,
-            authorization_mode: sourceDefinedProtectedOperation ? "owner_ratified" : "autonomous_engineering",
-          }
-        : {
-            ...buildOperatorExecutionPolicy(toolName, args),
-            pre_call_route: effectivePreCallRoute,
-            pre_call_routing_version: OPERATOR_PRE_CALL_ROUTING_VERSION,
-          };
-      const aliasRetryBlock = sourceDefinedStaticRoute
-        ? null
-        : await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
-      if (aliasRetryBlock) {
-        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_known_regression");
-                return mcpToolResultResponse(
-          id,
-          { ...aliasRetryBlock, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } },
-          `Lensically Operator Mode blocked same-backend wrapper retry for ${String(executionPolicy.canonical_tool ?? toolName)}.`,
-          true,
-        );
-      }
-      if (!sourceDefinedStaticRoute) {
-        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
-      }
-      const idempotencyKey = sourceDefinedDirectEngineering
-        ? null
-        : await operatorIdempotencyKey(toolName, args);
-      let receiptFingerprint: string | null = null;
-      if (idempotencyKey) {
-        const receipt = await beginOperatorOperationReceipt(env, idempotencyKey, toolName, args);
-        receiptFingerprint = receipt.fingerprint;
-        if (receipt.existing?.status === "completed" && receipt.existing.result_json) {
-          const replayed = safeParseJsonString(String(receipt.existing.result_json));
-          const resultPayload = replayed && typeof replayed === "object" && !Array.isArray(replayed)
-            ? replayed as Record<string, unknown>
-            : { ok: false, error: "idempotency_receipt_parse_failed" };
-                    resultPayload.execution_kernel = { ...operatorExecutionKernelMetadata(env), policy: executionPolicy };
-          resultPayload.idempotency = {
-            version: OPERATOR_IDEMPOTENCY_VERSION,
-            key: idempotencyKey,
-            replayed: true,
-            request_fingerprint: receiptFingerprint,
-          };
-          const isError = resultPayload.ok === false;
-                    return mcpToolResultResponse(
-            id,
-            resultPayload,
-            isError
-              ? `Lensically Operator Mode replayed failed operation ${toolName}.`
-              : `Lensically Operator Mode replayed completed operation ${toolName}.`,
-            isError,
-          );
-        }
-        if (!receipt.created && receipt.existing?.request_fingerprint && receipt.existing.request_fingerprint !== receiptFingerprint) {
-          const resultPayload = {
-            ok: false,
-            error: "idempotency_key_payload_mismatch",
-            idempotency: { version: OPERATOR_IDEMPOTENCY_VERSION, key: idempotencyKey, request_fingerprint: receiptFingerprint },
-                        execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy },
-          };
-                    return mcpToolResultResponse(
-            id,
-            resultPayload,
-            `Lensically Operator Mode rejected reused operation identity with different inputs for ${toolName}.`,
-            true,
-          );
-        }
-                if (!receipt.created && receipt.existing?.status === "started") {
-          const startedAt = Date.parse(String(receipt.existing.updated_at ?? receipt.existing.created_at ?? ""));
-                    const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
-          const leaseMs = operatorOperationLeaseMs(toolName);
-          if (ageMs < leaseMs) {
-            const resultPayload = {
-              ok: false,
-              error: "operation_already_in_progress",
-              retryable_after_seconds: Math.max(1, Math.ceil((leaseMs - ageMs) / 1000)),
-              idempotency: {
-                version: OPERATOR_IDEMPOTENCY_VERSION,
-                key: idempotencyKey,
-                replayed: false,
-                request_fingerprint: receiptFingerprint,
-              },
-                            execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy },
-            };
-                        return mcpToolResultResponse(
-              id,
-              resultPayload,
-              `Lensically Operator Mode operation ${toolName} is already in progress.`,
-              true,
-            );
-          }
-        }
-      }
-            const autonomyAuthorization = sourceDefinedDirectEngineering && !sourceDefinedProtectedOperation
-        ? {
-            allowed: true,
-            governed: false,
-            engineering_autonomous: true,
-            authority_version: OPERATOR_ENGINEERING_AUTHORITY_VERSION,
-          }
-        : await beginOperatorAutonomyAuthorization(env, toolName, args);
-            if (!autonomyAuthorization.allowed) {
-        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_autonomy_decision_required");
-        if (idempotencyKey) {
-          await failOperatorOperationReceipt(env, idempotencyKey, new Error(String(autonomyAuthorization.error ?? "autonomy_authorization_blocked")));
-        }
-                const resultPayload = { ok: false, ...autonomyAuthorization, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } };
-                return mcpToolResultResponse(
-          id,
-          resultPayload,
-          `Lensically Operator Mode blocked ${toolName}: an approved model-originated decision is required.`,
-          true,
-        );
-      }
-      let resultPayload: Record<string, unknown>;
-      try {
-                const handlerClass = OPERATOR_MCP_ROUTING_POLICY.classifyHandler(toolName);
-        resultPayload = handlerClass === "engineering"
-          ? await handleOperatorMcpEngineeringTool(request, env, toolName as OperatorMcpEngineeringToolName, args, routedGatewayMetadata !== null)
-          : handlerClass === "admin"
-            ? await handleOperatorMcpAdminTool(request, env, toolName as OperatorMcpAdminToolName, args, routedGatewayMetadata !== null)
-            : await callOperatorToolForMcp(request, env, toolName, args);
-            } catch (error) {
-        await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, {
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        if (idempotencyKey) {
-          await failOperatorOperationReceipt(env, idempotencyKey, error);
-        }
-        throw error;
-      }
-      await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, resultPayload);
-            if (autonomyAuthorization.governed) {
-        resultPayload.autonomy_decision = {
-          governed: true,
-          decision_id: autonomyAuthorization.decision_id,
-          decision_title: autonomyAuthorization.decision_title,
-          execution_event_id: autonomyAuthorization.event_id,
-        };
-            } else if (autonomyAuthorization.engineering_autonomous) {
-        resultPayload.engineering_authority = {
-          mode: "full_discretion_recursive",
-          version: autonomyAuthorization.authority_version,
-          outcome_bound: true,
-          owner_ratification_required: false,
-          numerical_tool_budget_applies: false,
-        };
-      } else if (autonomyAuthorization.guided_plan_approved) {
-        resultPayload.account_authority = {
-          mode: MANIFEST_GUIDED_EXECUTION_MODE,
-          version: autonomyAuthorization.authority_version,
-          objective: MANIFEST_AUTONOMY_OBJECTIVE,
-          growth_plan_status: autonomyAuthorization.growth_mission?.status ?? null,
-          owner_ratification_required: true,
-          routine_account_operations_autonomous: false,
-          execution_within_approved_plan: true,
-          protected_operations_owner_ratified: true,
-        };
-      } else if (autonomyAuthorization.account_autonomous) {
-        resultPayload.account_authority = {
-          mode: MANIFEST_AUTONOMY_MODE,
-          version: autonomyAuthorization.authority_version,
-          objective: MANIFEST_AUTONOMY_OBJECTIVE,
-          owner_ratification_required: false,
-          protected_operations_owner_ratified: true,
-        };
-      }
-      if (routedGatewayMetadata) {
-        const mapLifecycle = await finalizeMandatoryExecutionMapCall(
-          env.DB,
-          routedGatewayMetadata.map_execution && typeof routedGatewayMetadata.map_execution === "object" && !Array.isArray(routedGatewayMetadata.map_execution)
-            ? routedGatewayMetadata.map_execution as Record<string, unknown>
-            : null,
-          toolName,
-          args,
-          resultPayload,
-          (sourceDefinedDirectEngineering
-            ? buildOperatorMcpBaseTools(false)
-            : await buildOperatorMcpTools(env, false, false)) as MandatoryExecutionToolDefinition[],
-          {
-            signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
-            verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
-            readStaticPolicySources: () => SOURCE_DEFINED_PRE_CALL_ROUTES.map((route) => ({
-              source_type: "pre_call_route",
-              source_id: `source:${route.route_key}`,
-              text: JSON.stringify(route),
-              updated_at: null,
-            } satisfies ExecutionPolicyLibrarySource)),
-          },
-        );
-        resultPayload.execution_kernel = {
-          ...operatorExecutionKernelMetadata(env),
-          route: {
-            intent: routedGatewayMetadata.action_intent ?? null,
-            action_key: routedGatewayMetadata.action_key ?? null,
-            tool_name: toolName,
-            source_defined: true,
-            model_tool_choice_allowed: false,
-          },
-                                        lifecycle: mapLifecycle,
-          policy: executionPolicy,
-        };
-                        if (sourceDefinedDirectEngineering && routedGatewayMetadata.profile_id === "engineering_precheck") {
-          resultPayload.mandatory_execution_map = mapLifecycle;
-        }
-                resultPayload.routed_execution = routedGatewayMetadata;
-        resultPayload.execution_guard_enforcement = {
-          version: OPERATOR_EXECUTION_GUARD_VERSION,
-                    mode: sourceDefinedDirectEngineering ? "source_defined_direct_engineering" : "source_defined_static_route",
-          normalized_before_execution: true,
-          known_path_checked: true,
-          direct_operational_calls_allowed: false,
-          model_tool_choice_allowed: false,
-          ...(sourceDefinedDirectEngineering ? {
-            d1_bootstrap_bypassed: true,
-            d1_pre_call_routing_bypassed: true,
-            d1_execution_events_bypassed: true,
-            d1_autonomy_bypassed: !sourceDefinedProtectedOperation,
-          } : {}),
-        };
-            }
-      resultPayload = enforceOperatorPayloadBudget(resultPayload);
-      if (idempotencyKey) {
-        resultPayload.idempotency = {
-          version: OPERATOR_IDEMPOTENCY_VERSION,
-          key: idempotencyKey,
-          replayed: false,
-          request_fingerprint: receiptFingerprint,
-        };
-        await completeOperatorOperationReceipt(env, idempotencyKey, resultPayload);
-      }
-            const isError = resultPayload.ok === false;
-      const resultError = normalizeOperatorMachineKey(resultPayload.error ?? resultPayload.error_code, "unexpected_result");
-            const expectedControl = isError && isExpectedHardeningControlResult(toolName, resultError, resultPayload);
-      const unexplainedZero = !isError
-        && toolName === "searchRepoFiles"
-        && Number(resultPayload.returned_count ?? 0) === 0
-        && resultPayload.verified_complete_for_known_file !== true;
-      if ((!isError || expectedControl) && !unexplainedZero) {
-        const resolvedIncidentCount = await closeResolvedHardeningIncidentsForRequest(env, toolName, args, resultPayload);
-        if (resolvedIncidentCount > 0) resultPayload.resolved_hardening_incidents = resolvedIncidentCount;
-      }
-      if (!HARDENING_CONTROLLER_TOOLS.has(toolName)
-          && ((isError && !expectedControl) || unexplainedZero)) {
-        const automaticIncident = await recordHardeningIncident(env, {
-          boundary: isOperatorMcpEngineeringToolName(toolName) ? "server" : "quality",
-          blocked_profile_id: routedGatewayMetadata?.profile_id ?? operatorPublicProfileIdForToolName(toolName),
-          error_category: unexplainedZero ? "unexplained_zero_result" : resultError,
-          request_fingerprint: await operatorExecutionFingerprint(toolName, args),
-          operation_class: operatorToolMutatesState(toolName) ? "mutation" : "read",
-          expected_outcome: unexplainedZero ? "complete and non-ambiguous search evidence" : "successful typed handler result",
-          observed_outcome: resultPayload,
-          resume_capsule: {
-            profile_id: routedGatewayMetadata?.profile_id ?? operatorPublicProfileIdForToolName(toolName),
-            tool_name: toolName,
-            argument_keys: Object.keys(args).sort(),
-            workflow_session_id: normalizeOperatorText(args.workflow_session_id, 120, true),
-          },
-        });
-        resultPayload.hardening_incident = automaticIncident.incident;
-        resultPayload.normal_work_blocked = automaticIncident.normal_work_blocked;
-      }
-      resultPayload.operator_action_closure = await buildOperatorActionClosure(env, toolName, resultPayload);
-      resultPayload = enforceOperatorPayloadBudget(resultPayload);
-      if (!sourceDefinedStaticRoute) {
-        await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
-      }
-              return mcpToolCompletionResponse(id, toolName, resultPayload, isError);
+  return dispatchOperatorMcpToolCall({ request, id, params }, {
+    routedExecutionGateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+    mandatoryExecutionMapVersion: MANDATORY_EXECUTION_MAP_VERSION,
+    preCallRoutingVersion: OPERATOR_PRE_CALL_ROUTING_VERSION,
+    executionPolicyVersion: OPERATOR_EXECUTION_POLICY_VERSION,
+    idempotencyVersion: OPERATOR_IDEMPOTENCY_VERSION,
+    engineeringAuthorityVersion: OPERATOR_ENGINEERING_AUTHORITY_VERSION,
+    executionGuardVersion: OPERATOR_EXECUTION_GUARD_VERSION,
+    guidedExecutionMode: MANIFEST_GUIDED_EXECUTION_MODE,
+    autonomyMode: MANIFEST_AUTONOMY_MODE,
+    autonomyObjective: MANIFEST_AUTONOMY_OBJECTIVE,
+    protectedTools: MANIFEST_AUTONOMOUS_PROTECTED_TOOLS,
+    hardeningControllerTools: HARDENING_CONTROLLER_TOOLS,
+    isPublicDirectToolName: isOperatorPublicDirectToolName,
+    gatewayAccountDataLoaded: (args) => operatorGatewayAccountDataLoaded(env, args),
+    createExecutionGuard: (toolName, args) => createOperatorExecutionGuard(env, toolName, args),
+    compilePublicProfileRequest: compileOperatorPublicProfileRequest,
+    prepareRoutedGatewayCall: (gatewayRequest) => prepareOperatorRoutedGatewayCall(env, gatewayRequest),
+    toolExists: async (toolName) => Boolean(
+      buildOperatorMcpBaseTools(false).find((item) => item.name === toolName)
+      ?? (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === toolName),
+    ),
+    verifyExecutionGuard: (toolName, args) => verifyOperatorExecutionGuard(env, toolName, args),
+    isEngineeringToolName: isOperatorMcpEngineeringToolName,
+    canonicalAutonomyToolName: OPERATOR_MCP_ROUTING_POLICY.canonicalAutonomyToolName,
+    resolvePreCallRouting: (toolName, args) => resolveOperatorPreCallRouting(env, toolName, args),
+    normalizeText: normalizeOperatorText,
+    getBoundaryBlock: (candidate, toolName, args) => getOperatorMcpBoundaryBlock(candidate, env, toolName, args),
+    buildExecutionPolicy: buildOperatorExecutionPolicy,
+    getKnownAliasRetryBlock: (toolName, args, policy) => getKnownAliasRetryBlock(env, toolName, args, policy),
+    recordExecutionDecision: (toolName, args, policy, decision) => recordOperatorExecutionDecision(env, toolName, args, policy, decision),
+    executionKernelMetadata: () => operatorExecutionKernelMetadata(env),
+    operatorIdempotencyKey,
+    beginOperationReceipt: (key, toolName, args) => beginOperatorOperationReceipt(env, key, toolName, args),
+    parseJson: safeParseJsonString,
+    operationLeaseMs: operatorOperationLeaseMs,
+    failOperationReceipt: (key, error) => failOperatorOperationReceipt(env, key, error),
+    beginAutonomyAuthorization: (toolName, args) => beginOperatorAutonomyAuthorization(env, toolName, args),
+    completeAutonomyAuthorization: (authorization, result) => completeOperatorAutonomyAuthorization(env, authorization, result),
+    classifyHandler: OPERATOR_MCP_ROUTING_POLICY.classifyHandler,
+    executeEngineeringTool: (candidate, toolName, args, routed) => handleOperatorMcpEngineeringTool(
+      candidate,
+      env,
+      toolName as OperatorMcpEngineeringToolName,
+      args,
+      routed,
+    ),
+    executeAdminTool: (candidate, toolName, args, routed) => handleOperatorMcpAdminTool(
+      candidate,
+      env,
+      toolName as OperatorMcpAdminToolName,
+      args,
+      routed,
+    ),
+    executeAccountTool: (candidate, toolName, args) => callOperatorToolForMcp(candidate, env, toolName, args),
+    finalizeMandatoryExecutionMapCall: async ({
+      mapExecution,
+      toolName,
+      args,
+      result,
+      sourceDefinedDirectEngineering,
+    }) => finalizeMandatoryExecutionMapCall(
+      env.DB,
+      mapExecution,
+      toolName,
+      args,
+      result,
+      (sourceDefinedDirectEngineering
+        ? buildOperatorMcpBaseTools(false)
+        : await buildOperatorMcpTools(env, false, false)) as MandatoryExecutionToolDefinition[],
+      {
+        signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
+        verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
+        readStaticPolicySources: () => SOURCE_DEFINED_PRE_CALL_ROUTES.map((route) => ({
+          source_type: "pre_call_route",
+          source_id: `source:${route.route_key}`,
+          text: JSON.stringify(route),
+          updated_at: null,
+        } satisfies ExecutionPolicyLibrarySource)),
+      },
+    ),
+    enforcePayloadBudget: enforceOperatorPayloadBudget,
+    completeOperationReceipt: (key, result) => completeOperatorOperationReceipt(env, key, result),
+    normalizeMachineKey: normalizeOperatorMachineKey,
+    isExpectedHardeningControlResult,
+    closeResolvedHardeningIncidentsForRequest: (toolName, args, result) => closeResolvedHardeningIncidentsForRequest(
+      env,
+      toolName,
+      args,
+      result,
+    ),
+    recordHardeningIncident: (input) => recordHardeningIncident(
+      env,
+      input as Parameters<typeof recordHardeningIncident>[1],
+    ),
+    publicProfileIdForToolName: operatorPublicProfileIdForToolName,
+    executionFingerprint: operatorExecutionFingerprint,
+    toolMutatesState: operatorToolMutatesState,
+    buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
+  });
 }
+
+
+      
+      
+      
+            
+          
 
 async function handleOperatorMcp(request: Request, env: Env): Promise<Response> {
   return dispatchOperatorMcpRequest(request, {
