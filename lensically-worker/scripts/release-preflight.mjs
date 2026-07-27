@@ -693,7 +693,7 @@ if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-op
     || !source.includes("active_outcome_requirements_incomplete")
     || !source.includes("operator_work_self_merge_forbidden")
     || source.includes("active_outcome_key = CASE WHEN operator_work_state.status")
-    || !source.includes("resultPayload.operator_action_closure = await buildOperatorActionClosure")
+        || !operatorMcpToolCallDispatcher.includes("resultPayload.operator_action_closure = await dependencies.buildActionClosure")
     || !source.includes("cloudflare_validation_state")
     || !clientSafety.includes("repository_status")
     || !systemDirectoryTests.includes("reads repository and validation status through the exact Main profile")
@@ -754,9 +754,9 @@ const directMainContractChecks = [
   ["public_tool_builder", source.includes("buildOperatorPublicMcpTools")],
     ["direct_contract_metadata", source.includes('public_contract: "direct_typed_tools_v2"')],
   ["direct_discovery", source.includes("const tools = await buildOperatorPublicMcpTools(env)")],
-  ["direct_entry_gate", source.includes("const directPublicEntry = isOperatorPublicDirectToolName(requestedToolName)")],
-  ["legacy_gateway_hidden", source.includes("const legacyGatewayEntry = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY")],
-  ["direct_server_guard", source.includes("execution_guard: await createOperatorExecutionGuard(env, requestedToolName, requestedArgs)")],
+    ["direct_entry_gate", operatorMcpToolCallDispatcher.includes("const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName)")],
+  ["legacy_gateway_hidden", operatorMcpToolCallDispatcher.includes("const legacyGatewayEntry = requestedToolName === dependencies.routedExecutionGateway")],
+  ["direct_server_guard", operatorMcpToolCallDispatcher.includes("execution_guard: await dependencies.createExecutionGuard(requestedToolName, requestedArgs)")],
   ["generic_gateway_not_advertised", tests.includes('expect(names).not.toEqual(expect.arrayContaining([\n      "executeLensicallyIntent"')],
   ["closed_public_schemas", tests.includes("tool.inputSchema?.additionalProperties === false")],
   ["server_side_proceed", source.includes("Later direct account calls use server-side continuity and do not send a Proceed flag")],
@@ -770,9 +770,9 @@ for (const [checkId, present] of directMainContractChecks) {
   if (!present) errors.push(`direct_main_contract_missing:${checkId}`);
 }
 
-if (!source.includes("const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;")
-    || !source.includes("const preCallRouting = sourceDefinedStaticRoute")
-    || !source.includes("if (!sourceDefinedStaticRoute) {\n        await recordOperatorExecutionDecision")) {
+if (!operatorMcpToolCallDispatcher.includes("const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;")
+    || !operatorMcpToolCallDispatcher.includes("const preCallRouting: PreCallRoutingResult = sourceDefinedStaticRoute")
+    || !operatorMcpToolCallDispatcher.includes("if (!sourceDefinedStaticRoute) {\n    await dependencies.recordExecutionDecision")) {
   errors.push("direct_static_route_runtime_bypass_missing");
 }
 
@@ -874,7 +874,7 @@ if (!workflow.includes("release_sha:")
 
 if (!operatorMcpAccountAnalyticsRegistry.includes('name: "get_monthly_growth_review"')
     || !source.includes("OPERATOR_MCP_MAX_STRUCTURED_BYTES = 24_000")
-    || !source.includes("enforceOperatorPayloadBudget(resultPayload)")
+    || !operatorMcpToolCallDispatcher.includes("dependencies.enforcePayloadBudget(resultPayload)")
     || !router.includes('return "get_monthly_growth_review"')
     || !tests.includes("routes the exact monthly growth question to one bounded analytics response")) {
   errors.push("bounded_monthly_growth_contract_missing");
