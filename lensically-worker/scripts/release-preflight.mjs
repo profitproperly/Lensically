@@ -630,8 +630,8 @@ const manifestAutonomousGrowthChecks = [
     && source.includes('table: "operator_decision_proposals"')
     && source.includes('table: "operator_decision_execution_events"')],
   ["prepare_tool", source.includes('name: "prepare_manifest_autonomous_cycle"')],
-  ["analysis_page_tool", source.includes('name: "get_manifest_cycle_analysis_page"')],
-  ["cycle_strategy_tool", source.includes('name: "commit_manifest_cycle_strategy"')],
+    ["analysis_page_tool", operatorMcpManifestCycleRegistry.includes('name: "get_manifest_cycle_analysis_page"')],
+  ["cycle_strategy_tool", operatorMcpManifestCycleRegistry.includes('name: "commit_manifest_cycle_strategy"')],
   ["persist_tool", source.includes('name: "persist_manifest_autonomous_post"')],
   ["retired_monolithic_commit", source.includes('error: "retired_monolithic_autonomous_commit"')],
     ["source_backed_only", source.includes('source_backed_generation_only: true')
