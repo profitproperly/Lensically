@@ -27,6 +27,8 @@ const operatorMcpSourceDraftRegistry = read("src/operatorMcpSourceDraftRegistry.
 const operatorMcpSourceDraftRegistryTests = read("test/operatorMcpSourceDraftRegistry.spec.ts");
 const operatorMcpStrategyScheduleRegistry = read("src/operatorMcpStrategyScheduleRegistry.ts");
 const operatorMcpStrategyScheduleRegistryTests = read("test/operatorMcpStrategyScheduleRegistry.spec.ts");
+const operatorMcpManifestCycleRegistry = read("src/operatorMcpManifestCycleRegistry.ts");
+const operatorMcpManifestCycleRegistryTests = read("test/operatorMcpManifestCycleRegistry.spec.ts");
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
@@ -91,6 +93,9 @@ if (!workflow.includes("test/operatorMcpSourceDraftRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpStrategyScheduleRegistry.spec.ts")) {
   errors.push("operator_mcp_strategy_schedule_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpManifestCycleRegistry.spec.ts")) {
+  errors.push("operator_mcp_manifest_cycle_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -99,7 +104,7 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
@@ -286,6 +291,27 @@ if (!operatorMcpStrategyScheduleRegistryTests.includes("preserves the exact orde
     || !operatorMcpStrategyScheduleRegistryTests.includes("preserves protected scheduled-post deletion and retry restrictions")
     || !operatorMcpStrategyScheduleRegistryTests.includes("preserves owner batch limits and Manifest lineage protections")) {
   lifecycleErrors.push("operator_mcp_strategy_schedule_registry_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpManifestCycleRegistry"')) {
+  lifecycleErrors.push("operator_mcp_manifest_cycle_registry_import_missing");
+}
+if (source.includes('{ name: "get_manifest_intelligence_foundation"')
+    || source.includes('{ name: "get_manifest_cycle_receipt"')
+    || source.includes('{ name: "record_manifest_cycle_defect"')
+    || source.includes('{ name: "get_manifest_cycle_analysis_page"')
+    || source.includes('{ name: "commit_manifest_cycle_strategy"')) {
+  lifecycleErrors.push("operator_mcp_manifest_cycle_registry_returned_to_index");
+}
+if (!operatorMcpManifestCycleRegistry.includes("export const OPERATOR_MCP_MANIFEST_CYCLE_TOOL_NAMES")
+    || !operatorMcpManifestCycleRegistry.includes("export type OperatorMcpManifestCycleToolName")
+    || !operatorMcpManifestCycleRegistry.includes("export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_manifest_cycle_registry_module_incomplete");
+}
+if (!operatorMcpManifestCycleRegistryTests.includes("preserves the exact ordered six-tool Manifest cycle registry")
+    || !operatorMcpManifestCycleRegistryTests.includes("preserves pageable canonical cycle receipt reconstruction")
+    || !operatorMcpManifestCycleRegistryTests.includes("preserves seven-stage defect evidence and durable repair verification")
+    || !operatorMcpManifestCycleRegistryTests.includes("preserves complete analysis consumption and source-backed strategy locking")) {
+  lifecycleErrors.push("operator_mcp_manifest_cycle_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
