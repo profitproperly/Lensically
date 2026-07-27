@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 54c22fbaefe374d79e5db2d30e087f45382d77b6
-production_sha: 54c22fbaefe374d79e5db2d30e087f45382d77b6
+repository_base_sha: 1882efa90b462aee2294f2364da2907208f96971
+production_sha: 1882efa90b462aee2294f2364da2907208f96971
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -469,19 +469,32 @@ Completed checkpoint — Stage 5D3D Manifest intelligence and cycle-strategy reg
 - Exact-SHA release passed in run `30230597372`.
 - Live production independently confirmed exact SHA `54c22fbaefe374d79e5db2d30e087f45382d77b6` with 75/75 public tools.
 
-Current sub-action — Stage 5D3E autonomous cycle execution registry extraction:
+Completed checkpoint — Stage 5D3E autonomous cycle execution registry extraction:
 
-Move the next exact contiguous three-tool slice from `src/index.ts` into a focused ordered registry module:
+- Added `src/operatorMcpAutonomousExecutionRegistry.ts` with the exact ordered prepare, one-post persistence, and optional scheduled-review tools.
+- Switched runtime composition to the extracted registry before physically removing all three inert definitions from `src/index.ts`.
+- Added `test/operatorMcpAutonomousExecutionRegistry.spec.ts` covering immediate invocation integrity, rolling runway bounds, locked strategy and plan identity, canonical source-card lineage, engagement hypotheses, 6/12/18/24-hour experiments, idempotency, complete model evaluation, nonempty gate evidence, and slot-preserving owner review.
+- Updated lifecycle and full release preflight to scan the extracted registry, prevent these definitions from returning to `index.ts`, and move prepare, persist, placement, and exposure assertions to the new authority before release.
+- Push validation passed in run `30231386089`.
+- All eight Operator shards passed in run `30231484612`.
+- Exact-SHA release passed in run `30231534921`.
+- Live production independently confirmed exact SHA `1882efa90b462aee2294f2364da2907208f96971` with 75/75 public tools.
 
-- `prepare_manifest_autonomous_cycle`
-- `persist_manifest_autonomous_post`
-- `review_manifest_scheduled_post`
+Current sub-action — Stage 5D3F final account analytics registry extraction:
 
-Preserve exact declaration order, immediate invocation integrity, live Threads/database clock reconciliation, rolling runway bounds, one-post-per-call persistence, locked cycle strategy and plan identity, canonical source-card lineage, owner hard-ban coverage, source fidelity, duplicate and semantic-repetition checks, nonempty gate execution, idempotency, complete model evaluation, four-post coverage reconciliation, optional owner review, slot-preserving rewrite/replacement, public filtering, scoped wrappers, and tool counts. Add focused tests and release-preflight enforcement before exact-SHA release.
+Move the final exact contiguous five-tool account registry tail from `src/index.ts` into a focused ordered registry module:
+
+- `get_post_results`
+- `get_monthly_growth_review`
+- `get_performance_learning`
+- `get_manifest_intelligence_audit`
+- `get_content_focus`
+
+Preserve exact declaration order, compact post-result verification, date-bounded follower trajectory without post-level attribution, maturity-normalized learning evidence, bounded intelligence-audit pagination, persisted Content Focus reads, admin classification of monthly growth review, public filtering, scoped wrappers, and the exact 75-tool surface. Add focused tests and release-preflight enforcement, then prove that no static account registry definitions remain in `src/index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract post results, growth review, performance learning, Manifest intelligence audit, metrics, and remaining account definitions in bounded slices.
+- Extract MCP registry composition priorities and classification sets.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
