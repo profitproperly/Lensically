@@ -71,6 +71,8 @@ const operatorManifestReviewDraftAttachmentService = read("src/operatorManifestR
 const operatorManifestReviewDraftAttachmentServiceTests = read("test/operatorManifestReviewDraftAttachmentService.spec.ts");
 const operatorManifestReviewSourceResolutionService = read("src/operatorManifestReviewSourceResolutionService.ts");
 const operatorManifestReviewSourceResolutionServiceTests = read("test/operatorManifestReviewSourceResolutionService.spec.ts");
+const operatorManifestReviewBatchSchedulingService = read("src/operatorManifestReviewBatchSchedulingService.ts");
+const operatorManifestReviewBatchSchedulingServiceTests = read("test/operatorManifestReviewBatchSchedulingService.spec.ts");
 
 
 
@@ -214,6 +216,9 @@ if (!workflow.includes("test/operatorManifestReviewDraftAttachmentService.spec.t
 }
 if (!workflow.includes("test/operatorManifestReviewSourceResolutionService.spec.ts")) {
   errors.push("operator_manifest_review_source_resolution_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestReviewBatchSchedulingService.spec.ts")) {
+  errors.push("operator_manifest_review_batch_scheduling_service_workflow_gate_missing");
 }
 
 
@@ -1051,8 +1056,44 @@ if (!operatorManifestReviewSourceResolutionServiceTests.includes("returns the ex
     || !operatorManifestReviewSourceResolutionServiceTests.includes("uses the default owner reason for current-day source skips")
     || !operatorManifestReviewSourceResolutionServiceTests.includes("upserts a durable exclusion and completes a deleted saved-pattern source")
     || !operatorManifestReviewSourceResolutionServiceTests.includes("uses the claim batch identity and preserves an empty serialized fallback")) {
-  lifecycleErrors.push("operator_manifest_review_source_resolution_service_tests_incomplete");
+    lifecycleErrors.push("operator_manifest_review_source_resolution_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestReviewBatchSchedulingService"')
+    || !source.includes("scheduleOperatorManifestReviewBatch({")
+    || !source.includes("listApprovedClaims: async")
+    || !source.includes("runSchedulingGates: async")
+    || !source.includes("persistScheduledState: async")) {
+  lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_import_or_binding_missing");
+}
+if (source.includes("remaining_approved_item_numbers")
+    || source.includes("const eligibleClaimsAll =")
+    || source.includes("insufficient_open_hourly_slots")) {
+  lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_returned_to_index");
+}
+if (!operatorManifestReviewBatchSchedulingService.includes("export async function scheduleOperatorManifestReviewBatch")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.getReviewBatch")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.listScheduledPosts")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.listApprovedClaims")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.runSchedulingGates")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.createScheduledPost")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.persistScheduledState")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.saveStrategyTag")
+    || !operatorManifestReviewBatchSchedulingService.includes("dependencies.insertInventory")
+    || !operatorManifestReviewBatchSchedulingService.includes("remaining_approved_item_numbers")
+    || !operatorManifestReviewBatchSchedulingService.includes("insufficient_open_hourly_slots")) {
+  lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_module_incomplete");
+}
+if (!operatorManifestReviewBatchSchedulingServiceTests.includes("returns the exact missing-batch response before schedule reads")
+    || !operatorManifestReviewBatchSchedulingServiceTests.includes("reconciles occupied hours and preserves one-post continuation fields")
+    || !operatorManifestReviewBatchSchedulingServiceTests.includes("returns insufficient slots without reading or mutating a draft")
+    || !operatorManifestReviewBatchSchedulingServiceTests.includes("isolates scheduling gate failures without scheduler or lineage writes")
+    || !operatorManifestReviewBatchSchedulingServiceTests.includes("isolates scheduler failures and keeps continuation state deterministic")
+    || !operatorManifestReviewBatchSchedulingServiceTests.includes("persists scheduled state, strategy lineage, inventory, and completed review status")) {
+  lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_tests_incomplete");
+}
+
+
+
 
 
 
