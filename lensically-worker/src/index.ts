@@ -91,6 +91,10 @@ import {
 import {
   OPERATOR_MCP_SOURCE_DRAFT_TOOLS,
 } from "./operatorMcpSourceDraftRegistry";
+import {
+  OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS,
+} from "./operatorMcpStrategyScheduleRegistry";
+
 
 
 import {
@@ -17758,8 +17762,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
             engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
             adminTools: OPERATOR_MCP_ADMIN_TOOLS,
             accountTools: [
-      ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
+            ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
       ...OPERATOR_MCP_SOURCE_DRAFT_TOOLS,
+      ...OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS,
       ...OPERATOR_MCP_TOOLS,
     ],
     includeScopedWrappers,
