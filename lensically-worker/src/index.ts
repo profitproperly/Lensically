@@ -96,6 +96,7 @@ import {
 } from "./operatorManifestCycleService";
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
 import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepareCheckpointService";
+import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import {
   buildOperatorMcpRuntimeHeaders,
   operatorTransportFailureResponse,
@@ -11164,460 +11165,202 @@ async function prepareManifestAutonomousCycle(
   >;
 
 
-    const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
-  const databaseClockRow = await env.DB.prepare(
-    `SELECT CURRENT_TIMESTAMP AS current_time`,
-  ).first<{ current_time: string }>();
-  const databaseClockRaw = normalizeOperatorText(databaseClockRow?.current_time, 100, true);
-  const databaseTimeIso = databaseClockRaw
-    ? `${databaseClockRaw.replace(" ", "T").replace(/Z$/, "")}Z`
-    : null;
-    const clock = resolveManifestAutonomousClock(
+      return constructOperatorManifestAutonomousCycle({
+    brandKey: brand.brand_key,
+    accountId: brand.account_id,
+    threadsUserId: brand.profile.threads_user_id,
+    timezone,
+    horizonHours,
+    explicitOperationId,
+    phasedPreparation,
     runtimeNowIso,
-    threadsSnapshot.threads_server_time_iso,
-    databaseTimeIso,
-    threadsSnapshot.latest_published_at,
-    trustedUtcTimeIso,
-  );
-
-  const effectiveNowMs = parseOperatorTimestampMs(clock.effective_now_iso) ?? Date.now();
-  const local = operatorLocalDateTimeParts(new Date(effectiveNowMs), timezone);
-  const operationId = explicitOperationId ?? `${brand.brand_key}:autonomous-runway:${local.date}:${String(local.hour).padStart(2, "0")}`;
-  const targetSlots = buildManifestRollingHourlySlots(local.date, local.hour, horizonHours);
-  const coverage = await buildManifestAutonomousCoverageLedger(
-    env,
-    brand,
-    targetSlots,
-    timezone,
-    effectiveNowMs,
-  );
-  const missingSlots = targetSlots.filter((slot) => !coverage.occupied.has(slot.key));
-  const deliveryReconciliation = await reconcileOperatorDeliveryIncidents(
-    env,
-    brand,
-    timezone,
-    effectiveNowMs,
-  );
-        await ensureGptPostStrategyTagsTable(env);
-  await ensureOperatorWorkflowTables(env);
-  await ensureExternalPatternsTable(env);
-  await ensureThreadsFollowerSnapshotsTable(env);
-    const intelligenceEngineRefresh = {
-    mode: "autonomous_prepare_live_refresh",
-    recomputed: true,
-    refresh_owner: "autonomous_prepare",
-    due_checkpoint_post_count: threadsSnapshot.due_checkpoint_post_count,
-        due_checkpoint_count: threadsSnapshot.due_checkpoint_count,
-    processed_due_checkpoint_count: threadsSnapshot.processed_due_checkpoint_count,
-    remaining_due_checkpoint_count: threadsSnapshot.remaining_due_checkpoint_count,
-    list_metrics_complete: threadsSnapshot.list_metrics_complete,
-    max_insight_calls_per_invocation: threadsSnapshot.max_insight_calls_per_invocation,
-    metric_snapshots: threadsSnapshot.metric_snapshots,
-    evaluator_version: threadsSnapshot.performance_evaluation?.evaluator_version ?? null,
-    maturity_scores_upserted: Number(threadsSnapshot.performance_evaluation?.maturity_scores_upserted ?? 0),
-    evidence_records: Number(threadsSnapshot.performance_evaluation?.evidence_records ?? 0),
-    reason: "Autonomous preparation refreshed bounded live Threads evidence, persisted every currently due maturity checkpoint, and recomputed evaluator intelligence before strategy consumption.",
-  };
-    await ensureManifestMeasurementAuditTables(env.DB);
-  const [qualifiedPatternState, derivedPatternState] = await Promise.all([
-    env.DB.prepare(`SELECT COUNT(*) AS total, MAX(updated_at) AS latest_updated_at
-      FROM external_patterns
-      WHERE app_user_id = ? AND account_id = ? AND likes >= ?`)
-      .bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, MANIFEST_SOURCE_MIN_VERIFIED_LIKES)
-      .first<Record<string, unknown>>(),
-    env.DB.prepare(`SELECT COUNT(*) AS total, MAX(source_updated_at) AS latest_source_updated_at
-      FROM operator_manifest_saved_pattern_intelligence
-      WHERE brand_key = ?`)
-      .bind(brand.brand_key)
-      .first<Record<string, unknown>>(),
-  ]);
-  const qualifiedPatternCount = Number(qualifiedPatternState?.total ?? 0);
-  const derivedPatternCount = Number(derivedPatternState?.total ?? 0);
-  const qualifiedPatternUpdatedAt = normalizeOperatorText(qualifiedPatternState?.latest_updated_at, 100, true);
-  const derivedPatternUpdatedAt = normalizeOperatorText(derivedPatternState?.latest_source_updated_at, 100, true);
-  const savedPatternRefreshRequired = qualifiedPatternCount > 0 && (
-    derivedPatternCount !== qualifiedPatternCount
-    || !derivedPatternUpdatedAt
-    || Boolean(qualifiedPatternUpdatedAt && derivedPatternUpdatedAt < qualifiedPatternUpdatedAt)
-  );
-  const savedPatternIntelligenceRefresh = savedPatternRefreshRequired
-    ? await refreshManifestSavedPatternIntelligence(env.DB, {
-      brand_key: brand.brand_key,
-      account_id: brand.account_id,
-      app_user_id: SAVED_PATTERNS_APP_USER_ID,
-    })
-    : {
-      qualified_pattern_count: qualifiedPatternCount,
-      derived_pattern_count: derivedPatternCount,
-      recomputed: false,
-      current: true,
-    };
-  const measurementAuditRefresh = {
-    mode: savedPatternRefreshRequired
-      ? "saved_pattern_intelligence_refreshed"
-      : "latest_persisted_measurement_state",
-    recomputed: savedPatternRefreshRequired,
-    refresh_owner: savedPatternRefreshRequired
-      ? "autonomous_prepare_source_grounding"
-      : "performance_evaluator_and_insights_cycle",
-    saved_pattern_intelligence: savedPatternIntelligenceRefresh,
-    reason: savedPatternRefreshRequired
-      ? "Autonomous preparation repaired empty or stale Saved Pattern intelligence before generation so the source library cannot silently disappear."
-      : "Autonomous preparation consumed current durable learning, benchmark, Saved Pattern, and follower records without recomputing the full measurement layer.",
-  };
-    const decisionIntelligence = await buildManifestDecisionIntelligence(env.DB, brand.brand_key);
-  const decisionIntelligenceReceiptReference = {
-    version: decisionIntelligence.version ?? null,
-    source_fingerprint: decisionIntelligence.source_fingerprint ?? null,
-    latest_strategy_version_id: (decisionIntelligence.latest_strategy as Record<string, unknown> | null)?.id ?? null,
-    learning_brief_key: (decisionIntelligence.learning_brief as Record<string, unknown> | null)?.brief_key ?? null,
-    benchmark_snapshot_key: ((decisionIntelligence.benchmark_response as Record<string, unknown> | null)?.latest as Record<string, unknown> | null)?.snapshot_key ?? null,
-    required_directives: Array.isArray(decisionIntelligence.required_directives) ? decisionIntelligence.required_directives : [],
-    strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
-    consumption_contract: decisionIntelligence.consumption_contract ?? {},
-  };
-        const accountPosition: Record<string, unknown> = await buildManifestAutonomousAccountPosition(
-    env,
-    brand,
-    targetSlots,
-    coverage,
-    clock,
-    threadsSnapshot as unknown as Record<string, unknown>,
-    deliveryReconciliation,
-  );
-      const existing = await env.DB.prepare(
-    `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
-  ).bind(brand.brand_key, operationId).first<{ id: string }>();
-  const cycleId = existing?.id ?? crypto.randomUUID();
-  const cycleStatus = missingSlots.length > 0 ? "prepared" : "completed";
-  if (existing?.id) {
-    await env.DB.prepare(
-      `UPDATE operator_autonomous_growth_cycles
-       SET engine_version = ?, status = ?, timezone = ?, horizon_hours = ?,
-           horizon_start_local = ?, horizon_end_local = ?, target_slots_json = ?,
-           missing_slots_json = ?, account_position_json = ?, error_json = '[]',
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND brand_key = ?`,
-    ).bind(
-      MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
-      cycleStatus,
-      timezone,
-      horizonHours,
-      targetSlots[0]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
-      targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
-      normalizeOperatorJson(targetSlots, []),
-      normalizeOperatorJson(missingSlots, []),
-      normalizeOperatorJson(accountPosition, {}),
+    threadsSnapshot: threadsSnapshot as unknown as Record<string, unknown>,
+  }, {
+    growthEngineVersion: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+    sourceSelectionEngineVersion: SOURCE_SELECTION_ENGINE_VERSION,
+    savedPatternsAppUserId: SAVED_PATTERNS_APP_USER_ID,
+    sourceMinimumVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+    humanFreeAutonomyContract: HUMAN_FREE_AUTONOMY_CONTRACT,
+    followerAttributionPolicy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+    noninterferencePolicy: MANIFEST_NONINTERFERENCE_POLICY,
+    analysisWindowDays: MANIFEST_ANALYSIS_WINDOW_DAYS,
+    recentExposureHours: MANIFEST_RECENT_EXPOSURE_HOURS,
+    normalizeText: normalizeOperatorText,
+    refreshTrustedUtcClock: refreshManifestTrustedUtcClock,
+    readDatabaseClock: async () => {
+      const row = await env.DB.prepare(
+        `SELECT CURRENT_TIMESTAMP AS current_time`,
+      ).first<{ current_time: string }>();
+      return normalizeOperatorText(row?.current_time, 100, true);
+    },
+    resolveClock: resolveManifestAutonomousClock,
+    parseTimestampMs: parseOperatorTimestampMs,
+    nowMs: () => Date.now(),
+    localDateTimeParts: operatorLocalDateTimeParts,
+    hourlySlot: operatorHourlySlot,
+    buildTargetSlots: buildManifestRollingHourlySlots,
+    buildCoverage: (targetSlots, coverageTimezone, effectiveNowMs) => buildManifestAutonomousCoverageLedger(
+      env,
+      brand,
+      targetSlots,
+      coverageTimezone,
+      effectiveNowMs,
+    ),
+    reconcileDelivery: (deliveryTimezone, effectiveNowMs) => reconcileOperatorDeliveryIncidents(
+      env,
+      brand,
+      deliveryTimezone,
+      effectiveNowMs,
+    ),
+    ensureRequiredSchemas: async () => {
+      await ensureGptPostStrategyTagsTable(env);
+      await ensureOperatorWorkflowTables(env);
+      await ensureExternalPatternsTable(env);
+      await ensureThreadsFollowerSnapshotsTable(env);
+      await ensureManifestMeasurementAuditTables(env.DB);
+    },
+    readSavedPatternStates: async (accountId, brandKey) => {
+      const [qualified, derived] = await Promise.all([
+        env.DB.prepare(`SELECT COUNT(*) AS total, MAX(updated_at) AS latest_updated_at
+          FROM external_patterns
+          WHERE app_user_id = ? AND account_id = ? AND likes >= ?`)
+          .bind(SAVED_PATTERNS_APP_USER_ID, accountId, MANIFEST_SOURCE_MIN_VERIFIED_LIKES)
+          .first<Record<string, unknown>>(),
+        env.DB.prepare(`SELECT COUNT(*) AS total, MAX(source_updated_at) AS latest_source_updated_at
+          FROM operator_manifest_saved_pattern_intelligence
+          WHERE brand_key = ?`)
+          .bind(brandKey)
+          .first<Record<string, unknown>>(),
+      ]);
+      return { qualified, derived };
+    },
+    refreshSavedPatternIntelligence: (input) => refreshManifestSavedPatternIntelligence(
+      env.DB,
+      input as Parameters<typeof refreshManifestSavedPatternIntelligence>[1],
+    ),
+    buildDecisionIntelligence: (brandKey) => buildManifestDecisionIntelligence(env.DB, brandKey),
+    buildAccountPosition: (input) => buildManifestAutonomousAccountPosition(
+      env,
+      brand,
+      input.targetSlots,
+      input.coverage as Awaited<ReturnType<typeof buildManifestAutonomousCoverageLedger>>,
+      input.clock as ReturnType<typeof resolveManifestAutonomousClock>,
+      input.threadsSnapshot,
+      input.deliveryReconciliation,
+    ),
+    readExistingCycle: (operationId, brandKey) => env.DB.prepare(
+      `SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = ? AND operation_id = ? LIMIT 1`,
+    ).bind(brandKey, operationId).first<{ id: string }>(),
+    createId: () => crypto.randomUUID(),
+    writeCycle: async (input) => {
+      if (input.existing) {
+        await env.DB.prepare(
+          `UPDATE operator_autonomous_growth_cycles
+           SET engine_version = ?, status = ?, timezone = ?, horizon_hours = ?,
+               horizon_start_local = ?, horizon_end_local = ?, target_slots_json = ?,
+               missing_slots_json = ?, account_position_json = ?, error_json = '[]',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND brand_key = ?`,
+        ).bind(
+          input.engineVersion,
+          input.status,
+          input.timezone,
+          input.horizonHours,
+          input.horizonStartLocal,
+          input.horizonEndLocal,
+          normalizeOperatorJson(input.targetSlots, []),
+          normalizeOperatorJson(input.missingSlots, []),
+          normalizeOperatorJson(input.accountPosition, {}),
+          input.cycleId,
+          input.brandKey,
+        ).run();
+        return;
+      }
+      await env.DB.prepare(
+        `INSERT INTO operator_autonomous_growth_cycles (
+          id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
+          horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+          account_position_json, scheduled_post_ids_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')`,
+      ).bind(
+        input.cycleId,
+        input.brandKey,
+        input.operationId,
+        input.engineVersion,
+        input.status,
+        input.timezone,
+        input.horizonHours,
+        input.horizonStartLocal,
+        input.horizonEndLocal,
+        normalizeOperatorJson(input.targetSlots, []),
+        normalizeOperatorJson(input.missingSlots, []),
+        normalizeOperatorJson(input.accountPosition, {}),
+      ).run();
+    },
+    readLockedSourceSelectionPlan: (brandKey, cycleId) => readLockedSourceSelectionPlan(
+      env.DB,
+      brandKey,
       cycleId,
-      brand.brand_key,
-    ).run();
-  } else {
-    await env.DB.prepare(
-      `INSERT INTO operator_autonomous_growth_cycles (
-        id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
-        horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
-        account_position_json, scheduled_post_ids_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')`,
-    ).bind(
-      cycleId,
-      brand.brand_key,
-      operationId,
-      MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
-      cycleStatus,
-      timezone,
-      horizonHours,
-      targetSlots[0]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
-      targetSlots[targetSlots.length - 1]?.key ?? `${local.date}T${operatorHourlySlot(local.hour + 1)}`,
-      normalizeOperatorJson(targetSlots, []),
-      normalizeOperatorJson(missingSlots, []),
-                  normalizeOperatorJson(accountPosition, {}),
-    ).run();
-    }
-
-    let lockedSourceSelectionPlan = await readLockedSourceSelectionPlan(env.DB, brand.brand_key, cycleId);
-  let sourceSelectionPlanStatus = missingSlots.length === 0 ? "not_required" : lockedSourceSelectionPlan.length > 0 ? "locked" : "pending";
-  if (missingSlots.length > 0 && lockedSourceSelectionPlan.length === 0) {
-    const [lockedSourceCards, sourceExclusions] = await Promise.all([
-      loadLockedSourceCardSelectionCandidates(env.DB, brand.brand_key, clock.effective_now_iso),
-      env.DB.prepare(
+    ),
+    loadLockedSourceCards: (brandKey, asOf) => loadLockedSourceCardSelectionCandidates(
+      env.DB,
+      brandKey,
+      asOf,
+    ) as Promise<Record<string, unknown>[]>,
+    loadSourceExclusions: async (brandKey) => {
+      const rows = await env.DB.prepare(
         `SELECT source_identity_key FROM operator_source_exclusions
          WHERE brand_key = ? AND active = 1`,
-      ).bind(brand.brand_key).all<{ source_identity_key: string }>(),
-    ]);
-    const excludedIdentities = new Set((sourceExclusions.results ?? []).map((row) => String(row.source_identity_key)));
-    const selectionCandidates = lockedSourceCards
-      .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
-      .filter((candidate) => candidate.lifetime_label !== "disproven");
-    if (selectionCandidates.length > 0) {
-      const backendSelection = selectSourceFamilyLineup({
-        candidates: selectionCandidates,
-        slot_keys: missingSlots.map((slot) => slot.key),
-        seed: `${brand.brand_key}:${cycleId}:${operationId}`,
-      });
-      lockedSourceSelectionPlan = await persistLockedSourceSelectionPlan(env.DB, {
-        brand_key: brand.brand_key,
-        cycle_id: cycleId,
-        receipts: backendSelection.receipts,
-      });
-      sourceSelectionPlanStatus = "locked";
-    } else {
-      sourceSelectionPlanStatus = "pending_locked_source_card_inventory";
-    }
-  }
-
-
-      const rollingEvidence = await buildManifestRollingEvidence(env, brand, {
-
-    cycle_id: cycleId,
-    as_of: clock.effective_now_iso,
-    effective_now_ms: effectiveNowMs,
-    timezone,
-    future_schedule: coverage.scheduled_records.map((record) => ({ ...record })),
+      ).bind(brandKey).all<{ source_identity_key: string }>();
+      return (rows.results ?? []).map((row) => String(row.source_identity_key));
+    },
+    selectSourceLineup: (input) => selectSourceFamilyLineup(
+      input as Parameters<typeof selectSourceFamilyLineup>[0],
+    ),
+    persistLockedSourceSelectionPlan: (input) => persistLockedSourceSelectionPlan(
+      env.DB,
+      input as Parameters<typeof persistLockedSourceSelectionPlan>[1],
+    ),
+    buildRollingEvidence: (input) => buildManifestRollingEvidence(
+      env,
+      brand,
+      input as Parameters<typeof buildManifestRollingEvidence>[2],
+    ),
+    attachEvidenceSnapshot: (cycleId, brandKey, evidenceSnapshotId) => env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles
+       SET evidence_snapshot_id = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(evidenceSnapshotId, cycleId, brandKey).run(),
+    ensureIntelligencePolicy: (brandKey) => ensureManifestIntelligencePolicy(env.DB, brandKey),
+    getLatestStrategyVersion: (brandKey) => getLatestManifestStrategyVersion(env.DB, brandKey),
+    createExposureSnapshot: (input) => createManifestExposureSnapshot(
+      env.DB,
+      input as Parameters<typeof createManifestExposureSnapshot>[1],
+    ),
+    beginCycleReceipt: (input) => beginManifestCycleReceipt(
+      env.DB,
+      input as Parameters<typeof beginManifestCycleReceipt>[1],
+    ),
+    appendCycleEvent: (input) => appendManifestCycleEvent(
+      env.DB,
+      input as Parameters<typeof appendManifestCycleEvent>[1],
+    ),
+    clearPrepareCheckpoint: (brandKey, operationId) => clearManifestPrepareCheckpoint(
+      env.DB,
+      brandKey,
+      operationId,
+    ),
+    readPreparedCycle: (brandKey, cycleId) => readManifestAutonomousCycle(
+      env,
+      brandKey as GptBrandKey,
+      cycleId,
+    ),
   });
-  const evidenceSnapshot = rollingEvidence.snapshot && typeof rollingEvidence.snapshot === "object" && !Array.isArray(rollingEvidence.snapshot)
-    ? rollingEvidence.snapshot as Record<string, unknown>
-    : {};
-  await env.DB.prepare(
-    `UPDATE operator_autonomous_growth_cycles
-     SET evidence_snapshot_id = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND brand_key = ?`,
-  ).bind(evidenceSnapshot.id ?? null, cycleId, brand.brand_key).run();
+    
 
-  const intelligencePolicy = await ensureManifestIntelligencePolicy(env.DB, brand.brand_key);
-    const inputStrategyVersion = (await getLatestManifestStrategyVersion(env.DB, brand.brand_key)) ?? {
-    id: null,
-    strategy: null,
-    status: "legacy_strategy_unavailable",
-  };
-    const recentEvidence = evidenceSnapshot.recent_exposure && typeof evidenceSnapshot.recent_exposure === "object" && !Array.isArray(evidenceSnapshot.recent_exposure)
-    ? evidenceSnapshot.recent_exposure as Record<string, unknown>
-    : {};
-  const publishedExposure = Array.isArray(recentEvidence.posts)
-    ? recentEvidence.posts as Record<string, unknown>[]
-    : [];
-  const scheduledExposure = coverage.scheduled_records.map((record) => ({ ...record }));
-  const exposureSnapshot = await createManifestExposureSnapshot(env.DB, {
-    cycleId,
-    brandKey: brand.brand_key,
-    asOf: clock.effective_now_iso,
-    timezone,
-    horizonStartLocal: targetSlots[0]?.key ?? null,
-    horizonEndLocal: targetSlots[targetSlots.length - 1]?.key ?? null,
-    published: publishedExposure,
-    scheduled: scheduledExposure,
-  });
-  const cycleReceipt = await beginManifestCycleReceipt(env.DB, {
-    cycleId,
-    brandKey: brand.brand_key,
-    operationId,
-    trigger: {
-      operation_id: operationId,
-      requested_horizon_hours: horizonHours,
-      timezone,
-      clock,
-      invocation_mode: "model_orchestrated_autonomous_cycle",
-    },
-    startupState: {
-      account_position: accountPosition,
-      occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-                                                            data_consulted: ["complete rolling 28-day post evidence", "24-hour likes-first maturity records", "72-hour recent audience exposure", "future 48-hour scheduled exposure", "canonical hard bans", "active and newly mature experiments", "Saved Pattern and source-card lineage", "account-level follower checkpoint", "operational gates"],
-                  maturity_refresh: {
-        ...((rollingEvidence.maturity_refresh && typeof rollingEvidence.maturity_refresh === "object")
-          ? rollingEvidence.maturity_refresh as Record<string, unknown>
-          : {}),
-        collection_source: "autonomous_prepare",
-        due_checkpoint_post_count: threadsSnapshot.due_checkpoint_post_count,
-        due_checkpoint_count: threadsSnapshot.due_checkpoint_count,
-        metric_snapshots: threadsSnapshot.metric_snapshots,
-        evaluator_version: threadsSnapshot.performance_evaluation?.evaluator_version ?? null,
-        maturity_scores_upserted: Number(threadsSnapshot.performance_evaluation?.maturity_scores_upserted ?? 0),
-      },
-      intelligence_policy: intelligencePolicy,
-      evidence_snapshot_id: evidenceSnapshot.id ?? null,
-      evidence_page_count: evidenceSnapshot.page_count ?? 0,
-      legacy_decision_intelligence_supporting_only: decisionIntelligenceReceiptReference,
-    },
-    inputStrategyVersionId: normalizeOperatorText(inputStrategyVersion.id, 160, true),
-    exposureSnapshotId: normalizeOperatorText(exposureSnapshot.id, 160, true),
-    horizonPlan: {
-      target_slots: targetSlots,
-      authoritative_missing_slots: missingSlots,
-      occupied_slots: targetSlots.filter((slot) => coverage.occupied.has(slot.key)).map((slot) => ({ ...slot, evidence: coverage.occupied.get(slot.key) })),
-            full_horizon_lineup_required_before_first_persist: true,
-            backend_source_selection_locked: lockedSourceSelectionPlan.length > 0,
-      source_selection_plan_status: sourceSelectionPlanStatus,
-      source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
-      locked_source_selection_plan: lockedSourceSelectionPlan,
 
-    },
-
-    startedAt: clock.effective_now_iso,
-  });
-        await appendManifestCycleEvent(env.DB, {
-    cycleId,
-    brandKey: brand.brand_key,
-        eventKey: `cycle-prepared:${exposureSnapshot.revision ?? 1}:${runtimeNowIso}`,
-    eventType: "cycle_prepared",
-    payload: {
-      operation_id: operationId,
-      target_slot_count: targetSlots.length,
-      missing_slot_count: missingSlots.length,
-      input_strategy_version_id: inputStrategyVersion.id ?? null,
-      exposure_snapshot_id: exposureSnapshot.id ?? null,
-      exposure_revision: exposureSnapshot.revision ?? 1,
-      exposure_refreshed: exposureSnapshot.refreshed === true,
-      receipt_id: cycleReceipt.id ?? null,
-      effective_now_iso: clock.effective_now_iso,
-    },
-    });
-  if (phasedPreparation && explicitOperationId) {
-    await clearManifestPrepareCheckpoint(env.DB, brand.brand_key, explicitOperationId);
+      
   }
-  const preparedCycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
-  if (existing?.id) {
-    const compactCycle = preparedCycle ? {
-      id: preparedCycle.id,
-      brand_key: preparedCycle.brand_key,
-      operation_id: preparedCycle.operation_id,
-      engine_version: preparedCycle.engine_version,
-      status: preparedCycle.status,
-      timezone: preparedCycle.timezone,
-      horizon_hours: preparedCycle.horizon_hours,
-      horizon_start_local: preparedCycle.horizon_start_local,
-      horizon_end_local: preparedCycle.horizon_end_local,
-      target_slots: preparedCycle.target_slots,
-      missing_slots: preparedCycle.missing_slots,
-      scheduled_post_ids: preparedCycle.scheduled_post_ids,
-      error: preparedCycle.error,
-      updated_at: preparedCycle.updated_at,
-    } : null;
-    return {
-      success: true,
-      reused_existing: true,
-      refreshed_live_state: true,
-      cycle: compactCycle,
-      intelligence_engine_refresh: intelligenceEngineRefresh,
-            measurement_audit_refresh: measurementAuditRefresh,
-                  decision_intelligence: decisionIntelligenceReceiptReference,
-      rolling_evidence: rollingEvidence,
-                  strategy_required: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0,
-      source_backed_generation_only: true,
-      source_selection_plan_status: sourceSelectionPlanStatus,
-      locked_source_selection_plan: lockedSourceSelectionPlan,
-      model_source_substitution_allowed: false,
-
-
-            human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
-      remaining_missing_count: missingSlots.length,
-      next_missing_slot: missingSlots[0] ?? null,
-            next_action: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0
-        ? `Read every remaining analysis page for cycle ${cycleId}, then call commit_manifest_cycle_strategy with the exact locked backend source plan covering all ${missingSlots.length} authoritative missing slots. The model may decide execution wording and placement rationale but may not substitute sources.`
-        : missingSlots.length > 0
-          ? `Create or repair the locked source-card inventory, then call prepare_manifest_autonomous_cycle again with the same operation_id so the backend can lock the source plan.`
-          : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
-
-      reconciliation_contract: {
-        authoritative_clock_source: clock.source,
-        effective_now_iso: clock.effective_now_iso,
-        past_slots_ignored: true,
-        occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-        stale_operation_refresh: true,
-        coverage_reconciled: true,
-      },
-    };
-  }
-  return {
-    success: true,
-    reused_existing: false,
-    refreshed_live_state: true,
-                cycle: preparedCycle,
-                intelligence_engine_refresh: intelligenceEngineRefresh,
-                measurement_audit_refresh: measurementAuditRefresh,
-                                decision_intelligence: decisionIntelligence,
-    rolling_evidence: rollingEvidence,
-            strategy_required: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0,
-    source_backed_generation_only: true,
-    source_selection_plan_status: sourceSelectionPlanStatus,
-    locked_source_selection_plan: lockedSourceSelectionPlan,
-    model_source_substitution_allowed: false,
-
-
-        human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
-    remaining_missing_count: missingSlots.length,
-    next_missing_slot: missingSlots[0] ?? null,
-        next_action: missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0
-      ? `Read every remaining analysis page for cycle ${cycleId}, then call commit_manifest_cycle_strategy with the exact locked backend source plan covering all ${missingSlots.length} authoritative missing slots. The model may decide execution wording and placement rationale but may not substitute sources.`
-      : missingSlots.length > 0
-        ? `Create or repair the locked source-card inventory, then call prepare_manifest_autonomous_cycle again with the same operation_id so the backend can lock the source plan.`
-        : `The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.`,
-
-    intelligence_foundation: {
-      policy: intelligencePolicy,
-            legacy_input_strategy_reference: inputStrategyVersion,
-      exposure_snapshot: {
-        id: exposureSnapshot.id ?? null,
-        ledger_version: exposureSnapshot.ledger_version ?? null,
-        dimensions: exposureSnapshot.dimensions ?? {},
-      },
-      cycle_receipt: {
-        id: cycleReceipt.id ?? null,
-        receipt_version: cycleReceipt.receipt_version ?? null,
-        status: cycleReceipt.status ?? null,
-      },
-      follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
-      noninterference_policy: MANIFEST_NONINTERFERENCE_POLICY,
-    },
-        strategy_contract: {
-      objective: "Inspect the complete rolling 28-day evidence, form one fresh account-wide conclusion, and lock one source-backed strategy and full authoritative missing-slot lineup before generating the first candidate.",
-      analysis_window_days: MANIFEST_ANALYSIS_WINDOW_DAYS,
-      primary_performance_metric: "24_hour_likes",
-      recent_exposure_window_hours: MANIFEST_RECENT_EXPOSURE_HOURS,
-      one_strategy_per_cycle: true,
-      source_backed_generation_only: true,
-      original_model_posts_forbidden: true,
-      every_analysis_page_required: true,
-      fixed_percentages: false,
-      winner_preservation: "Continue using winners while comparable performance remains strong, while spacing them when recent published or scheduled exposure is dense.",
-      repetition_distinction: "Mechanism repetition can be productive; clustered execution sameness must be rejected, rewritten, or moved to a later slot.",
-      full_horizon_sequence_required: true,
-      slot_placement_reasoning_required: true,
-      recent_published_posts_required: true,
-      future_schedule_required: true,
-      delivery_incident_awareness_required: true,
-      family_roles: ["franchise", "core", "emerging", "prospect", "cooling", "dormant"],
-            generation_modes: ["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment"],
-      source_kinds: ["saved_pattern", "source_card"],
-      strategy_change_rule: "Change strategy when authoritative learning, benchmark movement, portfolio evidence, experiment results, audience response, account position, recent exposure, or opportunity changes—not merely because another day began.",
-      sequencing_rule: "A franchise may stay in the portfolio and still move later in the day. The earliest slot is reserved for the strongest contextually appropriate move after exposure and novelty review.",
-      scheduled_task_consumption_rule: "Before generating or placing any post, consume every field in decision_intelligence. Persist an intelligence_application_assessment explaining which learned directive changed the move or why evidence required preserving the current strategy.",
-      decision_influence_receipt_required: true,
-    },
-    reconciliation_contract: {
-      authoritative_clock_source: clock.source,
-      effective_now_iso: clock.effective_now_iso,
-      past_slots_ignored: true,
-      occupancy_sources: ["live Threads posts", "threads_posts_archive", "scheduled_posts all statuses"],
-      delivery_states_included: ["scheduled", "publishing", "published", "failed", "retry_required", "not_attempted", "publishing_stalled"],
-      stale_operation_refresh: true,
-      after_four_posts_tool: "get_hourly_coverage",
-      collision_behavior: "Treat an occupied slot as nonfatal, preserve it, refresh coverage, move the candidate to the next authoritative missing slot with a new slot operation id, and continue.",
-    },
-    persistence_contract: {
-      tool: "persist_manifest_autonomous_post",
-      posts_per_call: 1,
-      model_orchestrated: true,
-      preserve_existing_schedule: true,
-      exact_missing_slots_only: true,
-      required_post_fields: ["date", "time", "text", "generation_mode", "family_key", "source_mechanism", "audience_reward", "strategic_purpose"],
-            required_model_evaluation_fields: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment", "intelligence_application_assessment"],
-      server_enforcement: ["slot_open", "exact_duplicate", "explicit_banned_phrase", "idempotency", "lineage_persistence"],
-      internal_gate_fanout: false,
-      internal_runway_scan: false,
-      threads_api_during_persistence: false,
-      complete_lineage_required: true,
-    },
-  };
-}
 
 
 async function ensureManifestAutonomousSourceCard(
