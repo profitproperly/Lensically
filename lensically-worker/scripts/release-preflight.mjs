@@ -53,6 +53,9 @@ const operatorManifestCycleConstructionService = read("src/operatorManifestCycle
 const operatorManifestCycleConstructionServiceTests = read("test/operatorManifestCycleConstructionService.spec.ts");
 const operatorManifestPersistenceAdmissionService = read("src/operatorManifestPersistenceAdmissionService.ts");
 const operatorManifestPersistenceAdmissionServiceTests = read("test/operatorManifestPersistenceAdmissionService.spec.ts");
+const operatorManifestPersistenceService = read("src/operatorManifestPersistenceService.ts");
+const operatorManifestPersistenceServiceTests = read("test/operatorManifestPersistenceService.spec.ts");
+
 
 
 
@@ -164,6 +167,10 @@ if (!workflow.includes("test/operatorManifestCycleConstructionService.spec.ts"))
 if (!workflow.includes("test/operatorManifestPersistenceAdmissionService.spec.ts")) {
   errors.push("operator_manifest_persistence_admission_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestPersistenceService.spec.ts")) {
+  errors.push("operator_manifest_persistence_service_workflow_gate_missing");
+}
+
 
 
 
@@ -744,6 +751,37 @@ if (!operatorManifestPersistenceAdmissionServiceTests.includes("rejects candidat
     || !operatorManifestPersistenceAdmissionServiceTests.includes("repairs and receipts an existing complete scheduled lineage")) {
   lifecycleErrors.push("operator_manifest_persistence_admission_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestPersistenceService"')
+    || !source.includes("persistOperatorManifestCandidate({")
+    || !source.includes("persistLineageRecords: (input)")
+    || !source.includes("readLineageStatus: (input)")) {
+  lifecycleErrors.push("operator_manifest_persistence_service_import_or_binding_missing");
+}
+if (source.includes('completion_trigger: "final_post_persisted"')
+    || source.includes('eventType: "post_persisted"')
+    || source.includes('error: "autonomous_lineage_incomplete_after_persist"')) {
+  lifecycleErrors.push("operator_manifest_persistence_service_returned_to_index");
+}
+if (!operatorManifestPersistenceService.includes("export async function persistOperatorManifestCandidate")
+    || !operatorManifestPersistenceService.includes("dependencies.findExactDuplicate")
+    || !operatorManifestPersistenceService.includes("dependencies.analyzeRepetition")
+    || !operatorManifestPersistenceService.includes("dependencies.runGateSuite")
+    || !operatorManifestPersistenceService.includes("dependencies.recordGateReceipt")
+    || !operatorManifestPersistenceService.includes("dependencies.persistLineageRecords")
+    || !operatorManifestPersistenceService.includes("dependencies.readLineageStatus")
+    || !operatorManifestPersistenceService.includes("dependencies.reconcileCoverageState")
+    || !operatorManifestPersistenceService.includes("dependencies.finalizeCycleReceipt")
+    || !operatorManifestPersistenceService.includes('completion_trigger: "final_post_persisted"')) {
+  lifecycleErrors.push("operator_manifest_persistence_service_module_incomplete");
+}
+if (!operatorManifestPersistenceServiceTests.includes("blocks exact duplicate text before source and gate execution")
+    || !operatorManifestPersistenceServiceTests.includes("requires explicit evidence for every canonical owner hard ban")
+    || !operatorManifestPersistenceServiceTests.includes("blocks publication and records exact missing lineage stages")
+    || !operatorManifestPersistenceServiceTests.includes("persists complete lineage and leaves the next authoritative slot open")
+    || !operatorManifestPersistenceServiceTests.includes("finalizes the cycle when authoritative coverage is complete")) {
+  lifecycleErrors.push("operator_manifest_persistence_service_tests_incomplete");
+}
+
 
 
 
@@ -1083,8 +1121,8 @@ const manifestAutonomousGrowthChecks = [
     && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_plan_item_required')
     && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_strategy_mismatch')
     && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_plan_item_mismatch')],
-  ["hard_ban_enforcement", source.includes('canonical_hard_ban_evaluation_incomplete')],
-  ["nonempty_gate_execution", source.includes('required_candidate_gate_execution_empty') && source.includes('candidate_gate_receipt_failed')],
+    ["hard_ban_enforcement", operatorManifestPersistenceService.includes('canonical_hard_ban_evaluation_incomplete')],
+  ["nonempty_gate_execution", operatorManifestPersistenceService.includes('required_candidate_gate_execution_empty') && operatorManifestPersistenceService.includes('candidate_gate_receipt_failed')],
     ["placement_and_exposure_assessment", operatorMcpAutonomousExecutionRegistry.includes('slot_placement_assessment: { type: "string"') && operatorMcpAutonomousExecutionRegistry.includes('recent_exposure_assessment: { type: "string"')],
   ["live_reconciliation", source.includes('refreshManifestAutonomousThreadsSnapshot') && source.includes('buildManifestAutonomousCoverageLedger')],
   ["intelligence_v3", manifestIntelligence.includes('MANIFEST_INTELLIGENCE_FOUNDATION_VERSION = "manifest-intelligence-foundation-v3"')],
