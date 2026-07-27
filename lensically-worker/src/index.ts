@@ -11643,7 +11643,297 @@ async function commitManifestAutonomousRunway(
   };
 }
 
+async function persistManifestAutonomousLineageRecords(
+  env: Env,
+  input: Record<string, unknown>,
+): Promise<void> {
+  const post = input.post && typeof input.post === "object" && !Array.isArray(input.post)
+    ? input.post as Record<string, unknown>
+    : {};
+  const sourceCard = input.sourceCard && typeof input.sourceCard === "object" && !Array.isArray(input.sourceCard)
+    ? input.sourceCard as Record<string, unknown>
+    : {};
+  const strategy = input.strategy && typeof input.strategy === "object" && !Array.isArray(input.strategy)
+    ? input.strategy as Record<string, unknown>
+    : {};
+  const normalizedStrategy = input.normalizedStrategy && typeof input.normalizedStrategy === "object" && !Array.isArray(input.normalizedStrategy)
+    ? input.normalizedStrategy as Record<string, unknown>
+    : null;
+  const gateSummary = input.gateSummary && typeof input.gateSummary === "object" && !Array.isArray(input.gateSummary)
+    ? input.gateSummary as Record<string, unknown>
+    : {};
+  const draftAnalysis = input.draftAnalysis && typeof input.draftAnalysis === "object" && !Array.isArray(input.draftAnalysis)
+    ? input.draftAnalysis as Record<string, unknown>
+    : {};
+  const modelEvaluation = input.modelEvaluation && typeof input.modelEvaluation === "object" && !Array.isArray(input.modelEvaluation)
+    ? input.modelEvaluation as Record<string, unknown>
+    : {};
+  const effectiveStrategicThesis = input.effectiveStrategicThesis && typeof input.effectiveStrategicThesis === "object" && !Array.isArray(input.effectiveStrategicThesis)
+    ? input.effectiveStrategicThesis as Record<string, unknown>
+    : {};
+  const postHypothesis = input.postHypothesis && typeof input.postHypothesis === "object" && !Array.isArray(input.postHypothesis)
+    ? input.postHypothesis as Record<string, unknown>
+    : {};
+  const scheduledPostId = Number(input.scheduledPostId ?? 0);
+  const runId = String(input.runId ?? "");
+  const draftId = String(input.draftId ?? "");
+  const lineupId = String(input.lineupId ?? "");
+  const inventoryId = String(input.inventoryId ?? "");
+  const brandKey = String(input.brandKey ?? "");
+  const accountId = String(input.accountId ?? "");
+  const threadsUserId = String(input.threadsUserId ?? "");
+  const cycleId = String(input.cycleId ?? "");
+  const slotKey = String(input.slotKey ?? "");
+  const sourceCardId = String(input.sourceCardId ?? "");
+  const sourceSelectionId = normalizeOperatorText(input.sourceSelectionId, 160, true);
+  const familyId = normalizeOperatorText(input.familyId, 160, true);
+  const requestedCycleStrategyId = String(input.requestedCycleStrategyId ?? "");
+  const requestedCyclePlanItemId = String(input.requestedCyclePlanItemId ?? "");
+  const text = String(input.text ?? "");
+  const date = String(input.date ?? "");
+  const time = String(input.time ?? "");
+  const generationMode = String(input.generationMode ?? "");
+  const familyKey = String(input.familyKey ?? "");
+  const strategicPurpose = String(input.strategicPurpose ?? "");
+  const audienceReward = String(input.audienceReward ?? "");
+  const firstLine = String(input.firstLine ?? "");
+  const openingPhrase = String(input.openingPhrase ?? "");
+  const realmEntranceKey = normalizeOperatorText(input.realmEntranceKey, 160, true);
+  const usedAt = String(input.usedAt ?? new Date().toISOString());
+  const gateReceipt = input.gateReceipt && typeof input.gateReceipt === "object" && !Array.isArray(input.gateReceipt)
+    ? input.gateReceipt as Record<string, unknown>
+    : {};
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO gpt_generation_runs (
+        id, account_id, threads_user_id, objective, prompt_summary, status,
+        metadata_json, source_card_id, source_card_family_id,
+        source_card_version_number, adaptation_plan_json
+      ) VALUES (?, ?, ?, ?, ?, 'drafted', ?, ?, ?, ?, ?)`,
+    ).bind(
+      runId,
+      accountId,
+      threadsUserId,
+      strategicPurpose,
+      `Model-orchestrated autonomous ${generationMode} for ${slotKey}`,
+      normalizeOperatorJson({
+        cycle_id: cycleId,
+        strategic_thesis: effectiveStrategicThesis,
+        cycle_strategic_thesis_reused: input.cycleStrategicThesisReused === true,
+        strategy,
+        model_evaluation: modelEvaluation,
+      }, {}),
+      sourceCardId,
+      familyId,
+      Number(sourceCard.version_number ?? 1),
+      normalizeOperatorJson({
+        adaptation_goal: strategicPurpose,
+        payoff_choice: audienceReward,
+        experiment_notes: generationMode,
+        intentionally_different_from_prior: normalizeOperatorText(post.intentionally_different_from_prior, 2000, true),
+      }, {}),
+    ),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO gpt_generation_drafts (
+        id, run_id, account_id, threads_user_id, draft_index, text, status,
+        score_json, strategy_json, source_card_id, showable, metadata_json,
+        gate_summary_json, scheduled_post_id
+      ) VALUES (?, ?, ?, ?, 0, ?, 'scheduled', ?, ?, ?, 1, ?, ?, ?)`,
+    ).bind(
+      draftId,
+      runId,
+      accountId,
+      threadsUserId,
+      text,
+      normalizeOperatorJson(post.score, {}),
+      normalizeOperatorJson(strategy, {}),
+      sourceCardId,
+      normalizeOperatorJson({ cycle_id: cycleId, slot_key: slotKey, generation_mode: generationMode }, {}),
+      normalizeOperatorJson(gateSummary, {}),
+      scheduledPostId,
+    ),
+    env.DB.prepare(
+      `UPDATE gpt_generation_drafts
+       SET status = 'scheduled', text = ?, score_json = ?, strategy_json = ?, source_card_id = ?,
+           showable = 1, metadata_json = ?, gate_summary_json = ?, scheduled_post_id = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND account_id = ?`,
+    ).bind(
+      text,
+      normalizeOperatorJson(post.score, {}),
+      normalizeOperatorJson(strategy, {}),
+      sourceCardId,
+      normalizeOperatorJson({ cycle_id: cycleId, slot_key: slotKey, generation_mode: generationMode }, {}),
+      normalizeOperatorJson(gateSummary, {}),
+      scheduledPostId,
+      draftId,
+      accountId,
+    ),
+    env.DB.prepare(
+      `INSERT INTO operator_autonomous_lineup_items (
+        id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+        generation_mode, family_key, strategic_purpose, strategy_json,
+        cycle_strategy_id, cycle_plan_item_id, gate_receipt_id,
+        source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+      ON CONFLICT(cycle_id, slot_key) DO UPDATE SET
+        text = excluded.text,
+        strategy_json = excluded.strategy_json,
+        cycle_strategy_id = excluded.cycle_strategy_id,
+        cycle_plan_item_id = excluded.cycle_plan_item_id,
+        gate_receipt_id = excluded.gate_receipt_id,
+        source_card_id = excluded.source_card_id,
+        source_selection_id = excluded.source_selection_id,
+        hypothesis_id = excluded.hypothesis_id,
+        generation_run_id = excluded.generation_run_id,
+        draft_id = excluded.draft_id,
+        scheduled_post_id = excluded.scheduled_post_id,
+        status = 'scheduled',
+        updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      lineupId,
+      cycleId,
+      brandKey,
+      slotKey,
+      date,
+      time,
+      text,
+      generationMode,
+      familyKey,
+      strategicPurpose,
+      normalizeOperatorJson(strategy, {}),
+      requestedCycleStrategyId,
+      requestedCyclePlanItemId,
+      gateReceipt.id ?? null,
+      sourceCardId,
+      sourceSelectionId,
+      normalizeOperatorText(postHypothesis.id, 160, true),
+      runId,
+      draftId,
+      scheduledPostId,
+    ),
+    env.DB.prepare(
+      `INSERT INTO gpt_post_strategy_tags (
+        scheduled_post_id, account_id, threads_user_id, pillar, hook_style, format,
+        intent, experiment, novelty_level, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(scheduled_post_id) DO UPDATE SET
+        account_id = excluded.account_id,
+        threads_user_id = excluded.threads_user_id,
+        pillar = excluded.pillar,
+        hook_style = excluded.hook_style,
+        format = excluded.format,
+        intent = excluded.intent,
+        experiment = excluded.experiment,
+        novelty_level = excluded.novelty_level,
+        metadata_json = excluded.metadata_json`,
+    ).bind(
+      scheduledPostId,
+      accountId,
+      threadsUserId,
+      normalizedStrategy?.pillar ?? null,
+      normalizedStrategy?.hook_style ?? null,
+      normalizedStrategy?.format ?? null,
+      normalizedStrategy?.intent ?? null,
+      normalizedStrategy?.experiment ?? null,
+      normalizedStrategy?.novelty_level ?? null,
+      normalizedStrategy?.metadata_json ?? normalizeOperatorJson({}, {}),
+    ),
+    env.DB.prepare(
+      `INSERT INTO operator_content_inventory (
+        id, brand_key, source_type, source_id, text, first_line, opening_phrase,
+        realm_entrance_key, hook_style, lane_key, source_card_id, status, used_at, metadata_json
+      ) VALUES (?, ?, 'scheduled_post', ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        source_id = excluded.source_id,
+        text = excluded.text,
+        first_line = excluded.first_line,
+        opening_phrase = excluded.opening_phrase,
+        realm_entrance_key = excluded.realm_entrance_key,
+        hook_style = excluded.hook_style,
+        lane_key = excluded.lane_key,
+        source_card_id = excluded.source_card_id,
+        status = 'scheduled',
+        used_at = excluded.used_at,
+        metadata_json = excluded.metadata_json`,
+    ).bind(
+      inventoryId,
+      brandKey,
+      String(scheduledPostId),
+      text,
+      firstLine,
+      openingPhrase,
+      realmEntranceKey,
+      normalizeOperatorText(strategy.hook_style, 120, true),
+      normalizeOperatorMachineKey(strategy.pillar, "") || null,
+      sourceCardId,
+      usedAt,
+      normalizeOperatorJson({ strategy, analysis: draftAnalysis, model_evaluation: modelEvaluation }, {}),
+    ),
+    env.DB.prepare(
+      `UPDATE operator_manifest_post_hypotheses
+       SET scheduled_post_id = ?, status = 'scheduled', locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND cycle_id = ? AND slot_key = ?`,
+    ).bind(scheduledPostId, postHypothesis.id, cycleId, slotKey),
+    env.DB.prepare(
+      `UPDATE scheduled_posts SET publish_error_message = NULL WHERE id = ? AND threads_user_id = ?`,
+    ).bind(scheduledPostId, threadsUserId),
+    env.DB.prepare(
+      `UPDATE operator_manifest_cycle_plan_items
+       SET status = 'scheduled', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND strategy_id = ? AND cycle_id = ? AND slot_key = ?`,
+    ).bind(requestedCyclePlanItemId, requestedCycleStrategyId, cycleId, slotKey),
+  ]);
+}
+
+async function readManifestAutonomousLineageStatus(
+  env: Env,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  return env.DB.prepare(
+    `SELECT d.id AS draft_id, r.id AS generation_run_id, c.id AS source_card_id,
+            s.id AS source_selection_id, s.batch_id AS source_batch_id,
+            l.hypothesis_id, l.source_selection_id AS lineup_source_selection_id,
+            l.cycle_id, l.slot_key, l.cycle_strategy_id, l.cycle_plan_item_id, l.gate_receipt_id,
+            strategy.id AS stored_cycle_strategy_id,
+            h.id AS stored_hypothesis_id, h.scheduled_post_id AS hypothesis_scheduled_post_id,
+            h.status AS hypothesis_status, h.locked_at AS hypothesis_locked_at,
+            plan.id AS stored_plan_item_id, plan.status AS plan_status,
+            gate.id AS stored_gate_receipt_id, gate.passed AS gate_passed
+       FROM operator_autonomous_lineup_items l
+       LEFT JOIN gpt_generation_drafts d
+         ON d.id = l.draft_id AND d.scheduled_post_id = l.scheduled_post_id
+        AND d.account_id = ? AND d.threads_user_id = ?
+       LEFT JOIN gpt_generation_runs r
+         ON r.id = l.generation_run_id AND r.id = d.run_id
+        AND r.account_id = d.account_id AND r.threads_user_id = d.threads_user_id
+       LEFT JOIN operator_source_cards c
+         ON c.id = l.source_card_id AND c.brand_key = l.brand_key
+       LEFT JOIN operator_source_selections s
+         ON s.id = l.source_selection_id AND s.brand_key = l.brand_key
+       LEFT JOIN operator_manifest_cycle_strategies strategy
+         ON strategy.id = l.cycle_strategy_id AND strategy.cycle_id = l.cycle_id AND strategy.brand_key = l.brand_key
+       LEFT JOIN operator_manifest_post_hypotheses h
+         ON h.id = l.hypothesis_id AND h.cycle_id = l.cycle_id AND h.slot_key = l.slot_key
+       LEFT JOIN operator_manifest_cycle_plan_items plan
+         ON plan.id = l.cycle_plan_item_id AND plan.cycle_id = l.cycle_id AND plan.slot_key = l.slot_key
+       LEFT JOIN operator_manifest_candidate_gate_receipts gate
+         ON gate.id = l.gate_receipt_id AND gate.cycle_id = l.cycle_id AND gate.slot_key = l.slot_key
+      WHERE l.cycle_id = ? AND l.brand_key = ? AND l.slot_key = ? AND l.scheduled_post_id = ?
+      LIMIT 1`,
+  ).bind(
+    String(input.accountId ?? ""),
+    String(input.threadsUserId ?? ""),
+    String(input.cycleId ?? ""),
+    String(input.brandKey ?? ""),
+    String(input.slotKey ?? ""),
+    Number(input.scheduledPostId ?? 0),
+  ).first<Record<string, unknown>>();
+}
+
 async function persistManifestAutonomousPost(
+
   env: Env,
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
