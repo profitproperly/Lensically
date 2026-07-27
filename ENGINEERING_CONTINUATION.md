@@ -5,8 +5,9 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: e44166b783df0937ccb4c1c87d24b5072087f0a9
-production_sha: e44166b783df0937ccb4c1c87d24b5072087f0a9
+repository_base_sha: 6710100d98ddc118e08c3e29b4f2e62aaa391c73
+production_sha: 6710100d98ddc118e08c3e29b4f2e62aaa391c73
+
 
 
 
@@ -653,23 +654,34 @@ Completed checkpoint — Stage 6G account-state read service extraction:
 - Exact-SHA release passed in run `30306689235`.
 - Live production independently confirmed exact SHA `e44166b783df0937ccb4c1c87d24b5072087f0a9` with 75/75 public tools.
 
-Current sub-action — Stage 6H Lensically UI read-surface service extraction:
+Completed checkpoint — Stage 6H Lensically UI read-surface service extraction:
 
-Extract the complete `read_lensically_ui_surface` composition from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorLensicallyUiSurfaceService.ts` as the dependency-injected authority for selected-account admission, dashboard token gating, follower refresh and delta mapping, insights cursor policy and cache/archive writes, post-archive ordering, saved-pattern pagination and empty-table behavior, unsupported-surface handling, and exact HTTP status/body responses.
+- Reduced `read_lensically_ui_surface` in `src/index.ts` to explicit Threads-account, dashboard, follower, insights, archive/cache, and saved-pattern SQL adapters.
+- Added `test/operatorLensicallyUiSurfaceService.spec.ts` covering account/token admission, follower delta math, bounded insights cursors and first-page cache writes, archive and missing saved-pattern pagination, and unsupported surfaces.
+- Added permanent push and release ownership gates. The first ownership-gated run `30308021786` stopped before runtime on a false-positive marker shared by a separate retained follower surface; the assertion was narrowed to unique handler signatures.
+- Corrected push validation passed in run `30308141895`.
+- All eight Operator shards passed in run `30308364407`.
+- Exact-SHA release passed in run `30308429603`.
+- The first independent check briefly observed the prior deployment during propagation; the immediate recheck confirmed live production exact SHA `6710100d98ddc118e08c3e29b4f2e62aaa391c73` with 75/75 public tools.
 
-- selected Threads-account admission and exact 404 behavior
-- dashboard access-token admission and payload composition
-- follower snapshot refresh, page normalization, chronological delta mapping, pagination, and timezone
-- insights cursor/depth normalization, upstream failure handling, archive/cache writes, and response cursors
-- post-archive ordering and pagination
-- saved-pattern table absence, account isolation, likes/newest ordering, pagination, and exact empty-state contract
-- unsupported-surface 400 response and exact status/body behavior for every surface
+Current sub-action — Stage 6I Manifest review-batch retirement service extraction:
 
-Keep Threads/account primitives, database/archive/cache writes, saved-pattern SQL, constants, and shared JSON transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `discard_manifest_review_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- Manifest-only admission and exact 400 response for other brands
+- required nonempty discard reason and optional explicit review-batch identity
+- latest active batch lookup when no identity is supplied
+- idempotent no-active-batch success response
+- terminal-status preservation, bounded retirement update, exact prior/new status fields, and retired boolean
+- permanent preservation of source records and source lineage, with no source deletion or scheduling mutation
+
+Keep review-batch SQL, text normalization, and shared JSON transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6H, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6I, then continue Stage 6 product-service extraction in bounded domain clusters.
+
 
 
 - Stage 7 router and runtime composition.
