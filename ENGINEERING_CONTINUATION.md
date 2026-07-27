@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: d0c6fd133ee7596eecb9a17bd73ae6ff97b6d076
-production_sha: d0c6fd133ee7596eecb9a17bd73ae6ff97b6d076
+repository_base_sha: 13051d014a7a32d220c3a5562f28da9f209a21fd
+production_sha: 13051d014a7a32d220c3a5562f28da9f209a21fd
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -580,23 +580,34 @@ Completed checkpoint — Stage 6C1 Manifest autonomous preparation checkpoint an
 - Exact-SHA release passed in run `30293565508`.
 - Live production independently confirmed exact SHA `d0c6fd133ee7596eecb9a17bd73ae6ff97b6d076` with 75/75 public tools.
 
-Current sub-action — Stage 6C2 Manifest autonomous cycle-construction service extraction:
+Completed checkpoint — Stage 6C2 Manifest autonomous cycle-construction extraction:
 
-Extract the remaining final construction half of `prepareManifestAutonomousCycle` from `src/index.ts` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestCycleConstructionService.ts` as the dependency-injected authority for trusted clock reconciliation, rolling target-slot construction, authoritative occupancy and delivery reconciliation, readiness gates, Saved Pattern intelligence repair, decision intelligence, account position, cycle creation or same-operation refresh, locked source-card filtering and deterministic selection, rolling evidence construction, exposure and receipt initialization, cycle-prepared events, checkpoint clearing, and final prepare responses.
+- Removed the remaining cycle-construction and response-contract implementation from `prepareManifestAutonomousCycle` in `src/index.ts`; the monolith now supplies low-level Threads, clock, scheduler, database, source-selection, evidence, receipt, and persistence adapters only.
+- Preserved exact new-cycle and reused-cycle responses, source-substitution prohibition, continuation language, strategy and persistence contracts, follower and noninterference policies, elapsed-slot behavior, and idempotent database effects.
+- Added `test/operatorManifestCycleConstructionService.spec.ts` covering authoritative construction, source exclusions, deterministic source-plan locking, Saved Pattern intelligence refresh, evidence and receipt initialization, existing-cycle refresh, and already-covered horizons.
+- Added permanent push and release ownership gates preventing final autonomous preparation orchestration from returning to `src/index.ts`.
+- Push validation passed in run `30295266192`.
+- All eight Operator shards passed in run `30295746973`.
+- Exact-SHA release passed in run `30295865451`.
+- Live production independently confirmed exact SHA `13051d014a7a32d220c3a5562f28da9f209a21fd` with 75/75 public tools.
 
-- trusted Threads, database, runtime, latest-publication, and external UTC clock reconciliation
-- target-slot construction, authoritative occupancy, elapsed-slot exclusion, and delivery incident reconciliation
-- required schema/table readiness and current Saved Pattern intelligence repair
-- decision intelligence, account position, cycle creation, and same-operation refresh semantics
-- locked source-card inventory filtering, deterministic backend source selection, and persisted source-selection plans
-- rolling 28-day evidence snapshot construction, evidence snapshot attachment, intelligence policy, input strategy, exposure ledger, receipt initialization, and cycle-prepared events
-- checkpoint clearing, compact reused-cycle responses, full new-cycle response contracts, continuation language, and exact idempotent database effects
+Current sub-action — Stage 6D1 autonomous post persistence admission and reconciliation extraction:
 
-Keep low-level Threads collection, scheduler internals, database SQL adapters, JSON transport, autonomous post persistence, and unrelated product workflows in `src/index.ts`. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract the first bounded half of `persistManifestAutonomousPost` from `src/index.ts` into a focused dependency-injected service while preserving:
+
+- Manifest-only and autonomy-mode admission, stable operation and cycle identity, and durable candidate-rejection events
+- exact cycle strategy, evidence-consumption, and locked plan-item validation
+- post hypothesis, source context, model evaluation, follower-attribution, required-field, slot, family, generation-mode, and canonical lineage validation
+- candidate-evaluated events and deterministic hypothesis persistence
+- prepared-clock reconciliation, elapsed-slot and occupied-slot nonfatal outcomes, live coverage refresh, cycle missing-slot updates, and next-slot continuation
+- stale lineup repair, exact replay detection, existing scheduled-lineage reuse, experiment assignment, semantic signatures, decision influence, and reused persistence receipts
+
+Keep scheduling creation, hard-ban and gate execution, candidate receipt persistence, generation/draft/inventory writes, final lineage validation, coverage completion, and receipt finalization in `src/index.ts` until Stage 6D2. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6C2, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6D1 and 6D2, then continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
