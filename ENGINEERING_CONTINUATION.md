@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 6163e9a56ff951874c6811d9e990758e4c04d393
-production_sha: 6163e9a56ff951874c6811d9e990758e4c04d393
+repository_base_sha: c89a8a8fa3ae2e1aa9240d854e402ea15ed33bb4
+production_sha: c89a8a8fa3ae2e1aa9240d854e402ea15ed33bb4
 
 
 
@@ -698,23 +698,34 @@ Completed checkpoint — Stage 6K Manifest review-draft attachment service extra
 - Exact-SHA release passed in run `30312756514`.
 - Live production independently confirmed exact SHA `6163e9a56ff951874c6811d9e990758e4c04d393` with 75/75 public tools.
 
-Current sub-action — Stage 6L Manifest review-source resolution service extraction:
+Completed checkpoint — Stage 6L Manifest review-source resolution service extraction:
 
-Extract `skip_manifest_review_source` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestReviewSourceResolutionService.ts` as the dependency-injected authority for review-item lookup, scope and default-reason normalization, saved-pattern-only deletion authority, durable source exclusions, claim/source-selection disposition, batch completion state, and serialized response.
+- Reduced `skip_manifest_review_source` in `src/index.ts` to explicit claim, exclusion-upsert, claim/source-selection update, unresolved-count, batch-status, UUID, and serializer adapters.
+- Added `test/operatorManifestReviewSourceResolutionService.spec.ts` and permanent push/release ownership gates.
+- Push validation passed in run `30313634505`.
+- All eight Operator shards passed in run `30313827757`.
+- Exact-SHA release passed in run `30313884288`.
+- Live production independently confirmed exact SHA `c89a8a8fa3ae2e1aa9240d854e402ea15ed33bb4` with 75/75 public tools.
 
-- review batch/item identity, scope normalization, and default owner reason
-- exact review-item 404 behavior
-- `delete_source` authority limited to saved-pattern sources
-- durable active source exclusion upsert for deleted saved-pattern sources
-- deterministic `source_deleted` versus `source_skipped` claim and source-selection state
-- resolved batch identity, unresolved-count completion versus partial-resolution status, and serialized response
-- exact errors and no partial mutation on rejected inputs
+Current sub-action — Stage 6M Manifest review-batch scheduling service extraction:
 
-Keep claim SQL, exclusion upsert, claim/source-selection updates, unresolved counting, review-batch status writes, serializer, normalization, UUID creation, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `schedule_manifest_review_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- exact review-batch identity and 404 admission
+- production date, timezone, optional item filtering, and current-day first eligible hour
+- occupied-hour reconciliation and deterministic hourly open-slot ordering
+- approved claim/draft eligibility with the one-post-per-invocation limit
+- exact insufficient-slot response and remaining-item continuation fields
+- draft retrieval, scheduling gate enforcement, schedule failure isolation, and per-item results
+- successful scheduled-post creation, atomic draft/claim status writes, strategy-tag persistence, inventory lineage, unresolved-count batch status, and serialized review state
+- no mutation for rejected batch, slot, gate, or scheduler outcomes beyond recorded per-item results
+
+Keep review-batch/claim SQL, local clock, scheduled-post reads, gate execution, scheduler creation, atomic D1 writes, strategy tagging, inventory persistence, unresolved counting, batch status, serializer, normalization, constants, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6L, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6M, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
