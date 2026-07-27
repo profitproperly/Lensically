@@ -19,6 +19,9 @@ const operatorMcpToolDirectory = read("src/operatorMcpToolDirectory.ts");
 const operatorMcpToolDirectoryTests = read("test/operatorMcpToolDirectory.spec.ts");
 const operatorMcpEngineeringRegistry = read("src/operatorMcpEngineeringRegistry.ts");
 const operatorMcpEngineeringRegistryTests = read("test/operatorMcpEngineeringRegistry.spec.ts");
+const operatorMcpAdminRegistry = read("src/operatorMcpAdminRegistry.ts");
+const operatorMcpAdminRegistryTests = read("test/operatorMcpAdminRegistry.spec.ts");
+const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
 const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
@@ -69,6 +72,9 @@ if (!workflow.includes("test/operatorMcpToolDirectory.spec.ts")) {
 if (!workflow.includes("test/operatorMcpEngineeringRegistry.spec.ts")) {
   errors.push("operator_mcp_engineering_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpAdminRegistry.spec.ts")) {
+  errors.push("operator_mcp_admin_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -77,7 +83,7 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
@@ -164,6 +170,32 @@ if (!operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEER
 if (!operatorMcpEngineeringRegistryTests.includes("preserves the exact 33-tool engineering registry without duplicates")
     || !operatorMcpEngineeringRegistryTests.includes("preserves exact workflow and deployment controls")) {
   lifecycleErrors.push("operator_mcp_engineering_registry_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpAdminRegistry"')
+    || !source.includes('from "./operatorMcpSchemas"')) {
+  lifecycleErrors.push("operator_mcp_admin_registry_import_missing");
+}
+if (source.includes("const OPERATOR_MCP_ADMIN_TOOL_NAMES =")
+    || source.includes("const OPERATOR_MCP_ADMIN_TOOLS:")
+    || source.includes("type OperatorMcpAdminToolName =")
+    || source.includes('{ name: "selectOperatorKey"')
+    || source.includes("const BRAND_KEY_SCHEMA =")
+    || source.includes("const SOURCE_DRAFT_ANALYSIS_SCHEMA =")) {
+  lifecycleErrors.push("operator_mcp_admin_registry_returned_to_index");
+}
+if (!operatorMcpAdminRegistry.includes("export const OPERATOR_MCP_ADMIN_TOOL_NAMES")
+    || !operatorMcpAdminRegistry.includes("export type OperatorMcpAdminToolName")
+    || !operatorMcpAdminRegistry.includes("export const OPERATOR_MCP_ADMIN_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_admin_registry_module_incomplete");
+}
+if (!operatorMcpSchemas.includes("export const BRAND_KEY_SCHEMA")
+    || !operatorMcpSchemas.includes("export const SOURCE_DRAFT_ANALYSIS_SCHEMA")) {
+  lifecycleErrors.push("operator_mcp_shared_schemas_incomplete");
+}
+if (!operatorMcpAdminRegistryTests.includes("preserves the intentional 25-name classification and 24 static definitions")
+    || !operatorMcpAdminRegistryTests.includes("preserves protected scheduler and decision schemas")
+    || !operatorMcpAdminRegistryTests.includes("preserves workflow and gate compatibility schemas")) {
+  lifecycleErrors.push("operator_mcp_admin_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
