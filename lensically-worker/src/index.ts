@@ -86,6 +86,10 @@ import {
   type OperatorMcpAdminToolName,
 } from "./operatorMcpAdminRegistry";
 import {
+  OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
+} from "./operatorMcpAccountFoundationRegistry";
+
+import {
   BRAND_KEY_SCHEMA,
   SOURCE_DRAFT_ANALYSIS_SCHEMA,
   SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
@@ -18198,7 +18202,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     return buildOperatorMcpToolDefinitions({
             engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
             adminTools: OPERATOR_MCP_ADMIN_TOOLS,
-    accountTools: OPERATOR_MCP_TOOLS,
+        accountTools: [...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS, ...OPERATOR_MCP_TOOLS],
     includeScopedWrappers,
     directPriorities: directPriority,
     requiresProceed: operatorMcpToolNameRequiresProceed,
