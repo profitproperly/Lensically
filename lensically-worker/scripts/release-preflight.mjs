@@ -35,6 +35,10 @@ const operatorMcpAccountAnalyticsRegistry = read("src/operatorMcpAccountAnalytic
 const operatorMcpAccountAnalyticsRegistryTests = read("test/operatorMcpAccountAnalyticsRegistry.spec.ts");
 const operatorMcpRegistryComposition = read("src/operatorMcpRegistryComposition.ts");
 const operatorMcpRegistryCompositionTests = read("test/operatorMcpRegistryComposition.spec.ts");
+const operatorMcpRoutingPolicy = read("src/operatorMcpRoutingPolicy.ts");
+const operatorMcpRoutingPolicyTests = read("test/operatorMcpRoutingPolicy.spec.ts");
+
+
 
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
@@ -112,6 +116,10 @@ if (!workflow.includes("test/operatorMcpAccountAnalyticsRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpRegistryComposition.spec.ts")) {
   errors.push("operator_mcp_registry_composition_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpRoutingPolicy.spec.ts")) {
+  errors.push("operator_mcp_routing_policy_workflow_gate_missing");
+}
+
 
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
@@ -408,6 +416,45 @@ if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 55-tool a
     || !operatorMcpRegistryCompositionTests.includes("builds all three scoped account wrapper surfaces without brand_key")) {
   lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
 }
+if (!source.includes('from "./operatorMcpRoutingPolicy"')
+    || !source.includes("const OPERATOR_MCP_ROUTING_POLICY = createOperatorMcpRoutingPolicy")) {
+  lifecycleErrors.push("operator_mcp_routing_policy_import_or_binding_missing");
+}
+if (source.includes("function requestedMcpBrandKey(")
+    || source.includes("function operatorMcpCallRequiresProceed(")
+    || source.includes("function operatorMcpProceedConfirmed(")
+    || source.includes("function canonicalOperatorExecutionArgs(")
+    || source.includes("function canonicalAutonomyToolName(")
+    || source.includes('toolName.replace(/^(?:mm_|om_|vx_)/')
+    || source.includes('payload.brand_key = "manifestmental"')
+    || source.includes('payload.brand_key = "opmgdeadman"')) {
+  lifecycleErrors.push("operator_mcp_routing_policy_returned_to_index");
+}
+if (!source.includes("OPERATOR_MCP_ROUTING_POLICY.scopeCall(toolName, payload)")
+    || !source.includes("OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)")
+    || !source.includes("OPERATOR_MCP_ROUTING_POLICY.canonicalExecutionArgs(toolName, args)")
+    || !source.includes("OPERATOR_MCP_ROUTING_POLICY.classifyHandler(toolName)")) {
+  lifecycleErrors.push("operator_mcp_routing_policy_runtime_cutover_incomplete");
+}
+if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorMcpToolName")
+    || !operatorMcpRoutingPolicy.includes("export function scopeOperatorMcpToolCall")
+    || !operatorMcpRoutingPolicy.includes("export function requestedMcpBrandKey")
+    || !operatorMcpRoutingPolicy.includes("export function operatorMcpCallRequiresProceed")
+    || !operatorMcpRoutingPolicy.includes("export function canonicalOperatorExecutionArgs")
+    || !operatorMcpRoutingPolicy.includes("export function canonicalAutonomyToolName")
+    || !operatorMcpRoutingPolicy.includes("export function classifyOperatorMcpHandler")
+    || !operatorMcpRoutingPolicy.includes("export function createOperatorMcpRoutingPolicy")) {
+  lifecycleErrors.push("operator_mcp_routing_policy_module_incomplete");
+}
+if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicalization and account injection")
+    || !operatorMcpRoutingPolicyTests.includes("preserves scoped precedence and direct brand alias normalization")
+    || !operatorMcpRoutingPolicyTests.includes("preserves guided Proceed requirements and autonomous exemptions")
+    || !operatorMcpRoutingPolicyTests.includes("preserves nested alias canonicalization and strips execution metadata")
+    || !operatorMcpRoutingPolicyTests.includes("preserves autonomy canonical names and handler classification")
+    || !operatorMcpRoutingPolicyTests.includes("binds injected normalizers into one deterministic routing policy")) {
+  lifecycleErrors.push("operator_mcp_routing_policy_tests_incomplete");
+}
+
 
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
