@@ -12493,7 +12493,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       listDraftsByStatus: (accountId, statuses, limit) => listGptGenerationDraftsByStatus(
         env,
         accountId,
-        statuses as GptGenerationDraftStatus[],
+                statuses,
+
         limit,
       ),
       countScheduledPosts: async (threadsUserId) => {
