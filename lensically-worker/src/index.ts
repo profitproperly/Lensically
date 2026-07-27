@@ -12205,13 +12205,11 @@ async function persistManifestAutonomousPost(
       `UPDATE operator_autonomous_growth_cycles SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
     ).bind(status, cycleId, brandKey).run(),
     now: () => new Date(),
-  });
-
-  
-  
-      
+    });
+}
 
 async function reviewManifestScheduledPost(
+
   env: Env,
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
