@@ -18,11 +18,14 @@ export interface OperatorHourlyCoverageServiceDependencies {
   normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
   getCoverage(timezone: string, horizonDays: number, startDate: string | null): Promise<JsonRecord>;
   readCycle(cycleId: string): Promise<JsonRecord | null>;
-  occupiedSlots(targetSlots: OperatorCoverageSlot[], timezone: string): Promise<Set<string>>;
+    occupiedSlots(
+    targetSlots: OperatorCoverageSlot[],
+    timezone: string,
+  ): Promise<ReadonlyMap<string, JsonRecord>>;
   localDateTimeParts(date: Date, timezone: string): { date: string; time?: string };
   reconcileCoverage(
     targetSlots: OperatorCoverageSlot[],
-    occupied: Set<string>,
+    occupied: ReadonlyMap<string, JsonRecord>,
     currentLocalHourKey: string,
     scheduledPostIds: unknown[],
   ): OperatorCoverageState;
