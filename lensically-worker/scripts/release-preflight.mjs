@@ -49,6 +49,8 @@ const operatorHourlyCoverageService = read("src/operatorHourlyCoverageService.ts
 const operatorHourlyCoverageServiceTests = read("test/operatorHourlyCoverageService.spec.ts");
 const operatorManifestPrepareCheckpointService = read("src/operatorManifestPrepareCheckpointService.ts");
 const operatorManifestPrepareCheckpointServiceTests = read("test/operatorManifestPrepareCheckpointService.spec.ts");
+const operatorManifestCycleConstructionService = read("src/operatorManifestCycleConstructionService.ts");
+const operatorManifestCycleConstructionServiceTests = read("test/operatorManifestCycleConstructionService.spec.ts");
 
 
 
@@ -152,6 +154,9 @@ if (!workflow.includes("test/operatorHourlyCoverageService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorManifestPrepareCheckpointService.spec.ts")) {
   errors.push("operator_manifest_prepare_checkpoint_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestCycleConstructionService.spec.ts")) {
+  errors.push("operator_manifest_cycle_construction_service_workflow_gate_missing");
 }
 
 
@@ -678,6 +683,32 @@ if (!operatorManifestPrepareCheckpointServiceTests.includes("preserves admission
     || !operatorManifestPrepareCheckpointServiceTests.includes("persists bounded learning continuation offsets")
     || !operatorManifestPrepareCheckpointServiceTests.includes("finalizes Content Focus and returns cycle-construction context")) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorManifestCycleConstructionService"')
+    || !source.includes("constructOperatorManifestAutonomousCycle({")
+    || !source.includes("growthEngineVersion: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION")) {
+  lifecycleErrors.push("operator_manifest_cycle_construction_service_import_or_binding_missing");
+}
+if (source.includes('invocation_mode: "model_orchestrated_autonomous_cycle"')
+    || source.includes("original_model_posts_forbidden: true")
+    || source.includes('collision_behavior: "Treat an occupied slot as nonfatal')) {
+  lifecycleErrors.push("operator_manifest_cycle_construction_service_returned_to_index");
+}
+if (!operatorManifestCycleConstructionService.includes("export async function constructOperatorManifestAutonomousCycle")
+    || !operatorManifestCycleConstructionService.includes("dependencies.resolveClock")
+    || !operatorManifestCycleConstructionService.includes("dependencies.buildCoverage")
+    || !operatorManifestCycleConstructionService.includes("dependencies.refreshSavedPatternIntelligence")
+    || !operatorManifestCycleConstructionService.includes("dependencies.selectSourceLineup")
+    || !operatorManifestCycleConstructionService.includes("dependencies.buildRollingEvidence")
+    || !operatorManifestCycleConstructionService.includes("dependencies.beginCycleReceipt")
+    || !operatorManifestCycleConstructionService.includes('eventType: "cycle_prepared"')
+    || !operatorManifestCycleConstructionService.includes("original_model_posts_forbidden: true")) {
+  lifecycleErrors.push("operator_manifest_cycle_construction_service_module_incomplete");
+}
+if (!operatorManifestCycleConstructionServiceTests.includes("constructs a new authoritative cycle and locks only eligible source cards")
+    || !operatorManifestCycleConstructionServiceTests.includes("refreshes an existing cycle with a compact cycle and decision reference")
+    || !operatorManifestCycleConstructionServiceTests.includes("completes a fully occupied horizon without source-plan work")) {
+  lifecycleErrors.push("operator_manifest_cycle_construction_service_tests_incomplete");
 }
 
 
