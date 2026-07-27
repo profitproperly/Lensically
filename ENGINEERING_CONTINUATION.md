@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 382c50edf881d3960ad3636bee9c0a7ef91ce1c0
-production_sha: 382c50edf881d3960ad3636bee9c0a7ef91ce1c0
+repository_base_sha: 5163b172327479938c33ee99f15ca680dc41bb4d
+production_sha: 5163b172327479938c33ee99f15ca680dc41bb4d
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -445,23 +445,34 @@ Completed checkpoint — Stage 5D3B source-card, generation, and draft-gate regi
 - Exact-SHA release passed in run `30229038535`.
 - Live production independently confirmed exact SHA `382c50edf881d3960ad3636bee9c0a7ef91ce1c0` with 75/75 public tools.
 
-Current sub-action — Stage 5D3C strategy-memory and scheduled-post registry extraction:
+Completed checkpoint — Stage 5D3C strategy-memory and scheduled-post registry extraction:
 
-Move the next exact contiguous seven-tool slice from `src/index.ts` into a focused ordered registry module:
+- Added `src/operatorMcpStrategyScheduleRegistry.ts` with the exact ordered seven-tool strategy-memory and scheduled-post control slice.
+- Moved `GPT_STRATEGY_MEMORY_KINDS` into shared MCP constant authority while retaining canonical deletion-reason codes from `humanFreeAutonomy.ts`.
+- Switched runtime composition to the extracted registry before physically removing all seven inert definitions from `src/index.ts`.
+- Added `test/operatorMcpStrategyScheduleRegistry.spec.ts` covering exact order, strategy-memory kinds, protected deletion, retry restrictions, owner batch limits, and Manifest lineage protections.
+- Updated lifecycle parsing and release preflight to scan the extracted registry and prevent these definitions or the strategy-kind set from returning to `index.ts`.
+- Push validation passed in run `30229661820`.
+- All eight Operator shards passed in run `30229752379`.
+- Exact-SHA release passed in run `30229799419`.
+- Live production independently confirmed exact SHA `5163b172327479938c33ee99f15ca680dc41bb4d` with 75/75 public tools.
 
-- `list_strategy_memory`
-- `save_strategy_memory`
-- `list_scheduled_posts`
-- `delete_scheduled_post`
-- `edit_scheduled_post`
-- `schedule_owner_approved_batch`
-- `schedule_approved_draft`
+Current sub-action — Stage 5D3D Manifest intelligence and cycle-strategy registry extraction:
 
-Move the strategy-memory kind set into shared constant authority while continuing to import the canonical scheduled-post deletion reason codes from `humanFreeAutonomy.ts`. Preserve exact declaration order, schemas, destructive annotations, deletion authorization, retry restrictions, Manifest lineage protections, public filtering, scoped wrappers, and tool counts. Add focused tests and release-preflight enforcement before exact-SHA release.
+Move the next exact contiguous six-tool slice from `src/index.ts` into a focused ordered registry module:
+
+- `get_manifest_intelligence_foundation`
+- `get_manifest_cycle_receipt`
+- `record_manifest_cycle_defect`
+- `resolve_manifest_cycle_defect`
+- `get_manifest_cycle_analysis_page`
+- `commit_manifest_cycle_strategy`
+
+Preserve exact declaration order, pageable receipt sections, seven-stage defect evidence, durable repair verification, complete rolling 28-day analysis consumption, strategy replay safety, locked source-card-backed lineup requirements, public filtering, scoped wrappers, and tool counts. Add focused tests and release-preflight enforcement before exact-SHA release.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract Manifest intelligence, cycle receipt/defect, analysis, autonomous-cycle, metrics, and remaining account definitions in bounded slices.
+- Extract autonomous cycle prepare/persist/review definitions and remaining metrics/intelligence account definitions in bounded slices.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
