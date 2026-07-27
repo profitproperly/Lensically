@@ -90,7 +90,8 @@ import {
 } from "./operatorMcpAccountFoundationRegistry";
 
 import {
-  BRAND_KEY_SCHEMA,
+    BRAND_KEY_SCHEMA,
+  GENERATION_ADAPTATION_PLAN_SCHEMA,
   SOURCE_DRAFT_ANALYSIS_SCHEMA,
   SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
 } from "./operatorMcpSchemas";
@@ -17238,22 +17239,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 
 
-const GENERATION_ADAPTATION_PLAN_SCHEMA = {
-  type: "object",
-  description: "Structured plan for one new use of a canonical source card. Manifest runs require adaptation_goal.",
-  properties: {
-    adaptation_goal: { type: "string" },
-    retained_exact_surfaces: { type: "array", items: { type: "string" } },
-    preserved_functions: { type: "array", items: { type: "string" } },
-    transformed_elements: { type: "array", items: { type: "string" } },
-    payoff_choice: { type: "string" },
-    time_or_context_choice: { type: "string" },
-    closing_choice: { type: "string" },
-    experiment_notes: { type: "string" },
-    intentionally_different_from_prior: { type: "string" },
-  },
-  additionalProperties: false,
-};
+
 
 
 
