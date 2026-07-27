@@ -33,6 +33,9 @@ const operatorMcpAutonomousExecutionRegistry = read("src/operatorMcpAutonomousEx
 const operatorMcpAutonomousExecutionRegistryTests = read("test/operatorMcpAutonomousExecutionRegistry.spec.ts");
 const operatorMcpAccountAnalyticsRegistry = read("src/operatorMcpAccountAnalyticsRegistry.ts");
 const operatorMcpAccountAnalyticsRegistryTests = read("test/operatorMcpAccountAnalyticsRegistry.spec.ts");
+const operatorMcpRegistryComposition = read("src/operatorMcpRegistryComposition.ts");
+const operatorMcpRegistryCompositionTests = read("test/operatorMcpRegistryComposition.spec.ts");
+
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
@@ -106,6 +109,10 @@ if (!workflow.includes("test/operatorMcpAutonomousExecutionRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpAccountAnalyticsRegistry.spec.ts")) {
   errors.push("operator_mcp_account_analytics_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpRegistryComposition.spec.ts")) {
+  errors.push("operator_mcp_registry_composition_workflow_gate_missing");
+}
+
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -366,6 +373,40 @@ if (!operatorMcpAccountAnalyticsRegistryTests.includes("preserves the exact orde
     || !operatorMcpAccountAnalyticsRegistryTests.includes("preserves persisted Content Focus reads")) {
   lifecycleErrors.push("operator_mcp_account_analytics_registry_tests_incomplete");
 }
+if (!source.includes('from "./operatorMcpRegistryComposition"')) {
+  lifecycleErrors.push("operator_mcp_registry_composition_import_missing");
+}
+if (source.includes("const OPERATOR_MCP_ACCOUNT_TOOLS:")
+    || source.includes("const OPERATOR_MCP_ADMIN_TOOL_NAME_SET")
+    || source.includes("const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET")
+    || source.includes("const ACCOUNT_SCOPED_MCP_ADMIN_TOOLS")
+    || source.includes("function isOperatorMcpAdminToolName(")
+    || source.includes("function isOperatorMcpEngineeringToolName(")
+    || source.includes("function operatorMcpToolNameRequiresProceed(")
+    || source.includes("const directPriority = new Map(")
+    || source.includes("buildOperatorMcpToolDefinitions({")) {
+  lifecycleErrors.push("operator_mcp_registry_composition_returned_to_index");
+}
+if (!source.includes("assertClientSafetyRegistry();")
+    || !source.includes("return buildComposedOperatorMcpTools(includeScopedWrappers);")) {
+  lifecycleErrors.push("operator_mcp_registry_runtime_boundary_incomplete");
+}
+if (!operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ACCOUNT_TOOLS")
+    || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ADMIN_TOOL_NAME_SET")
+    || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET")
+    || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_DIRECT_PRIORITIES")
+    || !operatorMcpRegistryComposition.includes("export function operatorMcpToolNameRequiresProceed")
+    || !operatorMcpRegistryComposition.includes("export function buildComposedOperatorMcpTools")) {
+  lifecycleErrors.push("operator_mcp_registry_composition_module_incomplete");
+}
+if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 55-tool account aggregation order")
+    || !operatorMcpRegistryCompositionTests.includes("preserves engineering, admin, and intentional monthly-growth classifications")
+    || !operatorMcpRegistryCompositionTests.includes("preserves guided Proceed membership without blocking list_accounts")
+    || !operatorMcpRegistryCompositionTests.includes("builds the exact 112 direct tools with deterministic priority ordering")
+    || !operatorMcpRegistryCompositionTests.includes("builds all three scoped account wrapper surfaces without brand_key")) {
+  lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
+}
+
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
 }

@@ -118,7 +118,8 @@ jobs:
                     npm run test -- --run test/operatorMcpStrategyScheduleRegistry.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorMcpManifestCycleRegistry.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorMcpAutonomousExecutionRegistry.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorMcpAccountAnalyticsRegistry.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorMcpAccountAnalyticsRegistry.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorMcpRegistryComposition.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
 
@@ -337,7 +338,8 @@ jobs:
                     npm run test -- --run test/operatorMcpStrategyScheduleRegistry.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorMcpManifestCycleRegistry.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorMcpAutonomousExecutionRegistry.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorMcpAccountAnalyticsRegistry.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorMcpAccountAnalyticsRegistry.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorMcpRegistryComposition.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
           npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
