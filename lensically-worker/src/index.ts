@@ -104,6 +104,8 @@ import {
   manifestCycleFailureIsDefect as manifestCycleFailureIsDefectService,
   observeOperatorManifestCycleToolResult,
 } from "./operatorManifestCycleObservationService";
+import { readOperatorAccountState } from "./operatorAccountStateService";
+
 
 
 
@@ -12476,28 +12478,45 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(await reviewManifestScheduledPost(env, brand, payload));
   }
 
-  if (toolName === "get_account_state") {
-    const activeSession = await getActiveOperatorSession(env, brand.brand_key);
-    const activeSourceCard = activeSession?.active_source_card_id
-      ? await getOperatorSourceCard(env, brand.brand_key, String(activeSession.active_source_card_id))
-      : null;
-    const approved = await listGptGenerationDraftsByStatus(env, brand.account_id, ["approved"], 5);
-    const rejected = await listGptGenerationDraftsByStatus(env, brand.account_id, ["rejected"], 5);
-    const scheduledCountRow = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = ? AND status IN (?, ?)`,
-    ).bind(brand.profile.threads_user_id, SCHEDULED_POST_STATUS_APPROVED, SCHEDULED_POST_STATUS_POSTING).first<{ total: number }>();
-    const gates = await listOperatorGates(env, brand.brand_key, null, null, null);
-    return operatorJsonResponse({
-      brand_key: brand.brand_key,
-      active_workflow_session: activeSession,
-      active_source_card: activeSourceCard,
-      latest_approved_drafts: approved,
-      latest_rejected_drafts: rejected,
-      scheduled_posts_count: Number(scheduledCountRow?.total ?? 0),
-      active_gates_count: gates.length,
-      warnings: [],
+    if (toolName === "get_account_state") {
+    const state = await readOperatorAccountState({
+      brandKey: brand.brand_key,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+    }, {
+      getActiveSession: (brandKey) => getActiveOperatorSession(env, brandKey as GptBrandKey),
+      getSourceCard: (brandKey, sourceCardId) => getOperatorSourceCard(
+        env,
+        brandKey as GptBrandKey,
+        sourceCardId,
+      ),
+      listDraftsByStatus: (accountId, statuses, limit) => listGptGenerationDraftsByStatus(
+        env,
+        accountId,
+        statuses as GptGenerationDraftStatus[],
+        limit,
+      ),
+      countScheduledPosts: async (threadsUserId) => {
+        const row = await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM scheduled_posts WHERE threads_user_id = ? AND status IN (?, ?)`,
+        ).bind(
+          threadsUserId,
+          SCHEDULED_POST_STATUS_APPROVED,
+          SCHEDULED_POST_STATUS_POSTING,
+        ).first<{ total: number }>();
+        return Number(row?.total ?? 0);
+      },
+      listActiveGates: (brandKey) => listOperatorGates(
+        env,
+        brandKey as GptBrandKey,
+        null,
+        null,
+        null,
+      ),
     });
+    return operatorJsonResponse(state);
   }
+
 
   if (toolName === "read_lensically_ui_surface") {
     const surface = normalizeOperatorText(payload.surface, 40, true);
