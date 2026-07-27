@@ -55,6 +55,9 @@ const operatorManifestPersistenceAdmissionService = read("src/operatorManifestPe
 const operatorManifestPersistenceAdmissionServiceTests = read("test/operatorManifestPersistenceAdmissionService.spec.ts");
 const operatorManifestPersistenceService = read("src/operatorManifestPersistenceService.ts");
 const operatorManifestPersistenceServiceTests = read("test/operatorManifestPersistenceService.spec.ts");
+const operatorManifestScheduledReviewService = read("src/operatorManifestScheduledReviewService.ts");
+const operatorManifestScheduledReviewServiceTests = read("test/operatorManifestScheduledReviewService.spec.ts");
+
 
 
 
@@ -170,6 +173,10 @@ if (!workflow.includes("test/operatorManifestPersistenceAdmissionService.spec.ts
 if (!workflow.includes("test/operatorManifestPersistenceService.spec.ts")) {
   errors.push("operator_manifest_persistence_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestScheduledReviewService.spec.ts")) {
+  errors.push("operator_manifest_scheduled_review_service_workflow_gate_missing");
+}
+
 
 
 
@@ -781,6 +788,36 @@ if (!operatorManifestPersistenceServiceTests.includes("blocks exact duplicate te
     || !operatorManifestPersistenceServiceTests.includes("finalizes the cycle when authoritative coverage is complete")) {
   lifecycleErrors.push("operator_manifest_persistence_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestScheduledReviewService"')
+    || !source.includes("reviewOperatorManifestScheduledPost({")
+    || !source.includes("runGenerationGates: async")
+    || !source.includes("saveStrategyMemory: (input)")) {
+  lifecycleErrors.push("operator_manifest_scheduled_review_service_import_or_binding_missing");
+}
+if (source.includes("replacement_generation_gates_failed")
+    || source.includes("only_unpublished_approved_post_reviewable")
+    || source.includes('operational_effect: action === "keep"')) {
+  lifecycleErrors.push("operator_manifest_scheduled_review_service_returned_to_index");
+}
+if (!operatorManifestScheduledReviewService.includes("export async function reviewOperatorManifestScheduledPost")
+    || !operatorManifestScheduledReviewService.includes("dependencies.readScheduledPost")
+    || !operatorManifestScheduledReviewService.includes("dependencies.runGenerationGates")
+    || !operatorManifestScheduledReviewService.includes("dependencies.runSchedulingGates")
+    || !operatorManifestScheduledReviewService.includes("dependencies.updateScheduledPost")
+    || !operatorManifestScheduledReviewService.includes("dependencies.updateLineup")
+    || !operatorManifestScheduledReviewService.includes("dependencies.saveStrategyMemory")
+    || !operatorManifestScheduledReviewService.includes('return "approved_rule"')
+    || !operatorManifestScheduledReviewService.includes('return "current_belief"')) {
+  lifecycleErrors.push("operator_manifest_scheduled_review_service_module_incomplete");
+}
+if (!operatorManifestScheduledReviewServiceTests.includes("requires a valid scheduled-post action and feedback")
+    || !operatorManifestScheduledReviewServiceTests.includes("allows review only for approved unpublished scheduled posts")
+    || !operatorManifestScheduledReviewServiceTests.includes("blocks a replacement when generation gates fail")
+    || !operatorManifestScheduledReviewServiceTests.includes("rewrites the same scheduled slot after generation and scheduling gates pass")
+    || !operatorManifestScheduledReviewServiceTests.includes("records keep feedback without a production mutation and maps permanent rules")) {
+  lifecycleErrors.push("operator_manifest_scheduled_review_service_tests_incomplete");
+}
+
 
 
 
