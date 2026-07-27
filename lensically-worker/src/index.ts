@@ -91,6 +91,10 @@ import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
 import { dispatchOperatorMcpRequest } from "./operatorMcpDispatcher";
 import { dispatchOperatorMcpToolCall } from "./operatorMcpToolCallDispatcher";
 import {
+  handleOperatorManifestCycleServiceTool,
+  isOperatorManifestCycleServiceToolName,
+} from "./operatorManifestCycleService";
+import {
   buildOperatorMcpRuntimeHeaders,
   operatorTransportFailureResponse,
   type OperatorMcpJsonRpcId,
@@ -13634,206 +13638,33 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse({ success: false, error: "brand_key is required or unavailable" }, 400);
   }
 
-      if (toolName === "get_manifest_cycle_analysis_page") {
-    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
-    const snapshotId = normalizeOperatorText(payload.snapshot_id, 160, true);
-    const pageIndex = Math.max(0, Math.trunc(Number(payload.page_index ?? 0)));
-    if (!cycleId) return operatorJsonResponse({ success: false, error: "autonomous_cycle_id_required" }, 400);
-    try {
-            const result = await readManifestEvidencePage(env.DB, {
-        brandKey: brand.brand_key,
-        cycleId,
-        snapshotId,
-        pageIndex,
-      });
-      return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, result));
-    } catch (error) {
-      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
-        success: false,
-        error: error instanceof Error ? error.message : "manifest_evidence_page_read_failed",
-      });
-      return operatorJsonResponse(result, 400);
-    }
-  }
-
-  if (toolName === "commit_manifest_cycle_strategy") {
-    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
-    const snapshotId = normalizeOperatorText(payload.snapshot_id, 160);
-    if (!cycleId || !snapshotId) {
-      return operatorJsonResponse({ success: false, error: "cycle_id_and_snapshot_id_required" }, 400);
-    }
-    const accountConclusion = payload.account_conclusion && typeof payload.account_conclusion === "object" && !Array.isArray(payload.account_conclusion)
-      ? payload.account_conclusion as Record<string, unknown>
-      : {};
-    const contentFocus = payload.content_focus && typeof payload.content_focus === "object" && !Array.isArray(payload.content_focus)
-      ? payload.content_focus as Record<string, unknown>
-      : {};
-    const benchmarks = payload.benchmarks && typeof payload.benchmarks === "object" && !Array.isArray(payload.benchmarks)
-      ? payload.benchmarks as Record<string, unknown>
-      : {};
-    const directives = payload.directives && typeof payload.directives === "object" && !Array.isArray(payload.directives)
-      ? payload.directives as Record<string, unknown>
-      : {};
-    const strongestExecutions = Array.isArray(payload.strongest_executions)
-      ? payload.strongest_executions.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
-      : [];
-    const weakestExecutions = Array.isArray(payload.weakest_executions)
-      ? payload.weakest_executions.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
-      : [];
-    const experiments = Array.isArray(payload.experiments)
-      ? payload.experiments.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
-      : [];
-    const risks = Array.isArray(payload.risks) ? payload.risks : [];
-    const lineup = Array.isArray(payload.lineup)
-      ? payload.lineup.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[]
-      : [];
-    if (!Object.keys(accountConclusion).length || !Object.keys(contentFocus).length
-      || !Object.keys(benchmarks).length || !Object.keys(directives).length || !lineup.length) {
-      return operatorJsonResponse({ success: false, error: "complete_cycle_strategy_required" }, 400);
-    }
-        try {
-      const lockedSourceSelectionPlan = await validateLineupAgainstLockedSourceSelectionPlan(env.DB, {
-        brand_key: brand.brand_key,
-        cycle_id: cycleId,
-        lineup,
-      });
-      const strategy = await commitManifestCycleStrategy(env.DB, {
-
-        cycleId,
-        brandKey: brand.brand_key,
-        snapshotId,
-        accountConclusion,
-        contentFocus,
-        benchmarks,
-        strongestExecutions,
-        weakestExecutions,
-        directives,
-        experiments,
-        risks,
-        lineup,
-      });
-      await appendManifestCycleEvent(env.DB, {
-        cycleId,
-        brandKey: brand.brand_key,
-        eventKey: `cycle-strategy:${String(strategy.id ?? "locked")}`,
-        eventType: "cycle_strategy_locked",
-        payload: {
-          strategy_id: strategy.id ?? null,
-          snapshot_id: snapshotId,
-          lineup_count: lineup.length,
-          source_backed_generation_only: true,
-                    primary_metric: "24_hour_likes",
-          source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
-          locked_source_selection_count: lockedSourceSelectionPlan.length,
-          model_source_substitution_allowed: false,
-        },
-
-      });
-            const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
-        success: true,
-        cycle_id: cycleId,
-        strategy,
-        next_action: "Generate candidates only from each locked plan item's canonical source card, run every required candidate gate, and persist the first exact planned slot.",
-      });
-      return operatorJsonResponse(result);
-    } catch (error) {
-      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
-        success: false,
-        cycle_id: cycleId,
-        error: error instanceof Error ? error.message : "manifest_cycle_strategy_commit_failed",
-      });
-      return operatorJsonResponse(result, 400);
-    }
-    }
-
-  if (toolName === "record_manifest_cycle_defect") {
-    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
-    const defectKey = normalizeOperatorText(payload.defect_key, 300);
-    if (!cycleId || !defectKey) return operatorJsonResponse({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
-    const receipt = await getManifestCycleReceipt(env.DB, { brandKey: brand.brand_key, cycleId });
-    if (!receipt) return operatorJsonResponse({ success: false, error: "manifest_cycle_receipt_not_found" }, 404);
-    const defect = await recordManifestCycleDefect(env.DB, {
-      cycleId,
+        if (isOperatorManifestCycleServiceToolName(toolName)) {
+    const serviceResult = await handleOperatorManifestCycleServiceTool({
+      toolName,
       brandKey: brand.brand_key,
-      defectKey,
-      stageNumber: Math.max(1, Math.min(7, Math.trunc(Number(payload.stage_number ?? 1)))),
-      stageKey: normalizeOperatorText(payload.stage_key, 120) || "unknown_stage",
-      phase: normalizeOperatorText(payload.phase, 160) || "external_failure",
-      slotKey: normalizeOperatorText(payload.slot_key, 40, true),
-      operationId: normalizeOperatorText(payload.operation_id, 240, true),
-      errorCode: normalizeOperatorText(payload.error_code, 300) || "external_cycle_failure",
-      errorMessage: normalizeOperatorText(payload.error_message, 4000) || "External cycle failure",
-      impactState: normalizeOperatorText(payload.impact_state, 120) || "definitely_failed",
-      retryable: payload.retryable === true,
-      blocking: payload.blocking !== false,
-      status: payload.status === "repairing" ? "repairing" : "open",
-      reconciliation: payload.reconciliation && typeof payload.reconciliation === "object" && !Array.isArray(payload.reconciliation)
-        ? payload.reconciliation as Record<string, unknown> : {},
-      metadata: payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
-        ? payload.metadata as Record<string, unknown> : {},
+      payload,
+    }, {
+      db: env.DB,
+      normalizeText: normalizeOperatorText,
+      observe: (serviceToolName, servicePayload, result) => observeManifestCycleToolResult(
+        env,
+        brand,
+        serviceToolName,
+        servicePayload,
+        result,
+      ),
+      readAutonomousCycle: (brandKey, cycleId) => readManifestAutonomousCycle(env, brandKey, cycleId),
+      now: () => new Date().toISOString(),
     });
-    return operatorJsonResponse({ success: true, defect });
+    return operatorJsonResponse(serviceResult.body, serviceResult.status);
   }
 
-  if (toolName === "resolve_manifest_cycle_defect") {
-    const cycleId = normalizeOperatorText(payload.cycle_id, 160);
-    const defectKey = normalizeOperatorText(payload.defect_key, 300);
-    if (!cycleId || !defectKey) return operatorJsonResponse({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
-        const defect = await resolveManifestCycleDefect(env.DB, {
-      cycleId,
-      brandKey: brand.brand_key,
-      defectKey,
-      status: payload.status === "irrecoverable_historical_gap" ? "irrecoverable_historical_gap" : "resolved",
-      rootCause: normalizeOperatorText(payload.root_cause, 8000) || "Resolved with verified evidence.",
-      repairCommitSha: normalizeOperatorText(payload.repair_commit_sha, 80, true),
-      deployedSha: normalizeOperatorText(payload.deployed_sha, 80, true),
-      reconciliation: payload.reconciliation && typeof payload.reconciliation === "object" && !Array.isArray(payload.reconciliation)
-        ? payload.reconciliation as Record<string, unknown> : {},
-      regressionTests: Array.isArray(payload.regression_tests)
-        ? payload.regression_tests.filter((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown>[] : [],
-      verification: payload.verification && typeof payload.verification === "object" && !Array.isArray(payload.verification)
-        ? payload.verification as Record<string, unknown> : {},
-    });
-    const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
-    const missingSlots = cycle && Array.isArray(cycle.missing_slots) ? cycle.missing_slots : [];
-    let cycleCompletion: Record<string, unknown> | null = null;
-    if (cycle && missingSlots.length === 0) {
-      const receipt = await getManifestCycleReceipt(env.DB, { brandKey: brand.brand_key, cycleId });
-      if (receipt && !receipt.completed_at) {
-        const scheduledPostIds = Array.isArray(cycle.scheduled_post_ids) ? cycle.scheduled_post_ids.map(Number) : [];
-        const completedAt = new Date().toISOString();
-        cycleCompletion = await finalizeManifestCycleReceipt(env.DB, {
-          cycleId,
-          status: "completed",
-          completion: {
-            completed_slot_key: null,
-            completion_trigger: "last_blocking_defect_resolved",
-            scheduled_post_ids: scheduledPostIds,
-            scheduled_count: scheduledPostIds.length,
-            remaining_missing_count: 0,
-            final_post_lineage_complete: true,
-            output_strategy_version_id: receipt.output_strategy_version_id ?? null,
-            completed_at: completedAt,
-          },
-          unresolvedIssues: [],
-          completedAt,
-        });
-        if (cycleCompletion.completed === true) {
-          await appendManifestCycleEvent(env.DB, {
-            cycleId,
-            brandKey: brand.brand_key,
-            eventKey: "cycle-completed",
-            eventType: "cycle_completed",
-            payload: cycleCompletion,
-          });
-          await env.DB.prepare(
-            `UPDATE operator_autonomous_growth_cycles SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
-          ).bind(cycleId, brand.brand_key).run();
-        }
-      }
-    }
-    return operatorJsonResponse({ success: true, defect, cycle_completion: cycleCompletion });
-  }
+
+  
+
+  
+
+  
 
     if (toolName === "prepare_manifest_autonomous_cycle") {
     try {
