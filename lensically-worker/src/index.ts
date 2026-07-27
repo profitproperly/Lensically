@@ -110,6 +110,7 @@ import { retireOperatorManifestReviewBatch } from "./operatorManifestReviewBatch
 import { readOperatorManifestReviewBatchState } from "./operatorManifestReviewBatchStateService";
 import { attachOperatorManifestReviewDraft } from "./operatorManifestReviewDraftAttachmentService";
 import { resolveOperatorManifestReviewSource } from "./operatorManifestReviewSourceResolutionService";
+import { scheduleOperatorManifestReviewBatch } from "./operatorManifestReviewBatchSchedulingService";
 
 
 
@@ -13098,111 +13099,99 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(resolution.body, resolution.status);
   }
 
-  if (toolName === "schedule_manifest_review_batch") {
-    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
-    const batch = reviewBatchId
-      ? await env.DB.prepare(`SELECT * FROM operator_review_batches WHERE id = ? AND brand_key = ? LIMIT 1`).bind(reviewBatchId, brand.brand_key).first<Record<string, unknown>>()
-      : null;
-        if (!batch) return operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
-    const resolvedReviewBatchId = String(batch.id);
-    const productionDate = String(batch.production_date);
-    const timezone = String(batch.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
-    const requestedNumbers = Array.isArray(payload.item_numbers)
-      ? new Set(payload.item_numbers.map((value) => Math.trunc(Number(value))).filter((value) => Number.isInteger(value)))
-      : null;
-    const local = operatorLocalDateTimeParts(new Date(), timezone);
-    const firstEligibleHour = productionDate === local.date ? Math.min(local.hour + 1, 24) : 0;
-    const scheduledToday = await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, productionDate, timezone);
-    const occupied = new Set<number>();
-    for (const item of scheduledToday) {
-      const localTime = String((item as Record<string, unknown>).local_time ?? (item as Record<string, unknown>).scheduled_time_local ?? "");
-      const hour = Number(localTime.match(/(?:\s|^)(\d{1,2}):\d{2}/)?.[1] ?? localTime.split(":")[0]);
-      if (Number.isInteger(hour)) occupied.add(hour);
-    }
-    const openSlots = Array.from({ length: Math.max(24 - firstEligibleHour, 0) }, (_, index) => firstEligibleHour + index)
-      .filter((hour) => !occupied.has(hour))
-      .map(operatorHourlySlot);
-    const claims = await env.DB.prepare(
-      `SELECT c.*, d.status AS draft_status, d.text AS draft_text, d.source_card_id
-       FROM operator_daily_source_claims c
-       JOIN gpt_generation_drafts d ON d.id = c.draft_id AND d.account_id = ?
-       WHERE c.review_batch_id = ? AND c.brand_key = ?
-         AND c.status = 'approved' AND d.status = 'approved'
-       ORDER BY c.review_item_number ASC`,
-        ).bind(brand.account_id, resolvedReviewBatchId, brand.brand_key).all<Record<string, unknown>>();
-    const eligibleClaimsAll = (claims.results ?? []).filter((claim) => !requestedNumbers || requestedNumbers.has(Number(claim.review_item_number)));
-    const eligibleClaims = eligibleClaimsAll.slice(0, 1);
-    if (openSlots.length < eligibleClaims.length) {
-      return operatorJsonResponse({ success: false, error: "insufficient_open_hourly_slots", open_slots: openSlots, approved_items: eligibleClaims.length }, 409);
-    }
-    const results: Record<string, unknown>[] = [];
-    for (let index = 0; index < eligibleClaims.length; index += 1) {
-      const claim = eligibleClaims[index];
-      const time = openSlots[index];
-      const draft = await getOperatorDraft(env, brand, String(claim.draft_id));
-      if (!draft) continue;
-      const gateRun = await runOperatorGates(env, {
+    if (toolName === "schedule_manifest_review_batch") {
+    const schedulingResult = await scheduleOperatorManifestReviewBatch({
+      brandKey: brand.brand_key,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      payload,
+    }, {
+      defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+      normalizeText: normalizeOperatorText,
+      now: () => new Date(),
+      localDateTimeParts: operatorLocalDateTimeParts,
+      hourlySlot: operatorHourlySlot,
+      getReviewBatch: (reviewBatchId, brandKey) => env.DB.prepare(
+        `SELECT * FROM operator_review_batches WHERE id = ? AND brand_key = ? LIMIT 1`,
+      ).bind(reviewBatchId, brandKey).first<Record<string, unknown>>(),
+      listScheduledPosts: (threadsUserId, productionDate, timezone) =>
+        listScheduledPostsForThreadsAccountOnLocalDate(env, threadsUserId, productionDate, timezone),
+      listApprovedClaims: async (accountId, reviewBatchId, brandKey) => {
+        const rows = await env.DB.prepare(
+          `SELECT c.*, d.status AS draft_status, d.text AS draft_text, d.source_card_id
+           FROM operator_daily_source_claims c
+           JOIN gpt_generation_drafts d ON d.id = c.draft_id AND d.account_id = ?
+           WHERE c.review_batch_id = ? AND c.brand_key = ?
+             AND c.status = 'approved' AND d.status = 'approved'
+           ORDER BY c.review_item_number ASC`,
+        ).bind(accountId, reviewBatchId, brandKey).all<Record<string, unknown>>();
+        return rows.results ?? [];
+      },
+      getDraft: (draftId) => getOperatorDraft(env, brand, draftId),
+      runSchedulingGates: async (input) => runOperatorGates(env, {
         brand,
-        draftId: draft.id,
-        sourceCardId: draft.source_card_id,
-        draftText: draft.text,
+        draftId: String(input.draft.id),
+        sourceCardId: input.draft.source_card_id as string,
+        draftText: String(input.draft.text ?? ""),
         stageScope: "scheduling",
-        scheduling: { date: productionDate, time, timezone },
-      });
-      if (!gateRun.showable) {
-        results.push({ item_number: claim.review_item_number, success: false, error: "scheduling_gates_failed", gate_results: gateRun.gate_results });
-        continue;
-      }
-      const scheduled = await createScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id, draft.text, productionDate, time, timezone);
-      if (!scheduled.success || !scheduled.scheduledPostId) {
-        results.push({ item_number: claim.review_item_number, success: false, error: scheduled.error ?? "schedule_failed" });
-        continue;
-      }
-            await env.DB.batch([
+        scheduling: {
+          date: input.productionDate,
+          time: input.time,
+          timezone: input.timezone,
+        },
+      }),
+      createScheduledPost: (input) => createScheduledPostForAppUser(
+        env,
+        WORKSPACE_APP_USER_ID,
+        input.threadsUserId,
+        input.text,
+        input.productionDate,
+        input.time,
+        input.timezone,
+      ),
+      persistScheduledState: async (input) => env.DB.batch([
         env.DB.prepare(
           `UPDATE gpt_generation_drafts SET status = 'scheduled', scheduled_post_id = ?
            WHERE id = ? AND account_id = ?`,
-        ).bind(scheduled.scheduledPostId, draft.id, brand.account_id),
+        ).bind(input.scheduledPostId, input.draftId, input.accountId),
         env.DB.prepare(
           `UPDATE operator_daily_source_claims SET status = 'scheduled', scheduled_post_id = ? WHERE id = ?`,
-        ).bind(scheduled.scheduledPostId, claim.id),
-      ]);
-      await upsertGptPostStrategyTag(env, {
-        accountId: brand.account_id,
-        threadsUserId: brand.profile.threads_user_id,
-        scheduledPostId: scheduled.scheduledPostId,
-                                strategy: normalizeGptPostStrategyInput(
-          draft.strategy && typeof draft.strategy === "object"
-            ? draft.strategy as Record<string, unknown>
+        ).bind(input.scheduledPostId, input.claimId),
+      ]),
+      saveStrategyTag: (input) => upsertGptPostStrategyTag(env, {
+        accountId: input.accountId,
+        threadsUserId: input.threadsUserId,
+        scheduledPostId: String(input.scheduledPostId),
+        strategy: normalizeGptPostStrategyInput(
+          input.strategy && typeof input.strategy === "object"
+            ? input.strategy as Record<string, unknown>
             : {},
         ),
-      });
-      await insertOperatorInventory(env, {
-        brandKey: brand.brand_key,
+      }),
+      insertInventory: (input) => insertOperatorInventory(env, {
+        brandKey: input.brandKey,
         sourceType: "scheduled_post",
-        sourceId: String(scheduled.scheduledPostId),
-        text: draft.text,
-        sourceCardId: draft.source_card_id,
+        sourceId: String(input.scheduledPostId),
+        text: input.text,
+        sourceCardId: input.sourceCardId as string,
         status: "scheduled",
-        strategy: draft.strategy && typeof draft.strategy === "object" ? draft.strategy as Record<string, unknown> : null,
-      });
-      results.push({ item_number: Number(claim.review_item_number), success: true, scheduled_post_id: scheduled.scheduledPostId, date: productionDate, time, timezone });
-    }
-        const unresolved = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM operator_daily_source_claims
-       WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
-    ).bind(resolvedReviewBatchId).first<{ total: number }>();
-    await env.DB.prepare(`UPDATE operator_review_batches SET status = ? WHERE id = ?`)
-      .bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", resolvedReviewBatchId).run();
-    return operatorJsonResponse({
-      review_batch_id: resolvedReviewBatchId,
-      production_date: productionDate,
-      results,
-      invocation_item_limit: 1,
-      remaining_approved_item_numbers: eligibleClaimsAll.slice(1).map((claim) => Number(claim.review_item_number)),
-      continuation_required: eligibleClaimsAll.length > 1,
-      review_batch: await serializeManifestReviewBatch(env, brand, resolvedReviewBatchId),
+        strategy: input.strategy && typeof input.strategy === "object"
+          ? input.strategy as Record<string, unknown>
+          : null,
+      }),
+      countUnresolved: async (reviewBatchId) => {
+        const row = await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM operator_daily_source_claims
+           WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
+        ).bind(reviewBatchId).first<{ total: number }>();
+        return Number(row?.total ?? 0);
+      },
+      updateReviewBatchStatus: async (reviewBatchId, status) => env.DB.prepare(
+        `UPDATE operator_review_batches SET status = ? WHERE id = ?`,
+      ).bind(status, reviewBatchId).run(),
+      serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
     });
+    return operatorJsonResponse(schedulingResult.body, schedulingResult.status);
   }
 
   if (toolName === "start_workflow_session") {
