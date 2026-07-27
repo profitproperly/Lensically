@@ -31,6 +31,8 @@ const operatorMcpManifestCycleRegistry = read("src/operatorMcpManifestCycleRegis
 const operatorMcpManifestCycleRegistryTests = read("test/operatorMcpManifestCycleRegistry.spec.ts");
 const operatorMcpAutonomousExecutionRegistry = read("src/operatorMcpAutonomousExecutionRegistry.ts");
 const operatorMcpAutonomousExecutionRegistryTests = read("test/operatorMcpAutonomousExecutionRegistry.spec.ts");
+const operatorMcpAccountAnalyticsRegistry = read("src/operatorMcpAccountAnalyticsRegistry.ts");
+const operatorMcpAccountAnalyticsRegistryTests = read("test/operatorMcpAccountAnalyticsRegistry.spec.ts");
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
@@ -101,6 +103,9 @@ if (!workflow.includes("test/operatorMcpManifestCycleRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpAutonomousExecutionRegistry.spec.ts")) {
   errors.push("operator_mcp_autonomous_execution_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpAccountAnalyticsRegistry.spec.ts")) {
+  errors.push("operator_mcp_account_analytics_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -109,7 +114,7 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpAutonomousExecutionRegistry}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpAutonomousExecutionRegistry}\n${operatorMcpAccountAnalyticsRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
@@ -337,6 +342,29 @@ if (!operatorMcpAutonomousExecutionRegistryTests.includes("preserves the exact o
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves complete model evaluation and nonempty gate evidence")
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves optional owner review and slot-preserving replacement")) {
   lifecycleErrors.push("operator_mcp_autonomous_execution_registry_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpAccountAnalyticsRegistry"')) {
+  lifecycleErrors.push("operator_mcp_account_analytics_registry_import_missing");
+}
+if (source.includes("const OPERATOR_MCP_TOOLS:")
+    || source.includes('{ name: "get_post_results"')
+    || source.includes('{ name: "get_monthly_growth_review"')
+    || source.includes('{ name: "get_performance_learning"')
+    || source.includes('{ name: "get_manifest_intelligence_audit"')
+    || source.includes('{ name: "get_content_focus"')) {
+  lifecycleErrors.push("operator_mcp_static_account_registry_returned_to_index");
+}
+if (!operatorMcpAccountAnalyticsRegistry.includes("export const OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOL_NAMES")
+    || !operatorMcpAccountAnalyticsRegistry.includes("export type OperatorMcpAccountAnalyticsToolName")
+    || !operatorMcpAccountAnalyticsRegistry.includes("export const OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_account_analytics_registry_module_incomplete");
+}
+if (!operatorMcpAccountAnalyticsRegistryTests.includes("preserves the exact ordered five-tool account analytics registry")
+    || !operatorMcpAccountAnalyticsRegistryTests.includes("preserves compact post-result verification and date-bounded growth review")
+    || !operatorMcpAccountAnalyticsRegistryTests.includes("preserves maturity-normalized learning without follower attribution")
+    || !operatorMcpAccountAnalyticsRegistryTests.includes("preserves bounded intelligence-audit pagination")
+    || !operatorMcpAccountAnalyticsRegistryTests.includes("preserves persisted Content Focus reads")) {
+  lifecycleErrors.push("operator_mcp_account_analytics_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
@@ -630,7 +658,7 @@ if (!workflow.includes("release_sha:")
 }
 
 
-if (!source.includes('name: "get_monthly_growth_review"')
+if (!operatorMcpAccountAnalyticsRegistry.includes('name: "get_monthly_growth_review"')
     || !source.includes("OPERATOR_MCP_MAX_STRUCTURED_BYTES = 24_000")
     || !source.includes("enforceOperatorPayloadBudget(resultPayload)")
     || !router.includes('return "get_monthly_growth_review"')
