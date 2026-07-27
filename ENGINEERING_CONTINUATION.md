@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 58cacd3f28281afca71c5aff30351c34c042ccf5
-production_sha: 58cacd3f28281afca71c5aff30351c34c042ccf5
+repository_base_sha: b9a85980cbc930e26b8acee819490a8e10b9ce79
+production_sha: b9a85980cbc930e26b8acee819490a8e10b9ce79
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -556,23 +556,36 @@ Completed checkpoint — Stage 6A Manifest cycle evidence, strategy, and defect 
 - Exact-SHA release passed in run `30288973481`.
 - Live production independently confirmed exact SHA `58cacd3f28281afca71c5aff30351c34c042ccf5` with 75/75 public tools.
 
-Current sub-action — Stage 6B authoritative hourly coverage service extraction:
+Completed checkpoint — Stage 6B authoritative hourly coverage service extraction:
 
-Extract `get_hourly_coverage` from `handleOperatorTool` into a focused dependency-injected coverage service:
+- Added `src/operatorHourlyCoverageService.ts` as the dependency-injected authority for generic bounded hourly coverage reads, Manifest occupied-slot reconciliation, elapsed-slot handling, authoritative missing-slot computation, ledger-drift defect repair, cycle coverage updates, receipt completion, cycle-completed events, and next locked plan-item selection.
+- Replaced the legacy `get_hourly_coverage` business branch in `src/index.ts` with explicit environment, database, observation, and schedule dependencies while preserving brand resolution and common JSON transport in the monolith.
+- Corrected the occupancy contract to use the authoritative occupied-slot map and retained exact timezone defaults, horizon bounds, operation identity, status transitions, completion triggers, source-backed lineage evidence, response fields, and idempotent database effects.
+- Added `test/operatorHourlyCoverageService.spec.ts` covering generic brand coverage, authoritative Manifest ledger repair, locked next-plan selection, and final completion while ignoring elapsed unfilled slots.
+- Added permanent push and release ownership gates preventing hourly-coverage orchestration from returning to `src/index.ts`.
+- Push validation passed in run `30291270726`.
+- All eight Operator shards passed in run `30291509363`.
+- Exact-SHA release passed in run `30291691718`.
+- Live production independently confirmed exact SHA `b9a85980cbc930e26b8acee819490a8e10b9ce79` with 75/75 public tools.
 
-- generic bounded hourly coverage reads for every brand
-- Manifest cycle target-slot and occupied-slot reconciliation
-- elapsed-slot policy and authoritative missing-slot computation
-- stored-ledger drift detection, defect recording, repair evidence, and defect resolution
-- autonomous cycle status, missing-slot JSON, scheduled-post ID, and error-state updates
-- final coverage completion, receipt finalization, cycle-completed event recording, and completed cycle status
-- next exact locked cycle-plan item selection and response shaping
+Current sub-action — Stage 6C Manifest autonomous preparation service extraction:
 
-Keep brand resolution, common JSON transport, scheduler internals, Threads publishing, autonomous candidate persistence, and unrelated account tools in `src/index.ts`. Preserve exact time-zone defaults, horizon bounds, operation identity, drift semantics, status transitions, completion triggers, source-backed lineage evidence, response fields, and idempotent database effects. Add focused tests and permanent release-preflight ownership before exact-SHA release.
+Extract the `prepareManifestAutonomousCycle` orchestration from `src/index.ts` into a focused dependency-injected product service while preserving:
+
+- live Threads and database clock reconciliation
+- delivery-state and scheduled-post recovery evidence
+- rolling 28-day evidence snapshot construction and pagination manifest
+- follower, performance-learning, Content Focus, strategy, repetition, and exposure inputs
+- target-slot and authoritative occupancy computation
+- cycle creation or same-operation refresh semantics
+- receipt initialization, startup-state evidence, defects, events, and continuation requirements
+- exact response fields, failure states, and idempotent effects
+
+Keep low-level Threads collection, scheduler internals, database adapters, JSON transport, and autonomous post persistence in `src/index.ts`. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6C, then continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
