@@ -67,6 +67,8 @@ const operatorManifestReviewBatchRetirementService = read("src/operatorManifestR
 const operatorManifestReviewBatchRetirementServiceTests = read("test/operatorManifestReviewBatchRetirementService.spec.ts");
 const operatorManifestReviewBatchStateService = read("src/operatorManifestReviewBatchStateService.ts");
 const operatorManifestReviewBatchStateServiceTests = read("test/operatorManifestReviewBatchStateService.spec.ts");
+const operatorManifestReviewDraftAttachmentService = read("src/operatorManifestReviewDraftAttachmentService.ts");
+const operatorManifestReviewDraftAttachmentServiceTests = read("test/operatorManifestReviewDraftAttachmentService.spec.ts");
 
 
 
@@ -204,6 +206,9 @@ if (!workflow.includes("test/operatorManifestReviewBatchRetirementService.spec.t
 }
 if (!workflow.includes("test/operatorManifestReviewBatchStateService.spec.ts")) {
   errors.push("operator_manifest_review_batch_state_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestReviewDraftAttachmentService.spec.ts")) {
+  errors.push("operator_manifest_review_draft_attachment_service_workflow_gate_missing");
 }
 
 
@@ -984,8 +989,40 @@ if (!operatorManifestReviewBatchStateServiceTests.includes("ensures workflow rea
     || !operatorManifestReviewBatchStateServiceTests.includes("discovers the latest active batch with optional production-date scope")
     || !operatorManifestReviewBatchStateServiceTests.includes("returns autonomous-cycle continuation guidance when no review batch is active")
     || !operatorManifestReviewBatchStateServiceTests.includes("returns the exact not-found response when an identified batch cannot serialize")) {
-  lifecycleErrors.push("operator_manifest_review_batch_state_service_tests_incomplete");
+    lifecycleErrors.push("operator_manifest_review_batch_state_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestReviewDraftAttachmentService"')
+    || !source.includes("attachOperatorManifestReviewDraft({")
+    || !source.includes("findDuplicateClaim: async")
+    || !source.includes("applyAttachment: async")) {
+  lifecycleErrors.push("operator_manifest_review_draft_attachment_service_import_or_binding_missing");
+}
+if (source.includes("const replacementSelectionId = String(replacement.source_selection_id)")
+    || source.includes("const nextClaimStatus = draft.status === \"approved\"")
+    || source.includes("replacement_source_already_claimed_for_day")) {
+  lifecycleErrors.push("operator_manifest_review_draft_attachment_service_returned_to_index");
+}
+if (!operatorManifestReviewDraftAttachmentService.includes("export async function attachOperatorManifestReviewDraft")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.getDraft")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.getClaim")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.getReplacement")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.findDuplicateClaim")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.applyAttachment")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.countUnresolved")
+    || !operatorManifestReviewDraftAttachmentService.includes("dependencies.updateReviewBatchStatus")
+    || !operatorManifestReviewDraftAttachmentService.includes("review_source_replacement_requires_skip")) {
+  lifecycleErrors.push("operator_manifest_review_draft_attachment_service_module_incomplete");
+}
+if (!operatorManifestReviewDraftAttachmentServiceTests.includes("rejects incomplete attachment identity before any mutation")
+    || !operatorManifestReviewDraftAttachmentServiceTests.includes("enforces passing draft state and exact source-card generation lineage")
+    || !operatorManifestReviewDraftAttachmentServiceTests.includes("requires selected same-day replacement authority and a skipped prior source")
+    || !operatorManifestReviewDraftAttachmentServiceTests.includes("rejects a replacement source already claimed for the production day")
+    || !operatorManifestReviewDraftAttachmentServiceTests.includes("persists attachment state and completes the batch when no unresolved items remain")) {
+  lifecycleErrors.push("operator_manifest_review_draft_attachment_service_tests_incomplete");
+}
+
+
+
 
 
 
