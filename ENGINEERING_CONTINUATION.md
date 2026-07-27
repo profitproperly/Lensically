@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 2af9a5b4b5efc1bd6a181faacfe45b4ed44cb9b0
-production_sha: 2af9a5b4b5efc1bd6a181faacfe45b4ed44cb9b0
+repository_base_sha: ff8dc2de45da5bf8b320339214df064ae6e79151
+production_sha: ff8dc2de45da5bf8b320339214df064ae6e79151
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -420,20 +420,28 @@ Completed checkpoint — Stage 5D2 admin tool-registry extraction:
 - Exact-SHA release passed in run `30226772035`.
 - Live production independently confirmed exact SHA `2af9a5b4b5efc1bd6a181faacfe45b4ed44cb9b0`.
 
-Current sub-action — Stage 5D3A account-state, guided-review, and source-discovery registry extraction:
+Completed checkpoint — Stage 5D3A account foundation registry extraction:
 
-Move the first coherent account/content registry slice from `src/index.ts` into a focused module while preserving its current position ahead of the remaining account definitions:
+- Added `src/operatorMcpAccountFoundationRegistry.ts` with the exact first 21 account/content definitions in their original declaration order.
+- The extracted slice covers account discovery/state, Lensically UI reads, hourly coverage, guided-review lifecycle, workflow context, source discovery/deletion, published-lineage audit/recovery, source-card backfill, and persisted source-batch retrieval.
+- Added `src/operatorMcpConstants.ts` as the shared authority for `OPERATOR_WORKFLOW_TEMPLATE_KEY` and moved `SOURCE_TRANSFORMATION_CONTRACT_SCHEMA` into `src/operatorMcpSchemas.ts`.
+- Switched account composition to `[...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS, ...OPERATOR_MCP_TOOLS]` before physically deleting all 21 inert definitions from `src/index.ts`; `create_source_card` is now the first remaining monolith definition.
+- Added `test/operatorMcpAccountFoundationRegistry.spec.ts` covering exact order/count parity, UI pagination limits, review constraints, workflow defaults, destructive source deletion, lineage recovery, and bounded backfill contracts.
+- Updated lifecycle parsing and release preflight to scan the foundation registry, enforce shared schema/constant authority, and prevent these definitions from returning to `index.ts`.
+- Push validation passed in run `30227604519`.
+- All eight Operator shards passed in run `30227697647`.
+- Exact-SHA release passed in run `30227741205`.
+- Live production independently confirmed exact SHA `ff8dc2de45da5bf8b320339214df064ae6e79151`.
 
-- account discovery and state: `list_accounts`, `get_account_state`, `read_lensically_ui_surface`
-- hourly coverage and guided-review lifecycle: discard, claim, restore, attach, skip, and schedule review batches
-- guided workflow context: `start_workflow_session`, `admit_context`, `get_production_board`
-- source discovery and deletion: `list_source_candidates`, `delete_saved_pattern_source`, `draw_source_candidate_batch`, `get_source_candidate_batch`
+Current sub-action — Stage 5D3B source-card, generation, and draft-gate registry extraction:
 
-Preserve exact definition order, schemas, annotations, public filtering, scoped-wrapper construction, tool counts, and all guided/autonomous noninterference behavior. Add focused registry characterization and release-preflight enforcement preventing this slice from returning to `index.ts`.
+Measure and move the next contiguous account-definition slice beginning at `create_source_card` into a focused ordered registry module. The expected domain includes canonical source-card creation/locking/reads, generation-run creation, gate execution, candidate-draft submission, and the immediately adjacent draft lifecycle definitions through the next stable boundary.
+
+Preserve exact declaration order, schemas, annotations, shared schema ownership, public filtering, scoped-wrapper construction, tool counts, source-card versioning, source-fidelity requirements, showable gating, rejection handling, and all guided/autonomous noninterference behavior. Add focused characterization and release-preflight enforcement before exact-SHA release.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract the remaining source-card, generation, gate, scheduling, metrics, intelligence, and autonomous-cycle account definitions in bounded slices.
+- Extract the remaining scheduling, strategy-memory, metrics, intelligence, autonomous-cycle, and other account definitions in bounded slices.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
