@@ -585,9 +585,9 @@ if (!source.includes('from "./operatorManifestCycleService"')
     || !source.includes("handleOperatorManifestCycleServiceTool({")) {
   lifecycleErrors.push("operator_manifest_cycle_service_import_or_binding_missing");
 }
-if (source.includes("readManifestEvidencePage(env.DB")
-    || source.includes("validateLineupAgainstLockedSourceSelectionPlan(env.DB")
+if (source.includes('error: "complete_cycle_strategy_required"')
     || source.includes('"manifest_cycle_receipt_not_found"')
+    || source.includes('eventType: "cycle_strategy_locked"')
     || source.includes('completion_trigger: "last_blocking_defect_resolved"')) {
   lifecycleErrors.push("operator_manifest_cycle_service_returned_to_index");
 }
@@ -597,7 +597,12 @@ if (!operatorManifestCycleService.includes("export const OPERATOR_MANIFEST_CYCLE
     || !operatorManifestCycleService.includes('toolName === "get_manifest_cycle_analysis_page"')
     || !operatorManifestCycleService.includes('toolName === "commit_manifest_cycle_strategy"')
     || !operatorManifestCycleService.includes('toolName === "record_manifest_cycle_defect"')
-    || !operatorManifestCycleService.includes("resolveManifestCycleDefect")
+    || !operatorManifestCycleService.includes("dependencies.readEvidencePage")
+    || !operatorManifestCycleService.includes("dependencies.validateLockedLineup")
+    || !operatorManifestCycleService.includes("dependencies.commitStrategy")
+    || !operatorManifestCycleService.includes("dependencies.recordCycleDefect")
+    || !operatorManifestCycleService.includes("dependencies.resolveCycleDefect")
+    || !operatorManifestCycleService.includes("dependencies.finalizeCycleReceipt")
     || !operatorManifestCycleService.includes('primary_metric: "24_hour_likes"')
     || !operatorManifestCycleService.includes('completion_trigger: "last_blocking_defect_resolved"')) {
   lifecycleErrors.push("operator_manifest_cycle_service_module_incomplete");
