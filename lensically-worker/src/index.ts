@@ -17284,62 +17284,7 @@ const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
 
 
 
-const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
-  {
-    name: "getWorkflowStatus",
-    title: "Get workflow status",
-    description: "Inspect the selected account's active operator workflow, context admission, source card, generation, draft, scheduling, and blocker status.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  },
-  {
-    name: "updateWorkflowRequirement",
-    title: "Update workflow requirement",
-    description: "Create or update a DB-backed workflow requirement that blocks stage advancement until its completion rule passes.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, stage: { type: "string" }, required_sections: { type: "array", items: { type: "string" } }, completion_rule: { type: "string" }, enforcement_type: { type: "string", enum: ["block", "warn"] }, active: { type: "boolean" } }, required: ["stage", "required_sections", "completion_rule"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "advanceWorkflowStage",
-    title: "Advance workflow stage",
-    description: "Advance an operator workflow only if DB-backed requirements for the target stage pass.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" }, target_stage: { type: "string" } }, required: ["brand_key", "target_stage"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "prepareFullPreflight",
-    title: "Prepare full preflight",
-    description: "Run server-side preflight collection for the selected account and record complete/partial context admission before serious workflow advancement.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, workflow_session_id: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "updateGate",
-    title: "Update gate",
-    description: "Create or update an account-scoped operator gate through the admin MCP surface.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, gate_key: { type: "string" }, display_name: { type: "string" }, description: { type: "string" }, stage_scope: { type: "string" }, lane_scope: { type: "string" }, content_type_scope: { type: "string" }, gate_type: { type: "string" }, severity: { type: "string" }, evaluator: { type: "string" }, active: { type: "boolean" }, order_index: { type: "integer" }, pass_examples: { type: "array", items: {} }, fail_examples: { type: "array", items: {} }, source_memory_ids: { type: "array", items: {} } }, required: ["brand_key", "gate_key", "description", "stage_scope"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-        name: "runGateSuite",
-    title: "Run gate suite",
-                description: "Run all active operator gates for source cards or drafts, including source transformation, account-wide historical owner rejection review, and required-gate execution. For historical_owner_rejection_gate, include the exact rejection-context fingerprint and reviewed count from the generation run. Missing historical review or any missing blocking gate must keep showable=false. This remains a silent internal workflow stage.",
 
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
-
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-        name: "submitAndGateDraft",
-    title: "Submit and gate draft",
-                description: "Submit a candidate draft, record source-contract evidence, run every mandatory Lensically gate, and return showable/blocking status in one admin MCP call. Include historical_owner_rejection_gate evidence using the exact persisted account rejection-context fingerprint and reviewed count. The backend blocks explicit banned surfaces, rejected-draft near-matches, incomplete historical review, and missing gate execution. Present the draft only when showable=true.",
-
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id"], additionalProperties: false },
-
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-];
-void OPERATOR_MCP_ADMIN_TOOLS;
 
 const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
