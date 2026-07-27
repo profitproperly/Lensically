@@ -17286,57 +17286,6 @@ const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
 
 const OPERATOR_MCP_ADMIN_TOOLS: OperatorMcpToolDefinition[] = [
   {
-    name: "listMcpTools",
-    title: "List active MCP tools",
-    description: "List the active source-defined Lensically internal handlers. This action is read-only and cannot execute another tool.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  },
-  {
-    name: "readMcpToolDefinition",
-    title: "Read MCP tool definition",
-    description: "Read one active source-defined MCP handler and its typed input schema.",
-    inputSchema: { type: "object", properties: { tool_name: { type: "string" } }, required: ["tool_name"], additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  },
-  {
-    name: "runMcpTests",
-    title: "Run MCP tests",
-    description: "Run the bounded Execution Kernel campaign. Routes validates the complete surface; each read segment executes only its bounded read-only group so one Worker invocation never exceeds external-request limits.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        brand_key: BRAND_KEY_SCHEMA,
-        segment: {
-          type: "string",
-          enum: [
-            "routes",
-            "engineering_reads",
-            "admin_reads",
-            "account_reads_a",
-            "account_reads_b",
-            "engineering_mutations",
-            "admin_mutations",
-            "account_mutations_a",
-            "account_mutations_b",
-            "s0",
-            "s1",
-            "s2",
-            "s3",
-            "s4",
-            "s5",
-            "s6",
-            "s7",
-            "s8"
-          ],
-          default: "routes"
-        },
-      },
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-  },
-  {
     name: "getWorkflowStatus",
     title: "Get workflow status",
     description: "Inspect the selected account's active operator workflow, context admission, source card, generation, draft, scheduling, and blocker status.",
