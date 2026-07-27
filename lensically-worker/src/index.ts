@@ -99,6 +99,8 @@ import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepa
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
 import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
+import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
+
 
 
 import {
@@ -12209,129 +12211,100 @@ async function persistManifestAutonomousPost(
 }
 
 async function reviewManifestScheduledPost(
-
   env: Env,
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
-  const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id));
-  const action = normalizeOperatorMachineKey(payload.action, "");
-  const feedback = normalizeOperatorText(payload.feedback, 8000);
-  const lessonScope = normalizeOperatorMachineKey(payload.lesson_scope, "post_specific");
-    if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0 || !["keep", "rewrite", "reject_replace"].includes(action)) {
-    return { success: false, error: "scheduled_post_action_required" };
-  }
-  if (!feedback) return { success: false, error: "scheduled_post_feedback_required" };
-  const scheduled = await env.DB.prepare(
-    `SELECT * FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
-  ).bind(scheduledPostId, brand.profile.threads_user_id).first<Record<string, unknown>>();
-  if (!scheduled) return { success: false, error: "scheduled_post_not_found" };
-  if (String(scheduled.status ?? "") !== SCHEDULED_POST_STATUS_APPROVED) {
-    return { success: false, error: "only_unpublished_approved_post_reviewable", status: scheduled.status ?? null };
-  }
-  const linkedDraft = await env.DB.prepare(
-    `SELECT * FROM gpt_generation_drafts
-     WHERE scheduled_post_id = ? AND account_id = ?
-     ORDER BY datetime(updated_at) DESC LIMIT 1`,
-  ).bind(scheduledPostId, brand.account_id).first<Record<string, unknown>>();
-  const replacementText = normalizeOperatorText(payload.replacement_text, 20000, true);
-  if (["rewrite", "reject_replace"].includes(action) && !replacementText) {
-    return { success: false, error: "replacement_text_required" };
-  }
-  let updatedPost: Record<string, unknown> | null = null;
-  if (replacementText) {
-    const sourceCardId = normalizeOperatorText(linkedDraft?.source_card_id, 120, true);
-    const generationGates = await runOperatorGates(env, {
-      brand,
-      draftId: normalizeOperatorText(linkedDraft?.id, 120, true),
-      sourceCardId,
-      draftText: replacementText,
-      stageScope: "gate_evaluation",
-      draftAnalysis: {
-        opening_phrase: extractOpeningPhrase(replacementText),
-        preserved_functions: [],
-        transformed_elements: ["owner_directed_revision"],
-        satisfied_time_or_context_requirements: [],
-        audience_reward_delivered: true,
-      },
-    });
-    if (!generationGates.showable) {
-      return { success: false, error: "replacement_generation_gates_failed", blocking_failures: generationGates.blocking_failures };
-    }
-    const scheduledTimeMs = Date.parse(String(scheduled.scheduled_time ?? ""));
-    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
-    const parts = Number.isFinite(scheduledTimeMs) ? getPartsInTimeZone(scheduledTimeMs, timezone) : null;
-    if (!parts) return { success: false, error: "scheduled_time_unreadable" };
-    const date = formatIsoDateParts(parts.year, parts.month, parts.day);
-    const time = `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
-    const schedulingGates = await runOperatorGates(env, {
-      brand,
-      draftId: normalizeOperatorText(linkedDraft?.id, 120, true),
-      sourceCardId,
-      draftText: replacementText,
-      stageScope: "scheduling",
-      scheduling: { date, time, timezone },
-    });
-    if (!schedulingGates.showable) {
-      return { success: false, error: "replacement_scheduling_gates_failed", blocking_failures: schedulingGates.blocking_failures };
-    }
-    const updated = await updateScheduledPostForAppUser(env, {
-      appUserId: WORKSPACE_APP_USER_ID,
-      scheduledPostId,
-      expectedThreadsUserId: brand.profile.threads_user_id,
-      text: replacementText,
-      timeZone: timezone,
-    });
-    if (!updated.success || !updated.scheduledPost) {
-      return { success: false, error: updated.error ?? "scheduled_post_update_failed" };
-    }
-    updatedPost = updated.scheduledPost as unknown as Record<string, unknown>;
-  }
-  await env.DB.prepare(
-    `UPDATE operator_autonomous_lineup_items
-     SET text = COALESCE(?, text), status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE brand_key = ? AND scheduled_post_id = ?`,
-  ).bind(
-    replacementText ?? null,
-    action === "keep" ? "owner_kept" : "owner_revised",
-    feedback,
-    brand.brand_key,
-    scheduledPostId,
-  ).run();
-    const memoryKind: GptStrategyMemoryKind = lessonScope === "permanent_rule"
-    ? "approved_rule"
-    : lessonScope === "temporary_repetition"
-      ? "cooldown"
-      : lessonScope === "performance_hypothesis" || lessonScope === "experiment"
-        ? "experiment"
-        : lessonScope === "family_strategy"
-          ? "current_belief"
-          : "approval_feedback";
-  await saveGptStrategyMemory(env, {
+  return reviewOperatorManifestScheduledPost({
+    brandKey: brand.brand_key,
     accountId: brand.account_id,
     threadsUserId: brand.profile.threads_user_id,
-    kind: memoryKind,
-    title: `Scheduled post ${scheduledPostId} owner review`,
-    body: feedback,
-    metadataJson: normalizeOperatorJson({
-      source: "review_manifest_scheduled_post",
-      scheduled_post_id: scheduledPostId,
-      action,
-      lesson_scope: lessonScope,
-      permanent: lessonScope === "permanent_rule",
-      replacement_text: replacementText ?? null,
-    }, {}),
+    payload,
+  }, {
+    approvedStatus: SCHEDULED_POST_STATUS_APPROVED,
+    workspaceDefaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    normalizeText: normalizeOperatorText,
+    normalizeMachineKey: normalizeOperatorMachineKey,
+    readScheduledPost: (scheduledPostId, threadsUserId) => env.DB.prepare(
+      `SELECT * FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+    ).bind(scheduledPostId, threadsUserId).first<Record<string, unknown>>(),
+    readLinkedDraft: (scheduledPostId, accountId) => env.DB.prepare(
+      `SELECT * FROM gpt_generation_drafts
+       WHERE scheduled_post_id = ? AND account_id = ?
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).bind(scheduledPostId, accountId).first<Record<string, unknown>>(),
+    runGenerationGates: async ({ draftId, sourceCardId, replacementText }) => {
+      const result = await runOperatorGates(env, {
+        brand,
+        draftId,
+        sourceCardId,
+        draftText: replacementText,
+        stageScope: "gate_evaluation",
+        draftAnalysis: {
+          opening_phrase: extractOpeningPhrase(replacementText),
+          preserved_functions: [],
+          transformed_elements: ["owner_directed_revision"],
+          satisfied_time_or_context_requirements: [],
+          audience_reward_delivered: true,
+        },
+      });
+      return {
+        showable: result.showable,
+        blocking_failures: result.blocking_failures,
+      };
+    },
+    getPartsInTimeZone,
+    formatIsoDateParts,
+    runSchedulingGates: async ({ draftId, sourceCardId, replacementText, date, time, timezone }) => {
+      const result = await runOperatorGates(env, {
+        brand,
+        draftId,
+        sourceCardId,
+        draftText: replacementText,
+        stageScope: "scheduling",
+        scheduling: { date, time, timezone },
+      });
+      return {
+        showable: result.showable,
+        blocking_failures: result.blocking_failures,
+      };
+    },
+    updateScheduledPost: async ({ scheduledPostId, threadsUserId, replacementText, timezone }) => {
+      const updated = await updateScheduledPostForAppUser(env, {
+        appUserId: WORKSPACE_APP_USER_ID,
+        scheduledPostId,
+        expectedThreadsUserId: threadsUserId,
+        text: replacementText,
+        timeZone: timezone,
+      });
+      return {
+        success: updated.success,
+        scheduledPost: updated.scheduledPost as unknown as Record<string, unknown> | null | undefined,
+        error: updated.error,
+      };
+    },
+    updateLineup: (input) => env.DB.prepare(
+      `UPDATE operator_autonomous_lineup_items
+       SET text = COALESCE(?, text), status = ?, owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE brand_key = ? AND scheduled_post_id = ?`,
+    ).bind(
+      input.replacementText,
+      input.status,
+      input.feedback,
+      input.brandKey,
+      input.scheduledPostId,
+    ).run(),
+    saveStrategyMemory: (input) => saveGptStrategyMemory(env, {
+      accountId: input.accountId,
+      threadsUserId: input.threadsUserId,
+      kind: input.kind as GptStrategyMemoryKind,
+      title: input.title,
+      body: input.body,
+      metadataJson: normalizeOperatorJson(input.metadata, {}),
+    }),
   });
-  return {
-    success: true,
-    scheduled_post_id: scheduledPostId,
-    action,
-    lesson_scope: lessonScope,
-    updated_post: updatedPost,
-    operational_effect: action === "keep" ? "No production change; feedback recorded." : "The same scheduled slot was updated and remains covered.",
-  };
 }
+
 
 export function manifestCycleFailureIsDefect(errorCode: unknown): boolean {
   const code = normalizeOperatorMachineKey(errorCode, "");
