@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 5163b172327479938c33ee99f15ca680dc41bb4d
-production_sha: 5163b172327479938c33ee99f15ca680dc41bb4d
+repository_base_sha: 54c22fbaefe374d79e5db2d30e087f45382d77b6
+production_sha: 54c22fbaefe374d79e5db2d30e087f45382d77b6
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -457,22 +457,31 @@ Completed checkpoint — Stage 5D3C strategy-memory and scheduled-post registry 
 - Exact-SHA release passed in run `30229799419`.
 - Live production independently confirmed exact SHA `5163b172327479938c33ee99f15ca680dc41bb4d` with 75/75 public tools.
 
-Current sub-action — Stage 5D3D Manifest intelligence and cycle-strategy registry extraction:
+Completed checkpoint — Stage 5D3D Manifest intelligence and cycle-strategy registry extraction:
 
-Move the next exact contiguous six-tool slice from `src/index.ts` into a focused ordered registry module:
+- Added `src/operatorMcpManifestCycleRegistry.ts` with the exact ordered six-tool Manifest intelligence, receipt, defect, analysis-page, and strategy-lock slice.
+- Switched runtime composition to the extracted registry before physically removing all six inert definitions from `src/index.ts`.
+- Added `test/operatorMcpManifestCycleRegistry.spec.ts` covering exact order, pageable receipt sections, seven-stage defects, durable repair evidence, complete analysis-page consumption, and source-card-backed strategy locking.
+- Updated lifecycle parsing and release preflight to scan the extracted registry and prevent these definitions from returning to `index.ts`.
+- Push validation passed on the initial implementation in run `30230232553`; all eight Operator shards passed in run `30230318116`.
+- Initial release run `30230360600` stopped before migration or deployment because two full-release assertions still read `index.ts` for the extracted analysis-page and strategy-lock definitions.
+- Moved those assertions to the new registry authority, then push validation passed in run `30230448360` and all eight Operator shards passed in run `30230550911`.
+- Exact-SHA release passed in run `30230597372`.
+- Live production independently confirmed exact SHA `54c22fbaefe374d79e5db2d30e087f45382d77b6` with 75/75 public tools.
 
-- `get_manifest_intelligence_foundation`
-- `get_manifest_cycle_receipt`
-- `record_manifest_cycle_defect`
-- `resolve_manifest_cycle_defect`
-- `get_manifest_cycle_analysis_page`
-- `commit_manifest_cycle_strategy`
+Current sub-action — Stage 5D3E autonomous cycle execution registry extraction:
 
-Preserve exact declaration order, pageable receipt sections, seven-stage defect evidence, durable repair verification, complete rolling 28-day analysis consumption, strategy replay safety, locked source-card-backed lineup requirements, public filtering, scoped wrappers, and tool counts. Add focused tests and release-preflight enforcement before exact-SHA release.
+Move the next exact contiguous three-tool slice from `src/index.ts` into a focused ordered registry module:
+
+- `prepare_manifest_autonomous_cycle`
+- `persist_manifest_autonomous_post`
+- `review_manifest_scheduled_post`
+
+Preserve exact declaration order, immediate invocation integrity, live Threads/database clock reconciliation, rolling runway bounds, one-post-per-call persistence, locked cycle strategy and plan identity, canonical source-card lineage, owner hard-ban coverage, source fidelity, duplicate and semantic-repetition checks, nonempty gate execution, idempotency, complete model evaluation, four-post coverage reconciliation, optional owner review, slot-preserving rewrite/replacement, public filtering, scoped wrappers, and tool counts. Add focused tests and release-preflight enforcement before exact-SHA release.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract autonomous cycle prepare/persist/review definitions and remaining metrics/intelligence account definitions in bounded slices.
+- Extract post results, growth review, performance learning, Manifest intelligence audit, metrics, and remaining account definitions in bounded slices.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
