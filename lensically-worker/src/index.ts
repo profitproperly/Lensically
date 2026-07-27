@@ -17259,22 +17259,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   
         
   
-  {
-    name: "prepare_manifest_autonomous_cycle",
-    title: "Prepare Manifest autonomous cycle",
-                description: "Invocation integrity: when a request explicitly names prepare_manifest_autonomous_cycle, call this tool immediately after it is available; tool discovery or schema loading is not execution, and no failure may be reported without this tool's returned result. Refresh live Threads publications, use Threads and database clock evidence, reconcile scheduled, posting, posted, failed, stalled, retry-required, and manually published records, ignore every elapsed hour, and return the authoritative rolling runway. The model must inspect recent published posts, future scheduled exposure, repetition pressure, performance, Content Focus, and follower trajectory; build and sequence the full horizon before persisting the first post; preserve franchise winners while spacing clustered execution; and justify why each family belongs in each exact slot. Reusing the same daily operation id refreshes live state instead of replaying a stale cycle. Existing valid posts are always preserved. After each four successful persistence calls, use get_hourly_coverage rather than calling this tool again.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        brand_key: BRAND_KEY_SCHEMA,
-        timezone: { type: "string", default: "America/New_York" },
-        horizon_hours: { type: "integer", minimum: 1, maximum: 72, default: 48 },
-      },
-      required: ["brand_key"],
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
+  
     {
     name: "persist_manifest_autonomous_post",
     title: "Persist Manifest autonomous post",
@@ -17413,26 +17398,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
-    name: "review_manifest_scheduled_post",
-    title: "Review Manifest scheduled post",
-    description: "Apply optional owner criticism to one unpublished scheduled Manifest post. Keep records feedback only; rewrite or reject_replace validates and updates the same scheduled slot so runway coverage is preserved. Feedback scope controls whether the lesson is post-specific, temporary, strategic, experimental, or an explicit permanent rule.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        brand_key: BRAND_KEY_SCHEMA,
-        scheduled_post_id: { type: "integer", minimum: 1 },
-        action: { type: "string", enum: ["keep", "rewrite", "reject_replace"] },
-        feedback: { type: "string" },
-        replacement_text: { type: "string" },
-        lesson_scope: { type: "string", enum: ["post_specific", "temporary_repetition", "family_strategy", "performance_hypothesis", "permanent_rule", "experiment"] },
-        timezone: { type: "string", default: "America/New_York" },
-      },
-      required: ["brand_key", "scheduled_post_id", "action", "feedback", "lesson_scope"],
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
+  
     {
     name: "get_post_results",
     title: "Get post results",
