@@ -11,20 +11,19 @@ type CompiledProfileResult =
   | (JsonRecord & { ok: true; profile_id: string; request: JsonRecord })
     | (JsonRecord & { ok: false; error?: unknown; profile_id?: string | null });
 
-type PreparedGatewayResult =
-  | (JsonRecord & {
-      ok: true;
-      tool_name: string;
-      arguments: JsonRecord;
-      map_execution?: JsonRecord | null;
-      map_state?: unknown;
-      map_entry?: unknown;
-      incident?: unknown;
-      execution_library?: unknown;
-      corrections?: unknown[];
-      route_trail?: JsonRecord[];
-    })
-  | (JsonRecord & { ok: false; error?: unknown });
+type PreparedGatewayResult = JsonRecord & {
+  ok: boolean;
+  tool_name?: string;
+  arguments?: JsonRecord;
+  error?: unknown;
+  map_execution?: JsonRecord | null;
+  map_state?: unknown;
+  map_entry?: unknown;
+  incident?: unknown;
+  execution_library?: unknown;
+  corrections?: unknown[];
+  route_trail?: JsonRecord[];
+};
 
 type PreCallRoutingResult = {
   arguments: JsonRecord;
