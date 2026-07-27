@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 9237c4c3c76d0c16c5ab07d2f9f2e711efb602a1
-production_sha: 9237c4c3c76d0c16c5ab07d2f9f2e711efb602a1
+repository_base_sha: 58cacd3f28281afca71c5aff30351c34c042ccf5
+production_sha: 58cacd3f28281afca71c5aff30351c34c042ccf5
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -543,18 +543,32 @@ Completed checkpoint — Stage 5G MCP dispatcher and call-state-machine extracti
 - Live production independently confirmed exact SHA `9237c4c3c76d0c16c5ab07d2f9f2e711efb602a1` with 75/75 public tools.
 - Stage 5 completion audit passed through lifecycle, full release-preflight, architecture baseline, focused tests, eight deterministic shards, and live verification: protocol metadata, registry construction, directory/filtering, composition, routing policy, transport shaping, protocol dispatch, and tools/call orchestration no longer live as monolithic implementations in `src/index.ts`.
 
-Current sub-action — Stage 6A Manifest cycle evidence, strategy, and defect service extraction:
+Completed checkpoint — Stage 6A Manifest cycle evidence, strategy, and defect service extraction:
 
-Extract the first bounded product-service cluster from `handleOperatorTool` into a focused dependency-injected Manifest cycle service:
+- Added `src/operatorManifestCycleService.ts` as the focused product authority for `get_manifest_cycle_analysis_page`, `commit_manifest_cycle_strategy`, `record_manifest_cycle_defect`, and `resolve_manifest_cycle_defect`.
+- Moved evidence-page validation and observed failures, complete source-backed strategy locking, 24-hour-likes metadata, seven-stage defect recording, defect resolution, final receipt completion, cycle-completed events, and autonomous-cycle status reconciliation out of `src/index.ts`.
+- Converted deep evidence, source-selection, strategy, event, receipt, defect, and completion operations to explicit production dependencies so the service is independently testable without Workers module-mocking behavior.
+- Reduced `src/index.ts` to canonical brand resolution, explicit environment adapters, observation wiring, and shared JSON response transport for these four tools.
+- Added `test/operatorManifestCycleService.spec.ts` covering bounded evidence reads, observed failures, complete strategy requirements, locked source-selection metadata, seven-stage defect bounds, receipt requirements, and final cycle-completion reconciliation.
+- Added permanent push and release gates requiring the service and focused tests while preventing its business workflows from returning to `src/index.ts`.
+- Push validation passed in run `30288507324`.
+- The first eight-shard run hit one unrelated 30-second runner timeout; the exact-SHA rerun passed all eight shards in run `30288866294` without code changes.
+- Exact-SHA release passed in run `30288973481`.
+- Live production independently confirmed exact SHA `58cacd3f28281afca71c5aff30351c34c042ccf5` with 75/75 public tools.
 
-- `get_manifest_cycle_analysis_page`
-- `commit_manifest_cycle_strategy`
-- `record_manifest_cycle_defect`
-- `resolve_manifest_cycle_defect`
+Current sub-action — Stage 6B authoritative hourly coverage service extraction:
 
-Move payload validation, business-result shaping, evidence-page reads, locked source-plan validation, strategy commit/event recording, defect creation/resolution, and cycle-completion reconciliation. Keep authorization, brand resolution, common JSON transport, autonomous generation/persistence, scheduler behavior, and unrelated account tools in `src/index.ts`.
+Extract `get_hourly_coverage` from `handleOperatorTool` into a focused dependency-injected coverage service:
 
-Preserve exact status codes, error strings, source-selection locking, 24-hour-likes strategy metadata, seven-stage defect semantics, final receipt completion, cycle events, scheduled-post lineage evidence, and idempotent database effects. Add focused tests and permanent release-preflight ownership before exact-SHA release.
+- generic bounded hourly coverage reads for every brand
+- Manifest cycle target-slot and occupied-slot reconciliation
+- elapsed-slot policy and authoritative missing-slot computation
+- stored-ledger drift detection, defect recording, repair evidence, and defect resolution
+- autonomous cycle status, missing-slot JSON, scheduled-post ID, and error-state updates
+- final coverage completion, receipt finalization, cycle-completed event recording, and completed cycle status
+- next exact locked cycle-plan item selection and response shaping
+
+Keep brand resolution, common JSON transport, scheduler internals, Threads publishing, autonomous candidate persistence, and unrelated account tools in `src/index.ts`. Preserve exact time-zone defaults, horizon bounds, operation identity, drift semantics, status transitions, completion triggers, source-backed lineage evidence, response fields, and idempotent database effects. Add focused tests and permanent release-preflight ownership before exact-SHA release.
 
 Remaining work after this checkpoint:
 
