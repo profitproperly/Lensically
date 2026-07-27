@@ -99,7 +99,10 @@ import {
   SOURCE_DRAFT_ANALYSIS_SCHEMA,
   SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
 } from "./operatorMcpSchemas";
-import { OPERATOR_WORKFLOW_TEMPLATE_KEY } from "./operatorMcpConstants";
+import {
+  GPT_STRATEGY_MEMORY_KINDS,
+  OPERATOR_WORKFLOW_TEMPLATE_KEY,
+} from "./operatorMcpConstants";
 
 
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
@@ -1684,30 +1687,7 @@ const TEST_THREADS_USER_IDS: Readonly<Record<string, string>> = {
   deadman: "deadman",
 };
 
-const GPT_STRATEGY_MEMORY_KINDS = new Set<string>([
-  "winner",
-  "loser",
-  "hook",
-  "pillar",
-  "voice_rule",
-  "experiment",
-  "scheduled_batch",
-  "result_note",
-  "rejection_feedback",
-  "rule_proposal",
-  "approved_rule",
-  "taste_profile",
-  "approved_pattern",
-  "rejected_pattern",
-  "current_belief",
-  "brand_voice_note",
-  "banned_phrase",
-  "cooldown",
-  "experiment_result",
-  "rule_review",
-  "saved_pattern_note",
-  "approval_feedback",
-]);
+
 
 const DEFAULT_PATTERNS_ACCOUNT_ID = "manifest-mental";
 
