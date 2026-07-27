@@ -69,6 +69,8 @@ const operatorManifestReviewBatchStateService = read("src/operatorManifestReview
 const operatorManifestReviewBatchStateServiceTests = read("test/operatorManifestReviewBatchStateService.spec.ts");
 const operatorManifestReviewDraftAttachmentService = read("src/operatorManifestReviewDraftAttachmentService.ts");
 const operatorManifestReviewDraftAttachmentServiceTests = read("test/operatorManifestReviewDraftAttachmentService.spec.ts");
+const operatorManifestReviewSourceResolutionService = read("src/operatorManifestReviewSourceResolutionService.ts");
+const operatorManifestReviewSourceResolutionServiceTests = read("test/operatorManifestReviewSourceResolutionService.spec.ts");
 
 
 
@@ -209,6 +211,9 @@ if (!workflow.includes("test/operatorManifestReviewBatchStateService.spec.ts")) 
 }
 if (!workflow.includes("test/operatorManifestReviewDraftAttachmentService.spec.ts")) {
   errors.push("operator_manifest_review_draft_attachment_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestReviewSourceResolutionService.spec.ts")) {
+  errors.push("operator_manifest_review_source_resolution_service_workflow_gate_missing");
 }
 
 
@@ -1018,8 +1023,39 @@ if (!operatorManifestReviewDraftAttachmentServiceTests.includes("rejects incompl
     || !operatorManifestReviewDraftAttachmentServiceTests.includes("requires selected same-day replacement authority and a skipped prior source")
     || !operatorManifestReviewDraftAttachmentServiceTests.includes("rejects a replacement source already claimed for the production day")
     || !operatorManifestReviewDraftAttachmentServiceTests.includes("persists attachment state and completes the batch when no unresolved items remain")) {
-  lifecycleErrors.push("operator_manifest_review_draft_attachment_service_tests_incomplete");
+    lifecycleErrors.push("operator_manifest_review_draft_attachment_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestReviewSourceResolutionService"')
+    || !source.includes("resolveOperatorManifestReviewSource({")
+    || !source.includes("upsertSourceExclusion: async")
+    || !source.includes("updateSourceSelection: async")) {
+  lifecycleErrors.push("operator_manifest_review_source_resolution_service_import_or_binding_missing");
+}
+if (source.includes("const resolvedReviewBatchId = String(claim.review_batch_id ?? reviewBatchId)")
+    || source.includes("const nextStatus = scope === \"delete_source\"")
+    || source.includes("Owner rejected source for production use.")) {
+  lifecycleErrors.push("operator_manifest_review_source_resolution_service_returned_to_index");
+}
+if (!operatorManifestReviewSourceResolutionService.includes("export async function resolveOperatorManifestReviewSource")
+    || !operatorManifestReviewSourceResolutionService.includes("dependencies.getClaim")
+    || !operatorManifestReviewSourceResolutionService.includes("dependencies.upsertSourceExclusion")
+    || !operatorManifestReviewSourceResolutionService.includes("dependencies.updateClaim")
+    || !operatorManifestReviewSourceResolutionService.includes("dependencies.updateSourceSelection")
+    || !operatorManifestReviewSourceResolutionService.includes("dependencies.countUnresolved")
+    || !operatorManifestReviewSourceResolutionService.includes("dependencies.updateReviewBatchStatus")
+    || !operatorManifestReviewSourceResolutionService.includes("only_saved_patterns_can_be_deleted_as_sources")) {
+  lifecycleErrors.push("operator_manifest_review_source_resolution_service_module_incomplete");
+}
+if (!operatorManifestReviewSourceResolutionServiceTests.includes("returns the exact missing-item response without any mutation")
+    || !operatorManifestReviewSourceResolutionServiceTests.includes("limits permanent source deletion to saved patterns")
+    || !operatorManifestReviewSourceResolutionServiceTests.includes("uses the default owner reason for current-day source skips")
+    || !operatorManifestReviewSourceResolutionServiceTests.includes("upserts a durable exclusion and completes a deleted saved-pattern source")
+    || !operatorManifestReviewSourceResolutionServiceTests.includes("uses the claim batch identity and preserves an empty serialized fallback")) {
+  lifecycleErrors.push("operator_manifest_review_source_resolution_service_tests_incomplete");
+}
+
+
+
 
 
 
