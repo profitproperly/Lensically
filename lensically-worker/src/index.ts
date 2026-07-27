@@ -95,6 +95,7 @@ import {
   isOperatorManifestCycleServiceToolName,
 } from "./operatorManifestCycleService";
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
+import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepareCheckpointService";
 import {
   buildOperatorMcpRuntimeHeaders,
   operatorTransportFailureResponse,
@@ -11082,433 +11083,84 @@ async function prepareManifestAutonomousCycle(
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
-  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
-  if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
-    return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
-  }
-    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
-  const horizonHours = Math.min(Math.max(Math.trunc(Number(payload.horizon_hours ?? MANIFEST_AUTONOMOUS_RUNWAY_HOURS)), 1), 72);
-  const explicitOperationId = normalizeOperatorText(payload.operation_id, 240, true);
-  const phasedPreparation = Boolean(explicitOperationId) && !hasTestRuntimeTokens(env);
-  let runtimeNowIso = new Date().toISOString();
-  let threadsSnapshot: Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
-  if (phasedPreparation && explicitOperationId) {
-    await ensureManifestPrepareCheckpointTable(env.DB);
-    const checkpoint = await readManifestPrepareCheckpoint(env.DB, brand.brand_key, explicitOperationId);
-    if (checkpoint
-      && (String(checkpoint.timezone ?? "") !== timezone
-        || Number(checkpoint.horizon_hours ?? 0) !== horizonHours)) {
-      return {
-        success: false,
-        error: "idempotency_key_payload_mismatch",
-        operation_id: explicitOperationId,
-        stored_timezone: checkpoint.timezone ?? null,
-        requested_timezone: timezone,
-        stored_horizon_hours: Number(checkpoint.horizon_hours ?? 0),
-        requested_horizon_hours: horizonHours,
-      };
-    }
-        if (!checkpoint || String(checkpoint.phase ?? "") === "live_collection") {
-      const collectedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand, { defer_evaluator: true });
-      if (!collectedSnapshot.refreshed || !collectedSnapshot.evaluator_deferred || !collectedSnapshot.collection_state) {
-        return {
-          success: false,
-          error: collectedSnapshot.error ?? "manifest_live_collection_incomplete",
-          stage: "live_collection",
-          retryable: collectedSnapshot.continuation_required === true,
-          continuation_required: collectedSnapshot.continuation_required === true,
-          remaining_due_checkpoint_count: collectedSnapshot.remaining_due_checkpoint_count,
-          next_action: "Repair or retry the bounded live Threads collection before evaluator recomputation.",
-          threads_snapshot: compactManifestPrepareThreadsSnapshot(collectedSnapshot as unknown as Record<string, unknown>),
-        };
-      }
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "live_evaluator",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          collection_state: collectedSnapshot.collection_state,
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "live_collection",
-        next_stage: "live_evaluator",
-        threads_snapshot: compactManifestPrepareThreadsSnapshot(collectedSnapshot as unknown as Record<string, unknown>),
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical operation_id, timezone, and horizon_hours. The Threads collection and due metric snapshots are durably checkpointed; the next invocation runs evaluator recomputation only.",
-      };
-    }
-    const state = checkpoint.state && typeof checkpoint.state === "object" && !Array.isArray(checkpoint.state)
-      ? checkpoint.state as Record<string, unknown>
-      : {};
-    runtimeNowIso = normalizeOperatorText(state.runtime_now_iso, 100, true) ?? runtimeNowIso;
-    if (String(checkpoint.phase ?? "") === "live_evaluator") {
-      const collectionState = state.collection_state && typeof state.collection_state === "object" && !Array.isArray(state.collection_state)
-        ? state.collection_state as ManifestAutonomousThreadsCollectionState
-        : null;
-      if (!collectionState) {
-        await clearManifestPrepareCheckpoint(env.DB, brand.brand_key, explicitOperationId);
-        return {
-          success: false,
-          error: "manifest_live_collection_checkpoint_missing",
-          stage: "live_evaluator",
-          retryable: true,
-          next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs to rebuild the missing live collection checkpoint.",
-        };
-      }
-            const evaluatedSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand, {
-        collection_state: collectionState,
-        defer_manifest_layers: true,
-      });
-      if (!evaluatedSnapshot.complete) {
-        await writeManifestPrepareCheckpoint(env.DB, {
-          brand_key: brand.brand_key,
-          operation_id: explicitOperationId,
-          phase: "live_collection",
-          timezone,
-          horizon_hours: horizonHours,
-          state: { runtime_now_iso: runtimeNowIso },
-        });
-        return {
-          success: true,
-          preparation_complete: false,
-          continuation_required: true,
-          operation_id: explicitOperationId,
-          checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-          stage_completed: "live_evaluator",
-          next_stage: "live_collection",
-          remaining_due_checkpoint_count: evaluatedSnapshot.remaining_due_checkpoint_count,
-          threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
-          next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. The evaluator pass is persisted; another bounded Threads collection will advance the remaining due checkpoints.",
-        };
-      }
-            threadsSnapshot = evaluatedSnapshot;
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "manifest_intelligence",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "live_evaluator",
-        next_stage: "manifest_intelligence",
-        threads_snapshot: compactManifestPrepareThreadsSnapshot(evaluatedSnapshot as unknown as Record<string, unknown>),
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Core maturity scoring and evidence are complete; the next invocation refreshes Manifest intelligence only.",
-      };
-    }
-            if (String(checkpoint.phase ?? "") === "manifest_intelligence") {
-      const intelligenceEngine = await refreshManifestIntelligenceEngine(env.DB, {
+  const checkpointResult = await handleOperatorManifestPrepareCheckpoint({
+    brandKey: brand.brand_key,
+    accountId: brand.account_id,
+    threadsUserId: brand.profile.threads_user_id,
+    payload,
+  }, {
+    autonomyMode: MANIFEST_AUTONOMY_MODE,
+    defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    defaultRunwayHours: MANIFEST_AUTONOMOUS_RUNWAY_HOURS,
+    checkpointVersion: MANIFEST_PREPARE_CHECKPOINT_VERSION,
+    savedPatternsAppUserId: SAVED_PATTERNS_APP_USER_ID,
+    normalizeText: normalizeOperatorText,
+    hasTestRuntimeTokens: () => hasTestRuntimeTokens(env),
+    getAutonomyProfile: (brandKey) => getOperatorAutonomyProfile(env, brandKey as GptBrandKey),
+    ensureCheckpointTable: () => ensureManifestPrepareCheckpointTable(env.DB),
+    readCheckpoint: (brandKey, operationId) => readManifestPrepareCheckpoint(
+      env.DB,
+      brandKey,
+      operationId,
+    ),
+    writeCheckpoint: (input) => writeManifestPrepareCheckpoint(
+      env.DB,
+      input as Parameters<typeof writeManifestPrepareCheckpoint>[1],
+    ),
+    clearCheckpoint: (brandKey, operationId) => clearManifestPrepareCheckpoint(
+      env.DB,
+      brandKey,
+      operationId,
+    ),
+    refreshThreadsSnapshot: (options) => refreshManifestAutonomousThreadsSnapshot(
+      env,
+      brand,
+      options as Parameters<typeof refreshManifestAutonomousThreadsSnapshot>[2],
+    ) as Promise<Record<string, unknown>>,
+    compactThreadsSnapshot: (snapshot) => compactManifestPrepareThreadsSnapshot(snapshot),
+    refreshIntelligenceEngine: (options) => refreshManifestIntelligenceEngine(
+      env.DB,
+      {
         brand_key: brand.brand_key,
         threads_user_id: brand.profile.threads_user_id,
-      }, { phase: "semantic_signatures" });
-      const intelligenceSummary = compactOperatorPayloadValue(intelligenceEngine, "manifest_intelligence.semantic", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "manifest_intelligence_maturity",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: { semantic_signatures: intelligenceSummary },
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_intelligence_semantic",
-        next_stage: "manifest_intelligence_maturity",
-        intelligence_engine: intelligenceSummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Semantic exposure signatures are refreshed; the next invocation refreshes maturity and comparable analyses only.",
-      };
-    }
-        if (String(checkpoint.phase ?? "") === "manifest_intelligence_maturity") {
-      const maturity = await refreshManifestIntelligenceEngine(env.DB, {
-        brand_key: brand.brand_key,
-        threads_user_id: brand.profile.threads_user_id,
-      }, { phase: "maturity_evaluations" });
-      const maturitySummary = compactOperatorPayloadValue(maturity, "manifest_intelligence.maturity", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "manifest_intelligence_comparables",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: {
-            ...operatorRecord(state.intelligence_engine),
-            maturity_evaluations: maturitySummary,
-          },
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_intelligence_maturity",
-        next_stage: "manifest_intelligence_comparables",
-        intelligence_engine: maturitySummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Maturity evaluations are refreshed; the next invocation computes comparable analyses only.",
-      };
-    }
-    if (String(checkpoint.phase ?? "") === "manifest_intelligence_comparables") {
-      const comparables = await refreshManifestIntelligenceEngine(env.DB, {
-        brand_key: brand.brand_key,
-        threads_user_id: brand.profile.threads_user_id,
-      }, { phase: "comparable_analyses" });
-      const comparableSummary = compactOperatorPayloadValue(comparables, "manifest_intelligence.comparables", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "manifest_intelligence_learning",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: {
-            ...operatorRecord(state.intelligence_engine),
-            comparable_analyses: comparableSummary,
-          },
-          learning_offset: 0,
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_intelligence_comparables",
-        next_stage: "manifest_intelligence_learning",
-        intelligence_engine: comparableSummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Comparable analyses are refreshed; the next invocation begins bounded multi-level learning observations.",
-      };
-    }
-    if (String(checkpoint.phase ?? "") === "manifest_intelligence_learning") {
-      const learningOffset = Math.max(0, Math.trunc(Number(state.learning_offset ?? 0)));
-      const learning = await refreshManifestIntelligenceEngine(env.DB, {
-        brand_key: brand.brand_key,
-        threads_user_id: brand.profile.threads_user_id,
-      }, { phase: "learning_observations", learning_offset: learningOffset, learning_limit: 180 });
-      const learningSummary = compactOperatorPayloadValue(learning, "manifest_intelligence.learning", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      const learningContinuation = learning.continuation_required === true;
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: learningContinuation ? "manifest_intelligence_learning" : "manifest_intelligence_portfolio",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: {
-            ...operatorRecord(state.intelligence_engine),
-            learning_observations: learningSummary,
-          },
-          learning_offset: learningContinuation ? Number(learning.next_offset ?? learningOffset + 180) : null,
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_intelligence_learning_batch",
-        next_stage: learningContinuation ? "manifest_intelligence_learning" : "manifest_intelligence_portfolio",
-        intelligence_engine: learningSummary,
-        next_action: learningContinuation
-          ? "Call prepare_manifest_autonomous_cycle again with the identical inputs. The next bounded learning-observation batch will resume from the persisted offset."
-          : "Call prepare_manifest_autonomous_cycle again with the identical inputs. Multi-level learning is complete; the next invocation refreshes portfolio states and experiments.",
-      };
-    }
-    if (String(checkpoint.phase ?? "") === "manifest_intelligence_portfolio") {
-      const portfolio = await refreshManifestIntelligenceEngine(env.DB, {
-        brand_key: brand.brand_key,
-        threads_user_id: brand.profile.threads_user_id,
-      }, { phase: "portfolio_experiments" });
-      const portfolioSummary = compactOperatorPayloadValue(portfolio, "manifest_intelligence.portfolio", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      const completeIntelligence = {
-        ...operatorRecord(state.intelligence_engine),
-        portfolio_experiments: portfolioSummary,
-      };
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "manifest_measurement_audit",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: completeIntelligence,
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_intelligence_portfolio",
-        next_stage: "manifest_measurement_audit",
-        intelligence_engine: portfolioSummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. All intelligence-engine phases are complete; the next invocation refreshes the measurement audit only.",
-      };
-    }
-    if (String(checkpoint.phase ?? "") === "manifest_measurement_audit") {
-      const measurementAudit = await refreshManifestMeasurementAudit(env.DB, {
-        brand_key: brand.brand_key,
-        threads_user_id: brand.profile.threads_user_id,
-        account_id: brand.account_id,
-        saved_patterns_app_user_id: SAVED_PATTERNS_APP_USER_ID,
-      });
-      const measurementSummary = compactOperatorPayloadValue(measurementAudit, "manifest_measurement_audit", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "manifest_content_focus",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: state.intelligence_engine ?? {},
-          measurement_audit: measurementSummary,
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_measurement_audit",
-        next_stage: "manifest_content_focus",
-        measurement_audit: measurementSummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. Measurement audit state is durably refreshed; the next invocation refreshes Content Focus and finalizes the learning brief.",
-      };
-    }
-    if (String(checkpoint.phase ?? "") === "manifest_content_focus") {
-      const contentFocus = await refreshOperatorContentFocus(env, brand.brand_key);
-      const contentFocusSummary = compactOperatorPayloadValue(contentFocus, "manifest_content_focus", {
-        arrayItems: 12, stringChars: 400, objectKeys: 40, maxDepth: 5,
-      }, []);
-      const activeBrief = await env.DB.prepare(
-        `SELECT id, brief_json FROM operator_generation_learning_briefs
-         WHERE brand_key = ? AND active = 1
-         ORDER BY datetime(generated_at) DESC LIMIT 1`,
-      ).bind(brand.brand_key).first<Record<string, unknown>>();
-      if (activeBrief?.id) {
-        const brief = operatorRecord(safeParseJsonString(String(activeBrief.brief_json ?? "{}")));
-        await env.DB.prepare(
-                    `UPDATE operator_generation_learning_briefs
-           SET brief_json = ?
-           WHERE id = ? AND brand_key = ?`,
-        ).bind(normalizeOperatorJson({
-          ...brief,
-          intelligence_engine: state.intelligence_engine ?? {},
-          measurement_audit: state.measurement_audit ?? {},
-          content_focus: contentFocusSummary,
-          manifest_layers_finalized: true,
-        }, {}), activeBrief.id, brand.brand_key).run();
-      }
-      const storedThreadsSnapshot = state.threads_snapshot && typeof state.threads_snapshot === "object" && !Array.isArray(state.threads_snapshot)
-        ? state.threads_snapshot as Record<string, unknown>
-        : {};
-      const storedEvaluation = storedThreadsSnapshot.performance_evaluation && typeof storedThreadsSnapshot.performance_evaluation === "object" && !Array.isArray(storedThreadsSnapshot.performance_evaluation)
-        ? storedThreadsSnapshot.performance_evaluation as Record<string, unknown>
-        : {};
-      threadsSnapshot = {
-        ...storedThreadsSnapshot,
-        performance_evaluation: {
-          ...storedEvaluation,
-          manifest_layers_deferred: false,
-          manifest_layers_finalized: true,
-        },
-            } as unknown as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
-      await writeManifestPrepareCheckpoint(env.DB, {
-        brand_key: brand.brand_key,
-        operation_id: explicitOperationId,
-        phase: "cycle_construction",
-        timezone,
-        horizon_hours: horizonHours,
-        state: {
-          runtime_now_iso: runtimeNowIso,
-          threads_snapshot: threadsSnapshot as unknown as Record<string, unknown>,
-        },
-      });
-      return {
-        success: true,
-        preparation_complete: false,
-        continuation_required: true,
-        operation_id: explicitOperationId,
-        checkpoint_version: MANIFEST_PREPARE_CHECKPOINT_VERSION,
-        stage_completed: "manifest_content_focus",
-        next_stage: "cycle_construction",
-        content_focus: contentFocusSummary,
-        next_action: "Call prepare_manifest_autonomous_cycle again with the identical inputs. All evaluator layers and the active learning brief are finalized; the next invocation constructs the cycle.",
-      };
-    }
-    threadsSnapshot = (state.threads_snapshot && typeof state.threads_snapshot === "object" && !Array.isArray(state.threads_snapshot)
-      ? state.threads_snapshot
-      : {}) as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
-  } else {
-    threadsSnapshot = await refreshManifestAutonomousThreadsSnapshot(env, brand);
-  }
-  if (!threadsSnapshot.refreshed || !threadsSnapshot.complete) {
-    return {
-      success: false,
-      error: threadsSnapshot.error ?? "manifest_live_evidence_refresh_incomplete",
-      stage: "live_evidence_refresh",
-      retryable: threadsSnapshot.continuation_required === true,
-      continuation_required: threadsSnapshot.continuation_required === true,
-      remaining_due_checkpoint_count: threadsSnapshot.remaining_due_checkpoint_count,
-      next_action: threadsSnapshot.continuation_required === true
-        ? "Call prepare_manifest_autonomous_cycle again with the identical operation_id. The prior bounded refresh was persisted; the next invocation advances the remaining due checkpoint batch without replaying completed work."
-        : "Repair the live evidence refresh failure before strategy work.",
-      threads_snapshot: threadsSnapshot,
-    };
-  }
+      },
+      options as Parameters<typeof refreshManifestIntelligenceEngine>[2],
+    ) as Promise<Record<string, unknown>>,
+    compactPayloadValue: (value, path) => compactOperatorPayloadValue(value, path, {
+      arrayItems: 12,
+      stringChars: 400,
+      objectKeys: 40,
+      maxDepth: 5,
+    }, []),
+    operatorRecord,
+    refreshMeasurementAudit: (input) => refreshManifestMeasurementAudit(
+      env.DB,
+      input as Parameters<typeof refreshManifestMeasurementAudit>[1],
+    ) as Promise<Record<string, unknown>>,
+    refreshContentFocus: () => refreshOperatorContentFocus(env, brand.brand_key),
+    readActiveLearningBrief: (brandKey) => env.DB.prepare(
+      `SELECT id, brief_json FROM operator_generation_learning_briefs
+       WHERE brand_key = ? AND active = 1
+       ORDER BY datetime(generated_at) DESC LIMIT 1`,
+    ).bind(brandKey).first<Record<string, unknown>>(),
+    parseJson: safeParseJsonString,
+    updateActiveLearningBrief: (input) => env.DB.prepare(
+      `UPDATE operator_generation_learning_briefs
+       SET brief_json = ?
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(normalizeOperatorJson(input.brief, {}), input.id, input.brandKey).run(),
+    now: () => new Date().toISOString(),
+  });
+  if (checkpointResult.handled) return checkpointResult.response;
+  const {
+    timezone,
+    horizonHours,
+    explicitOperationId,
+    phasedPreparation,
+    runtimeNowIso,
+  } = checkpointResult.context;
+  const threadsSnapshot = checkpointResult.context.threadsSnapshot
+    as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
 
 
     const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
