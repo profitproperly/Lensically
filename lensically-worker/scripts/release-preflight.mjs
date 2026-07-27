@@ -39,6 +39,10 @@ const operatorMcpRoutingPolicy = read("src/operatorMcpRoutingPolicy.ts");
 const operatorMcpRoutingPolicyTests = read("test/operatorMcpRoutingPolicy.spec.ts");
 const operatorMcpTransport = read("src/operatorMcpTransport.ts");
 const operatorMcpTransportTests = read("test/operatorMcpTransport.spec.ts");
+const operatorMcpDispatcher = read("src/operatorMcpDispatcher.ts");
+const operatorMcpDispatcherTests = read("test/operatorMcpDispatcher.spec.ts");
+
+
 
 
 
@@ -126,6 +130,10 @@ if (!workflow.includes("test/operatorMcpRoutingPolicy.spec.ts")) {
 if (!workflow.includes("test/operatorMcpTransport.spec.ts")) {
   errors.push("operator_mcp_transport_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpDispatcher.spec.ts")) {
+  errors.push("operator_mcp_dispatcher_workflow_gate_missing");
+}
+
 
 
 
@@ -494,6 +502,46 @@ if (!operatorMcpTransportTests.includes("preserves JSON status, cache, content t
     || !operatorMcpTransportTests.includes("preserves bounded transport failures and runtime evidence")) {
   lifecycleErrors.push("operator_mcp_transport_tests_incomplete");
 }
+if (!source.includes('from "./operatorMcpDispatcher"')
+    || !source.includes("return dispatchOperatorMcpRequest(request, {")) {
+  lifecycleErrors.push("operator_mcp_dispatcher_import_or_binding_missing");
+}
+if (source.includes("type JsonRpcRequest =")
+    || source.includes("const message = await request.json().catch")
+    || source.includes('if (method === "initialize")')
+    || source.includes('if (method === "notifications/initialized")')
+    || source.includes('if (method === "ping")')
+    || source.includes('if (method === "tools/list")')
+    || source.includes('return mcpErrorResponse(id, -32601, "Method not found")')
+    || source.includes("Internal MCP error:")) {
+  lifecycleErrors.push("operator_mcp_dispatcher_shell_returned_to_index");
+}
+if (!source.includes("async function handleOperatorMcpToolCall(")
+    || !source.includes("handleToolCall: ({ request: candidate, id, params }) => handleOperatorMcpToolCall(candidate, env, id, params)")
+    || !source.includes("runtimeMetadata: () => operatorRuntimeMetadata(env)")) {
+  lifecycleErrors.push("operator_mcp_dispatcher_runtime_cutover_incomplete");
+}
+if (!operatorMcpDispatcher.includes("export async function dispatchOperatorMcpRequest")
+    || !operatorMcpDispatcher.includes('if (request.method !== "POST")')
+    || !operatorMcpDispatcher.includes("const message = await request.json().catch")
+    || !operatorMcpDispatcher.includes('if (method === "initialize")')
+    || !operatorMcpDispatcher.includes('if (method === "notifications/initialized")')
+    || !operatorMcpDispatcher.includes('if (method === "ping")')
+    || !operatorMcpDispatcher.includes('if (method === "tools/list")')
+    || !operatorMcpDispatcher.includes('if (method === "tools/call")')
+    || !operatorMcpDispatcher.includes('return mcpErrorResponse(id, -32601, "Method not found")')
+    || !operatorMcpDispatcher.includes("Internal MCP error:")) {
+  lifecycleErrors.push("operator_mcp_dispatcher_module_incomplete");
+}
+if (!operatorMcpDispatcherTests.includes("preserves POST-only admission and authorization")
+    || !operatorMcpDispatcherTests.includes("preserves parse and invalid-request JSON-RPC errors")
+    || !operatorMcpDispatcherTests.includes("preserves initialize and deployment-scoped session headers")
+    || !operatorMcpDispatcherTests.includes("preserves stale-session replacement and initialized notification")
+    || !operatorMcpDispatcherTests.includes("preserves ping, tools/list, and tools/call delegation")
+    || !operatorMcpDispatcherTests.includes("preserves unsupported-method and bounded internal-error shaping")) {
+  lifecycleErrors.push("operator_mcp_dispatcher_tests_incomplete");
+}
+
 
 
 
