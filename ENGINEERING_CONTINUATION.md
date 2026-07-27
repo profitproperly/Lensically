@@ -5,8 +5,9 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 9d32d244f5cf269e9331f4539cae07c5ba019e4a
-production_sha: 9d32d244f5cf269e9331f4539cae07c5ba019e4a
+repository_base_sha: e44166b783df0937ccb4c1c87d24b5072087f0a9
+production_sha: e44166b783df0937ccb4c1c87d24b5072087f0a9
+
 
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
@@ -640,21 +641,36 @@ Completed checkpoint — Stage 6F Manifest cycle-result observation service extr
 - Exact-SHA release passed in run `30305157010`.
 - Live production independently confirmed exact SHA `9d32d244f5cf269e9331f4539cae07c5ba019e4a` with 75/75 public tools.
 
-Current sub-action — Stage 6G account-state read service extraction:
+Completed checkpoint — Stage 6G account-state read service extraction:
 
-Extract the `get_account_state` read composition from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorAccountStateService.ts` as the dependency-injected read-only authority for active workflow session lookup, active source-card resolution, latest approved and rejected drafts, selected-account scheduled count, active gate count, exact response keys, and the empty warnings contract.
+- Reduced the `get_account_state` branch in `src/index.ts` to explicit session, source-card, draft-list, scheduled-count SQL, and gate adapters while preserving selected-account isolation and zero content mutation.
+- Added `test/operatorAccountStateService.spec.ts` covering active source-card resolution, absent source identity, exact approved/rejected filters and limits, scheduled count, gate count, and response shape.
+- Added permanent push and release ownership gates preventing account-state response composition from returning to `src/index.ts`.
+- The first wired push run `30305943074` stopped at TypeScript before runtime because the adapter referenced a nonexistent draft-status type; the adapter was corrected to the primitive's actual string-array contract.
+- Corrected push validation passed in run `30306373735`.
+- All eight Operator shards passed in run `30306608310`.
+- Exact-SHA release passed in run `30306689235`.
+- Live production independently confirmed exact SHA `e44166b783df0937ccb4c1c87d24b5072087f0a9` with 75/75 public tools.
 
-- active workflow session lookup and active source-card resolution
-- latest approved and rejected draft reads with existing limits
-- selected-account approved/posting scheduled count
-- active gate count, exact response keys, and empty warnings contract
-- read-only behavior, selected-account isolation, and no account-content mutation
+Current sub-action — Stage 6H Lensically UI read-surface service extraction:
 
-Keep database queries, active-session/source-card primitives, draft-list primitives, status constants, gate reads, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract the complete `read_lensically_ui_surface` composition from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- selected Threads-account admission and exact 404 behavior
+- dashboard access-token admission and payload composition
+- follower snapshot refresh, page normalization, chronological delta mapping, pagination, and timezone
+- insights cursor/depth normalization, upstream failure handling, archive/cache writes, and response cursors
+- post-archive ordering and pagination
+- saved-pattern table absence, account isolation, likes/newest ordering, pagination, and exact empty-state contract
+- unsupported-surface 400 response and exact status/body behavior for every surface
+
+Keep Threads/account primitives, database/archive/cache writes, saved-pattern SQL, constants, and shared JSON transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6G, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6H, then continue Stage 6 product-service extraction in bounded domain clusters.
+
 
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
