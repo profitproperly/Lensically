@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: d9c8801db0423353064c568d3959d24e8c4a736d
-production_sha: d9c8801db0423353064c568d3959d24e8c4a736d
+repository_base_sha: 9fbc7cd971b655d86ad61a5ddae3ac305f191aa6
+production_sha: 9fbc7cd971b655d86ad61a5ddae3ac305f191aa6
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -604,21 +604,33 @@ Completed checkpoint — Stage 6D1 autonomous post persistence admission and rec
 - Exact-SHA release passed in run `30298442983`; the prior release attempt `30298059853` stopped before migrations or deployment on the stale preflight assertion.
 - Live production independently confirmed exact SHA `d9c8801db0423353064c568d3959d24e8c4a736d` with 75/75 public tools.
 
-Current sub-action — Stage 6D2 autonomous post gated persistence and completion extraction:
+Completed checkpoint — Stage 6D2 autonomous post gated persistence and completion extraction:
 
-Extract the remaining half of `persistManifestAutonomousPost` from `src/index.ts` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestPersistenceService.ts` as the dependency-injected authority for schedule idempotency, authoritative occupied-slot collision reconciliation, exact duplicate detection, semantic repetition blocking, canonical source-card and source-selection enforcement, owner hard-ban completeness, server gate execution, durable gate receipts, deterministic scheduling and lineage persistence, publish and intelligence lineage verification, experiment assignment, semantic signatures, decision influence, coverage reconciliation, and cycle receipt completion.
+- Reduced the remaining half of `persistManifestAutonomousPost` in `src/index.ts` to explicit scheduler, gate, SQL, lineage-query, semantic-analysis, coverage, and receipt adapters; removed the legacy 790-line business implementation.
+- Added `persistManifestAutonomousLineageRecords` and `readManifestAutonomousLineageStatus` as low-level D1 adapters while keeping product decisions, exact failure responses, completion semantics, and continuation language in the service.
+- Added `test/operatorManifestPersistenceService.spec.ts` covering duplicate rejection, owner hard-ban evidence, lineage failure publication blocking, successful lineage persistence, and final cycle completion.
+- Added permanent push and release ownership gates and moved stale hard-ban/gate-receipt contract assertions from `index.ts` to the new service.
+- Push validation passed in run `30300994231`.
+- The first eight-shard run `30300856843` exposed a real adapter defect: `slotKey` was omitted from the lineage persistence payload, causing writes under an empty slot and correct final lineage blocking. The omission was repaired and permanently asserted in the focused test.
+- All eight Operator shards passed after repair in run `30301225812`.
+- Exact-SHA release passed in run `30301341906`.
+- Live production independently confirmed exact SHA `9fbc7cd971b655d86ad61a5ddae3ac305f191aa6` with 75/75 public tools.
 
-- schedule idempotency, authoritative occupied-slot collision reconciliation, exact duplicate detection, and semantic repetition blocking
-- canonical locked source-card resolution, source-selection validation, draft analysis, canonical owner hard-ban evidence, server gate execution, and durable candidate gate receipts
-- deterministic generation-run, draft, lineup, strategy-tag, content-inventory, hypothesis, and scheduled-post persistence
-- complete publish and intelligence lineage validation, publish blocking on missing lineage, experiment assignment, semantic signatures, decision influence, and persisted-cycle events
-- authoritative post-persist coverage reconciliation, elapsed-slot exclusion, cycle status and scheduled-ID updates, completion receipt finalization, completion-blocked handling, and exact final response fields
+Current sub-action — Stage 6E scheduled Manifest post review service extraction:
 
-Keep low-level scheduler creation, gate primitives, SQL statements, semantic-analysis primitives, JSON normalization, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `reviewManifestScheduledPost` from `src/index.ts` into a focused dependency-injected service while preserving:
+
+- Manifest-only admission, action/feedback/replacement validation, selected-account scheduled-post lookup, and approved-unpublished reviewability
+- linked-draft and canonical source-card context, replacement generation gates, timezone-safe existing-slot reconstruction, replacement scheduling gates, and same-slot scheduled-post update
+- keep/rewrite/reject-replace lineup status, owner feedback persistence, exact lesson-scope to strategy-memory-kind mapping, durable memory metadata, and final response wording
+- no deletion, no new slot creation, no direct publication, and exact existing runway preservation
+
+Keep low-level gate execution, scheduled-post update, SQL, timezone primitives, strategy-memory persistence, JSON normalization, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6D2, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6E, then continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
