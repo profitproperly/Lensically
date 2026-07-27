@@ -111,6 +111,7 @@ import { readOperatorManifestReviewBatchState } from "./operatorManifestReviewBa
 import { attachOperatorManifestReviewDraft } from "./operatorManifestReviewDraftAttachmentService";
 import { resolveOperatorManifestReviewSource } from "./operatorManifestReviewSourceResolutionService";
 import { scheduleOperatorManifestReviewBatch } from "./operatorManifestReviewBatchSchedulingService";
+import { startOperatorWorkflowSession } from "./operatorWorkflowSessionStartService";
 
 
 
@@ -13194,33 +13195,29 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(schedulingResult.body, schedulingResult.status);
   }
 
-  if (toolName === "start_workflow_session") {
-    const existingSession = await getActiveOperatorSession(env, brand.brand_key);
-    if (existingSession?.id) {
-      return operatorJsonResponse({
-        workflow_session_id: existingSession.id,
-        current_stage: existingSession.current_stage ?? "account_selection",
-        next_required_stage: existingSession.current_stage === "account_selection" ? "context_admission" : null,
-        workflow_template: workflowTemplatePayload(),
-        reused_existing: true,
-        idempotency_reason: "active_workflow_session_already_exists",
-      });
-    }
-    const sessionId = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO operator_workflow_sessions (
-        id, brand_key, workflow_template_key, objective, status, current_stage, notes
-      ) VALUES (?, ?, ?, ?, 'active', 'account_selection', ?)`,
-    )
-      .bind(
-        sessionId,
-        brand.brand_key,
-        normalizeOperatorText(payload.workflow_template_key, 120, true) ?? OPERATOR_WORKFLOW_TEMPLATE_KEY,
+    if (toolName === "start_workflow_session") {
+    const sessionResult = await startOperatorWorkflowSession({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      defaultWorkflowTemplateKey: OPERATOR_WORKFLOW_TEMPLATE_KEY,
+      normalizeText: normalizeOperatorText,
+      createId: () => crypto.randomUUID(),
+      getActiveSession: (brandKey) => getActiveOperatorSession(env, brandKey),
+      insertSession: async (input) => env.DB.prepare(
+        `INSERT INTO operator_workflow_sessions (
+          id, brand_key, workflow_template_key, objective, status, current_stage, notes
+        ) VALUES (?, ?, ?, ?, 'active', 'account_selection', ?)`,
+      ).bind(
+        input.sessionId,
+        input.brandKey,
+        input.workflowTemplateKey,
         null,
-        normalizeOperatorText(payload.notes, 2000, true),
-      )
-      .run();
-    return operatorJsonResponse({ workflow_session_id: sessionId, current_stage: "account_selection", next_required_stage: "context_admission", workflow_template: workflowTemplatePayload() });
+        input.notes,
+      ).run(),
+      workflowTemplatePayload,
+    });
+    return operatorJsonResponse(sessionResult);
   }
 
   if (toolName === "admit_context") {
