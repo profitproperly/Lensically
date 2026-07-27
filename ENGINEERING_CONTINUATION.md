@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 218dea184e4787b9729235446d5042fca6df0657
-production_sha: 218dea184e4787b9729235446d5042fca6df0657
+repository_base_sha: 2af9a5b4b5efc1bd6a181faacfe45b4ed44cb9b0
+production_sha: 2af9a5b4b5efc1bd6a181faacfe45b4ed44cb9b0
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -407,20 +407,33 @@ Completed checkpoint — Stage 5D1 engineering tool-registry extraction:
 - Exact-SHA release passed in run `30225856357`.
 - Live production independently confirmed exact SHA `218dea184e4787b9729235446d5042fca6df0657`.
 
-Current sub-action — Stage 5D2 admin tool-registry extraction:
+Completed checkpoint — Stage 5D2 admin tool-registry extraction:
 
-Move the static admin MCP registry from `src/index.ts` into a focused registry module:
+- Added `src/operatorMcpAdminRegistry.ts` with the exact 25-name admin classification tuple, union type, and 24 static admin definitions. `get_monthly_growth_review` remains intentionally classified as admin while its definition remains in the account registry.
+- Added `src/operatorMcpSchemas.ts` as the shared authority for `BRAND_KEY_SCHEMA` and `SOURCE_DRAFT_ANALYSIS_SCHEMA`.
+- Moved runtime admin composition and classification to the extracted registry before deleting all inert admin definitions from `src/index.ts`.
+- Removed the admin tuple, type, 24 definitions, brand schema, and draft-analysis schema from the monolith.
+- Added `test/operatorMcpAdminRegistry.spec.ts` covering the intentional 25/24 split, scheduler protections, decision approvals, workflow compatibility, gate schemas, and shared schema parity.
+- Updated lifecycle parsing and release preflight to scan the admin registry and shared schemas and prevent them from returning to `index.ts`.
+- Push validation passed in run `30226639091`.
+- All eight Operator shards passed in run `30226726736`.
+- Exact-SHA release passed in run `30226772035`.
+- Live production independently confirmed exact SHA `2af9a5b4b5efc1bd6a181faacfe45b4ed44cb9b0`.
 
-- admin tool-name tuple and union type
-- complete admin tool definitions
-- exact names, titles, descriptions, schemas, annotations, and declaration order
-- shared brand-key schema ownership required by the admin definitions
+Current sub-action — Stage 5D3A account-state, guided-review, and source-discovery registry extraction:
 
-Preserve Proceed handshake behavior, Growth Mission and decision tools, scheduler/admin controls, workflow compatibility, public filtering, exact tool counts, lifecycle declarations, and definition lookup. Add focused registry characterization and release-preflight enforcement preventing the admin registry from returning to `index.ts`.
+Move the first coherent account/content registry slice from `src/index.ts` into a focused module while preserving its current position ahead of the remaining account definitions:
+
+- account discovery and state: `list_accounts`, `get_account_state`, `read_lensically_ui_surface`
+- hourly coverage and guided-review lifecycle: discard, claim, restore, attach, skip, and schedule review batches
+- guided workflow context: `start_workflow_session`, `admit_context`, `get_production_board`
+- source discovery and deletion: `list_source_candidates`, `delete_saved_pattern_source`, `draw_source_candidate_batch`, `get_source_candidate_batch`
+
+Preserve exact definition order, schemas, annotations, public filtering, scoped-wrapper construction, tool counts, and all guided/autonomous noninterference behavior. Add focused registry characterization and release-preflight enforcement preventing this slice from returning to `index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract the larger account/content registry in bounded groups if required.
+- Extract the remaining source-card, generation, gate, scheduling, metrics, intelligence, and autonomous-cycle account definitions in bounded slices.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
