@@ -13646,14 +13646,42 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     }, {
       db: env.DB,
       normalizeText: normalizeOperatorText,
-      observe: (serviceToolName, servicePayload, result) => observeManifestCycleToolResult(
+            observe: (serviceToolName, servicePayload, result) => observeManifestCycleToolResult(
         env,
         brand,
         serviceToolName,
         servicePayload,
         result,
       ),
-            readAutonomousCycle: (brandKey, cycleId) => readManifestAutonomousCycle(env, brandKey as GptBrandKey, cycleId),
+      readEvidencePage: (input) => readManifestEvidencePage(env.DB, input),
+      validateLockedLineup: (input) => validateLineupAgainstLockedSourceSelectionPlan(env.DB, input),
+      commitStrategy: (input) => commitManifestCycleStrategy(
+        env.DB,
+        input as Parameters<typeof commitManifestCycleStrategy>[1],
+      ) as Promise<Record<string, unknown>>,
+      appendCycleEvent: (input) => appendManifestCycleEvent(
+        env.DB,
+        input as Parameters<typeof appendManifestCycleEvent>[1],
+      ),
+      getCycleReceipt: (input) => getManifestCycleReceipt(env.DB, input) as Promise<Record<string, unknown> | null>,
+      recordCycleDefect: (input) => recordManifestCycleDefect(
+        env.DB,
+        input as Parameters<typeof recordManifestCycleDefect>[1],
+      ),
+      resolveCycleDefect: (input) => resolveManifestCycleDefect(
+        env.DB,
+        input as Parameters<typeof resolveManifestCycleDefect>[1],
+      ),
+      finalizeCycleReceipt: (input) => finalizeManifestCycleReceipt(
+        env.DB,
+        input as Parameters<typeof finalizeManifestCycleReceipt>[1],
+      ) as Promise<Record<string, unknown>>,
+      readAutonomousCycle: (brandKey, cycleId) => readManifestAutonomousCycle(
+        env,
+        brandKey as GptBrandKey,
+        cycleId,
+      ),
+      sourceSelectionEngineVersion: SOURCE_SELECTION_ENGINE_VERSION,
       now: () => new Date().toISOString(),
     });
     return operatorJsonResponse(serviceResult.body, serviceResult.status);
