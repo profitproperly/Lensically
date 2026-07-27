@@ -88,7 +88,9 @@ import {
 import {
   BRAND_KEY_SCHEMA,
   SOURCE_DRAFT_ANALYSIS_SCHEMA,
+  SOURCE_TRANSFORMATION_CONTRACT_SCHEMA,
 } from "./operatorMcpSchemas";
+import { OPERATOR_WORKFLOW_TEMPLATE_KEY } from "./operatorMcpConstants";
 
 
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
@@ -431,7 +433,7 @@ type GptPreflightSnapshotSection = {
 
 type GptPreflightSnapshotSections = Record<GptPreflightSectionKey, GptPreflightSnapshotSection>;
 
-const OPERATOR_WORKFLOW_TEMPLATE_KEY = "content_operator_v1";
+
 const OPERATOR_WORKFLOW_STAGES = [
   "account_selection",
   "context_admission",
@@ -17230,22 +17232,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 
 
-const SOURCE_TRANSFORMATION_CONTRACT_SCHEMA = {
-  type: "object",
-    description: "Internal source-fidelity persistence and gate contract. Never expose these property names owner-facing. For Manifest, preserve the source mechanism, strongest structural choices, meaning, tone, and payoff while materially rewriting distinctive language; near-verbatim rearrangement is not acceptable.",
-  properties: {
-    must_preserve_exact: { type: "array", items: { type: "string" }, description: "Exact hook or high-performing source wording that should remain when useful. Manifest hooks may be preserved heavily." },
-    must_preserve_function: { type: "array", items: { type: "string" }, description: "Meaning, emotional sequence, structure, tone, or payoff that must remain." },
-    may_reuse: { type: "array", items: { type: "string" }, description: "Recognizable source wording explicitly allowed to recur." },
-    should_transform: { type: "array", items: {}, description: "Optional for Manifest. Use only when a specific source element truly needs changing." },
-    must_transform: { type: "array", items: {}, description: "Optional for Manifest. Do not populate merely to create distance from the source." },
-    forbidden_complete_combinations: { type: "array", items: {}, description: "Optional source packages that cannot be reproduced together. Manifest already blocks an exact full-source copy." },
-    audience_reward: { type: "string", description: "The same emotional or practical product the source delivers." },
-    time_or_context_requirements: { type: "array", items: { type: "string" }, description: "Only timing or context already present in the source; do not invent new scenes or events." },
-    notes: { type: "string", description: "For Manifest, state that only slight wording changes are needed and no scenes, characters, activities, settings, events, metaphors, or premises may be invented." },
-  },
-  additionalProperties: false,
-};
+
 
 const GENERATION_ADAPTATION_PLAN_SCHEMA = {
   type: "object",
