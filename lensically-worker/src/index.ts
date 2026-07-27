@@ -13161,7 +13161,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       saveStrategyTag: (input) => upsertGptPostStrategyTag(env, {
         accountId: input.accountId,
         threadsUserId: input.threadsUserId,
-        scheduledPostId: String(input.scheduledPostId),
+                scheduledPostId: Number(input.scheduledPostId),
         strategy: normalizeGptPostStrategyInput(
           input.strategy && typeof input.strategy === "object"
             ? input.strategy as Record<string, unknown>
@@ -13169,7 +13169,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         ),
       }),
       insertInventory: (input) => insertOperatorInventory(env, {
-        brandKey: input.brandKey,
+                brandKey: brand.brand_key,
         sourceType: "scheduled_post",
         sourceId: String(input.scheduledPostId),
         text: input.text,
