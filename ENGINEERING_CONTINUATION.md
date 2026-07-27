@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 6d5b49ab770c04668821f5df660b443f4242bb86
-production_sha: 6d5b49ab770c04668821f5df660b443f4242bb86
+repository_base_sha: 72f0363a340bce21ba2e0cb7c5379a7530c9d356
+production_sha: 72f0363a340bce21ba2e0cb7c5379a7530c9d356
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -492,22 +492,34 @@ Completed checkpoint — Stage 5D3F final account analytics registry extraction:
 - Exact-SHA release passed in run `30232328715`.
 - Live production independently confirmed exact SHA `6d5b49ab770c04668821f5df660b443f4242bb86` with 75/75 public tools.
 
-Current sub-action — Stage 5D4 MCP registry-composition extraction:
+Completed checkpoint — Stage 5D4 MCP registry-composition extraction:
 
-Move the remaining pure registry-composition policy from `src/index.ts` into a focused module:
+- Added `src/operatorMcpRegistryComposition.ts` as the pure authority for all six account-registry aggregation, admin and engineering name tuples/sets/type guards, account-scoped admin membership, direct priority ordering, Proceed membership, and scoped/base registry construction.
+- Replaced local aggregation, classification sets, type guards, priority maps, and `buildOperatorMcpToolDefinitions` composition in `src/index.ts` with one `buildComposedOperatorMcpTools` call while preserving `assertClientSafetyRegistry` at the runtime boundary.
+- Preserved the exact 55 account definitions, 112 internal direct definitions, the intentional admin classification of `get_monthly_growth_review`, three-account scoped wrappers, annotations, ordering, definition lookup, and 75 public tools.
+- Added `test/operatorMcpRegistryComposition.spec.ts` covering account aggregation, classifications, Proceed membership, deterministic priorities, and all scoped wrapper surfaces.
+- Added release-preflight enforcement preventing composition policy from returning to `index.ts` and requiring every registry import to remain owned by the composition module.
+- Push validation passed in run `30275081486` after the name-tuple and lifecycle ownership repairs.
+- All eight Operator shards passed in run `30275306736`.
+- Exact-SHA release passed in run `30275457127`.
+- Live production independently confirmed exact SHA `72f0363a340bce21ba2e0cb7c5379a7530c9d356` with 75/75 public tools.
 
-- deterministic aggregation of all extracted account registries
-- admin and engineering classification sets and type guards
-- account-tool membership classification
-- direct tool-priority ordering
-- scoped-wrapper/base registry construction through `buildOperatorMcpToolDefinitions`
+Current sub-action — Stage 5E MCP routing-policy extraction:
 
-Preserve exact tool ordering, the intentional admin classification of `get_monthly_growth_review`, Proceed classification, wrapper generation, annotations, public filtering, definition lookup, and the exact 75-tool surface. Keep `assertClientSafetyRegistry` at the runtime boundary or inject it explicitly; do not move business execution. Add focused tests and release-preflight enforcement preventing composition policy from returning to `index.ts`.
+Extract pure MCP call-policy logic from `src/index.ts` into a focused module:
+
+- scoped wrapper brand resolution and canonical direct-tool naming
+- direct typed `brand_key` normalization through an injected normalizer
+- Manifest autonomous Proceed exemptions
+- per-tool Proceed requirement and confirmation evaluation
+- handler classification and route-selection helpers that do not execute business/domain logic
+
+Preserve exact guided-workflow handshake behavior, autonomous cycle exemptions, `updateWorkflowRequirement` brand-sensitive behavior, admin/engineering/account routing, scoped wrapper aliases, public names, protocol errors, and all 75 tools. Add focused tests and release-preflight enforcement before exact-SHA release.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract MCP call routing and Proceed/brand resolution policy.
-- Extract protocol error shaping and transport response helpers.
+- Extract protocol error shaping and MCP transport response helpers.
+- Extract the remaining protocol request/response dispatcher shell.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
 ## Remaining
