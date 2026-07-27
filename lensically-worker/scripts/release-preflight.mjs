@@ -37,6 +37,10 @@ const operatorMcpRegistryComposition = read("src/operatorMcpRegistryComposition.
 const operatorMcpRegistryCompositionTests = read("test/operatorMcpRegistryComposition.spec.ts");
 const operatorMcpRoutingPolicy = read("src/operatorMcpRoutingPolicy.ts");
 const operatorMcpRoutingPolicyTests = read("test/operatorMcpRoutingPolicy.spec.ts");
+const operatorMcpTransport = read("src/operatorMcpTransport.ts");
+const operatorMcpTransportTests = read("test/operatorMcpTransport.spec.ts");
+
+
 
 
 
@@ -119,6 +123,10 @@ if (!workflow.includes("test/operatorMcpRegistryComposition.spec.ts")) {
 if (!workflow.includes("test/operatorMcpRoutingPolicy.spec.ts")) {
   errors.push("operator_mcp_routing_policy_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpTransport.spec.ts")) {
+  errors.push("operator_mcp_transport_workflow_gate_missing");
+}
+
 
 
 const lifecycleErrors = [];
@@ -454,6 +462,39 @@ if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicali
     || !operatorMcpRoutingPolicyTests.includes("binds injected normalizers into one deterministic routing policy")) {
   lifecycleErrors.push("operator_mcp_routing_policy_tests_incomplete");
 }
+if (!source.includes('from "./operatorMcpTransport"')) {
+  lifecycleErrors.push("operator_mcp_transport_import_missing");
+}
+if (source.includes("function mcpJsonResponse(")
+    || source.includes("function mcpErrorResponse(")
+    || source.includes("structuredContent:")) {
+  lifecycleErrors.push("operator_mcp_transport_shaping_returned_to_index");
+}
+if (!source.includes("return buildOperatorMcpRuntimeHeaders({")
+    || !source.includes("return operatorTransportFailureResponse({")
+    || !source.includes("return mcpToolCompletionResponse(id, toolName, resultPayload, isError);")
+    || !source.includes("mcpToolResultResponse(")) {
+  lifecycleErrors.push("operator_mcp_transport_runtime_cutover_incomplete");
+}
+if (!operatorMcpTransport.includes("export function mcpJsonResponse")
+    || !operatorMcpTransport.includes("export function mcpErrorResponse")
+    || !operatorMcpTransport.includes("export function buildMcpToolResultEnvelope")
+    || !operatorMcpTransport.includes("export function mcpToolResultResponse")
+    || !operatorMcpTransport.includes("export function buildOperatorMcpToolCompletionText")
+    || !operatorMcpTransport.includes("export function mcpToolCompletionResponse")
+    || !operatorMcpTransport.includes("export function buildOperatorMcpRuntimeHeaders")
+    || !operatorMcpTransport.includes("export function operatorTransportFailureResponse")) {
+  lifecycleErrors.push("operator_mcp_transport_module_incomplete");
+}
+if (!operatorMcpTransportTests.includes("preserves JSON status, cache, content type, and extra headers")
+    || !operatorMcpTransportTests.includes("preserves JSON-RPC errors, null IDs, optional data, and request IDs")
+    || !operatorMcpTransportTests.includes("preserves exact MCP tool-result envelopes and response shaping")
+    || !operatorMcpTransportTests.includes("preserves canonical completion and failure language")
+    || !operatorMcpTransportTests.includes("preserves deployment, commit, kernel, and optional session headers")
+    || !operatorMcpTransportTests.includes("preserves bounded transport failures and runtime evidence")) {
+  lifecycleErrors.push("operator_mcp_transport_tests_incomplete");
+}
+
 
 
 if (literalVersionAssertionEntries.length > 0) {
