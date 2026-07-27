@@ -82,11 +82,13 @@ import {
   OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
   OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET,
 
-  buildComposedOperatorMcpTools,
+    buildComposedOperatorMcpTools,
   isOperatorMcpAdminToolName,
   isOperatorMcpEngineeringToolName,
   operatorMcpToolNameRequiresProceed,
 } from "./operatorMcpRegistryComposition";
+import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
+
 
 
 
@@ -13592,7 +13594,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
     return unauthorizedGptResponse();
   }
-  const canonicalToolName = toolName.replace(/^(?:mm_|om_|vx_)/, "");
+    const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName);
   if (RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)) {
     return operatorJsonResponse({
       success: false,
@@ -13602,17 +13604,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     }, 410);
   }
   await prepareOperatorMode(env);
-  const payload = await readOperatorPayload(request);
-    if (toolName.startsWith("mm_")) {
-    toolName = toolName.slice(3);
-    payload.brand_key = "manifestmental";
-  } else if (toolName.startsWith("om_")) {
-    toolName = toolName.slice(3);
-    payload.brand_key = "opmgdeadman";
-  } else if (toolName.startsWith("vx_")) {
-    toolName = toolName.slice(3);
-    payload.brand_key = "vectrix";
-  }
+    const payload = await readOperatorPayload(request);
+  const scopedCall = OPERATOR_MCP_ROUTING_POLICY.scopeCall(toolName, payload);
+  toolName = scopedCall.tool_name;
+  Object.assign(payload, scopedCall.args);
+
 
 
   if (toolName === "list_accounts") {
@@ -19222,8 +19218,9 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
       ? normalizeOperatorText(args.tool_name, 160, true)
       : null;
   const canonicalTool = nestedTool || toolName;
-  const engineering = isOperatorMcpEngineeringToolName(canonicalTool);
-  const admin = isOperatorMcpAdminToolName(canonicalTool);
+    const handlerClass = OPERATOR_MCP_ROUTING_POLICY.classifyHandler(canonicalTool);
+  const engineering = handlerClass === "engineering";
+  const admin = handlerClass === "admin";
   const accountScoped = operatorMcpToolNameRequiresProceed(canonicalTool);
   const search = canonicalTool === "searchRepoFiles";
     const workflowPoll = canonicalTool === "getGitHubWorkflowRun";
@@ -19269,36 +19266,10 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
   };
 }
 
-function canonicalOperatorExecutionArgs(toolName: string, args: Record<string, unknown>): { tool_name: string; args: Record<string, unknown> } {
-  if (toolName === "listMcpTools") {
-    const nestedTool = normalizeOperatorText(args.execute_tool, 160, true);
-    if (nestedTool && nestedTool !== toolName) {
-      const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-        ? args.arguments as Record<string, unknown>
-        : {};
-      return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
-    }
-  }
-  if (toolName === "runEngineeringTool") {
-    const nestedTool = normalizeOperatorText(args.tool_name, 160, true);
-    if (nestedTool && nestedTool !== toolName) {
-      const nestedArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
-        ? args.arguments as Record<string, unknown>
-        : {};
-      return canonicalOperatorExecutionArgs(nestedTool, nestedArgs);
-    }
-  }
-    const canonicalArgs = { ...args };
-  delete canonicalArgs.execution_guard;
-  delete canonicalArgs.proceed_confirmed;
-  delete canonicalArgs.continuity_loaded;
-  delete canonicalArgs.continuity_ref;
-  delete canonicalArgs.continuity_token;
-  return { tool_name: toolName, args: canonicalArgs };
-}
+
 
 async function operatorExecutionFingerprint(toolName: string, args: Record<string, unknown>): Promise<string> {
-  const canonical = canonicalOperatorExecutionArgs(toolName, args);
+    const canonical = OPERATOR_MCP_ROUTING_POLICY.canonicalExecutionArgs(toolName, args);
   return sha256OperatorText(JSON.stringify({ tool_name: canonical.tool_name, args: canonical.args }));
 }
 
@@ -20034,7 +20005,7 @@ async function recordOperatorExecutionDecision(
   policy: Record<string, unknown>,
   decision = "allowed",
 ): Promise<void> {
-  const brandKey = requestedMcpBrandKey(toolName, args);
+    const brandKey = OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args);
   const evidence = {
     ...policy,
     canonical_fingerprint: await operatorExecutionFingerprint(toolName, args),
@@ -20100,11 +20071,7 @@ const MANIFEST_AUTONOMOUS_PROTECTED_TOOLS = new Set<string>([
   "transfer_account_ownership",
 ]);
 
-function canonicalAutonomyToolName(toolName: string): string {
-  const scoped = toolName.match(/^(?:mm|om|vx)_(.+)$/);
-  const canonical = scoped?.[1] ?? toolName;
-  return canonical === "runApprovedPostCanary" ? "setScheduledPostSchedulerMode" : canonical;
-}
+
 
 async function beginOperatorAutonomyAuthorization(
   env: Env,
@@ -20128,8 +20095,8 @@ async function beginOperatorAutonomyAuthorization(
   required_next_tool?: string;
   pending_decisions?: Record<string, unknown>[];
 }> {
-  const canonical = canonicalOperatorExecutionArgs(toolName, args);
-  const canonicalTool = canonicalAutonomyToolName(canonical.tool_name);
+    const canonical = OPERATOR_MCP_ROUTING_POLICY.canonicalExecutionArgs(toolName, args);
+  const canonicalTool = OPERATOR_MCP_ROUTING_POLICY.canonicalAutonomyToolName(canonical.tool_name);
   if (operatorUsesAutonomousEngineeringAuthority(canonicalTool, canonical.args)) {
     return {
       allowed: true,
@@ -20142,7 +20109,8 @@ async function beginOperatorAutonomyAuthorization(
     return { allowed: true, governed: false };
   }
 
-  const requestedBrand = requestedMcpBrandKey(canonicalTool, canonical.args) ?? requestedMcpBrandKey(toolName, args);
+    const requestedBrand = OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(canonicalTool, canonical.args)
+    ?? OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args);
   let profileRow: Record<string, unknown> | null = null;
   if (requestedBrand) {
     profileRow = await env.DB.prepare(
@@ -20357,7 +20325,7 @@ async function completeOperatorAutonomyAuthorization(
 function operatorSemanticOperationIdentity(toolName: string, args: Record<string, unknown>): string | null {
   const explicit = normalizeOperatorText(args.operation_id, 240, true);
   if (explicit) return explicit;
-  const brand = requestedMcpBrandKey(toolName, args) ?? "unscoped";
+    const brand = OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args) ?? "unscoped";
   const session = normalizeOperatorText(args.workflow_session_id, 120, true) ?? "no-session";
       if (toolName === "resolveContinuationContext") return `${brand}:${String(args.continuation_choice ?? "")}:${String(args.workflow_session_id ?? "latest")}`;
   if (toolName === "start_workflow_session") return `${brand}:active:${String(args.workflow_template_key ?? OPERATOR_WORKFLOW_TEMPLATE_KEY)}`;
@@ -20437,7 +20405,7 @@ async function beginOperatorOperationReceipt(
     ) VALUES (?, ?, ?, ?, ?, ?, 'started')`,
   ).bind(
     key,
-    requestedMcpBrandKey(toolName, args),
+        OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args),
     normalizeOperatorText(args.workflow_session_id, 120, true),
     toolName,
     toolName,
@@ -20743,50 +20711,11 @@ async function collectOperatorPreflightSection(
 
 
 
-function requestedMcpBrandKey(toolName: string, args: Record<string, unknown>): GptBrandKey | null {
-  if (toolName.startsWith("mm_")) {
-    return "manifest_mental";
-  }
-  if (toolName.startsWith("om_")) {
-    return "opmg_deadman";
-  }
-  if (toolName.startsWith("vx_")) {
-    return "vectrix";
-  }
-  const directBrand = normalizeGptBrandKey(args.brand_key);
-  if (directBrand) {
-    return directBrand;
-  }
-  return null;
-}
+const OPERATOR_MCP_ROUTING_POLICY = createOperatorMcpRoutingPolicy({
+  normalizeBrandKey: normalizeGptBrandKey,
+  normalizeText: (value, maxLength) => normalizeOperatorText(value, maxLength, true),
+});
 
-
-
-const MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS = new Set<string>([
-  "prepare_manifest_autonomous_cycle",
-  "persist_manifest_autonomous_post",
-  "get_hourly_coverage",
-  "get_manifest_cycle_receipt",
-  "get_manifest_intelligence_audit",
-  "get_manifest_intelligence_foundation",
-]);
-
-function operatorMcpCallRequiresProceed(toolName: string, args: Record<string, unknown>): boolean {
-  if (MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS.has(toolName)) {
-    return false;
-  }
-  if (operatorMcpToolNameRequiresProceed(toolName)) {
-    return true;
-  }
-  if (toolName === "updateWorkflowRequirement") {
-    return requestedMcpBrandKey(toolName, args) !== null;
-  }
-  return false;
-}
-
-function operatorMcpProceedConfirmed(_toolName: string, args: Record<string, unknown>): boolean {
-  return args.proceed_confirmed === true;
-}
 
 
 
@@ -20810,10 +20739,10 @@ async function getOperatorMcpBoundaryBlock(
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  if (!operatorMcpCallRequiresProceed(toolName, args)) {
+    if (!OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)) {
     return null;
   }
-  const requestedBrand = requestedMcpBrandKey(toolName, args);
+    const requestedBrand = OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args);
   const serverContinuity = requestedBrand
     ? await readLatestOperatorContinuityState(env, "continuity_context", requestedBrand)
     : null;
@@ -21630,7 +21559,7 @@ async function handleOperatorMcpAdminTool(
         continue;
       }
       const canonicalTool = prepared.tool_name ?? null;
-      const autonomyTool = canonicalAutonomyToolName(tool.name);
+            const autonomyTool = OPERATOR_MCP_ROUTING_POLICY.canonicalAutonomyToolName(tool.name);
       const protectedOperation = MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(autonomyTool);
       const protectedGateEnforced = protectedOperation
         && prepared.error === "known_blocker_prevented"
@@ -23369,7 +23298,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       const sourceDefinedDirectEngineering = (directPublicEntry && isOperatorMcpEngineeringToolName(toolName))
         || routedMapExecution?.mode === "source_defined_direct_engineering";
       const sourceDefinedProtectedOperation = sourceDefinedDirectEngineering
-        && MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(canonicalAutonomyToolName(toolName));
+                && MANIFEST_AUTONOMOUS_PROTECTED_TOOLS.has(OPERATOR_MCP_ROUTING_POLICY.canonicalAutonomyToolName(toolName));
       const preCallRouting = sourceDefinedStaticRoute
         ? { arguments: args, corrections: [], route: null, redirect: false }
         : await resolveOperatorPreCallRouting(env, toolName, args);
@@ -23585,10 +23514,11 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
       let resultPayload: Record<string, unknown>;
       try {
-        resultPayload = isOperatorMcpEngineeringToolName(toolName)
-          ? await handleOperatorMcpEngineeringTool(request, env, toolName, args, routedGatewayMetadata !== null)
-          : isOperatorMcpAdminToolName(toolName)
-            ? await handleOperatorMcpAdminTool(request, env, toolName, args, routedGatewayMetadata !== null)
+                const handlerClass = OPERATOR_MCP_ROUTING_POLICY.classifyHandler(toolName);
+        resultPayload = handlerClass === "engineering"
+          ? await handleOperatorMcpEngineeringTool(request, env, toolName as OperatorMcpEngineeringToolName, args, routedGatewayMetadata !== null)
+          : handlerClass === "admin"
+            ? await handleOperatorMcpAdminTool(request, env, toolName as OperatorMcpAdminToolName, args, routedGatewayMetadata !== null)
             : await callOperatorToolForMcp(request, env, toolName, args);
             } catch (error) {
         await completeOperatorAutonomyAuthorization(env, autonomyAuthorization, {
