@@ -5,8 +5,9 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 6710100d98ddc118e08c3e29b4f2e62aaa391c73
-production_sha: 6710100d98ddc118e08c3e29b4f2e62aaa391c73
+repository_base_sha: c65aa66976d6f0ab39c50d39d478612e07fccb5d
+production_sha: c65aa66976d6f0ab39c50d39d478612e07fccb5d
+
 
 
 
@@ -665,22 +666,34 @@ Completed checkpoint — Stage 6H Lensically UI read-surface service extraction:
 - Exact-SHA release passed in run `30308429603`.
 - The first independent check briefly observed the prior deployment during propagation; the immediate recheck confirmed live production exact SHA `6710100d98ddc118e08c3e29b4f2e62aaa391c73` with 75/75 public tools.
 
-Current sub-action — Stage 6I Manifest review-batch retirement service extraction:
+Completed checkpoint — Stage 6I Manifest review-batch retirement service extraction:
 
-Extract `discard_manifest_review_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestReviewBatchRetirementService.ts` as the dependency-injected authority for Manifest-only admission, required reasons, explicit-or-latest active lookup, idempotent no-active results, terminal-status preservation, bounded retirement, exact response fields, and permanent source/lineage preservation.
+- Reduced `discard_manifest_review_batch` in `src/index.ts` to explicit review-batch lookup and status-update SQL adapters; the path cannot delete sources, drafts, posts, or lineage.
+- Added `test/operatorManifestReviewBatchRetirementService.spec.ts` covering brand admission, reason validation, no-active idempotency, active retirement, and terminal-status preservation.
+- Added permanent push and release ownership gates preventing retirement decision and response composition from returning to `src/index.ts`.
+- Push validation passed in run `30309569392`.
+- All eight Operator shards passed in run `30309782479`.
+- Exact-SHA release passed in run `30309840321`.
+- Live production independently confirmed exact SHA `c65aa66976d6f0ab39c50d39d478612e07fccb5d` with 75/75 public tools.
 
-- Manifest-only admission and exact 400 response for other brands
-- required nonempty discard reason and optional explicit review-batch identity
-- latest active batch lookup when no identity is supplied
-- idempotent no-active-batch success response
-- terminal-status preservation, bounded retirement update, exact prior/new status fields, and retired boolean
-- permanent preservation of source records and source lineage, with no source deletion or scheduling mutation
+Current sub-action — Stage 6J Manifest review-batch state read service extraction:
 
-Keep review-batch SQL, text normalization, and shared JSON transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `get_manifest_review_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- workflow-table readiness and Manifest-only admission
+- explicit batch identity or latest active batch lookup, optionally scoped to production date
+- no-active-review response, normal-work unblocked state, and prepared autonomous-cycle continuation guidance
+- exact autonomous-cycle summary fields and required tool/route wording
+- serialized active batch response and exact 404 behavior when an identified batch is absent
+- read-only behavior with no review, source, draft, scheduling, or cycle mutation
+
+Keep workflow-table setup, review-batch SQL, autonomous-cycle SQL, serializer, text normalization, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6I, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6J, then continue Stage 6 product-service extraction in bounded domain clusters.
+
 
 
 
