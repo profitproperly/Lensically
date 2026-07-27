@@ -40,8 +40,7 @@ import {
 import {
   assertClientSafetyRegistry,
     buildClientSafeGatewayRequest,
-  CLIENT_SAFE_REQUEST_PROFILES,
-  CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
+    CLIENT_SAFE_REQUEST_PROFILES,
   CLIENT_SAFETY_GATEWAY_DESCRIPTION,
   CLIENT_SAFETY_STARTUP_INSTRUCTION,
   getClientSafetyRegistrySummary,
@@ -82,9 +81,14 @@ import {
   type OperatorMcpEngineeringToolName,
 } from "./operatorMcpEngineeringRegistry";
 import {
-  OPERATOR_MCP_ADMIN_TOOL_NAMES as EXTRACTED_OPERATOR_MCP_ADMIN_TOOL_NAMES,
-  OPERATOR_MCP_ADMIN_TOOLS as EXTRACTED_OPERATOR_MCP_ADMIN_TOOLS,
+  OPERATOR_MCP_ADMIN_TOOL_NAMES,
+  OPERATOR_MCP_ADMIN_TOOLS,
+  type OperatorMcpAdminToolName,
 } from "./operatorMcpAdminRegistry";
+import {
+  BRAND_KEY_SCHEMA,
+  SOURCE_DRAFT_ANALYSIS_SCHEMA,
+} from "./operatorMcpSchemas";
 
 
 export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
@@ -17224,11 +17228,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 
 
-const BRAND_KEY_SCHEMA = {
-  type: "string",
-  enum: ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"],
-    description: CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
-};
+
 
 const SOURCE_TRANSFORMATION_CONTRACT_SCHEMA = {
   type: "object",
@@ -17264,21 +17264,7 @@ const GENERATION_ADAPTATION_PLAN_SCHEMA = {
   additionalProperties: false,
 };
 
-const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
-  type: "object",
-  description: "Gate evidence for the active source contract. For Manifest, record preserved hook/function/time requirements and audience reward; transformed_elements is optional because close source mimicry is preferred.",
-  properties: {
-    opening_phrase: { type: "string" },
-    realm_entrance_key: { type: "string" },
-    hook_style: { type: "string" },
-    lane_key: { type: "string" },
-    preserved_functions: { type: "array", items: { type: "string" } },
-    transformed_elements: { type: "array", items: { type: "string" } },
-    satisfied_time_or_context_requirements: { type: "array", items: { type: "string" } },
-    audience_reward_delivered: { type: "boolean" },
-  },
-  additionalProperties: true,
-};
+
 
 
 
@@ -18168,7 +18154,7 @@ const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
 ];
 
 
-const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(EXTRACTED_OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
+const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
 const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
 
 function isOperatorMcpAdminToolName(value: string): value is OperatorMcpAdminToolName {
@@ -18224,7 +18210,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   ]);
     return buildOperatorMcpToolDefinitions({
             engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
-        adminTools: EXTRACTED_OPERATOR_MCP_ADMIN_TOOLS,
+            adminTools: OPERATOR_MCP_ADMIN_TOOLS,
     accountTools: OPERATOR_MCP_TOOLS,
     includeScopedWrappers,
     directPriorities: directPriority,
