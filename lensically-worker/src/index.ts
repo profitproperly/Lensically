@@ -107,6 +107,8 @@ import {
 import { readOperatorAccountState } from "./operatorAccountStateService";
 import { readOperatorLensicallyUiSurface } from "./operatorLensicallyUiSurfaceService";
 import { retireOperatorManifestReviewBatch } from "./operatorManifestReviewBatchRetirementService";
+import { readOperatorManifestReviewBatchState } from "./operatorManifestReviewBatchStateService";
+
 
 
 
@@ -12884,59 +12886,39 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-    if (toolName === "get_manifest_review_batch") {
-    await ensureOperatorWorkflowTables(env);
-    if (brand.brand_key !== "manifest_mental") {
-      return operatorJsonResponse({ success: false, error: "review_batch_not_configured_for_brand" }, 400);
-    }
-    let reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120, true);
-    if (!reviewBatchId) {
-      const productionDate = normalizeOperatorText(payload.production_date, 20, true);
-      const row = productionDate
-        ? await env.DB.prepare(
-          `SELECT id FROM operator_review_batches
-           WHERE brand_key = ? AND production_date = ?
-             AND status IN ('building', 'owner_review', 'partially_resolved')
-           ORDER BY datetime(updated_at) DESC LIMIT 1`,
-        ).bind(brand.brand_key, productionDate).first<{ id: string }>()
-        : await env.DB.prepare(
-          `SELECT id FROM operator_review_batches
-           WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
-           ORDER BY datetime(updated_at) DESC LIMIT 1`,
-        ).bind(brand.brand_key).first<{ id: string }>();
-      reviewBatchId = row?.id ?? null;
-    }
-        if (!reviewBatchId) {
-      const activeAutonomousCycle = await env.DB.prepare(
+        if (toolName === "get_manifest_review_batch") {
+    const reviewState = await readOperatorManifestReviewBatchState({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      ensureWorkflowTables: () => ensureOperatorWorkflowTables(env),
+      findActiveReviewBatchId: async (brandKey, productionDate) => {
+        const row = productionDate
+          ? await env.DB.prepare(
+            `SELECT id FROM operator_review_batches
+             WHERE brand_key = ? AND production_date = ?
+               AND status IN ('building', 'owner_review', 'partially_resolved')
+             ORDER BY datetime(updated_at) DESC LIMIT 1`,
+          ).bind(brandKey, productionDate).first<{ id: string }>()
+          : await env.DB.prepare(
+            `SELECT id FROM operator_review_batches
+             WHERE brand_key = ? AND status IN ('building', 'owner_review', 'partially_resolved')
+             ORDER BY datetime(updated_at) DESC LIMIT 1`,
+          ).bind(brandKey).first<{ id: string }>();
+        return row?.id ?? null;
+      },
+      findActiveAutonomousCycle: (brandKey) => env.DB.prepare(
         `SELECT id, status, timezone, horizon_hours, updated_at
          FROM operator_autonomous_growth_cycles
          WHERE brand_key = ? AND status IN ('prepared', 'partially_committed')
          ORDER BY datetime(updated_at) DESC LIMIT 1`,
-      ).bind(brand.brand_key).first<Record<string, unknown>>();
-      return operatorJsonResponse({
-        success: true,
-        active: false,
-        state: "no_active_review_batch",
-        normal_work_blocked: false,
-        autonomous_cycle_active: Boolean(activeAutonomousCycle),
-        autonomous_cycle: activeAutonomousCycle
-          ? {
-              cycle_id: activeAutonomousCycle.id,
-              status: activeAutonomousCycle.status,
-              timezone: activeAutonomousCycle.timezone,
-              horizon_hours: activeAutonomousCycle.horizon_hours,
-              updated_at: activeAutonomousCycle.updated_at,
-            }
-          : null,
-        required_tool: activeAutonomousCycle ? "persist_manifest_autonomous_post" : null,
-        required_route: activeAutonomousCycle
-          ? "Continue the prepared autonomous cycle with exactly one model-evaluated post per persistence call. Do not create, claim, read, attach, or schedule a guided review batch."
-          : null,
-      });
-    }
-    const serialized = await serializeManifestReviewBatch(env, brand, reviewBatchId);
-    return serialized ? operatorJsonResponse(serialized) : operatorJsonResponse({ success: false, error: "review_batch_not_found" }, 404);
+      ).bind(brandKey).first<Record<string, unknown>>(),
+      serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
+    });
+    return operatorJsonResponse(reviewState.body, reviewState.status);
   }
+
 
     if (toolName === "attach_manifest_review_draft") {
     const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
