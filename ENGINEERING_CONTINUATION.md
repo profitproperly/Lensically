@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: ff8dc2de45da5bf8b320339214df064ae6e79151
-production_sha: ff8dc2de45da5bf8b320339214df064ae6e79151
+repository_base_sha: 382c50edf881d3960ad3636bee9c0a7ef91ce1c0
+production_sha: 382c50edf881d3960ad3636bee9c0a7ef91ce1c0
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -433,15 +433,35 @@ Completed checkpoint — Stage 5D3A account foundation registry extraction:
 - Exact-SHA release passed in run `30227741205`.
 - Live production independently confirmed exact SHA `ff8dc2de45da5bf8b320339214df064ae6e79151`.
 
-Current sub-action — Stage 5D3B source-card, generation, and draft-gate registry extraction:
+Completed checkpoint — Stage 5D3B source-card, generation, and draft-gate registry extraction:
 
-Measure and move the next contiguous account-definition slice beginning at `create_source_card` into a focused ordered registry module. The expected domain includes canonical source-card creation/locking/reads, generation-run creation, gate execution, candidate-draft submission, and the immediately adjacent draft lifecycle definitions through the next stable boundary.
+- Added `src/operatorMcpSourceDraftRegistry.ts` with the exact ordered 13-tool source-card, generation, draft-lifecycle, and gate-definition slice.
+- Moved `GENERATION_ADAPTATION_PLAN_SCHEMA` into shared MCP schema authority.
+- Switched runtime composition to the extracted registry before physically removing all 13 inert definitions from `src/index.ts`.
+- Added `test/operatorMcpSourceDraftRegistry.spec.ts` covering exact order, source-card versioning, generation adaptation, showable draft lifecycle, rejection evidence, gate mutation, and memory promotion.
+- Updated lifecycle parsing and release preflight to scan the extracted registry and prevent these definitions or the adaptation schema from returning to `index.ts`.
+- Push validation passed in run `30228887735`.
+- All eight Operator shards passed in run `30228981548`.
+- Exact-SHA release passed in run `30229038535`.
+- Live production independently confirmed exact SHA `382c50edf881d3960ad3636bee9c0a7ef91ce1c0` with 75/75 public tools.
 
-Preserve exact declaration order, schemas, annotations, shared schema ownership, public filtering, scoped-wrapper construction, tool counts, source-card versioning, source-fidelity requirements, showable gating, rejection handling, and all guided/autonomous noninterference behavior. Add focused characterization and release-preflight enforcement before exact-SHA release.
+Current sub-action — Stage 5D3C strategy-memory and scheduled-post registry extraction:
+
+Move the next exact contiguous seven-tool slice from `src/index.ts` into a focused ordered registry module:
+
+- `list_strategy_memory`
+- `save_strategy_memory`
+- `list_scheduled_posts`
+- `delete_scheduled_post`
+- `edit_scheduled_post`
+- `schedule_owner_approved_batch`
+- `schedule_approved_draft`
+
+Move the strategy-memory kind set into shared constant authority while continuing to import the canonical scheduled-post deletion reason codes from `humanFreeAutonomy.ts`. Preserve exact declaration order, schemas, destructive annotations, deletion authorization, retry restrictions, Manifest lineage protections, public filtering, scoped wrappers, and tool counts. Add focused tests and release-preflight enforcement before exact-SHA release.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract the remaining scheduling, strategy-memory, metrics, intelligence, autonomous-cycle, and other account definitions in bounded slices.
+- Extract Manifest intelligence, cycle receipt/defect, analysis, autonomous-cycle, metrics, and remaining account definitions in bounded slices.
 - Extract MCP call routing, protocol error shaping, and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
