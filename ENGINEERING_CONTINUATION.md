@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 13051d014a7a32d220c3a5562f28da9f209a21fd
-production_sha: 13051d014a7a32d220c3a5562f28da9f209a21fd
+repository_base_sha: d9c8801db0423353064c568d3959d24e8c4a736d
+production_sha: d9c8801db0423353064c568d3959d24e8c4a736d
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -592,22 +592,33 @@ Completed checkpoint — Stage 6C2 Manifest autonomous cycle-construction extrac
 - Exact-SHA release passed in run `30295865451`.
 - Live production independently confirmed exact SHA `13051d014a7a32d220c3a5562f28da9f209a21fd` with 75/75 public tools.
 
-Current sub-action — Stage 6D1 autonomous post persistence admission and reconciliation extraction:
+Completed checkpoint — Stage 6D1 autonomous post persistence admission and reconciliation extraction:
 
-Extract the first bounded half of `persistManifestAutonomousPost` from `src/index.ts` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestPersistenceAdmissionService.ts` as the dependency-injected authority for Manifest/autonomy admission, stable operation and cycle identity, durable candidate-rejection events, exact strategy/evidence/plan validation, hypothesis/source/model/follower/slot validation, candidate-evaluated events, initial hypothesis persistence, prepared-clock reconciliation, elapsed and occupied nonfatal outcomes, live missing-slot updates, stale lineup repair, exact replay, and existing complete-lineage reuse.
+- Reduced the first half of `persistManifestAutonomousPost` in `src/index.ts` to explicit environment, database, coverage, lineage, experiment, semantic-signature, and decision-influence adapters plus a typed continuation into the remaining persistence stage.
+- Preserved exact rejection codes and details, same-operation replay behavior, candidate-reslot continuation, source-card and locked-plan enforcement, follower-attribution boundary, experiment assignment, decision influence, and reused persistence receipts.
+- Added `test/operatorManifestPersistenceAdmissionService.spec.ts` covering locked-plan rejection, validated continuation handoff, elapsed-slot reconciliation, exact persistence replay, and existing scheduled-lineage reuse.
+- Added permanent push and release ownership gates preventing admission, reconciliation, replay, and reuse orchestration from returning to `src/index.ts`.
+- Push validation passed in run `30298165014` after correcting one stale release-preflight ownership assertion.
+- All eight Operator shards passed in run `30298364783`.
+- Exact-SHA release passed in run `30298442983`; the prior release attempt `30298059853` stopped before migrations or deployment on the stale preflight assertion.
+- Live production independently confirmed exact SHA `d9c8801db0423353064c568d3959d24e8c4a736d` with 75/75 public tools.
 
-- Manifest-only and autonomy-mode admission, stable operation and cycle identity, and durable candidate-rejection events
-- exact cycle strategy, evidence-consumption, and locked plan-item validation
-- post hypothesis, source context, model evaluation, follower-attribution, required-field, slot, family, generation-mode, and canonical lineage validation
-- candidate-evaluated events and deterministic hypothesis persistence
-- prepared-clock reconciliation, elapsed-slot and occupied-slot nonfatal outcomes, live coverage refresh, cycle missing-slot updates, and next-slot continuation
-- stale lineup repair, exact replay detection, existing scheduled-lineage reuse, experiment assignment, semantic signatures, decision influence, and reused persistence receipts
+Current sub-action — Stage 6D2 autonomous post gated persistence and completion extraction:
 
-Keep scheduling creation, hard-ban and gate execution, candidate receipt persistence, generation/draft/inventory writes, final lineage validation, coverage completion, and receipt finalization in `src/index.ts` until Stage 6D2. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract the remaining half of `persistManifestAutonomousPost` from `src/index.ts` into a focused dependency-injected service while preserving:
+
+- schedule idempotency, authoritative occupied-slot collision reconciliation, exact duplicate detection, and semantic repetition blocking
+- canonical locked source-card resolution, source-selection validation, draft analysis, canonical owner hard-ban evidence, server gate execution, and durable candidate gate receipts
+- deterministic generation-run, draft, lineup, strategy-tag, content-inventory, hypothesis, and scheduled-post persistence
+- complete publish and intelligence lineage validation, publish blocking on missing lineage, experiment assignment, semantic signatures, decision influence, and persisted-cycle events
+- authoritative post-persist coverage reconciliation, elapsed-slot exclusion, cycle status and scheduled-ID updates, completion receipt finalization, completion-blocked handling, and exact final response fields
+
+Keep low-level scheduler creation, gate primitives, SQL statements, semantic-analysis primitives, JSON normalization, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6D1 and 6D2, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6D2, then continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
