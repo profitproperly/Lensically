@@ -5,8 +5,9 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: b754ff8cd14c4d5c886e44f969d6f94310bc8a8c
-production_sha: b754ff8cd14c4d5c886e44f969d6f94310bc8a8c
+repository_base_sha: 9d32d244f5cf269e9331f4539cae07c5ba019e4a
+production_sha: 9d32d244f5cf269e9331f4539cae07c5ba019e4a
+
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -628,21 +629,33 @@ Completed checkpoint — Stage 6E scheduled Manifest post review service extract
 - Exact-SHA release passed in run `30302737583`.
 - The first independent check briefly observed the prior deployment during propagation; the immediate recheck confirmed live production exact SHA `b754ff8cd14c4d5c886e44f969d6f94310bc8a8c` with 75/75 public tools.
 
-Current sub-action — Stage 6F Manifest cycle-result observation service extraction:
+Completed checkpoint — Stage 6F Manifest cycle-result observation service extraction:
 
-Extract `manifestCycleFailureIsDefect`, `manifestCycleToolScope`, and `observeManifestCycleToolResult` from `src/index.ts` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestCycleObservationService.ts` as the dependency-injected authority for exact expected/non-defect classification, tool-to-seven-stage scope mapping, slot-key derivation, evaluator-phase recognition, automatic scoped defect resolution, unexpected failure normalization, impact-state classification, retryability, reconciliation metadata, durable defect receipts, and exact response augmentation.
+- Reduced `manifestCycleFailureIsDefect` and `observeManifestCycleToolResult` in `src/index.ts` to an exported compatibility wrapper plus explicit text-normalization and database defect adapters; the scope mapper no longer lives in the monolith.
+- Added `test/operatorManifestCycleObservationService.spec.ts` covering expected-failure classification, persistence/evaluator scope mapping, successful scoped auto-resolution, expected operational failure passthrough, and unexpected partially successful defect recording.
+- Added permanent push and release ownership gates preventing scope, resolution, and defect-classification orchestration from returning to `src/index.ts`.
+- Push validation passed in run `30304821027`.
+- All eight Operator shards passed in run `30305058454`.
+- Exact-SHA release passed in run `30305157010`.
+- Live production independently confirmed exact SHA `9d32d244f5cf269e9331f4539cae07c5ba019e4a` with 75/75 public tools.
 
-- exact expected/non-defect failure classification and exported test compatibility
-- tool-to-seven-stage scope mapping, slot-key derivation, evaluator-phase recognition, and preparation/persistence/coverage phase identity
-- automatic scoped defect resolution after successful retry or reconciliation, compact verification evidence, and unchanged successful results when no defects resolve
-- unexpected failure normalization, impact-state classification, retryability, blocking defect recording, reconciliation metadata, durable defect receipts, and exact response augmentation
-- Manifest-only observation and no mutation for other brands, missing cycle IDs, unscoped tools, or expected operational outcomes
+Current sub-action — Stage 6G account-state read service extraction:
 
-Keep database defect primitives, text normalization, shared transport, and tool invocation wrappers as explicit `index.ts` adapters. Preserve the existing exported `manifestCycleFailureIsDefect` API through the new module. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract the `get_account_state` read composition from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- active workflow session lookup and active source-card resolution
+- latest approved and rejected draft reads with existing limits
+- selected-account approved/posting scheduled count
+- active gate count, exact response keys, and empty warnings contract
+- read-only behavior, selected-account isolation, and no account-content mutation
+
+Keep database queries, active-session/source-card primitives, draft-list primitives, status constants, gate reads, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6F, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6G, then continue Stage 6 product-service extraction in bounded domain clusters.
+
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
