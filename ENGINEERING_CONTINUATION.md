@@ -1,12 +1,12 @@
 # Engineering Continuation
 
 status: active
-updated_at: 2026-07-26
+updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: c2d99cec386503aafbc402d6307ed003905f8ae1
-production_sha: c2d99cec386503aafbc402d6307ed003905f8ae1
+repository_base_sha: 9237c4c3c76d0c16c5ab07d2f9f2e711efb602a1
+production_sha: 9237c4c3c76d0c16c5ab07d2f9f2e711efb602a1
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -529,32 +529,44 @@ Completed checkpoint — Stage 5F MCP transport and error-shaping extraction:
 - Exact-SHA release passed in run `30280096298`.
 - Live production independently confirmed exact SHA `c2d99cec386503aafbc402d6307ed003905f8ae1` with 75/75 public tools.
 
-Current sub-action — Stage 5G MCP dispatcher-shell extraction and Stage 5 completion audit:
+Completed checkpoint — Stage 5G MCP dispatcher and call-state-machine extraction:
 
-Extract the remaining protocol dispatcher shell from `src/index.ts` into a focused dependency-injected module:
+- Added `src/operatorMcpDispatcher.ts` as the dependency-injected authority for POST admission, authorization, JSON-RPC parsing, initialize/session lifecycle, notifications, ping, tools/list, tools/call delegation, unsupported methods, and bounded internal errors.
+- Added `src/operatorMcpToolCallDispatcher.ts` as the dependency-injected authority for direct-tool and registered-gateway admission, execution guards, pre-call routing, protected-operation handoff, account boundary checks, execution policy, alias-retry prevention, idempotency, autonomy authorization, handler selection, routed execution metadata, hardening, action closure, and final completion responses.
+- Reduced `handleOperatorMcp` and `handleOperatorMcpToolCall` in `src/index.ts` to environment-bound dependency wiring; the protocol shell and 400-line call state machine no longer live in the monolith.
+- Added focused dispatcher and tool-call dispatcher tests covering request/session behavior, delegation, public admission, gateway failures, redirects, replay, autonomy blocking, hardening, and completion.
+- Added permanent push and release gates preventing protocol dispatch, response shaping, routing ownership, or the tools/call state machine from returning to `src/index.ts`.
+- Dispatcher-shell push validation passed after the async rejection repair; all eight Operator shards passed; exact-SHA shell release passed in run `30282423977` at SHA `342fc690822802bd3d056a59e5c19bb205eb8b2a`.
+- Final Stage 5 push validation passed in run `30285540839`.
+- All eight Operator shards passed in run `30285720714`.
+- Exact-SHA final Stage 5 release passed in run `30285815294`.
+- Live production independently confirmed exact SHA `9237c4c3c76d0c16c5ab07d2f9f2e711efb602a1` with 75/75 public tools.
+- Stage 5 completion audit passed through lifecycle, full release-preflight, architecture baseline, focused tests, eight deterministic shards, and live verification: protocol metadata, registry construction, directory/filtering, composition, routing policy, transport shaping, protocol dispatch, and tools/call orchestration no longer live as monolithic implementations in `src/index.ts`.
 
-- request-method and authorization admission
-- JSON-RPC parsing and method validation
-- initialize, session validation, initialized notification, ping, and tools/list dispatch
-- direct-tool versus registered-gateway admission
-- tools/call orchestration through injected guards, routing, authorization, handlers, receipts, hardening, and action-closure callbacks
-- unsupported method and internal-error termination
+Current sub-action — Stage 6A Manifest cycle evidence, strategy, and defect service extraction:
 
-Do not move domain/business implementations, database queries, OAuth handlers, authorization storage, execution guards, autonomy controllers, or account services. Preserve exact request methods, status codes, session headers, runtime metadata, public direct-tool contract, all error texts, handler order, idempotency, hardening behavior, and 75 public tools.
+Extract the first bounded product-service cluster from `handleOperatorTool` into a focused dependency-injected Manifest cycle service:
 
-After release, run the Stage 5 completion audit proving protocol metadata, tool construction, registries, directory, composition, routing policy, response transport, and dispatcher composition no longer live as monolithic implementations in `src/index.ts`.
+- `get_manifest_cycle_analysis_page`
+- `commit_manifest_cycle_strategy`
+- `record_manifest_cycle_defect`
+- `resolve_manifest_cycle_defect`
+
+Move payload validation, business-result shaping, evidence-page reads, locked source-plan validation, strategy commit/event recording, defect creation/resolution, and cycle-completion reconciliation. Keep authorization, brand resolution, common JSON transport, autonomous generation/persistence, scheduler behavior, and unrelated account tools in `src/index.ts`.
+
+Preserve exact status codes, error strings, source-selection locking, 24-hour-likes strategy metadata, seven-stage defect semantics, final receipt completion, cycle events, scheduled-post lineage evidence, and idempotent database effects. Add focused tests and permanent release-preflight ownership before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Stage 6 product-service extraction.
+- Continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
 
 ## Remaining
 
-5. MCP modularization — ACTIVE
-6. Product-service extraction
+5. MCP modularization — COMPLETE AND DEPLOYED
+6. Product-service extraction — ACTIVE
 7. Router and runtime composition
 8. Test and release modernization
 9. Final comparison and production release
