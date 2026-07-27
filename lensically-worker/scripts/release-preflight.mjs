@@ -23,6 +23,8 @@ const operatorMcpAdminRegistry = read("src/operatorMcpAdminRegistry.ts");
 const operatorMcpAdminRegistryTests = read("test/operatorMcpAdminRegistry.spec.ts");
 const operatorMcpAccountFoundationRegistry = read("src/operatorMcpAccountFoundationRegistry.ts");
 const operatorMcpAccountFoundationRegistryTests = read("test/operatorMcpAccountFoundationRegistry.spec.ts");
+const operatorMcpSourceDraftRegistry = read("src/operatorMcpSourceDraftRegistry.ts");
+const operatorMcpSourceDraftRegistryTests = read("test/operatorMcpSourceDraftRegistry.spec.ts");
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
@@ -81,6 +83,9 @@ if (!workflow.includes("test/operatorMcpAdminRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpAccountFoundationRegistry.spec.ts")) {
   errors.push("operator_mcp_account_foundation_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpSourceDraftRegistry.spec.ts")) {
+  errors.push("operator_mcp_source_draft_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -89,7 +94,7 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
@@ -229,6 +234,30 @@ if (!operatorMcpAccountFoundationRegistryTests.includes("preserves the exact ord
     || !operatorMcpAccountFoundationRegistryTests.includes("preserves guided review limits and workflow defaults")
     || !operatorMcpAccountFoundationRegistryTests.includes("preserves source deletion, lineage recovery, and bounded backfill contracts")) {
   lifecycleErrors.push("operator_mcp_account_foundation_registry_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpSourceDraftRegistry"')) {
+  lifecycleErrors.push("operator_mcp_source_draft_registry_import_missing");
+}
+if (source.includes('{ name: "create_source_card"')
+    || source.includes('{ name: "create_generation_run"')
+    || source.includes('{ name: "submit_candidate_draft"')
+    || source.includes('{ name: "list_active_gates"')
+    || source.includes("const GENERATION_ADAPTATION_PLAN_SCHEMA =")) {
+  lifecycleErrors.push("operator_mcp_source_draft_registry_returned_to_index");
+}
+if (!operatorMcpSourceDraftRegistry.includes("export const OPERATOR_MCP_SOURCE_DRAFT_TOOL_NAMES")
+    || !operatorMcpSourceDraftRegistry.includes("export type OperatorMcpSourceDraftToolName")
+    || !operatorMcpSourceDraftRegistry.includes("export const OPERATOR_MCP_SOURCE_DRAFT_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_source_draft_registry_module_incomplete");
+}
+if (!operatorMcpSchemas.includes("export const GENERATION_ADAPTATION_PLAN_SCHEMA")) {
+  lifecycleErrors.push("operator_mcp_generation_adaptation_schema_missing");
+}
+if (!operatorMcpSourceDraftRegistryTests.includes("preserves the exact ordered 13-tool source-draft registry")
+    || !operatorMcpSourceDraftRegistryTests.includes("preserves source-card versioning and generation adaptation contracts")
+    || !operatorMcpSourceDraftRegistryTests.includes("preserves showable draft lifecycle and rejection evidence requirements")
+    || !operatorMcpSourceDraftRegistryTests.includes("preserves gate discovery, mutation, and memory-promotion schemas")) {
+  lifecycleErrors.push("operator_mcp_source_draft_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
