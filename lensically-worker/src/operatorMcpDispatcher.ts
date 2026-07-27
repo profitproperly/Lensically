@@ -108,8 +108,8 @@ export async function dispatchOperatorMcpRequest(
       });
     }
 
-    if (method === "tools/call") {
-      return dependencies.handleToolCall({
+        if (method === "tools/call") {
+      return await dependencies.handleToolCall({
         request,
         id,
         params: message.params ?? {},
