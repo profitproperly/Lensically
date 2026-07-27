@@ -59,6 +59,9 @@ const operatorManifestScheduledReviewService = read("src/operatorManifestSchedul
 const operatorManifestScheduledReviewServiceTests = read("test/operatorManifestScheduledReviewService.spec.ts");
 const operatorManifestCycleObservationService = read("src/operatorManifestCycleObservationService.ts");
 const operatorManifestCycleObservationServiceTests = read("test/operatorManifestCycleObservationService.spec.ts");
+const operatorAccountStateService = read("src/operatorAccountStateService.ts");
+const operatorAccountStateServiceTests = read("test/operatorAccountStateService.spec.ts");
+
 
 
 
@@ -182,6 +185,10 @@ if (!workflow.includes("test/operatorManifestScheduledReviewService.spec.ts")) {
 if (!workflow.includes("test/operatorManifestCycleObservationService.spec.ts")) {
   errors.push("operator_manifest_cycle_observation_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorAccountStateService.spec.ts")) {
+  errors.push("operator_account_state_service_workflow_gate_missing");
+}
+
 
 
 
@@ -851,6 +858,33 @@ if (!operatorManifestCycleObservationServiceTests.includes("classifies expected 
     || !operatorManifestCycleObservationServiceTests.includes("records unexpected partially successful failures with deterministic metadata")) {
   lifecycleErrors.push("operator_manifest_cycle_observation_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorAccountStateService"')
+    || !source.includes("readOperatorAccountState({")
+    || !source.includes("getActiveSession: (brandKey)")
+    || !source.includes("countScheduledPosts: async")) {
+  lifecycleErrors.push("operator_account_state_service_import_or_binding_missing");
+}
+if (source.includes("active_workflow_session: activeSession")
+    || source.includes("latest_approved_drafts: approved")
+    || source.includes("active_gates_count: gates.length")) {
+  lifecycleErrors.push("operator_account_state_service_returned_to_index");
+}
+if (!operatorAccountStateService.includes("export async function readOperatorAccountState")
+    || !operatorAccountStateService.includes("dependencies.getActiveSession")
+    || !operatorAccountStateService.includes("dependencies.getSourceCard")
+    || !operatorAccountStateService.includes("dependencies.listDraftsByStatus")
+    || !operatorAccountStateService.includes("dependencies.countScheduledPosts")
+    || !operatorAccountStateService.includes("dependencies.listActiveGates")
+    || !operatorAccountStateService.includes("active_workflow_session: activeSession")
+    || !operatorAccountStateService.includes("warnings: []")) {
+  lifecycleErrors.push("operator_account_state_service_module_incomplete");
+}
+if (!operatorAccountStateServiceTests.includes("reads the selected account state and resolves its active source card")
+    || !operatorAccountStateServiceTests.includes("does not read a source card when the active session has no source identity")
+    || !operatorAccountStateServiceTests.includes("normalizes an unavailable scheduled count without changing the response contract")) {
+  lifecycleErrors.push("operator_account_state_service_tests_incomplete");
+}
+
 
 
 
