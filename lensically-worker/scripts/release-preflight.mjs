@@ -43,6 +43,8 @@ const operatorMcpDispatcher = read("src/operatorMcpDispatcher.ts");
 const operatorMcpDispatcherTests = read("test/operatorMcpDispatcher.spec.ts");
 const operatorMcpToolCallDispatcher = read("src/operatorMcpToolCallDispatcher.ts");
 const operatorMcpToolCallDispatcherTests = read("test/operatorMcpToolCallDispatcher.spec.ts");
+const operatorManifestCycleService = read("src/operatorManifestCycleService.ts");
+const operatorManifestCycleServiceTests = read("test/operatorManifestCycleService.spec.ts");
 
 
 
@@ -137,6 +139,9 @@ if (!workflow.includes("test/operatorMcpDispatcher.spec.ts")) {
 }
 if (!workflow.includes("test/operatorMcpToolCallDispatcher.spec.ts")) {
   errors.push("operator_mcp_tool_call_dispatcher_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestCycleService.spec.ts")) {
+  errors.push("operator_manifest_cycle_service_workflow_gate_missing");
 }
 
 
@@ -575,6 +580,35 @@ if (!operatorMcpToolCallDispatcherTests.includes("preserves direct-public admiss
     || !operatorMcpToolCallDispatcherTests.includes("preserves handler completion, hardening intake, and action closure")) {
   lifecycleErrors.push("operator_mcp_tool_call_dispatcher_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestCycleService"')
+    || !source.includes("if (isOperatorManifestCycleServiceToolName(toolName))")
+    || !source.includes("handleOperatorManifestCycleServiceTool({")) {
+  lifecycleErrors.push("operator_manifest_cycle_service_import_or_binding_missing");
+}
+if (source.includes('if (toolName === "get_manifest_cycle_analysis_page")')
+    || source.includes('if (toolName === "commit_manifest_cycle_strategy")')
+    || source.includes('if (toolName === "record_manifest_cycle_defect")')
+    || source.includes('if (toolName === "resolve_manifest_cycle_defect")')) {
+  lifecycleErrors.push("operator_manifest_cycle_service_returned_to_index");
+}
+if (!operatorManifestCycleService.includes("export const OPERATOR_MANIFEST_CYCLE_SERVICE_TOOL_NAMES")
+    || !operatorManifestCycleService.includes("export function isOperatorManifestCycleServiceToolName")
+    || !operatorManifestCycleService.includes("export async function handleOperatorManifestCycleServiceTool")
+    || !operatorManifestCycleService.includes('toolName === "get_manifest_cycle_analysis_page"')
+    || !operatorManifestCycleService.includes('toolName === "commit_manifest_cycle_strategy"')
+    || !operatorManifestCycleService.includes('toolName === "record_manifest_cycle_defect"')
+    || !operatorManifestCycleService.includes("resolveManifestCycleDefect")
+    || !operatorManifestCycleService.includes('primary_metric: "24_hour_likes"')
+    || !operatorManifestCycleService.includes('completion_trigger: "last_blocking_defect_resolved"')) {
+  lifecycleErrors.push("operator_manifest_cycle_service_module_incomplete");
+}
+if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page validation and observed failures")
+    || !operatorManifestCycleServiceTests.includes("preserves complete strategy locking and source-selection metadata")
+    || !operatorManifestCycleServiceTests.includes("preserves seven-stage defect validation and receipt requirements")
+    || !operatorManifestCycleServiceTests.includes("preserves final defect resolution and cycle completion reconciliation")) {
+  lifecycleErrors.push("operator_manifest_cycle_service_tests_incomplete");
+}
+
 
 
 
