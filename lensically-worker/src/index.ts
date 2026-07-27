@@ -11159,8 +11159,9 @@ async function prepareManifestAutonomousCycle(
     phasedPreparation,
     runtimeNowIso,
   } = checkpointResult.context;
-  const threadsSnapshot = checkpointResult.context.threadsSnapshot
-    as Awaited<ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>>;
+    const threadsSnapshot = checkpointResult.context.threadsSnapshot as Awaited<
+    ReturnType<typeof refreshManifestAutonomousThreadsSnapshot>
+  >;
 
 
     const trustedUtcTimeIso = await refreshManifestTrustedUtcClock();
