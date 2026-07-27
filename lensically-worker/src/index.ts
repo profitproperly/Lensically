@@ -17255,27 +17255,6 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 const OPERATOR_MCP_TOOLS: OperatorMcpToolDefinition[] = [
   {
-    name: "list_active_gates",
-    title: "List active gates",
-    description: "Use this to inspect global and account-specific active gates for a stage, lane, or content type.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, stage_scope: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" } }, required: ["brand_key"], additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  },
-  {
-    name: "create_or_update_gate",
-    title: "Create or update gate",
-    description: "Use this to create or update a scoped operator gate as data instead of hard-coding account-specific rules.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, gate_key: { type: "string" }, display_name: { type: "string" }, description: { type: "string" }, stage_scope: { type: "string" }, lane_scope: { type: "string" }, content_type_scope: { type: "string" }, gate_type: { type: "string" }, severity: { type: "string" }, evaluator: { type: "string" }, active: { type: "boolean" }, order_index: { type: "integer" }, pass_examples: { type: "array", items: {} }, fail_examples: { type: "array", items: {} }, source_memory_ids: { type: "array", items: {} } }, required: ["brand_key", "gate_key", "description", "stage_scope"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
-    name: "promote_memory_to_gate",
-    title: "Promote memory to gate",
-    description: "Use this when a strategy memory or owner lesson should become an enforceable scoped operator gate.",
-    inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, memory_id: { type: "integer" }, gate_key: { type: "string" }, stage_scope: { type: "string" }, lane_scope: { type: "string" }, severity: { type: "string" }, evaluator: { type: "string" } }, required: ["brand_key", "memory_id", "gate_key", "stage_scope"], additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
-  {
     name: "list_strategy_memory",
     title: "List strategy memory",
     description: "Use this to read active strategy memory for one Lensically account, optionally filtered by kind.",
