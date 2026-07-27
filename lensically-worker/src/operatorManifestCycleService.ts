@@ -1,16 +1,4 @@
-import {
-  appendManifestCycleEvent,
-  commitManifestCycleStrategy,
-  finalizeManifestCycleReceipt,
-  getManifestCycleReceipt,
-  readManifestEvidencePage,
-  recordManifestCycleDefect,
-  resolveManifestCycleDefect,
-} from "./manifestIntelligence";
-import {
-  SOURCE_SELECTION_ENGINE_VERSION,
-  validateLineupAgainstLockedSourceSelectionPlan,
-} from "./sourceFamilySelection";
+
 
 type JsonRecord = Record<string, unknown>;
 
@@ -44,7 +32,25 @@ export interface OperatorManifestCycleServiceDependencies {
     payload: JsonRecord,
     result: JsonRecord,
   ): Promise<JsonRecord>;
+    readEvidencePage(input: {
+    brandKey: string;
+    cycleId: string;
+    snapshotId: string | null;
+    pageIndex: number;
+  }): Promise<JsonRecord>;
+  validateLockedLineup(input: {
+    brand_key: string;
+    cycle_id: string;
+    lineup: JsonRecord[];
+  }): Promise<JsonRecord[]>;
+  commitStrategy(input: JsonRecord): Promise<JsonRecord>;
+  appendCycleEvent(input: JsonRecord): Promise<unknown>;
+  getCycleReceipt(input: { brandKey: string; cycleId: string }): Promise<JsonRecord | null>;
+  recordCycleDefect(input: JsonRecord): Promise<unknown>;
+  resolveCycleDefect(input: JsonRecord): Promise<unknown>;
+  finalizeCycleReceipt(input: JsonRecord): Promise<JsonRecord>;
   readAutonomousCycle(brandKey: string, cycleId: string): Promise<JsonRecord | null>;
+  sourceSelectionEngineVersion: string;
   now(): string;
 }
 
@@ -83,7 +89,7 @@ export async function handleOperatorManifestCycleServiceTool(
       return result({ success: false, error: "autonomous_cycle_id_required" }, 400);
     }
     try {
-      const page = await readManifestEvidencePage(db, {
+            const page = await dependencies.readEvidencePage({
         brandKey,
         cycleId,
         snapshotId,
@@ -125,12 +131,12 @@ export async function handleOperatorManifestCycleServiceTool(
     }
 
     try {
-      const lockedSourceSelectionPlan = await validateLineupAgainstLockedSourceSelectionPlan(db, {
+            const lockedSourceSelectionPlan = await dependencies.validateLockedLineup({
         brand_key: brandKey,
         cycle_id: cycleId,
         lineup,
       });
-      const strategy = await commitManifestCycleStrategy(db, {
+            const strategy = await dependencies.commitStrategy({
         cycleId,
         brandKey,
         snapshotId,
@@ -144,7 +150,7 @@ export async function handleOperatorManifestCycleServiceTool(
         risks,
         lineup,
       });
-      await appendManifestCycleEvent(db, {
+            await dependencies.appendCycleEvent({
         cycleId,
         brandKey,
         eventKey: `cycle-strategy:${String(strategy.id ?? "locked")}`,
@@ -155,7 +161,7 @@ export async function handleOperatorManifestCycleServiceTool(
           lineup_count: lineup.length,
           source_backed_generation_only: true,
           primary_metric: "24_hour_likes",
-          source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
+                    source_selection_engine_version: dependencies.sourceSelectionEngineVersion,
           locked_source_selection_count: lockedSourceSelectionPlan.length,
           model_source_substitution_allowed: false,
         },
@@ -183,11 +189,11 @@ export async function handleOperatorManifestCycleServiceTool(
     if (!cycleId || !defectKey) {
       return result({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
     }
-    const receipt = await getManifestCycleReceipt(db, { brandKey, cycleId });
+        const receipt = await dependencies.getCycleReceipt({ brandKey, cycleId });
     if (!receipt) {
       return result({ success: false, error: "manifest_cycle_receipt_not_found" }, 404);
     }
-    const defect = await recordManifestCycleDefect(db, {
+        const defect = await dependencies.recordCycleDefect({
       cycleId,
       brandKey,
       defectKey,
@@ -214,7 +220,7 @@ export async function handleOperatorManifestCycleServiceTool(
     return result({ success: false, error: "cycle_id_and_defect_key_required" }, 400);
   }
 
-  const defect = await resolveManifestCycleDefect(db, {
+    const defect = await dependencies.resolveCycleDefect({
     cycleId,
     brandKey,
     defectKey,
@@ -232,14 +238,14 @@ export async function handleOperatorManifestCycleServiceTool(
   const missingSlots = cycle && Array.isArray(cycle.missing_slots) ? cycle.missing_slots : [];
   let cycleCompletion: JsonRecord | null = null;
 
-  if (cycle && missingSlots.length === 0) {
-    const receipt = await getManifestCycleReceipt(db, { brandKey, cycleId });
+    if (cycle && missingSlots.length === 0) {
+    const receipt = await dependencies.getCycleReceipt({ brandKey, cycleId });
     if (receipt && !receipt.completed_at) {
       const scheduledPostIds = Array.isArray(cycle.scheduled_post_ids)
         ? cycle.scheduled_post_ids.map(Number)
         : [];
       const completedAt = dependencies.now();
-      cycleCompletion = await finalizeManifestCycleReceipt(db, {
+            cycleCompletion = await dependencies.finalizeCycleReceipt({
         cycleId,
         status: "completed",
         completion: {
@@ -256,7 +262,7 @@ export async function handleOperatorManifestCycleServiceTool(
         completedAt,
       }) as JsonRecord;
       if (cycleCompletion.completed === true) {
-        await appendManifestCycleEvent(db, {
+                await dependencies.appendCycleEvent({
           cycleId,
           brandKey,
           eventKey: "cycle-completed",
