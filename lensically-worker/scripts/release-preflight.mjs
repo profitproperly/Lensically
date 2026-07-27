@@ -625,8 +625,7 @@ if (!source.includes('from "./operatorHourlyCoverageService"')
 }
 if (source.includes('const driftDefectKey = `coverage-ledger-drift:')
     || source.includes('errorCode: "manifest_cycle_missing_slot_ledger_drift"')
-    || source.includes('completion_trigger: "authoritative_coverage_reconciliation"')
-    || source.includes('eventType: "coverage_reconciled"')) {
+    || source.includes('completion_trigger: "authoritative_coverage_reconciliation"')) {
   lifecycleErrors.push("operator_hourly_coverage_service_returned_to_index");
 }
 if (!operatorHourlyCoverageService.includes("export async function handleOperatorHourlyCoverageService")
