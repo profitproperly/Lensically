@@ -88,16 +88,16 @@ import {
   operatorMcpToolNameRequiresProceed,
 } from "./operatorMcpRegistryComposition";
 import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
-import {
-  dispatchOperatorMcpRequest,
-  type OperatorMcpJsonRpcId,
-} from "./operatorMcpDispatcher";
+import { dispatchOperatorMcpRequest } from "./operatorMcpDispatcher";
 import {
   buildOperatorMcpRuntimeHeaders,
+  mcpErrorResponse,
   mcpToolCompletionResponse,
   mcpToolResultResponse,
   operatorTransportFailureResponse,
+  type OperatorMcpJsonRpcId,
 } from "./operatorMcpTransport";
+
 
 
 
