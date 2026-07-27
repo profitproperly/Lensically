@@ -13653,7 +13653,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         servicePayload,
         result,
       ),
-      readAutonomousCycle: (brandKey, cycleId) => readManifestAutonomousCycle(env, brandKey, cycleId),
+            readAutonomousCycle: (brandKey, cycleId) => readManifestAutonomousCycle(env, brandKey as GptBrandKey, cycleId),
       now: () => new Date().toISOString(),
     });
     return operatorJsonResponse(serviceResult.body, serviceResult.status);
