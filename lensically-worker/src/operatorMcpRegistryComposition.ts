@@ -19,6 +19,11 @@ import { OPERATOR_MCP_MANIFEST_CYCLE_TOOLS } from "./operatorMcpManifestCycleReg
 import { OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS } from "./operatorMcpAutonomousExecutionRegistry";
 import { OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS } from "./operatorMcpAccountAnalyticsRegistry";
 
+export {
+  OPERATOR_MCP_ADMIN_TOOL_NAMES,
+  OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
+};
+
 export const OPERATOR_MCP_ACCOUNT_TOOLS: readonly OperatorMcpToolDefinition[] = [
   ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
   ...OPERATOR_MCP_SOURCE_DRAFT_TOOLS,

@@ -391,7 +391,9 @@ if (!source.includes("assertClientSafetyRegistry();")
     || !source.includes("return buildComposedOperatorMcpTools(includeScopedWrappers);")) {
   lifecycleErrors.push("operator_mcp_registry_runtime_boundary_incomplete");
 }
-if (!operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ACCOUNT_TOOLS")
+if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
+    || !operatorMcpRegistryComposition.includes("OPERATOR_MCP_ENGINEERING_TOOL_NAMES")
+    || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ACCOUNT_TOOLS")
     || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ADMIN_TOOL_NAME_SET")
     || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET")
     || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_DIRECT_PRIORITIES")
