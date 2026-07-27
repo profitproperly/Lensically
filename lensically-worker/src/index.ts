@@ -13203,7 +13203,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       defaultWorkflowTemplateKey: OPERATOR_WORKFLOW_TEMPLATE_KEY,
       normalizeText: normalizeOperatorText,
       createId: () => crypto.randomUUID(),
-      getActiveSession: (brandKey) => getActiveOperatorSession(env, brandKey),
+            getActiveSession: () => getActiveOperatorSession(env, brand.brand_key),
       insertSession: async (input) => env.DB.prepare(
         `INSERT INTO operator_workflow_sessions (
           id, brand_key, workflow_template_key, objective, status, current_stage, notes
