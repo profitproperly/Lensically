@@ -23163,20 +23163,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         ? await operatorGatewayAccountDataLoaded(env, requestedArgs)
         : false;
       if (!directPublicEntry && !legacyGatewayEntry) {
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: {
-              ok: false,
-              error: "public_direct_tool_required",
-              requested_tool: requestedToolName,
-              account_data_loaded: false,
-            },
-            content: [{ type: "text", text: "Lensically accepts only advertised direct typed Main tools." }],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(id, {
+          ok: false,
+          error: "public_direct_tool_required",
+          requested_tool: requestedToolName,
+          account_data_loaded: false,
+        }, "Lensically accepts only advertised direct typed Main tools.", true);
       }
       let toolName = requestedToolName;
       let rawArgs = directPublicEntry
@@ -23189,37 +23181,21 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       if (requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY) {
         const compiledProfile = compileOperatorPublicProfileRequest(requestedArgs);
         if (!compiledProfile.ok) {
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: {
-                ...compiledProfile,
-                required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-                account_data_loaded: gatewayAccountDataLoaded,
-                freehand_gateway_payload_allowed: false,
-              },
-              content: [{ type: "text", text: `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.` }],
-              isError: true,
-            },
-          });
+                    return mcpToolResultResponse(id, {
+            ...compiledProfile,
+            required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+            account_data_loaded: gatewayAccountDataLoaded,
+            freehand_gateway_payload_allowed: false,
+          }, `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.`, true);
         }
         const prepared = await prepareOperatorRoutedGatewayCall(env, compiledProfile.request);
         if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: {
-                ...prepared,
-                profile_id: compiledProfile.profile_id,
-                required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-                account_data_loaded: gatewayAccountDataLoaded,
-              },
-              content: [{ type: "text", text: `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.` }],
-              isError: true,
-            },
-          });
+                    return mcpToolResultResponse(id, {
+            ...prepared,
+            profile_id: compiledProfile.profile_id,
+            required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+            account_data_loaded: gatewayAccountDataLoaded,
+          }, `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.`, true);
         }
         toolName = prepared.tool_name;
         rawArgs = {
@@ -23249,21 +23225,13 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       }
       const guardCheck = await verifyOperatorExecutionGuard(env, toolName, rawArgs);
             if (!guardCheck.ok) {
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: {
-              ok: false,
-              error: guardCheck.error ?? "execution_guard_required",
-              intended_tool: toolName,
-              required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
-              account_data_loaded: gatewayAccountDataLoaded,
-            },
-            content: [{ type: "text", text: `Lensically rejected an operation that was not prepared by the routed execution gateway.` }],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(id, {
+          ok: false,
+          error: guardCheck.error ?? "execution_guard_required",
+          intended_tool: toolName,
+          required_tool: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+          account_data_loaded: gatewayAccountDataLoaded,
+        }, "Lensically rejected an operation that was not prepared by the routed execution gateway.", true);
       }
             let args: Record<string, unknown> = { ...rawArgs };
       delete args.execution_guard;
@@ -23295,15 +23263,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           suggested_tools: [requiredTool],
           account_data_loaded: gatewayAccountDataLoaded,
         };
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: resultPayload,
-            content: [{ type: "text", text: `Lensically requires the proven pre-call route for ${toolName} before execution.` }],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(
+          id,
+          resultPayload,
+          `Lensically requires the proven pre-call route for ${toolName} before execution.`,
+          true,
+        );
       }
       args = preCallRouting.arguments;
       if (sourceDefinedProtectedOperation && !normalizeOperatorText(args.owner_response, 8000, true)) {
@@ -23313,42 +23278,26 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           required_tool: toolName,
           mandatory_route: "Include brand_key and the owner's exact approval in owner_response before the protected operation executes.",
         };
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: {
-              ok: false,
-              error: "known_blocker_prevented",
-              intended_tool: toolName,
-              required_tool: toolName,
-              required_route: route.mandatory_route,
-              route_trail: [route],
-              account_data_loaded: gatewayAccountDataLoaded,
-            },
-            content: [{ type: "text", text: `Lensically blocked protected operation ${toolName} until explicit owner ratification is supplied.` }],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(id, {
+          ok: false,
+          error: "known_blocker_prevented",
+          intended_tool: toolName,
+          required_tool: toolName,
+          required_route: route.mandatory_route,
+          route_trail: [route],
+          account_data_loaded: gatewayAccountDataLoaded,
+        }, `Lensically blocked protected operation ${toolName} until explicit owner ratification is supplied.`, true);
       }
       const boundaryBlock = sourceDefinedDirectEngineering
         ? null
         : await getOperatorMcpBoundaryBlock(request, env, toolName, args);
       if (boundaryBlock) {
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: boundaryBlock,
-            content: [
-              {
-                type: "text",
-                text: `Lensically Operator Mode blocked ${toolName}: ${String(boundaryBlock.error ?? "account_boundary_block")}`,
-              },
-            ],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(
+          id,
+          boundaryBlock,
+          `Lensically Operator Mode blocked ${toolName}: ${String(boundaryBlock.error ?? "account_boundary_block")}`,
+          true,
+        );
       }
                               const routedRouteTrail = Array.isArray(routedGatewayMetadata?.route_trail)
         ? routedGatewayMetadata.route_trail as Array<Record<string, unknown>>
@@ -23377,15 +23326,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
         : await getKnownAliasRetryBlock(env, toolName, args, executionPolicy);
       if (aliasRetryBlock) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, "blocked_known_regression");
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-                        structuredContent: { ...aliasRetryBlock, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } },
-            content: [{ type: "text", text: `Lensically Operator Mode blocked same-backend wrapper retry for ${String(executionPolicy.canonical_tool ?? toolName)}.` }],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(
+          id,
+          { ...aliasRetryBlock, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } },
+          `Lensically Operator Mode blocked same-backend wrapper retry for ${String(executionPolicy.canonical_tool ?? toolName)}.`,
+          true,
+        );
       }
       if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy);
@@ -23410,15 +23356,14 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             request_fingerprint: receiptFingerprint,
           };
           const isError = resultPayload.ok === false;
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: resultPayload,
-              content: [{ type: "text", text: isError ? `Lensically Operator Mode replayed failed operation ${toolName}.` : `Lensically Operator Mode replayed completed operation ${toolName}.` }],
-              isError,
-            },
-          });
+                    return mcpToolResultResponse(
+            id,
+            resultPayload,
+            isError
+              ? `Lensically Operator Mode replayed failed operation ${toolName}.`
+              : `Lensically Operator Mode replayed completed operation ${toolName}.`,
+            isError,
+          );
         }
         if (!receipt.created && receipt.existing?.request_fingerprint && receipt.existing.request_fingerprint !== receiptFingerprint) {
           const resultPayload = {
@@ -23427,15 +23372,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
             idempotency: { version: OPERATOR_IDEMPOTENCY_VERSION, key: idempotencyKey, request_fingerprint: receiptFingerprint },
                         execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy },
           };
-          return mcpJsonResponse({
-            jsonrpc: "2.0",
-            id: id ?? null,
-            result: {
-              structuredContent: resultPayload,
-              content: [{ type: "text", text: `Lensically Operator Mode rejected reused operation identity with different inputs for ${toolName}.` }],
-              isError: true,
-            },
-          });
+                    return mcpToolResultResponse(
+            id,
+            resultPayload,
+            `Lensically Operator Mode rejected reused operation identity with different inputs for ${toolName}.`,
+            true,
+          );
         }
                 if (!receipt.created && receipt.existing?.status === "started") {
           const startedAt = Date.parse(String(receipt.existing.updated_at ?? receipt.existing.created_at ?? ""));
@@ -23454,15 +23396,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
               },
                             execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy },
             };
-            return mcpJsonResponse({
-              jsonrpc: "2.0",
-              id: id ?? null,
-              result: {
-                structuredContent: resultPayload,
-                content: [{ type: "text", text: `Lensically Operator Mode operation ${toolName} is already in progress.` }],
-                isError: true,
-              },
-            });
+                        return mcpToolResultResponse(
+              id,
+              resultPayload,
+              `Lensically Operator Mode operation ${toolName} is already in progress.`,
+              true,
+            );
           }
         }
       }
@@ -23480,15 +23419,12 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
           await failOperatorOperationReceipt(env, idempotencyKey, new Error(String(autonomyAuthorization.error ?? "autonomy_authorization_blocked")));
         }
                 const resultPayload = { ok: false, ...autonomyAuthorization, execution_kernel: { ...operatorExecutionKernelMetadata(env), policy: executionPolicy } };
-        return mcpJsonResponse({
-          jsonrpc: "2.0",
-          id: id ?? null,
-          result: {
-            structuredContent: resultPayload,
-            content: [{ type: "text", text: `Lensically Operator Mode blocked ${toolName}: an approved model-originated decision is required.` }],
-            isError: true,
-          },
-        });
+                return mcpToolResultResponse(
+          id,
+          resultPayload,
+          `Lensically Operator Mode blocked ${toolName}: an approved model-originated decision is required.`,
+          true,
+        );
       }
       let resultPayload: Record<string, unknown>;
       try {
