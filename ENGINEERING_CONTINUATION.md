@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: d163422607a4d390efb3af50d0aa959bab60e1c2
-production_sha: d163422607a4d390efb3af50d0aa959bab60e1c2
+repository_base_sha: 6163e9a56ff951874c6811d9e990758e4c04d393
+production_sha: 6163e9a56ff951874c6811d9e990758e4c04d393
 
 
 
@@ -688,24 +688,33 @@ Completed checkpoint — Stage 6J Manifest review-batch state read service extra
 - Exact-SHA release passed in run `30311456370`.
 - Live production independently confirmed exact SHA `d163422607a4d390efb3af50d0aa959bab60e1c2` with 75/75 public tools.
 
-Current sub-action — Stage 6K Manifest review-draft attachment service extraction:
+Completed checkpoint — Stage 6K Manifest review-draft attachment service extraction:
 
-Extract `attach_manifest_review_draft` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestReviewDraftAttachmentService.ts` as the dependency-injected authority for attachment admission, passing draft state, exact source/run lineage, claimed review item and source-card selection authority, same-day replacement rules, duplicate daily-claim prevention, deterministic claim status, persistence orchestration, batch status, and response composition.
+- Reduced `attach_manifest_review_draft` in `src/index.ts` to explicit draft, claim, source-card, duplicate lookup, atomic D1 batch, unresolved-count, review-batch status, and serializer adapters.
+- Added `test/operatorManifestReviewDraftAttachmentService.spec.ts` and permanent push/release ownership gates.
+- Push validation passed in run `30312500241`.
+- All eight Operator shards passed in run `30312699815`.
+- Exact-SHA release passed in run `30312756514`.
+- Live production independently confirmed exact SHA `6163e9a56ff951874c6811d9e990758e4c04d393` with 75/75 public tools.
 
-- review batch, item number, draft identity, and showable/passing draft admission
-- exact source-card and generation-run lineage matching
-- claimed review item lookup and source-card selection authority
-- same-source attachment versus same-day replacement behavior
-- replacement requires a previously skipped/deleted source and rejects duplicate daily claims
-- deterministic next claim status from draft state
-- atomic claim/source-selection updates, unresolved-count batch status, and serialized response
-- exact 400, 404, and 409 errors with no partial mutation on rejected inputs
+Current sub-action — Stage 6L Manifest review-source resolution service extraction:
 
-Keep draft reads, claim/replacement SQL, duplicate lookup, atomic D1 batch writes, unresolved counting, review-batch status writes, serializer, normalization, constants, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `skip_manifest_review_source` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- review batch/item identity, scope normalization, and default owner reason
+- exact review-item 404 behavior
+- `delete_source` authority limited to saved-pattern sources
+- durable active source exclusion upsert for deleted saved-pattern sources
+- deterministic `source_deleted` versus `source_skipped` claim and source-selection state
+- resolved batch identity, unresolved-count completion versus partial-resolution status, and serialized response
+- exact errors and no partial mutation on rejected inputs
+
+Keep claim SQL, exclusion upsert, claim/source-selection updates, unresolved counting, review-batch status writes, serializer, normalization, UUID creation, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6K, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6L, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
