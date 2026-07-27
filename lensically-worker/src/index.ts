@@ -100,6 +100,10 @@ import {
 import {
   OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS,
 } from "./operatorMcpAutonomousExecutionRegistry";
+import {
+  OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS,
+} from "./operatorMcpAccountAnalyticsRegistry";
+
 
 
 
@@ -17386,9 +17390,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
             ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
             ...OPERATOR_MCP_SOURCE_DRAFT_TOOLS,
             ...OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS,
-      ...OPERATOR_MCP_MANIFEST_CYCLE_TOOLS,
+            ...OPERATOR_MCP_MANIFEST_CYCLE_TOOLS,
       ...OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS,
-      ...OPERATOR_MCP_TOOLS,
+      ...OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS,
     ],
     includeScopedWrappers,
     directPriorities: directPriority,
