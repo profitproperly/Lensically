@@ -63,6 +63,9 @@ const operatorAccountStateService = read("src/operatorAccountStateService.ts");
 const operatorAccountStateServiceTests = read("test/operatorAccountStateService.spec.ts");
 const operatorLensicallyUiSurfaceService = read("src/operatorLensicallyUiSurfaceService.ts");
 const operatorLensicallyUiSurfaceServiceTests = read("test/operatorLensicallyUiSurfaceService.spec.ts");
+const operatorManifestReviewBatchRetirementService = read("src/operatorManifestReviewBatchRetirementService.ts");
+const operatorManifestReviewBatchRetirementServiceTests = read("test/operatorManifestReviewBatchRetirementService.spec.ts");
+
 
 
 
@@ -194,6 +197,10 @@ if (!workflow.includes("test/operatorAccountStateService.spec.ts")) {
 if (!workflow.includes("test/operatorLensicallyUiSurfaceService.spec.ts")) {
   errors.push("operator_lensically_ui_surface_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestReviewBatchRetirementService.spec.ts")) {
+  errors.push("operator_manifest_review_batch_retirement_service_workflow_gate_missing");
+}
+
 
 
 
@@ -921,6 +928,33 @@ if (!operatorLensicallyUiSurfaceServiceTests.includes("enforces selected Threads
     || !operatorLensicallyUiSurfaceServiceTests.includes("returns the exact unsupported-surface status and body")) {
   lifecycleErrors.push("operator_lensically_ui_surface_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestReviewBatchRetirementService"')
+    || !source.includes("retireOperatorManifestReviewBatch({")
+    || !source.includes("findBatch: (brandKey, reviewBatchId)")
+    || !source.includes("retireBatch: (reviewBatchId, brandKey)")) {
+  lifecycleErrors.push("operator_manifest_review_batch_retirement_service_import_or_binding_missing");
+}
+if (source.includes("source_lineage_preserved: true")
+    || source.includes('reason: "no_active_review_batch"')
+    || source.includes('retired: priorStatus !== "retired"')) {
+  lifecycleErrors.push("operator_manifest_review_batch_retirement_service_returned_to_index");
+}
+if (!operatorManifestReviewBatchRetirementService.includes("export async function retireOperatorManifestReviewBatch")
+    || !operatorManifestReviewBatchRetirementService.includes("dependencies.findBatch")
+    || !operatorManifestReviewBatchRetirementService.includes("dependencies.retireBatch")
+    || !operatorManifestReviewBatchRetirementService.includes("review_batch_not_configured_for_brand")
+    || !operatorManifestReviewBatchRetirementService.includes("discard_reason_required")
+    || !operatorManifestReviewBatchRetirementService.includes("source_lineage_preserved: true")) {
+  lifecycleErrors.push("operator_manifest_review_batch_retirement_service_module_incomplete");
+}
+if (!operatorManifestReviewBatchRetirementServiceTests.includes("admits only Manifest review-batch retirement")
+    || !operatorManifestReviewBatchRetirementServiceTests.includes("requires a nonempty discard reason before lookup")
+    || !operatorManifestReviewBatchRetirementServiceTests.includes("returns an idempotent preserved-source result when no active batch exists")
+    || !operatorManifestReviewBatchRetirementServiceTests.includes("retires an active batch while preserving source records and lineage")
+    || !operatorManifestReviewBatchRetirementServiceTests.includes("preserves terminal batch status without issuing another mutation")) {
+  lifecycleErrors.push("operator_manifest_review_batch_retirement_service_tests_incomplete");
+}
+
 
 
 
