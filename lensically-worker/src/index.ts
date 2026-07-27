@@ -89,13 +89,16 @@ import {
 } from "./operatorMcpRegistryComposition";
 import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
 import {
+  dispatchOperatorMcpRequest,
+  type OperatorMcpJsonRpcId,
+} from "./operatorMcpDispatcher";
+import {
   buildOperatorMcpRuntimeHeaders,
-  mcpErrorResponse,
-  mcpJsonResponse,
   mcpToolCompletionResponse,
   mcpToolResultResponse,
   operatorTransportFailureResponse,
 } from "./operatorMcpTransport";
+
 
 
 
@@ -17916,12 +17919,7 @@ function compactTextMatches(content: string, query: string, limit: number): Arra
   return matches;
 }
 
-type JsonRpcRequest = {
-  jsonrpc?: string;
-  id?: string | number | null;
-  method?: string;
-  params?: Record<string, unknown>;
-};
+
 
 
 
@@ -23076,87 +23074,17 @@ async function operatorGatewayAccountDataLoaded(
   }
 }
 
-async function handleOperatorMcp(request: Request, env: Env): Promise<Response> {
-  const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
-  if (request.method === "GET") {
-    return new Response(null, { status: 405, headers: { Allow: "POST" } });
-  }
-  if (request.method === "DELETE") {
-    return new Response(null, { status: 405, headers: { Allow: "POST" } });
-  }
-  if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { Allow: "POST" } });
-  }
+async function handleOperatorMcpToolCall(
+  request: Request,
+  env: Env,
+  id: OperatorMcpJsonRpcId,
+  params: Record<string, unknown>,
+): Promise<Response> {
+  const requestedToolName = typeof params.name === "string" ? params.name : "";
+  const requestedArgs = params.arguments && typeof params.arguments === "object" && !Array.isArray(params.arguments)
+    ? params.arguments as Record<string, unknown>
+    : {};
 
-  if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
-    return unauthorizedGptResponse();
-  }
-
-  const message = await request.json().catch(() => null) as JsonRpcRequest | null;
-  if (!message || typeof message !== "object" || Array.isArray(message)) {
-    return mcpErrorResponse(null, -32700, "Parse error", 400);
-  }
-
-  const id = message.id;
-  const method = typeof message.method === "string" ? message.method : "";
-  if (!method) {
-    return mcpErrorResponse(id, -32600, "Invalid Request");
-  }
-
-  try {
-    if (method === "initialize") {
-      const sessionId = await createOperatorMcpSessionId(env);
-      return mcpJsonResponse({
-        jsonrpc: "2.0",
-        id: id ?? null,
-        result: await operatorMcpInitializeResult(env, message.params?.protocolVersion),
-      }, 200, {
-        "MCP-Protocol-Version": String(message.params?.protocolVersion ?? "2025-06-18"),
-        ...operatorMcpRuntimeHeaders(env, sessionId),
-      });
-    }
-
-    const sessionValidation = await verifyOperatorMcpSession(request, env);
-    if (!sessionValidation.ok) {
-      const replacementSessionId = await createOperatorMcpSessionId(env);
-      return mcpJsonResponse({
-        jsonrpc: "2.0",
-        id: id ?? null,
-        error: {
-          code: -32001,
-          message: "MCP deployment changed. Reinitialize before retrying the request.",
-          data: {
-            reason: sessionValidation.reason ?? "stale_mcp_deployment_session",
-            execution_kernel: operatorExecutionKernelMetadata(env),
-          },
-        },
-      }, 404, operatorMcpRuntimeHeaders(env, replacementSessionId));
-    }
-
-    if (method === "notifications/initialized") {
-      return new Response(null, { status: 202, headers: operatorMcpRuntimeHeaders(env) });
-    }
-
-    if (method === "ping") {
-      return mcpJsonResponse({ jsonrpc: "2.0", id: id ?? null, result: {} });
-    }
-
-    if (method === "tools/list") {
-      const tools = await buildOperatorPublicMcpTools(env);
-      return mcpJsonResponse({
-        jsonrpc: "2.0",
-        id: id ?? null,
-        result: {
-          tools,
-        },
-      });
-    }
-
-        if (method === "tools/call") {
-      const requestedToolName = typeof message.params?.name === "string" ? message.params.name : "";
-      const requestedArgs = message.params?.arguments && typeof message.params.arguments === "object" && !Array.isArray(message.params.arguments)
-        ? message.params.arguments as Record<string, unknown>
-        : {};
       const directPublicEntry = isOperatorPublicDirectToolName(requestedToolName);
       const legacyGatewayEntry = requestedToolName === OPERATOR_ROUTED_EXECUTION_GATEWAY;
       const gatewayAccountDataLoaded = directPublicEntry || legacyGatewayEntry
@@ -23580,33 +23508,26 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
       }
-            return mcpToolCompletionResponse(id, toolName, resultPayload, isError);
-    }
-
-    return mcpErrorResponse(id, -32601, "Method not found");
-  } catch (error) {
-    const messageText = error instanceof Error ? error.message : String(error);
-    return mcpErrorResponse(
-      id,
-      -32603,
-      `Internal MCP error: ${messageText || "unknown_error"}`,
-      200,
-      {
-        ok: false,
-        error_code: "operator_mcp_method_failed",
-        phase: method === "tools/call"
-          ? `tools_call:${String(message.params?.name ?? "unknown")}`
-          : method.replace("/", "_"),
-        request_id: requestId,
-        ...operatorRuntimeMetadata(env),
-        safe_message: (messageText || "unknown_error").slice(0, 500),
-        retryable: true,
-        surface_available: true,
-      },
-      requestId,
-    );
-  }
+              return mcpToolCompletionResponse(id, toolName, resultPayload, isError);
 }
+
+async function handleOperatorMcp(request: Request, env: Env): Promise<Response> {
+  return dispatchOperatorMcpRequest(request, {
+    isAuthorized: (candidate) => isGptRequestAuthorized(candidate, env)
+      || isOperatorMcpRequestAuthorized(candidate, env)
+      || isInternalRequestAuthorized(candidate, env),
+    unauthorizedResponse: unauthorizedGptResponse,
+    createSessionId: () => createOperatorMcpSessionId(env),
+    initializeResult: (requestedVersion) => operatorMcpInitializeResult(env, requestedVersion),
+    runtimeHeaders: (sessionId) => operatorMcpRuntimeHeaders(env, sessionId),
+    validateSession: (candidate) => verifyOperatorMcpSession(candidate, env),
+    executionKernelMetadata: () => operatorExecutionKernelMetadata(env),
+    listTools: () => buildOperatorPublicMcpTools(env),
+    handleToolCall: ({ request: candidate, id, params }) => handleOperatorMcpToolCall(candidate, env, id, params),
+    runtimeMetadata: () => operatorRuntimeMetadata(env),
+  });
+}
+
 
 async function createGptGenerationRun(
   env: Env,
