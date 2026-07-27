@@ -11660,10 +11660,10 @@ async function persistManifestAutonomousPost(
       "mechanism_expansion",
       "adjacent_experiment",
     ],
-    getAutonomyProfile: (brandKey) => getOperatorAutonomyProfile(env, brandKey),
+        getAutonomyProfile: () => getOperatorAutonomyProfile(env, brand.brand_key),
     normalizeText: normalizeOperatorText,
     normalizeMachineKey: normalizeOperatorMachineKey,
-    readCycle: (brandKey, cycleId) => readManifestAutonomousCycle(env, brandKey, cycleId) as Promise<Record<string, unknown> | null>,
+        readCycle: (_brandKey, cycleId) => readManifestAutonomousCycle(env, brand.brand_key, cycleId) as Promise<Record<string, unknown> | null>,
     appendCycleEvent: (input) => appendManifestCycleEvent(env.DB, input as Parameters<typeof appendManifestCycleEvent>[1]),
     getCycleStrategy: (cycleId, brandKey) => getManifestCycleStrategy(env.DB, cycleId, brandKey) as Promise<Record<string, unknown> | null>,
     getEvidenceConsumption: (cycleId, brandKey) => getManifestEvidenceConsumptionState(env.DB, cycleId, brandKey),
@@ -11763,9 +11763,16 @@ async function persistManifestAutonomousPost(
     rejectPersist,
     reconcileNonfatalSlot,
   } = admission.context;
-  const hypothesisValidation = { ok: true as const, value: hypothesis };
-  const sourceContextValidation = { ok: true as const, value: sourceContext };
+    const hypothesisValidation = validateManifestPostHypothesis(hypothesis);
+  const sourceContextValidation = normalizeManifestSourceContext(sourceContext);
+  if (!hypothesisValidation.ok || !sourceContextValidation.ok) {
+    return rejectPersist("validated_admission_context_unreadable", {
+      hypothesis_errors: hypothesisValidation.ok ? [] : hypothesisValidation.errors,
+      source_context_errors: sourceContextValidation.ok ? [] : sourceContextValidation.errors,
+    }, slotKey);
+  }
   let postHypothesis = admittedPostHypothesis;
+
 
   
   
