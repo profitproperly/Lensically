@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: c89a8a8fa3ae2e1aa9240d854e402ea15ed33bb4
-production_sha: c89a8a8fa3ae2e1aa9240d854e402ea15ed33bb4
+repository_base_sha: 5b992795837f960799afe44f074f9e224d0c96bd
+production_sha: 5b992795837f960799afe44f074f9e224d0c96bd
 
 
 
@@ -708,24 +708,32 @@ Completed checkpoint — Stage 6L Manifest review-source resolution service extr
 - Exact-SHA release passed in run `30313884288`.
 - Live production independently confirmed exact SHA `c89a8a8fa3ae2e1aa9240d854e402ea15ed33bb4` with 75/75 public tools.
 
-Current sub-action — Stage 6M Manifest review-batch scheduling service extraction:
+Completed checkpoint — Stage 6M Manifest review-batch scheduling service extraction:
 
-Extract `schedule_manifest_review_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestReviewBatchSchedulingService.ts` as the dependency-injected authority for review-batch admission, hourly slot reconciliation, approved-item filtering, one-post-per-invocation continuation, scheduling gates, scheduler failure isolation, scheduled-state persistence, strategy tagging, inventory lineage, batch completion, and response composition.
+- Reduced `schedule_manifest_review_batch` in `src/index.ts` to explicit review-batch/claim SQL, clock, scheduled-post reads, gates, scheduler, atomic D1, strategy, inventory, unresolved-count, status, and serializer adapters.
+- Added `test/operatorManifestReviewBatchSchedulingService.spec.ts` and permanent push/release ownership gates.
+- Corrected the numeric scheduled-post ID and canonical brand-key adapter types before release.
+- Push validation passed in run `30314903229`.
+- All eight Operator shards passed in run `30315114298`.
+- Exact-SHA release passed in run `30315179170`.
+- Live production independently confirmed exact SHA `5b992795837f960799afe44f074f9e224d0c96bd` with 75/75 public tools.
 
-- exact review-batch identity and 404 admission
-- production date, timezone, optional item filtering, and current-day first eligible hour
-- occupied-hour reconciliation and deterministic hourly open-slot ordering
-- approved claim/draft eligibility with the one-post-per-invocation limit
-- exact insufficient-slot response and remaining-item continuation fields
-- draft retrieval, scheduling gate enforcement, schedule failure isolation, and per-item results
-- successful scheduled-post creation, atomic draft/claim status writes, strategy-tag persistence, inventory lineage, unresolved-count batch status, and serialized review state
-- no mutation for rejected batch, slot, gate, or scheduler outcomes beyond recorded per-item results
+Current sub-action — Stage 6N workflow-session start service extraction:
 
-Keep review-batch/claim SQL, local clock, scheduled-post reads, gate execution, scheduler creation, atomic D1 writes, strategy tagging, inventory persistence, unresolved counting, batch status, serializer, normalization, constants, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `start_workflow_session` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- active-session reuse and exact idempotency fields
+- current-stage normalization and account-selection next-stage guidance
+- workflow-template response payload on both reused and new sessions
+- new session identity, canonical template fallback, optional notes, active/account-selection persistence state, and exact response keys
+- no duplicate session creation when an active session already exists
+
+Keep active-session lookup, UUID creation, workflow-template payload, session insert SQL, text normalization, template constant, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6M, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6N, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
