@@ -57,6 +57,9 @@ const operatorManifestPersistenceService = read("src/operatorManifestPersistence
 const operatorManifestPersistenceServiceTests = read("test/operatorManifestPersistenceService.spec.ts");
 const operatorManifestScheduledReviewService = read("src/operatorManifestScheduledReviewService.ts");
 const operatorManifestScheduledReviewServiceTests = read("test/operatorManifestScheduledReviewService.spec.ts");
+const operatorManifestCycleObservationService = read("src/operatorManifestCycleObservationService.ts");
+const operatorManifestCycleObservationServiceTests = read("test/operatorManifestCycleObservationService.spec.ts");
+
 
 
 
@@ -176,6 +179,10 @@ if (!workflow.includes("test/operatorManifestPersistenceService.spec.ts")) {
 if (!workflow.includes("test/operatorManifestScheduledReviewService.spec.ts")) {
   errors.push("operator_manifest_scheduled_review_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestCycleObservationService.spec.ts")) {
+  errors.push("operator_manifest_cycle_observation_service_workflow_gate_missing");
+}
+
 
 
 
@@ -817,6 +824,34 @@ if (!operatorManifestScheduledReviewServiceTests.includes("requires a valid sche
     || !operatorManifestScheduledReviewServiceTests.includes("records keep feedback without a production mutation and maps permanent rules")) {
   lifecycleErrors.push("operator_manifest_scheduled_review_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestCycleObservationService"')
+    || !source.includes("observeOperatorManifestCycleToolResult({")
+    || !source.includes("resolveDefectsByScope: (input)")
+    || !source.includes("recordDefect: (input)")) {
+  lifecycleErrors.push("operator_manifest_cycle_observation_service_import_or_binding_missing");
+}
+if (source.includes("function manifestCycleToolScope(")
+    || source.includes('resolution_mode: "successful_scoped_retry_or_reconciliation"')
+    || source.includes('impactState = result.scheduled_post_id')) {
+  lifecycleErrors.push("operator_manifest_cycle_observation_service_returned_to_index");
+}
+if (!operatorManifestCycleObservationService.includes("export function manifestCycleFailureIsDefect")
+    || !operatorManifestCycleObservationService.includes("export function manifestCycleToolScope")
+    || !operatorManifestCycleObservationService.includes("export async function observeOperatorManifestCycleToolResult")
+    || !operatorManifestCycleObservationService.includes("dependencies.resolveDefectsByScope")
+    || !operatorManifestCycleObservationService.includes("dependencies.recordDefect")
+    || !operatorManifestCycleObservationService.includes('impactState = result.scheduled_post_id')
+    || !operatorManifestCycleObservationService.includes('resolution_mode: "successful_scoped_retry_or_reconciliation"')) {
+  lifecycleErrors.push("operator_manifest_cycle_observation_service_module_incomplete");
+}
+if (!operatorManifestCycleObservationServiceTests.includes("classifies expected autonomous control outcomes without defect receipts")
+    || !operatorManifestCycleObservationServiceTests.includes("maps persistence and evaluator tools to deterministic cycle scopes")
+    || !operatorManifestCycleObservationServiceTests.includes("resolves matching open defects after a successful scoped retry")
+    || !operatorManifestCycleObservationServiceTests.includes("does not record expected gate or continuation failures")
+    || !operatorManifestCycleObservationServiceTests.includes("records unexpected partially successful failures with deterministic metadata")) {
+  lifecycleErrors.push("operator_manifest_cycle_observation_service_tests_incomplete");
+}
+
 
 
 
