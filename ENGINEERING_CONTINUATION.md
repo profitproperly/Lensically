@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: b9a85980cbc930e26b8acee819490a8e10b9ce79
-production_sha: b9a85980cbc930e26b8acee819490a8e10b9ce79
+repository_base_sha: d0c6fd133ee7596eecb9a17bd73ae6ff97b6d076
+production_sha: d0c6fd133ee7596eecb9a17bd73ae6ff97b6d076
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -568,24 +568,35 @@ Completed checkpoint — Stage 6B authoritative hourly coverage service extracti
 - Exact-SHA release passed in run `30291691718`.
 - Live production independently confirmed exact SHA `b9a85980cbc930e26b8acee819490a8e10b9ce79` with 75/75 public tools.
 
-Current sub-action — Stage 6C Manifest autonomous preparation service extraction:
+Completed checkpoint — Stage 6C1 Manifest autonomous preparation checkpoint and intelligence extraction:
 
-Extract the `prepareManifestAutonomousCycle` orchestration from `src/index.ts` into a focused dependency-injected product service while preserving:
+- Added `src/operatorManifestPrepareCheckpointService.ts` as the dependency-injected authority for Manifest-only admission, autonomy-mode enforcement, timezone and horizon normalization, stable operation identity, payload-mismatch blocking, bounded live Threads collection, evaluator continuation, semantic signatures, maturity evaluations, comparable analyses, bounded learning batches, portfolio experiments, measurement audit, Content Focus finalization, active learning-brief updates, and cycle-construction continuation context.
+- Removed the phased preparation, intelligence, measurement, and Content Focus state machine from `prepareManifestAutonomousCycle` in `src/index.ts`; the monolith now supplies explicit environment, Threads, database, compaction, and persistence adapters before continuing into final cycle construction.
+- Preserved exact checkpoint phases, continuation language, same-operation semantics, learning offsets, failure states, non-phased evidence refresh behavior, and durable state effects.
+- Added `test/operatorManifestPrepareCheckpointService.spec.ts` covering admission and idempotency mismatch, bounded live collection, learning continuation offsets, Content Focus finalization, active learning-brief updates, and cycle-construction handoff.
+- Added permanent push and release ownership gates preventing the extracted checkpoint and intelligence orchestration from returning to `src/index.ts`.
+- Push validation passed in run `30293238145`.
+- All eight Operator shards passed in run `30293441695`.
+- Exact-SHA release passed in run `30293565508`.
+- Live production independently confirmed exact SHA `d0c6fd133ee7596eecb9a17bd73ae6ff97b6d076` with 75/75 public tools.
 
-- live Threads and database clock reconciliation
-- delivery-state and scheduled-post recovery evidence
-- rolling 28-day evidence snapshot construction and pagination manifest
-- follower, performance-learning, Content Focus, strategy, repetition, and exposure inputs
-- target-slot and authoritative occupancy computation
-- cycle creation or same-operation refresh semantics
-- receipt initialization, startup-state evidence, defects, events, and continuation requirements
-- exact response fields, failure states, and idempotent effects
+Current sub-action — Stage 6C2 Manifest autonomous cycle-construction service extraction:
 
-Keep low-level Threads collection, scheduler internals, database adapters, JSON transport, and autonomous post persistence in `src/index.ts`. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract the remaining final construction half of `prepareManifestAutonomousCycle` from `src/index.ts` into a focused dependency-injected service while preserving:
+
+- trusted Threads, database, runtime, latest-publication, and external UTC clock reconciliation
+- target-slot construction, authoritative occupancy, elapsed-slot exclusion, and delivery incident reconciliation
+- required schema/table readiness and current Saved Pattern intelligence repair
+- decision intelligence, account position, cycle creation, and same-operation refresh semantics
+- locked source-card inventory filtering, deterministic backend source selection, and persisted source-selection plans
+- rolling 28-day evidence snapshot construction, evidence snapshot attachment, intelligence policy, input strategy, exposure ledger, receipt initialization, and cycle-prepared events
+- checkpoint clearing, compact reused-cycle responses, full new-cycle response contracts, continuation language, and exact idempotent database effects
+
+Keep low-level Threads collection, scheduler internals, database SQL adapters, JSON transport, autonomous post persistence, and unrelated product workflows in `src/index.ts`. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6C, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6C2, then continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
