@@ -961,29 +961,29 @@ if (!operatorManifestReviewBatchRetirementServiceTests.includes("admits only Man
 }
 if (!source.includes('from "./operatorManifestReviewBatchStateService"')
     || !source.includes("readOperatorManifestReviewBatchState({")
-    || !source.includes("findReviewBatchId: async")
-    || !source.includes("readActiveAutonomousCycle: (brandKey)")) {
+    || !source.includes("findActiveReviewBatchId: async")
+    || !source.includes("findActiveAutonomousCycle: (brandKey)")) {
   lifecycleErrors.push("operator_manifest_review_batch_state_service_import_or_binding_missing");
 }
-if (source.includes('state: "no_active_review_batch"')
-    || source.includes('required_tool: activeAutonomousCycle ? "persist_manifest_autonomous_post" : null')
-    || source.includes('error: "review_batch_not_found"')) {
+if (source.includes("autonomous_cycle_active: Boolean(activeAutonomousCycle)")
+    || source.includes("required_route: activeAutonomousCycle")
+    || source.includes("Continue the prepared autonomous cycle with exactly one model-evaluated post per persistence call.")) {
   lifecycleErrors.push("operator_manifest_review_batch_state_service_returned_to_index");
 }
 if (!operatorManifestReviewBatchStateService.includes("export async function readOperatorManifestReviewBatchState")
     || !operatorManifestReviewBatchStateService.includes("dependencies.ensureWorkflowTables")
-    || !operatorManifestReviewBatchStateService.includes("dependencies.findReviewBatchId")
-    || !operatorManifestReviewBatchStateService.includes("dependencies.readActiveAutonomousCycle")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.findActiveReviewBatchId")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.findActiveAutonomousCycle")
     || !operatorManifestReviewBatchStateService.includes("dependencies.serializeReviewBatch")
     || !operatorManifestReviewBatchStateService.includes('state: "no_active_review_batch"')
     || !operatorManifestReviewBatchStateService.includes('error: "review_batch_not_found"')) {
   lifecycleErrors.push("operator_manifest_review_batch_state_service_module_incomplete");
 }
-if (!operatorManifestReviewBatchStateServiceTests.includes("ensures workflow tables before brand admission")
-    || !operatorManifestReviewBatchStateServiceTests.includes("rejects unsupported brands without review-batch reads")
-    || !operatorManifestReviewBatchStateServiceTests.includes("uses explicit and date-scoped active review-batch lookup")
+if (!operatorManifestReviewBatchStateServiceTests.includes("ensures workflow readiness before enforcing Manifest-only admission")
+    || !operatorManifestReviewBatchStateServiceTests.includes("serializes an explicitly identified review batch without discovery")
+    || !operatorManifestReviewBatchStateServiceTests.includes("discovers the latest active batch with optional production-date scope")
     || !operatorManifestReviewBatchStateServiceTests.includes("returns autonomous-cycle continuation guidance when no review batch is active")
-    || !operatorManifestReviewBatchStateServiceTests.includes("serializes an active batch and returns the exact missing-batch status")) {
+    || !operatorManifestReviewBatchStateServiceTests.includes("returns the exact not-found response when an identified batch cannot serialize")) {
   lifecycleErrors.push("operator_manifest_review_batch_state_service_tests_incomplete");
 }
 
