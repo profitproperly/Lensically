@@ -61,6 +61,9 @@ const operatorManifestCycleObservationService = read("src/operatorManifestCycleO
 const operatorManifestCycleObservationServiceTests = read("test/operatorManifestCycleObservationService.spec.ts");
 const operatorAccountStateService = read("src/operatorAccountStateService.ts");
 const operatorAccountStateServiceTests = read("test/operatorAccountStateService.spec.ts");
+const operatorLensicallyUiSurfaceService = read("src/operatorLensicallyUiSurfaceService.ts");
+const operatorLensicallyUiSurfaceServiceTests = read("test/operatorLensicallyUiSurfaceService.spec.ts");
+
 
 
 
@@ -188,6 +191,10 @@ if (!workflow.includes("test/operatorManifestCycleObservationService.spec.ts")) 
 if (!workflow.includes("test/operatorAccountStateService.spec.ts")) {
   errors.push("operator_account_state_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorLensicallyUiSurfaceService.spec.ts")) {
+  errors.push("operator_lensically_ui_surface_service_workflow_gate_missing");
+}
+
 
 
 
@@ -884,6 +891,36 @@ if (!operatorAccountStateServiceTests.includes("reads the selected account state
     || !operatorAccountStateServiceTests.includes("normalizes an unavailable scheduled count without changing the response contract")) {
   lifecycleErrors.push("operator_account_state_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorLensicallyUiSurfaceService"')
+    || !source.includes("readOperatorLensicallyUiSurface({")
+    || !source.includes("refreshFollowerSnapshot: (account, timezone)")
+    || !source.includes("listSavedPatterns: async")) {
+  lifecycleErrors.push("operator_lensically_ui_surface_service_import_or_binding_missing");
+}
+if (source.includes("unsupported_lensically_ui_surface")
+    || source.includes("start_of_day_followers: startOfDayFollowers")
+    || source.includes("cursor_depth: cursorDepth")) {
+  lifecycleErrors.push("operator_lensically_ui_surface_service_returned_to_index");
+}
+if (!operatorLensicallyUiSurfaceService.includes("export async function readOperatorLensicallyUiSurface")
+    || !operatorLensicallyUiSurfaceService.includes("dependencies.getThreadsAccount")
+    || !operatorLensicallyUiSurfaceService.includes("dependencies.buildDashboard")
+    || !operatorLensicallyUiSurfaceService.includes("dependencies.refreshFollowerSnapshot")
+    || !operatorLensicallyUiSurfaceService.includes("dependencies.fetchPostsPage")
+    || !operatorLensicallyUiSurfaceService.includes("dependencies.listPostArchive")
+    || !operatorLensicallyUiSurfaceService.includes("dependencies.listSavedPatterns")
+    || !operatorLensicallyUiSurfaceService.includes("unsupported_lensically_ui_surface")
+    || !operatorLensicallyUiSurfaceService.includes("threads_insights_upstream_failed")) {
+  lifecycleErrors.push("operator_lensically_ui_surface_service_module_incomplete");
+}
+if (!operatorLensicallyUiSurfaceServiceTests.includes("enforces selected Threads account and dashboard token admission")
+    || !operatorLensicallyUiSurfaceServiceTests.includes("maps follower snapshots into exact deltas and pagination")
+    || !operatorLensicallyUiSurfaceServiceTests.includes("bounds insights cursor depth and writes first-page archive and cache state")
+    || !operatorLensicallyUiSurfaceServiceTests.includes("preserves archive and missing saved-pattern pagination contracts")
+    || !operatorLensicallyUiSurfaceServiceTests.includes("returns the exact unsupported-surface status and body")) {
+  lifecycleErrors.push("operator_lensically_ui_surface_service_tests_incomplete");
+}
+
 
 
 

@@ -132,9 +132,11 @@ jobs:
                     npm run test -- --run test/operatorManifestPersistenceService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorManifestScheduledReviewService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorManifestCycleObservationService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorAccountStateService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorAccountStateService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorLensicallyUiSurfaceService.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+
 
 
 
@@ -367,9 +369,11 @@ jobs:
                     npm run test -- --run test/operatorManifestPersistenceService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorManifestScheduledReviewService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorManifestCycleObservationService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorAccountStateService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorAccountStateService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorLensicallyUiSurfaceService.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
+
 
 
           npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
