@@ -65,6 +65,8 @@ const operatorLensicallyUiSurfaceService = read("src/operatorLensicallyUiSurface
 const operatorLensicallyUiSurfaceServiceTests = read("test/operatorLensicallyUiSurfaceService.spec.ts");
 const operatorManifestReviewBatchRetirementService = read("src/operatorManifestReviewBatchRetirementService.ts");
 const operatorManifestReviewBatchRetirementServiceTests = read("test/operatorManifestReviewBatchRetirementService.spec.ts");
+const operatorManifestReviewBatchStateService = read("src/operatorManifestReviewBatchStateService.ts");
+const operatorManifestReviewBatchStateServiceTests = read("test/operatorManifestReviewBatchStateService.spec.ts");
 
 
 
@@ -199,6 +201,9 @@ if (!workflow.includes("test/operatorLensicallyUiSurfaceService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorManifestReviewBatchRetirementService.spec.ts")) {
   errors.push("operator_manifest_review_batch_retirement_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestReviewBatchStateService.spec.ts")) {
+  errors.push("operator_manifest_review_batch_state_service_workflow_gate_missing");
 }
 
 
@@ -952,8 +957,38 @@ if (!operatorManifestReviewBatchRetirementServiceTests.includes("admits only Man
     || !operatorManifestReviewBatchRetirementServiceTests.includes("returns an idempotent preserved-source result when no active batch exists")
     || !operatorManifestReviewBatchRetirementServiceTests.includes("retires an active batch while preserving source records and lineage")
     || !operatorManifestReviewBatchRetirementServiceTests.includes("preserves terminal batch status without issuing another mutation")) {
-  lifecycleErrors.push("operator_manifest_review_batch_retirement_service_tests_incomplete");
+    lifecycleErrors.push("operator_manifest_review_batch_retirement_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestReviewBatchStateService"')
+    || !source.includes("readOperatorManifestReviewBatchState({")
+    || !source.includes("findReviewBatchId: async")
+    || !source.includes("readActiveAutonomousCycle: (brandKey)")) {
+  lifecycleErrors.push("operator_manifest_review_batch_state_service_import_or_binding_missing");
+}
+if (source.includes('state: "no_active_review_batch"')
+    || source.includes('required_tool: activeAutonomousCycle ? "persist_manifest_autonomous_post" : null')
+    || source.includes('error: "review_batch_not_found"')) {
+  lifecycleErrors.push("operator_manifest_review_batch_state_service_returned_to_index");
+}
+if (!operatorManifestReviewBatchStateService.includes("export async function readOperatorManifestReviewBatchState")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.ensureWorkflowTables")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.findReviewBatchId")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.readActiveAutonomousCycle")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.serializeReviewBatch")
+    || !operatorManifestReviewBatchStateService.includes('state: "no_active_review_batch"')
+    || !operatorManifestReviewBatchStateService.includes('error: "review_batch_not_found"')) {
+  lifecycleErrors.push("operator_manifest_review_batch_state_service_module_incomplete");
+}
+if (!operatorManifestReviewBatchStateServiceTests.includes("ensures workflow tables before brand admission")
+    || !operatorManifestReviewBatchStateServiceTests.includes("rejects unsupported brands without review-batch reads")
+    || !operatorManifestReviewBatchStateServiceTests.includes("uses explicit and date-scoped active review-batch lookup")
+    || !operatorManifestReviewBatchStateServiceTests.includes("returns autonomous-cycle continuation guidance when no review batch is active")
+    || !operatorManifestReviewBatchStateServiceTests.includes("serializes an active batch and returns the exact missing-batch status")) {
+  lifecycleErrors.push("operator_manifest_review_batch_state_service_tests_incomplete");
+}
+
+
+
 
 
 
