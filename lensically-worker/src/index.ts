@@ -88,6 +88,15 @@ import {
   operatorMcpToolNameRequiresProceed,
 } from "./operatorMcpRegistryComposition";
 import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
+import {
+  buildOperatorMcpRuntimeHeaders,
+  mcpErrorResponse,
+  mcpJsonResponse,
+  mcpToolCompletionResponse,
+  mcpToolResultResponse,
+  operatorTransportFailureResponse,
+} from "./operatorMcpTransport";
+
 
 
 
@@ -17914,16 +17923,7 @@ type JsonRpcRequest = {
   params?: Record<string, unknown>;
 };
 
-function mcpJsonResponse(payload: Record<string, unknown>, status = 200, extraHeaders: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=UTF-8",
-      "cache-control": "no-store",
-      ...extraHeaders,
-    },
-  });
-}
+
 
 
 
@@ -18006,13 +18006,14 @@ async function verifyOperatorMcpSession(
 }
 
 function operatorMcpRuntimeHeaders(env: Env, sessionId?: string): Record<string, string> {
-  return {
-    ...(sessionId ? { "Mcp-Session-Id": sessionId } : {}),
-    "X-Lensically-Deployment-Id": currentOperatorDeploymentIdentity(env),
-    "X-Lensically-Commit-Sha": env.LENSICALLY_COMMIT_SHA?.trim() || "unknown",
-    "X-Lensically-Execution-Kernel": EXECUTION_KERNEL_VERSION,
-  };
+  return buildOperatorMcpRuntimeHeaders({
+    sessionId,
+    deploymentId: currentOperatorDeploymentIdentity(env),
+    commitSha: env.LENSICALLY_COMMIT_SHA?.trim() || "unknown",
+    executionKernelVersion: EXECUTION_KERNEL_VERSION,
+  });
 }
+
 
 const RETIRED_EXECUTION_TABLES = [
   "operator_execution_library_events",
@@ -18080,38 +18081,15 @@ async function retireLegacyExecutionInfrastructure(env: Env): Promise<void> {
 }
 
 function operatorTransportFailure(env: Env, requestId: string, phase: string, error: unknown, status = 500): Response {
-  const safeMessage = error instanceof Error ? error.message : String(error || "unknown_error");
-  return new Response(JSON.stringify({
-    ok: false,
-    error_code: "operator_transport_failure",
+  return operatorTransportFailureResponse({
+    requestId,
     phase,
-    request_id: requestId,
-    ...operatorRuntimeMetadata(env),
-    message: safeMessage.slice(0, 500),
-  }), {
+    error,
     status,
-    headers: {
-      "content-type": "application/json; charset=UTF-8",
-      "cache-control": "no-store",
-      "x-request-id": requestId,
-    },
+    runtimeMetadata: operatorRuntimeMetadata(env),
   });
 }
 
-function mcpErrorResponse(
-  id: string | number | null | undefined,
-  code: number,
-  message: string,
-  status = 200,
-  data?: Record<string, unknown>,
-  requestId?: string,
-): Response {
-  return mcpJsonResponse({
-    jsonrpc: "2.0",
-    id: id ?? null,
-    error: { code, message, ...(data ? { data } : {}) },
-  }, status, requestId ? { "x-request-id": requestId } : {});
-}
 
 function operatorMcpBaseUrl(request: Request, env: Env): string {
   return (env.WORKER_ORIGIN?.trim() || new URL(request.url).origin).replace(/\/+$/, "");
@@ -23666,22 +23644,7 @@ async function handleOperatorMcp(request: Request, env: Env): Promise<Response> 
       if (!sourceDefinedStaticRoute) {
         await recordOperatorExecutionDecision(env, toolName, args, executionPolicy, isError ? "failed" : "completed");
       }
-      return mcpJsonResponse({
-        jsonrpc: "2.0",
-        id: id ?? null,
-        result: {
-          structuredContent: resultPayload,
-          content: [
-            {
-              type: "text",
-              text: isError
-                ? `Lensically Operator Mode tool ${toolName} failed: ${String(resultPayload.error ?? resultPayload.status ?? "unknown_error")}. Required next action: ${String((resultPayload.operator_action_closure as Record<string, unknown> | undefined)?.next_action ?? "Contain, repair, verify, record, and checkpoint before ending the turn.")}`
-                : `Lensically Operator Mode tool ${toolName} completed. Required turn closure: record progress; preserve deferred work; declare next action: ${String((resultPayload.operator_action_closure as Record<string, unknown> | undefined)?.next_action ?? "Continue the active durable outcome.")}; emit checkpoint: ${String((resultPayload.operator_action_closure as Record<string, unknown> | undefined)?.checkpoint ?? "Resume from durable state, not chat memory.")}`,
-            },
-          ],
-          isError,
-        },
-      });
+            return mcpToolCompletionResponse(id, toolName, resultPayload, isError);
     }
 
     return mcpErrorResponse(id, -32601, "Method not found");
