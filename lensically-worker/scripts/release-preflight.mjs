@@ -45,6 +45,8 @@ const operatorMcpToolCallDispatcher = read("src/operatorMcpToolCallDispatcher.ts
 const operatorMcpToolCallDispatcherTests = read("test/operatorMcpToolCallDispatcher.spec.ts");
 const operatorManifestCycleService = read("src/operatorManifestCycleService.ts");
 const operatorManifestCycleServiceTests = read("test/operatorManifestCycleService.spec.ts");
+const operatorHourlyCoverageService = read("src/operatorHourlyCoverageService.ts");
+const operatorHourlyCoverageServiceTests = read("test/operatorHourlyCoverageService.spec.ts");
 
 
 
@@ -142,6 +144,9 @@ if (!workflow.includes("test/operatorMcpToolCallDispatcher.spec.ts")) {
 }
 if (!workflow.includes("test/operatorManifestCycleService.spec.ts")) {
   errors.push("operator_manifest_cycle_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorHourlyCoverageService.spec.ts")) {
+  errors.push("operator_hourly_coverage_service_workflow_gate_missing");
 }
 
 
@@ -612,6 +617,35 @@ if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page
     || !operatorManifestCycleServiceTests.includes("preserves seven-stage defect validation and receipt requirements")
     || !operatorManifestCycleServiceTests.includes("preserves final defect resolution and cycle completion reconciliation")) {
   lifecycleErrors.push("operator_manifest_cycle_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorHourlyCoverageService"')
+    || !source.includes('if (toolName === "get_hourly_coverage")')
+    || !source.includes("handleOperatorHourlyCoverageService({")) {
+  lifecycleErrors.push("operator_hourly_coverage_service_import_or_binding_missing");
+}
+if (source.includes('const driftDefectKey = `coverage-ledger-drift:')
+    || source.includes('errorCode: "manifest_cycle_missing_slot_ledger_drift"')
+    || source.includes('completion_trigger: "authoritative_coverage_reconciliation"')
+    || source.includes('eventType: "coverage_reconciled"')) {
+  lifecycleErrors.push("operator_hourly_coverage_service_returned_to_index");
+}
+if (!operatorHourlyCoverageService.includes("export async function handleOperatorHourlyCoverageService")
+    || !operatorHourlyCoverageService.includes("dependencies.getCoverage")
+    || !operatorHourlyCoverageService.includes("dependencies.occupiedSlots")
+    || !operatorHourlyCoverageService.includes("dependencies.reconcileCoverage")
+    || !operatorHourlyCoverageService.includes("dependencies.recordDefect")
+    || !operatorHourlyCoverageService.includes("dependencies.resolveDefect")
+    || !operatorHourlyCoverageService.includes("dependencies.updateCycleCoverage")
+    || !operatorHourlyCoverageService.includes("dependencies.readNextPlanItem")
+    || !operatorHourlyCoverageService.includes("dependencies.finalizeCycleReceipt")
+    || !operatorHourlyCoverageService.includes('completion_trigger: "authoritative_coverage_reconciliation"')
+    || !operatorHourlyCoverageService.includes('eventType: "coverage_reconciled"')) {
+  lifecycleErrors.push("operator_hourly_coverage_service_module_incomplete");
+}
+if (!operatorHourlyCoverageServiceTests.includes("preserves generic bounded hourly coverage reads for every brand")
+    || !operatorHourlyCoverageServiceTests.includes("repairs authoritative Manifest ledger drift and selects the next locked plan item")
+    || !operatorHourlyCoverageServiceTests.includes("finalizes complete coverage while ignoring elapsed unfilled slots")) {
+  lifecycleErrors.push("operator_hourly_coverage_service_tests_incomplete");
 }
 
 
