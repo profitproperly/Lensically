@@ -108,6 +108,7 @@ import { readOperatorAccountState } from "./operatorAccountStateService";
 import { readOperatorLensicallyUiSurface } from "./operatorLensicallyUiSurfaceService";
 import { retireOperatorManifestReviewBatch } from "./operatorManifestReviewBatchRetirementService";
 import { readOperatorManifestReviewBatchState } from "./operatorManifestReviewBatchStateService";
+import { attachOperatorManifestReviewDraft } from "./operatorManifestReviewDraftAttachmentService";
 
 
 
@@ -12920,152 +12921,130 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-    if (toolName === "attach_manifest_review_draft") {
-    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
-    const itemNumber = Math.trunc(Number(payload.item_number));
-    const draftId = normalizeOperatorText(payload.draft_id, 120);
-    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
-    if (!reviewBatchId || !Number.isInteger(itemNumber) || itemNumber < 1 || itemNumber > MANIFEST_REVIEW_BATCH_SIZE || !draft) {
-      return operatorJsonResponse({ success: false, error: "review_batch_item_and_draft_required" }, 400);
-    }
-    if (!draft.showable || !["shown", "approved", "scheduled", "published"].includes(draft.status)) {
-      return operatorJsonResponse({ success: false, error: "passing_shown_draft_required", draft_status: draft.status }, 400);
-    }
-
-    const requestedSourceCardId = normalizeOperatorText(payload.source_card_id, 120, true) ?? draft.source_card_id;
-    const requestedGenerationRunId = normalizeOperatorText(payload.generation_run_id, 120, true) ?? draft.run_id;
-    if (!requestedSourceCardId || draft.source_card_id !== requestedSourceCardId || draft.run_id !== requestedGenerationRunId) {
-      return operatorJsonResponse({ success: false, error: "draft_lineage_mismatch" }, 409);
-    }
-
-    const claim = await env.DB.prepare(
-      `SELECT * FROM operator_daily_source_claims
-       WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
-    ).bind(reviewBatchId, itemNumber, brand.brand_key).first<Record<string, unknown>>();
-    if (!claim) return operatorJsonResponse({ success: false, error: "review_batch_item_not_found" }, 404);
-
-    const replacement = await env.DB.prepare(
-      `SELECT
-         c.id AS source_card_id,
-         c.source_selection_id,
-         s.batch_id AS source_batch_id,
-         s.source_identity_key,
-         s.source_type,
-         s.internal_source_id,
-         b.production_date AS source_production_date
-       FROM operator_source_cards c
-       JOIN operator_source_selections s
-         ON s.id = c.source_selection_id
-        AND s.brand_key = c.brand_key
-       JOIN operator_source_selection_batches b
-         ON b.id = s.batch_id
-        AND b.brand_key = s.brand_key
-       WHERE c.id = ?
-         AND c.brand_key = ?
-       LIMIT 1`,
-    ).bind(requestedSourceCardId, brand.brand_key).first<Record<string, unknown>>();
-    if (!replacement?.source_selection_id) {
-      return operatorJsonResponse({ success: false, error: "manifest_source_card_selection_required" }, 409);
-    }
-
-    const replacementSelectionId = String(replacement.source_selection_id);
-    const sameSourceIdentity = String(replacement.source_identity_key ?? "") === String(claim.source_identity_key ?? "");
-    if (!sameSourceIdentity && String(replacement.source_production_date ?? "") !== String(claim.production_date ?? "")) {
-      return operatorJsonResponse({ success: false, error: "replacement_source_production_date_mismatch" }, 409);
-    }
-
-    const replacingSource = !sameSourceIdentity && replacementSelectionId !== String(claim.source_selection_id ?? "");
-    if (replacingSource && !["source_skipped", "source_deleted"].includes(String(claim.status ?? ""))) {
-      return operatorJsonResponse({ success: false, error: "review_source_replacement_requires_skip" }, 409);
-    }
-    if (replacingSource) {
-      const duplicateClaim = await env.DB.prepare(
-        `SELECT id FROM operator_daily_source_claims
-         WHERE brand_key = ?
-           AND production_date = ?
-           AND source_identity_key = ?
-           AND id <> ?
+        if (toolName === "attach_manifest_review_draft") {
+    const attachment = await attachOperatorManifestReviewDraft({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      maxReviewBatchSize: MANIFEST_REVIEW_BATCH_SIZE,
+      normalizeText: normalizeOperatorText,
+      getDraft: (draftId) => getOperatorDraft(env, brand, draftId),
+      getClaim: (reviewBatchId, itemNumber, brandKey) => env.DB.prepare(
+        `SELECT * FROM operator_daily_source_claims
+         WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
+      ).bind(reviewBatchId, itemNumber, brandKey).first<Record<string, unknown>>(),
+      getReplacement: (sourceCardId, brandKey) => env.DB.prepare(
+        `SELECT
+           c.id AS source_card_id,
+           c.source_selection_id,
+           s.batch_id AS source_batch_id,
+           s.source_identity_key,
+           s.source_type,
+           s.internal_source_id,
+           b.production_date AS source_production_date
+         FROM operator_source_cards c
+         JOIN operator_source_selections s
+           ON s.id = c.source_selection_id
+          AND s.brand_key = c.brand_key
+         JOIN operator_source_selection_batches b
+           ON b.id = s.batch_id
+          AND b.brand_key = s.brand_key
+         WHERE c.id = ?
+           AND c.brand_key = ?
          LIMIT 1`,
-      ).bind(
-        brand.brand_key,
-        String(claim.production_date ?? ""),
-        String(replacement.source_identity_key ?? ""),
-        String(claim.id),
-      ).first<{ id: string }>();
-      if (duplicateClaim?.id) {
-        return operatorJsonResponse({ success: false, error: "replacement_source_already_claimed_for_day" }, 409);
-      }
-    }
-
-    const nextClaimStatus = draft.status === "approved"
-      ? "approved"
-      : draft.status === "scheduled" || draft.status === "published"
-        ? draft.status
-        : "shown";
-    const statements = [];
-    if (replacingSource) {
-      statements.push(
-        env.DB.prepare(
-          `UPDATE operator_daily_source_claims
-           SET source_identity_key = ?,
-               source_type = ?,
-               internal_source_id = ?,
-               source_batch_id = ?,
-               source_selection_id = ?,
-               source_card_id = ?,
-               generation_run_id = ?,
-               draft_id = ?,
-               scheduled_post_id = ?,
-               status = ?,
-               disposition_reason = NULL
-           WHERE id = ?`,
+      ).bind(sourceCardId, brandKey).first<Record<string, unknown>>(),
+      findDuplicateClaim: async (input) => {
+        const row = await env.DB.prepare(
+          `SELECT id FROM operator_daily_source_claims
+           WHERE brand_key = ?
+             AND production_date = ?
+             AND source_identity_key = ?
+             AND id <> ?
+           LIMIT 1`,
         ).bind(
-          String(replacement.source_identity_key ?? ""),
-          String(replacement.source_type ?? ""),
-          String(replacement.internal_source_id ?? ""),
-          String(replacement.source_batch_id ?? ""),
-          replacementSelectionId,
-          requestedSourceCardId,
-          requestedGenerationRunId,
-          draftId,
-          draft.scheduled_post_id ?? null,
-          nextClaimStatus,
-          String(claim.id),
-        ),
-        env.DB.prepare(
-          `UPDATE operator_source_selections
-           SET disposition = 'claimed',
-               disposition_reason = ?,
-               disposition_at = CURRENT_TIMESTAMP
-           WHERE id = ?
-             AND brand_key = ?`,
-        ).bind(`production_date:${String(claim.production_date ?? "")}:review_item_replacement`, replacementSelectionId, brand.brand_key),
-      );
-    } else {
-      statements.push(
-        env.DB.prepare(
-          `UPDATE operator_daily_source_claims
-           SET source_card_id = ?, generation_run_id = ?, draft_id = ?, scheduled_post_id = ?, status = ?
-           WHERE id = ?`,
-        ).bind(
-          requestedSourceCardId,
-          requestedGenerationRunId,
-          draftId,
-          draft.scheduled_post_id ?? null,
-          nextClaimStatus,
-          String(claim.id),
-        ),
-      );
-    }
-    await env.DB.batch(statements);
-    const unresolvedAfterAttach = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM operator_daily_source_claims
-       WHERE review_batch_id = ?
-         AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
-    ).bind(reviewBatchId).first<{ total: number }>();
-    await env.DB.prepare(`UPDATE operator_review_batches SET status = ? WHERE id = ?`)
-      .bind(Number(unresolvedAfterAttach?.total ?? 0) === 0 ? "completed" : "owner_review", reviewBatchId).run();
-    return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, reviewBatchId)) ?? {});
+          input.brandKey,
+          input.productionDate,
+          input.sourceIdentityKey,
+          input.excludeClaimId,
+        ).first<{ id: string }>();
+        return row?.id ?? null;
+      },
+      applyAttachment: async (input) => {
+        const statements = [];
+        if (input.replacingSource) {
+          statements.push(
+            env.DB.prepare(
+              `UPDATE operator_daily_source_claims
+               SET source_identity_key = ?,
+                   source_type = ?,
+                   internal_source_id = ?,
+                   source_batch_id = ?,
+                   source_selection_id = ?,
+                   source_card_id = ?,
+                   generation_run_id = ?,
+                   draft_id = ?,
+                   scheduled_post_id = ?,
+                   status = ?,
+                   disposition_reason = NULL
+               WHERE id = ?`,
+            ).bind(
+              input.sourceIdentityKey,
+              input.sourceType,
+              input.internalSourceId,
+              input.sourceBatchId,
+              input.sourceSelectionId,
+              input.sourceCardId,
+              input.generationRunId,
+              input.draftId,
+              input.scheduledPostId,
+              input.claimStatus,
+              input.claimId,
+            ),
+            env.DB.prepare(
+              `UPDATE operator_source_selections
+               SET disposition = 'claimed',
+                   disposition_reason = ?,
+                   disposition_at = CURRENT_TIMESTAMP
+               WHERE id = ?
+                 AND brand_key = ?`,
+            ).bind(
+              `production_date:${input.productionDate}:review_item_replacement`,
+              input.sourceSelectionId,
+              input.brandKey,
+            ),
+          );
+        } else {
+          statements.push(
+            env.DB.prepare(
+              `UPDATE operator_daily_source_claims
+               SET source_card_id = ?, generation_run_id = ?, draft_id = ?, scheduled_post_id = ?, status = ?
+               WHERE id = ?`,
+            ).bind(
+              input.sourceCardId,
+              input.generationRunId,
+              input.draftId,
+              input.scheduledPostId,
+              input.claimStatus,
+              input.claimId,
+            ),
+          );
+        }
+        await env.DB.batch(statements);
+      },
+      countUnresolved: async (reviewBatchId) => {
+        const row = await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM operator_daily_source_claims
+           WHERE review_batch_id = ?
+             AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
+        ).bind(reviewBatchId).first<{ total: number }>();
+        return Number(row?.total ?? 0);
+      },
+      updateReviewBatchStatus: async (reviewBatchId, status) => env.DB.prepare(
+        `UPDATE operator_review_batches SET status = ? WHERE id = ?`,
+      ).bind(status, reviewBatchId).run(),
+      serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
+    });
+    return operatorJsonResponse(attachment.body, attachment.status);
   }
 
 
