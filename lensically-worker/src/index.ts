@@ -12109,13 +12109,15 @@ async function persistManifestAutonomousPost(
       env.DB,
       input as Parameters<typeof linkManifestHypothesisResult>[1],
     ),
-    extractOpeningPhrase,
+        extractOpeningPhrase: (text) => extractOpeningPhrase(text) ?? "",
+
     listHardBans: (brandKey) => listManifestHardBans(env.DB, brandKey),
     runGateSuite: (input) => runOperatorGates(env, {
       brand,
       sourceCardId: normalizeOperatorText(input.sourceCardId, 160, true),
       draftText: normalizeOperatorText(input.draftText, 20000, true) ?? "",
-      stageScope: String(input.stageScope ?? "gate_evaluation"),
+            stageScope: "gate_evaluation",
+
       laneKey: normalizeOperatorText(input.laneKey, 160, true),
       contentType: normalizeOperatorText(input.contentType, 160, true),
       draftAnalysis: input.draftAnalysis as Parameters<typeof runOperatorGates>[1]["draftAnalysis"],
