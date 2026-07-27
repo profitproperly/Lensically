@@ -17252,6 +17252,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 
 
+const OPERATOR_MCP_ACCOUNT_TOOLS: OperatorMcpToolDefinition[] = [
+  ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
+  ...OPERATOR_MCP_SOURCE_DRAFT_TOOLS,
+  ...OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS,
+  ...OPERATOR_MCP_MANIFEST_CYCLE_TOOLS,
+  ...OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS,
+  ...OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS,
+];
+
 const OPERATOR_MCP_ADMIN_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES as readonly string[]);
 const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES as readonly string[]);
 
@@ -17309,14 +17318,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     return buildOperatorMcpToolDefinitions({
             engineeringTools: OPERATOR_MCP_ENGINEERING_TOOLS,
             adminTools: OPERATOR_MCP_ADMIN_TOOLS,
-            accountTools: [
-            ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
-            ...OPERATOR_MCP_SOURCE_DRAFT_TOOLS,
-            ...OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS,
-            ...OPERATOR_MCP_MANIFEST_CYCLE_TOOLS,
-      ...OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS,
-      ...OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS,
-    ],
+                        accountTools: OPERATOR_MCP_ACCOUNT_TOOLS,
     includeScopedWrappers,
     directPriorities: directPriority,
     requiresProceed: operatorMcpToolNameRequiresProceed,
@@ -20855,7 +20857,7 @@ function operatorMcpToolNameRequiresProceed(toolName: string): boolean {
   if (toolName.startsWith("mm_") || toolName.startsWith("om_") || toolName.startsWith("vx_")) {
     return true;
   }
-  if (OPERATOR_MCP_TOOLS.some((tool) => tool.name === toolName && toolName !== "list_accounts")) {
+    if (OPERATOR_MCP_ACCOUNT_TOOLS.some((tool) => tool.name === toolName && toolName !== "list_accounts")) {
     return true;
   }
   return ACCOUNT_SCOPED_MCP_ADMIN_TOOLS.has(toolName);
@@ -21918,8 +21920,8 @@ async function handleOperatorMcpAdminTool(
       { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
       { name: "session_handshake_tools_registered", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
-      { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
-      { name: "schedule_requires_approved", passed: OPERATOR_MCP_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
+            { name: "mark_draft_shown_requires_showable", passed: OPERATOR_MCP_ACCOUNT_TOOLS.some((tool) => tool.name === "mark_draft_shown" && tool.description.includes("showable=true")) },
+      { name: "schedule_requires_approved", passed: OPERATOR_MCP_ACCOUNT_TOOLS.some((tool) => tool.name === "schedule_approved_draft" && tool.description.toLowerCase().includes("approved")) },
             { name: "static_router_active", passed: OPERATOR_REGISTRY_GENERATION === "static-execution-router-v2" },
       { name: "complete_capability_campaign_passed", passed: campaignFailures.length === 0 },
       { name: "live_read_capability_campaign_passed", passed: liveReadFailures.length === 0 },
