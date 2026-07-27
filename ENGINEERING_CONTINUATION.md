@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 72f0363a340bce21ba2e0cb7c5379a7530c9d356
-production_sha: 72f0363a340bce21ba2e0cb7c5379a7530c9d356
+repository_base_sha: bb39b0ca018e4305231ba92649572430db58302b
+production_sha: bb39b0ca018e4305231ba92649572430db58302b
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -504,22 +504,34 @@ Completed checkpoint — Stage 5D4 MCP registry-composition extraction:
 - Exact-SHA release passed in run `30275457127`.
 - Live production independently confirmed exact SHA `72f0363a340bce21ba2e0cb7c5379a7530c9d356` with 75/75 public tools.
 
-Current sub-action — Stage 5E MCP routing-policy extraction:
+Completed checkpoint — Stage 5E MCP routing-policy extraction:
 
-Extract pure MCP call-policy logic from `src/index.ts` into a focused module:
+- Added `src/operatorMcpRoutingPolicy.ts` as the pure authority for scoped wrapper canonicalization, account injection, direct `brand_key` normalization through injected dependencies, autonomous Proceed exemptions, per-tool Proceed decisions, Proceed confirmation, nested wrapper canonicalization, execution metadata stripping, autonomy tool aliases, and engineering/admin/account handler classification.
+- Replaced local routing decisions in `src/index.ts` with one configured `OPERATOR_MCP_ROUTING_POLICY` while preserving execution guards, continuity storage, database pre-call routing, autonomy authorization, and business handlers in the monolith.
+- Preserved scoped `mm_`, `om_`, and `vx_` behavior, legacy account aliases, `updateWorkflowRequirement` brand-sensitive Proceed handling, autonomous Manifest exemptions, `runApprovedPostCanary` autonomy mapping, canonical execution fingerprints, and final handler dispatch.
+- Added `test/operatorMcpRoutingPolicy.spec.ts` covering scoped calls, alias precedence, direct brand normalization, guided Proceed requirements, autonomous exemptions, nested wrapper unwrapping, metadata stripping, autonomy names, and handler classification.
+- Added release-preflight enforcement preventing routing policy from returning to `index.ts` and requiring focused tests in both push and exact-release gates.
+- Push validation passed in run `30277855981`.
+- All eight Operator shards passed in run `30278100066`.
+- Exact-SHA release passed in run `30278227698`.
+- Live production independently confirmed exact SHA `bb39b0ca018e4305231ba92649572430db58302b` with 75/75 public tools.
 
-- scoped wrapper brand resolution and canonical direct-tool naming
-- direct typed `brand_key` normalization through an injected normalizer
-- Manifest autonomous Proceed exemptions
-- per-tool Proceed requirement and confirmation evaluation
-- handler classification and route-selection helpers that do not execute business/domain logic
+Current sub-action — Stage 5F MCP transport and error-shaping extraction:
 
-Preserve exact guided-workflow handshake behavior, autonomous cycle exemptions, `updateWorkflowRequirement` brand-sensitive behavior, admin/engineering/account routing, scoped wrapper aliases, public names, protocol errors, and all 75 tools. Add focused tests and release-preflight enforcement before exact-SHA release.
+Extract pure MCP response construction from `src/index.ts` into a focused module:
+
+- JSON transport responses and shared response headers
+- JSON-RPC success envelopes
+- JSON-RPC error envelopes and optional structured error data
+- standard direct-tool success/failure text content construction
+- unsupported-method, invalid-tool, boundary-block, and internal-error result shaping that does not perform routing or domain execution
+
+Preserve exact status codes, JSON-RPC IDs, `structuredContent`, text content, `isError`, CORS/cache headers, tool failure language, required-next-action closure text, and existing client compatibility. Add focused tests and release-preflight enforcement before exact-SHA release.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract protocol error shaping and MCP transport response helpers.
 - Extract the remaining protocol request/response dispatcher shell.
+- Run the Stage 5 completion audit proving protocol, registries, directory, routing policy, transport, and dispatcher composition no longer live as monolithic implementations in `src/index.ts`.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
 ## Remaining
