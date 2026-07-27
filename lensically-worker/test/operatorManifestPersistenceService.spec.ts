@@ -347,8 +347,9 @@ describe("operatorManifestPersistenceService", () => {
     expect(harness.mocks.persistLineageRecords).toHaveBeenCalledWith(expect.objectContaining({
       runId: `autonomous-run-${"a".repeat(32)}`,
       draftId: `autonomous-draft-${"a".repeat(32)}`,
-      inventoryId: `autonomous-inventory-${"a".repeat(32)}`,
+            inventoryId: `autonomous-inventory-${"a".repeat(32)}`,
       scheduledPostId: 91,
+      slotKey: "2026-07-27T19:00",
     }));
     expect(harness.mocks.updateCycleAfterPersist).toHaveBeenCalledWith(expect.objectContaining({
       status: "partially_committed",

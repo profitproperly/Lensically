@@ -458,12 +458,13 @@ export async function persistOperatorManifestCandidate(
   const firstLine = text.split(/\n/)[0]?.trim().slice(0, 500) ?? "";
   const openingPhrase = dependencies.extractOpeningPhrase(text);
   const realmEntranceKey = dependencies.inferRealmEntranceKey(openingPhrase);
-  await dependencies.persistLineageRecords({
+    await dependencies.persistLineageRecords({
     brandKey,
     accountId,
     threadsUserId,
     operationId,
     cycleId,
+    slotKey,
     requestedCycleStrategyId,
     requestedCyclePlanItemId,
     post,
