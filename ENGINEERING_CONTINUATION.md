@@ -5,8 +5,8 @@ updated_at: 2026-07-26
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 1882efa90b462aee2294f2364da2907208f96971
-production_sha: 1882efa90b462aee2294f2364da2907208f96971
+repository_base_sha: 6d5b49ab770c04668821f5df660b443f4242bb86
+production_sha: 6d5b49ab770c04668821f5df660b443f4242bb86
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -480,22 +480,34 @@ Completed checkpoint — Stage 5D3E autonomous cycle execution registry extracti
 - Exact-SHA release passed in run `30231534921`.
 - Live production independently confirmed exact SHA `1882efa90b462aee2294f2364da2907208f96971` with 75/75 public tools.
 
-Current sub-action — Stage 5D3F final account analytics registry extraction:
+Completed checkpoint — Stage 5D3F final account analytics registry extraction:
 
-Move the final exact contiguous five-tool account registry tail from `src/index.ts` into a focused ordered registry module:
+- Added `src/operatorMcpAccountAnalyticsRegistry.ts` with the final ordered five-tool post-results, monthly-growth, performance-learning, intelligence-audit, and Content Focus registry tail.
+- Switched runtime composition to the extracted registry and physically removed the last static account definition array from `src/index.ts`.
+- Added `test/operatorMcpAccountAnalyticsRegistry.spec.ts` covering exact order, compact post verification, bounded monthly growth without post-level follower attribution, maturity-normalized learning, intelligence-audit pagination, and persisted Content Focus reads.
+- Added a permanent release-preflight assertion forbidding `OPERATOR_MCP_TOOLS` or any static account tool definitions from returning to `index.ts`.
+- Replaced the three remaining legacy-array consumers with one deterministic composed account-tool list built entirely from extracted registries.
+- Push validation passed in run `30232176051` after the composed-list repair.
+- All eight Operator shards passed in run `30232283409`.
+- Exact-SHA release passed in run `30232328715`.
+- Live production independently confirmed exact SHA `6d5b49ab770c04668821f5df660b443f4242bb86` with 75/75 public tools.
 
-- `get_post_results`
-- `get_monthly_growth_review`
-- `get_performance_learning`
-- `get_manifest_intelligence_audit`
-- `get_content_focus`
+Current sub-action — Stage 5D4 MCP registry-composition extraction:
 
-Preserve exact declaration order, compact post-result verification, date-bounded follower trajectory without post-level attribution, maturity-normalized learning evidence, bounded intelligence-audit pagination, persisted Content Focus reads, admin classification of monthly growth review, public filtering, scoped wrappers, and the exact 75-tool surface. Add focused tests and release-preflight enforcement, then prove that no static account registry definitions remain in `src/index.ts`.
+Move the remaining pure registry-composition policy from `src/index.ts` into a focused module:
+
+- deterministic aggregation of all extracted account registries
+- admin and engineering classification sets and type guards
+- account-tool membership classification
+- direct tool-priority ordering
+- scoped-wrapper/base registry construction through `buildOperatorMcpToolDefinitions`
+
+Preserve exact tool ordering, the intentional admin classification of `get_monthly_growth_review`, Proceed classification, wrapper generation, annotations, public filtering, definition lookup, and the exact 75-tool surface. Keep `assertClientSafetyRegistry` at the runtime boundary or inject it explicitly; do not move business execution. Add focused tests and release-preflight enforcement preventing composition policy from returning to `index.ts`.
 
 Remaining Stage 5 work after this checkpoint:
 
-- Extract MCP registry composition priorities and classification sets.
-- Extract MCP call routing, protocol error shaping, and transport response helpers.
+- Extract MCP call routing and Proceed/brand resolution policy.
+- Extract protocol error shaping and transport response helpers.
 - Leave business/domain tool execution for Stage 6 product-service extraction.
 
 ## Remaining
