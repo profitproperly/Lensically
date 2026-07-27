@@ -585,10 +585,10 @@ if (!source.includes('from "./operatorManifestCycleService"')
     || !source.includes("handleOperatorManifestCycleServiceTool({")) {
   lifecycleErrors.push("operator_manifest_cycle_service_import_or_binding_missing");
 }
-if (source.includes('if (toolName === "get_manifest_cycle_analysis_page")')
-    || source.includes('if (toolName === "commit_manifest_cycle_strategy")')
-    || source.includes('if (toolName === "record_manifest_cycle_defect")')
-    || source.includes('if (toolName === "resolve_manifest_cycle_defect")')) {
+if (source.includes("readManifestEvidencePage(env.DB")
+    || source.includes("validateLineupAgainstLockedSourceSelectionPlan(env.DB")
+    || source.includes('"manifest_cycle_receipt_not_found"')
+    || source.includes('completion_trigger: "last_blocking_defect_resolved"')) {
   lifecycleErrors.push("operator_manifest_cycle_service_returned_to_index");
 }
 if (!operatorManifestCycleService.includes("export const OPERATOR_MANIFEST_CYCLE_SERVICE_TOOL_NAMES")
