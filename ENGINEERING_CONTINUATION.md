@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: c65aa66976d6f0ab39c50d39d478612e07fccb5d
-production_sha: c65aa66976d6f0ab39c50d39d478612e07fccb5d
+repository_base_sha: d163422607a4d390efb3af50d0aa959bab60e1c2
+production_sha: d163422607a4d390efb3af50d0aa959bab60e1c2
 
 
 
@@ -677,22 +677,35 @@ Completed checkpoint — Stage 6I Manifest review-batch retirement service extra
 - Exact-SHA release passed in run `30309840321`.
 - Live production independently confirmed exact SHA `c65aa66976d6f0ab39c50d39d478612e07fccb5d` with 75/75 public tools.
 
-Current sub-action — Stage 6J Manifest review-batch state read service extraction:
+Completed checkpoint — Stage 6J Manifest review-batch state read service extraction:
 
-Extract `get_manifest_review_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestReviewBatchStateService.ts` as the dependency-injected read authority for workflow readiness, Manifest-only admission, explicit or date-scoped active batch lookup, autonomous-cycle continuation guidance, active-batch serialization, and exact status responses.
+- Reduced `get_manifest_review_batch` in `src/index.ts` to explicit workflow-table, review-batch SQL, autonomous-cycle SQL, and serializer adapters with no review, source, draft, scheduling, or cycle mutation.
+- Added `test/operatorManifestReviewBatchStateService.spec.ts` and permanent push/release ownership gates.
+- Corrected initially guessed ownership markers to source-verified adapter, service, legacy, and test identifiers before release.
+- Push validation passed in run `30311156229`.
+- All eight Operator shards passed in run `30311368731`.
+- Exact-SHA release passed in run `30311456370`.
+- Live production independently confirmed exact SHA `d163422607a4d390efb3af50d0aa959bab60e1c2` with 75/75 public tools.
 
-- workflow-table readiness and Manifest-only admission
-- explicit batch identity or latest active batch lookup, optionally scoped to production date
-- no-active-review response, normal-work unblocked state, and prepared autonomous-cycle continuation guidance
-- exact autonomous-cycle summary fields and required tool/route wording
-- serialized active batch response and exact 404 behavior when an identified batch is absent
-- read-only behavior with no review, source, draft, scheduling, or cycle mutation
+Current sub-action — Stage 6K Manifest review-draft attachment service extraction:
 
-Keep workflow-table setup, review-batch SQL, autonomous-cycle SQL, serializer, text normalization, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `attach_manifest_review_draft` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- review batch, item number, draft identity, and showable/passing draft admission
+- exact source-card and generation-run lineage matching
+- claimed review item lookup and source-card selection authority
+- same-source attachment versus same-day replacement behavior
+- replacement requires a previously skipped/deleted source and rejects duplicate daily claims
+- deterministic next claim status from draft state
+- atomic claim/source-selection updates, unresolved-count batch status, and serialized response
+- exact 400, 404, and 409 errors with no partial mutation on rejected inputs
+
+Keep draft reads, claim/replacement SQL, duplicate lookup, atomic D1 batch writes, unresolved counting, review-batch status writes, serializer, normalization, constants, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6J, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6K, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
