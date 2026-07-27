@@ -109,6 +109,7 @@ import { readOperatorLensicallyUiSurface } from "./operatorLensicallyUiSurfaceSe
 import { retireOperatorManifestReviewBatch } from "./operatorManifestReviewBatchRetirementService";
 import { readOperatorManifestReviewBatchState } from "./operatorManifestReviewBatchStateService";
 import { attachOperatorManifestReviewDraft } from "./operatorManifestReviewDraftAttachmentService";
+import { resolveOperatorManifestReviewSource } from "./operatorManifestReviewSourceResolutionService";
 
 
 
@@ -13048,49 +13049,53 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-  if (toolName === "skip_manifest_review_source") {
-    const reviewBatchId = normalizeOperatorText(payload.review_batch_id, 120);
-    const itemNumber = Math.trunc(Number(payload.item_number));
-    const scope = normalizeOperatorMachineKey(payload.scope, "current_day");
-    const reason = normalizeOperatorText(payload.reason, 2000, true) ?? "Owner rejected source for production use.";
-    const claim = await env.DB.prepare(
-      `SELECT * FROM operator_daily_source_claims
-       WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
-    ).bind(reviewBatchId, itemNumber, brand.brand_key).first<Record<string, unknown>>();
-        if (!claim) return operatorJsonResponse({ success: false, error: "review_batch_item_not_found" }, 404);
-    const resolvedReviewBatchId = String(claim.review_batch_id ?? reviewBatchId);
-    if (scope === "delete_source") {
-      if (claim.source_type !== "saved_pattern") {
-        return operatorJsonResponse({ success: false, error: "only_saved_patterns_can_be_deleted_as_sources" }, 400);
-      }
-      await env.DB.prepare(
+    if (toolName === "skip_manifest_review_source") {
+    const resolution = await resolveOperatorManifestReviewSource({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      createId: () => crypto.randomUUID(),
+      getClaim: (reviewBatchId, itemNumber, brandKey) => env.DB.prepare(
+        `SELECT * FROM operator_daily_source_claims
+         WHERE review_batch_id = ? AND review_item_number = ? AND brand_key = ? LIMIT 1`,
+      ).bind(reviewBatchId, itemNumber, brandKey).first<Record<string, unknown>>(),
+      upsertSourceExclusion: async (input) => env.DB.prepare(
         `INSERT INTO operator_source_exclusions (
           id, brand_key, source_identity_key, source_type, internal_source_id, reason, active
         ) VALUES (?, ?, ?, ?, ?, ?, 1)
         ON CONFLICT(brand_key, source_identity_key) DO UPDATE SET
           active = 1, reason = excluded.reason, updated_at = CURRENT_TIMESTAMP`,
       ).bind(
-        crypto.randomUUID(), brand.brand_key, claim.source_identity_key, claim.source_type,
-        claim.internal_source_id, reason,
-      ).run();
-    }
-    const nextStatus = scope === "delete_source" ? "source_deleted" : "source_skipped";
-    await env.DB.prepare(
-      `UPDATE operator_daily_source_claims SET status = ?, disposition_reason = ? WHERE id = ?`,
-    ).bind(nextStatus, reason, claim.id).run();
-    await env.DB.prepare(
-      `UPDATE operator_source_selections
-       SET disposition = 'skipped', disposition_reason = ?, disposition_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND brand_key = ?`,
-    ).bind(nextStatus, claim.source_selection_id, brand.brand_key).run();
-        const unresolved = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM operator_daily_source_claims
-       WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
-    ).bind(resolvedReviewBatchId).first<{ total: number }>();
-    await env.DB.prepare(
-      `UPDATE operator_review_batches SET status = ? WHERE id = ?`,
-    ).bind(Number(unresolved?.total ?? 0) === 0 ? "completed" : "partially_resolved", resolvedReviewBatchId).run();
-    return operatorJsonResponse((await serializeManifestReviewBatch(env, brand, resolvedReviewBatchId)) ?? {});
+        input.id,
+        input.brandKey,
+        input.sourceIdentityKey,
+        input.sourceType,
+        input.internalSourceId,
+        input.reason,
+      ).run(),
+      updateClaim: async (input) => env.DB.prepare(
+        `UPDATE operator_daily_source_claims SET status = ?, disposition_reason = ? WHERE id = ?`,
+      ).bind(input.status, input.reason, input.claimId).run(),
+      updateSourceSelection: async (input) => env.DB.prepare(
+        `UPDATE operator_source_selections
+         SET disposition = 'skipped', disposition_reason = ?, disposition_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND brand_key = ?`,
+      ).bind(input.dispositionReason, input.sourceSelectionId, input.brandKey).run(),
+      countUnresolved: async (reviewBatchId) => {
+        const row = await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM operator_daily_source_claims
+           WHERE review_batch_id = ? AND status NOT IN ('scheduled', 'published', 'source_skipped', 'source_deleted')`,
+        ).bind(reviewBatchId).first<{ total: number }>();
+        return Number(row?.total ?? 0);
+      },
+      updateReviewBatchStatus: async (reviewBatchId, status) => env.DB.prepare(
+        `UPDATE operator_review_batches SET status = ? WHERE id = ?`,
+      ).bind(status, reviewBatchId).run(),
+      serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
+    });
+    return operatorJsonResponse(resolution.body, resolution.status);
   }
 
   if (toolName === "schedule_manifest_review_batch") {
